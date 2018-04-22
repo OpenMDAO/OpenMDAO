@@ -56,8 +56,8 @@ class DOEDriver(Driver):
 
     Options
     -------
-    options['run_parallel'] :  bool
-        If True and running under MPI, cases will run in parallel. Default is False.
+    options['parallel'] :  bool
+        True or number of cases to run in parallel.. Default is False.
 
     Attributes
     ----------
@@ -91,8 +91,8 @@ class DOEDriver(Driver):
         self._generator = generator
         self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
 
-        self.options.declare('run_parallel', default=False,
-                             desc='Set to True to run the cases in parallel.')
+        self.options.declare('parallel', default=False,
+                             desc='True or number of cases to run in parallel.')
 
     def _get_name(self):
         """
@@ -114,9 +114,12 @@ class DOEDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        if MPI and self.options['run_parallel']:
+        parallel = self.options['parallel']
+        if MPI and parallel:
             comm = self._comm = problem.comm
-            color = self._color = comm.rank % comm.size
+
+            size = comm.size//parallel
+            color = self._color = comm.rank % size
 
             problem.model.comm = comm.Split(color)
             problem.model.resetup('full')
@@ -191,7 +194,7 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._comm.size
+        size = self._comm.size//self.options['parallel']
         color = self._color
 
         for i, case in enumerate(self._generator(design_vars)):

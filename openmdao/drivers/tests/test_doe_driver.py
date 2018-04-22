@@ -20,6 +20,8 @@ from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGener
     PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.groups.parallel_groups import FanInGrouped
+
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -493,7 +495,7 @@ class TestDOEDriver(unittest.TestCase):
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestParallelDOE(unittest.TestCase):
 
-    N_PROCS = 2
+    N_PROCS = 4
 
     def setUp(self):
         self.startdir = os.getcwd()
@@ -520,8 +522,8 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql", all_procs=True))
-        prob.driver.options['run_parallel'] =  True
+        prob.driver.add_recorder(SqliteRecorder("CASES.db", all_procs=True))
+        prob.driver.options['parallel'] =  True
 
         prob.setup(vector_class=PETScVector)
         prob.run_driver()
@@ -541,12 +543,16 @@ class TestParallelDOE(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        rank = prob.comm.rank
         size = prob.comm.size
-        filename = "CASES.sql_%d" % rank
+        rank = prob.comm.rank
+
+        # cases will be split across files for each proc
+        filename = "CASES.db_%d" % rank
         cases = CaseReader(filename).driver_cases
 
-        self.assertEqual(cases.num_cases, len(expected)//size+(rank<len(expected)%size))
+        # cases recorded on this proc
+        num_cases = cases.num_cases
+        self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
         for n in range(cases.num_cases):
             case = cases.get_case(n)
@@ -563,6 +569,80 @@ class TestParallelDOE(unittest.TestCase):
             self.assertEqual(cases.get_case(n).desvars['x'], expected[n*size+rank]['x'])
             self.assertEqual(cases.get_case(n).desvars['y'], expected[n*size+rank]['y'])
             self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n*size+rank]['f_xy'])
+
+        # total number of cases recorded across all procs
+        num_cases = prob.comm.allgather(num_cases)
+        self.assertEqual(sum(num_cases), len(expected))
+
+    def test_fan_in_grouped(self):
+        doe_parallel = 2
+
+        prob = Problem(FanInGrouped())
+        model = prob.model
+
+        model.add_design_var('iv.x1', lower=0.0, upper=1.0)
+        model.add_design_var('iv.x2', lower=0.0, upper=1.0)
+
+        model.add_objective('c3.y')
+
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db", all_procs=True))
+        prob.driver.options['parallel'] =  doe_parallel
+
+        prob.setup(vector_class=PETScVector, check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'iv.x1': np.array([0.]), 'iv.x2': np.array([0.]), 'c3.y': np.array([ 0.0])},
+            1: {'iv.x1': np.array([.5]), 'iv.x2': np.array([0.]), 'c3.y': np.array([-3.0])},
+            2: {'iv.x1': np.array([1.]), 'iv.x2': np.array([0.]), 'c3.y': np.array([-6.0])},
+
+            3: {'iv.x1': np.array([0.]), 'iv.x2': np.array([.5]), 'c3.y': np.array([17.5])},
+            4: {'iv.x1': np.array([.5]), 'iv.x2': np.array([.5]), 'c3.y': np.array([14.5])},
+            5: {'iv.x1': np.array([1.]), 'iv.x2': np.array([.5]), 'c3.y': np.array([11.5])},
+
+            6: {'iv.x1': np.array([0.]), 'iv.x2': np.array([1.]), 'c3.y': np.array([35.0])},
+            7: {'iv.x1': np.array([.5]), 'iv.x2': np.array([1.]), 'c3.y': np.array([32.0])},
+            8: {'iv.x1': np.array([1.]), 'iv.x2': np.array([1.]), 'c3.y': np.array([29.0])},
+        }
+
+        rank = prob.comm.rank
+        size = prob.comm.size//doe_parallel
+
+        num_cases = 0
+
+        # cases will be split across files for each proc up to the number requested
+        # there will be additional procs used by the model that we don't care about
+        if rank < doe_parallel:
+            filename = "CASES.db_%d" % rank
+            cases = CaseReader(filename).driver_cases
+
+            # cases recorded on this proc
+            num_cases = cases.num_cases
+            print('num_cases:', num_cases)
+            print('expected num_cases:', len(expected)//size+(rank<len(expected)%size))
+            self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
+
+            for n in range(cases.num_cases):
+                case = cases.get_case(n)
+                print('-----------')
+                print('filename:', case.filename)
+                print('counter:', case.counter)
+                print('iteration_coordinate:', case.iteration_coordinate)
+                print('timestamp:', case.timestamp)
+                print('success:', case.success)
+                print('msg:', case.msg)
+                print(cases.get_case(n).desvars['iv.x1'],
+                      cases.get_case(n).desvars['iv.x2'],
+                      cases.get_case(n).objectives['c3.y'])
+                self.assertEqual(cases.get_case(n).desvars['iv.x1'], expected[n*size+rank]['iv.x1'])
+                self.assertEqual(cases.get_case(n).desvars['iv.x2'], expected[n*size+rank]['iv.x2'])
+                self.assertEqual(cases.get_case(n).objectives['c3.y'], expected[n*size+rank]['c3.y'])
+
+        # total number of cases recorded across all requested procs
+        num_cases = prob.comm.allgather(num_cases)
+        self.assertEqual(sum(num_cases), len(expected))
 
 
 if __name__ == "__main__":
