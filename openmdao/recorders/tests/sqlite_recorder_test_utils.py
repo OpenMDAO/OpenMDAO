@@ -16,8 +16,7 @@ def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
         Expected can be from multiple cases.
     """
     # iterate through the cases
-    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, \
-            constraints_expected, inputs_expected in expected:
+    for coord, (t0, t1), outputs_expected, inputs_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
@@ -49,45 +48,25 @@ def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
         test.assertEqual(success, 1)
         test.assertEqual(msg, '')
 
-        desvars_actual = _get_vars_of_type('desvar', outputs_actual, abs2meta)
-        objectives_actual = _get_vars_of_type('objective', outputs_actual, abs2meta)
-        constraints_actual = _get_vars_of_type('constraint', outputs_actual, abs2meta)
-        responses_actual = _get_vars_of_type('response', outputs_actual, abs2meta)
-
         for vartype, actual, expected in (
-            ('desvars', desvars_actual, desvars_expected),
-            ('responses', responses_actual, responses_expected),
-            ('objectives', objectives_actual, objectives_expected),
-            ('constraints', constraints_actual, constraints_expected),
+            ('outputs', outputs_actual, outputs_expected),
             ('inputs', inputs_actual, inputs_expected)
         ):
 
             if expected is None:
                 test.assertEqual(actual, np.array(None, dtype=object))
             else:
+                actual = actual[0]
                 # Check to see if the number of values in actual and expected match
                 test.assertEqual(len(actual), len(expected))
                 for key, value in iteritems(expected):
                     # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual,
+                    test.assertTrue(key in actual.dtype.names,
                                     '{} variable not found in actual data'
                                     ' from recorder'.format(key))
                     # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[key][0], expected[key], tolerance)
+                    assert_rel_error(test, actual[key], expected[key], tolerance)
         return
-
-def _get_vars_of_type(var_type, outputs, abs2meta):
-    """
-        Gathers variables of a given type.
-    """
-    var_set = {}
-    for var in outputs.dtype.names:
-        if var_type in abs2meta[var]['type']:
-            var_set[var] = outputs[var]
-
-    if len(var_set) is 0:
-        return np.array(None, dtype=object)
-    return var_set
 
 def assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
     """
