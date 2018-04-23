@@ -1138,8 +1138,8 @@ class Problem(object):
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
-            ['lower', 'upper', 'equals', ref', 'ref0', 'indices', 'index', adder', 'scaler',
-            'linear', parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
             'cache_linear_solution']
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
