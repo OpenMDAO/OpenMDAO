@@ -242,7 +242,6 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
             self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
 
-    @unittest.skipIf(PY3, "There is a bug in this pyDOE algorithm under PY3.")
     def test_box_behnken(self):
         upper = 10.
         center = 1

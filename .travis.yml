@@ -87,7 +87,7 @@ install:
 - pip install git+https://github.com/OpenMDAO/testflo.git
 - pip install coverage
 - pip install git+https://github.com/swryan/coveralls-python@work
-- pip install .  # Not using -e on purpose here, to catch pkging errors
+- pip install . --process-dependency-links # Not using -e on purpose here, to catch pkging errors
 
 # do this after petsc install to avoid weird petsc install failure
 - conda install --yes matplotlib
