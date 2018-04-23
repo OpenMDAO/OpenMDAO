@@ -240,7 +240,7 @@ class Driver(object):
 
         Parameters
         ----------
-        MPI.Comm or <FakeComm> or None
+        comm : MPI.Comm or <FakeComm> or None
             The communicator for the Problem.
 
         Returns
