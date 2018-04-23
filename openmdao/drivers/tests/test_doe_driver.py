@@ -103,7 +103,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(UniformGenerator(num_samples=5, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -118,7 +118,7 @@ class TestDOEDriver(unittest.TestCase):
             4: {'x': np.array([ 9.27325521]), 'y': np.array([-2.33116962])},
         }
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, 5)
 
@@ -139,7 +139,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -159,7 +159,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, 9)
 
@@ -179,7 +179,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -197,7 +197,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'xy': np.array([ 50.,  50.])},
         }
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, 9)
 
@@ -218,7 +218,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(PlackettBurmanGenerator())
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -231,7 +231,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, 4)
 
@@ -261,13 +261,13 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('a')
 
         prob.driver = DOEDriver(BoxBehnkenGenerator(center=center))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
         # which 2 factors are varied thru the 4 possible combinations of high & low.
@@ -321,7 +321,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -349,7 +349,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([-0.72559325]), 'y': np.array([-2.27558409])},
         }
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, 4)
 
@@ -387,7 +387,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -415,7 +415,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'xy': np.array([-7.25593248, -11.37792043])},
         }
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, 4)
 
@@ -457,13 +457,13 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('comp.f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=samples, criterion='c'))
-        prob.driver.add_recorder(SqliteRecorder("CASES.sql"))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("CASES.sql").driver_cases
+        cases = CaseReader("CASES.db").driver_cases
 
         self.assertEqual(cases.num_cases, samples)
 

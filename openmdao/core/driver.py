@@ -249,8 +249,10 @@ class Driver(object):
         model = problem.model
 
         self._total_jac = None
+
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
+
         self._responses = model.get_responses(recurse=True)
         response_size = 0
         for name, data in iteritems(self._responses):
@@ -341,8 +343,10 @@ class Driver(object):
 
         mydesvars = myobjectives = myconstraints = myresponses = set()
         mysystem_outputs = set()
+
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
+
         rec_desvars = self.recording_options['record_desvars']
         rec_objectives = self.recording_options['record_objectives']
         rec_constraints = self.recording_options['record_constraints']
