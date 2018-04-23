@@ -82,14 +82,7 @@ class Case(object):
         dict
             Map of variables to their values.
         """
-        if self.outputs is None:
-            return {}
-
-        desvars = {}
-        for var in self.outputs._values.dtype.names:
-            if 'desvar' in self.meta[var]['type']:
-                desvars[var] = self.outputs._values[var]
-        return desvars
+        return self._get_variables_of_type('desvar')
 
     def get_objectives(self):
         """
@@ -100,14 +93,7 @@ class Case(object):
         dict
             Map of variables to their values.
         """
-        if self.outputs is None:
-            return {}
-
-        objectives = {}
-        for var in self.outputs._values.dtype.names:
-            if 'objective' in self.meta[var]['type']:
-                objectives[var] = self.outputs._values[var]
-        return objectives
+        return self._get_variables_of_type('objective')
 
     def get_constraints(self):
         """
@@ -118,14 +104,7 @@ class Case(object):
         dict
             Map of variables to their values.
         """
-        if self.outputs is None:
-            return {}
-
-        constraints = {}
-        for var in self.outputs._values.dtype.names:
-            if 'constraint' in self.meta[var]['type']:
-                constraints[var] = self.outputs._values[var]
-        return constraints
+        return self._get_variables_of_type('constraint')
 
     def get_responses(self):
         """
@@ -136,14 +115,25 @@ class Case(object):
         dict
             Map of variables to their values.
         """
+        return self._get_variables_of_type('response')
+
+    def _get_variables_of_type(self, var_type):
+        """
+        Get the variables of a given type and their values.
+
+        Returns
+        -------
+        dict
+            Map of variables to their values.
+        """
         if self.outputs is None:
             return {}
 
-        responses = {}
+        ret_vars = {}
         for var in self.outputs._values.dtype.names:
-            if 'response' in self.meta[var]['type']:
-                responses[var] = self.outputs._values[var]
-        return responses
+            if var_type in self.meta[var]['type']:
+                ret_vars[var] = self.outputs._values[var]
+        return ret_vars
 
 
 class DriverCase(Case):
