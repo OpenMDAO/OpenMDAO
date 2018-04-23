@@ -3,6 +3,8 @@ Test DOE Driver and Generators.
 """
 from __future__ import print_function, division
 
+from six import PY3
+
 import unittest
 
 import os
@@ -240,6 +242,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
             self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
 
+    @unittest.skipIf(PY3, "There is a bug in this pyDOE algorithm under PY3.")
     def test_box_behnken(self):
         upper = 10.
         center = 1
@@ -554,21 +557,12 @@ class TestParallelDOE(unittest.TestCase):
         num_cases = cases.num_cases
         self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
-        for n in range(cases.num_cases):
+        for n in range(num_cases):
             case = cases.get_case(n)
-            print('-----------')
-            print('filename:', case.filename)
-            print('counter:', case.counter)
-            print('iteration_coordinate:', case.iteration_coordinate)
-            print('timestamp:', case.timestamp)
-            print('success:', case.success)
-            print('msg:', case.msg)
-            print(cases.get_case(n).desvars['x'],
-                  cases.get_case(n).desvars['y'],
-                  cases.get_case(n).objectives['f_xy'])
-            self.assertEqual(cases.get_case(n).desvars['x'], expected[n*size+rank]['x'])
-            self.assertEqual(cases.get_case(n).desvars['y'], expected[n*size+rank]['y'])
-            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n*size+rank]['f_xy'])
+            idx = n * size + rank  # index of expected case
+            self.assertEqual(cases.get_case(n).desvars['x'], expected[idx]['x'])
+            self.assertEqual(cases.get_case(n).desvars['y'], expected[idx]['y'])
+            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[idx]['f_xy'])
 
         # total number of cases recorded across all procs
         num_cases = prob.comm.allgather(num_cases)
@@ -608,7 +602,7 @@ class TestParallelDOE(unittest.TestCase):
         }
 
         rank = prob.comm.rank
-        size = prob.comm.size//doe_parallel
+        size = prob.comm.size // doe_parallel
 
         num_cases = 0
 
@@ -620,25 +614,14 @@ class TestParallelDOE(unittest.TestCase):
 
             # cases recorded on this proc
             num_cases = cases.num_cases
-            print('num_cases:', num_cases)
-            print('expected num_cases:', len(expected)//size+(rank<len(expected)%size))
             self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
-            for n in range(cases.num_cases):
+            for n in range(num_cases):
                 case = cases.get_case(n)
-                print('-----------')
-                print('filename:', case.filename)
-                print('counter:', case.counter)
-                print('iteration_coordinate:', case.iteration_coordinate)
-                print('timestamp:', case.timestamp)
-                print('success:', case.success)
-                print('msg:', case.msg)
-                print(cases.get_case(n).desvars['iv.x1'],
-                      cases.get_case(n).desvars['iv.x2'],
-                      cases.get_case(n).objectives['c3.y'])
-                self.assertEqual(cases.get_case(n).desvars['iv.x1'], expected[n*size+rank]['iv.x1'])
-                self.assertEqual(cases.get_case(n).desvars['iv.x2'], expected[n*size+rank]['iv.x2'])
-                self.assertEqual(cases.get_case(n).objectives['c3.y'], expected[n*size+rank]['c3.y'])
+                idx = n * size + rank  # index of expected case
+                self.assertEqual(cases.get_case(n).desvars['iv.x1'], expected[idx]['iv.x1'])
+                self.assertEqual(cases.get_case(n).desvars['iv.x2'], expected[idx]['iv.x2'])
+                self.assertEqual(cases.get_case(n).objectives['c3.y'], expected[idx]['c3.y'])
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)

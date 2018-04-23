@@ -14,7 +14,7 @@ import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 
-from openmdao.utils.mpi import MPI, debug
+from openmdao.utils.mpi import MPI
 
 
 class DOEGenerator(object):
@@ -118,7 +118,7 @@ class DOEDriver(Driver):
         if MPI and parallel:
             comm = self._comm = problem.comm
 
-            size = comm.size//parallel
+            size = comm.size // parallel
             color = self._color = comm.rank % size
 
             problem.model.comm = comm.Split(color)
@@ -194,7 +194,7 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._comm.size//self.options['parallel']
+        size = self._comm.size // self.options['parallel']
         color = self._color
 
         for i, case in enumerate(self._generator(design_vars)):
@@ -227,8 +227,9 @@ class DOEDriver(Driver):
         else:
             con_vars = {}
 
-        if False:  # opts['record_responses']:  # not really working yet
-            res_vars = self.get_response_values(filt['res'])
+        if opts['record_responses']:
+            # res_vars = self.get_response_values(filt['res'])  # not really working yet
+            res_vars = {}
         else:
             res_vars = {}
 
@@ -248,5 +249,4 @@ class DOEDriver(Driver):
         data['con'] = con_vars
         data['sys'] = sys_vars
 
-        debug('recording:', data,  self._metadata)
         self._rec_mgr.record_iteration(self, data, self._metadata)

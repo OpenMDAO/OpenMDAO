@@ -88,11 +88,11 @@ class SqliteRecorder(BaseRecorder):
     _abs2meta : {'name': {}}
         Dictionary mapping absolute variable names to their metadata including units,
         bounds, and scaling.
-    _open_close_sqlite: bool
+    _open_close_sqlite : bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
-    _pickle_version: int
+    _pickle_version : int
         The pickle protocol version to use when pickling metadata.
-    _all_procs: bool
+    _all_procs : bool
         If True, write to a separate sqlite file on each processor.
     """
 
@@ -108,8 +108,8 @@ class SqliteRecorder(BaseRecorder):
             Optional. If True, append to an existing case recorder file.
         pickle_version : int
             Optional. The pickle protocol version to use when pickling metadata.
-        all_procs: bool
-            If True, write to a separate sqlite file on each processor.
+        all_procs : bool
+            If True, run on all procs and write to a separate file on each processor.
         """
         super(SqliteRecorder, self).__init__()
 

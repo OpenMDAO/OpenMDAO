@@ -727,24 +727,30 @@ class Driver(object):
         filt = self._filtered_vars_to_record
 
         if opts['record_desvars']:
-            des_vars = self.get_design_var_values(filt['des'])
+            des_vars = self.get_design_var_values()
         else:
             des_vars = {}
 
         if opts['record_objectives']:
-            obj_vars = self.get_objective_values(filt['obj'])
+            obj_vars = self.get_objective_values()
         else:
             obj_vars = {}
 
         if opts['record_constraints']:
-            con_vars = self.get_constraint_values(filt['con'])
+            con_vars = self.get_constraint_values()
         else:
             con_vars = {}
 
-        if False:  # opts['record_responses']:  # not really working yet
-            res_vars = self.get_response_values(filt['res'])
+        if opts['record_responses']:
+            # res_vars = self.get_response_values()  # not really working yet
+            res_vars = {}
         else:
             res_vars = {}
+
+        des_vars = {name: des_vars[name] for name in filt['des']}
+        obj_vars = {name: obj_vars[name] for name in filt['obj']}
+        con_vars = {name: con_vars[name] for name in filt['con']}
+        # res_vars = {name: res_vars[name] for name in filt['res']}
 
         model = self._problem.model
 
