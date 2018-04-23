@@ -90,11 +90,7 @@ setup(
         'mock',
         'requests_mock',
         'tornado',
-        'pyDOE>=0.3.9'
-    ],
-    dependency_links=[
-        # the version of pyDOE on pypi (0.3.8) is missing bug fixes for PY3
-        'https://github.com/swryan/pyDOE/tarball/master#egg=pyDOE-0.3.9'
+        'pyDOE2'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""

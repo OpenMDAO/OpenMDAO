@@ -1,5 +1,5 @@
 """
-Case generators for Design-of-Experiments Driver using pyDOE.
+Case generators for Design-of-Experiments Driver using pyDOE2.
 """
 
 from six import iteritems, itervalues
@@ -13,7 +13,7 @@ from six import iteritems, itervalues
 from collections import OrderedDict
 
 from openmdao.drivers.doe_driver import DOEGenerator
-import pyDOE
+import pyDOE2
 
 
 class UniformGenerator(DOEGenerator):
@@ -86,7 +86,7 @@ class UniformGenerator(DOEGenerator):
 
 class _pyDOE_Generator(DOEGenerator):
     """
-    Base class for DOE case generators implementing methods from pyDOE.
+    Base class for DOE case generators implementing methods from pyDOE2.
 
     Attributes
     ----------
@@ -206,7 +206,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE.fullfact([self._levels] * size)
+        return pyDOE2.fullfact([self._levels] * size)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):
@@ -234,7 +234,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        doe = pyDOE.pbdesign(size)
+        doe = pyDOE2.pbdesign(size)
 
         doe[doe < 0] = 0  # replace -1 with zero
 
@@ -282,14 +282,14 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
                                "but must be at least 3 when using %s. " %
                                (size, self.__class__.__name__))
 
-        doe = pyDOE.bbdesign(size, center=self._center)
+        doe = pyDOE2.bbdesign(size, center=self._center)
 
         return doe + 1  # replace [-1, 0, 1] with [0, 1, 2]
 
 
 class LatinHypercubeGenerator(DOEGenerator):
     """
-    DOE case generators implementing Latin hypercube method via pyDOE.
+    DOE case generators implementing Latin hypercube method via pyDOE2.
 
     Attributes
     ----------
@@ -372,9 +372,10 @@ class LatinHypercubeGenerator(DOEGenerator):
             self._samples = size
 
         # generate design
-        doe = pyDOE.lhs(size, samples=self._samples,
-                        criterion=self._criterion,
-                        iterations=self._iterations)
+        doe = pyDOE2.lhs(size, samples=self._samples,
+                         criterion=self._criterion,
+                         iterations=self._iterations,
+                         random_state=self._seed)
 
         self._num_samples = len(doe)
 
