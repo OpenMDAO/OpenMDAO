@@ -15,6 +15,7 @@ from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
+import openmdao.utils.coloring as coloring_mod
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -125,6 +126,8 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True,
                              desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -316,6 +319,12 @@ class ScipyOptimizeDriver(Driver):
             jac = self._gradfunc
         else:
             jac = None
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            coloring = coloring_mod.get_simul_meta(problem, mode=problem._mode, repeats=3,
+                                                   tol=1.e-15, include_sparsity=True, stream=None)
+            self.set_simul_deriv_color(coloring)
 
         # optimize
         try:

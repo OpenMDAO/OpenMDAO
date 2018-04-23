@@ -22,6 +22,7 @@ from pyoptsparse import Optimization
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.record_util import create_local_meta
+import openmdao.utils.coloring as coloring_mod
 
 
 # names of optimizers that use gradients
@@ -154,6 +155,8 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
@@ -228,6 +231,16 @@ class pyOptSparseDriver(Driver):
                 rec.abs = 0.0
                 rec.rel = 0.0
             self.iter_count += 1
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            self._total_jac = None
+            coloring = coloring_mod.get_simul_meta(problem, mode=problem._mode, repeats=3,
+                                                   tol=1.e-15, include_sparsity=True,
+                                                   setup=False, run_model=False, stream=None)
+            self.set_simul_deriv_color(coloring)
+            self._setup_simul_coloring(mode=problem._mode)
+            self._setup_tot_jac_sparsity()
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
