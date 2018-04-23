@@ -178,6 +178,23 @@ class SimulColoringTestCase(unittest.TestCase):
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
 
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_simul_coloring_snopt(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False,
+                          dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
+
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:
             from pyoptsparse import OPT
@@ -260,6 +277,32 @@ class SimulColoringTestCase(unittest.TestCase):
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
 
+    def test_dynamic_simul_coloring_pyoptsparse_slsqp(self):
+        try:
+            from pyoptsparse import OPT
+        except ImportError:
+            raise unittest.SkipTest("This test requires pyoptsparse.")
+
+        try:
+            OPT('SLSQP')
+        except:
+            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
+
+        p_color = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False,
+                          dynamic_simul_derivs=True)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
+
 
 class SimulColoringScipyTestCase(unittest.TestCase):
 
@@ -309,6 +352,22 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
+
+    def test_dynamic_simul_coloring(self):
+
+        # first, run w/o coloring
+        p = run_opt(ScipyOptimizeDriver, optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
     def test_simul_coloring_example(self):
 

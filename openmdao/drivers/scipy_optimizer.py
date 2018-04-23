@@ -128,6 +128,9 @@ class ScipyOptimizeDriver(Driver):
                              desc='Set to False to prevent printing of Scipy convergence messages')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -203,8 +206,9 @@ class ScipyOptimizeDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        problem = self._problem
         opt = self.options['optimizer']
-        model = self._problem.model
+        model = problem.model
         self.iter_count = 0
 
         # Initial Run
@@ -322,9 +326,13 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
-            coloring = coloring_mod.get_simul_meta(problem, mode=problem._mode, repeats=3,
-                                                   tol=1.e-15, include_sparsity=True, stream=None)
+            self._total_jac = None
+            repeats = self.options['dynamic_simul_derivs_repeats']
+            coloring = coloring_mod.get_simul_meta(problem, mode=problem._mode, repeats=repeats,
+                                                   tol=1.e-15, include_sparsity=True,
+                                                   setup=False, run_model=False, stream=None)
             self.set_simul_deriv_color(coloring)
+            self._setup_simul_coloring(mode=problem._mode)
 
         # optimize
         try:

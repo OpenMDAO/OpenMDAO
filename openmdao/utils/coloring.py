@@ -175,6 +175,10 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model
         Starting tolerance on values in jacobian.  Actual tolerance is computed based on
         consistent numbers of zero entries over a sweep of tolerances.  Anything smaller in
         magnitude than the computed tolerance will be set to 0.0.
+    setup : bool
+        If True, run setup before calling compute_totals.
+    run_model : bool
+        If True, run run_model before calling compute_totals.
 
     Returns
     -------
@@ -450,6 +454,10 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         If True, display a visualiation of the final total jacobian used to compute the coloring.
     stream : file-like or None
         Stream where output coloring info will be written.
+    setup : bool
+        If True, run setup before calling compute_totals.
+    run_model : bool
+        If True, run run_model before calling compute_totals.
 
     Returns
     -------
@@ -499,6 +507,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     include_sparsity : bool
         If True, include the sparsity structure of the total jacobian mapped to design vars
         and responses.  (This info is used by pyOptSparseDriver).
+    setup : bool
+        If True, run setup before calling compute_totals.
+    run_model : bool
+        If True, run run_model before calling compute_totals.
     stream : file-like or None
         Stream where output coloring info will be written.
 
