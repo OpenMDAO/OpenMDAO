@@ -65,6 +65,7 @@ class Case(object):
         self.outputs = None
         self.residuals = None
         self.meta = meta
+        self.prom2abs = prom2abs
 
         if inputs is not None and inputs.dtype.names:
             self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, False)
@@ -133,7 +134,7 @@ class Case(object):
         for var in self.outputs._values.dtype.names:
             if var_type in self.meta[var]['type']:
                 ret_vars[var] = self.outputs._values[var]
-        return ret_vars
+        return PromotedToAbsoluteMap(ret_vars, self.prom2abs)
 
 
 class DriverCase(Case):

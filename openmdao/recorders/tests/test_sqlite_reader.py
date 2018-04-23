@@ -237,7 +237,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
-        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.desvars['z'], [1.97846296,  -2.21388305e-13],
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'], [1.97846296,  -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -245,11 +245,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
-        np.testing.assert_almost_equal(last_case.desvars['z'], self.prob['z'],
+        np.testing.assert_almost_equal(last_case.outputs['z'], self.prob['z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['x'], [-0.00309521],
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -373,7 +373,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(cr.driver_metadata['connections_list']), 11)
         self.assertEqual(len(cr.driver_metadata['tree']), 4)
 
-    def test_reading_units(self):
+    def test_reading_metadata(self):
         self.setup_sellar_model_with_units()
         self.prob.driver.add_recorder(self.recorder)
 
@@ -389,9 +389,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.input2meta['d1.x']['units'], None)
         self.assertEqual(cr.input2meta['d1.y1']['units'], None)
         self.assertEqual(cr.input2meta['d1.y2']['units'], None)
-        self.assertEqual(cr.output2meta['x']['type'], 'Explicit')
-        self.assertEqual(cr.input2meta['obj_cmp.y1']['type'], 'Explicit')
-        self.assertEqual(cr.input2meta['obj_cmp.y2']['type'], 'Explicit')
+        self.assertEqual(cr.output2meta['x']['explicit'], True)
+        self.assertEqual(cr.output2meta['x']['type'], {'output', 'desvar'})
+        self.assertEqual(cr.input2meta['obj_cmp.y1']['explicit'], True)
+        self.assertEqual(cr.input2meta['obj_cmp.y2']['explicit'], True)
         self.assertEqual(cr.output2meta['x']['lower'], -1000)
         self.assertEqual(cr.output2meta['x']['upper'], 1000)
         self.assertEqual(cr.output2meta['y2']['upper'], None)
@@ -509,17 +510,17 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
-        np.testing.assert_almost_equal(last_case.desvars['z'],
+        np.testing.assert_almost_equal(last_case.outputs['z'],
                                        self.prob['pz.z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
-        np.testing.assert_almost_equal(last_case.desvars['x'],
+        np.testing.assert_almost_equal(last_case.outputs['x'],
                                        self.prob['px.x'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('px.x'))
-        np.testing.assert_almost_equal(last_case.sysincludes['y2'],
+        np.testing.assert_almost_equal(last_case.outputs['y2'],
                                        self.prob['mda.d2.y2'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
