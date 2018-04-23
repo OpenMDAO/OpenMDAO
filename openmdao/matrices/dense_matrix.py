@@ -1,6 +1,7 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
 import numpy as np
+from six import iteritems
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 
@@ -125,7 +126,7 @@ class DenseMatrix(Matrix):
         else:
             self._matrix[irows, icols] += val
 
-    def _prod(self, in_vec, mode, ranges):
+    def _prod(self, in_vec, mode, ranges, mask=None):
         """
         Perform a matrix vector product.
 
@@ -137,6 +138,8 @@ class DenseMatrix(Matrix):
             'fwd' or 'rev'.
         ranges : (int, int, int, int)
             Min row, max row, min col, max col for the current system.
+        mask : ndarray of type bool, or None
+            Array used to mask out part of the input vector.
 
         Returns
         -------
@@ -154,6 +157,50 @@ class DenseMatrix(Matrix):
             mat = self._matrix[rstart:rend, cstart:cend]
 
         if mode == 'fwd':
-            return mat.dot(in_vec)
+            if mask is None:
+                return mat.dot(in_vec)
+            else:
+                inputs_masked = np.ma.array(in_vec, mask=mask)
+
+                # Use the special dot product function from masking module so that we
+                # ignore masked parts.
+                return np.ma.dot(mat, inputs_masked)
         else:  # rev
-            return mat.T.dot(in_vec)
+            if mask is None:
+                return mat.T.dot(in_vec)
+            else:
+                # Mask need to be applied to ext_mtx so that we can ignore multiplication
+                # by certain columns.
+                mat_T = mat.T
+                arrmask = np.zeros(mat_T.shape, dtype=np.bool)
+                arrmask[mask, :] = True
+                masked_mtx = np.ma.array(mat_T, mask=arrmask, fill_value=0.0)
+
+                masked_product = np.ma.dot(masked_mtx, in_vec).flatten()
+                return np.ma.filled(masked_product, fill_value=0.0)
+
+    def _create_mask_cache(self, d_inputs):
+        """
+        Create masking array for this matrix.
+
+        Note: this only applies when this Matrix is an 'ext_mtx' inside of a
+        Jacobian object.
+
+        Parameters
+        ----------
+        d_inputs : Vector
+            The inputs linear vector.
+
+        Returns
+        -------
+        ndarray or None
+            The mask array or None.
+        """
+        if len(d_inputs._views) > len(d_inputs._names):
+            sub = d_inputs._names
+            mask = np.ones(len(d_inputs), dtype=np.bool)
+            for key, val in iteritems(self._metadata):
+                if key[1] in sub:
+                    mask[val[1]] = False
+
+            return mask
