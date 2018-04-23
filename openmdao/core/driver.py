@@ -234,6 +234,22 @@ class Driver(object):
         """
         self._rec_mgr.close()
 
+    def _setup_comm(self, comm):
+        """
+        Perform any driver-specific setup of communicators for the model.
+
+        Parameters
+        ----------
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem model.
+        """
+        return comm
+
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.

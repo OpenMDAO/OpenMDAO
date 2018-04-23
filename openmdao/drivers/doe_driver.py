@@ -105,28 +105,33 @@ class DOEDriver(Driver):
         """
         return self._name
 
-    def _setup_driver(self, problem):
+    def _setup_comm(self, comm):
         """
-        Prepare the driver for execution.
+        Perform any driver-specific setup of communicators for the model.
 
         Parameters
         ----------
-        problem : <Problem>
-            Pointer to the containing problem.
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem model.
         """
         parallel = self.options['parallel']
         if MPI and parallel:
-            comm = self._comm = problem.comm
+            self._comm = comm
 
             size = comm.size // parallel
             color = self._color = comm.rank % size
 
-            problem.model.comm = comm.Split(color)
-            problem.model.resetup('full')
+            model_comm = comm.Split(color)
         else:
             self._comm = None
+            model_comm = comm
 
-        super(DOEDriver, self)._setup_driver(problem)
+        return model_comm
 
     def run(self):
         """
