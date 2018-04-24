@@ -7,8 +7,6 @@ import sys
 import traceback
 import inspect
 
-from six import PY3
-
 import numpy as np
 
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -47,7 +45,7 @@ class DOEGenerator(object):
         list
             list of name, value tuples for the design variables.
         """
-        pass
+        yield from []
 
 
 class DOEDriver(Driver):
@@ -91,10 +89,10 @@ class DOEDriver(Driver):
 
         if generator is None:
             self._generator = DOEGenerator()
+            self._name = 'DOEDriver_None'
         else:
             self._generator = generator
-
-        self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
+            self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
 
         self.options.declare('parallel', default=False,
                              desc='True or number of cases to run in parallel. '

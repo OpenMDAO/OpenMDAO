@@ -92,6 +92,29 @@ class TestDOEDriver(unittest.TestCase):
         except OSError:
             pass
 
+    def test_no_generator(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        prob.driver = DOEDriver()
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cases = CaseReader("CASES.db").driver_cases
+
+        self.assertEqual(cases.num_cases, 0)
+
     def test_uniform(self):
         prob = Problem()
         model = prob.model
