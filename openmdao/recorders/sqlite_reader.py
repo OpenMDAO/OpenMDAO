@@ -89,8 +89,10 @@ class SqliteCaseReader(BaseCaseReader):
                 self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
         con.close()
 
-        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, True)
-        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, False)
+        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
+                                                 self._abs2prom, True)
+        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
+                                                self._abs2prom, False)
 
         self._load()
 
@@ -467,7 +469,7 @@ class SqliteCaseReader(BaseCaseReader):
         impl_outputs = []
         sys_vars = self._get_all_sysvars()
 
-        if case_id is None:
+        if case is None:
             sys_vars = self._get_all_sysvars()
         else:
             sys_vars = self._get_case_sysvars(case)

@@ -681,9 +681,10 @@ class TestSqliteCaseReader(unittest.TestCase):
             'd1.y1': {'lower': None, 'ref': 1.0, 'resids': [1.318e-10], 'shape': (1,), 'values': [25.5454859]}
         }
 
-        outputs_case = cr.list_outputs(1, True, True, True, True, None, True, True, True,
+        sys_case = cr.system_cases.get_case(1)
+        outputs_case = cr.list_outputs(sys_case, True, True, True, True, None, True, True, True,
                                        True, True, True)
-        
+
         for o in outputs_case:
             vals = o[1]
             name = o[0]
@@ -742,7 +743,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'd1.y2': {'value': [12.27257053]}
         }
 
-        inputs_case = cr.list_inputs(1, True, True, True, None)
+        sys_case = cr.system_cases.get_case(1)
+        inputs_case = cr.list_inputs(sys_case, True, True, True, None)
         
         for o in inputs_case:
             vals = o[1]

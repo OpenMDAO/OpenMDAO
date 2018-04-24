@@ -324,13 +324,16 @@ class PromotedToAbsoluteMap:
         self._is_output = output
         self._iteration_index = 0
 
-        var_names = list(self._values.keys()) if isinstance(self._values, dict)\
-            else self._values.dtype.names
-        io = 'output' if output else 'input'
-        self.keys = []
-        for n in var_names:
-            if n in self._abs2prom[io]:
-                self.keys.append(self._abs2prom[io][n])
+        if self._values is None:
+            self.keys = []
+        else:
+            var_names = list(self._values.keys()) if isinstance(self._values, dict)\
+                else self._values.dtype.names
+            io = 'output' if output else 'input'
+            self.keys = []
+            for n in var_names:
+                if n in self._abs2prom[io]:
+                    self.keys.append(self._abs2prom[io][n])
 
     def __getitem__(self, key):
         """
