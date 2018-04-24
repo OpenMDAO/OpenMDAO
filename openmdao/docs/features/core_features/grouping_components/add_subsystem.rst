@@ -22,7 +22,7 @@ Add a Component to a Group
 .. note::
 
     Group names must be Pythonic, so they can only contain alphanumeric characters plus the underscore. In addtion, the
-    first character in the group name needs to be a letter of the alphabet. Also, the system name should no duplicate
+    first character in the group name needs to be a letter of the alphabet. Also, the system name should not duplicate
     any method or attribute of the `System` API.
 
 Promote the input and output of a Component
