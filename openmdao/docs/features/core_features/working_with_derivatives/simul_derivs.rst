@@ -61,7 +61,7 @@ Driver.
     :noindex:
 
 
-While this has the advantage of removing the runtime cost of the computation of the coloring,
+While this has the advantage of removing the runtime cost of computing the coloring,
 it should be used with care, because any changes in the model, design variables, or responses
 can make the existing coloring invalid.  If *anything* about the optimization changes, it's recommended
 to always regenerate the coloring before re-running the optimization.

@@ -108,7 +108,7 @@ but the chance of having any incidental zero values is now very small. The likel
 computing the total-derivative Jacobian multiple times with different, random left-hand sides, and summing the absolute values of the
 resulting total-derivative Jacobians together.
 
-Hence the cost of the coloring algorithm increases with the cost of :math:`n` computations of the full total-derivative Jacobian.
+Hence the cost of the coloring algorithm increases by the cost of :math:`n` computations of the full total-derivative Jacobian.
 The larger you choose to make :math:`n`, the more reliable your coloring will be.
 If the model is intended to be used in an optimization context, then it is fair to assume that the total-derivative Jacobian is inexpensive enough to compute many times,
 and using a few additional computations to compute a coloring will not significantly impact the overall compute cost.
