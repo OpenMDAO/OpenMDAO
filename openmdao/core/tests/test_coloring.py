@@ -191,7 +191,8 @@ class SimulColoringTestCase(unittest.TestCase):
         # - coloring saves 16 solves per driver iter  (5 vs 21)
         # - initial solve for linear constraints takes 21 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
@@ -299,7 +300,8 @@ class SimulColoringTestCase(unittest.TestCase):
         # - coloring saves 16 solves per driver iter  (5 vs 21)
         # - initial solve for linear constraints takes 21 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
@@ -365,7 +367,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - coloring saves 16 solves per driver iter  (5 vs 21)
         # - initial solve for linear constraints takes 21 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
-        # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
