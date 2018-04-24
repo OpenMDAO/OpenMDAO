@@ -48,6 +48,9 @@ For example:
     prob.driver.options['dynamic_simul_derivs_repeats'] = 2
 
 
+Whenever a dynamic coloring is computed, the coloring is written to a file called *coloring.json*
+for later inspection.
+
 
 Static Coloring
 ===============

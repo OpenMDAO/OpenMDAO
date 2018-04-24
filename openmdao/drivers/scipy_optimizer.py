@@ -331,13 +331,7 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
-            self._total_jac = None
-            repeats = self.options['dynamic_simul_derivs_repeats']
-            coloring = coloring_mod.get_simul_meta(problem, mode=problem._mode, repeats=repeats,
-                                                   tol=1.e-15, include_sparsity=True,
-                                                   setup=False, run_model=False, stream=None)
-            self.set_simul_deriv_color(coloring)
-            self._setup_simul_coloring(mode=problem._mode)
+            coloring_mod.dynamic_simul_coloring(self)
 
         # optimize
         try:

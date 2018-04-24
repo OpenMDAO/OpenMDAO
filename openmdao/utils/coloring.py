@@ -601,6 +601,32 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
                      (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
 
+def dynamic_simul_coloring(driver, do_sparsity=False):
+    """
+    Compute simultaneous deriv coloring during runtime.
+
+    Parameters
+    ----------
+    driver : <Driver>
+        The driver performing the optimization.
+    do_sparsity : bool
+        If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
+    """
+    problem = driver._problem
+    driver._total_jac = None
+    repeats = driver.options['dynamic_simul_derivs_repeats']
+
+    # save the coloring.json file for later inspection
+    with open("coloring.json", "w") as f:
+        coloring = get_simul_meta(problem, mode=problem._mode, repeats=repeats,
+                                  tol=1.e-15, include_sparsity=True,
+                                  setup=False, run_model=False, stream=f)
+    driver.set_simul_deriv_color(coloring)
+    driver._setup_simul_coloring(mode=problem._mode)
+    if do_sparsity:
+        driver._setup_tot_jac_sparsity()
+
+
 def _simul_coloring_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao simul_coloring' command.
