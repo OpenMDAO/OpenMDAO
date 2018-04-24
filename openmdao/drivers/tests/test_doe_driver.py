@@ -92,12 +92,12 @@ class TestDOEDriver(unittest.TestCase):
         except OSError:
             pass
 
-    def test_uniform_generator(self):
+    def test_uniform(self):
         prob = Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', IndepVarComp('x', 0.), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         model.add_design_var('x', lower=-10, upper=10)
@@ -174,7 +174,7 @@ class TestDOEDriver(unittest.TestCase):
         prob = Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('xy', np.array([50., 50.])), promotes=['*'])
+        model.add_subsystem('p1', IndepVarComp('xy', np.array([0., 0.])), promotes=['*'])
         model.add_subsystem('comp', ParaboloidArray(), promotes=['*'])
 
         model.add_design_var('xy', lower=np.array([-50., -50.]), upper=np.array([50., 50.]))
@@ -625,6 +625,108 @@ class TestParallelDOE(unittest.TestCase):
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)
         self.assertEqual(sum(num_cases), len(expected))
+
+
+class TestDOEDriverFeature(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriverFeature-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    def test_uniform(self):
+        from openmdao.api import Problem, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        from openmdao.api import DOEDriver, UniformGenerator, SqliteRecorder, CaseReader
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 5.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 5.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_design_var('x', lower=-10, upper=10)
+        model.add_design_var('y', lower=-10, upper=10)
+        model.add_objective('f_xy')
+
+        prob.driver = DOEDriver(UniformGenerator(num_samples=5))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cases = CaseReader("CASES.db").driver_cases
+
+        self.assertEqual(cases.num_cases, 5)
+
+        values = []
+        for n in range(cases.num_cases):
+            case = cases.get_case(n)
+            values.append((case.desvars['x'], case.desvars['y'], case.objectives['f_xy']))
+
+        print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestParallelDOEFeature(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_full_factorial(self):
+        from openmdao.api import Problem, IndepVarComp, PETScVector
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        from openmdao.api import DOEDriver, FullFactorialGenerator
+        from openmdao.api import SqliteRecorder, CaseReader
+
+        from mpi4py import MPI
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+
+        prob.driver.options['parallel'] =  True
+        prob.driver.add_recorder(SqliteRecorder("CASES.db", all_procs=True))
+
+        prob.setup(vector_class=PETScVector)
+        prob.run_driver()
+        prob.cleanup()
+
+        self.assertEqual(MPI.COMM_WORLD.size, 2)
+
+        rank = MPI.COMM_WORLD.rank
+
+        # cases will be split across files for each processor
+        filename = "CASES.db_%d" % rank
+        cases = CaseReader(filename).driver_cases
+
+        self.assertEqual(cases.num_cases, 5 if rank == 0 else 4)
+
+        values = []
+        for n in range(cases.num_cases):
+            case = cases.get_case(n)
+            values.append((case.desvars['x'], case.desvars['y'], case.objectives['f_xy']))
+
+        print("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
 
 if __name__ == "__main__":

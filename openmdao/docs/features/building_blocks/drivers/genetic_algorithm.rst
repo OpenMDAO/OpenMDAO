@@ -49,3 +49,5 @@ evaluations for a new generation can be performed in parallel by turning on the 
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.MPIFeatureTests.test_option_parallel
     :layout: interleave
+
+.. tags:: Driver, Optimizer, Optimization

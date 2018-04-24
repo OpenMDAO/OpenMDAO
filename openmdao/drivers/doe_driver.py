@@ -56,8 +56,9 @@ class DOEDriver(Driver):
 
     Options
     -------
-    options['parallel'] :  bool
-        True or number of cases to run in parallel.. Default is False.
+    options['parallel'] :  bool or int
+        True or number of cases to run in parallel. Default is False.
+        If True, cases will be run on all available processors.
 
     Attributes
     ----------
@@ -67,16 +68,16 @@ class DOEDriver(Driver):
         The name used to identify this driver in recorded cases.
     """
 
-    def __init__(self, generator):
+    def __init__(self, generator=None):
         """
         Constructor.
 
         Parameters
         ----------
-        generator : DOEGenerator
-            The case generator
+        generator : DOEGenerator or None
+            The case generator. If None, no cases will be generated.
         """
-        if not isinstance(generator, DOEGenerator):
+        if generator and not isinstance(generator, DOEGenerator):
             if inspect.isclass(generator):
                 raise TypeError("DOEDriver requires an instance of DOEGenerator, "
                                 "but a class object was found: %s"
@@ -88,11 +89,16 @@ class DOEDriver(Driver):
 
         super(DOEDriver, self).__init__()
 
-        self._generator = generator
+        if generator is None:
+            self._generator = DOEGenerator()
+        else:
+            self._generator = generator
+
         self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
 
         self.options.declare('parallel', default=False,
-                             desc='True or number of cases to run in parallel.')
+                             desc='True or number of cases to run in parallel. '
+                                  'If True, cases will be run on all available processors.')
 
     def _get_name(self):
         """

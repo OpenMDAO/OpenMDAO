@@ -52,4 +52,4 @@ ScipyOptimizeDriver Option Examples
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_tol
       :layout: interleave
 
-.. tags:: Driver, optimization
+.. tags:: Driver, Optimizer, Optimization
