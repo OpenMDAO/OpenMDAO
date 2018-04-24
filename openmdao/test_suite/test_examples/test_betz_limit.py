@@ -206,6 +206,9 @@ class TestBetzLimit(unittest.TestCase):
         # There is a bug in scipy version < 1.0 that causes this value to be wrong.
         if LooseVersion(scipy.__version__) >= LooseVersion("1.0"):
             assert_rel_error(self, prob['Area'], 1.0, 1e-4)
+        else:
+            msg = "Outdated version of Scipy detected; this problem does not solve properly."
+            raise unittest.SkipTest(msg)
 
     def test_betz_derivatives(self):
         from openmdao.api import Problem, IndepVarComp
