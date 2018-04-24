@@ -89,8 +89,8 @@ class SqliteCaseReader(BaseCaseReader):
                 self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
         con.close()
 
-        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, True)
-        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, False)
+        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, True)
+        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, False)
 
         self._load()
 
@@ -105,16 +105,12 @@ class SqliteCaseReader(BaseCaseReader):
         The `iterations` table is read to load the keys which identify
         the individual cases/iterations from the recorded file.
         """
-        self.driver_cases = DriverCases(self.filename)
-        self.system_cases = SystemCases(self.filename)
-        self.solver_cases = SolverCases(self.filename)
-
-        self.driver_cases._prom2abs = self._prom2abs
-        self.system_cases._prom2abs = self._prom2abs
-        self.solver_cases._prom2abs = self._prom2abs
-        self.driver_cases._abs2meta = self._abs2meta
-        self.system_cases._abs2meta = self._abs2meta
-        self.solver_cases._abs2meta = self._abs2meta
+        self.driver_cases = DriverCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
+        self.system_cases = SystemCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
+        self.solver_cases = SolverCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
 
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
@@ -340,7 +336,7 @@ class SqliteCaseReader(BaseCaseReader):
         return self._coordinate_split_re.split(coordinate)
 
     def list_inputs(self,
-                    case_id=None,
+                    case=None,
                     values=True,
                     units=False,
                     hierarchical=True,
@@ -353,9 +349,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        case_id : int or string, optional
-            The integer index or string-identifier of the system case whose outputs will be listed.
-            If None, gives all inputs. Defaults to None.
+        case : Case, optional
+            The case whose inputs will be listed. If None, gives all inputs. Defaults to None.
         values : bool, optional
             When True, display/return input values. Default is True.
         units : bool, optional
@@ -378,10 +373,10 @@ class SqliteCaseReader(BaseCaseReader):
             list of input names and other optional information about those inputs
         """
         meta = self._abs2meta
-        if case_id is None:
+        if case is None:
             sys_vars = self._get_all_sysvars(False)
         else:
-            sys_vars = self._get_case_sysvars(case_id, False)
+            sys_vars = self._get_case_sysvars(case, False)
         inputs = []
 
         if sys_vars is not None and len(sys_vars) > 0:
@@ -409,7 +404,7 @@ class SqliteCaseReader(BaseCaseReader):
         return inputs
 
     def list_outputs(self,
-                     case_id=None,
+                     case=None,
                      explicit=True, implicit=True,
                      values=True,
                      residuals=False,
@@ -428,9 +423,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        case_id : int or string, optional
-            The integer index or string-identifier of the system case whose outputs will be listed.
-            If None, gives all inputs. Defaults to None.
+        case : Case, optional
+            The case whose outputs will be listed. If None, gives all outputs. Defaults to None.
         explicit : bool, optional
             include outputs from explicit components. Default is True.
         implicit : bool, optional
@@ -476,7 +470,7 @@ class SqliteCaseReader(BaseCaseReader):
         if case_id is None:
             sys_vars = self._get_all_sysvars()
         else:
-            sys_vars = self._get_case_sysvars(case_id)
+            sys_vars = self._get_case_sysvars(case)
 
         if sys_vars is not None and len(sys_vars) > 0:
             for name in sys_vars:
@@ -533,14 +527,14 @@ class SqliteCaseReader(BaseCaseReader):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _get_case_sysvars(self, case_id, get_outputs=True):
+    def _get_case_sysvars(self, case, get_outputs=True):
         """
         Get the set of output or input variables and their values for a given case.
 
         Parameters
         ----------
-        case_id : int or string
-            The integer index or string-identifier of the system case whose outputs will be listed.
+        case : Case
+            The case whose variables will be returned.
         get_outputs : bool, optional
             indicates if the returned set should contain outputs. If false, returns inputs.
 
@@ -551,7 +545,6 @@ class SqliteCaseReader(BaseCaseReader):
             were recorded.
         """
         variables = {}
-        case = self.system_cases.get_case(case_id)
         if get_outputs and case.outputs is None:
             return variables
 
@@ -745,7 +738,7 @@ class DriverCases(BaseCases):
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           inputs_array, outputs_array,
-                          self._prom2abs, self._abs2meta)
+                          self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case
 
@@ -790,7 +783,7 @@ class SystemCases(BaseCases):
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           inputs_array, outputs_array, residuals_array,
-                          self._prom2abs, self._abs2meta)
+                          self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case
 
@@ -834,6 +827,6 @@ class SolverCases(BaseCases):
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           abs_err, rel_err, input_array, output_array, residuals_array,
-                          self._prom2abs, self._abs2meta)
+                          self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case

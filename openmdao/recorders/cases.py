@@ -14,11 +14,17 @@ class BaseCases(object):
         The number of cases contained in the recorded file.
     _case_keys : tuple
         Case string identifiers available in this CaseReader.
+    _abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    _abs2meta : dict
+        Dicitonary mapping absolute variable names to variable metadata.
+    _prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
     """
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, filename):
+    def __init__(self, filename, abs2prom, abs2meta, prom2abs):
         """
         Initialize.
 
@@ -26,10 +32,19 @@ class BaseCases(object):
         ----------
         filename : str
             The name of the recording file from which to instantiate the case reader.
+        abs2prom : {'input': dict, 'output': dict}
+            Dictionary mapping absolute names to promoted names.
+        abs2meta : dict
+            Dicitonary mapping absolute variable names to variable metadata.
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
         """
         self._case_keys = ()
         self.num_cases = 0
         self.filename = filename
+        self._abs2prom = abs2prom
+        self._abs2meta = abs2meta
+        self._prom2abs = prom2abs
 
     @abstractmethod
     def get_case(self, case_id):
