@@ -109,6 +109,36 @@ class TestExternalCode(unittest.TestCase):
         else:
             self.fail("AnalysisError expected")
 
+    def test_allowed_return_code(self):
+        self.extcode.options['allowed_return_codes'] = set(range(5))
+        self.extcode.options['command'] = [
+            'python', 'extcode_example.py', 'extcode.out', '--return_code', '4'
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+
+        dev_null = open(os.devnull, 'w')
+        self.prob.setup(check=True)
+        self.prob.run_model()
+
+    def test_disallowed_return_code(self):
+        self.extcode.options['allowed_return_codes'] = list(range(5))
+        self.extcode.options['command'] = [
+            'python', 'extcode_example.py', 'extcode.out', '--return_code', '7'
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+
+        dev_null = open(os.devnull, 'w')
+        self.prob.setup(check=True)
+        try:
+            self.prob.run_model()
+        except RuntimeError as err:
+            self.assertTrue("return_code = 7" in str(err),
+                            "expected 'return_code = 7' to be in '%s'" % str(err))
+        else:
+            self.fail("RuntimeError expected")
+
     def test_badcmd(self):
         # Set command to nonexistant path.
         self.extcode.options['command'] = ['no-such-command', ]
