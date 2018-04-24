@@ -124,8 +124,6 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        names = design_vars.keys()
-
         size = sum([meta['size'] for name, meta in iteritems(design_vars)])
 
         doe = self._generate_design(size)
@@ -391,7 +389,7 @@ class LatinHypercubeGenerator(DOEGenerator):
             var = 0
             for name, meta in iteritems(design_vars):
                 size = meta['size']
-                val = np.zeros(size)
+                val = np.empty(size)
                 for k in range(size):
                     sample = row[col + k]
 
