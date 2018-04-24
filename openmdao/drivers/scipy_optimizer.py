@@ -64,6 +64,11 @@ class ScipyOptimizeDriver(Driver):
         Name of optimizer to use
     options['tol'] :  float(1e-06)
         Tolerance for termination. For detailed control, use solver-specific options.
+    options['dynamic_simul_derivs'] : bool(False)
+        Set to True to turn on dynamic computation of simultaneous total derivative coloring.
+    options['dynamic_simul_derivs_repeats'] : int(3)
+        Set the number of compute_totals calls made during computation of simultaneous derivative
+        coloring.
 
     Attributes
     ----------
