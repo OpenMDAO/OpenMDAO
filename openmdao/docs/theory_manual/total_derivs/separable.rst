@@ -105,9 +105,10 @@ So we need to compute the sparsity pattern of the total Jacobian, given the spar
 We can minimize the chance of having incidental zeros in the inverse by setting random numbers into the nonzero entries of the partial-derivative matrix,
 then computing the resulting total-derivative Jacobian using the randomized values. The derivatives computed in this way will not be physically meaningful,
 but the chance of having any incidental zero values is now very small. The likelihood of incidental zeros can be further reduced by
-computing the total-derivative Jacobian multiple times with different, random left-hand sides, and summing the resulting total-derivative Jacobians together.
+computing the total-derivative Jacobian multiple times with different, random left-hand sides, and summing the absolute values of the
+resulting total-derivative Jacobians together.
 
-Hence the cost of the coloring algorithm is equivalent to the cost of :math:`n` computations of the full total-derivative Jacobian.
+Hence the cost of the coloring algorithm increases with the cost of :math:`n` computations of the full total-derivative Jacobian.
 The larger you choose to make :math:`n`, the more reliable your coloring will be.
 If the model is intended to be used in an optimization context, then it is fair to assume that the total-derivative Jacobian is inexpensive enough to compute many times,
 and using a few additional computations to compute a coloring will not significantly impact the overall compute cost.

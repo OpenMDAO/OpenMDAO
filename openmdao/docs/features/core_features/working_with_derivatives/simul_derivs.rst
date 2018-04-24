@@ -21,17 +21,56 @@ The concept of separability is explained in the :ref:`Theory Manual<theory_separ
    While it is possible for problems to exist where simultaneous reverse solves would be possible,
    OpenMDAO does not currently support simultaneous derivatives in reverse mode.
 
-In order to tell OpenMDAO to take advantage of the separable sparsity in your model, call the
-:code:`set_simul_deriv_color` method on a :code:`Driver` instance.
+
+Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically.
+
+
+Dynamic Coloring
+================
+
+Dynamic coloring computes the derivative colors at runtime, shortly after the driver begins the
+optimization.  This has the advantage of simplicity and robustness to changes in the model, but
+adds the cost of the coloring computation to the run time of the optimization.  For a typical
+optimization, however, this cost will be small.  Activating dynamic coloring is simple.  Just
+set the `dynamic_simul_derivs` option on the driver.  For example:
+
+.. code-block:: python
+
+    prob.driver.options['dynamic_simul_derivs'] = True
+
+
+If you want to change the number of compute_totals calls that the coloring algorithm uses to
+compute the jacobian sparsity (default is 3), you can set the `dynamic_simul_derivs_repeats` option.
+For example:
+
+.. code-block:: python
+
+    prob.driver.options['dynamic_simul_derivs_repeats'] = 2
+
+
+
+Static Coloring
+===============
+
+To get rid of the runtime cost of computing the coloring, you can precompute it and tell the
+driver what coloring to use by calling the :code:`set_simul_deriv_color` method on your
+Driver.
+
 
 .. automethod:: openmdao.core.driver.Driver.set_simul_deriv_color
     :noindex:
 
 
+While this has the advantage of removing the runtime cost of the computation of the coloring,
+it should be used with care, because any changes in the model, design variables, or responses
+can make the existing coloring invalid.  If *anything* about the optimization changes, it's recommended
+to always regenerate the coloring before re-running the optimization.
 
 
-For our problem above, the structure we would pass to :code:`set_simul_deriv_color` would look
-like this:
+Consider a simple problem where we have a design variable *x* of size 10 and a constraint *y* of
+size 5.  Assume that each total derivative of *y* is affected only by 2 entries of x, let's say
+for derivative *i* of *y*, it is affected by entries 2*i and 2*i+1 of *x*.  In that case, the
+coloring we would pass to :code:`set_simul_deriv_color` would look like this:
 
 
 .. code-block:: python
@@ -97,7 +136,8 @@ you change your model.
 
 To streamline the process, OpenMDAO provides an automatic coloring algorithm that uses the
 sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all of the components in your model.
-So if you're not :ref:`specifying the sparsity of the partial derivatives<feature_sparse_partials>` of your components, then it won't be possible to find an automatic coloring
+So if you're not :ref:`specifying the sparsity of the partial derivatives<feature_sparse_partials>`
+of your components, then it won't be possible to find an automatic coloring
 for your model.
 
 The *color_info* data structure can be generated automatically using the following command:
@@ -287,15 +327,16 @@ The coloring will be written in json format to the given file and can be loaded 
     prob.driver.set_simul_deriv_color('my_coloring.json')
 
 
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available, or that you don't gain very much by coloring,
-don't be surprised.
-Problems that have the necessary total Jacobian sparsity to allow simultaneous derivatives are relatively uncommon.
+If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
+or that you don't gain very much by coloring, don't be surprised.
+Problems that have the necessary total Jacobian sparsity to allow simultaneous derivatives are
+relatively uncommon.
 
 
 Checking that it works
 ######################
 
-After activating simultaneous derivatives, you need to check your total
+After activating simultaneous derivatives, you should check your total
 derivatives using the :ref:`check_totals <check-total-derivatives>` function.
 If you provided a manually-computed coloring, you need to be sure it was correct.
 If you used the automatic coloring, the algorithm that we use still has a small chance of
