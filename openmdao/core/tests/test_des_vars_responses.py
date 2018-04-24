@@ -512,6 +512,36 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                           indices=range(2))
 
+    def test_error_eq_ineq_con(self):
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
+                                      indices='foo')
+
+        msg = "Constraint 'con1' cannot be both equality and inequality."
+        self.assertEqual(str(context.exception), msg)
+
+    def test_bad_con(self):
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('sub', SellarDerivatives())
+        sub.nonlinear_solver = NonlinearBlockGS()
+
+        #with self.assertRaises(ValueError) as context:
+        sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
+
+        from openmdao.api import PETScVector
+        prob.setup(vector_class=PETScVector, mode='rev')
+        prob.setup(vector_class=PETScVector, mode='rev')
+
+        msg = "Constraint 'con1' cannot be both equality and inequality."
+        self.assertEqual(str(context.exception), msg)
+
 
 class TestObjectiveOnModel(unittest.TestCase):
 

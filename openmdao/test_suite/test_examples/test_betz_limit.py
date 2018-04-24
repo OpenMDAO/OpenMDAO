@@ -1,6 +1,9 @@
 from __future__ import print_function, division, absolute_import
 
+from distutils.version import LooseVersion
 import unittest
+
+import scipy
 
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -200,8 +203,9 @@ class TestBetzLimit(unittest.TestCase):
         # minimum value
         assert_rel_error(self, prob['a_disk.Cp'], 16./27., 1e-4)
         assert_rel_error(self, prob['a'], 0.33333, 1e-4)
-        # TODO: this is a bad value. Should be 1.0! The problem is a related to a bug in scipy, which is fixed in version > 1.0
-        # assert_rel_error(self, prob['Area'], 5.65272869, 1e-4)
+        # There is a bug in scipy version < 1.0 that causes this value to be wrong.
+        if LooseVersion(scipy.__version__) >= LooseVersion("1.0"):
+            assert_rel_error(self, prob['Area'], 1.0, 1e-4)
 
     def test_betz_derivatives(self):
         from openmdao.api import Problem, IndepVarComp

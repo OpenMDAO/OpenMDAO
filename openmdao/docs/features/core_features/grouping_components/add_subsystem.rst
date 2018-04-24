@@ -19,6 +19,12 @@ Add a Component to a Group
     openmdao.core.tests.test_group.TestGroup.test_group_simple
     :layout: interleave
 
+.. note::
+
+    Group names must be Pythonic, so they can only contain alphanumeric characters plus the underscore. In addtion, the
+    first character in the group name needs to be a letter of the alphabet. Also, the system name should no duplicate
+    any method or attribute of the `System` API.
+
 Promote the input and output of a Component
 -------------------------------------------
 Because the promoted names of `indep.a` and `comp.a` are the same, `indep.a` is automatically connected to `comp1.a`.

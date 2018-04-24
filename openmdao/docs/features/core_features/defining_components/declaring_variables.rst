@@ -16,6 +16,10 @@ An example is given below.
 .. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimple
 
+.. note::
+
+    Variable names have few restrictions, but the following characters are not allowed in a variable name: '.', '*', '?', '!', '[', ']'.
+
 Method Signatures
 -----------------
 
