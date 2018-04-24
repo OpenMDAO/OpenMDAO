@@ -427,7 +427,7 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
-                allprocs_prom2abs_list[type_] = defaultdict(list)
+                allprocs_prom2abs_list[type_] = OrderedDict()
 
             for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta, oscale, rscale in gathered:
                 self._has_output_scaling |= oscale
@@ -443,6 +443,8 @@ class Group(System):
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
+                        if prom_name not in allprocs_prom2abs_list[type_]:
+                            allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
     def _setup_var_sizes(self, recurse=True):

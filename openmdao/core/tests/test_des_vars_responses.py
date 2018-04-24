@@ -13,6 +13,11 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives, ExecComp, ScipyKrylov
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 
 class TestDesVarsResponses(unittest.TestCase):
 
@@ -512,34 +517,26 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                           indices=range(2))
 
-    def test_error_eq_ineq_con(self):
-        prob = Problem()
 
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestAddConstraintMPI(unittest.TestCase):
 
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
-                                      indices='foo')
+    N_PROCS = 2
 
-        msg = "Constraint 'con1' cannot be both equality and inequality."
-        self.assertEqual(str(context.exception), msg)
-
-    def test_bad_con(self):
+    def test_add_bad_con(self):
+        # From a bug, this message didn't work in mpi.
         prob = Problem()
         model = prob.model
 
         sub = model.add_subsystem('sub', SellarDerivatives())
         sub.nonlinear_solver = NonlinearBlockGS()
 
-        #with self.assertRaises(ValueError) as context:
         sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
 
-        from openmdao.api import PETScVector
-        prob.setup(vector_class=PETScVector, mode='rev')
-        prob.setup(vector_class=PETScVector, mode='rev')
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup(vector_class=PETScVector, mode='rev')
 
-        msg = "Constraint 'con1' cannot be both equality and inequality."
+        msg = "Output not found for response 'd1.junk' in system 'sub'."
         self.assertEqual(str(context.exception), msg)
 
 
