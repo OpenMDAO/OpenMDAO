@@ -1,5 +1,5 @@
 """
-Case generators for Design-of-Experiments Driver using pyDOE2.
+Case generators for Design-of-Experiments Driver.
 """
 
 from six import iteritems, itervalues
@@ -289,7 +289,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
 
 class LatinHypercubeGenerator(DOEGenerator):
     """
-    DOE case generators implementing Latin hypercube method via pyDOE2.
+    DOE case generator implementing Latin hypercube method via pyDOE2.
 
     Attributes
     ----------

@@ -47,7 +47,7 @@ class SimpleGADriver(Driver):
     _ga : <GeneticAlgorithm>
         Main genetic algorithm lies here.
     _randomstate : np.random.RandomState, int
-         Random state (or seed-number) which controls the seed and random draws
+         Random state (or seed-number) which controls the seed and random draws.
     """
 
     def __init__(self):
@@ -299,7 +299,7 @@ class GeneticAlgorithm():
         max_gen : int
             Number of generations to run the GA.
         random_state : np.random.RandomState, int
-             Random state (or seed-number) which controls the seed and random draws
+             Random state (or seed-number) which controls the seed and random draws.
 
         Returns
         -------
