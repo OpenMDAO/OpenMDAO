@@ -1335,7 +1335,8 @@ class TestProblem(unittest.TestCase):
                                objs_opts=['ref', 'ref0',
                                           'indices', 'adder', 'scaler',
                                           'parallel_deriv_color',
-                                          'vectorize_derivs']
+                                          'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                          'cache_linear_solution'],
                                )
 
 if __name__ == "__main__":
