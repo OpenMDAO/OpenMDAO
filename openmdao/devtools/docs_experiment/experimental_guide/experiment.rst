@@ -191,3 +191,4 @@ SNOPT test
 .. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_atol
     :layout: interleave
+
