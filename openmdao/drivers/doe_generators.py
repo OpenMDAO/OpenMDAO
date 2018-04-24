@@ -134,7 +134,7 @@ class _pyDOE_Generator(DOEGenerator):
         # over the range of that varable's lower to upper bound
 
         # rows = vars (# rows/var = var size), cols = levels
-        values = np.zeros((size, self._levels))
+        values = np.empty((size, self._levels))
 
         row = 0
         for name, meta in iteritems(design_vars):
@@ -158,7 +158,7 @@ class _pyDOE_Generator(DOEGenerator):
             var = row = 0
             for name, meta in iteritems(design_vars):
                 size = meta['size']
-                val = np.zeros(size)
+                val = np.empty(size)
                 for k in range(size):
                     idx = idxs[var + k]
                     val[k] = values[row + k][idx]
@@ -376,11 +376,6 @@ class LatinHypercubeGenerator(DOEGenerator):
                          random_state=self._seed)
 
         self._num_samples = len(doe)
-
-        # generate values for each level for each design variable
-        # over the range of that varable's lower to upper bound
-        # rows = vars (# rows/var = var size), cols = levels
-        values = np.zeros((size, self._samples))
 
         # yield desvar values for doe samples
         for row in doe:
