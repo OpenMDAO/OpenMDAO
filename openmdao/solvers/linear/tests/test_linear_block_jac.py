@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, AssembledJacobian, \
+from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, DenseJacobian, \
     ExecComp, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -29,7 +29,7 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
         model.linear_solver = LinearBlockJac()
         prob.set_solver_print(level=0)
 
-        prob.model.jacobian = AssembledJacobian()
+        prob.model.jacobian = DenseJacobian()
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0
