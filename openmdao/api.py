@@ -11,9 +11,12 @@ from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.balance_comp import BalanceComp
+from openmdao.components.cross_product_comp import CrossProductComp
+from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.external_code import ExternalCode
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.linear_system_comp import LinearSystemComp
+from openmdao.components.matrix_vector_product_comp import MatrixVectorProductComp
 from openmdao.components.meta_model_unstructured import MetaModelUnStructured
 from openmdao.components.multifi_meta_model import MultiFiMetaModelUnStructured
 from openmdao.components.meta_model_structured import MetaModelStructured
