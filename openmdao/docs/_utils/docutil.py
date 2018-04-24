@@ -437,6 +437,7 @@ def insert_output_start_stop_indicators(src):
                        '.check_totals(',
                        '.list_inputs(',
                        '.list_outputs(',
+                       '.list_problem_vars(',
                        ]
 
     newlines = []

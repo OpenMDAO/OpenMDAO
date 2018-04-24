@@ -2,12 +2,14 @@
 
 from __future__ import print_function
 
+from six.moves import cStringIO as StringIO
 import sys
 import unittest
-import numpy as np
 import time
 import random
 from distutils.version import LooseVersion
+
+import numpy as np
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
     ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
@@ -135,6 +137,42 @@ class ParDerivTestCase(unittest.TestCase):
         J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
         assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
+
+    def test_debug_print_option_totals_color(self):
+
+        prob = Problem()
+        prob.model = FanInGrouped()
+        prob.model.linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
+
+        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('iv.x3')
+        prob.model.add_objective('c3.y')
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_driver()
+
+        indep_list = ['iv.x1', 'iv.x2', 'iv.x3']
+        unknown_list = ['c3.y']
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            _ = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict',
+                                    debug_print=not prob.comm.rank)
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue()
+
+        if not prob.comm.rank:
+            self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
+            self.assertTrue('Solving variable: iv.x3' in output)
 
     def test_fan_out_parallel_sets_rev(self):
 
