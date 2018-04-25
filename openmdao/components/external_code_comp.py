@@ -13,6 +13,7 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExternalCodeComp(ExplicitComponent):

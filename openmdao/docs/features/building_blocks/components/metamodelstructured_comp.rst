@@ -22,7 +22,7 @@ via initialization attribute (see below).
 
 
 .. embed-options::
-    openmdao.components.meta_model_structured
+    openmdao.components.meta_model_structured_comp
     MetaModelStructured
     metadata
 
@@ -33,7 +33,7 @@ A simple quick-start example is fitting the exclusive-or ("XOR") operator betwee
 two inputs, `x` and `y`:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredCompMapFeature.test_xor
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_xor
     :layout: code, output
 
 
@@ -47,7 +47,7 @@ with shape (5, 12, 20).
 This is illustrated by the example:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredCompMapFeature.test_shape
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_shape
     :layout: code, output
 
 Finally, it is possible to compute gradients with respect to the given
@@ -65,5 +65,5 @@ to `True`. This automatically creates an input named `f_train` when the output
 match the finite difference estimate in the `check_partials` output.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured.TestMetaModelStructuredCompMapFeature.test_training_derivatives
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_training_derivatives
     :layout: code, output

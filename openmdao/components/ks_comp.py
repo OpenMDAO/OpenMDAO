@@ -5,6 +5,7 @@ KS Function Component.
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 CITATIONS = """

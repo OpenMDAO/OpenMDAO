@@ -17,7 +17,7 @@ KSComp Options
 --------------
 
 .. embed-options::
-    openmdao.components.ks
+    openmdao.components.ks_comp
     KSComp
     options
 
@@ -30,7 +30,7 @@ of width two. We would like to aggregate the values of this constraint vector in
 value using the KSComp.
 
 .. embed-code::
-    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_basic
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_basic
     :layout: code, output
 
 A more practical example that uses the KSComp can be found in the :ref:`beam optimization <beam_optimization_example_part_2>` example.
@@ -47,7 +47,7 @@ is still satisfied if it is less than zero.
 **upper**
 
 .. embed-code::
-    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_upper
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_upper
     :layout: interleave
 
 Normally, the input constraint vector is satisfied if it is negative and violated if it is positive. You can

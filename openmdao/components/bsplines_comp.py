@@ -5,7 +5,7 @@ Simple B-spline component for interpolation.
 import numpy as np
 from scipy.sparse import csc_matrix, csr_matrix
 
-from openmdao.api import ExplicitComponent
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 CITATIONS = """

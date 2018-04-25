@@ -16,6 +16,7 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class OutOfBoundsError(Exception):
@@ -789,4 +790,4 @@ class MetaModelStructured(MetaModelStructuredComp):
         """
         warn_deprecation("'MetaModelStructured' component has been deprecated. Use"
                          "'MetaModelStructuredComp' instead.")
-        super(MetamodelStructured, self).__init__(*args, **kwargs)
+        super(MetaModelStructured, self).__init__(*args, **kwargs)
