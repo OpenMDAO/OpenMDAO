@@ -1,6 +1,6 @@
 
 [![Build Status](https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master)](https://travis-ci.org/OpenMDAO/OpenMDAO)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
-)](https://ci.appveyor.com/project/OpenMDAO/OpenMDAO/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master)
+)](https://ci.appveyor.com/project/OpenMDAO/blue/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master)
 
 
 
