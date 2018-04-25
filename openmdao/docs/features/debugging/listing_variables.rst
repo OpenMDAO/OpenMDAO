@@ -156,4 +156,4 @@ The user can optionally print out a variety of metadata. In this example, all th
 
 .. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_list_problem_vars
-    :layout: code, output
+    :layout: interleave

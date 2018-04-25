@@ -145,3 +145,48 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
             tab = ' ' * start
             stream.write('%s|%s\n' % (tab, name))
             start += prob.driver._designvars[name]['size']
+
+
+def array_connection_compatible(shape1, shape2):
+    """
+    Return True if the two arrays shapes are compatible.
+
+    Array shapes are compatible if the underlying data has the same size and is
+    stored in the same contiguous order for the two shapes.
+
+    Parameters
+    ----------
+    shape1 : tuple of int
+        Shape of the first array.
+    shape2 : tuple of int
+        Shape of the second array.
+
+    Returns
+    -------
+    bool
+        True if the two shapes are compatible for connection, else False.
+    """
+    ashape1 = np.asarray(shape1, dtype=int)
+    ashape2 = np.asarray(shape2, dtype=int)
+
+    size1 = np.prod(ashape1)
+    size2 = np.prod(ashape2)
+
+    # Shapes are not connection-compatible if size is different
+    if size1 != size2:
+        return False
+
+    nz1 = np.where(ashape1 > 1)[0]
+    nz2 = np.where(ashape2 > 1)[0]
+
+    if len(nz1) > 0:
+        fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1) + 1]
+    else:
+        fundamental_shape1 = np.ones((1,))
+
+    if len(nz2) > 0:
+        fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
+    else:
+        fundamental_shape2 = np.ones((1,))
+
+    return np.all(fundamental_shape1 == fundamental_shape2)
