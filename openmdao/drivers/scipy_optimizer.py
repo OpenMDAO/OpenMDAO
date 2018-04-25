@@ -15,6 +15,7 @@ from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
+import openmdao.utils.coloring as coloring_mod
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -63,6 +64,11 @@ class ScipyOptimizeDriver(Driver):
         Name of optimizer to use
     options['tol'] :  float(1e-06)
         Tolerance for termination. For detailed control, use solver-specific options.
+    options['dynamic_simul_derivs'] : bool(False)
+        Set to True to turn on dynamic computation of simultaneous total derivative coloring.
+    options['dynamic_simul_derivs_repeats'] : int(3)
+        Set the number of compute_totals calls made during computation of simultaneous derivative
+        coloring.
 
     Attributes
     ----------
@@ -125,6 +131,11 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True,
                              desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -200,8 +211,9 @@ class ScipyOptimizeDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        problem = self._problem
         opt = self.options['optimizer']
-        model = self._problem.model
+        model = problem.model
         self.iter_count = 0
 
         # Initial Run
@@ -316,6 +328,10 @@ class ScipyOptimizeDriver(Driver):
             jac = self._gradfunc
         else:
             jac = None
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            coloring_mod.dynamic_simul_coloring(self)
 
         # optimize
         try:

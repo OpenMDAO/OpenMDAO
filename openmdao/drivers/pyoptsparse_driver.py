@@ -22,6 +22,7 @@ from pyoptsparse import Optimization
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.record_util import create_local_meta
+import openmdao.utils.coloring as coloring_mod
 
 
 # names of optimizers that use gradients
@@ -93,6 +94,11 @@ class pyOptSparseDriver(Driver):
         Finite difference implementation to use ('snopt_fd' may only be used with SNOPT)
     options['title'] :  str('Optimization using pyOpt_sparse')
         Title of this optimization run
+    options['dynamic_simul_derivs'] : bool(False)
+        Set to True to turn on dynamic computation of simultaneous total derivative coloring.
+    options['dynamic_simul_derivs_repeats'] : int(3)
+        Set the number of compute_totals calls made during computation of simultaneous derivative
+        coloring.
 
     Attributes
     ----------
@@ -154,6 +160,11 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
@@ -228,6 +239,10 @@ class pyOptSparseDriver(Driver):
                 rec.abs = 0.0
                 rec.rel = 0.0
             self.iter_count += 1
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            coloring_mod.dynamic_simul_coloring(self, do_sparsity=True)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
