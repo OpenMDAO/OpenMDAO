@@ -19,7 +19,7 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.meta_model_structured import _RegularGridInterp, MetaModelStructured
+    from openmdao.components.meta_model_structured_comp import _RegularGridInterp, MetaModelStructuredComp
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985 ,
         0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -763,7 +763,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = MetaModelStructured(method='slinear', extrapolate=True)
+        comp = MetaModelStructuredComp(method='slinear', extrapolate=True)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -837,7 +837,7 @@ class TestRegularGridMap(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         # Need to make sure extrapolate is False for bounds to be checked
-        comp = MetaModelStructured(method='slinear', extrapolate=False)
+        comp = MetaModelStructuredComp(method='slinear', extrapolate=False)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -877,7 +877,7 @@ class TestRegularGridMap(unittest.TestCase):
         ivc.add_output('f_train', outs[0]['values'])
         ivc.add_output('g_train', outs[1]['values'])
 
-        comp = MetaModelStructured(training_data_gradients=True,
+        comp = MetaModelStructuredComp(training_data_gradients=True,
                                    method='cubic',
                                    num_nodes=3)
         for param in params:
@@ -919,16 +919,16 @@ class TestRegularGridMap(unittest.TestCase):
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-class TestMetaModelStructuredMapFeature(unittest.TestCase):
+class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_xor(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured import MetaModelStructured
+        from openmdao.components.meta_model_structured_comp import MetaModelStructured
 
         # Create regular grid interpolator instance
-        xor_interp = MetaModelStructured(method='slinear')
+        xor_interp = MetaModelStructuredComp(method='slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -964,7 +964,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
     def test_shape(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured import MetaModelStructured
+        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -980,7 +980,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
 
         # Create regular grid interpolator instance
-        interp = MetaModelStructured(method='cubic')
+        interp = MetaModelStructuredComp(method='cubic')
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -1013,7 +1013,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
     def test_training_derivatives(self):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured import MetaModelStructured
+        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1029,7 +1029,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
 
         # Create regular grid interpolator instance
-        interp = MetaModelStructured(method='cubic', training_data_gradients=True)
+        interp = MetaModelStructuredComp(method='cubic', training_data_gradients=True)
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)

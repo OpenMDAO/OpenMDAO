@@ -7,7 +7,7 @@ import numpy as np
 
 from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver, \
      ExplicitComponent
-from openmdao.components.ks import KSComponent
+from openmdao.components.ks_comp import KSComp
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
 from openmdao.utils.assert_utils import assert_rel_error
@@ -21,7 +21,7 @@ class TestKSFunction(unittest.TestCase):
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         model.add_subsystem('comp', DoubleArrayComp())
-        model.add_subsystem('ks', KSComponent(width=2))
+        model.add_subsystem('ks', KSComp(width=2))
         model.connect('px.x', 'comp.x1')
         model.connect('comp.y2', 'ks.g')
 
@@ -76,7 +76,7 @@ class TestKSFunction(unittest.TestCase):
 
         model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.add_subsystem('ks', KSComponent(width=2))
+        model.add_subsystem('ks', KSComp(width=2))
 
         model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
@@ -94,7 +94,7 @@ class TestKSFunction(unittest.TestCase):
 
         model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.add_subsystem('ks', KSComponent(width=2))
+        model.add_subsystem('ks', KSComp(width=2))
 
         model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
@@ -112,14 +112,14 @@ class TestKSFunctionFeatures(unittest.TestCase):
         import numpy as np
 
         from openmdao.api import Problem, IndepVarComp, ExecComp
-        from openmdao.components.ks import KSComponent
+        from openmdao.components.ks_comp import KSComp
 
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.add_subsystem('ks', KSComponent(width=2))
+        model.add_subsystem('ks', KSComp(width=2))
 
         model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
@@ -133,14 +133,14 @@ class TestKSFunctionFeatures(unittest.TestCase):
         import numpy as np
 
         from openmdao.api import Problem, IndepVarComp, ExecComp
-        from openmdao.components.ks import KSComponent
+        from openmdao.components.ks_comp import KSComp
 
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.add_subsystem('ks', KSComponent(width=2))
+        model.add_subsystem('ks', KSComp(width=2))
 
         model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')
@@ -155,14 +155,14 @@ class TestKSFunctionFeatures(unittest.TestCase):
         import numpy as np
 
         from openmdao.api import Problem, IndepVarComp, ExecComp
-        from openmdao.components.ks import KSComponent
+        from openmdao.components.ks_comp import KSComp
 
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
         model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, )), y=np.zeros((2, ))))
-        model.add_subsystem('ks', KSComponent(width=2))
+        model.add_subsystem('ks', KSComp(width=2))
 
         model.connect('px.x', 'comp.x')
         model.connect('comp.y', 'ks.g')

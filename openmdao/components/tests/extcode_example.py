@@ -5,7 +5,7 @@ import argparse
 
 def main():
     """
-    A standalone program for testing ExternalCode.
+    A standalone program for testing ExternalCodeComp.
 
     Writes "test data" to the specified output file after an optional delay.
     Optionally writes the value of the environment variable "TEST_ENV_VAR"

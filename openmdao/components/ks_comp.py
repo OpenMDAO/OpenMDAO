@@ -72,7 +72,7 @@ class KSfunction(object):
         return dKS_dg, dKS_drho
 
 
-class KSComponent(ExplicitComponent):
+class KSComp(ExplicitComponent):
     """
     KS function component.
 
@@ -99,7 +99,7 @@ class KSComponent(ExplicitComponent):
         width : dict of keyword arguments
             'Width of constraint vector.
         """
-        super(KSComponent, self).__init__(width=width)
+        super(KSComp, self).__init__(width=width)
 
         self.options.declare('lower_flag', False,
                              desc="Set to True to reverse sign of input constraints.")
@@ -162,3 +162,24 @@ class KSComponent(ExplicitComponent):
             derivs = -derivs
 
         partials['KS', 'g'] = derivs
+
+
+class KSComponent(KSComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'KSComponent' component has been deprecated. Use"
+                         "'KSComp' instead.")
+        super(KSComponent, self).__init__(*args, **kwargs)

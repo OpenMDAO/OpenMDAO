@@ -11,13 +11,13 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation
 
 
-class MetaModelUnStructured(ExplicitComponent):
+class MetaModelUnStructuredComp(ExplicitComponent):
     """
     Class that creates a reduced order model for outputs from inputs.
 
     Each output may have it's own surrogate model.
     Training inputs and outputs are automatically created with
-    'train:' prepended to the corresponding inputeter/output name.
+    'train:' prepended to the corresponding input/output name.
 
     For a Float variable, the training data is an array of length m.
 
@@ -62,7 +62,7 @@ class MetaModelUnStructured(ExplicitComponent):
         vectorize : None or int
             First dimension of all inputs and outputs for case where data is vectorized, optional.
         """
-        super(MetaModelUnStructured, self).__init__()
+        super(MetaModelUnStructuredComp, self).__init__()
 
         # This surrogate will be used for all outputs that don't have
         # a specific surrogate assigned to them
@@ -118,7 +118,7 @@ class MetaModelUnStructured(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructured, self).add_input(name, val, **kwargs)
+        metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
 
         if self._vectorize is not None:
             if metadata['shape'][0] != self._vectorize:
@@ -162,7 +162,7 @@ class MetaModelUnStructured(ExplicitComponent):
         """
         surrogate = kwargs.pop('surrogate', None)
 
-        metadata = super(MetaModelUnStructured, self).add_output(name, val, **kwargs)
+        metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
 
         if self._vectorize is not None:
             if metadata['shape'][0] != self._vectorize:
@@ -213,7 +213,7 @@ class MetaModelUnStructured(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        super(MetaModelUnStructured, self)._setup_vars()
+        super(MetaModelUnStructuredComp, self)._setup_vars()
 
     def check_config(self, logger):
         """
@@ -398,7 +398,7 @@ class MetaModelUnStructured(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(MetaModelUnStructured, self)._setup_partials()
+        super(MetaModelUnStructuredComp, self)._setup_partials()
         self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                wrt=[name[0] for name in self._surrogate_input_names])
 
@@ -417,7 +417,7 @@ class MetaModelUnStructured(ExplicitComponent):
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
-                msg = "MetaModelUnStructured: Each variable must have the same number"\
+                msg = "MetaModelUnStructuredComp: Each variable must have the same number"\
                       " of training points. Expected {0} but found {1} "\
                       "points for '{2}'."\
                       .format(num_sample, len(val), name)
@@ -430,14 +430,14 @@ class MetaModelUnStructured(ExplicitComponent):
                 missing_training_data.append(train_name)
                 continue
             if len(val) != num_sample:
-                msg = "MetaModelUnStructured: Each variable must have the same number" \
+                msg = "MetaModelUnStructuredComp: Each variable must have the same number" \
                       " of training points. Expected {0} but found {1} " \
                       "points for '{2}'." \
                     .format(num_sample, len(val), name)
                 raise RuntimeError(msg)
 
         if len(missing_training_data) > 0:
-            msg = "MetaModelUnStructured: The following training data sets must be " \
+            msg = "MetaModelUnStructuredComp: The following training data sets must be " \
                   "provided as metadata for %s: " % self.pathname + \
                   str(missing_training_data)
             raise RuntimeError(msg)
@@ -506,7 +506,7 @@ class MetaModelUnStructured(ExplicitComponent):
         return self._var_rel2data_io[name]['metadata']
 
 
-class MetaModel(MetaModelUnStructured):
+class MetaModel(MetaModelUnStructuredComp):
     """
     Deprecated.
     """
@@ -523,5 +523,26 @@ class MetaModel(MetaModelUnStructured):
             Deprecated arguments.
         """
         warn_deprecation("'MetaModel' component has been deprecated. Use"
-                         "'MetaModelUnStructured' instead.")
+                         "'MetaModelUnStructuredComp' instead.")
         super(Metamodel, self).__init__(*args, **kwargs)
+
+
+class MetaModelUnStructured(MetaModelUnStructuredComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'MetaModelUnStructured' component has been deprecated. Use"
+                         "'MetaModelUnStructuredComp' instead.")
+        super(MetaModelUnStructured, self).__init__(*args, **kwargs)

@@ -1,4 +1,4 @@
-"""Define the ExternalCode class."""
+"""Define the ExternalCodeComp class."""
 from __future__ import print_function
 
 import os
@@ -15,7 +15,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
 
 
-class ExternalCode(ExplicitComponent):
+class ExternalCodeComp(ExplicitComponent):
     """
     Run an external code as a component.
 
@@ -62,9 +62,9 @@ class ExternalCode(ExplicitComponent):
 
     def __init__(self):
         """
-        Intialize the ExternalCode component.
+        Intialize the ExternalCodeComp component.
         """
-        super(ExternalCode, self).__init__()
+        super(ExternalCodeComp, self).__init__()
 
         self.STDOUT = STDOUT
         self.DEV_NULL = DEV_NULL
@@ -94,7 +94,7 @@ class ExternalCode(ExplicitComponent):
         self.return_code = 0  # Return code from the command
         self.stdin = self.DEV_NULL
         self.stdout = None
-        self.stderr = "external_code_error.out"
+        self.stderr = "external_code_comp_error.out"
 
     def check_config(self, logger):
         """
@@ -240,3 +240,24 @@ class ExternalCode(ExplicitComponent):
             self._process = None
 
         return (return_code, error_msg)
+
+
+class ExternalCode(ExternalCodeComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'ExternalCode' component has been deprecated. Use"
+                         "'ExternalCodeComp' instead.")
+        super(ExternalCode, self).__init__(*args, **kwargs)

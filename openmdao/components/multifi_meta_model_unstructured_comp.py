@@ -4,7 +4,7 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.meta_model_unstructured import MetaModelUnStructured
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -30,7 +30,7 @@ def _get_name_fi(name, fi_index):
         return name
 
 
-class MultiFiMetaModelUnStructured(MetaModelUnStructured):
+class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     """
     Generalize MetaModel to be able to train surrogates with multi-fidelity training inputs.
 
@@ -50,7 +50,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
 
     Thus given the initialization::
 
-    >>> mm = MultiFiMetaModelUnStructured(nfi=2)`
+    >>> mm = MultiFiMetaModelUnStructuredComp(nfi=2)`
     >>> mm.add_input('x1', 0.)
     >>> mm.add_input('x2', 0.)
     >>> mm.add_ouput('y1', 0.)
@@ -69,7 +69,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
     Where Y is a list [Y1_fi1, Y1_fi2] where Y1_fi1 is a (m1, 1) ndarray of
     y1 values and Y1_fi2 a (m2, 1) ndarray y1_fi2 values.
 
-    .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructured` object behaves as
+    .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructuredComp` object behaves as
         a :class:`MetaModelUnStructured` object.
 
     Attributes
@@ -89,7 +89,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
         nfi : float
             number of levels of fidelity
         """
-        super(MultiFiMetaModelUnStructured, self).__init__()
+        super(MultiFiMetaModelUnStructuredComp, self).__init__()
 
         self._nfi = nfi
 
@@ -130,7 +130,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             For advanced users only. ID or color for this variable, relevant for
             reconfigurability. Default is 0.
         """
-        item = MultiFiMetaModelUnStructured
+        item = MultiFiMetaModelUnStructuredComp
         metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
                                                flat_src_indices=flat_src_indices, units=units,
                                                desc=desc, var_set=var_set)
@@ -193,11 +193,13 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
             For advanced users only. ID or color for this variable, relevant for reconfigurability.
             Default is 0.
         """
-        super(MultiFiMetaModelUnStructured, self).add_output(name, val, shape=shape, units=units,
-                                                             res_units=res_units, desc=desc,
-                                                             lower=lower, upper=upper, ref=ref,
-                                                             ref0=ref0, res_ref=res_ref,
-                                                             var_set=var_set, surrogate=surrogate)
+        super(MultiFiMetaModelUnStructuredComp, self).add_output(name, val, shape=shape,
+                                                                 units=units, res_units=res_units,
+                                                                 desc=desc, lower=lower,
+                                                                 upper=upper, ref=ref,
+                                                                 ref0=ref0, res_ref=res_ref,
+                                                                 var_set=var_set,
+                                                                 surrogate=surrogate)
         self._training_output[name] = self._nfi * [np.zeros(0)]
 
         # Add train:<outvar>_fi<n>
@@ -213,7 +215,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
         """
         if self._nfi == 1:
             # shortcut: fallback to base class behaviour immediatly
-            super(MultiFiMetaModelUnStructured, self)._train()
+            super(MultiFiMetaModelUnStructuredComp, self)._train()
             return
 
         num_sample = self._nfi * [None]
@@ -316,7 +318,7 @@ class MultiFiMetaModelUnStructured(MetaModelUnStructured):
         self.train = False
 
 
-class MultiFiMetaModel(MultiFiMetaModelUnStructured):
+class MultiFiMetaModel(MultiFiMetaModelUnStructuredComp):
     """
     Deprecated.
     """
@@ -333,5 +335,26 @@ class MultiFiMetaModel(MultiFiMetaModelUnStructured):
             Deprecated arguments.
         """
         warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use"
-                         "'MultiFiMetaModelUnStructured' instead.")
+                         "'MultiFiMetaModelUnStructuredComp' instead.")
         super(MultiFiMetaModel, self).__init__(*args, **kwargs)
+
+
+class MultiFiMetaModelUnStructured(MultiFiMetaModelUnStructuredComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'MultiFiMetaModelUnStructured' component has been deprecated. Use"
+                         "'MultiFiMetaModelUnStructuredComp' instead.")
+        super(MultiFiMetaModelUnStructured, self).__init__(*args, **kwargs)
