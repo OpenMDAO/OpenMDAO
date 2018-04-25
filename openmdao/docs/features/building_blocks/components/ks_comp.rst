@@ -35,6 +35,13 @@ value using the KSComp.
 
 A more practical example that uses the KSComp can be found in the :ref:`beam optimization <beam_optimization_example_part_2>` example.
 
+You can also independently aggregate multiple rows of an output as separate constraints by declaring the vec_size argument:
+
+.. embed-code::
+    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_vectorized
+    :layout: code, output
+
+
 KSComp Option Examples
 ----------------------
 
