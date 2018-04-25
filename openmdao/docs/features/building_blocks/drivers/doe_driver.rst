@@ -7,7 +7,7 @@ DOEDriver
 `DOEDriver` facilitates performing a design of experiments (DOE) with your OpenMDAO model.
 It will run your model multiple times with different values for the design variables
 depending on the selected input generator. A number of generators are available, each with
-it's own parameters that can be specified when it is instantiated:
+its own parameters that can be specified when it is instantiated:
 
 * :class:`UniformGenerator<openmdao.drivers.doe_generators.UniformGenerator>`
 * :class:`FullFactorialGenerator<openmdao.drivers.doe_generators.FullFactorialGenerator>`
