@@ -695,6 +695,22 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(vals['resids'], expected['resids'])
             np.testing.assert_almost_equal(vals['value'], expected['values'])
 
+        expected_explicit_outputs_case = expected_outputs_case
+        expl_outputs_case = cr.list_outputs(sys_case, True, False, True, True, None, True, True, True,
+                                            True, True, True)
+        for o in outputs_case:
+            vals = o[1]
+            name = o[0]
+            expected = expected_explicit_outputs_case[name]
+            self.assertEqual(vals['lower'], expected['lower'])
+            self.assertEqual(vals['ref'], expected['ref'])
+            self.assertEqual(vals['shape'], expected['shape'])
+            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
+            np.testing.assert_almost_equal(vals['value'], expected['values'])
+
+        impl_outputs_case = cr.list_outputs(sys_case, False, True)
+        self.assertEqual(len(impl_outputs_case), 0)
+
     def test_list_inputs(self):
         self.setup_sellar_model()
 
@@ -745,12 +761,56 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         sys_case = cr.system_cases.get_case(1)
         inputs_case = cr.list_inputs(sys_case, True, True, True, None)
-        
+
         for o in inputs_case:
             vals = o[1]
             name = o[0]
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(vals['value'], expected['value'])
+
+    def test_get_vars(self):
+        self.setup_sellar_model()
+
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        d1.nonlinear_solver = NonlinearBlockGS()
+        d1.nonlinear_solver.options['maxiter'] = 5
+        self.prob.model.add_recorder(self.recorder)
+        self.prob.model.d1.add_recorder(self.recorder)
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.driver.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        driver_case = cr.driver_cases.get_case(0)
+        desvars = driver_case.get_desvars()
+        objectives = driver_case.get_objectives()
+        constraints = driver_case.get_constraints()
+        responses = driver_case.get_responses()
+
+        expected_desvars = {
+            "x": [1.],
+            "z": [5., 2.]
+        }
+
+        expected_objectives = { "obj": [28.58830817], }
+
+        expected_constraints = { "con1": [-22.42830237], "con2": [-11.94151185] }
+
+        expected_responses = expected_objectives.copy()
+        expected_responses.update(expected_constraints)
+
+        for expected_set, actual_set in (
+            (expected_desvars, desvars),
+            (expected_objectives, objectives),
+            (expected_constraints, constraints),
+            (expected_responses, responses)):
+            
+            self.assertEqual(len(expected_set), len(actual_set.keys))
+            for k in actual_set:
+                np.testing.assert_almost_equal(expected_set[k], actual_set[k])   
 
 
 if __name__ == "__main__":
