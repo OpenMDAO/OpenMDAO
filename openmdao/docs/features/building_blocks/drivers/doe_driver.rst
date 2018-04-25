@@ -61,7 +61,7 @@ for our `Paraboloid` model. With two inputs, :math:`3^2=9` cases have been
 generated. Since we are running on two processors, those cases have been split
 with 5 cases run on the first processor and 4 cases on the second.
 
-Note that we have used the `all_procs` argument to `SqliteRecorder` so that a
+Note that we have used the :code:`all_procs` argument to `SqliteRecorder` so that a
 separate case file is generated for each processor, otherwise we would only
 get cases from the root processor.
 
