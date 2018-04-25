@@ -268,8 +268,7 @@ class Solver(object):
             else:  # it's a LinearSolver
                 outputs = self._system._vectors['output']['linear']
 
-            myoutputs = {n for n in outputs._names
-                        if check_path(n, incl, excl)}
+            myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_inputs']:
             if isinstance(self, NonlinearSolver):
