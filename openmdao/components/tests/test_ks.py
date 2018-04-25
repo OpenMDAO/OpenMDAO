@@ -40,8 +40,8 @@ class TestKSFunction(unittest.TestCase):
 
         x = np.zeros((3, 5))
         x[0, :] = np.array([3.0, 5.0, 11.0, 13.0, 17.0])
-        x[1, :] = np.array([3.0, 5.0, 11.0, 13.0, 17.0])*2
-        x[2, :] = np.array([3.0, 5.0, 11.0, 13.0, 17.0])*3
+        x[1, :] = np.array([13.0, 11.0, 5.0, 17.0, 3.0])*2
+        x[2, :] = np.array([11.0, 3.0, 17.0, 5.0, 13.0])*3
 
         model.add_subsystem('px', IndepVarComp(name="x", val=x))
         model.add_subsystem('ks', KSComponent(width=5, vec_size=3))
@@ -56,6 +56,11 @@ class TestKSFunction(unittest.TestCase):
         assert_rel_error(self, prob['ks.KS'][0], 17.0)
         assert_rel_error(self, prob['ks.KS'][1], 34.0)
         assert_rel_error(self, prob['ks.KS'][2], 51.0)
+
+        partials = prob.check_partials(comps=['ks'], out_stream=None)
+
+        for (of, wrt) in partials['ks']:
+            assert_rel_error(self, partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
 
     def test_beam_stress(self):
         E = 1.

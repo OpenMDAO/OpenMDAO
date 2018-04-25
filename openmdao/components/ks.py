@@ -154,12 +154,19 @@ class KSComponent(ExplicitComponent):
             `Vector` containing outputs.
         """
         opt = self.options
+        meta = self.metadata
+        vec_size = meta['vec_size']
+        width = meta['width']
+
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
             con_val = -con_val
 
-        for j in range(self.metadata['vec_size']):
+        self.derivs = np.empty((vec_size, width))
+
+        for j in range(meta['vec_size']):
             outputs['KS'][j, :] = self._ks.compute(con_val[j, :], opt['rho'])
+            self.derivs[j, :] = self._ks.derivatives()[0]
 
     def compute_partials(self, inputs, partials):
         """
@@ -172,14 +179,7 @@ class KSComponent(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        meta = self.metadata
-        width = meta['width']
-        vec_size = meta['vec_size']
-
-        derivs = np.empty((vec_size, width))
-
-        for j in range(vec_size):
-            derivs[j, :] = self._ks.derivatives()[0]
+        derivs = self.derivs
 
         if self.options['lower_flag']:
             derivs = -derivs
