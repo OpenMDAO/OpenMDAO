@@ -8,7 +8,8 @@ from six import StringIO
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, ScipyOptimizer, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -1034,6 +1035,111 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
 
+    def test_sellar_mdf_linear_con_directsolver(self):
+        # This test makes sure that we call solve_nonlinear first if we have any linear constraints
+        # to cache.
+
+        class SellarDis1withDerivatives(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('z', val=np.zeros(2))
+                self.add_input('x', val=0.)
+                self.add_input('y2', val=0.0)
+                self.add_output('y1', val=0.0)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                z1 = inputs['z'][0]
+                z2 = inputs['z'][1]
+                x1 = inputs['x']
+                y2 = inputs['y2']
+
+                outputs['y1'] = z1**2 + z2 + x1 - 0.2*y2
+
+            def compute_partials(self, inputs, partials):
+                partials['y1', 'y2'] = -0.2
+                partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
+                partials['y1', 'x'] = 1.0
+
+
+        class SellarDis2withDerivatives(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('z', val=np.zeros(2))
+                self.add_input('y1', val=0.0)
+                self.add_output('y2', val=0.0)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                z1 = inputs['z'][0]
+                z2 = inputs['z'][1]
+                y1 = inputs['y1']
+
+                if y1.real < 0.0:
+                    y1 *= -1
+
+                outputs['y2'] = y1**.5 + z1 + z2
+
+            def compute_partials(self, inputs, J):
+                y1 = inputs['y1']
+                if y1.real < 0.0:
+                    y1 *= -1
+
+                J['y2', 'y1'] = .5*y1**-.5
+                J['y2', 'z'] = np.array([[1.0, 1.0]])
+
+
+        class MySellarGroup(Group):
+
+            def setup(self):
+                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+                self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+                mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+                mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+                self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                       z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+                self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+                self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+                self.linear_solver = DirectSolver()
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
+        prob = Problem()
+        model = prob.model = MySellarGroup()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-3
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.add_constraint('x', upper=11.0, linear=True)
+
+        prob.setup(check=False, mode='rev')
+        prob.set_solver_print(level=0)
+
+        failed = prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+
+        self.assertEqual(len(prob.driver._lincongrad_cache), 1)
+        # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
+        prob.driver.run()
+        self.assertEqual(len(prob.driver._lincongrad_cache), 1)
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
