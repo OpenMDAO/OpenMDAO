@@ -55,6 +55,9 @@ class Group(System):
             dict of arguments available here and in all descendants of this
             Group.
         """
+        self._mpi_proc_allocator = DefaultAllocator()
+        self._proc_info = {}
+
         super(Group, self).__init__(**kwargs)
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -64,8 +67,6 @@ class Group(System):
             self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
-        self._mpi_proc_allocator = DefaultAllocator()
-        self._proc_info = {}
 
     def setup(self):
         """
