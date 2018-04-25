@@ -66,12 +66,18 @@ If we had not promoted `pz.z`, we would use:
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
 
-If a user would like to access the user-defined metadata on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. Note that the case recorder does need to be explicitly added to a system in order for its metadata to be recorded. Accessing this data for `pz` would look like:
+If a user would like to access the user-defined metadata on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. The case recorder does need to be explicitly added to a system in order for its metadata to be recorded. System metadata stored in `system_metadata` is accessed by system name where each system has two keys: `component_metadata` for accessing the user-defined metadata and `scaling_factors`. Accessing this data for `pz` would look like:
 
 .. code-block:: console
 
+    pz.metadata.declare('test data', True)
+    ...
     pz_metadata = cr.system_metadata['pz']['component_metadata']
+    test_data_value = pz_metadata['test data']
+
     pz_scaling = cr.system_metadata['pz']['scaling_factors']
+
+
 
 Finally, if a user would like to access variable metadata there is a `output2meta` dictionary and a `input2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
 
@@ -116,20 +122,20 @@ Just like :ref:`listing variables <listing-variables>` on System objects, there 
 .. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.list_outputs
     :noindex:
 
-These methods use System cases and thus will only return variables on systems which have the recorder attached. Using these methods is as simple as:
+These methods default to using System cases if no specific case is supplied. If the user does supply a Case then the output will only reflect the variables recorded within that case. For example, if we wanted to get the inputs and outputs recorded in the last driver case we would use:
 
 .. code-block:: console
 
-    cr.list_inputs()
-    cr.list_outputs()
+    last_driver_case = cr.driver_cases.get_case(-1)
+    inputs = cr.list_inputs(last_driver_case)
+    outputs = cr.list_outputs(last_driver_case)
 
-
-By default, both methods will give all recorded variables and, if the `values` parameter is set to True, the last recorded value of each variable. Using the `case_id` parameter, however, enables listing inputs and outputs for a single system case. For example, listing the first and last system outputs recorded would be:
+By default, both methods will give all inputs or outputs recorded in system iterations and, if the `values` parameter is set to True, the last recorded value of each variable. Grabbing all recorded inputs and outputs is as simple as:
 
 .. code-block:: console
 
-    cr.list_outputs(case_id=0)
-    cr.list_outputs(case_id=-1)
+    all_outputs = cr.list_outputs()
+    all_inputs cr.list_outputs()
 
 But you can also choose to use a specific iteration coordinate:
 
