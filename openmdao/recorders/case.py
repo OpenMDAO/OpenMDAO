@@ -27,6 +27,12 @@ class Case(object):
         Dictionary mapping absolute names to promoted names.
     meta : dict
         Dicitonary mapping absolute variable names to variable metadata.
+    inputs : PromotedToAbsoluteMap
+        Map of inputs to values recorded.
+    outputs : PromotedToAbsoluteMap
+        Map of outputs to values recorded.
+    residuals : PromotedToAbsoluteMap
+        Map of outputs to residuals recorded.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
@@ -130,6 +136,12 @@ class Case(object):
     def _get_variables_of_type(self, var_type):
         """
         Get the variables of a given type and their values.
+
+        Parameters
+        ----------
+        var_type : str
+            String indicating which value for 'type' should be accepted for a variable
+            to be included in the returned map.
 
         Returns
         -------
@@ -297,6 +309,8 @@ class PromotedToAbsoluteMap:
         Array of values accessible via absolute variable name.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
     _is_output : bool
         True if this should map using output variable names, False for input variable names.
     _iteration_index : int

@@ -44,7 +44,7 @@ The `get_case` method provides a way to get at individual cases. The argument to
             as is normally done in Python.
     #. String - in which case the argument is one of the case keys.
 
-For example, in the common situation where the user wants to see the last case, they can do
+For example, in the common situation where the user wants to see the last case, they can do:
 
 .. code-block:: console
 
@@ -113,8 +113,17 @@ Note that this generator can return both Driver and Solver cases, which have dif
 
 *Listing Variables*
 ~~~~~~~~~~~~~~~~~~~
+Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`, and :code:`get_responses()` which, as their names imply, will return the corresponding set of variables and their values on that case. In the situation where the user may want to print the design variables on the first driver case they could use:
 
-Just like :ref:`listing variables <listing-variables>` on System objects, there is a :code:`list_inputs` method and a :code:`list_outputs` method.
+.. code-block:: console
+
+    print("-----------desvars-----------")
+    first_case = cr.driver_cases.get_case(0)
+    desvars = first_case.get_desvars()
+    for des in desvars:
+        print(des + ': ' + str(desvars[des]))
+
+Additionally, just like :ref:`listing variables <listing-variables>` on System objects, there is a :code:`list_inputs` method and a :code:`list_outputs` method on the CaseReader.
 
 .. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.list_inputs
     :noindex:
@@ -136,9 +145,3 @@ By default, both methods will give all inputs or outputs recorded in system iter
 
     all_outputs = cr.list_outputs()
     all_inputs cr.list_outputs()
-
-But you can also choose to use a specific iteration coordinate:
-
-.. code-block:: console
-
-    cr.list_inputs(case_id='rank0:SLSQP|0|root._solve_nonlinear|0')
