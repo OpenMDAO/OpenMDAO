@@ -40,12 +40,12 @@ class DOEGenerator(object):
         design_vars : dict
             Dictionary of design variables for which to generate values.
 
-        Yields
-        ------
+        Returns
+        -------
         list
             list of name, value tuples for the design variables.
         """
-        return ()
+        return []
 
 
 class DOEDriver(Driver):
