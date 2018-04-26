@@ -81,9 +81,8 @@ Setting a limit on the number of major iterations. Here, we set it to just a few
 You can learn more about the available options in the SNOPT_Manual_.
 
 
-.. toctree::
-    :maxdepth: 1
-
 .. _mdolab: https://github.com/mdolab/pyoptsparse
 
 .. _SNOPT_Manual: http://www.sbsi-sol-optimize.com/manuals/SNOPT%20Manual.pdf
+
+.. tags:: Driver, Optimizer, Optimization

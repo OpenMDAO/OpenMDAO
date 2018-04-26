@@ -541,7 +541,9 @@ class Problem(object):
 
         self._mode = mode
 
-        model._setup(comm, 'full', mode)
+        model_comm = self.driver._setup_comm(comm)
+
+        model._setup(model_comm, 'full', mode)
 
         # Cache all args for final setup.
         self._vector_class = vector_class
