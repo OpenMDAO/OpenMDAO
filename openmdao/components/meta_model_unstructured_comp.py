@@ -543,6 +543,6 @@ class MetaModelUnStructured(MetaModelUnStructuredComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'MetaModelUnStructured' component has been deprecated. Use"
+        warn_deprecation("'MetaModelUnStructured' has been deprecated. Use "
                          "'MetaModelUnStructuredComp' instead.")
         super(MetaModelUnStructured, self).__init__(*args, **kwargs)

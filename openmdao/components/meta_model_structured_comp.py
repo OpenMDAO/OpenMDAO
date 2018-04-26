@@ -788,6 +788,6 @@ class MetaModelStructured(MetaModelStructuredComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'MetaModelStructured' component has been deprecated. Use"
+        warn_deprecation("'MetaModelStructured' has been deprecated. Use "
                          "'MetaModelStructuredComp' instead.")
         super(MetaModelStructured, self).__init__(*args, **kwargs)

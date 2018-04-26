@@ -204,6 +204,6 @@ class KSComponent(KSComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'KSComponent' component has been deprecated. Use"
+        warn_deprecation("'KSComponent' has been deprecated. Use "
                          "'KSComp' instead.")
         super(KSComponent, self).__init__(*args, **kwargs)
