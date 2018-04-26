@@ -524,7 +524,7 @@ class MetaModel(MetaModelUnStructuredComp):
         """
         warn_deprecation("'MetaModel' component has been deprecated. Use"
                          "'MetaModelUnStructuredComp' instead.")
-        super(Metamodel, self).__init__(*args, **kwargs)
+        super(MetaModel, self).__init__(*args, **kwargs)
 
 
 class MetaModelUnStructured(MetaModelUnStructuredComp):
