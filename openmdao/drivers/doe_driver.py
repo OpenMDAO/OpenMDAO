@@ -45,8 +45,7 @@ class DOEGenerator(object):
         list
             list of name, value tuples for the design variables.
         """
-        return
-        yield
+        return ()
 
 
 class DOEDriver(Driver):
