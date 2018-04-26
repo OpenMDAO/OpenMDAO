@@ -312,6 +312,8 @@ class Driver(object):
         # set up case recording
         self._setup_recording()
 
+        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+
         # set up simultaneous deriv coloring
         if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
@@ -319,8 +321,6 @@ class Driver(object):
                 self._setup_simul_coloring(problem._mode)
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
-
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
 
         # if we're using simultaneous derivatives then our effective design var size is less
         # than the full design var size
@@ -938,21 +938,20 @@ class Driver(object):
         if not coloring_mod._use_sparsity:
             return
 
-        prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
-
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
-                tup = self._simul_coloring_info
-                column_lists, row_map = tup[:2]
-                if len(tup) > 2:
-                    sparsity = tup[2]
-                    if self._total_jac_sparsity is not None:
-                        raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                                           " and _total_jac_sparsity.")
-                    self._total_jac_sparsity = sparsity
 
-                self._simul_coloring_info = column_lists, row_map
+        tup = self._simul_coloring_info
+        column_lists, row_map = tup[:2]
+        if len(tup) > 2:
+            sparsity = tup[2]
+            if self._total_jac_sparsity is not None:
+                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                                   " and _total_jac_sparsity.")
+            self._total_jac_sparsity = sparsity
+
+        self._simul_coloring_info = column_lists, row_map
 
     def _pre_run_model_debug_print(self):
         """
