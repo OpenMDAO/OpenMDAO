@@ -547,7 +547,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db", all_procs=True))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
         prob.driver.options['parallel'] =  True
 
         prob.setup(vector_class=PETScVector)
@@ -602,7 +602,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('c3.y')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db", all_procs=True))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
         prob.driver.options['parallel'] =  doe_parallel
 
         prob.setup(vector_class=PETScVector, check=False)
@@ -726,9 +726,9 @@ class TestParallelDOEFeature(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-
         prob.driver.options['parallel'] =  True
-        prob.driver.add_recorder(SqliteRecorder("CASES.db", all_procs=True))
+
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(vector_class=PETScVector)
         prob.run_driver()
