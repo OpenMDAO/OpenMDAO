@@ -957,7 +957,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
         assert_almost_equal(computed, actual)
 
-        # we can verify all gradients by checking against finit-difference
+        # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
@@ -1006,7 +1006,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
         assert_almost_equal(computed, actual)
 
-        # we can verify all gradients by checking against finit-difference
+        # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
@@ -1055,7 +1055,7 @@ class TestMetaModelStructuredMapFeature(unittest.TestCase):
 
         assert_almost_equal(computed, actual)
 
-        # we can verify all gradients by checking against finit-difference
+        # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
 
 
