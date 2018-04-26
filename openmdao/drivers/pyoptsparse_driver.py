@@ -223,6 +223,7 @@ class pyOptSparseDriver(Driver):
         model = problem.model
         relevant = model._relevant
         self.pyopt_solution = None
+        self._total_jac = None
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
