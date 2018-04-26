@@ -33,7 +33,7 @@ The BsplinesComp is vectorized, so you can operate on a multi-row vector and hav
 interpolated points independently for each row:
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_vectorized
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_vectorized
     :layout: code, output
 
 
