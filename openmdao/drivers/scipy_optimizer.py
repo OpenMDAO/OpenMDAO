@@ -215,6 +215,7 @@ class ScipyOptimizeDriver(Driver):
         opt = self.options['optimizer']
         model = problem.model
         self.iter_count = 0
+        self._total_jac = None
 
         # Initial Run
         model._solve_nonlinear()
