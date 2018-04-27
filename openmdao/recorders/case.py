@@ -26,7 +26,7 @@ class Case(object):
     abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     meta : dict
-        Dicitonary mapping absolute variable names to variable metadata.
+        Dictionary mapping absolute variable names to variable metadata.
     inputs : PromotedToAbsoluteMap
         Map of inputs to values recorded.
     outputs : PromotedToAbsoluteMap
@@ -59,7 +59,7 @@ class Case(object):
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         meta : dict
-            Dicitonary mapping absolute variable names to variable metadata.
+            Dictionary mapping absolute variable names to variable metadata.
         inputs : array
             Inputs to read in from the recording file.
         outputs : array
@@ -83,7 +83,7 @@ class Case(object):
         self.abs2prom = abs2prom
 
         if inputs is not None and inputs.dtype.names:
-            self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, False)
+            self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
         if outputs is not None and outputs.dtype.names:
             self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs, abs2prom)
         if residuals is not None and residuals.dtype.names:
@@ -191,7 +191,7 @@ class DriverCase(Case):
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         meta : dict
-            Dicitonary mapping absolute variable names to variable metadata.
+            Dictionary mapping absolute variable names to variable metadata.
         """
         super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg, prom2abs,
@@ -233,12 +233,12 @@ class SystemCase(Case):
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         meta : dict
-            Dicitonary mapping absolute variable names to variable metadata.
+            Dictionary mapping absolute variable names to variable metadata.
         """
         super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg, prom2abs,
                                          abs2prom, meta, inputs, outputs,
-                                         residuals)
+                                         residuals=residuals)
 
 
 class SolverCase(Case):
@@ -287,11 +287,11 @@ class SolverCase(Case):
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         meta : dict
-            Dicitonary mapping absolute variable names to variable metadata.
+            Dictionary mapping absolute variable names to variable metadata.
         """
         super(SolverCase, self).__init__(filename, counter, iteration_coordinate, timestamp,
                                          success, msg, prom2abs, abs2prom, meta,
-                                         inputs, outputs, residuals)
+                                         inputs, outputs, residuals=residuals)
 
         self.abs_err = abs_err
         self.rel_err = rel_err

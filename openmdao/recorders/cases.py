@@ -17,7 +17,7 @@ class BaseCases(object):
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _abs2meta : dict
-        Dicitonary mapping absolute variable names to variable metadata.
+        Dictionary mapping absolute variable names to variable metadata.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
     """
@@ -35,7 +35,7 @@ class BaseCases(object):
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         abs2meta : dict
-            Dicitonary mapping absolute variable names to variable metadata.
+            Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
         """
