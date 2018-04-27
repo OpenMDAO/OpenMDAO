@@ -4,9 +4,10 @@ Utils for dealing with arrays.
 from __future__ import print_function, division
 
 import sys
-import numpy as np
 import six
 from six.moves import range
+
+import numpy as np
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):
@@ -190,3 +191,45 @@ def array_connection_compatible(shape1, shape2):
         fundamental_shape2 = np.ones((1,))
 
     return np.all(fundamental_shape1 == fundamental_shape2)
+
+
+def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
+    """
+    Assemble a sprase csr jacobian for a vectorized component.
+
+    Parameters
+    ----------
+    data : ndarray
+        Array of values
+    rows : index array
+        Array of row indices.
+    cols : index array
+        Array of column indices.
+    nrow : int
+        Number of rows in sub jacobian.
+    ncol : int
+        Number of columns in sub jacobian.
+    num_nodes : int
+        Number of vectorized copies to tile.
+
+    Returns
+    -------
+    ndarray, ndarray, ndarray
+        CSR Sparse jacobian of size num_nodes*nrow by num_nodes*ncol
+    """
+    nnz = len(rows)
+
+    if np.isscalar(data):
+        data = data * np.ones(nnz)
+
+    if not np.isscalar(nrow):
+        nrow = np.prod(nrow)
+
+    if not np.isscalar(ncol):
+        ncol = np.prod(ncol)
+
+    data = np.tile(data, num_nodes)
+    rows = np.tile(rows, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * nrow
+    cols = np.tile(cols, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * ncol
+
+    return data, rows, cols

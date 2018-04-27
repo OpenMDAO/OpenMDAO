@@ -6,7 +6,7 @@ import numpy as np
 from scipy.sparse import csc_matrix, csr_matrix
 
 from openmdao.api import ExplicitComponent
-
+from openmdao.utils.array_utils import tile_sparse_jac
 
 CITATIONS = """
 @conference {Hwang2012c,
@@ -111,8 +111,8 @@ class BsplinesComp(ExplicitComponent):
     Simple B-spline component for interpolation.
     """
 
-    def __init__(self, num_control_points=10, num_points=20, bspline_order=4, in_name='h_cp',
-                 out_name='h', distribution='sine'):
+    def __init__(self, num_control_points=10, num_points=20, vec_size=1, bspline_order=4,
+                 in_name='h_cp', out_name='h', distribution='sine'):
         """
         Initialize the BsplinesComp.
 
@@ -122,6 +122,8 @@ class BsplinesComp(ExplicitComponent):
             Number of control points.
         num_points : int
             Number of interpolated points.
+        vec_size : int
+            The number of independent rows to interpolate.
         bspline_order : int(4)
             B-spline order.
         in_name : str
@@ -133,7 +135,8 @@ class BsplinesComp(ExplicitComponent):
             or 'uniform'.
         """
         super(BsplinesComp, self).__init__(num_control_points=num_control_points,
-                                           num_points=num_points, bspline_order=bspline_order,
+                                           num_points=num_points, vec_size=vec_size,
+                                           bspline_order=bspline_order,
                                            in_name=in_name, out_name=out_name,
                                            distribution=distribution)
         self.cite = CITATIONS
@@ -142,14 +145,18 @@ class BsplinesComp(ExplicitComponent):
         """
         Declare metadata.
         """
-        self.metadata.declare('num_control_points', types=int, desc="Number of control points.")
-        self.metadata.declare('num_points', types=int, desc="Number of interpolated points.")
+        self.metadata.declare('num_control_points', types=int, default=10,
+                              desc="Number of control points.")
+        self.metadata.declare('num_points', types=int, default=20,
+                              desc="Number of interpolated points.")
+        self.metadata.declare('vec_size', types=int, default=1,
+                              desc='The number of independent rows to interpolate.')
         self.metadata.declare('bspline_order', 4, types=int, desc="B-spline order.")
-        self.metadata.declare('in_name', types=str,
+        self.metadata.declare('in_name', types=str, default='h_cp',
                               desc="Name to use for the input variable (control points).")
-        self.metadata.declare('out_name', types=str,
+        self.metadata.declare('out_name', types=str, default='h',
                               desc="Name to use for the output variable (interpolated points).")
-        self.metadata.declare('distribution', 'sine', values=['uniform', 'sine'],
+        self.metadata.declare('distribution', default='sine', values=['uniform', 'sine'],
                               desc="Choice of spatial distribution to use for placing the control "
                               "points. It can be 'sine' or 'uniform'.")
 
@@ -160,20 +167,22 @@ class BsplinesComp(ExplicitComponent):
         meta = self.metadata
         num_control_points = meta['num_control_points']
         num_points = meta['num_points']
+        vec_size = meta['vec_size']
         in_name = meta['in_name']
         out_name = meta['out_name']
 
-        self.add_input(in_name, val=np.random.rand(num_control_points, ))
-        self.add_output(out_name, val=np.random.rand(num_points, ))
+        self.add_input(in_name, val=np.random.rand(vec_size, num_control_points))
+        self.add_output(out_name, val=np.random.rand(vec_size, num_points))
 
         jac = get_bspline_mtx(num_control_points, num_points,
                               order=meta['bspline_order'],
                               distribution=meta['distribution']).tocoo()
 
-        data, rows, cols = jac.data, jac.row, jac.col
+        data, rows, cols = tile_sparse_jac(jac.data, jac.row, jac.col,
+                                           num_points, num_control_points, vec_size)
 
         self.jac = csc_matrix((data, (rows, cols)),
-                              shape=(num_points, num_control_points))
+                              shape=(vec_size * num_points, vec_size * num_control_points))
 
         self.declare_partials(of=out_name, wrt=in_name, val=data, rows=rows, cols=cols)
 
@@ -191,9 +200,12 @@ class BsplinesComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         meta = self.metadata
+        num_control_points = meta['num_control_points']
+        num_points = meta['num_points']
+        vec_size = meta['vec_size']
 
-        out_shape = (meta['num_points'], )
-        in_shape = (meta['num_control_points'], )
+        out_shape = (vec_size, num_points)
+        in_shape = (vec_size, num_control_points)
 
         out = self.jac * inputs[meta['in_name']].reshape(np.prod(in_shape))
         outputs[meta['out_name']] = out.reshape(out_shape)

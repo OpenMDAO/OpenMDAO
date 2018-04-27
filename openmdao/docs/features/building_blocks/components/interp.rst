@@ -29,6 +29,13 @@ degrees and represent it with 5 control points that can be used as design variab
     openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_basic
     :layout: code, output
 
+The BsplinesComp is vectorized, so you can operate on a multi-row vector and have the it create
+interpolated points independently for each row:
+
+.. embed-code::
+    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_vectorized
+    :layout: code, output
+
 
 BsplinesComp Option Examples
 ----------------------------
