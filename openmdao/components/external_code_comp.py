@@ -59,6 +59,8 @@ class ExternalCodeComp(ExplicitComponent):
     options['fail_hard'] :  bool(True)
         Behavior on error returned from code, either raise a 'hard' error (RuntimeError) if True
         or a 'soft' error (AnalysisError) if False.
+    options['allowed_return_codes'] :  list or set of int [0]
+        List of return codes that are considered successful.
     """
 
     def __init__(self):
@@ -90,6 +92,8 @@ class ExternalCodeComp(ExplicitComponent):
                              desc="If True, external code errors raise a 'hard' exception "
                              "(RuntimeError).  Otherwise raise a 'soft' exception "
                              "(AnalysisError).")
+        self.options.declare('allowed_return_codes', [0],
+                             desc="Set of return codes that are considered successful.")
 
         # Outputs of the run of the component or items that will not work with the OptionsDictionary
         self.return_code = 0  # Return code from the command
@@ -161,7 +165,7 @@ class ExternalCodeComp(ExplicitComponent):
                 raise AnalysisError('Timed out after %s sec.' %
                                     self.options['timeout'])
 
-            elif return_code:
+            elif return_code not in self.options['allowed_return_codes']:
                 if isinstance(self.stderr, str):
                     if os.path.exists(self.stderr):
                         stderrfile = open(self.stderr, 'r')
