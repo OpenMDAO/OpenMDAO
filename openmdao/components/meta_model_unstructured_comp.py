@@ -1,6 +1,7 @@
 """MetaModel provides basic meta modeling capability."""
 from six.moves import range
 from copy import deepcopy
+from itertools import chain
 
 import numpy as np
 
@@ -27,10 +28,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         to them.
     train : bool
         If True, training will occur on the first execution.
-    warm_restart : bool
-        When set to False (default), the metamodel retrains with the new dataset whenever the
-        training data values are changed. When set to True, the new data is appended to the old
-        data and all of the data is used to train.
     _input_size : int
         Keeps track of the cumulative size of all inputs.
     _surrogate_input_names : [str, ..]
@@ -70,12 +67,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._training_input = np.zeros(0)
         self._training_output = {}
 
-        # When set to False (default), the metamodel retrains with the new
-        # dataset whenever the training data values are changed. When set to
-        # True, the new data is appended to the old data and all of the data
-        # is used to train.
-        self.warm_restart = False
-
         self._input_size = 0
 
     def initialize(self):
@@ -97,8 +88,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         val : float or ndarray
             Initial value for the input.
         training_data : float or ndarray
-            training data for this variable. Optional, can be set
-            by the problem later.
+            training data for this variable. Optional, can be set by the problem later.
         **kwargs : dict
             Additional agruments for add_input.
 
@@ -191,8 +181,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        # create an instance of the default surrogate for outputs that
-        # did not have a surrogate specified
+        # Create an instance of the default surrogate for outputs that did not have a surrogate
+        # specified.
         if self.default_surrogate is not None:
             for name, shape in self._surrogate_output_names:
                 metadata = self._metadata(name)
@@ -205,6 +195,39 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         super(MetaModelUnStructuredComp, self)._setup_vars()
 
+    def _setup_partials(self, recurse=True):
+        """
+        Process all partials and approximations that the user declared.
+
+        Metamodel needs to declare its partials after inputs and outputs are known.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(MetaModelUnStructuredComp, self)._setup_partials()
+
+        vec_size = self.metadata['vec_size']
+        if vec_size > 1:
+            # Sparse specification of partials for vectorized models.
+            for wrt, n_wrt in self._surrogate_input_names:
+                for of, shape_of in self._surrogate_output_names:
+
+                    n_of = np.prod(shape_of)
+                    rows = np.repeat(np.arange(n_of), n_wrt)
+                    cols = np.tile(np.arange(n_wrt), n_of)
+                    nnz = len(rows)
+                    rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
+                    cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
+
+                    self.declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
+
+        else:
+            # Dense specification of partials for non-vectorized models.
+            self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
+                                   wrt=[name[0] for name in self._surrogate_input_names])
+
     def check_config(self, logger):
         """
         Perform optional error checks.
@@ -214,8 +237,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         logger : object
             The object that manages logging output.
         """
-        # All outputs must have surrogates assigned
-        # either explicitly or through the default surrogate
+        # All outputs must have surrogates assigned either explicitly or through the default
+        # surrogate.
         if self.default_surrogate is None:
             no_sur = []
             for name, shape in self._surrogate_output_names:
@@ -245,12 +268,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         vec_size = self.metadata['vec_size']
 
-        if self.train:  # train first
+        # train first
+        if self.train:
             self._train()
 
         # predict for current inputs
         if vec_size > 1:
-            inputs = self._vec_to_array2d(inputs)
+            inputs = self._vec_to_array_vectorized(inputs)
         else:
             inputs = self._vec_to_array(inputs)
 
@@ -325,9 +349,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         return arr
 
-    def _vec_to_array2d(self, vec):
+    def _vec_to_array_vectorized(self, vec):
         """
-        Convert from a dictionary of inputs to a 2d ndarray with self._vectorize rows.
+        Convert from a dictionary of inputs to a 2d ndarray with vec_size rows.
 
         Parameters
         ----------
@@ -373,7 +397,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         vec_size = self.metadata['vec_size']
         if vec_size > 1:
-            arr = self._vec_to_array2d(inputs)
+            arr = self._vec_to_array_vectorized(inputs)
         else:
             arr = self._vec_to_array(inputs)
 
@@ -386,33 +410,19 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 partials[(uname, pname)] = sjac[:, idx:idx + sz]
                 idx += sz
 
-    def _setup_partials(self, recurse=True):
-        """
-        Process all partials and approximations that the user declared.
-
-        Metamodel needs to declare its partials after inputs and outputs are known.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(MetaModelUnStructuredComp, self)._setup_partials()
-        self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
-                               wrt=[name[0] for name in self._surrogate_input_names])
-
     def _train(self):
         """
         Train the metamodel, if necessary, using the provided training data.
         """
         missing_training_data = []
         num_sample = None
-        for name, _ in self._surrogate_input_names:
+        for name, _ in chain(self._surrogate_input_names, self._surrogate_output_names):
             train_name = 'train:' + name
             val = self.metadata[train_name]
             if val is None:
                 missing_training_data.append(train_name)
                 continue
+
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
@@ -422,34 +432,14 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                       .format(num_sample, len(val), name)
                 raise RuntimeError(msg)
 
-        for name, _ in self._surrogate_output_names:
-            train_name = 'train:' + name
-            val = self.metadata[train_name]
-            if val is None:
-                missing_training_data.append(train_name)
-                continue
-            if len(val) != num_sample:
-                msg = "MetaModelUnStructuredComp: Each variable must have the same number" \
-                      " of training points. Expected {0} but found {1} " \
-                      "points for '{2}'." \
-                    .format(num_sample, len(val), name)
-                raise RuntimeError(msg)
-
         if len(missing_training_data) > 0:
             msg = "MetaModelUnStructuredComp: The following training data sets must be " \
                   "provided as metadata for %s: " % self.pathname + \
                   str(missing_training_data)
             raise RuntimeError(msg)
 
-        if self.warm_restart:
-            num_old_pts = self._training_input.shape[0]
-            inputs = np.zeros((num_sample + num_old_pts, self._input_size))
-            if num_old_pts > 0:
-                inputs[:num_old_pts, :] = self._training_input
-            new_input = inputs[num_old_pts:, :]
-        else:
-            inputs = np.zeros((num_sample, self._input_size))
-            new_input = inputs
+        inputs = np.zeros((num_sample, self._input_size))
+        new_input = inputs
 
         self._training_input = inputs
 
@@ -472,17 +462,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if num_sample > 0:
                 output_size = np.prod(shape)
 
-                if self.warm_restart:
-                    outputs = np.zeros((num_sample + num_old_pts,
-                                        output_size))
-                    if num_old_pts > 0:
-                        outputs[:num_old_pts, :] = self._training_output[name]
-                    self._training_output[name] = outputs
-                    new_output = outputs[num_old_pts:, :]
-                else:
-                    outputs = np.zeros((num_sample, output_size))
-                    self._training_output[name] = outputs
-                    new_output = outputs
+                outputs = np.zeros((num_sample, output_size))
+                self._training_output[name] = outputs
+                new_output = outputs
 
                 val = self.metadata['train:' + name]
 

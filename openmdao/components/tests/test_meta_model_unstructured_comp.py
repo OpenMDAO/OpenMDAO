@@ -1,3 +1,6 @@
+"""
+Unit tests for the unstructured metamodel component.
+"""
 import numpy as np
 import unittest
 
@@ -181,13 +184,6 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
 
         self.assertTrue(mm.train)  # training will occur after re-setup
-        mm.warm_restart = True     # use existing training data
-
-        prob['mm.x1'] = 2.5
-        prob['mm.x2'] = 3.5
-
-        prob.run_model()
-        assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
 
     def test_warm_start(self):
         # create metamodel with warm_restart = True
@@ -224,12 +220,6 @@ class MetaModelTestCase(unittest.TestCase):
         mm.metadata['train:x2'] = [3.0]
         mm.metadata['train:y1'] = [2.0]
         mm.metadata['train:y2'] = [4.0]
-
-        mm.train = True  # currently need to tell meta to re-train
-
-        prob.run_model()
-        assert_rel_error(self, prob['mm.y1'], 2.0, .00001)
-        assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
 
     def test_vector_inputs(self):
         mm = MetaModelUnStructuredComp()
