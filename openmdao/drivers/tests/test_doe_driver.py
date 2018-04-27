@@ -753,9 +753,8 @@ class TestParallelDOEFeature(unittest.TestCase):
 
         self.assertEqual(MPI.COMM_WORLD.size, 2)
 
+        # check recorded cases from each case file
         rank = MPI.COMM_WORLD.rank
-
-        # cases will be split across files for each processor
         filename = "CASES.db_%d" % rank
         cases = CaseReader(filename).driver_cases
 
@@ -767,6 +766,55 @@ class TestParallelDOEFeature(unittest.TestCase):
             values.append((case.desvars['x'], case.desvars['y'], case.objectives['f_xy']))
 
         print("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestParallelDOEFeature2(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_fan_in_grouped(self):
+        from openmdao.api import Problem, IndepVarComp, PETScVector
+        from openmdao.test_suite.groups.parallel_groups import FanInGrouped
+
+        from openmdao.api import DOEDriver, FullFactorialGenerator
+        from openmdao.api import SqliteRecorder, CaseReader
+
+        from mpi4py import MPI
+
+        prob = Problem(FanInGrouped())
+        model = prob.model
+
+        model.add_design_var('iv.x1', lower=0.0, upper=1.0)
+        model.add_design_var('iv.x2', lower=0.0, upper=1.0)
+
+        model.add_objective('c3.y')
+
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+
+        doe_parallel = prob.driver.options['parallel'] = 2
+
+        prob.setup(vector_class=PETScVector)
+        prob.run_driver()
+        prob.cleanup()
+
+        rank = MPI.COMM_WORLD.rank
+
+        # check recorded cases from each case file
+        if rank < doe_parallel:
+            filename = "CASES.db_%d" % rank
+
+            cases = CaseReader(filename).driver_cases
+
+            num_cases = cases.num_cases
+
+            values = []
+            for n in range(cases.num_cases):
+                case = cases.get_case(n)
+                values.append((case.desvars['iv.x1'], case.desvars['iv.x2'], case.objectives['c3.y']))
+
+            print("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
 
 if __name__ == "__main__":

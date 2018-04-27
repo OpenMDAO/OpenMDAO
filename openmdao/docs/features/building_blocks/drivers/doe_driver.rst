@@ -49,8 +49,8 @@ DOEDriver Options
 
 .. _doe_driver_parallel:
 
-Running a DOE Driver in Parallel
---------------------------------
+Running a DOE in Parallel
+-------------------------
 
 In a parallel processing environment, it is possible for `DOEDriver` to run
 cases concurrently. This is done by specifying the `parallel` option as shown
@@ -62,12 +62,36 @@ generated. Since we are running on two processors, those cases have been split
 with 5 cases run on the first processor and 4 cases on the second.
 
 Note that, when running in parallel, the `SqliteRecorder` will generate a separate
-case file for each processor on which a case is recorded. A message will be displayed
-indicating the name of each file, as seen in the example.
+case file for each processor on which cases are recorded. The case files will have a
+suffix indicating the recording rank and a message will be displayed indicating the
+file name, as seen in the example.
 
 .. embed-code::
     openmdao.drivers.tests.test_doe_driver.TestParallelDOEFeature.test_full_factorial
     :layout: interleave
+
+
+Running a DOE in Parallel with a Parallel Model
+-----------------------------------------------
+
+If the model that is being subjected to the DOE on is also parallel, then the total
+number of processors should reflect the model size as well as the desired concurrency.
+
+To illustrate this, we will demonstrate performing a DOE on a model based on the
+:ref:`ParallelGroup<feature_parallel_group>` example:
+
+.. embed-code::
+    openmdao.test_suite.groups.parallel_groups.FanInGrouped
+    :layout: code
+
+In this case, the model itself requires two processors, so in order to run cases
+concurrently we need to allocate at least four processors in total.  With four
+processors we can run two cases at a time, which is done by specifying
+:code:`options['parallel']=2` for the `DOEDriver` options.
+
+.. embed-code::
+    openmdao.drivers.tests.test_doe_driver.TestParallelDOEFeature2.test_fan_in_grouped
+    :layout: code, output
 
 .. _pyDOE: https://pythonhosted.org/pyDOE
 .. _pyDOE2: https://pypi.org/project/pyDOE2
