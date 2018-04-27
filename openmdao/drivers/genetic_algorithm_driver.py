@@ -18,7 +18,7 @@ from six import iteritems
 from six.moves import range, zip
 
 import numpy as np
-from pyDOE import lhs
+from pyDOE2 import lhs
 
 from openmdao.core.driver import Driver
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -46,6 +46,8 @@ class SimpleGADriver(Driver):
         design variables.
     _ga : <GeneticAlgorithm>
         Main genetic algorithm lies here.
+    _randomstate : np.random.RandomState, int
+         Random state (or seed-number) which controls the seed and random draws.
     """
 
     def __init__(self):
@@ -85,6 +87,9 @@ class SimpleGADriver(Driver):
 
         self._desvar_idx = {}
         self._ga = None
+
+        # random state can be set for predictability during testing
+        self._randomstate = None
 
     def _setup_driver(self, problem):
         """
@@ -165,7 +170,9 @@ class SimpleGADriver(Driver):
         if pop_size == 0:
             pop_size = 4 * np.sum(bits)
 
-        desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound, bits, pop_size, max_gen)
+        desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound,
+                                              bits, pop_size, max_gen,
+                                              self._randomstate)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
@@ -275,7 +282,7 @@ class GeneticAlgorithm():
         self.npop = 0
         self.elite = True
 
-    def execute_ga(self, vlb, vub, bits, pop_size, max_gen):
+    def execute_ga(self, vlb, vub, bits, pop_size, max_gen, random_state):
         """
         Perform the genetic algorithm.
 
@@ -291,6 +298,8 @@ class GeneticAlgorithm():
             Number of points in the population.
         max_gen : int
             Number of generations to run the GA.
+        random_state : np.random.RandomState, int
+             Random state (or seed-number) which controls the seed and random draws.
 
         Returns
         -------
@@ -316,7 +325,8 @@ class GeneticAlgorithm():
 
         # TODO: from an user-supplied intial population
         # new_gen, lchrom = encode(x0, vlb, vub, bits)
-        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center'))
+        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
+                               random_state=random_state))
 
         # Main Loop
         nfit = 0

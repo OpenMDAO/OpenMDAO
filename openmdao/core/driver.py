@@ -149,32 +149,33 @@ class Driver(object):
         ###########################
         self.options.declare('debug_print', types=list, is_valid=_is_debug_print_opts_valid,
                              desc="List of what type of Driver variables to print at each "
-                             "iteration. Valid items in list are 'desvars', 'ln_cons', "
-                             "'nl_cons', 'objs'",
+                                  "iteration. Valid items in list are 'desvars', 'ln_cons', "
+                                  "'nl_cons', 'objs'",
                              default=[])
 
         ###########################
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
                                        default=True)
         self.recording_options.declare('record_desvars', types=bool, default=True,
-                                       desc='Set to True to record design variables at the \
-                                       driver level')
+                                       desc='Set to True to record design variables at the '
+                                            'driver level')
         self.recording_options.declare('record_responses', types=bool, default=False,
                                        desc='Set to True to record responses at the driver level')
         self.recording_options.declare('record_objectives', types=bool, default=True,
-                                       desc='Set to True to record objectives at the \
-                                       driver level')
+                                       desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
-                                       desc='Set to True to record constraints at the \
-                                       driver level')
+                                       desc='Set to True to record constraints at the '
+                                            'driver level')
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                            '(processed post-includes)')
+        self.recording_options.declare('record_derivatives', types=bool, default=False,
+                                       desc='Set to True to record derivatives at the driver '
+                                            'level')
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the driver level')
-        ###########################
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -221,6 +222,22 @@ class Driver(object):
         """
         self._rec_mgr.close()
 
+    def _setup_comm(self, comm):
+        """
+        Perform any driver-specific setup of communicators for the model.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem model.
+        """
+        return comm
+
     def _setup_driver(self, problem):
         """
         Prepare the driver for execution.
@@ -236,8 +253,10 @@ class Driver(object):
         model = problem.model
 
         self._total_jac = None
+
         self._objs = objs = OrderedDict()
         self._cons = cons = OrderedDict()
+
         self._responses = model.get_responses(recurse=True)
         response_size = 0
         for name, data in iteritems(self._responses):
@@ -291,12 +310,48 @@ class Driver(object):
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
 
-        # Case recording setup
+        # set up case recording
+        self._setup_recording()
+
+        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+
+        # set up simultaneous deriv coloring
+        if (coloring_mod._use_sparsity and self._simul_coloring_info and
+                self.supports['simultaneous_derivatives']):
+            if problem._mode == 'fwd':
+                self._setup_simul_coloring(problem._mode)
+            else:
+                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
+
+        # if we're using simultaneous derivatives then our effective design var size is less
+        # than the full design var size
+        if self._simul_coloring_info:
+            col_lists = self._simul_coloring_info[0]
+            if col_lists:
+                desvar_size = len(col_lists[0])
+                desvar_size += len(col_lists) - 1
+
+        if ((problem._mode == 'fwd' and desvar_size > response_size) or
+                (problem._mode == 'rev' and response_size > desvar_size)):
+            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
+                          "problem with %d design variables and %d response variables "
+                          "(objectives and constraints)." %
+                          (problem._mode, desvar_size, response_size), RuntimeWarning)
+
+    def _setup_recording(self):
+        """
+        Set up case recording.
+        """
+        problem = self._problem
+        model = problem.model
+
         mydesvars = myobjectives = myconstraints = myresponses = set()
         myinputs = set()
         mysystem_outputs = set()
+
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
+
         rec_desvars = self.recording_options['record_desvars']
         rec_objectives = self.recording_options['record_objectives']
         rec_constraints = self.recording_options['record_constraints']
@@ -324,19 +379,17 @@ class Driver(object):
 
         # get the includes that were requested for this Driver recording
         if incl:
-            prob = self._problem
-            root = prob.model
             # The my* variables are sets
 
             # First gather all of the desired outputs
             # The following might only be the local vars if MPI
-            mysystem_outputs = {n for n in root._outputs
+            mysystem_outputs = {n for n in model._outputs
                                 if check_path(n, incl, excl)}
 
             # If MPI, and on rank 0, need to gather up all the variables
             #    even those not local to rank 0
             if MPI:
-                all_vars = root.comm.gather(mysystem_outputs, root=0)
+                all_vars = model.comm.gather(mysystem_outputs, root=0)
                 if MPI.COMM_WORLD.rank == 0:
                     mysystem_outputs = all_vars[-1]
                     for d in all_vars[:-1]:
@@ -366,7 +419,7 @@ class Driver(object):
                 raise RuntimeError(
                     "RecordingManager.startup should never be called when "
                     "running in parallel on an inactive System")
-            rrank = self._problem.comm.rank  # root ( aka model ) rank.
+            rrank = problem.comm.rank
             rowned = model._owning_rank
             mydesvars = [n for n in mydesvars if rrank == rowned[n]]
             myresponses = [n for n in myresponses if rrank == rowned[n]]
@@ -381,7 +434,7 @@ class Driver(object):
             'con': myconstraints,
             'res': myresponses,
             'sys': mysystem_outputs,
-            'inp': myinputs
+            'in': myinputs
         }
 
         self._rec_mgr.startup(self)
@@ -390,31 +443,6 @@ class Driver(object):
             self._model_viewer_data = _get_viewer_data(problem)
         if self.recording_options['record_metadata']:
             self._rec_mgr.record_metadata(self)
-
-        # set up simultaneous deriv coloring
-        if (coloring_mod._use_sparsity and self._simul_coloring_info and
-                self.supports['simultaneous_derivatives']):
-            if problem._mode == 'fwd':
-                self._setup_simul_coloring(problem._mode)
-            else:
-                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
-
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
-        # if we're using simultaneous derivatives then our effective design var size is less
-        # than the full design var size
-        if self._simul_coloring_info:
-            col_lists = self._simul_coloring_info[0]
-            if col_lists:
-                desvar_size = len(col_lists[0])
-                desvar_size += len(col_lists) - 1
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
 
     def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
@@ -724,78 +752,71 @@ class Driver(object):
         if not self._rec_mgr._recorders:
             return
 
-        metadata = create_local_meta(self._get_name())
+        # Get the data to record (collective calls that get across all ranks)
+        opts = self.recording_options
+        filt = self._filtered_vars_to_record
 
-        # Get the data to record
-        data = {}
-        if self.recording_options['record_desvars']:
-            # collective call that gets across all ranks
-            desvars = self.get_design_var_values()
+        if opts['record_desvars']:
+            des_vars = self.get_design_var_values()
         else:
-            desvars = {}
+            des_vars = {}
 
-        if self.recording_options['record_responses']:
-            # responses = self.get_response_values() # not really working yet
-            responses = {}
+        if opts['record_objectives']:
+            obj_vars = self.get_objective_values()
         else:
-            responses = {}
+            obj_vars = {}
 
-        if self.recording_options['record_objectives']:
-            objectives = self.get_objective_values()
+        if opts['record_constraints']:
+            con_vars = self.get_constraint_values()
         else:
-            objectives = {}
+            con_vars = {}
 
-        if self.recording_options['record_constraints']:
-            constraints = self.get_constraint_values()
+        if opts['record_responses']:
+            # res_vars = self.get_response_values()  # not really working yet
+            res_vars = {}
         else:
-            constraints = {}
+            res_vars = {}
 
-        desvars = {name: desvars[name]
-                   for name in self._filtered_vars_to_record['des']}
-        # responses not working yet
-        # responses = {name: responses[name] for name in self._filtered_vars_to_record['res']}
-        objectives = {name: objectives[name]
-                      for name in self._filtered_vars_to_record['obj']}
-        constraints = {name: constraints[name]
-                       for name in self._filtered_vars_to_record['con']}
+        des_vars = {name: des_vars[name] for name in filt['des']}
+        obj_vars = {name: obj_vars[name] for name in filt['obj']}
+        con_vars = {name: con_vars[name] for name in filt['con']}
+        # res_vars = {name: res_vars[name] for name in filt['res']}
 
-        if self.recording_options['includes']:
-            root = self._problem.model
-            outputs_v = root._outputs
-            inputs_v = root._inputs
-            # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
-            sysvars = {}
-            inputs = {}
-            views_out = outputs_v._views
-            views_in = inputs_v._views
-            for name in outputs_v._names:
-                if name in self._filtered_vars_to_record['sys']:
-                    sysvars[name] = views_out[name]
+        model = self._problem.model
+
+        if opts['includes']:
+            outputs = model._outputs
+            inputs = model._inputs
+            views = outputs._views
+            views_in = inputs._views
+            sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
             if self.recording_options['record_inputs']:
-                for name in inputs_v._names:
-                    if name in self._filtered_vars_to_record['inp']:
-                        inputs[name] = views_in[name]
+                in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
+
         else:
-            sysvars = {}
-            inputs = {}
+            sys_vars = {}
+            in_vars = {}
 
         if MPI:
-            root = self._problem.model
-            desvars = self._gather_vars(root, desvars)
-            responses = self._gather_vars(root, responses)
-            objectives = self._gather_vars(root, objectives)
-            constraints = self._gather_vars(root, constraints)
-            sysvars = self._gather_vars(root, sysvars)
-            inputs = self._gather_vars(root, inputs)
+            des_vars = self._gather_vars(model, des_vars)
+            res_vars = self._gather_vars(model, res_vars)
+            obj_vars = self._gather_vars(model, obj_vars)
+            con_vars = self._gather_vars(model, con_vars)
+            sys_vars = self._gather_vars(model, sys_vars)
+            in_vars = self._gather_vars(model, in_vars)
 
-        outs = desvars
-        outs.update(responses)
-        outs.update(objectives)
-        outs.update(constraints)
-        outs.update(sysvars)
+        outs = des_vars
+        outs.update(res_vars)
+        outs.update(obj_vars)
+        outs.update(con_vars)
+        outs.update(sys_vars)
 
-        data['out'] = outs
-        data['in'] = inputs
+        data = {
+            'out': outs,
+            'in': in_vars
+        }
+
+        metadata = create_local_meta(self._get_name())
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -946,21 +967,20 @@ class Driver(object):
         if not coloring_mod._use_sparsity:
             return
 
-        prom2abs = self._problem.model._var_allprocs_prom2abs_list['output']
-
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
-                tup = self._simul_coloring_info
-                column_lists, row_map = tup[:2]
-                if len(tup) > 2:
-                    sparsity = tup[2]
-                    if self._total_jac_sparsity is not None:
-                        raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                                           " and _total_jac_sparsity.")
-                    self._total_jac_sparsity = sparsity
 
-                self._simul_coloring_info = column_lists, row_map
+        tup = self._simul_coloring_info
+        column_lists, row_map = tup[:2]
+        if len(tup) > 2:
+            sparsity = tup[2]
+            if self._total_jac_sparsity is not None:
+                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                                   " and _total_jac_sparsity.")
+            self._total_jac_sparsity = sparsity
+
+        self._simul_coloring_info = column_lists, row_map
 
     def _pre_run_model_debug_print(self):
         """

@@ -8,11 +8,12 @@ from six import StringIO
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, ScipyOptimizer, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 
@@ -1034,6 +1035,37 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
 
+    def test_sellar_mdf_linear_con_directsolver(self):
+        # This test makes sure that we call solve_nonlinear first if we have any linear constraints
+        # to cache.
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-3
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.add_constraint('x', upper=11.0, linear=True)
+
+        prob.setup(check=False, mode='rev')
+        prob.set_solver_print(level=0)
+
+        failed = prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+
+        self.assertEqual(len(prob.driver._lincongrad_cache), 1)
+        # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
+        prob.driver.run()
+        self.assertEqual(len(prob.driver._lincongrad_cache), 1)
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 

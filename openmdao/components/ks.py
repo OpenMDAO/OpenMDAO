@@ -1,6 +1,7 @@
 """
 KS Function Component.
 """
+from six.moves import range
 
 import numpy as np
 
@@ -90,7 +91,7 @@ class KSComponent(ExplicitComponent):
         Upper bound for constraint, default is zero.
     """
 
-    def __init__(self, width=1):
+    def __init__(self, width=1, vec_size=1):
         """
         Initialize the KS component.
 
@@ -98,8 +99,10 @@ class KSComponent(ExplicitComponent):
         ----------
         width : dict of keyword arguments
             'Width of constraint vector.
+        vec_size : int
+            The number of rows to independently aggregate.
         """
-        super(KSComponent, self).__init__(width=width)
+        super(KSComponent, self).__init__(width=width, vec_size=vec_size)
 
         self.options.declare('lower_flag', False,
                              desc="Set to True to reverse sign of input constraints.")
@@ -113,20 +116,30 @@ class KSComponent(ExplicitComponent):
         Declare metadata.
         """
         self.metadata.declare('width', types=int, default=1, desc='Width of constraint vector.')
+        self.metadata.declare('vec_size', types=int, default=1,
+                              desc='The number of rows to independently aggregate.')
 
     def setup(self):
         """
         Declare inputs, outputs, and derivatives for the KS component.
         """
-        width = self.metadata['width']
+        meta = self.metadata
+        width = meta['width']
+        vec_size = meta['vec_size']
 
         # Inputs
-        self.add_input('g', shape=(width, ), desc="Array of function values to be aggregated")
+        self.add_input('g', shape=(vec_size, width),
+                       desc="Array of function values to be aggregated")
 
         # Outputs
-        self.add_output('KS', 0.0, desc="Value of the aggregate KS function")
+        self.add_output('KS', shape=(vec_size, 1), desc="Value of the aggregate KS function")
 
-        self.declare_partials(of='KS', wrt='g')
+        rows = np.zeros(width, dtype=np.int)
+        cols = range(width)
+        rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), width)
+        cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), width) * width
+
+        self.declare_partials(of='KS', wrt='g', rows=rows, cols=cols)
         self._ks = KSfunction()
 
     def compute(self, inputs, outputs):
@@ -140,11 +153,20 @@ class KSComponent(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
-        con_val = inputs['g'] - self.options['upper']
-        if self.options['lower_flag']:
+        opt = self.options
+        meta = self.metadata
+        vec_size = meta['vec_size']
+        width = meta['width']
+
+        con_val = inputs['g'] - opt['upper']
+        if opt['lower_flag']:
             con_val = -con_val
 
-        outputs['KS'] = self._ks.compute(con_val, self.options['rho'])
+        self.derivs = np.empty((vec_size, width))
+
+        for j in range(meta['vec_size']):
+            outputs['KS'][j, :] = self._ks.compute(con_val[j, :], opt['rho'])
+            self.derivs[j, :] = self._ks.derivatives()[0]
 
     def compute_partials(self, inputs, partials):
         """
@@ -157,8 +179,9 @@ class KSComponent(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        derivs = self._ks.derivatives()[0]
+        derivs = self.derivs
+
         if self.options['lower_flag']:
             derivs = -derivs
 
-        partials['KS', 'g'] = derivs
+        partials['KS', 'g'] = derivs.flatten()

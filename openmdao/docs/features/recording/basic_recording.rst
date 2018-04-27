@@ -1,3 +1,5 @@
+.. _basic_recording:
+
 **************************
 Recording Data in OpenMDAO
 **************************

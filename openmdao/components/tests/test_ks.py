@@ -32,7 +32,35 @@ class TestKSFunction(unittest.TestCase):
         prob.setup(check=False)
         prob.run_driver()
 
-        assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'])
+        assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'][0])
+
+    def test_vectorized(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        x = np.zeros((3, 5))
+        x[0, :] = np.array([3.0, 5.0, 11.0, 13.0, 17.0])
+        x[1, :] = np.array([13.0, 11.0, 5.0, 17.0, 3.0])*2
+        x[2, :] = np.array([11.0, 3.0, 17.0, 5.0, 13.0])*3
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=x))
+        model.add_subsystem('ks', KSComponent(width=5, vec_size=3))
+        model.connect('px.x', 'ks.g')
+
+        model.add_design_var('px.x')
+        model.add_constraint('ks.KS', upper=0.0)
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        assert_rel_error(self, prob['ks.KS'][0], 17.0)
+        assert_rel_error(self, prob['ks.KS'][1], 34.0)
+        assert_rel_error(self, prob['ks.KS'][2], 51.0)
+
+        partials = prob.check_partials(comps=['ks'], out_stream=None)
+
+        for (of, wrt) in partials['ks']:
+            assert_rel_error(self, partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
 
     def test_beam_stress(self):
         E = 1.
@@ -85,7 +113,7 @@ class TestKSFunction(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'], -1.0)
+        assert_rel_error(self, prob['ks.KS'][0], -1.0)
 
     def test_lower_flag(self):
 
@@ -103,7 +131,7 @@ class TestKSFunction(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'], -12.0)
+        assert_rel_error(self, prob['ks.KS'][0], -12.0)
 
 
 class TestKSFunctionFeatures(unittest.TestCase):
@@ -127,7 +155,29 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'], 15.0)
+        assert_rel_error(self, prob['ks.KS'][0], 15.0)
+
+    def test_vectorized(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp
+        from openmdao.components.ks import KSComponent
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([[5.0, 4.0], [10.0, 8.0]])))
+        model.add_subsystem('comp', ExecComp('y = 3.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('ks', KSComponent(width=2, vec_size=2))
+
+        model.connect('px.x', 'comp.x')
+        model.connect('comp.y', 'ks.g')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['ks.KS'][0], 15.0)
+        assert_rel_error(self, prob['ks.KS'][1], 30.0)
 
     def test_upper(self):
         import numpy as np
@@ -149,7 +199,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'], -1.0)
+        assert_rel_error(self, prob['ks.KS'][0], -1.0)
 
     def test_lower_flag(self):
         import numpy as np
@@ -171,7 +221,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['ks.KS'], -12.0)
+        assert_rel_error(self, prob['ks.KS'][0], -12.0)
 
 if __name__ == "__main__":
     unittest.main()
