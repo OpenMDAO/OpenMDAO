@@ -784,6 +784,8 @@ class Driver(object):
 
         model = self._problem.model
 
+        sys_vars = {}
+        in_vars = {}
         if opts['includes']:
             outputs = model._outputs
             inputs = model._inputs
@@ -792,10 +794,6 @@ class Driver(object):
             sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
             if self.recording_options['record_inputs']:
                 in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
-
-        else:
-            sys_vars = {}
-            in_vars = {}
 
         if MPI:
             des_vars = self._gather_vars(model, des_vars)
