@@ -1,9 +1,8 @@
 """MetaModel provides basic meta modeling capability."""
-
 from six.moves import range
+from copy import deepcopy
 
 import numpy as np
-from copy import deepcopy
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
@@ -16,42 +15,35 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     Class that creates a reduced order model for outputs from inputs.
 
     Each output may have it's own surrogate model.
-    Training inputs and outputs are automatically created with
-    'train:' prepended to the corresponding input/output name.
+    Training inputs and outputs are automatically created with 'train:' prepended to the
+    corresponding input/output name.
 
     For a Float variable, the training data is an array of length m.
 
     Attributes
     ----------
-    _surrogate_input_names : [str, ..]
-        List of inputs that are not the training vars
-    _surrogate_output_names : [str, ..]
-        List of outputs that are not the training vars
-    _vectorize : None or int
-        First dimension of all inputs and outputs for case where data is vectorized
+    default_surrogate : str
+        This surrogate will be used for all outputs that don't have a specific surrogate assigned
+        to them.
+    train : bool
+        If True, training will occur on the first execution.
     warm_restart : bool
-        When set to False (default), the metamodel retrains with the new
-        dataset whenever the training data values are changed. When set to
-        True, the new data is appended to the old data and all of the data
-        is used to train.
-    _surrogate_overrides : set
-        keeps track of which sur_<name> slots are full.
+        When set to False (default), the metamodel retrains with the new dataset whenever the
+        training data values are changed. When set to True, the new data is appended to the old
+        data and all of the data is used to train.
+    _input_size : int
+        Keeps track of the cumulative size of all inputs.
+    _surrogate_input_names : [str, ..]
+        List of inputs that are not the training vars.
+    _surrogate_output_names : [str, ..]
+        List of outputs that are not the training vars.
     _training_input : dict
         Training data for inputs.
     _training_output : dict
         Training data for outputs.
-    _input_size : int
-        Keeps track of the cumulative size of all inputs.
-    default_surrogate : str
-        This surrogate will be used for all outputs that don't have
-        a specific surrogate assigned to them
-    train : bool
-        If True, training will occur on the first execution.
-
-
     """
 
-    def __init__(self, default_surrogate=None, vectorize=None):
+    def __init__(self, default_surrogate=None, vec_size=1):
         """
         Initialize all attributes.
 
@@ -59,23 +51,15 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         ----------
         default_surrogate : SurrogateModel
             Default surrogate model to use.
-        vectorize : None or int
-            First dimension of all inputs and outputs for case where data is vectorized, optional.
+        vec_size : None or int
+            Number of rows in the input and output vectors for which surrogates are independently
+            generated.
         """
-        super(MetaModelUnStructuredComp, self).__init__()
+        super(MetaModelUnStructuredComp, self).__init__(vec_size=vec_size)
 
         # This surrogate will be used for all outputs that don't have
         # a specific surrogate assigned to them
         self.default_surrogate = default_surrogate
-
-        # all inputs and outputs will have this many independent rows
-        if vectorize and (not isinstance(vectorize, int) or vectorize < 2):
-            raise RuntimeError("Metamodel: The value of the 'vectorize' "
-                               "argument must be an integer greater than "
-                               "one, found '%s'."
-                               % vectorize)
-
-        self._vectorize = vectorize
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -92,10 +76,15 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # is used to train.
         self.warm_restart = False
 
-        # keeps track of which sur_<name> slots are full
-        self._surrogate_overrides = set()
-
         self._input_size = 0
+
+    def initialize(self):
+        """
+        Declare metadata.
+        """
+        self.metadata.declare('vec_size', types=int, default=1, lower=1,
+                              desc='Number of rows in the input and output vectors for which '
+                              'surrogates are independently generated.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -119,11 +108,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata for added variable
         """
         metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
+        vec_size = self.metadata['vec_size']
 
-        if self._vectorize is not None:
-            if metadata['shape'][0] != self._vectorize:
+        if vec_size > 1:
+            if metadata['shape'][0] != vec_size:
                 raise RuntimeError("Metamodel: First dimension of input '%s' must be %d"
-                                   % (name, self._vectorize))
+                                   % (name, vec_size))
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size
@@ -138,7 +128,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         return metadata
 
-    def add_output(self, name, val=1.0, training_data=None, **kwargs):
+    def add_output(self, name, val=1.0, training_data=None, surrogate=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -147,11 +137,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         name : string
             Name of the variable output.
         val : float or ndarray
-            Initial value for the output. While the value is overwritten during
-            execution, it is useful for inferring size.
+            Initial value for the output. While the value is overwritten during execution, it is
+            useful for inferring size.
         training_data : float or ndarray
-            training data for this variable. Optional, can be set
-            by the problem later.
+            Training data for this variable. Optional, can be set by the problem later.
+        surrogate : <SurrogateModel>, optional
+            Surrogate model to use for this output; if None, use default surrogate.
         **kwargs : dict
             Additional arguments for add_output.
 
@@ -160,14 +151,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        surrogate = kwargs.pop('surrogate', None)
-
         metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
+        vec_size = self.metadata['vec_size']
 
-        if self._vectorize is not None:
-            if metadata['shape'][0] != self._vectorize:
+        if vec_size > 1:
+            if metadata['shape'][0] != vec_size:
                 raise RuntimeError("Metamodel: First dimension of output '%s' must be %d"
-                                   % (name, self._vectorize))
+                                   % (name, vec_size))
             output_shape = metadata['shape'][1:]
             if len(output_shape) == 0:
                 output_shape = 1
@@ -253,14 +243,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
+        vec_size = self.metadata['vec_size']
+
         if self.train:  # train first
             self._train()
 
         # predict for current inputs
-        if self._vectorize is None:
-            inputs = self._vec_to_array(inputs)
-        else:
+        if vec_size > 1:
             inputs = self._vec_to_array2d(inputs)
+        else:
+            inputs = self._vec_to_array(inputs)
 
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
@@ -268,13 +260,14 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
                                    % (self.pathname, name))
             else:
-                if self._vectorize is None:
+                if vec_size == 1:
                     # one input, one prediction
                     predicted = surrogate.predict(inputs)
                     if isinstance(predicted, tuple):  # rmse option
                         self._metadata(name)['rmse'] = predicted[1]
                         predicted = predicted[0]
                     outputs[name] = np.reshape(predicted, outputs[name].shape)
+
                 elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
                     # multiple inputs flattened, one prediction of multiple outputs
                     predicted = surrogate.vectorized_predict(inputs.flat)
@@ -282,15 +275,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                         self._metadata(name)['rmse'] = predicted[1]
                         predicted = predicted[0]
                     outputs[name] = np.reshape(predicted, outputs[name].shape)
+
                 else:
                     # multiple inputs, multiple predictions
                     if isinstance(shape, tuple):
-                        output_shape = (self._vectorize,) + shape
+                        output_shape = (vec_size, ) + shape
                     else:
-                        output_shape = (self._vectorize,)
+                        output_shape = (vec_size, )
                     predicted = np.zeros(output_shape)
                     rmse = self._metadata(name)['rmse'] = []
-                    for i in range(self._vectorize):
+                    for i in range(vec_size):
                         pred_i = surrogate.predict(inputs[i])
                         predicted[i] = np.reshape(pred_i, shape)
                         if isinstance(predicted[i], tuple):  # rmse option
@@ -345,11 +339,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         ndarray
             2d array, self._vectorize rows of flattened input data.
         """
+        vec_size = self.metadata['vec_size']
         array_real = True
 
-        arr = np.zeros((self._vectorize, self._input_size))
+        arr = np.zeros((vec_size, self._input_size))
 
-        for row in range(self._vectorize):
+        for row in range(vec_size):
             idx = 0
             for name, sz in self._surrogate_input_names:
                 val = vec[name]
@@ -408,7 +403,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         missing_training_data = []
         num_sample = None
-        for name, sz in self._surrogate_input_names:
+        for name, _ in self._surrogate_input_names:
             train_name = 'train:' + name
             val = self.metadata[train_name]
             if val is None:
@@ -423,7 +418,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                       .format(num_sample, len(val), name)
                 raise RuntimeError(msg)
 
-        for name, shape in self._surrogate_output_names:
+        for name, _ in self._surrogate_output_names:
             train_name = 'train:' + name
             val = self.metadata[train_name]
             if val is None:

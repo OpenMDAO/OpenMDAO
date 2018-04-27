@@ -419,7 +419,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob['x'] = 0.125
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(out_stream=None)
 
         Jf = data['mm'][('f', 'x')]['J_fwd']
         Jr = data['mm'][('f', 'x')]['J_rev']
@@ -513,7 +513,7 @@ class MetaModelTestCase(unittest.TestCase):
         size = 3
 
         # create a vectorized MetaModelUnStructuredComp for sine
-        trig = MetaModelUnStructuredComp(vectorize=size, default_surrogate=FloatKrigingSurrogate())
+        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=FloatKrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros(size))
 
@@ -542,7 +542,7 @@ class MetaModelTestCase(unittest.TestCase):
         size = 3
 
         # create a vectorized MetaModelUnStructuredComp for sine and cosine
-        trig = MetaModelUnStructuredComp(vectorize=size, default_surrogate=FloatKrigingSurrogate())
+        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=FloatKrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros((size, 2)))
 
@@ -569,17 +569,8 @@ class MetaModelTestCase(unittest.TestCase):
                          1e-4)
 
     def test_metamodel_vector_errors(self):
-        # invalid values for vectorize argument. Bad.
-        for bad_value in [True, -1, 0, 1, 1.5]:
-            with self.assertRaises(RuntimeError) as cm:
-                MetaModelUnStructuredComp(vectorize=True)
-                self.assertEqual(str(cm.exception),
-                                 "Metamodel: The value of the 'vectorize' "
-                                 "argument must be an integer greater than "
-                                 "one, found '%s'." % str(bad_value))
-
         # first dimension of all inputs/outputs must be 3
-        mm = MetaModelUnStructuredComp(vectorize=3)
+        mm = MetaModelUnStructuredComp(vec_size=3)
 
         with self.assertRaises(RuntimeError) as cm:
             mm.add_input('x', np.zeros(2))
