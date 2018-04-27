@@ -176,6 +176,8 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
+            self._database_initialized = True
+
     def startup(self, recording_requester):
         """
         Prepare for a new run and create/update the abs2prom and prom2abs variables.

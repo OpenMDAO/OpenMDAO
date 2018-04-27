@@ -42,14 +42,13 @@ if OPTIMIZER:
 class TestSqliteCaseReader(unittest.TestCase):
 
     def setup_sellar_model_with_optimization(self):
-        self.prob = Problem()
-        self.prob.model = SellarDerivatives()
+        self.prob = Problem(SellarDerivatives())
 
         optimizer = 'pyoptsparse'
         self.prob.driver = optimizers[optimizer]()
 
         self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                   upper=np.array([10.0, 10.0]))
+                                       upper=np.array([10.0, 10.0]))
         self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
         self.prob.model.add_objective('obj')
         self.prob.model.add_constraint('con1', upper=0.0)
@@ -61,7 +60,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def setup_sellar_model(self):
         self.prob = Problem()
 
-        model = self.prob.model = Group()
+        model = self.prob.model
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
@@ -72,14 +71,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        self.prob.model.nonlinear_solver = NonlinearBlockGS()
-        self.prob.model.linear_solver = LinearBlockGS()
 
-        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
-        self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1', upper=0.0)
-        self.prob.model.add_constraint('con2', upper=0.0)
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
 
     def setup_sellar_grouped_model(self):
         self.prob = Problem()
@@ -193,6 +193,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_format_version(self):
         self.setup_sellar_model()
+        self.prob.model.add_recorder(self.recorder)
         self.prob.setup(check=False)
         self.prob.run_driver()
         self.prob.cleanup()
@@ -204,6 +205,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reader_instantiates(self):
         """ Test that CaseReader returns an SqliteCaseReader. """
         self.setup_sellar_model()
+        self.prob.model.add_recorder(self.recorder)
         self.prob.setup(check=False)
         self.prob.run_driver()
         self.prob.cleanup()
@@ -454,7 +456,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.setup_sellar_model()
 
         nonlinear_solver = self.prob.model.nonlinear_solver
-        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+        nonlinear_solver.add_recorder(self.recorder)
 
         linear_solver = self.prob.model.linear_solver
         linear_solver.add_recorder(self.recorder)
@@ -682,7 +684,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         outputs_case = cr.list_outputs(1, True, True, True, True, None, True, True, True,
                                        True, True, True)
-        
+
         for o in outputs_case:
             vals = o[1]
             name = o[0]
@@ -742,7 +744,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         }
 
         inputs_case = cr.list_inputs(1, True, True, True, None)
-        
+
         for o in inputs_case:
             vals = o[1]
             name = o[0]
