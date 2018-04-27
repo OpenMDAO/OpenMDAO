@@ -74,7 +74,7 @@ file name, as seen in the example.
 Running a DOE in Parallel with a Parallel Model
 -----------------------------------------------
 
-If the model that is being subjected to the DOE on is also parallel, then the total
+If the model that is being subjected to the DOE is also parallel, then the total
 number of processors should reflect the model size as well as the desired concurrency.
 
 To illustrate this, we will demonstrate performing a DOE on a model based on the
