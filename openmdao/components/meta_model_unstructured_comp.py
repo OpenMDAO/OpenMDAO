@@ -371,7 +371,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        arr = self._vec_to_array(inputs)
+        vec_size = self.metadata['vec_size']
+        if vec_size > 1:
+            arr = self._vec_to_array2d(inputs)
+        else:
+            arr = self._vec_to_array(inputs)
 
         for uname, _ in self._surrogate_output_names:
             surrogate = self._metadata(uname).get('surrogate')
