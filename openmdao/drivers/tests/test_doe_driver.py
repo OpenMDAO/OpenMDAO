@@ -25,6 +25,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import run_driver
 
 
 class ParaboloidArray(ExplicitComponent):
@@ -551,7 +552,10 @@ class TestParallelDOE(unittest.TestCase):
         prob.driver.options['parallel'] =  True
 
         prob.setup(vector_class=PETScVector)
-        prob.run_driver()
+
+        failed, output = run_driver(prob)
+        self.assertFalse(failed)
+
         prob.cleanup()
 
         expected = {
@@ -573,6 +577,10 @@ class TestParallelDOE(unittest.TestCase):
 
         # cases will be split across files for each proc
         filename = "CASES.db_%d" % rank
+
+        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        self.assertTrue(expect_msg in output)
+
         cases = CaseReader(filename).driver_cases
 
         # cases recorded on this proc
@@ -606,7 +614,10 @@ class TestParallelDOE(unittest.TestCase):
         prob.driver.options['parallel'] =  doe_parallel
 
         prob.setup(vector_class=PETScVector, check=False)
-        prob.run_driver()
+
+        failed, output = run_driver(prob)
+        self.assertFalse(failed)
+
         prob.cleanup()
 
         expected = {
@@ -629,9 +640,12 @@ class TestParallelDOE(unittest.TestCase):
         num_cases = 0
 
         # cases will be split across files for each proc up to the number requested
-        # there will be additional procs used by the model that we don't care about
         if rank < doe_parallel:
             filename = "CASES.db_%d" % rank
+
+            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+            self.assertTrue(expect_msg in output)
+
             cases = CaseReader(filename).driver_cases
 
             # cases recorded on this proc
@@ -644,6 +658,9 @@ class TestParallelDOE(unittest.TestCase):
                 self.assertEqual(cases.get_case(n).desvars['iv.x1'], expected[idx]['iv.x1'])
                 self.assertEqual(cases.get_case(n).desvars['iv.x2'], expected[idx]['iv.x2'])
                 self.assertEqual(cases.get_case(n).objectives['c3.y'], expected[idx]['c3.y'])
+        else:
+            self.assertFalse("Cases from rank %d are being written" % rank in output)
+
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)

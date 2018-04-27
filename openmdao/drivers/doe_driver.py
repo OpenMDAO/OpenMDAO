@@ -14,6 +14,8 @@ from openmdao.core.analysis_error import AnalysisError
 
 from openmdao.utils.mpi import MPI
 
+from openmdao.recorders.sqlite_recorder import SqliteRecorder
+
 
 class DOEGenerator(object):
     """
@@ -239,6 +241,14 @@ class DOEDriver(Driver):
         if MPI and parallel:
             for recorder in self._recorders:
                 recorder._parallel = True
+
+                # if SqliteRecorder, write cases only on procs up to the number
+                # of parallel DOEs (i.e. on the root procs for the cases)
+                if isinstance(recorder, SqliteRecorder):
+                    if parallel is True or self._comm.rank < parallel:
+                        recorder._record_on_proc = True
+                    else:
+                        recorder._record_on_proc = False
 
         super(DOEDriver, self)._setup_recording()
 

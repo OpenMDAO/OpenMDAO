@@ -3,8 +3,6 @@
 import sys
 import unittest
 
-from six.moves import cStringIO as StringIO
-
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent, \
@@ -13,7 +11,7 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 
 
 # check that pyoptsparse is installed
@@ -1345,15 +1343,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue()
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
         self.assertTrue('Solving variable: comp.f_xy' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
@@ -1384,15 +1378,13 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue().split('\n')
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        output = output.split('\n')
+
         self.assertTrue(output.count("Design Vars") > 1,
                         "Should be more than one design vars header printed")
         self.assertTrue(output.count("Nonlinear constraints") > 1,
@@ -1772,14 +1764,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        stdout = sys.stdout
-        strout = StringIO()
-
-        sys.stdout = strout
-        try:
-            failed = prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1791,7 +1776,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         self.assertEqual(model.cycle.d1.failed, 2)
 
         # Checking that iprint stack gets routinely cleaned.
-        output = strout.getvalue().split('\n')
+        output = output.split('\n')
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
 
 
