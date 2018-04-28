@@ -424,6 +424,8 @@ def run_driver(prob):
 
     Returns
     -------
+    boolean
+        Failure flag; True if failed to converge, False is successful.
     string
         output from calling `run_driver` on the Problem, captured from stdout
     """
