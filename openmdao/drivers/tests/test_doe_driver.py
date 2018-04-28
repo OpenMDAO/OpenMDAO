@@ -807,8 +807,6 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
             cases = CaseReader(filename).driver_cases
 
-            num_cases = cases.num_cases
-
             values = []
             for n in range(cases.num_cases):
                 case = cases.get_case(n)
