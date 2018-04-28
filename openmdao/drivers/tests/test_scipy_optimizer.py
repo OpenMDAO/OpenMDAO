@@ -1004,8 +1004,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         failed, output = run_driver(prob)
 
-        print(output)
-
         self.assertFalse(failed, "Optimization failed.")
 
         output = output.split('\n')
