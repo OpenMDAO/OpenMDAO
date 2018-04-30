@@ -29,16 +29,6 @@ class SimpleGADriver(Driver):
     """
     Driver for a simple genetic algorithm.
 
-    Options
-    -------
-    options['elitism'] :  bool(True)
-        If True, replace worst performing point with best from previous generation each iteration.
-    options['max_gen'] :  int(300)
-        Number of generations before termination.
-    options['pop_size'] :  int(25)
-        Number of points in the GA. Set to 0 and it will be computed as four times the total number
-        of bits.
-
     Attributes
     ----------
     _desvar_idx : dict

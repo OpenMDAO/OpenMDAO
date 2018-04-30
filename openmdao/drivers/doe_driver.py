@@ -52,12 +52,6 @@ class DOEDriver(Driver):
     """
     Design-of-Experiments Driver.
 
-    Options
-    -------
-    options['parallel'] :  bool or int
-        True or number of cases to run in parallel. Default is False.
-        If True, cases will be run on all available processors.
-
     Attributes
     ----------
     _generator : DOEGenerator
