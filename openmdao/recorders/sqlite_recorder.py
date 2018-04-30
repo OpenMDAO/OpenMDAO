@@ -256,7 +256,7 @@ class SqliteRecorder(BaseRecorder):
         outputs = data['out']
         inputs = data['in']
 
-        if MPI is None or MPI.COMM_WORLD.rank == 0:
+        if MPI is None or MPI.COMM_WORLD.rank == 0 or self._all_procs:
             outputs_array = values_to_array(outputs)
             inputs_array = values_to_array(inputs)
 
