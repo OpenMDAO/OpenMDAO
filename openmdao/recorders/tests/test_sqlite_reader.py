@@ -807,7 +807,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.prob.model.recording_options['record_outputs'] = True
         self.prob.model.recording_options['record_residuals'] = True
         self.prob.model.recording_options['record_metadata'] = False
-        self.prob.model.add_recorder(self.recorder)
+
+        # just record
+        #   model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        # p.model._get_subsystem
+
+        # Only record a subsystem
+        d2 = self.prob.model._get_subsystem('d2')
+
+        d2.add_recorder(self.recorder)
         self.prob.setup(check=False)
         self.prob.run_driver()
         self.prob.cleanup()
@@ -832,19 +840,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.prob.load_case(case)
 
         # Run the model
-        self.prob.run_driver()
+        # self.prob.run_driver()
 
         # Check to see if the inputs and outputs in the model match those of the case
         case_inputs = case.inputs._values
-        model_inputs = self.prob.model._inputs
+        model_inputs = d2._inputs
         for name, model_input in iteritems(model_inputs._views):
             np.testing.assert_almost_equal(case_inputs[name],model_input)
 
         case_outputs = case.outputs._values
-        model_outputs = self.prob.model._outputs
+        model_outputs = d2._outputs
         for name, model_output in iteritems(model_outputs._views):
             np.testing.assert_almost_equal(case_outputs[name],model_output)
 
+        print('gleep')
 
     def test_load_system_cases_with_units(self):
         # test with units
