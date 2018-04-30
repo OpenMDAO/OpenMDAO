@@ -243,21 +243,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                         .format(num_sample[fi], len(val), name)
                     raise RuntimeError(msg)
 
-        if self.warm_restart:
-            inputs = []
-            new_inputs = self._nfi * [None]
-            num_old_pts = self._nfi * [0]
-            for fi in range(self._nfi):
-                num_old_pts[fi] = self._training_input[fi].shape[0]
-                inputs.append(np.zeros((num_sample[fi] + num_old_pts[fi],
-                                        self._input_sizes[fi])))
-                if num_old_pts[fi] > 0:
-                    inputs[fi][:num_old_pts[fi], :] = self._training_input[fi]
-                new_inputs[fi] = inputs[fi][num_old_pts[fi]:, :]
-        else:
-            inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
-                      for fi in range(self._nfi)]
-            new_inputs = inputs
+        inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
+                  for fi in range(self._nfi)]
+        new_inputs = inputs
 
         self._training_input = inputs
 
@@ -286,19 +274,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 name_fi = _get_name_fi(name, fi)
                 if num_sample[fi] > 0:
                     output_size = np.prod(shape)
-                    if self.warm_restart:
-                        outputs[fi] = np.zeros((num_sample[fi] + num_old_pts[fi],
-                                                output_size))
-                        if num_old_pts[fi] > 0:
-                            outputs[fi][:num_old_pts[fi],
-                                        :] = self._training_output[name][fi]
-                        self._training_output[name][fi] = outputs[fi]
-                        new_outputs[fi] = outputs[fi][num_old_pts[fi]:, :]
-                    else:
-                        outputs[fi] = np.zeros((num_sample[fi], output_size))
-                        self._training_output[name] = []
-                        self._training_output[name].extend(outputs)
-                        new_outputs = outputs
+                    outputs[fi] = np.zeros((num_sample[fi], output_size))
+                    self._training_output[name] = []
+                    self._training_output[name].extend(outputs)
+                    new_outputs = outputs
 
                     val = self.metadata['train:' + name_fi]
 

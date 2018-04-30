@@ -221,7 +221,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
                     cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
 
-                    self.declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
+                    self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
 
         else:
             # Dense specification of partials for non-vectorized models.
@@ -396,19 +396,34 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         vec_size = self.metadata['vec_size']
+        in_size = self._input_size
+
         if vec_size > 1:
-            arr = self._vec_to_array_vectorized(inputs)
+            flat_inputs = self._vec_to_array_vectorized(inputs)
         else:
-            arr = self._vec_to_array(inputs)
+            flat_inputs = self._vec_to_array(inputs)
 
-        for uname, _ in self._surrogate_output_names:
-            surrogate = self._metadata(uname).get('surrogate')
-            sjac = surrogate.linearize(arr)
+        for out_name, out_shape in self._surrogate_output_names:
+            surrogate = self._metadata(out_name).get('surrogate')
+            if vec_size > 1:
+                out_size = np.prod(out_shape)
+                for j in range(vec_size):
+                    flat_input = flat_inputs[j]
+                    derivs = surrogate.linearize(flat_input)
+                    idx = 0
+                    for in_name, sz in self._surrogate_input_names:
+                        j1 = j * out_size * sz
+                        j2 = j1 + out_size * sz
+                        partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flatten()
+                        idx += sz
 
-            idx = 0
-            for pname, sz in self._surrogate_input_names:
-                partials[(uname, pname)] = sjac[:, idx:idx + sz]
-                idx += sz
+            else:
+                sjac = surrogate.linearize(flat_inputs)
+
+                idx = 0
+                for in_name, sz in self._surrogate_input_names:
+                    partials[(out_name, in_name)] = sjac[:, idx:idx + sz]
+                    idx += sz
 
     def _train(self):
         """

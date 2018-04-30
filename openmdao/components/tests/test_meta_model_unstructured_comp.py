@@ -185,42 +185,6 @@ class MetaModelTestCase(unittest.TestCase):
 
         self.assertTrue(mm.train)  # training will occur after re-setup
 
-    def test_warm_start(self):
-        # create metamodel with warm_restart = True
-        mm = MetaModelUnStructuredComp()
-        mm.add_input('x1', 0.)
-        mm.add_input('x2', 0.)
-        mm.add_output('y1', 0.)
-        mm.add_output('y2', 0.)
-        mm.default_surrogate = ResponseSurface()
-        mm.warm_restart = True
-
-        # add to problem
-        prob = Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
-
-        # provide initial training data
-        mm.metadata['train:x1'] = [1.0, 3.0]
-        mm.metadata['train:x2'] = [1.0, 4.0]
-        mm.metadata['train:y1'] = [3.0, 1.0]
-        mm.metadata['train:y2'] = [1.0, 7.0]
-
-        # run against a data point and check result
-        prob['mm.x1'] = 2.0
-        prob['mm.x2'] = 3.0
-        prob.run_model()
-
-        assert_rel_error(self, prob['mm.y1'], 1.9085, .001)
-        assert_rel_error(self, prob['mm.y2'], 3.9203, .001)
-
-        # Add 3rd training point, moves the estimate for that point
-        # back to where it should be.
-        mm.metadata['train:x1'] = [2.0]
-        mm.metadata['train:x2'] = [3.0]
-        mm.metadata['train:y1'] = [2.0]
-        mm.metadata['train:y2'] = [4.0]
-
     def test_vector_inputs(self):
         mm = MetaModelUnStructuredComp()
         mm.add_input('x', np.zeros(4))
@@ -489,6 +453,93 @@ class MetaModelTestCase(unittest.TestCase):
                          ),
                          1e-4)
 
+    def test_vectorized(self):
+        size = 3
+
+        # create a vectorized MetaModelUnStructuredComp for sine
+        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=FloatKrigingSurrogate())
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros(size))
+
+        # add it to a Problem
+        prob = Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0, 10, 20)
+        trig.metadata['train:y'] = .5*np.sin(trig.metadata['train:x'])
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.run_model()
+        assert_rel_error(self, prob['trig.y'],
+                         np.array(.5*np.sin(prob['trig.x'])),
+                         1e-4)
+
+        data = prob.check_partials(out_stream=None)
+
+        abs_errors = data['trig'][('y', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-6)
+
+    def test_derivatives_vectorized_multiD(self):
+        vec_size = 5
+        mm = MetaModelUnStructuredComp(vec_size=vec_size)
+        mm.add_input('x', np.zeros((vec_size, 2, 3)))
+        mm.add_input('xx', np.zeros((vec_size, 1)))
+        mm.add_output('y', np.zeros((vec_size, 4, 2)))
+        mm.default_surrogate = FloatKrigingSurrogate()
+
+        prob = Problem()
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        mm.metadata['train:x'] = [
+            [[1.0, 2.0, 1.0], [1.0, 2.0, 1.0]],
+            [[2.0, 1.0, 1.0], [1.0, 1.0, 1.0]],
+            [[1.0, 1.0, 2.0], [1.0, 2.0, 1.0]],
+            [[1.0, 1.0, 1.0], [2.0, 1.0, 1.0]],
+            [[1.0, 2.0, 1.0], [1.0, 2.0, 2.0]]
+        ]
+
+        mm.metadata['train:xx'] = [1.0, 2.0, 1.0, 1.0, 2.0]
+
+
+        mm.metadata['train:y'] = [
+            [[30.0, 10.0], [30.0, 25.0], [50.0, 10.7], [15.0, 25.7]],
+            [[20.0, 40.0], [20.0, 40.0], [80.0, 30.3], [12.0, 20.7]],
+            [[10.0, 70.0], [10.0, 70.0], [20.0, 10.9], [13.0, 15.7]],
+            [[60.0, -30.0], [60.0, -30.0], [50.0, 50.5], [14.0, 10.7]],
+            [[-20.0, 30.0], [-20.0, 30.0], [20.2, 10.0], [15.0, 60.7]]
+        ]
+
+        prob['mm.x'] = [[[1.3, 1.3, 1.3], [1.5, 1.5, 1.5]],
+                        [[1.4, 1.4, 1.4], [1.5, 1.5, 1.5]],
+                        [[1.5, 1.5, 1.5], [1.5, 1.5, 1.5]],
+                        [[1.5, 1.5, 1.5], [1.4, 1.4, 1.4]],
+                        [[1.5, 1.5, 1.5], [1.3, 1.3, 1.3]]]
+
+        prob['mm.xx'] = [[1.4], [1.5], [1.6], [1.5], [1.4]]
+
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None)
+
+        abs_errors = data['mm'][('y', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-5)
+
+        abs_errors = data['mm'][('y', 'xx')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-5)
+
     def test_metamodel_feature_vector(self):
         # Like simple sine example, but with input of length n instead of scalar
         # The expected behavior is that the output is also of length n, with
@@ -672,7 +723,6 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
 
         self.assertTrue(mm.train)  # training will occur after re-setup
-        mm.warm_restart = True     # use existing training data
 
         prob['mm.x1'] = 2.5
         prob['mm.x2'] = 3.5
