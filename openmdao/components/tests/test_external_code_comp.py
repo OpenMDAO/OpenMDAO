@@ -1,4 +1,4 @@
-""" Test the ExternalCode. """
+""" Test the ExternalCodeComp. """
 from __future__ import print_function
 
 import os
@@ -6,20 +6,20 @@ import shutil
 import tempfile
 import unittest
 
-from openmdao.api import Problem, Group, ExternalCode, AnalysisError
-from openmdao.components.external_code import STDOUT
+from openmdao.api import Problem, Group, ExternalCodeComp, AnalysisError
+from openmdao.components.external_code_comp import STDOUT
 
 from openmdao.utils.assert_utils import assert_rel_error
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
 
-class ExternalCodeForTesting(ExternalCode):
+class ExternalCodeCompForTesting(ExternalCodeComp):
     def __init__(self):
-        super(ExternalCodeForTesting, self).__init__()
+        super(ExternalCodeCompForTesting, self).__init__()
 
 
-class TestExternalCode(unittest.TestCase):
+class TestExternalCodeComp(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()
@@ -28,7 +28,7 @@ class TestExternalCode(unittest.TestCase):
         shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
                     os.path.join(self.tempdir, 'extcode_example.py'))
 
-        self.extcode = ExternalCodeForTesting()
+        self.extcode = ExternalCodeCompForTesting()
         self.prob = Problem()
 
         self.prob.model.add_subsystem('extcode', self.extcode)
@@ -185,7 +185,7 @@ class TestExternalCode(unittest.TestCase):
                         "'SOME_ENV_VAR_VALUE' missing from '%s'" % file_contents)
 
 
-class ParaboloidExternalCode(ExternalCode):
+class ParaboloidExternalCodeComp(ExternalCodeComp):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
@@ -213,7 +213,7 @@ class ParaboloidExternalCode(ExternalCode):
             input_file.write('%.16f\n%.16f\n' % (x,y))
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCode, self).compute(inputs, outputs)
+        super(ParaboloidExternalCodeComp, self).compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
         with open(self.output_file, 'r') as output_file:
@@ -222,7 +222,7 @@ class ParaboloidExternalCode(ExternalCode):
         outputs['f_xy'] = f_xy
 
 
-class ParaboloidExternalCodeFD(ExternalCode):
+class ParaboloidExternalCodeCompFD(ExternalCodeComp):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
@@ -253,7 +253,7 @@ class ParaboloidExternalCodeFD(ExternalCode):
             input_file.write('%.16f\n%.16f\n' % (x,y))
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeFD, self).compute(inputs, outputs)
+        super(ParaboloidExternalCodeCompFD, self).compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
         with open(self.output_file, 'r') as output_file:
@@ -262,7 +262,7 @@ class ParaboloidExternalCodeFD(ExternalCode):
         outputs['f_xy'] = f_xy
 
 
-class ParaboloidExternalCodeDerivs(ExternalCode):
+class ParaboloidExternalCodeCompDerivs(ExternalCodeComp):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
@@ -295,7 +295,7 @@ class ParaboloidExternalCodeDerivs(ExternalCode):
             input_file.write('%.16f\n%.16f\n' % (x,y))
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeDerivs, self).compute(inputs, outputs)
+        super(ParaboloidExternalCodeCompDerivs, self).compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
         with open(self.output_file, 'r') as output_file:
@@ -307,7 +307,7 @@ class ParaboloidExternalCodeDerivs(ExternalCode):
         outputs = {}
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeDerivs, self).compute(inputs, outputs)
+        super(ParaboloidExternalCodeCompDerivs, self).compute(inputs, outputs)
 
         # parse the derivs file from the external code and set partials
         with open(self.derivs_file, 'r') as derivs_file:
@@ -315,7 +315,7 @@ class ParaboloidExternalCodeDerivs(ExternalCode):
             partials['f_xy', 'y'] = float(derivs_file.readline())
 
 
-class TestExternalCodeFeature(unittest.TestCase):
+class TestExternalCodeCompFeature(unittest.TestCase):
 
     def setUp(self):
         import os
@@ -323,7 +323,7 @@ class TestExternalCodeFeature(unittest.TestCase):
         import tempfile
 
         # get the directory where the needed support files are located
-        import openmdao.components.tests.test_external_code as extcode_test
+        import openmdao.components.tests.test_external_code_comp as extcode_test
         DIRECTORY = os.path.dirname((os.path.abspath(extcode_test.__file__)))
 
         # change to temp dir
@@ -347,7 +347,7 @@ class TestExternalCodeFeature(unittest.TestCase):
 
     def test_main(self):
         from openmdao.api import Problem, Group, IndepVarComp
-        from openmdao.components.tests.test_external_code import ParaboloidExternalCode
+        from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeComp
 
         prob = Problem()
         model = prob.model
@@ -355,12 +355,12 @@ class TestExternalCodeFeature(unittest.TestCase):
         # create and connect inputs
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
-        model.add_subsystem('p', ParaboloidExternalCode())
+        model.add_subsystem('p', ParaboloidExternalCodeComp())
 
         model.connect('p1.x', 'p.x')
         model.connect('p2.y', 'p.y')
 
-        # run the ExternalCode Component
+        # run the ExternalCodeComp Component
         prob.setup()
         prob.run_model()
 
@@ -370,7 +370,7 @@ class TestExternalCodeFeature(unittest.TestCase):
     def test_optimize_fd(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.api import ScipyOptimizeDriver
-        from openmdao.components.tests.test_external_code import ParaboloidExternalCodeFD
+        from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompFD
 
         prob = Problem()
         model = prob.model
@@ -378,7 +378,7 @@ class TestExternalCodeFeature(unittest.TestCase):
         # create and connect inputs
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
-        model.add_subsystem('p', ParaboloidExternalCodeFD())
+        model.add_subsystem('p', ParaboloidExternalCodeCompFD())
 
         model.connect('p1.x', 'p.x')
         model.connect('p2.y', 'p.y')
@@ -405,7 +405,7 @@ class TestExternalCodeFeature(unittest.TestCase):
     def test_optimize_derivs(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.api import ScipyOptimizeDriver
-        from openmdao.components.tests.test_external_code import ParaboloidExternalCodeDerivs
+        from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompDerivs
 
         prob = Problem()
         model = prob.model
@@ -413,7 +413,7 @@ class TestExternalCodeFeature(unittest.TestCase):
         # create and connect inputs
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
-        model.add_subsystem('p', ParaboloidExternalCodeDerivs())
+        model.add_subsystem('p', ParaboloidExternalCodeCompDerivs())
 
         model.connect('p1.x', 'p.x')
         model.connect('p2.y', 'p.y')
@@ -437,6 +437,57 @@ class TestExternalCodeFeature(unittest.TestCase):
         assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
+# ------------------------------------------------------
+# run same test as above, only with the deprecated component,
+# to ensure we get the warning and the correct answer.
+# self-contained, to be removed when class name goes away.
+from openmdao.api import ExternalCode
+import warnings
+
+
+class DeprecatedExternalCodeForTesting(ExternalCode):
+    def __init__(self):
+        super(DeprecatedExternalCodeForTesting, self).__init__()
+
+
+class TestDeprecatedExternalCode(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_extcode-')
+        os.chdir(self.tempdir)
+        shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
+                    os.path.join(self.tempdir, 'extcode_example.py'))
+
+        with warnings.catch_warnings(record=True) as w:
+            self.extcode = DeprecatedExternalCodeForTesting()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "'ExternalCode' has been deprecated. Use 'ExternalCodeComp' instead.")
+
+        self.prob = Problem()
+
+        self.prob.model.add_subsystem('extcode', self.extcode)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    def test_normal(self):
+        self.extcode.options['command'] = [
+            'python', 'extcode_example.py', 'extcode.out'
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode_example.py',]
+        self.extcode.options['external_output_files'] = ['extcode.out',]
+
+        dev_null = open(os.devnull, 'w')
+        self.prob.setup(check=True)
+        self.prob.run_model()
 
 if __name__ == "__main__":
     unittest.main()

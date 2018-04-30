@@ -1,48 +1,49 @@
-.. index:: KSComponent Example
+.. index:: KSComp Example
 
-.. _kscomponent_feature:
+.. _kscomp_feature:
 
-***********
-KSComponent
-***********
+******
+KSComp
+******
 
-KSComponent provides a way to aggregate many constraints into a single constraint. This is usually done for performance
-reasons, in particular, to reduce the calculation time needed for the total derivatives of your model. The KSComponent
+KSComp provides a way to aggregate many constraints into a single constraint. This is usually done for performance
+reasons, in particular, to reduce the calculation time needed for the total derivatives of your model. The KSComp
 implements the Kreisselmeier-Steinhauser Function to aggregate constraint vector input "g" into a single scalar output 'KS'.
 
 By default, the constraint vector "g" is assumed be of the form where g<=0 satisfies the constraints, but other forms can
 be specified using the "upper" and "lower_flag" options.
 
-KSComponent Options
--------------------
+KSComp Options
+--------------
 
 .. embed-options::
-    openmdao.components.ks
-    KSComponent
+    openmdao.components.ks_comp
+    KSComp
     options
 
 
-KSComponent Example
--------------------
+KSComp Example
+--------------
 
 The following example is perhaps the simplest possible. It shows a component that represents a constraint
 of width two. We would like to aggregate the values of this constraint vector into a single scalar
-value using the KSComponent.
+value using the KSComp.
 
 .. embed-code::
-    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_basic
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_basic
     :layout: code, output
+
+A more practical example that uses the KSComp can be found in the :ref:`beam optimization <beam_optimization_example_part_2>` example.
 
 You can also independently aggregate multiple rows of an output as separate constraints by declaring the vec_size argument:
 
 .. embed-code::
-    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_vectorized
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_vectorized
     :layout: code, output
 
-A more practical example that uses the KSComponent can be found in the :ref:`beam optimization <beam_optimization_example_part_2>` example.
 
-KSComponent Option Examples
----------------------------
+KSComp Option Examples
+----------------------
 
 Normally, the input constraint vector is assumed to be of the form g<=0 is satisfied. If you would like to set a
 different upper bound for the constraint, you can declare it in the "upper" option in the options dictionary.
@@ -53,7 +54,7 @@ is still satisfied if it is less than zero.
 **upper**
 
 .. embed-code::
-    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_upper
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_upper
     :layout: interleave
 
 Normally, the input constraint vector is satisfied if it is negative and violated if it is positive. You can
@@ -64,8 +65,8 @@ is still satisfied if it is less than zero.
 **lower_flag**
 
 .. embed-code::
-    openmdao.components.tests.test_ks.TestKSFunctionFeatures.test_lower_flag
+    openmdao.components.tests.test_ks_comp.TestKSFunctionFeatures.test_lower_flag
     :layout: interleave
 
 
-.. tags:: KSComponent, Constraints, Optimization
+.. tags:: KSComp, Constraints, Optimization

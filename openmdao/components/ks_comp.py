@@ -6,6 +6,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 CITATIONS = """
@@ -73,7 +74,7 @@ class KSfunction(object):
         return dKS_dg, dKS_drho
 
 
-class KSComponent(ExplicitComponent):
+class KSComp(ExplicitComponent):
     """
     KS function component.
 
@@ -102,7 +103,7 @@ class KSComponent(ExplicitComponent):
         vec_size : int
             The number of rows to independently aggregate.
         """
-        super(KSComponent, self).__init__(width=width, vec_size=vec_size)
+        super(KSComp, self).__init__(width=width, vec_size=vec_size)
 
         self.options.declare('lower_flag', False,
                              desc="Set to True to reverse sign of input constraints.")
@@ -185,3 +186,24 @@ class KSComponent(ExplicitComponent):
             derivs = -derivs
 
         partials['KS', 'g'] = derivs.flatten()
+
+
+class KSComponent(KSComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'KSComponent' has been deprecated. Use "
+                         "'KSComp' instead.")
+        super(KSComponent, self).__init__(*args, **kwargs)
