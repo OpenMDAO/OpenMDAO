@@ -3,11 +3,8 @@ Design-of-Experiments Driver.
 """
 from __future__ import print_function
 
-import sys
 import traceback
 import inspect
-
-import numpy as np
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError

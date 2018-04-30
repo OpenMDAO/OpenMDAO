@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, gmres, bicg, bicgstab, cg, cgs
+from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
