@@ -201,15 +201,27 @@ class SqliteRecorder(BaseRecorder):
         if not self._database_initialized:
             self._initialize_database()
 
-        if self.con:
-            # grab the system
-            if isinstance(recording_requester, Driver):
-                system = recording_requester._problem.model
-            elif isinstance(recording_requester, System):
-                system = recording_requester
-            else:
-                system = recording_requester._system
+        # grab the system
+        if isinstance(recording_requester, Driver):
+            system = recording_requester._problem.model
+        elif isinstance(recording_requester, System):
+            system = recording_requester
+        else:
+            system = recording_requester._system
 
+        # grab all of the units and type (collective calls)
+        states = system._list_states_allprocs()
+        desvars = system.get_design_vars(True)
+        responses = system.get_responses(True)
+        objectives = system.get_objectives(True)
+        constraints = system.get_constraints(True)
+        inputs = system._var_allprocs_abs_names['input']
+        outputs = system._var_allprocs_abs_names['output']
+        full_var_set = [(inputs, 'input'), (outputs, 'output'),
+                        (desvars, 'desvar'), (responses, 'response'),
+                        (objectives, 'objective'), (constraints, 'constraint')]
+
+        if self.con:
             # merge current abs2prom and prom2abs with this system's version
             for io in ['input', 'output']:
                 for v in system._var_abs2prom[io]:
@@ -220,18 +232,6 @@ class SqliteRecorder(BaseRecorder):
                     else:
                         self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
                                                      set(system._var_allprocs_prom2abs_list[io][v]))
-
-            # grab all of the units and type
-            states = system._list_states_allprocs()
-            desvars = system.get_design_vars(True)
-            responses = system.get_responses(True)
-            objectives = system.get_objectives(True)
-            constraints = system.get_constraints(True)
-            inputs = system._var_allprocs_abs_names['input']
-            outputs = system._var_allprocs_abs_names['output']
-            full_var_set = [(inputs, 'input'), (outputs, 'output'),
-                            (desvars, 'desvar'), (responses, 'response'),
-                            (objectives, 'objective'), (constraints, 'constraint')]
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
