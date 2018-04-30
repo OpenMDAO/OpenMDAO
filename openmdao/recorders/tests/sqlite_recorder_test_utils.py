@@ -16,8 +16,7 @@ def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
         Expected can be from multiple cases.
     """
     # iterate through the cases
-    for coord, (t0, t1), desvars_expected, responses_expected, objectives_expected, \
-            constraints_expected, sysincludes_expected in expected:
+    for coord, (t0, t1), outputs_expected, inputs_expected in expected:
         iter_coord = format_iteration_coordinate(coord)
 
         # from the database, get the actual data recorded
@@ -26,18 +25,22 @@ def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
                        {"iteration_coordinate": iter_coord})
         row_actual = db_cur.fetchone()
 
+        db_cur.execute("SELECT abs2meta FROM metadata")
+        row_abs2meta = db_cur.fetchone()
+
         test.assertTrue(row_actual,
             'Driver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
 
+        counter, global_counter, iteration_coordinate, timestamp, success, msg,\
+            input_blob, output_blob = row_actual
 
-        counter, global_counter, iteration_coordinate, timestamp, success, msg, desvars_blob,\
-            responses_blob, objectives_blob, constraints_blob, sysincludes_blob = row_actual
+        if PY2:
+            abs2meta = pickle.loads(str(row_abs2meta[0])) if row_abs2meta[0] is not None else None
+        else:
+            abs2meta = pickle.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
 
-        desvars_actual = blob_to_array(desvars_blob)
-        responses_actual = blob_to_array(responses_blob)
-        objectives_actual = blob_to_array(objectives_blob)
-        constraints_actual = blob_to_array(constraints_blob)
-        sysincludes_actual = blob_to_array(sysincludes_blob)
+        inputs_actual = blob_to_array(input_blob)
+        outputs_actual = blob_to_array(output_blob)
 
         # Does the timestamp make sense?
         test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -46,25 +49,23 @@ def assertDriverIterationDataRecorded(test, db_cur, expected, tolerance):
         test.assertEqual(msg, '')
 
         for vartype, actual, expected in (
-            ('desvars', desvars_actual, desvars_expected),
-            ('responses', responses_actual, responses_expected),
-            ('objectives', objectives_actual, objectives_expected),
-            ('constraints', constraints_actual, constraints_expected),
-            ('sysincludes', sysincludes_actual, sysincludes_expected),
+            ('outputs', outputs_actual, outputs_expected),
+            ('inputs', inputs_actual, inputs_expected)
         ):
 
             if expected is None:
                 test.assertEqual(actual, np.array(None, dtype=object))
             else:
+                actual = actual[0]
                 # Check to see if the number of values in actual and expected match
-                test.assertEqual(len(actual[0]), len(expected))
+                test.assertEqual(len(actual), len(expected))
                 for key, value in iteritems(expected):
                     # Check to see if the keys in the actual and expected match
-                    test.assertTrue(key in actual[0].dtype.names,
+                    test.assertTrue(key in actual.dtype.names,
                                     '{} variable not found in actual data'
                                     ' from recorder'.format(key))
                     # Check to see if the values in actual and expected match
-                    assert_rel_error(test, actual[0][key], expected[key], tolerance)
+                    assert_rel_error(test, actual[key], expected[key], tolerance)
         return
 
 def assertSystemIterationDataRecorded(test, db_cur, expected, tolerance):
@@ -135,7 +136,7 @@ def assertSolverIterationDataRecorded(test, db_cur, expected, tolerance):
         test.assertTrue(row_actual, 'Solver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
 
         counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-            output_blob, residuals_blob = row_actual
+            input_blob, output_blob, residuals_blob = row_actual
 
         output_actual = blob_to_array(output_blob)
         residuals_actual = blob_to_array(residuals_blob)

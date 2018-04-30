@@ -148,8 +148,8 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 5)
 
         for n in range(cases.num_cases):
-            assert_rel_error(self, cases.get_case(n).desvars['x'], expected[n]['x'], 1e-4)
-            assert_rel_error(self, cases.get_case(n).desvars['y'], expected[n]['y'], 1e-4)
+            assert_rel_error(self, cases.get_case(n).get_desvars()['x'], expected[n]['x'], 1e-4)
+            assert_rel_error(self, cases.get_case(n).get_desvars()['y'], expected[n]['y'], 1e-4)
 
     def test_full_factorial(self):
         prob = Problem()
@@ -189,9 +189,9 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 9)
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
+            self.assertEqual(cases.get_case(n).get_desvars()['x'], expected[n]['x'])
+            self.assertEqual(cases.get_case(n).get_desvars()['y'], expected[n]['y'])
+            self.assertEqual(cases.get_case(n).get_objectives()['f_xy'], expected[n]['f_xy'])
 
     def test_full_factorial_array(self):
         prob = Problem()
@@ -227,8 +227,8 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 9)
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).desvars['xy'][0], expected[n]['xy'][0])
-            self.assertEqual(cases.get_case(n).desvars['xy'][1], expected[n]['xy'][1])
+            self.assertEqual(cases.get_case(n).get_desvars()['xy'][0], expected[n]['xy'][0])
+            self.assertEqual(cases.get_case(n).get_desvars()['xy'][1], expected[n]['xy'][1])
 
     def test_plackett_burman(self):
         prob = Problem()
@@ -261,9 +261,9 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[n]['f_xy'])
+            self.assertEqual(cases.get_case(n).get_desvars()['x'], expected[n]['x'])
+            self.assertEqual(cases.get_case(n).get_desvars()['y'], expected[n]['y'])
+            self.assertEqual(cases.get_case(n).get_objectives()['f_xy'], expected[n]['f_xy'])
 
     def test_box_behnken(self):
         upper = 10.
@@ -320,9 +320,9 @@ class TestDOEDriver(unittest.TestCase):
         }
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).desvars['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).desvars['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).desvars['z'], expected[n]['z'])
+            self.assertEqual(cases.get_case(n).get_desvars()['x'], expected[n]['x'])
+            self.assertEqual(cases.get_case(n).get_desvars()['y'], expected[n]['y'])
+            self.assertEqual(cases.get_case(n).get_desvars()['z'], expected[n]['z'])
 
     def test_latin_hypercube(self):
         samples = 4
@@ -379,8 +379,8 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            x = cases.get_case(n).desvars['x']
-            y = cases.get_case(n).desvars['y']
+            x = cases.get_case(n).get_desvars()['x']
+            y = cases.get_case(n).get_desvars()['y']
 
             bucket = int((x+x_offset)/(x_bucket_size/samples))
             x_buckets_filled.add(bucket)
@@ -445,8 +445,8 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            x = cases.get_case(n).desvars['xy'][0]
-            y = cases.get_case(n).desvars['xy'][1]
+            x = cases.get_case(n).get_desvars()['xy'][0]
+            y = cases.get_case(n).get_desvars()['xy'][1]
 
             bucket = int((x+x_offset)/(x_bucket_size/samples))
             x_buckets_filled.add(bucket)
@@ -504,8 +504,8 @@ class TestDOEDriver(unittest.TestCase):
         valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
         for n in range(cases.num_cases):
-            x = float(cases.get_case(n).desvars['indep.x'])
-            y = float(cases.get_case(n).desvars['indep.y'])
+            x = float(cases.get_case(n).get_desvars()['indep.x'])
+            y = float(cases.get_case(n).get_desvars()['indep.y'])
 
             x_buckets_filled.add(int(x/bucket_size))
             y_buckets_filled.add(int(y/bucket_size))
@@ -582,9 +582,9 @@ class TestParallelDOE(unittest.TestCase):
         for n in range(num_cases):
             case = cases.get_case(n)
             idx = n * size + rank  # index of expected case
-            self.assertEqual(cases.get_case(n).desvars['x'], expected[idx]['x'])
-            self.assertEqual(cases.get_case(n).desvars['y'], expected[idx]['y'])
-            self.assertEqual(cases.get_case(n).objectives['f_xy'], expected[idx]['f_xy'])
+            self.assertEqual(cases.get_case(n).get_desvars()['x'], expected[idx]['x'])
+            self.assertEqual(cases.get_case(n).get_desvars()['y'], expected[idx]['y'])
+            self.assertEqual(cases.get_case(n).get_objectives()['f_xy'], expected[idx]['f_xy'])
 
         # total number of cases recorded across all procs
         num_cases = prob.comm.allgather(num_cases)
@@ -641,9 +641,9 @@ class TestParallelDOE(unittest.TestCase):
             for n in range(num_cases):
                 case = cases.get_case(n)
                 idx = n * size + rank  # index of expected case
-                self.assertEqual(cases.get_case(n).desvars['iv.x1'], expected[idx]['iv.x1'])
-                self.assertEqual(cases.get_case(n).desvars['iv.x2'], expected[idx]['iv.x2'])
-                self.assertEqual(cases.get_case(n).objectives['c3.y'], expected[idx]['c3.y'])
+                self.assertEqual(cases.get_case(n).get_desvars()['iv.x1'], expected[idx]['iv.x1'])
+                self.assertEqual(cases.get_case(n).get_desvars()['iv.x2'], expected[idx]['iv.x2'])
+                self.assertEqual(cases.get_case(n).get_objectives()['c3.y'], expected[idx]['c3.y'])
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)
@@ -695,7 +695,7 @@ class TestDOEDriverFeature(unittest.TestCase):
         values = []
         for n in range(cases.num_cases):
             case = cases.get_case(n)
-            values.append((case.desvars['x'], case.desvars['y'], case.objectives['f_xy']))
+            values.append((case.get_desvars()['x'], case.get_desvars()['y'], case.get_objectives()['f_xy']))
 
         print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
@@ -747,7 +747,7 @@ class TestParallelDOEFeature(unittest.TestCase):
         values = []
         for n in range(cases.num_cases):
             case = cases.get_case(n)
-            values.append((case.desvars['x'], case.desvars['y'], case.objectives['f_xy']))
+            values.append((case.get_desvars()['x'], case.get_desvars()['y'], case.get_objectives()['f_xy']))
 
         print("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
