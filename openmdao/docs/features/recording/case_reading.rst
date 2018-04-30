@@ -136,3 +136,18 @@ But you can also choose to use a specific iteration coordinate:
 .. code-block:: console
 
     cr.list_inputs(case_id='rank0:SLSQP|0|root._solve_nonlinear|0')
+
+*Loading Cases into Problems*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are some situations where it would be useful to load in a recorded case back into a Problem. One example is if
+you have a long running optimization and, for whatever reason, the job dies before it completes. It would be great
+to go back to the last recorded case for the entire model System, load it in to the Problem, and then do some
+debugging to determine what went wrong.
+
+Here is an example that shows how that might work.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_feature_load_system_case_for_restart
+    :layout: interleave
+

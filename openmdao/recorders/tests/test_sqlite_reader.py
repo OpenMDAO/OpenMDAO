@@ -8,6 +8,7 @@ from shutil import rmtree
 from tempfile import mkdtemp, mkstemp
 
 import numpy as np
+from six import iteritems
 
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyKrylov, LinearBlockGS
@@ -713,6 +714,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         inputs = cr.list_inputs(None, True, True, True)
+        outputs = cr.list_outputs(None, True, True, True, True, None, True, True, True,
+                                  True, True, True)
 
         expected_inputs = {
             'obj_cmp.x': {'value': [1.]},
@@ -748,6 +751,430 @@ class TestSqliteCaseReader(unittest.TestCase):
             name = o[0]
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(vals['value'], expected['value'])
+
+    def test_simple_load_system_cases(self):
+        # Ken's test
+        # i think the key to checking it is to load them in, then just run_model, and check all vectors
+        # model._inputs and _outputs, every value, compared to saved values.
+
+        # run the model to get some case values
+        self.setup_sellar_model()
+        self.prob.model.recording_options['record_inputs'] = True
+        self.prob.model.recording_options['record_outputs'] = True
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.model.recording_options['record_metadata'] = False
+        self.prob.model.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        # get case
+        case = cr.system_cases.get_case(0)
+
+        # add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes
+        #   the model
+        for name in self.prob.model._inputs:
+            self.prob.model._inputs[name] += 1.0
+
+        # Run the model again to generate new outputs
+        self.prob.run_driver()
+
+        # Now all the inputs and outputs should be different from the
+        #   recorded case
+
+        # Now load in the case we recorded
+        self.prob.load_case(case)
+
+        # Run the model
+        self.prob.run_driver()
+
+        # Check to see if the inputs and outputs in the model match those of the case
+        case_inputs = case.inputs._values
+        model_inputs = self.prob.model._inputs
+        for name, model_input in iteritems(model_inputs._views):
+            np.testing.assert_almost_equal(case_inputs[name],model_input)
+
+        case_outputs = case.outputs._values
+        model_outputs = self.prob.model._outputs
+        for name, model_output in iteritems(model_outputs._views):
+            np.testing.assert_almost_equal(case_outputs[name],model_output)
+
+    def test_subsystem_load_system_cases(self):
+        self.setup_sellar_model()
+        self.prob.model.recording_options['record_inputs'] = True
+        self.prob.model.recording_options['record_outputs'] = True
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.model.recording_options['record_metadata'] = False
+        self.prob.model.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        # get case
+        case = cr.system_cases.get_case(0)
+
+        # add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes
+        #   the model
+        for name in self.prob.model._inputs:
+            self.prob.model._inputs[name] += 1.0
+
+        # Run the model again to generate new outputs
+        self.prob.run_driver()
+
+        # Now all the inputs and outputs should be different from the
+        #   recorded case
+
+        # Now load in the case we recorded
+        self.prob.load_case(case)
+
+        # Run the model
+        self.prob.run_driver()
+
+        # Check to see if the inputs and outputs in the model match those of the case
+        case_inputs = case.inputs._values
+        model_inputs = self.prob.model._inputs
+        for name, model_input in iteritems(model_inputs._views):
+            np.testing.assert_almost_equal(case_inputs[name],model_input)
+
+        case_outputs = case.outputs._values
+        model_outputs = self.prob.model._outputs
+        for name, model_output in iteritems(model_outputs._views):
+            np.testing.assert_almost_equal(case_outputs[name],model_output)
+
+
+    def test_load_system_cases_with_units(self):
+        # test with units
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+        from openmdao.core.tests.test_units import SpeedComp
+
+        comp = IndepVarComp()
+        comp.add_output('distance', val=1., units='m')
+        comp.add_output('time', val=1., units='s')
+
+        self.prob = Problem(model=Group())
+        self.prob.model.add_subsystem('c1', comp)
+        self.prob.model.add_subsystem('c2', SpeedComp())
+        self.prob.model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
+        self.prob.model.connect('c1.distance', 'c2.distance')
+        self.prob.model.connect('c1.time', 'c2.time')
+        self.prob.model.connect('c2.speed', 'c3.speed')
+
+        self.prob.model.add_recorder(self.recorder)
+
+        self.prob.setup()
+        self.prob.run_model()
+
+        cr = CaseReader(self.filename)
+        # get case
+        case = cr.system_cases.get_case(0)
+
+        # add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes
+        #   the model
+        for name in self.prob.model._inputs:
+            self.prob.model._inputs[name] += 1.0
+
+        # Run the model again to generate new outputs
+        self.prob.run_driver()
+
+        # Now all the inputs and outputs should be different from the
+        #   recorded case
+
+        # Now load in the case we recorded
+        self.prob.load_case(case)
+
+        # Run the model
+        self.prob.run_driver()
+
+        # Check to see if the inputs and outputs in the model match those of the case
+        case_inputs = case.inputs._values
+        model_inputs = self.prob.model._inputs
+        for name, model_input in iteritems(model_inputs._views):
+            np.testing.assert_almost_equal(case_inputs[name],model_input)
+
+        case_outputs = case.outputs._values
+        model_outputs = self.prob.model._outputs
+        for name, model_output in iteritems(model_outputs._views):
+            np.testing.assert_almost_equal(case_outputs[name],model_output)
+
+
+    def test_optimization_load_system_cases(self):
+
+        self.setup_sellar_grouped_model()
+
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+            ScipyOptimizer, ExplicitComponent
+
+        self.prob.driver = ScipyOptimizeDriver()
+        self.prob.driver.options['optimizer'] = 'SLSQP'
+        self.prob.driver.options['tol'] = 1e-9
+        self.prob.driver.options['disp'] = False
+
+        # self.prob.driver = pyOptSparseDriver()
+        # self.prob.driver.options['optimizer'] = OPTIMIZER
+        # if OPTIMIZER == 'SLSQP':
+        #     self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.model.add_recorder(self.recorder)
+        driver = self.prob.driver
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+
+        # self.prob.driver.options['optimizer'] = OPTIMIZER
+        # if OPTIMIZER == 'SLSQP':
+        #     self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        inputs_before = self.prob.model.list_inputs(values=True, units=True )
+        outputs_before = self.prob.model.list_outputs(values=True, units=True )
+
+        cr = CaseReader(self.filename)
+
+        # get third case
+        third_case = cr.system_cases.get_case(2)
+
+        iter_count_before = driver.iter_count
+
+        # run the model again with a fresh model
+        self.setup_sellar_grouped_model()
+
+        # self.prob.driver = pyOptSparseDriver()
+        # self.prob.driver.options['optimizer'] = OPTIMIZER
+        # if OPTIMIZER == 'SLSQP':
+        #     self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.driver = ScipyOptimizeDriver()
+        self.prob.driver.options['optimizer'] = 'SLSQP'
+        self.prob.driver.options['tol'] = 1e-9
+        self.prob.driver.options['disp'] = False
+
+        driver = self.prob.driver
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+
+        # self.prob.driver.options['optimizer'] = OPTIMIZER
+        # if OPTIMIZER == 'SLSQP':
+        #     self.prob.driver.opt_settings['ACC'] = 1e-9
+
+        self.prob.setup(check=False)
+        self.prob.load_case(third_case)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        inputs_after = self.prob.model.list_inputs(values=True, units=True )
+        outputs_after = self.prob.model.list_outputs(values=True, units=True )
+        iter_count_after = driver.iter_count
+
+        print(cr)
+
+        for before, after in zip(inputs_before, inputs_after):
+            np.testing.assert_almost_equal(before[1]['value'], after[1]['value'])
+
+        for before, after in zip(outputs_before, outputs_after):
+            np.testing.assert_almost_equal(before[1]['value'], after[1]['value'])
+
+        self.assertEqual(iter_count_before, iter_count_after + 1)
+
+        # test with solver, driver recording
+
+        # That sounds right. I guess you could also record everything once, then set the problem to
+        # contain all values from something like the third iteration (or just somewhere in the
+        # middle, I suppose), and verify that the values after one more iteration of the solver
+        # gives the same output as the original case's fourth iteration. Or something like that
+
+
+    def test_load_solver_cases(self):
+
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.linear_solver = LinearBlockGS()
+
+        model.nonlinear_solver = NewtonSolver()
+
+        model.linear_solver.add_recorder(self.recorder)
+
+
+        prob.setup()
+
+        prob.run_model()
+
+        cr = CaseReader(self.filename)
+
+        # Solvers only have outputs and residuals
+        case = cr.solver_cases.get_case(0)
+        inputs = case.inputs._values
+        names = inputs.dtype.names
+        for name in names:
+            val = inputs[name]
+        print(case)
+
+        case_inputs = case.inputs._values
+        model_inputs = self.prob.model._inputs
+        for name, model_input in iteritems(model_inputs._views):
+            np.testing.assert_almost_equal(case_inputs[name],model_input)
+
+    def test_load_driver_cases(self):
+
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver
+
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0)
+
+        prob.driver.add_recorder(self.recorder)
+
+        prob.setup(check=False)
+
+        prob.run_driver()
+
+
+        cr = CaseReader(self.filename)
+
+        # Solvers only have outputs and residuals
+        case = cr.driver_cases.get_case(0)
+        inputs = case.inputs._values
+        names = inputs.dtype.names
+        for name in names:
+            val = inputs[name]
+        print(case)
+
+        case_inputs = case.inputs._values
+        model_inputs = self.prob.model._inputs
+        for name, model_input in iteritems(model_inputs._views):
+            np.testing.assert_almost_equal(case_inputs[name],model_input)
+
+    def test_feature_load_system_case_for_restart(self):
+
+        #######################################################################
+        # Do the initial optimization run
+        #######################################################################
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.suppress_solver_output = True
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        case_recorder_filename = 'cases.sql'
+        recorder = SqliteRecorder(case_recorder_filename)
+
+        model.add_recorder(recorder)
+
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+        model.recording_options['record_metadata'] = False
+        model.recording_options['metadata_excludes'] = ['*']
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        #######################################################################
+        # Assume that the optimization given above failed before it finished.
+        # To debug the problem, we can run the script again but this time using
+        # the last recorded case as a starting point.
+        #######################################################################
+        from openmdao.api import Problem, ScipyOptimizeDriver, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.suppress_solver_output = True
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+        model.recording_options['record_metadata'] = False
+        model.recording_options['metadata_excludes'] = ['*']
+
+        prob.setup(check=False)
+
+        case_recorder_filename = 'cases.sql'
+        cr = CaseReader(case_recorder_filename)
+        # Load the last case written
+        last_case = cr.system_cases.get_case(-1)
+        prob.load_case(last_case)
+
+        prob.run_driver()
+        prob.cleanup()
 
 
 if __name__ == "__main__":

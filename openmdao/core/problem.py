@@ -1272,6 +1272,24 @@ class Problem(object):
 
         print()
 
+    def load_case(self, case):
+        """
+        Pull all input and output variables from a case into the model.
+
+        Parameters
+        ----------
+        case : Case object
+            A Case from a CaseRecorder file.
+        """
+        inputs = case.inputs._values if case.inputs is not None else None
+        for name, val in zip(inputs.dtype.names, inputs):
+            self[name] = val
+
+        outputs = case.outputs._values if case.outputs is not None else None
+        for name, val in zip(outputs.dtype.names, outputs):
+            self[name] = val
+
+        return
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
