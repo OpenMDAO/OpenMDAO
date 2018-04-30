@@ -1,15 +1,15 @@
-.. index:: ExternalCode Example
+.. index:: ExternalCodeComp Example
 
-.. _externalcode_feature:
+.. _externalcodecomp_feature:
 
-**********************
-ExternalCode Component
-**********************
+**************************
+ExternalCodeComp Component
+**************************
 
-ExternalCode is a component that runs an external program in a subprocess on your operating system.
+ExternalCodeComp is a component that runs an external program in a subprocess on your operating system.
 
 If external programs do not have Python APIs, it is necessary to "file wrap" them.
-`ExternalCode` is a utility component that makes file wrapping easier by
+`ExternalCodeComp` is a utility component that makes file wrapping easier by
 taking care of the mundane tasks associated with executing the external application.
 These include:
 
@@ -20,21 +20,21 @@ These include:
 - Handling timeout and polling
 - Running the code on a remote server if required
 
-ExternalCode Options
---------------------
+ExternalCodeComp Options
+------------------------
 
 .. embed-options::
-    openmdao.components.external_code
-    ExternalCode
+    openmdao.components.external_code_comp
+    ExternalCodeComp
     options
 
 
-ExternalCode Example
---------------------
+ExternalCodeComp Example
+------------------------
 
 In this example we will give an example based on a common scenario of a code that takes
 its inputs from an input file, performs some computations, and then writes the results
-to an output file. `ExternalCode` supports multiple input and output files but
+to an output file. `ExternalCodeComp` supports multiple input and output files but
 for simplicity, this example only uses one of each.  Also, for the purposes of this
 example we have kept the input and output files as simple as possible. In practice,
 the data will likely be organized in some defined way and thus some care must be taken
@@ -62,12 +62,12 @@ does the same computation as the :ref:`Paraboloid Tutorial <tutorial_paraboloid_
 The following example demonstrates how to build an OpenMDAO component that makes use of this external code.
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.ParaboloidExternalCode
+    openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeComp
 
 
 We will go through each section and explain how this code works.
 
-OpenMDAO provides a base class, `ExternalCode`, which you should inherit from to
+OpenMDAO provides a base class, `ExternalCodeComp`, which you should inherit from to
 build your wrapper components. Just like any other component, you will define the
 necessary inputs and outputs in the `setup` method.
 If you want the component to check to make sure any files exist before/after you run,
@@ -75,7 +75,7 @@ then you can set the `external_input_files` and `external_output_files`, respect
 You'll also define the command that should be called by the external code.
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.ParaboloidExternalCode.setup
+    openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeComp.setup
 
 
 The `compute` method is responsible for calculating outputs for a
@@ -85,33 +85,33 @@ run your code, then pull the output values back up. So there is some Python
 code needed to do all that file writing, reading, and parsing.
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.ParaboloidExternalCode.compute
+    openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeComp.compute
 
 
-`ParaboloidExternalCode` is now complete. All that is left is to actually use it in a model.
+`ParaboloidExternalCodeComp` is now complete. All that is left is to actually use it in a model.
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_main
+    openmdao.components.tests.test_external_code_comp.TestExternalCodeCompFeature.test_main
     :layout: interleave
 
 
-Using ExternalCode in an Optimization
--------------------------------------
+Using ExternalCodeComp in an Optimization
+-----------------------------------------
 
-If you are going to use an ExternalCode component in a gradient based optimization, you'll need to
+If you are going to use an ExternalCodeComp component in a gradient based optimization, you'll need to
 get its :ref:`partial derivatives<advanced_guide_partial_derivs_explicit>` somehow.
 One way would be just to use :ref:`finite-difference approximations<feature_declare_partials_approx>` for the partials.
 
-In the following example, the `ParaboloidExternalCode` component has been modified to specify
+In the following example, the `ParaboloidExternalCodeComp` component has been modified to specify
 that partial derivatives are approximiated via finite difference.
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.ParaboloidExternalCodeFD
+    openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeCompFD
 
 Now we can perform an optimization using the external code, as shown here:
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize_fd
+    openmdao.components.tests.test_external_code_comp.TestExternalCodeCompFeature.test_optimize_fd
     :layout: interleave
 
 Alternatively, if the code you are wrapping happens to provide analytic derivatives you could
@@ -123,16 +123,16 @@ Here is a version of our external script that writes its derivatives to a second
 .. embed-code::
     openmdao.components.tests.extcode_paraboloid_derivs
 
-And the corresponding `ParaboloidExternalCodeDerivs` component:
+And the corresponding `ParaboloidExternalCodeCompDerivs` component:
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.ParaboloidExternalCodeDerivs
+    openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeCompDerivs
 
 Again, we can perform an optimization using the external code with derivatives:
 
 .. embed-code::
-    openmdao.components.tests.test_external_code.TestExternalCodeFeature.test_optimize_derivs
+    openmdao.components.tests.test_external_code_comp.TestExternalCodeCompFeature.test_optimize_derivs
     :layout: interleave
 
 
-.. tags:: ExternalCode, FileWrapping
+.. tags:: ExternalCodeComp, FileWrapping

@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 
-from openmdao.api import Group, Problem, MultiFiMetaModelUnStructured, MultiFiSurrogateModel
+from openmdao.api import Group, Problem, MultiFiMetaModelUnStructuredComp, MultiFiSurrogateModel
 
 
 class MockSurrogate(MultiFiSurrogateModel):
@@ -23,7 +23,7 @@ class MockSurrogate(MultiFiSurrogateModel):
 class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_inputs_wrt_nfidelity(self):
-        mm = MultiFiMetaModelUnStructured(nfi=3)
+        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
@@ -40,7 +40,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(mm.metadata['train:y_fi3'], None)
 
     def test_one_dim_one_fidelity_training(self):
-        mm = MultiFiMetaModelUnStructured()
+        mm = MultiFiMetaModelUnStructuredComp()
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
@@ -67,7 +67,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
     def test_one_dim_bi_fidelity_training(self):
-        mm = MultiFiMetaModelUnStructured(nfi=2)
+        mm = MultiFiMetaModelUnStructuredComp(nfi=2)
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
@@ -99,7 +99,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
 
     def test_two_dim_bi_fidelity_training(self):
-        mm = MultiFiMetaModelUnStructured(nfi=2)
+        mm = MultiFiMetaModelUnStructuredComp(nfi=2)
         surr_y1 = MockSurrogate()
         surr_y2 = MockSurrogate()
 
@@ -140,7 +140,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr_y2.ytrain[1], expected_y2train[1])
 
     def test_multifidelity_warm_start(self):
-        mm = MultiFiMetaModelUnStructured(nfi=2)
+        mm = MultiFiMetaModelUnStructuredComp(nfi=2)
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
@@ -203,6 +203,35 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.xtrain[1], expected_xtrain[1])
         np.testing.assert_array_equal(surr.ytrain[0], expected_ytrain[0])
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
+
+    def test_multifi_meta_model_unstructured_deprecated(self):
+        # run same test as above, only with the deprecated component,
+        # to ensure we get the warning and the correct answer.
+        # self-contained, to be removed when class name goes away.
+        from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured  # deprecated
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            mm = MultiFiMetaModelUnStructured(nfi=3)
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "'MultiFiMetaModelUnStructured' has been deprecated. Use "
+                                            "'MultiFiMetaModelUnStructuredComp' instead.")
+
+        mm.add_input('x', 0.)
+        mm.add_output('y', 0.)
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        self.assertEqual(mm.metadata['train:x'], None)
+        self.assertEqual(mm.metadata['train:x_fi2'], None)
+        self.assertEqual(mm.metadata['train:x_fi3'], None)
+        self.assertEqual(mm.metadata['train:y'], None)
+        self.assertEqual(mm.metadata['train:y_fi2'], None)
+        self.assertEqual(mm.metadata['train:y_fi3'], None)
 
 if __name__ == "__main__":
     unittest.main()

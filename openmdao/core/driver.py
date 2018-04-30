@@ -174,7 +174,8 @@ class Driver(object):
         self.recording_options.declare('record_derivatives', types=bool, default=False,
                                        desc='Set to True to record derivatives at the driver '
                                             'level')
-        ###########################
+        self.recording_options.declare('record_inputs', types=bool, default=True,
+                                       desc='Set to True to record inputs at the driver level')
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -345,6 +346,7 @@ class Driver(object):
         model = problem.model
 
         mydesvars = myobjectives = myconstraints = myresponses = set()
+        myinputs = set()
         mysystem_outputs = set()
 
         incl = self.recording_options['includes']
@@ -354,6 +356,7 @@ class Driver(object):
         rec_objectives = self.recording_options['record_objectives']
         rec_constraints = self.recording_options['record_constraints']
         rec_responses = self.recording_options['record_responses']
+        rec_inputs = self.recording_options['record_inputs']
 
         all_desvars = {n for n in self._designvars
                        if check_path(n, incl, excl, True)}
@@ -396,6 +399,19 @@ class Driver(object):
             mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
                                                            all_constraints)
 
+        if rec_inputs:
+            prob = self._problem
+            root = prob.model
+            myinputs = {n for n in root._inputs
+                        if check_path(n, incl, excl)}
+
+            if MPI:
+                all_vars = root.comm.gather(myinputs, root=0)
+                if MPI.COMM_WORLD.rank == 0:
+                    myinputs = all_vars[-1]
+                    for d in all_vars[:-1]:
+                        myinputs.update(d)
+
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
@@ -410,6 +426,7 @@ class Driver(object):
             myobjectives = [n for n in myobjectives if rrank == rowned[n]]
             myconstraints = [n for n in myconstraints if rrank == rowned[n]]
             mysystem_outputs = [n for n in mysystem_outputs if rrank == rowned[n]]
+            myinputs = [n for n in myinputs if rrank == rowned[n]]
 
         self._filtered_vars_to_record = {
             'des': mydesvars,
@@ -417,6 +434,7 @@ class Driver(object):
             'con': myconstraints,
             'res': myresponses,
             'sys': mysystem_outputs,
+            'in': myinputs
         }
 
         self._rec_mgr.startup(self)
@@ -766,12 +784,15 @@ class Driver(object):
 
         model = self._problem.model
 
-        if opts['includes']:
-            outputs = model._outputs
-            views = outputs._views
-            sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
-        else:
-            sys_vars = {}
+        sys_vars = {}
+        in_vars = {}
+        outputs = model._outputs
+        inputs = model._inputs
+        views = outputs._views
+        views_in = inputs._views
+        sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
+        if self.recording_options['record_inputs']:
+            in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
 
         if MPI:
             des_vars = self._gather_vars(model, des_vars)
@@ -779,13 +800,18 @@ class Driver(object):
             obj_vars = self._gather_vars(model, obj_vars)
             con_vars = self._gather_vars(model, con_vars)
             sys_vars = self._gather_vars(model, sys_vars)
+            in_vars = self._gather_vars(model, in_vars)
 
-        data = {}
-        data['des'] = des_vars
-        data['res'] = res_vars
-        data['obj'] = obj_vars
-        data['con'] = con_vars
-        data['sys'] = sys_vars
+        outs = des_vars
+        outs.update(res_vars)
+        outs.update(obj_vars)
+        outs.update(con_vars)
+        outs.update(sys_vars)
+
+        data = {
+            'out': outs,
+            'in': in_vars
+        }
 
         metadata = create_local_meta(self._get_name())
 

@@ -39,7 +39,7 @@ training data that has been provided, and then it will predict the output
 values. This training step only occurs on the first run.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature
     :layout: code, output
 
 
@@ -58,7 +58,7 @@ surrogate can be passed as an argument to the `MetaModelUnStructured` constructo
 alternative to specifying it later.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature2d
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature2d
     :layout: code, output
 
 In addition, it's possible to vectorize the input and output variables so that you can
@@ -72,7 +72,7 @@ for the sine and cosine functions at those three points.  Note that a vectorized
 to be the same size as specified in the ``vectorize`` argument.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_unstructured.MetaModelTestCase.test_metamodel_feature_vector2d
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature_vector2d
     :layout: code, output
 
 .. tags:: MetaModel, Examples

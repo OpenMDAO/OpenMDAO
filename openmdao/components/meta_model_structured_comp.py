@@ -16,6 +16,7 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 class OutOfBoundsError(Exception):
@@ -188,7 +189,7 @@ class _RegularGridInterp(object):
             is True (raise an exception).
         """
         if not make_interp_spline:
-            msg = "'MetaModelStructured' requires scipy>=0.19, but the currently" \
+            msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
@@ -588,7 +589,7 @@ class _RegularGridInterp(object):
         return gradients
 
 
-class MetaModelStructured(ExplicitComponent):
+class MetaModelStructuredComp(ExplicitComponent):
     """
     Interpolation Component generated from data on a regular grid.
 
@@ -612,7 +613,7 @@ class MetaModelStructured(ExplicitComponent):
         Initialize the component.
         """
         if not make_interp_spline:
-            msg = "'MetaModelStructured' requires scipy>=0.19, but the currently" \
+            msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
@@ -647,7 +648,7 @@ class MetaModelStructured(ExplicitComponent):
             Additional agruments for add_input.
         """
         n = self.metadata['num_nodes']
-        super(MetaModelStructured, self).add_input(name, val * np.ones(n), **kwargs)
+        super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
         self.params.append(np.asarray(training_data))
@@ -670,7 +671,7 @@ class MetaModelStructured(ExplicitComponent):
             Additional agruments for add_output.
         """
         n = self.metadata['num_nodes']
-        super(MetaModelStructured, self).add_output(name, val * np.ones(n), **kwargs)
+        super(MetaModelStructuredComp, self).add_output(name, val * np.ones(n), **kwargs)
 
         self.interps[name] = _RegularGridInterp(self.params,
                                                 training_data,
@@ -683,8 +684,8 @@ class MetaModelStructured(ExplicitComponent):
         arange = np.arange(n)
         self.declare_partials(name, self.pnames, rows=arange, cols=arange)
         if self.metadata['training_data_gradients']:
-            super(MetaModelStructured, self).add_input("%s_train" % name,
-                                                       val=training_data, **kwargs)
+            super(MetaModelStructuredComp, self).add_input("%s_train" % name,
+                                                           val=training_data, **kwargs)
             self.declare_partials(name, "%s_train" % name)
 
     def setup(self):
@@ -769,3 +770,24 @@ class MetaModelStructured(ExplicitComponent):
 
             if self.metadata['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
+
+
+class MetaModelStructured(MetaModelStructuredComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'MetaModelStructured' has been deprecated. Use "
+                         "'MetaModelStructuredComp' instead.")
+        super(MetaModelStructured, self).__init__(*args, **kwargs)

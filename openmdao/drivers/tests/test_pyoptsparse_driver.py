@@ -1140,6 +1140,9 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
+        # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
+        prob.driver.run()
+
     def test_analysis_error_objfunc(self):
 
         # Component raises an analysis error during some runs, and pyopt
