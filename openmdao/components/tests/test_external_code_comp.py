@@ -437,6 +437,57 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
+# ------------------------------------------------------
+# run same test as above, only with the deprecated component,
+# to ensure we get the warning and the correct answer.
+# self-contained, to be removed when class name goes away.
+from openmdao.api import ExternalCode
+import warnings
+
+
+class DeprecatedExternalCodeForTesting(ExternalCode):
+    def __init__(self):
+        super(DeprecatedExternalCodeForTesting, self).__init__()
+
+
+class TestDeprecatedExternalCode(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_extcode-')
+        os.chdir(self.tempdir)
+        shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
+                    os.path.join(self.tempdir, 'extcode_example.py'))
+
+        with warnings.catch_warnings(record=True) as w:
+            self.extcode = DeprecatedExternalCodeForTesting()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "'ExternalCode' has been deprecated. Use 'ExternalCodeComp' instead.")
+
+        self.prob = Problem()
+
+        self.prob.model.add_subsystem('extcode', self.extcode)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    def test_normal(self):
+        self.extcode.options['command'] = [
+            'python', 'extcode_example.py', 'extcode.out'
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode_example.py',]
+        self.extcode.options['external_output_files'] = ['extcode.out',]
+
+        dev_null = open(os.devnull, 'w')
+        self.prob.setup(check=True)
+        self.prob.run_model()
 
 if __name__ == "__main__":
     unittest.main()

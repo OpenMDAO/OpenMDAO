@@ -263,6 +263,6 @@ class ExternalCode(ExternalCodeComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'ExternalCode' component has been deprecated. Use"
+        warn_deprecation("'ExternalCode' has been deprecated. Use "
                          "'ExternalCodeComp' instead.")
         super(ExternalCode, self).__init__(*args, **kwargs)

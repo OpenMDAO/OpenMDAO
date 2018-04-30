@@ -204,5 +204,34 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.ytrain[0], expected_ytrain[0])
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
 
+    def test_multifi_meta_model_unstructured_deprecated(self):
+        # run same test as above, only with the deprecated component,
+        # to ensure we get the warning and the correct answer.
+        # self-contained, to be removed when class name goes away.
+        from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured  # deprecated
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            mm = MultiFiMetaModelUnStructured(nfi=3)
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "'MultiFiMetaModelUnStructured' has been deprecated. Use "
+                                            "'MultiFiMetaModelUnStructuredComp' instead.")
+
+        mm.add_input('x', 0.)
+        mm.add_output('y', 0.)
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        self.assertEqual(mm.metadata['train:x'], None)
+        self.assertEqual(mm.metadata['train:x_fi2'], None)
+        self.assertEqual(mm.metadata['train:x_fi3'], None)
+        self.assertEqual(mm.metadata['train:y'], None)
+        self.assertEqual(mm.metadata['train:y_fi2'], None)
+        self.assertEqual(mm.metadata['train:y_fi3'], None)
+
 if __name__ == "__main__":
     unittest.main()
