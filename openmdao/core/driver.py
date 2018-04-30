@@ -403,7 +403,7 @@ class Driver(object):
             prob = self._problem
             root = prob.model
             myinputs = {n for n in root._inputs
-                        if check_path(n, incl, excl, True)}
+                        if check_path(n, incl, excl)}
 
             if MPI:
                 all_vars = root.comm.gather(myinputs, root=0)
@@ -786,14 +786,13 @@ class Driver(object):
 
         sys_vars = {}
         in_vars = {}
-        if opts['includes']:
-            outputs = model._outputs
-            inputs = model._inputs
-            views = outputs._views
-            views_in = inputs._views
-            sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
-            if self.recording_options['record_inputs']:
-                in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
+        outputs = model._outputs
+        inputs = model._inputs
+        views = outputs._views
+        views_in = inputs._views
+        sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
+        if self.recording_options['record_inputs']:
+            in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
 
         if MPI:
             des_vars = self._gather_vars(model, des_vars)
