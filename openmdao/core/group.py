@@ -22,7 +22,7 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible
 from openmdao.utils.mpi import MPI
@@ -55,6 +55,9 @@ class Group(System):
             dict of arguments available here and in all descendants of this
             Group.
         """
+        self._mpi_proc_allocator = DefaultAllocator()
+        self._proc_info = {}
+
         super(Group, self).__init__(**kwargs)
 
         # TODO: we cannot set the solvers with property setters at the moment
@@ -64,8 +67,6 @@ class Group(System):
             self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
-        self._mpi_proc_allocator = DefaultAllocator()
-        self._proc_info = {}
 
     def setup(self):
         """
@@ -427,7 +428,7 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
-                allprocs_prom2abs_list[type_] = defaultdict(list)
+                allprocs_prom2abs_list[type_] = OrderedDict()
 
             for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta, oscale, rscale in gathered:
                 self._has_output_scaling |= oscale
@@ -443,6 +444,8 @@ class Group(System):
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
+                        if prom_name not in allprocs_prom2abs_list[type_]:
+                            allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
     def _setup_var_sizes(self, recurse=True):
@@ -806,8 +809,7 @@ class Group(System):
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
-                    if not (np.prod(out_shape) == abs2meta[abs_in]['size']
-                            == np.max(out_shape) == np.max(in_shape)):
+                    if not array_connection_compatible(in_shape, out_shape):
                         msg = ("The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
                         raise ValueError(msg % (abs_out, abs_in,
@@ -1540,9 +1542,6 @@ class Group(System):
             sub_do_ln = (self._linear_solver is not None) and \
                         (self._linear_solver._linearize_children())
 
-            for subsys in self._subsystems_myproc:
-                subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
-
             # Group finite difference
             if self._owns_approx_jac:
                 with self._unscaled_context(outputs=[self._outputs]):
@@ -1551,9 +1550,14 @@ class Group(System):
 
                 J._update()
 
-            # Update jacobian
-            elif self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            else:
+                # Only linearize subsystems if we aren't approximating the derivs at this level.
+                for subsys in self._subsystems_myproc:
+                    subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
+
+                # Update jacobian
+                if self._owns_assembled_jac or self._views_assembled_jac:
+                    J._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()
@@ -1680,6 +1684,7 @@ class Group(System):
             approx._init_approximations()
 
             self._jacobian._system = self
+            self._views_assembled_jac = False
             self._jacobian._initialize()
 
         super(Group, self)._setup_jacobians(jacobian, recurse)

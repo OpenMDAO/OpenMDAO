@@ -541,7 +541,9 @@ class Problem(object):
 
         self._mode = mode
 
-        model._setup(comm, 'full', mode)
+        model_comm = self.driver._setup_comm(comm)
+
+        model._setup(model_comm, 'full', mode)
 
         # Cache all args for final setup.
         self._vector_class = vector_class
@@ -703,11 +705,12 @@ class Problem(object):
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
-            model.run_linearize()
 
             jac_key = 'J_' + mode
 
             for comp in comps:
+
+                comp.run_linearize()
 
                 # Skip IndepVarComps
                 if isinstance(comp, IndepVarComp):
@@ -1054,7 +1057,7 @@ class Problem(object):
                                   {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
-    def compute_totals(self, of=None, wrt=None, return_format='flat_dict'):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1070,6 +1073,8 @@ class Problem(object):
             Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).
+        debug_print : bool
+            Set to True to print out some debug information during linear solve.
 
         Returns
         -------
@@ -1084,7 +1089,8 @@ class Problem(object):
                 total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
                 return total_info.compute_totals_approx(initialize=True)
             else:
-                total_info = _TotalJacInfo(self, of, wrt, False, return_format)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+                                           debug_print=debug_print)
                 return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1137,8 +1143,8 @@ class Problem(object):
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
-            ['lower', 'upper', 'equals', ref', 'ref0', 'indices', 'index', adder', 'scaler',
-            'linear', parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
             'cache_linear_solution']
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.

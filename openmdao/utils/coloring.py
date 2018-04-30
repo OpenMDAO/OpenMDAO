@@ -84,8 +84,10 @@ class _SubjacRandomizer(object):
         elif isinstance(subjac, sparse_types):  # sparse
             subjac = subjac.copy()
             subjac.data = rand(subjac.data.size) + 1.0
-        else:   # dense
+        elif isinstance(subjac, np.ndarray):   # dense array
             subjac = rand(*(subjac.shape)) + 1.0
+        else:  # scalar
+            subjac = rand() + 1.0
 
         self._orig_set_abs(key, subjac)
 
@@ -150,13 +152,13 @@ def _get_full_disjoint(J, start, end):
     return sorted(full_disjoint, key=lambda x: len(x)), rows
 
 
-def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
+def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
     The jacobian is computed by calculating a total jacobian using _compute_totals 'repeats'
     times and adding the absolute values of those together, then dividing by the max value,
-    then converting to a boolean array, specifying all entries below 'tol' as False and all
+    then converting to a boolean array, specifying all entries below a tolerance as False and all
     others as True.  Prior to calling _compute_totals, all of the partial jacobians in the
     model are modified so that when any of their subjacobians are assigned a value, that
     value is populated with positive random numbers in the range [1.0, 2.0).
@@ -170,8 +172,13 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     repeats : int
         Number of times to repeat total jacobian computation.
     tol : float
-        Tolerance on values in jacobian.  Anything smaller in magnitude will be
-        set to 0.0.
+        Starting tolerance on values in jacobian.  Actual tolerance is computed based on
+        consistent numbers of zero entries over a sweep of tolerances.  Anything smaller in
+        magnitude than the computed tolerance will be set to 0.0.
+    setup : bool
+        If True, run setup before calling compute_totals.
+    run_model : bool
+        If True, run run_model before calling compute_totals.
 
     Returns
     -------
@@ -182,9 +189,11 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15):
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
 
-    prob.setup(mode=mode)
+    if setup:
+        prob.setup(mode=mode)
 
-    prob.run_model()
+    if run_model:
+        prob.run_model()
 
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
@@ -426,7 +435,8 @@ def _write_coloring(col_lists, rows, sparsity, stream):
     stream.write("]")
 
 
-def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, stream=sys.stdout):
+def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
+                 setup=False, run_model=False, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -444,6 +454,10 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, str
         If True, display a visualiation of the final total jacobian used to compute the coloring.
     stream : file-like or None
         Stream where output coloring info will be written.
+    setup : bool
+        If True, run setup before calling compute_totals.
+    run_model : bool
+        If True, run run_model before calling compute_totals.
 
     Returns
     -------
@@ -452,12 +466,15 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, str
     """
     driver = problem.driver
 
-    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol)
+    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
+                      run_model=run_model)
 
     of = driver._get_ordered_nl_responses()
     wrt = list(driver._designvars)
 
     sparsity = _sparsity_from_jac(J, of, wrt, driver)
+
+    driver._total_jac = None
 
     if stream is not None:
         _write_sparsity(sparsity, stream)
@@ -471,7 +488,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False, str
 
 
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
-                   include_sparsity=True, stream=sys.stdout):
+                   include_sparsity=True, setup=False, run_model=False, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -490,6 +507,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     include_sparsity : bool
         If True, include the sparsity structure of the total jacobian mapped to design vars
         and responses.  (This info is used by pyOptSparseDriver).
+    setup : bool
+        If True, run setup before calling compute_totals.
+    run_model : bool
+        If True, run run_model before calling compute_totals.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -505,7 +526,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     # TODO: fix this to work in rev mode as well
     assert mode == 'fwd', "Simultaneous derivatives are currently supported only in fwd mode."
 
-    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol)
+    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
+                      run_model=run_model)
 
     full_disjoint, rows = _find_global_disjoint(problem, J)
     uncolored_cols = [i for i, r in enumerate(rows) if r is None]
@@ -523,6 +545,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
     if include_sparsity:
         sparsity = _sparsity_from_jac(J, of, wrt, driver)
+
+    driver._total_jac = None
 
     if stream is not None:
         if stream.isatty():
@@ -577,6 +601,32 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
                      (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
 
+def dynamic_simul_coloring(driver, do_sparsity=False):
+    """
+    Compute simultaneous deriv coloring during runtime.
+
+    Parameters
+    ----------
+    driver : <Driver>
+        The driver performing the optimization.
+    do_sparsity : bool
+        If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
+    """
+    problem = driver._problem
+    driver._total_jac = None
+    repeats = driver.options['dynamic_simul_derivs_repeats']
+
+    # save the coloring.json file for later inspection
+    with open("coloring.json", "w") as f:
+        coloring = get_simul_meta(problem, mode=problem._mode, repeats=repeats,
+                                  tol=1.e-15, include_sparsity=True,
+                                  setup=False, run_model=False, stream=f)
+    driver.set_simul_deriv_color(coloring)
+    driver._setup_simul_coloring(mode=problem._mode)
+    if do_sparsity:
+        driver._setup_tot_jac_sparsity()
+
+
 def _simul_coloring_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao simul_coloring' command.
@@ -627,6 +677,7 @@ def _simul_coloring_cmd(options):
         color_info = get_simul_meta(prob, repeats=options.num_jacs, tol=options.tolerance,
                                     show_jac=options.show_jac,
                                     include_sparsity=not options.no_sparsity,
+                                    setup=True, run_model=True,
                                     stream=outfile)
         if sys.stdout.isatty():
             simul_coloring_summary(prob, color_info, stream=sys.stdout)
@@ -681,6 +732,6 @@ def _sparsity_cmd(options):
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
         get_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=prob._mode,
-                     show_jac=options.show_jac, stream=outfile)
+                     show_jac=options.show_jac, setup=True, run_model=True, stream=outfile)
         exit()
     return _sparsity

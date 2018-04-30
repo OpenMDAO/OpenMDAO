@@ -860,7 +860,7 @@ class System(object):
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
+        self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
@@ -1324,7 +1324,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._subjacs_info = {}
+        self._subjacs_info = OrderedDict()
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1359,6 +1359,7 @@ class System(object):
                 self._jacobian._subjacs = jacobian._subjacs
                 self._jacobian._subjacs_info = jacobian._subjacs_info
                 self._jacobian._keymap = jacobian._keymap
+                self._jacobian._view_ranges = jacobian._view_ranges
 
             # At present, we don't support a AssembledJacobian in a group
             # if any subcomponents are matrix-free.
@@ -1390,9 +1391,31 @@ class System(object):
         if self._owns_assembled_jac:
             self._jacobian._system = self
             self._jacobian._initialize()
+            out_ranges = self._jacobian._out_ranges
+            in_ranges = self._jacobian._in_ranges
 
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(recurse=True, include_self=True):
                 if s._jacobian is self._jacobian and s._views_assembled_jac:
+                    # set up view range for current subsystem
+                    input_names = s._var_abs_names['input']
+                    if input_names:
+                        min_in_offset = in_ranges[input_names[0]][0]
+                        max_in_offset = in_ranges[input_names[-1]][1]
+                    else:
+                        min_in_offset = sys.maxsize
+                        max_in_offset = 0
+
+                    output_names = s._var_abs_names['output']
+                    if output_names:
+                        min_res_offset = out_ranges[output_names[0]][0]
+                        max_res_offset = out_ranges[output_names[-1]][1]
+                    else:
+                        min_res_offset = sys.maxsize
+                        max_res_offset = 0
+
+                    self._jacobian._view_ranges[s.pathname] = (
+                        min_res_offset, max_res_offset, min_in_offset, max_in_offset)
+
                     self._jacobian._init_view(s)
 
     def set_initial_values(self):

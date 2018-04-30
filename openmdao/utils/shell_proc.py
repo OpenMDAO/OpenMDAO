@@ -1,4 +1,4 @@
-"""Some basic shell utilities, used for ExternalCode mostly."""
+"""Some basic shell utilities, used for ExternalCodeComp mostly."""
 import os
 import signal
 import subprocess
