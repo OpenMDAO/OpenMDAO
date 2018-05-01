@@ -1,7 +1,6 @@
 """Define the AssembledJacobian class."""
 from __future__ import division, print_function
 
-import sys
 from collections import defaultdict
 
 from six import iteritems
@@ -13,9 +12,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.units import get_conversion
-from openmdao.utils.name_maps import key2abs_key
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
