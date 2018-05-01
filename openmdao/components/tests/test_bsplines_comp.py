@@ -13,7 +13,7 @@ except ImportError:
     matplotlib = None
 
 from openmdao.api import Problem, IndepVarComp
-from openmdao.components.interp import BsplinesComp
+from openmdao.components.bsplines_comp import BsplinesComp
 from openmdao.utils.assert_utils import assert_rel_error
 
 

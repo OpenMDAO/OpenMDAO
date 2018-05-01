@@ -5,7 +5,7 @@ from __future__ import print_function, division
 
 from collections import OrderedDict
 from copy import deepcopy
-from six import iteritems, itervalues
+from six import iteritems
 from six.moves import zip
 import sys
 import time

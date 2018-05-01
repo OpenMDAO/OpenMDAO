@@ -14,7 +14,7 @@ distributed design variables where you know that the physics gives you smooth de
 BsplinesComp accepts the following arguments during instantiation:
 
 .. embed-options::
-    openmdao.components.interp
+    openmdao.components.bsplines_comp
     BsplinesComp
     metadata
 
@@ -26,14 +26,14 @@ The following is a simple example where we use a BsplineComp to take a 10 point 
 degrees and represent it with 5 control points that can be used as design variables.
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_basic
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_basic
     :layout: code, output
 
 The BsplinesComp is vectorized, so you can operate on a multi-row vector and have the it create
 interpolated points independently for each row:
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_vectorized
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_vectorized
     :layout: code, output
 
 
@@ -51,7 +51,7 @@ initial value for this variable is roughly a sine wave. When we create the Bspli
 distribution, our control points are evenly spaced over the domain, as seen in the figure below.
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_distribution_uniform
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_distribution_uniform
     :layout: code, plot
     :scale: 90
     :align: center
@@ -61,7 +61,7 @@ as seen below. This is beneficial if we know that the optimal design will have m
 higher spatial frequency content) near the edges than the middle.
 
 .. embed-code::
-    openmdao.components.tests.test_interp.TestBsplinesCompFeature.test_distribution_sine
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_distribution_sine
     :layout: code, plot
     :scale: 90
     :align: center

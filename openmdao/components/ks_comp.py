@@ -6,6 +6,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 CITATIONS = """
@@ -73,22 +74,13 @@ class KSfunction(object):
         return dKS_dg, dKS_drho
 
 
-class KSComponent(ExplicitComponent):
+class KSComp(ExplicitComponent):
     """
     KS function component.
 
     Component that aggregates a number of functions to a single value via the
     Kreisselmeier-Steinhauser Function. This new constraint is satisfied when it
     is less than or equal to zero.
-
-    Options
-    -------
-    lower_flag : bool(False)
-        Set to True to turn upper bound into a lower bound for satisfaction.
-    rho : float(50.0)
-        Constraint Aggregation Factor.
-    upper : float(0.0)
-        Upper bound for constraint, default is zero.
     """
 
     def __init__(self, width=1, vec_size=1):
@@ -102,7 +94,7 @@ class KSComponent(ExplicitComponent):
         vec_size : int
             The number of rows to independently aggregate.
         """
-        super(KSComponent, self).__init__(width=width, vec_size=vec_size)
+        super(KSComp, self).__init__(width=width, vec_size=vec_size)
 
         self.options.declare('lower_flag', False,
                              desc="Set to True to reverse sign of input constraints.")
@@ -185,3 +177,24 @@ class KSComponent(ExplicitComponent):
             derivs = -derivs
 
         partials['KS', 'g'] = derivs.flatten()
+
+
+class KSComponent(KSComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'KSComponent' has been deprecated. Use "
+                         "'KSComp' instead.")
+        super(KSComponent, self).__init__(*args, **kwargs)

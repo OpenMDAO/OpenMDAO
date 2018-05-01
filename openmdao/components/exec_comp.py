@@ -1,7 +1,5 @@
 """Define the ExecComp class, a component that evaluates an expression."""
-import math
 import re
-from collections import OrderedDict
 from itertools import product
 
 import numpy as np

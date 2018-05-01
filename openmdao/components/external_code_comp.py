@@ -1,21 +1,19 @@
-"""Define the ExternalCode class."""
+"""Define the ExternalCodeComp class."""
 from __future__ import print_function
 
 import os
 import sys
-
-from six import iteritems, itervalues
 
 import numpy.distutils
 from numpy.distutils.exec_command import find_executable
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
+from openmdao.utils.general_utils import warn_deprecation
 
 
-class ExternalCode(ExplicitComponent):
+class ExternalCodeComp(ExplicitComponent):
     """
     Run an external code as a component.
 
@@ -37,36 +35,13 @@ class ExternalCode(ExplicitComponent):
         that standard error should go into the same handle as standard output.
     return_code : int
         Exit status of the child process.
-
-    Options
-    -------
-    options['command'] :  list([])
-        Command to be executed. Command must be a list of command line args.
-    options['env_vars'] :  dict({})
-        Environment variables required by the command
-    options['external_input_files'] :  list([])
-        (optional) list of input file names to check the existence of before solve_nonlinear
-    options['external_output_files'] :  list([])
-        (optional) list of input file names to check the existence of after solve_nonlinear
-    options['poll_delay'] :  float(0.0)
-        Delay between polling for command completion. A value of zero will use
-        an internally computed default.
-    options['timeout'] :  float(0.0)
-        Maximum time in seconds to wait for command completion. A value of zero
-        implies an infinite wait. If the timeout interval is exceeded, an
-        AnalysisError will be raised.
-    options['fail_hard'] :  bool(True)
-        Behavior on error returned from code, either raise a 'hard' error (RuntimeError) if True
-        or a 'soft' error (AnalysisError) if False.
-    options['allowed_return_codes'] :  list or set of int [0]
-        List of return codes that are considered successful.
     """
 
     def __init__(self):
         """
-        Intialize the ExternalCode component.
+        Intialize the ExternalCodeComp component.
         """
-        super(ExternalCode, self).__init__()
+        super(ExternalCodeComp, self).__init__()
 
         self.STDOUT = STDOUT
         self.DEV_NULL = DEV_NULL
@@ -98,7 +73,7 @@ class ExternalCode(ExplicitComponent):
         self.return_code = 0  # Return code from the command
         self.stdin = self.DEV_NULL
         self.stdout = None
-        self.stderr = "external_code_error.out"
+        self.stderr = "external_code_comp_error.out"
 
     def check_config(self, logger):
         """
@@ -244,3 +219,24 @@ class ExternalCode(ExplicitComponent):
             self._process = None
 
         return (return_code, error_msg)
+
+
+class ExternalCode(ExternalCodeComp):
+    """
+    Deprecated.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Capture Initialize to throw warning.
+
+        Parameters
+        ----------
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
+        """
+        warn_deprecation("'ExternalCode' has been deprecated. Use "
+                         "'ExternalCodeComp' instead.")
+        super(ExternalCode, self).__init__(*args, **kwargs)
