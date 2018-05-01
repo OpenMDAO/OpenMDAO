@@ -24,7 +24,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.mpi import FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.units import get_conversion
 from openmdao.vectors.default_vector import DefaultVector

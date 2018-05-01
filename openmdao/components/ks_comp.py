@@ -81,15 +81,6 @@ class KSComp(ExplicitComponent):
     Component that aggregates a number of functions to a single value via the
     Kreisselmeier-Steinhauser Function. This new constraint is satisfied when it
     is less than or equal to zero.
-
-    Options
-    -------
-    lower_flag : bool(False)
-        Set to True to turn upper bound into a lower bound for satisfaction.
-    rho : float(50.0)
-        Constraint Aggregation Factor.
-    upper : float(0.0)
-        Upper bound for constraint, default is zero.
     """
 
     def __init__(self, width=1, vec_size=1):

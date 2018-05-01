@@ -5,12 +5,10 @@ from __future__ import division
 import numpy as np
 from six import itervalues, iteritems
 from six.moves import range
-from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
 
