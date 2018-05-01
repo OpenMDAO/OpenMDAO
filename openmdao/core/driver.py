@@ -782,11 +782,16 @@ class Driver(object):
             in_vars = self._gather_vars(model, in_vars)
 
         outs = {}
-        outs.update(des_vars)
-        outs.update(res_vars)
-        outs.update(obj_vars)
-        outs.update(con_vars)
-        outs.update(sys_vars)
+        if des_vars is not None:
+            outs.update(des_vars)
+        if res_vars is not None:
+            outs.update(res_vars)
+        if obj_vars is not None:
+            outs.update(obj_vars)
+        if con_vars is not None:
+            outs.update(con_vars)
+        if sys_vars is not None:
+            outs.update(sys_vars)
 
         data = {
             'out': outs,
