@@ -62,6 +62,27 @@ class MetaModelTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
+    def test_error_no_surrogate(self):
+        # Seems like the error message from above should also be present and readable even if the
+        # user chooses to skip checking the model.
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0.)
+
+        prob = Problem()
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.setup(check=False)
+
+        sin_mm.metadata['train:x'] = np.linspace(0,10,20)
+        sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        msg = ("Metamodel 'sin_mm': No surrogate specified for output 'f_x'")
+        self.assertEqual(str(cm.exception), msg)
+
     def test_sin_metamodel_preset_data(self):
         # preset training data
         x = np.linspace(0,10,200)
@@ -381,8 +402,16 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, Jf[0][0], -1., 1.e-3)
         assert_rel_error(self, Jr[0][0], -1., 1.e-3)
 
-        # TODO: complex step not currently supported in check_partial_derivs
-        # data = prob.check_partials(global_options={'method': 'cs'})
+        abs_errors = data['mm'][('f', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-6)
+
+        # Complex step
+        prob.setup(force_alloc_complex=True)
+        prob.model.mm.set_check_partial_options(wrt='*', method='cs')
+        data = prob.check_partials(out_stream=None)
 
         abs_errors = data['mm'][('f', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
@@ -485,6 +514,33 @@ class MetaModelTestCase(unittest.TestCase):
             abs_error = float(match)
             self.assertTrue(abs_error < 1.e-6)
 
+    def test_vectorized_kriging(self):
+        # Test for coverage (handling the rmse)
+        size = 3
+
+        # create a vectorized MetaModelUnStructuredComp for sine
+        trig = MetaModelUnStructuredComp(vec_size=size,
+                                         default_surrogate=KrigingSurrogate(eval_rmse=True))
+        trig.add_input('x', np.zeros(size))
+        trig.add_output('y', np.zeros(size))
+
+        # add it to a Problem
+        prob = Problem()
+        prob.model.add_subsystem('trig', trig)
+        prob.setup(check=False)
+
+        # provide training data
+        trig.metadata['train:x'] = np.linspace(0, 10, 20)
+        trig.metadata['train:y'] = .5*np.sin(trig.metadata['train:x'])
+
+        # train the surrogate and check predicted value
+        prob['trig.x'] = np.array([2.1, 3.2, 4.3])
+        prob.run_model()
+        assert_rel_error(self, prob['trig.y'],
+                         np.array(.5*np.sin(prob['trig.x'])),
+                         1e-4)
+        self.assertEqual(len(prob.model.trig._metadata('y')['rmse']), 3)
+
     def test_derivatives_vectorized_multiD(self):
         vec_size = 5
         mm = MetaModelUnStructuredComp(vec_size=vec_size)
@@ -526,6 +582,23 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob.run_model()
 
+        data = prob.check_partials(out_stream=None)
+
+        abs_errors = data['mm'][('y', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-5)
+
+        abs_errors = data['mm'][('y', 'xx')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-5)
+
+        # Complex step
+        prob.setup(force_alloc_complex=True)
+        prob.model.mm.set_check_partial_options(wrt='*', method='cs')
         data = prob.check_partials(out_stream=None)
 
         abs_errors = data['mm'][('y', 'x')]['abs error']
@@ -669,6 +742,156 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), "'MetaModelUnStructured' has been deprecated. Use "
                                             "'MetaModelUnStructuredComp' instead.")
+
+        mm.add_input('x1', 0.)
+        mm.add_input('x2', 0.)
+
+        mm.add_output('y1', 0.)
+        mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
+
+        mm.default_surrogate = ResponseSurface()
+
+        # add metamodel to a problem
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        # check that surrogates were properly assigned
+        surrogate = mm._metadata('y1').get('surrogate')
+        self.assertTrue(isinstance(surrogate, ResponseSurface))
+
+        surrogate = mm._metadata('y2').get('surrogate')
+        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+
+        # populate training data
+        mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
+        mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
+        mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
+        mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
+
+        # run problem for provided data point and check prediction
+        prob['mm.x1'] = 2.0
+        prob['mm.x2'] = 3.0
+
+        self.assertTrue(mm.train)   # training will occur before 1st run
+        prob.run_model()
+
+        assert_rel_error(self, prob['mm.y1'], 2.0, .00001)
+        assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
+
+        # run problem for interpolated data point and check prediction
+        prob['mm.x1'] = 2.5
+        prob['mm.x2'] = 3.5
+
+        self.assertFalse(mm.train)  # training will not occur before 2nd run
+        prob.run_model()
+
+        assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
+
+        # change default surrogate, re-setup and check that metamodel re-trains
+        mm.default_surrogate = FloatKrigingSurrogate()
+        prob.setup(check=False)
+
+        surrogate = mm._metadata('y1').get('surrogate')
+        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+
+        self.assertTrue(mm.train)  # training will occur after re-setup
+
+        prob['mm.x1'] = 2.5
+        prob['mm.x2'] = 3.5
+
+        prob.run_model()
+        assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
+
+    def test_meta_model_unstructured_deprecated(self):
+        # run same test as above, only with the deprecated component,
+        # to ensure we get the warning and the correct answer.
+        # self-contained, to be removed when class name goes away.
+        from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured #deprecated
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            mm = MetaModelUnStructured()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "'MetaModelUnStructured' has been deprecated. Use "
+                         "'MetaModelUnStructuredComp' instead.")
+
+        mm.add_input('x1', 0.)
+        mm.add_input('x2', 0.)
+
+        mm.add_output('y1', 0.)
+        mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
+
+        mm.default_surrogate = ResponseSurface()
+
+        # add metamodel to a problem
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        # check that surrogates were properly assigned
+        surrogate = mm._metadata('y1').get('surrogate')
+        self.assertTrue(isinstance(surrogate, ResponseSurface))
+
+        surrogate = mm._metadata('y2').get('surrogate')
+        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+
+        # populate training data
+        mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
+        mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
+        mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
+        mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
+
+        # run problem for provided data point and check prediction
+        prob['mm.x1'] = 2.0
+        prob['mm.x2'] = 3.0
+
+        self.assertTrue(mm.train)   # training will occur before 1st run
+        prob.run_model()
+
+        assert_rel_error(self, prob['mm.y1'], 2.0, .00001)
+        assert_rel_error(self, prob['mm.y2'], 4.0, .00001)
+
+        # run problem for interpolated data point and check prediction
+        prob['mm.x1'] = 2.5
+        prob['mm.x2'] = 3.5
+
+        self.assertFalse(mm.train)  # training will not occur before 2nd run
+        prob.run_model()
+
+        assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
+
+        # change default surrogate, re-setup and check that metamodel re-trains
+        mm.default_surrogate = FloatKrigingSurrogate()
+        prob.setup(check=False)
+
+        surrogate = mm._metadata('y1').get('surrogate')
+        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+
+        self.assertTrue(mm.train)  # training will occur after re-setup
+
+        prob['mm.x1'] = 2.5
+        prob['mm.x2'] = 3.5
+
+        prob.run_model()
+        assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
+
+    def test_metamodel_deprecated(self):
+        # run same test as above, only with the deprecated component,
+        # to ensure we get the warning and the correct answer.
+        # self-contained, to be removed when class name goes away.
+        from openmdao.components.meta_model_unstructured_comp import MetaModel #deprecated
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            mm = MetaModel()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "'MetaModel' has been deprecated. Use "
+                         "'MetaModelUnStructuredComp' instead.")
 
         mm.add_input('x1', 0.)
         mm.add_input('x2', 0.)

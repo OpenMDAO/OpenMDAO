@@ -64,7 +64,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         # training will occur on first execution
         self.train = True
-        self._training_input = np.zeros(0)
+        self._training_input = np.empty(0)
         self._training_output = {}
 
         self._input_size = 0
@@ -74,8 +74,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Declare metadata.
         """
         self.metadata.declare('vec_size', types=int, default=1, lower=1,
-                              desc='Number of rows in the input and output vectors for which '
-                              'surrogates are independently generated.')
+                              desc='Number of points that will be simultaneously predicted by '
+                              'the surrogate.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -157,6 +157,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.append((name, output_shape))
         self._training_output[name] = np.zeros(0)
 
+        # Note: the default_surrogate flag is stored in metadata so that we can reconfigure
+        # with a new default by rerunning setup.
         if surrogate:
             metadata['surrogate'] = surrogate
             metadata['default_surrogate'] = False
@@ -280,41 +282,40 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
-            if surrogate is None:
-                raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
-                                   % (self.pathname, name))
+
+            if vec_size == 1:
+                # Non vectorized.
+                predicted = surrogate.predict(inputs)
+                if isinstance(predicted, tuple):  # rmse option
+                    self._metadata(name)['rmse'] = predicted[1]
+                    predicted = predicted[0]
+                outputs[name] = np.reshape(predicted, shape)
+
+            elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
+                # Vectorized; surrogate provides vectorized computation.
+                # TODO: This code is untested because no surrogates provide this option.
+                predicted = surrogate.vectorized_predict(inputs.flat)
+                if isinstance(predicted, tuple):  # rmse option
+                    self._metadata(name)['rmse'] = predicted[1]
+                    predicted = predicted[0]
+                outputs[name] = np.reshape(predicted, shape)
+
             else:
-                if vec_size == 1:
-                    # one input, one prediction
-                    predicted = surrogate.predict(inputs)
-                    if isinstance(predicted, tuple):  # rmse option
-                        self._metadata(name)['rmse'] = predicted[1]
-                        predicted = predicted[0]
-                    outputs[name] = np.reshape(predicted, outputs[name].shape)
-
-                elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
-                    # multiple inputs flattened, one prediction of multiple outputs
-                    predicted = surrogate.vectorized_predict(inputs.flat)
-                    if isinstance(predicted, tuple):  # rmse option
-                        self._metadata(name)['rmse'] = predicted[1]
-                        predicted = predicted[0]
-                    outputs[name] = np.reshape(predicted, outputs[name].shape)
-
+                # Vectorized; must call surrogate multiple times.
+                if isinstance(shape, tuple):
+                    output_shape = (vec_size, ) + shape
                 else:
-                    # multiple inputs, multiple predictions
-                    if isinstance(shape, tuple):
-                        output_shape = (vec_size, ) + shape
-                    else:
-                        output_shape = (vec_size, )
-                    predicted = np.zeros(output_shape)
-                    rmse = self._metadata(name)['rmse'] = []
-                    for i in range(vec_size):
-                        pred_i = surrogate.predict(inputs[i])
-                        predicted[i] = np.reshape(pred_i, shape)
-                        if isinstance(predicted[i], tuple):  # rmse option
-                            rmse.append(predicted[i][1])
-                            predicted[i] = predicted[i][0]
-                    outputs[name] = np.reshape(predicted, output_shape)
+                    output_shape = (vec_size, )
+                predicted = np.zeros(output_shape)
+                rmse = self._metadata(name)['rmse'] = []
+                for i in range(vec_size):
+                    pred_i = surrogate.predict(inputs[i])
+                    if isinstance(pred_i, tuple):  # rmse option
+                        rmse.append(pred_i[1])
+                        pred_i = pred_i[0]
+                    predicted[i] = np.reshape(pred_i, shape)
+
+                outputs[name] = np.reshape(predicted, output_shape)
 
     def _vec_to_array(self, vec):
         """
@@ -337,15 +338,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         idx = 0
         for name, sz in self._surrogate_input_names:
             val = vec[name]
-            if isinstance(val, np.ndarray):
-                if array_real and np.issubdtype(val.dtype, np.complexfloating):
-                    array_real = False
-                    arr = arr.astype(np.complexfloating)
-                arr[idx:idx + sz] = val.flat
-                idx += sz
-            else:
-                arr[idx] = val
-                idx += 1
+            if array_real and np.issubdtype(val.dtype, np.complexfloating):
+                array_real = False
+                arr = arr.astype(np.complexfloating)
+            arr[idx:idx + sz] = val.flat
+            idx += sz
 
         return arr
 
@@ -372,15 +369,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             idx = 0
             for name, sz in self._surrogate_input_names:
                 val = vec[name]
-                if isinstance(val, np.ndarray):
-                    if array_real and np.issubdtype(val.dtype, np.complexfloating):
-                        array_real = False
-                        arr = arr.astype(np.complexfloating)
-                    arr[row][idx:idx + sz] = val[row].flat
-                    idx += sz
-                else:
-                    arr[row][idx] = val
-                    idx += 1
+                if array_real and np.issubdtype(val.dtype, np.complexfloating):
+                    array_real = False
+                    arr = arr.astype(np.complexfloating)
+                arr[row][idx:idx + sz] = val[row].flat
+                idx += sz
 
         return arr
 
@@ -454,45 +447,41 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             raise RuntimeError(msg)
 
         inputs = np.zeros((num_sample, self._input_size))
-        new_input = inputs
-
         self._training_input = inputs
 
-        # add training data for each input
-        if num_sample > 0:
-            idx = 0
-            for name, sz in self._surrogate_input_names:
-                val = self.metadata['train:' + name]
-                if isinstance(val[0], float):
-                    new_input[:, idx] = val
-                    idx += 1
-                else:
-                    for row_idx, v in enumerate(val):
-                        if not isinstance(v, np.ndarray):
-                            v = np.array(v)
-                        new_input[row_idx, idx:idx + sz] = v.flat
+        # Assemble input data.
+        idx = 0
+        for name, sz in self._surrogate_input_names:
+            val = self.metadata['train:' + name]
+            if isinstance(val[0], float):
+                inputs[:, idx] = val
+                idx += 1
+            else:
+                for row_idx, v in enumerate(val):
+                    v = np.asarray(v)
+                    inputs[row_idx, idx:idx + sz] = v.flat
 
-        # add training data for each output
+        # Assemble output data and train each output.
         for name, shape in self._surrogate_output_names:
-            if num_sample > 0:
-                output_size = np.prod(shape)
+            output_size = np.prod(shape)
 
-                outputs = np.zeros((num_sample, output_size))
-                self._training_output[name] = outputs
-                new_output = outputs
+            outputs = np.zeros((num_sample, output_size))
+            self._training_output[name] = outputs
 
-                val = self.metadata['train:' + name]
+            val = self.metadata['train:' + name]
 
-                if isinstance(val[0], float):
-                    new_output[:, 0] = val
-                else:
-                    for row_idx, v in enumerate(val):
-                        if not isinstance(v, np.ndarray):
-                            v = np.array(v)
-                        new_output[row_idx, :] = v.flat
+            if isinstance(val[0], float):
+                outputs[:, 0] = val
+            else:
+                for row_idx, v in enumerate(val):
+                    v = np.asarray(v)
+                    outputs[row_idx, :] = v.flat
 
             surrogate = self._metadata(name).get('surrogate')
-            if surrogate is not None:
+            if surrogate is None:
+                raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
+                                   % (self.pathname, name))
+            else:
                 surrogate.train(self._training_input,
                                 self._training_output[name])
 
@@ -518,7 +507,7 @@ class MetaModel(MetaModelUnStructuredComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'MetaModel' component has been deprecated. Use"
+        warn_deprecation("'MetaModel' has been deprecated. Use "
                          "'MetaModelUnStructuredComp' instead.")
         super(MetaModel, self).__init__(*args, **kwargs)
 
