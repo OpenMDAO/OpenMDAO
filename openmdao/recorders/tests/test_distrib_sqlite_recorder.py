@@ -263,7 +263,8 @@ class DistributedRecorderTest(unittest.TestCase):
         expected_outputs = expected_desvars
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
-        expected_outputs.update(expected_includes)
+        if prob.comm.rank == 0:
+            expected_outputs.update(expected_includes)
 
         if prob.comm.rank == 0:
             coordinate = [0, 'SLSQP', (48,)]
