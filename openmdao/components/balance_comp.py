@@ -63,10 +63,13 @@ class BalanceComp(ImplicitComponent):
             prob.model.add_subsystem(name='balance', subsys=bal)
 
             prob.model.connect('y_tgt', 'balance.rhs:x')
+
             prob.model.connect('balance.x', 'exec.x')
+
             prob.model.connect('exec.y', 'balance.lhs:x')
 
             prob.model.linear_solver = DirectSolver()
+
             prob.model.nonlinear_solver = NewtonSolver()
 
             prob.setup()
@@ -92,10 +95,13 @@ class BalanceComp(ImplicitComponent):
             prob.model.add_subsystem(name='balance', subsys=bal)
 
             prob.model.connect('y_tgt', 'balance.rhs:x')
+
             prob.model.connect('balance.x', 'exec.x')
+
             prob.model.connect('exec.y', 'balance.lhs:x')
 
             prob.model.linear_solver = DirectSolver()
+
             prob.model.nonlinear_solver = NewtonSolver()
 
             prob.setup()
