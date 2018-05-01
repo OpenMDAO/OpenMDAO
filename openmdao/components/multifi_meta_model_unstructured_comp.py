@@ -80,7 +80,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         number of levels of fidelity
     """
 
-    def __init__(self, nfi=1):
+    def __init__(self, nfi=1, vec_size=1):
         """
         Initialize all attributes.
 
@@ -88,8 +88,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         ----------
         nfi : float
             number of levels of fidelity
+        vec_size : None or int
+            Number of points that will be simultaneously predicted by the surrogate.
         """
-        super(MultiFiMetaModelUnStructuredComp, self).__init__()
+        super(MultiFiMetaModelUnStructuredComp, self).__init__(vec_size=vec_size)
 
         self._nfi = nfi
 
@@ -200,7 +202,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                                                                  ref0=ref0, res_ref=res_ref,
                                                                  var_set=var_set,
                                                                  surrogate=surrogate)
-        self._training_output[name] = self._nfi * [np.zeros(0)]
+        self._training_output[name] = self._nfi * [np.empty(0)]
 
         # Add train:<outvar>_fi<n>
         for fi in range(self._nfi):
@@ -245,55 +247,49 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
                   for fi in range(self._nfi)]
-        new_inputs = inputs
-
-        self._training_input = inputs
 
         # add training data for each input
         idx = self._nfi * [0]
         for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
-                if num_sample[fi] > 0:
-                    name = _get_name_fi(name, fi)
-                    val = self.metadata['train:' + name]
-                    if isinstance(val[0], float):
-                        new_inputs[fi][:, idx[fi]] = val
-                        idx[fi] += 1
-                    else:
-                        for row_idx, v in enumerate(val):
-                            if not isinstance(v, np.ndarray):
-                                v = np.array(v)
-                            new_inputs[fi][row_idx, idx[
-                                fi]:idx[fi] + sz] = v.flat
+                name = _get_name_fi(name, fi)
+                val = self.metadata['train:' + name]
+                if isinstance(val[0], float):
+                    inputs[fi][:, idx[fi]] = val
+                    idx[fi] += 1
+                else:
+                    for row_idx, v in enumerate(val):
+                        v = np.asarray(v)
+                        inputs[fi][row_idx, idx[fi]:idx[fi] + sz] = v.flat
 
         # add training data for each output
         outputs = self._nfi * [None]
-        new_outputs = self._nfi * [None]
         for name, shape in self._surrogate_output_names:
+            output_size = np.prod(shape)
             for fi in range(self._nfi):
                 name_fi = _get_name_fi(name, fi)
-                if num_sample[fi] > 0:
-                    output_size = np.prod(shape)
-                    outputs[fi] = np.zeros((num_sample[fi], output_size))
-                    self._training_output[name] = []
-                    self._training_output[name].extend(outputs)
-                    new_outputs = outputs
+                outputs[fi] = np.zeros((num_sample[fi], output_size))
 
-                    val = self.metadata['train:' + name_fi]
+                val = self.metadata['train:' + name_fi]
 
-                    if isinstance(val[0], float):
-                        new_outputs[fi][:, 0] = val
-                    else:
-                        for row_idx, v in enumerate(val):
-                            if not isinstance(v, np.ndarray):
-                                v = np.array(v)
-                            new_outputs[fi][row_idx, :] = v.flat
+                if isinstance(val[0], float):
+                    outputs[fi][:, 0] = val
+                else:
+                    for row_idx, v in enumerate(val):
+                        v = np.asarray(v)
+                        outputs[fi][row_idx, :] = v.flat
+
+            self._training_output[name] = []
+            self._training_output[name].extend(outputs)
 
             surrogate = self._metadata(name).get('surrogate')
-            if surrogate is not None:
-                surrogate.train_multifi(self._training_input,
-                                        self._training_output[name])
+            if surrogate is None:
+                raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
+                                   % (self.pathname, name))
+            else:
+                surrogate.train_multifi(inputs, self._training_output[name])
 
+        self._training_input = inputs
         self.train = False
 
 

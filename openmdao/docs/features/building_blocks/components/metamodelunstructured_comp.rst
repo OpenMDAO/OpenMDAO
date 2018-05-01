@@ -63,13 +63,13 @@ alternative to specifying it later.
 
 In addition, it's possible to vectorize the input and output variables so that you can
 make multiple predictions for the inputs and outputs in a single execution of the
-`MetaModelUnStructured` component. This is done by setting the ``vectorize`` argument when
-constructing the `MetaModelUnStructured` component.  The following example vectorizes the ``trig``
+`MetaModelUnStructured` component. This is done by setting the ``vec_size`` argument when
+constructing the `MetaModelUnStructured` component and giving it the number of predictions to make.  The following example vectorizes the ``trig``
 component so that it makes three predictions at a time.  In this case, the input is
 three independent values of ``x`` and the output is the corresponding predicted values
 for the sine and cosine functions at those three points.  Note that a vectorized
 `MetaModelUnStructured` component requires the first dimension of all input and output variables
-to be the same size as specified in the ``vectorize`` argument.
+to be the same size as specified in the ``vec_size`` argument.
 
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature_vector2d

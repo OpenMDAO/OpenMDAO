@@ -5,7 +5,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
-    FloatKrigingSurrogate, KrigingSurrogate, MultiFiCoKrigingSurrogate, ScipyOptimizeDriver
+    FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.logger_utils import TestLogger

@@ -49,8 +49,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         default_surrogate : SurrogateModel
             Default surrogate model to use.
         vec_size : None or int
-            Number of rows in the input and output vectors for which surrogates are independently
-            generated.
+            Number of points that will be simultaneously predicted by the surrogate.
         """
         super(MetaModelUnStructuredComp, self).__init__(vec_size=vec_size)
 
@@ -389,7 +388,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         vec_size = self.metadata['vec_size']
-        in_size = self._input_size
 
         if vec_size > 1:
             flat_inputs = self._vec_to_array_vectorized(inputs)
@@ -407,7 +405,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     for in_name, sz in self._surrogate_input_names:
                         j1 = j * out_size * sz
                         j2 = j1 + out_size * sz
-                        partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flatten()
+                        partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
                         idx += sz
 
             else:
