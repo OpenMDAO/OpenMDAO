@@ -773,44 +773,88 @@ class TestSqliteCaseReader(unittest.TestCase):
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(vals['value'], expected['value'])
 
-    def test_simple_load_system_cases(self):
-        # run the model to get some case values
+    def test_get_vars(self):
         self.setup_sellar_model()
-        self.prob.model.recording_options['record_inputs'] = True
-        self.prob.model.recording_options['record_outputs'] = True
-        self.prob.model.recording_options['record_residuals'] = True
+
+        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        d1.nonlinear_solver = NonlinearBlockGS()
+        d1.nonlinear_solver.options['maxiter'] = 5
         self.prob.model.add_recorder(self.recorder)
+        self.prob.model.d1.add_recorder(self.recorder)
+        self.prob.model.recording_options['record_residuals'] = True
+        self.prob.driver.add_recorder(self.recorder)
+
         self.prob.setup(check=False)
         self.prob.run_driver()
         self.prob.cleanup()
 
         cr = CaseReader(self.filename)
-        case = cr.system_cases.get_case(0)
+        driver_case = cr.driver_cases.get_case(0)
+        desvars = driver_case.get_desvars()
+        objectives = driver_case.get_objectives()
+        constraints = driver_case.get_constraints()
+        responses = driver_case.get_responses()
 
-        # Add one to all the inputs just to change the model
-        #   so we can see if loading the case values really changes the model
-        for name in self.prob.model._inputs:
-            self.prob.model._inputs[name] += 1.0
+        expected_desvars = {
+            "x": [1.],
+            "z": [5., 2.]
+        }
 
-        # Run the model again to generate new outputs
-        self.prob.run_driver()
+        expected_objectives = {"obj": [28.58830817], }
 
-        # Now load in the case we recorded
-        self.prob.load_case(case)
+        expected_constraints = {"con1": [-22.42830237], "con2": [-11.94151185]}
 
-        # Run the model
-        self.prob.run_driver()
+        expected_responses = expected_objectives.copy()
+        expected_responses.update(expected_constraints)
 
-        # Check to see if the inputs and outputs in the model match those of the case
+        for expected_set, actual_set in (
+                (expected_desvars, desvars),
+                (expected_objectives, objectives),
+                (expected_constraints, constraints),
+                (expected_responses, responses)):
+
+            self.assertEqual(len(expected_set), len(actual_set.keys))
+            for k in actual_set:
+                np.testing.assert_almost_equal(expected_set[k], actual_set[k])
+
+    def _assert_model_matches_case(self, case, model):
         case_inputs = case.inputs._values
-        model_inputs = self.prob.model._inputs
+        model_inputs = model._inputs
         for name, model_input in iteritems(model_inputs._views):
             np.testing.assert_almost_equal(case_inputs[name],model_input)
 
         case_outputs = case.outputs._values
-        model_outputs = self.prob.model._outputs
+        model_outputs = model._outputs
         for name, model_output in iteritems(model_outputs._views):
             np.testing.assert_almost_equal(case_outputs[name],model_output)
+
+    def test_simple_load_system_cases(self):
+        # run the model to get some case values
+        self.setup_sellar_model()
+        prob = self.prob
+        model = prob.model
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+        model.add_recorder(self.recorder)
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        case = cr.system_cases.get_case(0)
+
+        # Add one to all the inputs and outputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in model._inputs:
+            model._inputs[name] += 1.0
+        for name in model._outputs:
+            model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        prob.load_case(case)
+
+        self._assert_model_matches_case(case, model)
 
     def test_subsystem_load_system_cases(self):
         self.setup_sellar_model()
@@ -837,81 +881,58 @@ class TestSqliteCaseReader(unittest.TestCase):
         for name in self.prob.model._outputs:
             model._outputs[name] += 1.0
 
-        # Run the model again to generate new outputs
-        prob.run_driver()
-
         # Now load in the case we recorded
         prob.load_case(case)
 
-        # Check to see if the inputs and outputs in the model match those of the case
-        case_inputs = case.inputs._values
-        model_inputs = d2._inputs
-        for name, model_input in iteritems(model_inputs._views):
-            np.testing.assert_almost_equal(case_inputs[name],model_input)
-
-        case_outputs = case.outputs._values
-        model_outputs = d2._outputs
-        for name, model_output in iteritems(model_outputs._views):
-            np.testing.assert_almost_equal(case_outputs[name],model_output)
+        self._assert_model_matches_case(case, d2)
 
     def test_load_system_cases_with_units(self):
-        # test with units
 
         comp = IndepVarComp()
         comp.add_output('distance', val=1., units='m')
         comp.add_output('time', val=1., units='s')
 
-        self.prob = Problem(model=Group())
-        self.prob.model.add_subsystem('c1', comp)
-        self.prob.model.add_subsystem('c2', SpeedComp())
-        self.prob.model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
-        self.prob.model.connect('c1.distance', 'c2.distance')
-        self.prob.model.connect('c1.time', 'c2.time')
-        self.prob.model.connect('c2.speed', 'c3.speed')
+        prob = Problem(model=Group())
+        model = prob.model
+        model.add_subsystem('c1', comp)
+        model.add_subsystem('c2', SpeedComp())
+        model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
+        model.connect('c1.distance', 'c2.distance')
+        model.connect('c1.time', 'c2.time')
+        model.connect('c2.speed', 'c3.speed')
 
-        self.prob.model.add_recorder(self.recorder)
+        model.add_recorder(self.recorder)
 
-        self.prob.setup()
-        self.prob.run_model()
+        prob.setup()
+        prob.run_model()
 
         cr = CaseReader(self.filename)
         case = cr.system_cases.get_case(0)
 
         # Add one to all the inputs just to change the model
         #   so we can see if loading the case values really changes the model
-        for name in self.prob.model._inputs:
-            self.prob.model._inputs[name] += 1.0
-
-        # Run the model again to generate new outputs
-        self.prob.run_driver()
+        for name in model._inputs:
+            model._inputs[name] += 1.0
+        for name in model._outputs:
+            model._outputs[name] += 1.0
 
         # Now load in the case we recorded
-        self.prob.load_case(case)
+        prob.load_case(case)
 
-        # Run the model
-        self.prob.run_driver()
-
-        # Check to see if the inputs and outputs in the model match those of the case
-        case_inputs = case.inputs._values
-        model_inputs = self.prob.model._inputs
-        for name, model_input in iteritems(model_inputs._views):
-            np.testing.assert_almost_equal(case_inputs[name],model_input)
-        case_outputs = case.outputs._values
-        model_outputs = self.prob.model._outputs
-        for name, model_output in iteritems(model_outputs._views):
-            np.testing.assert_almost_equal(case_outputs[name],model_output)
+        self._assert_model_matches_case(case, model)
 
 
     def test_optimization_load_system_cases(self):
 
         self.setup_sellar_grouped_model()
         prob = self.prob
+        model = prob.model
         driver = prob.driver = ScipyOptimizeDriver()
         driver.options['optimizer'] = 'SLSQP'
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
 
-        prob.model.add_recorder(self.recorder)
+        model.add_recorder(self.recorder)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -921,8 +942,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_before = prob.model.list_inputs(values=True, units=True )
-        outputs_before = prob.model.list_outputs(values=True, units=True )
+        inputs_before = model.list_inputs(values=True, units=True )
+        outputs_before = model.list_outputs(values=True, units=True )
 
         cr = CaseReader(self.filename)
         # get third case
@@ -934,6 +955,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.setup_sellar_grouped_model()
 
         prob = self.prob
+        model = prob.model
         driver = prob.driver = ScipyOptimizeDriver()
         driver.options['optimizer'] = 'SLSQP'
         driver.options['tol'] = 1e-9
@@ -944,8 +966,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_after = prob.model.list_inputs(values=True, units=True )
-        outputs_after = prob.model.list_outputs(values=True, units=True )
+        inputs_after = model.list_inputs(values=True, units=True )
+        outputs_after = model.list_outputs(values=True, units=True )
         iter_count_after = driver.iter_count
 
         for before, after in zip(inputs_before, inputs_after):
@@ -993,15 +1015,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        # Check to see if the model is updated appropriately
-        case_inputs = case.inputs._values
-        model_inputs = prob.model._inputs
-        for name, model_input in iteritems(model_inputs._views):
-            np.testing.assert_almost_equal(case_inputs[name],model_input)
-        case_outputs = case.outputs._values
-        model_outputs = prob.model._outputs
-        for name, model_output in iteritems(model_outputs._views):
-            np.testing.assert_almost_equal(case_outputs[name],model_output)
+        self._assert_model_matches_case(case, model)
 
     def test_load_driver_cases(self):
 
@@ -1045,15 +1059,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        # Check to see if the model is updated appropriately
-        case_inputs = case.inputs._values
-        model_inputs = prob.model._inputs
-        for name, model_input in iteritems(model_inputs._views):
-            np.testing.assert_almost_equal(case_inputs[name],model_input)
-        case_outputs = case.outputs._values
-        model_outputs = prob.model._outputs
-        for name, model_output in iteritems(model_outputs._views):
-            np.testing.assert_almost_equal(case_outputs[name],model_output)
+        self._assert_model_matches_case(case, model)
 
     def test_feature_load_system_case_for_restart(self):
 
@@ -1120,7 +1126,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
 
-
         model.recording_options['record_inputs'] = True
         model.recording_options['record_outputs'] = True
         model.recording_options['record_residuals'] = True
@@ -1137,50 +1142,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
         prob.cleanup()
-
-    def test_get_vars(self):
-        self.setup_sellar_model()
-
-        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
-        d1.nonlinear_solver = NonlinearBlockGS()
-        d1.nonlinear_solver.options['maxiter'] = 5
-        self.prob.model.add_recorder(self.recorder)
-        self.prob.model.d1.add_recorder(self.recorder)
-        self.prob.model.recording_options['record_residuals'] = True
-        self.prob.driver.add_recorder(self.recorder)
-
-        self.prob.setup(check=False)
-        self.prob.run_driver()
-        self.prob.cleanup()
-
-        cr = CaseReader(self.filename)
-        driver_case = cr.driver_cases.get_case(0)
-        desvars = driver_case.get_desvars()
-        objectives = driver_case.get_objectives()
-        constraints = driver_case.get_constraints()
-        responses = driver_case.get_responses()
-
-        expected_desvars = {
-            "x": [1.],
-            "z": [5., 2.]
-        }
-
-        expected_objectives = { "obj": [28.58830817], }
-
-        expected_constraints = { "con1": [-22.42830237], "con2": [-11.94151185] }
-
-        expected_responses = expected_objectives.copy()
-        expected_responses.update(expected_constraints)
-
-        for expected_set, actual_set in (
-            (expected_desvars, desvars),
-            (expected_objectives, objectives),
-            (expected_constraints, constraints),
-            (expected_responses, responses)):
-            
-            self.assertEqual(len(expected_set), len(actual_set.keys))
-            for k in actual_set:
-                np.testing.assert_almost_equal(expected_set[k], actual_set[k])   
 
 
 if __name__ == "__main__":
