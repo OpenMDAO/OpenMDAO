@@ -4,7 +4,6 @@ import numpy as np
 
 from six import iteritems, PY3
 
-from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 

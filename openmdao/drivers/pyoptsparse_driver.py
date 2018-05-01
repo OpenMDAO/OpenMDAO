@@ -9,7 +9,6 @@ additional MPI capability.
 from __future__ import print_function
 from collections import OrderedDict
 import traceback
-import warnings
 import json
 
 from six import iteritems, itervalues, string_types
@@ -83,22 +82,6 @@ class pyOptSparseDriver(Driver):
         inequality_constraints
 
         two_sided_constraints
-
-    Options
-    -------
-    options['optimizer'] :  str('SLSQP')
-        Name of optimizers to use.
-    options['print_results'] :  bool(True)
-        Print pyOpt results if True
-    options['gradient method'] :  str('openmdao', 'pyopt_fd', 'snopt_fd')
-        Finite difference implementation to use ('snopt_fd' may only be used with SNOPT)
-    options['title'] :  str('Optimization using pyOpt_sparse')
-        Title of this optimization run
-    options['dynamic_simul_derivs'] : bool(False)
-        Set to True to turn on dynamic computation of simultaneous total derivative coloring.
-    options['dynamic_simul_derivs_repeats'] : int(3)
-        Set the number of compute_totals calls made during computation of simultaneous derivative
-        coloring.
 
     Attributes
     ----------

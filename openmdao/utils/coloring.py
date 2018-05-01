@@ -3,23 +3,17 @@ Routines to compute coloring for use with simultaneous derivatives.
 """
 from __future__ import division, print_function
 
-import os
 import sys
-import json
-
 from collections import OrderedDict, defaultdict
-from itertools import combinations, chain
-from numbers import Integral
+from itertools import combinations
 
-from six import iteritems, itervalues
+from six import iteritems
 from six.moves import range
 
 import numpy as np
 from numpy.random import rand
 
 from openmdao.jacobians.jacobian import Jacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
-from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 
