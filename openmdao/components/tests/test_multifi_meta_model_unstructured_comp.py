@@ -24,6 +24,85 @@ class MockSurrogate(MultiFiSurrogateModel):
 
 class MultiFiMetaModelTestCase(unittest.TestCase):
 
+    def test_error_messages(self):
+        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+
+        mm.add_input('x', 0.)
+        mm.add_output('y', 0.)
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:x_fi2'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:x_fi3'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        msg = ("MultiFiMetaModelUnStructured 'mm': No surrogate specified for output 'y'")
+        self.assertEqual(str(cm.exception), msg)
+
+        # Wrong number of input samples
+
+        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+
+        mm.add_input('x', 0.)
+        mm.add_input('x2', 0.)
+        mm.add_output('y', 0.)
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:x2'] = [0.0, 0.4, 1.0, 999.0]
+        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:x_fi2'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:x2_fi2'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:x_fi3'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:x2_fi3'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        msg = ("MultiFiMetaModelUnStructured: Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
+        self.assertEqual(str(cm.exception), msg)
+
+        # Wrong number of output samples
+
+        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+
+        mm.add_input('x', 0.)
+        mm.add_output('y', 0.)
+        mm.add_output('y2', 0.)
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195, 3.14159]
+        mm.metadata['train:x_fi2'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:x_fi3'] = [0.0, 0.4, 1.0]
+        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        msg = ("MultiFiMetaModelUnStructured: Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
+        self.assertEqual(str(cm.exception), msg)
+
     def test_inputs_wrt_nfidelity(self):
         mm = MultiFiMetaModelUnStructuredComp(nfi=3)
 
@@ -202,7 +281,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[2./3., 1./3.]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 26, tolerance=0.02)
+        assert_rel_error(self, prob['mm.y'], 26.26, tolerance=0.02)
 
         prob['mm.x'] = np.array([[1./3., 2./3.]])
         prob.run_model()
@@ -228,7 +307,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[[2./3., 1./3.]], [[1./3., 2./3.]]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], [26, 36.1031735], tolerance=0.02)
+        assert_rel_error(self, prob['mm.y'], [[26.26], [36.1031735]], tolerance=0.02)
 
     def test_multifi_meta_model_unstructured_deprecated(self):
         # run same test as above, only with the deprecated component,
@@ -259,7 +338,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(mm.metadata['train:y_fi2'], None)
         self.assertEqual(mm.metadata['train:y_fi3'], None)
 
-    def test_multifi_meta_model_unstructured_deprecated(self):
+    def test_multifi_meta_model_deprecated(self):
         # run same test as above, only with the deprecated component,
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
