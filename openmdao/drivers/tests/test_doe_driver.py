@@ -757,8 +757,9 @@ class TestParallelDOEFeature(unittest.TestCase):
         # check recorded cases from each case file
         rank = MPI.COMM_WORLD.rank
         filename = "CASES.db_%d" % rank
-        cases = CaseReader(filename).driver_cases
+        self.assertEqual(filename, "CASES.db_%d" % rank)
 
+        cases = CaseReader(filename).driver_cases
         self.assertEqual(cases.num_cases, 5 if rank == 0 else 4)
 
         values = []
