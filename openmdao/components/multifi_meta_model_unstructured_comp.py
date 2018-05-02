@@ -1,6 +1,6 @@
 """Define the MultiFiMetaModel class."""
-
 from six.moves import range
+from itertools import chain
 
 import numpy as np
 
@@ -224,7 +224,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             return
 
         num_sample = self._nfi * [None]
-        for name_root, sz in self._surrogate_input_names:
+        for name_root, _ in chain(self._surrogate_input_names, self._surrogate_output_names):
             for fi in range(self._nfi):
                 name = _get_name_fi(name_root, fi)
                 val = self.metadata['train:' + name]
@@ -235,17 +235,6 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                           " of training points. Expected {0} but found {1} "\
                           "points for '{2}'."\
                           .format(num_sample[fi], len(val), name)
-                    raise RuntimeError(msg)
-
-        for name_root, shape in self._surrogate_output_names:
-            for fi in range(self._nfi):
-                name = _get_name_fi(name_root, fi)
-                val = self.metadata['train:' + name]
-                if len(val) != num_sample[fi]:
-                    msg = "MultiFiMetaModelUnStructured: Each variable must have the same number" \
-                          " of training points. Expected {0} but found {1} " \
-                          "points for '{2}'." \
-                        .format(num_sample[fi], len(val), name)
                     raise RuntimeError(msg)
 
         inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
