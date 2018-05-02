@@ -734,8 +734,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         inputs = cr.list_inputs(None, True, True, True)
-        outputs = cr.list_outputs(None, True, True, True, True, None, True, True, True,
-                                  True, True, True)
 
         expected_inputs = {
             'obj_cmp.x': {'value': [1.]},
