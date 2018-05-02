@@ -57,7 +57,7 @@ kwargs      dict or named arguments  Additional arguments to be passed for the c
 Example:  Scalar Root Finding
 -----------------------------
 
-The following example uses the BalanceComp to implicitly solve the
+The following example uses a BalanceComp to implicitly solve the
 equation:
 
 .. math::
@@ -82,7 +82,7 @@ Alternatively, we could simplify the code by using the :code:`mult_val` argument
 Example:  Vectorized Root Finding
 ---------------------------------
 
-The following example uses the BalanceComp to implicitly solve the equation:
+The following example uses a BalanceComp to implicitly solve the equation:
 
 .. math::
 
