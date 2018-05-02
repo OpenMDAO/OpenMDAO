@@ -157,7 +157,8 @@ One possible use case is if you have a long running optimization and, for whatev
 completes. It would be great to go back to the last recorded case for the entire model System, load it in to the
 Problem, and then do some debugging to determine what went wrong.
 
-Here is an example that shows how you might want to use this method.
+Here is an example that shows how you might want to use this method. Notice that this code actually has two separate
+runs of the model.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_feature_load_system_case_for_restart
