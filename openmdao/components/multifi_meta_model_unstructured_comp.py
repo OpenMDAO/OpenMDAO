@@ -309,7 +309,7 @@ class MultiFiMetaModel(MultiFiMetaModelUnStructuredComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use"
+        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use "
                          "'MultiFiMetaModelUnStructuredComp' instead.")
         super(MultiFiMetaModel, self).__init__(*args, **kwargs)
 
