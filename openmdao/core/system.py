@@ -251,10 +251,11 @@ class System(object):
         self.name = ''
         self.pathname = ''
         self.comm = None
-        self.metadata = OptionsDictionary()
 
         # System options
         self.options = OptionsDictionary()
+        self.metadata = self.options  # Deprecated
+
         self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the system level')
@@ -357,7 +358,7 @@ class System(object):
         self._scope_cache = {}
 
         self.initialize()
-        self.metadata.update(kwargs)
+        self.options.update(kwargs)
 
         self._has_guess = False
         self._has_output_scaling = False
