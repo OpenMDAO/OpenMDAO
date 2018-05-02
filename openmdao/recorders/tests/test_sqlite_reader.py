@@ -714,9 +714,6 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_list_inputs(self):
         self.setup_sellar_model()
 
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        linear_solver = self.prob.model.linear_solver
-
         d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
@@ -813,7 +810,6 @@ class TestSqliteCaseReader(unittest.TestCase):
                 np.testing.assert_almost_equal(expected_set[k], actual_set[k])
 
     def test_simple_load_system_cases(self):
-        # run the model to get some case values
         self.setup_sellar_model()
         prob = self.prob
         model = prob.model
@@ -960,6 +956,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for before, after in zip(outputs_before, outputs_after):
             np.testing.assert_almost_equal(before[1]['value'], after[1]['value'])
 
+        # Should take one less iteration since we gave it a head start in the second run
         self.assertEqual(iter_count_before, iter_count_after + 1)
 
 
@@ -1087,7 +1084,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         #######################################################################
         # Assume that the optimization given above failed before it finished.
-        # To debug the problem, we can run the script again but this time using
+        # To debug the problem, we can run the script again, but this time using
         # the last recorded case as a starting point.
         #######################################################################
         from openmdao.api import Problem, ScipyOptimizeDriver, CaseReader
