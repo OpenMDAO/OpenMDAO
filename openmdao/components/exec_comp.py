@@ -136,7 +136,7 @@ class ExecComp(ExplicitComponent):
         ExecComp that takes an array 'x' as input and outputs a float variable
         'y' which is the sum of the entries in 'x'.
 
-        ::
+        .. code-block:: python
 
             import numpy
             from openmdao.api import ExecComp
@@ -149,7 +149,7 @@ class ExecComp(ExplicitComponent):
         If you want to assign certain metadata for 'x' in addition to its
         initial value, you can do it as follows:
 
-        ::
+        .. code-block:: python
 
             excomp = ExecComp('y=sum(x)',
                               x={'value': numpy.ones(10,dtype=float),

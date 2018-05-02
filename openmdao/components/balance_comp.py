@@ -45,61 +45,42 @@ class BalanceComp(ImplicitComponent):
         calling `add_balance`.  As an example, solving the equation
         :math:`x**2 = 2` implicitly can be be accomplished as follows:
 
-        ::
+        .. code-block:: python
+
             prob = Problem(model=Group())
-
             bal = BalanceComp()
-
             bal.add_balance('x', val=1.0)
-
             tgt = IndepVarComp(name='y_tgt', val=2)
-
             exec_comp = ExecComp('y=x**2')
-
             prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-
             prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
             prob.model.add_subsystem(name='balance', subsys=bal)
-
             prob.model.connect('y_tgt', 'balance.rhs:x')
             prob.model.connect('balance.x', 'exec.x')
             prob.model.connect('exec.y', 'balance.lhs:x')
-
             prob.model.linear_solver = DirectSolver()
             prob.model.nonlinear_solver = NewtonSolver()
-
             prob.setup()
-
             prob.run_model()
 
         The arguments to add_balance can be provided on initialization to provide a balance
         with a one state/residual without the need to call `add_balance`:
 
-        ::
+        .. code-block:: python
+
             prob = Problem(model=Group())
-
             bal = BalanceComp('x', val=1.0)
-
             tgt = IndepVarComp(name='y_tgt', val=2)
-
             exec_comp = ExecComp('y=x**2')
-
             prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-
             prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
             prob.model.add_subsystem(name='balance', subsys=bal)
-
             prob.model.connect('y_tgt', 'balance.rhs:x')
             prob.model.connect('balance.x', 'exec.x')
             prob.model.connect('exec.y', 'balance.lhs:x')
-
             prob.model.linear_solver = DirectSolver()
             prob.model.nonlinear_solver = NewtonSolver()
-
             prob.setup()
-
             prob.run_model()
 
         Parameters
