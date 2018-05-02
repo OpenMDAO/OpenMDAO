@@ -698,13 +698,10 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(vals['resids'], expected['resids'])
             np.testing.assert_almost_equal(vals['value'], expected['values'])
 
-        expected_explicit_outputs_case = expected_outputs_case
-        expl_outputs_case = cr.list_outputs(sys_case, True, False, True, True, None, True, True, True,
-                                            True, True, True)
         for o in outputs_case:
             vals = o[1]
             name = o[0]
-            expected = expected_explicit_outputs_case[name]
+            expected = expected_outputs_case[name]
             self.assertEqual(vals['lower'], expected['lower'])
             self.assertEqual(vals['ref'], expected['ref'])
             self.assertEqual(vals['shape'], expected['shape'])
@@ -815,17 +812,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             for k in actual_set:
                 np.testing.assert_almost_equal(expected_set[k], actual_set[k])
 
-    def _assert_model_matches_case(self, case, model):
-        case_inputs = case.inputs._values
-        model_inputs = model._inputs
-        for name, model_input in iteritems(model_inputs._views):
-            np.testing.assert_almost_equal(case_inputs[name],model_input)
-
-        case_outputs = case.outputs._values
-        model_outputs = model._outputs
-        for name, model_output in iteritems(model_outputs._views):
-            np.testing.assert_almost_equal(case_outputs[name],model_output)
-
     def test_simple_load_system_cases(self):
         # run the model to get some case values
         self.setup_sellar_model()
@@ -852,7 +838,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        self._assert_model_matches_case(case, model)
+        _assert_model_matches_case(case, model)
 
     def test_subsystem_load_system_cases(self):
         self.setup_sellar_model()
@@ -882,7 +868,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        self._assert_model_matches_case(case, d2)
+        _assert_model_matches_case(case, d2)
 
     def test_load_system_cases_with_units(self):
 
@@ -917,7 +903,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        self._assert_model_matches_case(case, model)
+        _assert_model_matches_case(case, model)
 
 
     def test_optimization_load_system_cases(self):
@@ -1013,7 +999,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        self._assert_model_matches_case(case, model)
+        _assert_model_matches_case(case, model)
 
     def test_load_driver_cases(self):
 
@@ -1057,7 +1043,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
 
-        self._assert_model_matches_case(case, model)
+        _assert_model_matches_case(case, model)
 
     def test_feature_load_system_case_for_restart(self):
 
@@ -1140,6 +1126,29 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
         prob.cleanup()
+
+
+def _assert_model_matches_case(case, system):
+    '''
+    Check to see if the values in the case match those in the model.
+
+    Parameters
+    ----------
+    case : Case object
+        Case to be used for the comparison.
+    system : System object
+        System to be used for the comparison.
+    '''
+    case_inputs = case.inputs._values
+    model_inputs = system._inputs
+    for name, model_input in iteritems(model_inputs._views):
+        np.testing.assert_almost_equal(case_inputs[name],model_input)
+
+    case_outputs = case.outputs._values
+    model_outputs = system._outputs
+    for name, model_output in iteritems(model_outputs._views):
+        np.testing.assert_almost_equal(case_outputs[name],model_output)
+
 
 
 if __name__ == "__main__":
