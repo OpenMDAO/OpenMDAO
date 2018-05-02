@@ -50,8 +50,8 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
         # train the surrogate and check predicted value
-        sin_mm.metadata['train:x'] = np.linspace(0,10,20)
-        sin_mm.metadata['train:f_x'] = .5*np.sin(sin_mm.metadata['train:x'])
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
 
         prob['sin_mm.x'] = 2.1
 
@@ -114,8 +114,8 @@ class MetaModelTestCase(unittest.TestCase):
         prob.setup(check=False)
 
         # train the surrogate and check predicted value
-        sin_mm.metadata['train:x'] = np.linspace(0,10,20)
-        sin_mm.metadata['train:f_x'] = np.sin(sin_mm.metadata['train:x'])
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = np.sin(sin_mm.options['train:x'])
 
         prob['sin_mm.x'] = 2.1
 
@@ -149,10 +149,10 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
 
         # populate training data
-        mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
-        mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
-        mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
-        mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
+        mm.options['train:x1'] = [1.0, 2.0, 3.0]
+        mm.options['train:x2'] = [1.0, 3.0, 4.0]
+        mm.options['train:y1'] = [3.0, 2.0, 1.0]
+        mm.options['train:y2'] = [1.0, 4.0, 7.0]
 
         # run problem for provided data point and check prediction
         prob['mm.x1'] = 2.0
@@ -205,10 +205,10 @@ class MetaModelTestCase(unittest.TestCase):
         prob.setup(check=False)
 
         # provide initial training data
-        mm.metadata['train:x1'] = [1.0, 3.0]
-        mm.metadata['train:x2'] = [1.0, 4.0]
-        mm.metadata['train:y1'] = [3.0, 1.0]
-        mm.metadata['train:y2'] = [1.0, 7.0]
+        mm.options['train:x1'] = [1.0, 3.0]
+        mm.options['train:x2'] = [1.0, 4.0]
+        mm.options['train:y1'] = [3.0, 1.0]
+        mm.options['train:y2'] = [1.0, 7.0]
 
         # run against a data point and check result
         prob['mm.x1'] = 2.0
@@ -220,10 +220,10 @@ class MetaModelTestCase(unittest.TestCase):
 
         # Add 3rd training point, moves the estimate for that point
         # back to where it should be.
-        mm.metadata['train:x1'] = [2.0]
-        mm.metadata['train:x2'] = [3.0]
-        mm.metadata['train:y1'] = [2.0]
-        mm.metadata['train:y2'] = [4.0]
+        mm.options['train:x1'] = [2.0]
+        mm.options['train:x2'] = [3.0]
+        mm.options['train:y1'] = [2.0]
+        mm.options['train:y2'] = [4.0]
 
         mm.train = True  # currently need to tell meta to re-train
 
@@ -242,15 +242,15 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [
+        mm.options['train:x'] = [
             [1.0, 1.0, 1.0, 1.0],
             [2.0, 1.0, 1.0, 1.0],
             [1.0, 2.0, 1.0, 1.0],
             [1.0, 1.0, 2.0, 1.0],
             [1.0, 1.0, 1.0, 2.0]
         ]
-        mm.metadata['train:y1'] = [3.0, 2.0, 1.0, 6.0, -2.0]
-        mm.metadata['train:y2'] = [1.0, 4.0, 7.0, -3.0, 3.0]
+        mm.options['train:y1'] = [3.0, 2.0, 1.0, 6.0, -2.0]
+        mm.options['train:y2'] = [1.0, 4.0, 7.0, -3.0, 3.0]
 
         prob['mm.x'] = [1.0, 2.0, 1.0, 1.0]
         prob.run_model()
@@ -269,15 +269,15 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [
+        mm.options['train:x'] = [
             [[1.0, 1.0], [1.0, 1.0]],
             [[2.0, 1.0], [1.0, 1.0]],
             [[1.0, 2.0], [1.0, 1.0]],
             [[1.0, 1.0], [2.0, 1.0]],
             [[1.0, 1.0], [1.0, 2.0]]
         ]
-        mm.metadata['train:y1'] = [3.0, 2.0, 1.0, 6.0, -2.0]
-        mm.metadata['train:y2'] = [1.0, 4.0, 7.0, -3.0, 3.0]
+        mm.options['train:y1'] = [3.0, 2.0, 1.0, 6.0, -2.0]
+        mm.options['train:y2'] = [1.0, 4.0, 7.0, -3.0, 3.0]
 
         prob['mm.x'] = [[1.0, 2.0], [1.0, 1.0]]
         prob.run_model()
@@ -295,7 +295,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [
+        mm.options['train:x'] = [
             [[1.0, 1.0], [1.0, 1.0]],
             [[2.0, 1.0], [1.0, 1.0]],
             [[1.0, 2.0], [1.0, 1.0]],
@@ -303,7 +303,7 @@ class MetaModelTestCase(unittest.TestCase):
             [[1.0, 1.0], [1.0, 2.0]]
         ]
 
-        mm.metadata['train:y'] = [
+        mm.options['train:y'] = [
             [3.0, 1.0],
             [2.0, 4.0],
             [1.0, 7.0],
@@ -326,7 +326,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [
+        mm.options['train:x'] = [
             [[1.0, 1.0], [1.0, 1.0]],
             [[2.0, 1.0], [1.0, 1.0]],
             [[1.0, 2.0], [1.0, 1.0]],
@@ -334,7 +334,7 @@ class MetaModelTestCase(unittest.TestCase):
             [[1.0, 1.0], [1.0, 2.0]]
         ]
 
-        mm.metadata['train:y'] = [
+        mm.options['train:y'] = [
             [[3.0, 1.0],[3.0, 1.0]],
             [[2.0, 4.0],[2.0, 4.0]],
             [[1.0, 7.0],[1.0, 7.0]],
@@ -358,9 +358,9 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [1.0, 1.0, 1.0, 1.0]
-        mm.metadata['train:y'] = [1.0, 2.0]
-        mm.metadata['train:f'] = [1.0, 1.0, 1.0, 1.0]
+        mm.options['train:x'] = [1.0, 1.0, 1.0, 1.0]
+        mm.options['train:y'] = [1.0, 2.0]
+        mm.options['train:f'] = [1.0, 1.0, 1.0, 1.0]
 
         prob['mm.x'] = 1.0
         prob['mm.y'] = 1.0
@@ -385,9 +385,9 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [1.0, 1.0, 1.0, 1.0]
-        mm.metadata['train:y'] = [1.0, 2.0, 3.0, 4.0]
-        mm.metadata['train:f'] = [1.0, 1.0]
+        mm.options['train:x'] = [1.0, 1.0, 1.0, 1.0]
+        mm.options['train:y'] = [1.0, 2.0, 3.0, 4.0]
+        mm.options['train:f'] = [1.0, 1.0]
 
         prob['mm.x'] = 1.0
         prob['mm.y'] = 1.0
@@ -413,8 +413,8 @@ class MetaModelTestCase(unittest.TestCase):
                                  promotes_inputs=['x'])
         prob.setup()
 
-        mm.metadata['train:x'] = [0., .25, .5, .75, 1.]
-        mm.metadata['train:f'] = [1., .75, .5, .25, 0.]
+        mm.options['train:x'] = [0., .25, .5, .75, 1.]
+        mm.options['train:f'] = [1., .75, .5, .25, 0.]
 
         prob['x'] = 0.125
         prob.run_model()
@@ -483,10 +483,10 @@ class MetaModelTestCase(unittest.TestCase):
         prob.setup(check=False)
 
         # provide training data
-        trig.metadata['train:x'] = np.linspace(0, 10, 20)
-        trig.metadata['train:y'] = np.column_stack((
-            .5*np.sin(trig.metadata['train:x']),
-            .5*np.cos(trig.metadata['train:x'])
+        trig.options['train:x'] = np.linspace(0, 10, 20)
+        trig.options['train:y'] = np.column_stack((
+            .5*np.sin(trig.options['train:x']),
+            .5*np.cos(trig.options['train:x'])
         ))
 
         # train the surrogate and check predicted value
@@ -523,8 +523,8 @@ class MetaModelTestCase(unittest.TestCase):
         prob.setup(check=False)
 
         # provide training data
-        trig.metadata['train:x'] = np.linspace(0, 10, 20)
-        trig.metadata['train:y'] = .5*np.sin(trig.metadata['train:x'])
+        trig.options['train:x'] = np.linspace(0, 10, 20)
+        trig.options['train:y'] = .5*np.sin(trig.options['train:x'])
 
         # train the surrogate and check predicted value
         prob['trig.x'] = np.array([2.1, 3.2, 4.3])
@@ -552,10 +552,10 @@ class MetaModelTestCase(unittest.TestCase):
         prob.setup(check=False)
 
         # provide training data
-        trig.metadata['train:x'] = np.linspace(0, 10, 20)
-        trig.metadata['train:y'] = np.column_stack((
-            .5*np.sin(trig.metadata['train:x']),
-            .5*np.cos(trig.metadata['train:x'])
+        trig.options['train:x'] = np.linspace(0, 10, 20)
+        trig.options['train:y'] = np.column_stack((
+            .5*np.sin(trig.options['train:x']),
+            .5*np.cos(trig.options['train:x'])
         ))
 
         # train the surrogate and check predicted value
@@ -659,10 +659,10 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
 
         # populate training data
-        mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
-        mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
-        mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
-        mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
+        mm.options['train:x1'] = [1.0, 2.0, 3.0]
+        mm.options['train:x2'] = [1.0, 3.0, 4.0]
+        mm.options['train:y1'] = [3.0, 2.0, 1.0]
+        mm.options['train:y2'] = [1.0, 4.0, 7.0]
 
         # run problem for provided data point and check prediction
         prob['mm.x1'] = 2.0

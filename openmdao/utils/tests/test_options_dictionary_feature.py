@@ -13,7 +13,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
-        prob.model.add_subsystem('double', VectorDoublingComp(size=3))  # 'size' is metadata
+        prob.model.add_subsystem('double', VectorDoublingComp(size=3))  # 'size' is an option
         prob.model.connect('inputs.x', 'double.x')
 
         prob.setup()

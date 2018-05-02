@@ -170,7 +170,6 @@ class Driver(object):
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
 
         self.iter_count = 0
-        self.metadata = None
         self._model_viewer_data = None
         self.cite = ""
 

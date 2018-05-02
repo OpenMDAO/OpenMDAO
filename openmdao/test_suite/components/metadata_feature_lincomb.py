@@ -1,6 +1,6 @@
 """
 A component that computes y = a*x + b, where a and b
-are given as metadata of type 'numpy.ScalarType'.
+are given as an option of type 'numpy.ScalarType'.
 """
 import numpy as np
 
@@ -9,13 +9,13 @@ from openmdao.api import ExplicitComponent
 class LinearCombinationComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('a', default=1., types=np.ScalarType)
-        self.metadata.declare('b', default=1., types=np.ScalarType)
+        self.options.declare('a', default=1., types=np.ScalarType)
+        self.options.declare('b', default=1., types=np.ScalarType)
 
     def setup(self):
         self.add_input('x')
         self.add_output('y')
-        self.declare_partials('y', 'x', val=self.metadata['a'])
+        self.declare_partials('y', 'x', val=self.options['a'])
 
     def compute(self, inputs, outputs):
-        outputs['y'] = self.metadata['a'] * inputs['x'] + self.metadata['b']
+        outputs['y'] = self.options['a'] * inputs['x'] + self.options['b']

@@ -24,8 +24,8 @@ class Driver(object):
         Reports whether the driver ran successfully.
     iter_count : int
         Keep track of iterations for case recording.
-    metadata : list
-        List of metadata
+    options : list
+        List of options
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
@@ -126,7 +126,7 @@ class Driver(object):
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
 
         self.iter_count = 0
-        self.metadata = None
+        self.options = None
         self._model_viewer_data = None
         self.cite = ""
 
@@ -137,6 +137,15 @@ class Driver(object):
         self._res_jacs = {}
 
         self.fail = False
+
+    @property
+    def metadata(self):
+        """
+        Get the options for this Driver.
+        """
+        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use 'options' instead.")
+        return self.options
 
     def add_recorder(self, recorder):
         """

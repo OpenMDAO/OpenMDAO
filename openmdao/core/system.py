@@ -55,8 +55,6 @@ class System(object):
         Global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
-    metadata : <OptionsDictionary>
-        Dictionary of user-defined arguments.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -254,7 +252,6 @@ class System(object):
 
         # System options
         self.options = OptionsDictionary()
-        self.metadata = self.options  # Deprecated
 
         self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_inputs', types=bool, default=True,
@@ -1597,6 +1594,15 @@ class System(object):
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
+
+    @property
+    def metadata(self):
+        """
+        Get the options for this System.
+        """
+        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use 'options' instead.")
+        return self.options
 
     @property
     def jacobian(self):

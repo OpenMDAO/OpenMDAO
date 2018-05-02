@@ -132,9 +132,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._input_size += input_size
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
-            self.metadata[train_name] = training_data
+            self.options[train_name] = training_data
 
         return metadata
 
@@ -184,9 +184,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata['default_surrogate'] = True
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
-            self.metadata[train_name] = training_data
+            self.options[train_name] = training_data
 
         return metadata
 
@@ -410,7 +410,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         num_sample = None
         for name, sz in self._surrogate_input_names:
             train_name = 'train:' + name
-            val = self.metadata[train_name]
+            val = self.options[train_name]
             if val is None:
                 missing_training_data.append(train_name)
                 continue
@@ -425,7 +425,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         for name, shape in self._surrogate_output_names:
             train_name = 'train:' + name
-            val = self.metadata[train_name]
+            val = self.options[train_name]
             if val is None:
                 missing_training_data.append(train_name)
                 continue
@@ -458,7 +458,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         if num_sample > 0:
             idx = 0
             for name, sz in self._surrogate_input_names:
-                val = self.metadata['train:' + name]
+                val = self.options['train:' + name]
                 if isinstance(val[0], float):
                     new_input[:, idx] = val
                     idx += 1
@@ -485,7 +485,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     self._training_output[name] = outputs
                     new_output = outputs
 
-                val = self.metadata['train:' + name]
+                val = self.options['train:' + name]
 
                 if isinstance(val[0], float):
                     new_output[:, 0] = val

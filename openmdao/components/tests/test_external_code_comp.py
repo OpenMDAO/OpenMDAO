@@ -492,13 +492,5 @@ class TestDeprecatedExternalCode(unittest.TestCase):
         self.prob.run_model()
 
 
-class TestDeprecatedExternalCodeCompArgs(unittest.TestCase):
-
-    def test_kwargs(self):
-        extcode = ExternalCodeComp(poll_delay=999)
-
-        self.assertTrue(extcode.metadata['poll_delay'] == 999)
-
-
 if __name__ == "__main__":
     unittest.main()

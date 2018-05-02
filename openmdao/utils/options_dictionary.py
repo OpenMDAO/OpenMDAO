@@ -14,7 +14,7 @@ class OptionsDictionary(object):
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
         2. the supports attribute in drivers
-        3. the metadata attribute in systems
+        3. the options attribute in systems
 
     Attributes
     ----------

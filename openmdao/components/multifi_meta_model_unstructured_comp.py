@@ -142,7 +142,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
-                self.metadata.declare(
+                self.options.declare(
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
                 self._input_sizes[fi] += input_size
 
@@ -206,7 +206,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for fi in range(self._nfi):
             if fi > 0:
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
-                self.metadata.declare(
+                self.options.declare(
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
 
     def _train(self):
@@ -222,7 +222,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for name, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
-                val = self.metadata['train:' + name]
+                val = self.options['train:' + name]
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
@@ -235,7 +235,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         for name, shape in self._surrogate_output_names:
             for fi in range(self._nfi):
                 name = _get_name_fi(name, fi)
-                val = self.metadata['train:' + name]
+                val = self.options['train:' + name]
                 if len(val) != num_sample[fi]:
                     msg = "MetaModelUnStructured: Each variable must have the same number" \
                           " of training points. Expected {0} but found {1} " \
@@ -267,7 +267,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             for fi in range(self._nfi):
                 if num_sample[fi] > 0:
                     name = _get_name_fi(name, fi)
-                    val = self.metadata['train:' + name]
+                    val = self.options['train:' + name]
                     if isinstance(val[0], float):
                         new_inputs[fi][:, idx[fi]] = val
                         idx[fi] += 1
@@ -300,7 +300,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                         self._training_output[name].extend(outputs)
                         new_outputs = outputs
 
-                    val = self.metadata['train:' + name_fi]
+                    val = self.options['train:' + name_fi]
 
                     if isinstance(val[0], float):
                         new_outputs[fi][:, 0] = val
