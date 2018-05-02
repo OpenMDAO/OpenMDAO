@@ -1,8 +1,8 @@
 .. _building-components:
 
-*********************************************************
+*********************************
 How OpenMDAO Represents Variables
-*********************************************************
+*********************************
 
 In general, a numerical model can be complex, multidisciplinary, and heterogeneous.
 It can be decomposed into a series of smaller computations that are chained together by passing variables from one to the next.
@@ -29,7 +29,7 @@ let us consider the following numerical model that takes :math:`x` as an input:
 
 
 The Three Types of Components
------------------------------------------
+-----------------------------
 
 
 In our numerical model, we have three variables: :math:`x`, :math:`y`, and :math:`z`.

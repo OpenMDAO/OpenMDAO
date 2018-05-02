@@ -888,6 +888,7 @@ class Driver(object):
                         ...
                     }
                 )
+
         """
         if self.supports['simultaneous_derivatives']:
             self._simul_coloring_info = simul_info

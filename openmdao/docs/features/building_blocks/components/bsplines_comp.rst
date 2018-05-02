@@ -65,3 +65,5 @@ higher spatial frequency content) near the edges than the middle.
     :layout: code, plot
     :scale: 90
     :align: center
+
+.. tags:: BsplinesComp, Component

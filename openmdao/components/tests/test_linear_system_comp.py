@@ -9,10 +9,10 @@ from openmdao.api import LinearSystemComp, ScipyKrylov, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class TestLinearSystem(unittest.TestCase):
+class TestLinearSystemComp(unittest.TestCase):
     """Test the LinearSystemComp class with a 3x3 linear system."""
 
-    def test_linear_system(self):
+    def test_linear_system_comp(self):
         """Check against the scipy solver."""
 
         model = Group()
@@ -41,7 +41,7 @@ class TestLinearSystem(unittest.TestCase):
         assert_rel_error(self, prob['lin.x'], x, .0001)
         assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
-    def test_linear_system_solve_linear(self):
+    def test_linear_system_comp_solve_linear(self):
         """Check against solve_linear."""
 
         x = np.array([1, 2, -3])

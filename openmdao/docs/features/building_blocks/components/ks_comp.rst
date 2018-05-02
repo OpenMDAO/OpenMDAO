@@ -69,4 +69,4 @@ is still satisfied if it is less than zero.
     :layout: interleave
 
 
-.. tags:: KSComp, Constraints, Optimization
+.. tags:: KSComp, Component, Constraints, Optimization
