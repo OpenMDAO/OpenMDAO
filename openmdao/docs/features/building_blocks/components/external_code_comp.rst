@@ -2,9 +2,9 @@
 
 .. _externalcodecomp_feature:
 
-**************************
-ExternalCodeComp Component
-**************************
+****************
+ExternalCodeComp
+****************
 
 ExternalCodeComp is a component that runs an external program in a subprocess on your operating system.
 
