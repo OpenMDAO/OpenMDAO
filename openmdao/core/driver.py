@@ -782,15 +782,11 @@ class Driver(object):
             in_vars = self._gather_vars(model, in_vars)
 
         outs = {}
-        if des_vars is not None:
+        if not MPI or model.comm.rank == 0:
             outs.update(des_vars)
-        if res_vars is not None:
             outs.update(res_vars)
-        if obj_vars is not None:
             outs.update(obj_vars)
-        if con_vars is not None:
             outs.update(con_vars)
-        if sys_vars is not None:
             outs.update(sys_vars)
 
         data = {
