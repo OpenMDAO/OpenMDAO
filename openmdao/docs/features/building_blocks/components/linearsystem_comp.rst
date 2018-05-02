@@ -3,3 +3,5 @@
 ****************
 LinearSystemComp
 ****************
+
+.. tags:: LinearSystemComp, Component

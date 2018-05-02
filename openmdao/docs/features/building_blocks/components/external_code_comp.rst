@@ -135,4 +135,4 @@ Again, we can perform an optimization using the external code with derivatives:
     :layout: interleave
 
 
-.. tags:: ExternalCodeComp, FileWrapping
+.. tags:: ExternalCodeComp, FileWrapping, Component

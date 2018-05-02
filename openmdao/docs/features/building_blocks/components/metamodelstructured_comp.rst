@@ -1,11 +1,11 @@
-.. _feature_MetaModelStructured:
+.. _feature_MetaModelStructuredComp:
 
 ***********************
 MetaModelStructuredComp
 ***********************
 
 `MetaModelStructuredComp` is a smooth interpolation Component for data that exists on a regular, structured, grid.
-This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructured>` which accepts unstructured data as collections of points.
+This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructuredComp>` which accepts unstructured data as collections of points.
 
 `MetaModelStructuredComp` produces smooth fits through provided training data using polynomial
 splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
@@ -67,3 +67,5 @@ match the finite difference estimate in the `check_partials` output.
 .. embed-code::
     openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_training_derivatives
     :layout: code, output
+
+.. tags:: MetaModelStructuredComp, Component

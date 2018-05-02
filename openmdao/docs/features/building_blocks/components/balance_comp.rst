@@ -97,4 +97,4 @@ they need not be connected.
     :layout: interleave
 
 
-.. tags:: BalanceComp
+.. tags:: BalanceComp, Component

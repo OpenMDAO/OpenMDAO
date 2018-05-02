@@ -38,3 +38,6 @@ with `a_units` and `b_units`.
 
 .. embed-code::
     openmdao.components.tests.test_cross_product_comp.TestForDocs.test
+
+
+.. tags:: CrossProductComp, Component
