@@ -152,7 +152,7 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
 
 .. note::
 
-    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_amijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
+    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_armijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
     For many problems you might want to use :ref:`BoundsEnforceLS <feature_bounds_enforce>` instead, which only activates the
     line search to enforce upper and lower bounds on the outputs in the model.
 
