@@ -12,7 +12,6 @@ from six.moves import cPickle as pickle
 
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.utils.mpi import MPI
-
 from openmdao.utils.record_util import values_to_array, check_path
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver

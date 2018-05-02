@@ -1,4 +1,4 @@
-from openmdao.api import OptionsDictionary, ExplicitComponent
+from openmdao.api import ExplicitComponent
 import unittest
 from six import PY3, assertRegex
 import numpy as np

@@ -2,15 +2,10 @@
 Case generators for Design-of-Experiments Driver.
 """
 
-from six import iteritems, itervalues
-from six.moves import range, zip
-
 import numpy as np
 
-import itertools
-from six import iteritems, itervalues
-
-from collections import OrderedDict
+from six import iteritems
+from six.moves import range
 
 from openmdao.drivers.doe_driver import DOEGenerator
 import pyDOE2

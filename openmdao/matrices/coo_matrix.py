@@ -3,12 +3,12 @@ from __future__ import division, print_function
 
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix
 
 from six import iteritems
 from six.moves import range
 
-from collections import OrderedDict, Counter, defaultdict
+from collections import OrderedDict
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 

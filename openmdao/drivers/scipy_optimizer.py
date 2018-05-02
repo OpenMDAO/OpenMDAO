@@ -6,7 +6,6 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
-
 from six import itervalues, iteritems, reraise
 from six.moves import range
 
@@ -53,22 +52,6 @@ class ScipyOptimizeDriver(Driver):
     ScipyOptimizeDriver supports the following:
         equality_constraints
         inequality_constraints
-
-    Options
-    -------
-    options['disp'] :  bool(True)
-        Set to False to prevent printing of Scipy convergence messages
-    options['maxiter'] : int(200)
-        Maximum number of iterations.
-    options['optimizer'] : str('SLSQP')
-        Name of optimizer to use
-    options['tol'] :  float(1e-06)
-        Tolerance for termination. For detailed control, use solver-specific options.
-    options['dynamic_simul_derivs'] : bool(False)
-        Set to True to turn on dynamic computation of simultaneous total derivative coloring.
-    options['dynamic_simul_derivs_repeats'] : int(3)
-        Set the number of compute_totals calls made during computation of simultaneous derivative
-        coloring.
 
     Attributes
     ----------

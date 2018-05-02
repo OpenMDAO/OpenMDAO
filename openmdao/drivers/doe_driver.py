@@ -3,11 +3,8 @@ Design-of-Experiments Driver.
 """
 from __future__ import print_function
 
-import sys
 import traceback
 import inspect
-
-import numpy as np
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
@@ -53,12 +50,6 @@ class DOEGenerator(object):
 class DOEDriver(Driver):
     """
     Design-of-Experiments Driver.
-
-    Options
-    -------
-    options['parallel'] :  bool or int
-        True or number of cases to run in parallel. Default is False.
-        If True, cases will be run on all available processors.
 
     Attributes
     ----------

@@ -165,11 +165,6 @@ class PETScKrylov(LinearSolver):
     """
     LinearSolver that uses PetSC KSP to solve for a system's derivatives.
 
-    Options
-    -------
-    options['ksp_type'] :  str
-        KSP algorithm to use. Default is 'fgmres'.
-
     Attributes
     ----------
     precon : Solver

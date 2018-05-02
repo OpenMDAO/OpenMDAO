@@ -8,10 +8,8 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 from __future__ import print_function
 
 import sys
-from math import isnan
-from six import iteritems, reraise
-
 import numpy as np
+from six import iteritems, reraise
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
