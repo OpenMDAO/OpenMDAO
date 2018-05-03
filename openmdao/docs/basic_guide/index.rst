@@ -35,9 +35,9 @@ Multidisciplinary Optimization
     first_mdao.rst
 
 
-----------------------------------------
+---------------------------------------
 Using the OpenMDAO Command Line Utility
-----------------------------------------
+---------------------------------------
 
 .. toctree::
     :maxdepth: 1
