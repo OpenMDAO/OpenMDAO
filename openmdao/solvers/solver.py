@@ -160,8 +160,8 @@ class Solver(object):
         self._mode = 'fwd'
         self._iter_count = 0
 
+        # Solver options
         self.options = OptionsDictionary()
-        self.recording_options = OptionsDictionary()
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -174,6 +174,7 @@ class Solver(object):
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
         # Case recording options
+        self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
                                        solver level')

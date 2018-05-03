@@ -19,7 +19,7 @@ class OptionsDictionary(object):
     Attributes
     ----------
     _dict : dict of dict
-        Dictionary of entries. Each option is a dictionary consisting of value, values,
+        Dictionary of entries. Each entry is a dictionary consisting of value, values,
         types, desc, lower, and upper.
     _read_only : bool
         If True, setting (via __setitem__ or update) is not permitted.

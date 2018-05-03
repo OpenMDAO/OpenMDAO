@@ -253,6 +253,7 @@ class System(object):
         # System options
         self.options = OptionsDictionary()
 
+        # Case recording options
         self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the system level')
@@ -1595,14 +1596,14 @@ class System(object):
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
 
-    # @property
-    # def metadata(self):
-    #     """
-    #     Get the options for this System.
-    #     """
-    #     warn_deprecation("The 'metadata' attribute provides backwards compatibility "
-    #                      "with earlier version of OpenMDAO; use 'options' instead.")
-    #     return self.options
+    @property
+    def metadata(self):
+        """
+        Get the options for this System.
+        """
+        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use 'options' instead.")
+        return self.options
 
     @property
     def jacobian(self):

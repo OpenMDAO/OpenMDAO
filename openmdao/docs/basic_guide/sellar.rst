@@ -101,7 +101,7 @@ You can pick which kind of solver you would like to use to converge the MDA. The
 The :code:`NonlinearBlockGaussSeidel` solver, also sometimes called a "fixed-point iteration solver," is a gradient-free method
 that works well in many situations.
 More tightly-coupled problems, or problems with instances of :ref:`ImplicitComponent <comp-type-3-implicitcomp>`
-that don't implement their own :code:'solve_nonlinear' method, will require the :code:`Newton` solver.
+that don't implement their own :code:`solve_nonlinear` method, will require the :code:`Newton` solver.
 
 .. note::
     OpenMDAO comes with other nonlinear solvers you can use if they suit your problem.

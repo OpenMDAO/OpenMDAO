@@ -102,9 +102,14 @@ class Driver(object):
         Cached total jacobian handling object.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize the driver.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
         """
         self._rec_mgr = RecordingManager()
         self._vars_to_record = {
@@ -120,19 +125,21 @@ class Driver(object):
         self._cons = None
         self._objs = None
         self._responses = None
-        self.options = OptionsDictionary()
-        self.recording_options = OptionsDictionary()
 
-        ###########################
+        # Driver options
+        self.options = OptionsDictionary()
+
         self.options.declare('debug_print', types=list, is_valid=_is_debug_print_opts_valid,
                              desc="List of what type of Driver variables to print at each "
                                   "iteration. Valid items in list are 'desvars', 'ln_cons', "
                                   "'nl_cons', 'objs'",
                              default=[])
 
-        ###########################
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
-                                       default=True)
+        # Case recording options
+        self.recording_options = OptionsDictionary()
+
+        self.recording_options.declare('record_metadata', types=bool, default=True,
+                                       desc='Record metadata')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
@@ -166,13 +173,12 @@ class Driver(object):
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
+        # TODO, support these in OpenMDAO
+        self.supports.declare('integer_design_vars', types=bool, default=False)
 
         self.iter_count = 0
         self._model_viewer_data = None
         self.cite = ""
-
-        # TODO, support these in OpenMDAO
-        self.supports.declare('integer_design_vars', types=bool, default=False)
 
         self._simul_coloring_info = None
         self._total_jac_sparsity = None
@@ -180,6 +186,8 @@ class Driver(object):
         self._total_jac = None
 
         self.fail = False
+
+        self.options.update(kwargs)
 
     def add_recorder(self, recorder):
         """
