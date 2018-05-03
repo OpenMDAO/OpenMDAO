@@ -30,6 +30,7 @@ class DefaultTransfer(Transfer):
             Whether to call this method in subsystems.
         """
         group._transfers = {}
+        iproc = group.comm.rank
 
         def merge(indices_list):
             if len(indices_list) > 0:
@@ -125,28 +126,8 @@ class DefaultTransfer(Transfer):
                             src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
 
                     # 1. Compute the output indices
-                    output_inds = np.zeros(src_indices.shape[0], INT_DTYPE)
-                    ind1 = ind2 = 0
-                    for iproc in range(group.comm.size):
-                        ind2 += sizes_out[iproc, idx_byset_out]
-
-                        # The part of src on iproc
-                        on_iproc = np.logical_and(ind1 <= src_indices, src_indices < ind2)
-
-                        # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                        # Subtract off part of previous procs
-                        # Then add all variables on previous procs
-                        # Then all previous variables on this proc
-                        # - np.sum(out_sizes[:iproc, idx_byset_out])
-                        # + np.sum(out_sizes[:iproc, :])
-                        # + np.sum(out_sizes[iproc, :idx_byset_out])
-                        # + inds
-                        offset = -ind1
-                        offset += np.sum(sizes_out[:iproc, :])
-                        offset += np.sum(sizes_out[iproc, :idx_byset_out])
-                        output_inds[on_iproc] = src_indices[on_iproc] + offset
-
-                        ind1 += sizes_out[iproc, idx_byset_out]
+                    output_inds = np.zeros(src_indices.size, INT_DTYPE)
+                    output_inds[:] = src_indices + np.sum(sizes_out[iproc, :idx_byset_out])
 
                     # 2. Compute the input indices
                     iproc = group.comm.rank
