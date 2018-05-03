@@ -201,6 +201,8 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
+            if subsys._vector_class is None:
+                subsys._vector_class = self._vector_class
             if self.pathname:
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
             else:

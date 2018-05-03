@@ -1136,7 +1136,10 @@ class System(object):
             raise RuntimeError(msg)
 
         for vec_name in self._rel_vec_name_list:
-            vector_class = root_vectors['output'][vec_name].__class__
+            if self._vector_class is None:
+                vector_class = root_vectors['output'][vec_name].__class__
+            else:
+                vector_class = self._vector_class
 
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
