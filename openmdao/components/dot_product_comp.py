@@ -19,7 +19,7 @@ class DotProductComp(ExplicitComponent):
           b is of shape (vec_size, n)
           c is of shape (vec_size,)
 
-    Vectors a and b must be of the same length, specified by the options option 'length'.
+    Vectors a and b must be of the same length, specified by the option 'length'.
     """
 
     def initialize(self):

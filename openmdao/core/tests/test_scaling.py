@@ -64,6 +64,7 @@ class ScalingExample2(ImplicitComponent):
         residuals['y1'] = 1e5 * (x1 - y1)/y1
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
+
 class ScalingExample3(ImplicitComponent):
 
     def setup(self):
@@ -80,6 +81,7 @@ class ScalingExample3(ImplicitComponent):
 
         residuals['y1'] = 1e5 * (x1 - y1)/y1
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
+
 
 class ScalingExampleVector(ImplicitComponent):
 
@@ -159,7 +161,7 @@ class ScalingTestComp(ImplicitComponent):
             res_ref = 1.0
 
         self.add_input('x')
-        self.add_output('y', val = init_state, ref=ref, res_ref=res_ref)
+        self.add_output('y', val=init_state, ref=ref, res_ref=res_ref)
 
         self.declare_partials('*', '*')
 
@@ -660,7 +662,7 @@ class TestScaling(unittest.TestCase):
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
-                residuals['extra'] = 2.0*self.options['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+                residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
                 # These are incorrect derivatives, but we aren't doing any calculations, and it makes
@@ -719,7 +721,7 @@ class TestScaling(unittest.TestCase):
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
-                residuals['extra'] = 2.0*self.options['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+                residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
                 # These are incorrect derivatives, but we aren't doing any calculations, and it makes
