@@ -681,7 +681,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm)
+            self._setup_procs(self.pathname, comm, mode)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -800,7 +800,7 @@ class System(object):
         for sub in self.system_iter(recurse=True, include_self=True):
             sub._rec_mgr.record_metadata(sub)
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, mode):
         """
         Distribute processors and assign pathnames.
 
@@ -810,9 +810,13 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
         self.comm = comm
+        self._mode = mode
         self._subsystems_proc_range = []
 
         # TODO: This version only runs for Components, because it is overriden in Group, so

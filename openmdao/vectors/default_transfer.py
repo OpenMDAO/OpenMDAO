@@ -31,6 +31,7 @@ class DefaultTransfer(Transfer):
         """
         group._transfers = {}
         iproc = group.comm.rank
+        rev = group._mode == 'rev'
 
         def merge(indices_list):
             if len(indices_list) > 0:
@@ -56,6 +57,8 @@ class DefaultTransfer(Transfer):
         vectors = group._vectors
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
+            relvars_in = relvars['input']
+            relvars_out = relvars['output']
 
             # Initialize empty lists for the transfer indices
             nsub_allprocs = len(group._subsystems_allprocs)
@@ -63,8 +66,9 @@ class DefaultTransfer(Transfer):
             xfer_out = {}
             fwd_xfer_in = [{} for i in range(nsub_allprocs)]
             fwd_xfer_out = [{} for i in range(nsub_allprocs)]
-            rev_xfer_in = [{} for i in range(nsub_allprocs)]
-            rev_xfer_out = [{} for i in range(nsub_allprocs)]
+            if rev:
+                rev_xfer_in = [{} for i in range(nsub_allprocs)]
+                rev_xfer_out = [{} for i in range(nsub_allprocs)]
             for set_name_in in group._num_var_byset[vec_name]['input']:
                 for set_name_out in group._num_var_byset[vec_name]['output']:
                     key = (set_name_in, set_name_out)
@@ -73,8 +77,9 @@ class DefaultTransfer(Transfer):
                     for isub in range(nsub_allprocs):
                         fwd_xfer_in[isub][key] = []
                         fwd_xfer_out[isub][key] = []
-                        rev_xfer_in[isub][key] = []
-                        rev_xfer_out[isub][key] = []
+                        if rev:
+                            rev_xfer_in[isub][key] = []
+                            rev_xfer_out[isub][key] = []
 
             allprocs_abs2idx_byset = group._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = group._var_sizes_byset[vec_name]['input']
@@ -82,7 +87,7 @@ class DefaultTransfer(Transfer):
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
-                if abs_out not in relvars['output']:
+                if abs_out not in relvars_out or abs_in not in relvars_in:
                     continue
 
                 # Only continue if the input exists on this processor
@@ -105,7 +110,6 @@ class DefaultTransfer(Transfer):
                     # Read in and process src_indices
                     shape_in = meta_in['shape']
                     shape_out = meta_out['shape']
-                    global_shape_out = meta_out['global_shape']
                     global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
@@ -121,20 +125,17 @@ class DefaultTransfer(Transfer):
                             # in System._setup_scaling.
                             entries = [list(range(x)) for x in shape_in]
                             cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                            dimidxs = [convert_neg(cols[:, i], shape_out[i])
                                        for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+                            src_indices = np.ravel_multi_index(dimidxs, shape_out)
 
                     # 1. Compute the output indices
                     output_inds = np.zeros(src_indices.size, INT_DTYPE)
                     output_inds[:] = src_indices + np.sum(sizes_out[iproc, :idx_byset_out])
 
                     # 2. Compute the input indices
-                    iproc = group.comm.rank
-                    ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    delta = np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind1 += delta
-                    ind2 += (delta + sizes_in[iproc, idx_byset_in])
+                    ind1 = np.sum(sizes_in[iproc, :idx_byset_in])
+                    ind2 = ind1 + sizes_in[iproc, idx_byset_in]
                     input_inds = np.arange(ind1, ind2, dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
@@ -145,7 +146,7 @@ class DefaultTransfer(Transfer):
                     isub = abs2isub['input'][abs_in]
                     fwd_xfer_in[isub][key].append(input_inds)
                     fwd_xfer_out[isub][key].append(output_inds)
-                    if abs_out in abs2isub['output']:
+                    if rev and abs_out in abs2isub['output']:
                         isub = abs2isub['output'][abs_out]
                         rev_xfer_in[isub][key].append(input_inds)
                         rev_xfer_out[isub][key].append(output_inds)
@@ -158,24 +159,25 @@ class DefaultTransfer(Transfer):
                     for isub in range(nsub_allprocs):
                         fwd_xfer_in[isub][key] = merge(fwd_xfer_in[isub][key])
                         fwd_xfer_out[isub][key] = merge(fwd_xfer_out[isub][key])
-                        rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
-                        rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
+                        if rev:
+                            rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
+                            rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
 
             out_vec = vectors['output'][vec_name]
-            transfer_class = out_vec.TRANSFER
 
             transfers[vec_name] = {}
-            xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
-                                      xfer_in, xfer_out, group.comm)
+            xfer_all = DefaultTransfer(vectors['input'][vec_name], out_vec,
+                                       xfer_in, xfer_out, group.comm)
             transfers[vec_name]['fwd', None] = xfer_all
             transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = transfer_class(
+                transfers[vec_name]['fwd', isub] = DefaultTransfer(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
-                transfers[vec_name]['rev', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                if rev:
+                    transfers[vec_name]['rev', isub] = DefaultTransfer(
+                        vectors['input'][vec_name], vectors['output'][vec_name],
+                        rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
 
         transfers['nonlinear'] = transfers['linear']
 

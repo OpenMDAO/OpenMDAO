@@ -121,7 +121,7 @@ class Group(System):
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, mode):
         """
         Distribute processors and assign pathnames.
 
@@ -131,9 +131,13 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
         self.comm = comm
+        self._mode = mode
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
@@ -198,9 +202,9 @@ class Group(System):
         # Perform recursion
         for subsys in self._subsystems_myproc:
             if self.pathname:
-                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm)
+                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
             else:
-                subsys._setup_procs(subsys.name, sub_comm)
+                subsys._setup_procs(subsys.name, sub_comm, mode)
 
     def _setup_vars(self, recurse=True):
         """
