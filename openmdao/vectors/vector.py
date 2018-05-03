@@ -1,7 +1,8 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
-import numpy as np
 
+import os
+import numpy as np
 from six import iteritems, PY3
 
 from openmdao.utils.name_maps import name2abs_name
@@ -13,6 +14,12 @@ _type_map = {
     'output': 'output',
     'residual': 'output'
 }
+
+# This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
+if os.environ.get('OPENMDAO_USE_BIG_INTS'):
+    INT_DTYPE = np.dtype(np.int64)
+else:
+    INT_DTYPE = np.dtype(np.int32)
 
 
 class VectorInfo(object):

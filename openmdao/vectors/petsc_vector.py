@@ -6,7 +6,7 @@ from petsc4py import PETSc
 from six import iteritems, itervalues
 from six.moves import range
 
-from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer, INT_DTYPE
 from openmdao.utils.mpi import MPI
 
 
@@ -62,10 +62,8 @@ class PETScTransfer(DefaultTransfer):
             if lensums[i] > 0:
                 in_set_name, out_set_name = key
 
-                in_indexset = PETSc.IS().createGeneral(
-                    np.array(in_inds[key], 'i'), comm=self._comm)
-                out_indexset = PETSc.IS().createGeneral(
-                    np.array(out_inds[key], 'i'), comm=self._comm)
+                in_indexset = PETSc.IS().createGeneral(in_inds[key], comm=self._comm)
+                out_indexset = PETSc.IS().createGeneral(out_inds[key], comm=self._comm)
 
                 in_petsc = in_vec._petsc[in_set_name]
                 out_petsc = out_vec._petsc[out_set_name]

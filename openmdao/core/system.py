@@ -20,6 +20,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
@@ -2197,7 +2198,7 @@ class System(object):
         else:  # 'obj'
             if index is not None:
                 resp['size'] = 1
-                index = np.array([index], dtype=int)
+                index = np.array([index], dtype=INT_DTYPE)
             resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):

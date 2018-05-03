@@ -425,13 +425,15 @@ class _TotalJacInfo(object):
             elif matmat:
                 if name not in idx_iter_dict:
                     idx_iter_dict[name] = (None, matmat,
-                                           [np.arange(start, end, dtype=int)], self.matmat_iter)
+                                           [np.arange(start, end, dtype=int)],
+                                           self.matmat_iter)
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
             elif not simul_coloring:  # plain old single index iteration
                 idx_iter_dict[name] = (None, False,
-                                       np.arange(start, end, dtype=int), self.single_index_iter)
+                                       np.arange(start, end, dtype=int),
+                                       self.single_index_iter)
 
             tup = (name, rhsname, rel, cache_lin_sol)
             idx_map.extend([tup] * (end - start))

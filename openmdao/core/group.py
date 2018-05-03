@@ -15,7 +15,7 @@ import networkx as nx
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System
+from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
@@ -31,6 +31,8 @@ from openmdao.utils.graph_utils import all_connected_nodes
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
+_empty_idx_array = np.array([], dtype=INT_DTYPE)
 
 
 class Group(System):
@@ -227,7 +229,7 @@ class Group(System):
             for type_ in ['input', 'output']:
                 num_var[vec_name][type_] = np.sum(
                     [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
-                     if vec_name in subsys._rel_vec_names], dtype=int)
+                     if vec_name in subsys._rel_vec_names], dtype=INT_DTYPE)
 
                 num_var_byset[vec_name][type_] = vbyset = {}
                 for subsys in self._subsystems_myproc:
@@ -294,9 +296,9 @@ class Group(System):
             # Here, we count the number of variables (total and by varset) in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
             allprocs_counters = {
-                type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+                type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
             allprocs_counters_byset = {
-                type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+                type_: np.zeros((nsub_allprocs, len(set2iset[type_])), INT_DTYPE)
                 for type_ in ['input', 'output']}
 
             for type_ in ['input', 'output']:
@@ -314,9 +316,9 @@ class Group(System):
                 gathered = self.comm.allgather(raw)
 
                 allprocs_counters = {
-                    type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
+                    type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
                 allprocs_counters_byset = {
-                    type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
+                    type_: np.zeros((nsub_allprocs, len(set2iset[type_])), INT_DTYPE)
                     for type_ in ['input', 'output']
                 }
                 for myproc_counters, myproc_counters_byset in gathered:
@@ -480,11 +482,12 @@ class Group(System):
             subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
 
             for type_ in ['input', 'output']:
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
+                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]),
+                                                  INT_DTYPE)
 
                 sizes_byset[vec_name][type_] = {}
                 for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
-                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
+                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
                     if vec_name not in subsys._rel_vec_names:
@@ -973,7 +976,7 @@ class Group(System):
             if len(indices_list) > 0:
                 return np.concatenate(indices_list)
             else:
-                return np.array([], int)
+                return _empty_idx_array
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1046,7 +1049,7 @@ class Group(System):
                     global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
-                        src_indices = np.arange(meta_in['size'], dtype=int)
+                        src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     elif src_indices.ndim == 1:
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
@@ -1063,7 +1066,7 @@ class Group(System):
                             src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
 
                     # 1. Compute the output indices
-                    output_inds = np.zeros(src_indices.shape[0], int)
+                    output_inds = np.zeros(src_indices.shape[0], INT_DTYPE)
                     ind1 = ind2 = 0
                     for iproc in range(self.comm.size):
                         ind2 += sizes_out[iproc, idx_byset_out]
@@ -1092,7 +1095,7 @@ class Group(System):
                     delta = np.sum(sizes_in[iproc, :idx_byset_in])
                     ind1 += delta
                     ind2 += (delta + sizes_in[iproc, idx_byset_in])
-                    input_inds = np.arange(ind1, ind2)
+                    input_inds = np.arange(ind1, ind2, dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
                     key = (set_name_in, set_name_out)
