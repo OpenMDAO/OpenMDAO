@@ -1,6 +1,6 @@
 """Define the MultiFiMetaModel class."""
-
 from six.moves import range
+from itertools import chain
 
 import numpy as np
 
@@ -96,7 +96,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         self._nfi = nfi
 
         # generalize MetaModelUnStructured training inputs to a list of training inputs
-        self._training_input = nfi * [np.zeros(0)]
+        self._training_input = nfi * [np.empty(0)]
         self._input_sizes = nfi * [0]
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
@@ -136,7 +136,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
                                                flat_src_indices=flat_src_indices, units=units,
                                                desc=desc, var_set=var_set)
-        input_size = metadata['value'].size
+        if self.metadata['vec_size'] > 1:
+            input_size = metadata['value'][0].size
+        else:
+            input_size = metadata['value'].size
 
         self._input_sizes[0] = self._input_size
 
@@ -221,28 +224,17 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             return
 
         num_sample = self._nfi * [None]
-        for name, sz in self._surrogate_input_names:
+        for name_root, _ in chain(self._surrogate_input_names, self._surrogate_output_names):
             for fi in range(self._nfi):
-                name = _get_name_fi(name, fi)
+                name = _get_name_fi(name_root, fi)
                 val = self.metadata['train:' + name]
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
-                    msg = "MetaModelUnStructured: Each variable must have the same number"\
+                    msg = "MultiFiMetaModelUnStructured: Each variable must have the same number"\
                           " of training points. Expected {0} but found {1} "\
                           "points for '{2}'."\
                           .format(num_sample[fi], len(val), name)
-                    raise RuntimeError(msg)
-
-        for name, shape in self._surrogate_output_names:
-            for fi in range(self._nfi):
-                name = _get_name_fi(name, fi)
-                val = self.metadata['train:' + name]
-                if len(val) != num_sample[fi]:
-                    msg = "MetaModelUnStructured: Each variable must have the same number" \
-                          " of training points. Expected {0} but found {1} " \
-                          "points for '{2}'." \
-                        .format(num_sample[fi], len(val), name)
                     raise RuntimeError(msg)
 
         inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
@@ -250,9 +242,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         # add training data for each input
         idx = self._nfi * [0]
-        for name, sz in self._surrogate_input_names:
+        for name_root, sz in self._surrogate_input_names:
             for fi in range(self._nfi):
-                name = _get_name_fi(name, fi)
+                name = _get_name_fi(name_root, fi)
                 val = self.metadata['train:' + name]
                 if isinstance(val[0], float):
                     inputs[fi][:, idx[fi]] = val
@@ -264,10 +256,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         # add training data for each output
         outputs = self._nfi * [None]
-        for name, shape in self._surrogate_output_names:
+        for name_root, shape in self._surrogate_output_names:
             output_size = np.prod(shape)
             for fi in range(self._nfi):
-                name_fi = _get_name_fi(name, fi)
+                name_fi = _get_name_fi(name_root, fi)
                 outputs[fi] = np.zeros((num_sample[fi], output_size))
 
                 val = self.metadata['train:' + name_fi]
@@ -282,10 +274,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             self._training_output[name] = []
             self._training_output[name].extend(outputs)
 
-            surrogate = self._metadata(name).get('surrogate')
+            surrogate = self._metadata(name_root).get('surrogate')
             if surrogate is None:
-                raise RuntimeError("Metamodel '%s': No surrogate specified for output '%s'"
-                                   % (self.pathname, name))
+                msg = "MultiFiMetaModelUnStructured '{}': No surrogate specified for output '{}'"
+                raise RuntimeError(msg.format(self.pathname, name_root))
             else:
                 surrogate.train_multifi(inputs, self._training_output[name])
 
@@ -309,7 +301,7 @@ class MultiFiMetaModel(MultiFiMetaModelUnStructuredComp):
         **kwargs : dict
             Deprecated arguments.
         """
-        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use"
+        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use "
                          "'MultiFiMetaModelUnStructuredComp' instead.")
         super(MultiFiMetaModel, self).__init__(*args, **kwargs)
 
