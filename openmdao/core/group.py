@@ -32,8 +32,6 @@ from openmdao.utils.graph_utils import all_connected_nodes
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
-_empty_idx_array = np.array([], dtype=INT_DTYPE)
-
 
 class Group(System):
     """
@@ -970,174 +968,15 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_transfers()
+        # get the transfer class
+        if self._vector_class is None:
+            for vec_name, vec in iteritems(self._vectors['output']):
+                transfer_class = vec.TRANSFER
+                break
+        else:
+            transfer_class = self._vector_class.TRANSFER
 
-        def merge(indices_list):
-            if len(indices_list) > 0:
-                return np.concatenate(indices_list)
-            else:
-                return _empty_idx_array
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_transfers(recurse)
-
-        # Pre-compute map from abs_names to the index of the containing subsystem
-        abs2isub = {'input': {}, 'output': {}}
-        for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
-            for type_ in ['input', 'output']:
-                for abs_name in subsys._var_allprocs_abs_names[type_]:
-                    abs2isub[type_][abs_name] = isub
-
-        abs2meta = self._var_abs2meta
-        allprocs_abs2meta = self._var_allprocs_abs2meta
-
-        transfers = self._transfers
-        vectors = self._vectors
-        for vec_name in self._lin_rel_vec_name_list:
-            relvars, _ = self._relevant[vec_name]['@all']
-
-            # Initialize empty lists for the transfer indices
-            nsub_allprocs = len(self._subsystems_allprocs)
-            xfer_in = {}
-            xfer_out = {}
-            fwd_xfer_in = [{} for i in range(nsub_allprocs)]
-            fwd_xfer_out = [{} for i in range(nsub_allprocs)]
-            rev_xfer_in = [{} for i in range(nsub_allprocs)]
-            rev_xfer_out = [{} for i in range(nsub_allprocs)]
-            for set_name_in in self._num_var_byset[vec_name]['input']:
-                for set_name_out in self._num_var_byset[vec_name]['output']:
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key] = []
-                    xfer_out[key] = []
-                    for isub in range(nsub_allprocs):
-                        fwd_xfer_in[isub][key] = []
-                        fwd_xfer_out[isub][key] = []
-                        rev_xfer_in[isub][key] = []
-                        rev_xfer_out[isub][key] = []
-
-            allprocs_abs2idx_byset = self._var_allprocs_abs2idx_byset[vec_name]
-            sizes_byset_in = self._var_sizes_byset[vec_name]['input']
-            sizes_byset_out = self._var_sizes_byset[vec_name]['output']
-
-            # Loop through all explicit / implicit connections owned by this system
-            for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-                if abs_out not in relvars['output']:
-                    continue
-
-                # Only continue if the input exists on this processor
-                if abs_in in abs2meta and abs_in in relvars['input']:
-
-                    # Get meta
-                    meta_in = abs2meta[abs_in]
-                    meta_out = allprocs_abs2meta[abs_out]
-
-                    # Get varset info
-                    set_name_in = meta_in['var_set']
-                    set_name_out = meta_out['var_set']
-                    idx_byset_in = allprocs_abs2idx_byset[abs_in]
-                    idx_byset_out = allprocs_abs2idx_byset[abs_out]
-
-                    # Get the sizes (byset) array
-                    sizes_in = sizes_byset_in[set_name_in]
-                    sizes_out = sizes_byset_out[set_name_out]
-
-                    # Read in and process src_indices
-                    shape_in = meta_in['shape']
-                    shape_out = meta_out['shape']
-                    global_shape_out = meta_out['global_shape']
-                    global_size_out = meta_out['global_size']
-                    src_indices = meta_in['src_indices']
-                    if src_indices is None:
-                        src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
-                    elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, global_size_out)
-                    else:
-                        if len(shape_out) == 1 or shape_in == src_indices.shape:
-                            src_indices = src_indices.flatten()
-                            src_indices = convert_neg(src_indices, global_size_out)
-                        else:
-                            # TODO: this duplicates code found
-                            # in System._setup_scaling.
-                            entries = [list(range(x)) for x in shape_in]
-                            cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                       for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
-
-                    # 1. Compute the output indices
-                    output_inds = np.zeros(src_indices.shape[0], INT_DTYPE)
-                    ind1 = ind2 = 0
-                    for iproc in range(self.comm.size):
-                        ind2 += sizes_out[iproc, idx_byset_out]
-
-                        # The part of src on iproc
-                        on_iproc = np.logical_and(ind1 <= src_indices, src_indices < ind2)
-
-                        # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                        # Subtract off part of previous procs
-                        # Then add all variables on previous procs
-                        # Then all previous variables on this proc
-                        # - np.sum(out_sizes[:iproc, idx_byset_out])
-                        # + np.sum(out_sizes[:iproc, :])
-                        # + np.sum(out_sizes[iproc, :idx_byset_out])
-                        # + inds
-                        offset = -ind1
-                        offset += np.sum(sizes_out[:iproc, :])
-                        offset += np.sum(sizes_out[iproc, :idx_byset_out])
-                        output_inds[on_iproc] = src_indices[on_iproc] + offset
-
-                        ind1 += sizes_out[iproc, idx_byset_out]
-
-                    # 2. Compute the input indices
-                    iproc = self.comm.rank
-                    ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    delta = np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind1 += delta
-                    ind2 += (delta + sizes_in[iproc, idx_byset_in])
-                    input_inds = np.arange(ind1, ind2, dtype=INT_DTYPE)
-
-                    # Now the indices are ready - input_inds, output_inds
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key].append(input_inds)
-                    xfer_out[key].append(output_inds)
-
-                    isub = abs2isub['input'][abs_in]
-                    fwd_xfer_in[isub][key].append(input_inds)
-                    fwd_xfer_out[isub][key].append(output_inds)
-                    if abs_out in abs2isub['output']:
-                        isub = abs2isub['output'][abs_out]
-                        rev_xfer_in[isub][key].append(input_inds)
-                        rev_xfer_out[isub][key].append(output_inds)
-
-            for set_name_in in self._num_var_byset[vec_name]['input']:
-                for set_name_out in self._num_var_byset[vec_name]['output']:
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key] = merge(xfer_in[key])
-                    xfer_out[key] = merge(xfer_out[key])
-                    for isub in range(nsub_allprocs):
-                        fwd_xfer_in[isub][key] = merge(fwd_xfer_in[isub][key])
-                        fwd_xfer_out[isub][key] = merge(fwd_xfer_out[isub][key])
-                        rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
-                        rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
-
-            out_vec = vectors['output'][vec_name]
-            transfer_class = out_vec.TRANSFER
-
-            transfers[vec_name] = {}
-            xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
-                                      xfer_in, xfer_out, self.comm)
-            transfers[vec_name]['fwd', None] = xfer_all
-            transfers[vec_name]['rev', None] = xfer_all
-            for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
-                transfers[vec_name]['rev', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
-
-        transfers['nonlinear'] = transfers['linear']
+        transfer_class._setup_transfers(self, recurse=recurse)
 
     def add(self, name, subsys, promotes=None):
         """

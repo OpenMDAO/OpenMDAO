@@ -21,6 +21,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
 from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
@@ -238,6 +239,8 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _vector_class : class
+        Class to use for data vectors.  If not specified, inherits vector class from parent.
     """
 
     def __init__(self, **kwargs):
@@ -364,6 +367,8 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+
+        self._vector_class = None
 
     def _check_reconf(self):
         """
@@ -533,6 +538,9 @@ class System(object):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
+        if self._vector_class is not None:
+            vector_class = self._vector_class
+
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
         self._root_vecs = root_vectors = {'input': OrderedDict(),
@@ -772,7 +780,7 @@ class System(object):
         root_vectors = self._get_root_vectors(vector_class, initial,
                                               force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
-        self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
+        self._setup_bounds(*self._get_bounds_root_vectors(DefaultVector, initial), resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -1296,7 +1304,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._transfers = {}
+        pass
 
     def _setup_solvers(self, recurse=True):
         """
