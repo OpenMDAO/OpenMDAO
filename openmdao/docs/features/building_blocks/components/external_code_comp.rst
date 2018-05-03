@@ -2,9 +2,9 @@
 
 .. _externalcodecomp_feature:
 
-**************************
-ExternalCodeComp Component
-**************************
+****************
+ExternalCodeComp
+****************
 
 ExternalCodeComp is a component that runs an external program in a subprocess on your operating system.
 
@@ -135,4 +135,4 @@ Again, we can perform an optimization using the external code with derivatives:
     :layout: interleave
 
 
-.. tags:: ExternalCodeComp, FileWrapping
+.. tags:: ExternalCodeComp, FileWrapping, Component

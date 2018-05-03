@@ -1,5 +1,7 @@
 .. index:: Linear System Example
 
-***********************
-LinearSystem Component
-***********************
+****************
+LinearSystemComp
+****************
+
+.. tags:: LinearSystemComp, Component
