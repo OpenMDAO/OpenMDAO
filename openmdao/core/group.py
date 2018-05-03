@@ -72,7 +72,10 @@ class Group(System):
         """
         Build this group.
 
-        This method should be overidden by your Group's method.
+        This method should be overidden by your Group's method. The reason for using this
+        method to add subsystem is to save memory and setup time when using your Group
+        while running under MPI.  This avoids the creation of systems that will not be
+        used in the current process.
 
         You may call 'add_subsystem' to add systems to this group. You may also issue connections,
         and set the linear and nonlinear solvers for this group level. You cannot safely change
