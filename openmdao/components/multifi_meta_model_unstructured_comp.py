@@ -136,7 +136,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
                                                flat_src_indices=flat_src_indices, units=units,
                                                desc=desc, var_set=var_set)
-        if self.metadata['vec_size'] > 1:
+        if self.options['vec_size'] > 1:
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size

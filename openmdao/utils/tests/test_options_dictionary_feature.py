@@ -9,7 +9,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
     def test_simple(self):
         from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.metadata_feature_vector import VectorDoublingComp
+        from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 
         prob = Problem()
         prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
@@ -25,7 +25,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
     def test_simple_fail(self):
         from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.metadata_feature_vector import VectorDoublingComp
+        from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 
         prob = Problem()
         prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
@@ -35,11 +35,11 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "Entry 'size' is required but has not been set.")
+            self.assertEqual(str(err), "Option 'size' is required but has not been set.")
 
     def test_with_default(self):
         from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.metadata_feature_lincomb import LinearCombinationComp
+        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
 
         prob = Problem()
         prob.model.add_subsystem('inputs', IndepVarComp('x'))
@@ -57,7 +57,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         import numpy as np
 
         from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.metadata_feature_array import ArrayMultiplyComp
+        from openmdao.test_suite.components.options_feature_array import ArrayMultiplyComp
 
         prob = Problem()
         prob.model.add_subsystem('inputs', IndepVarComp('x', 1.))
@@ -74,7 +74,7 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
 
     def test_simple_function(self):
         from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.metadata_feature_function import UnitaryFunctionComp
+        from openmdao.test_suite.components.options_feature_function import UnitaryFunctionComp
 
         def my_func(x):
             return x*2

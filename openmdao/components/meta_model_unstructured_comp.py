@@ -97,7 +97,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata for added variable
         """
         metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
@@ -141,7 +141,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata for added variable
         """
         metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:

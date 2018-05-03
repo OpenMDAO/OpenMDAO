@@ -66,11 +66,11 @@ If we had not promoted `pz.z`, we would use:
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
 
-If a user would like to access the user-defined metadata on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. The case recorder does need to be explicitly added to a system in order for its metadata to be recorded. System metadata stored in `system_metadata` is accessed by system name where each system has two keys: `component_metadata` for accessing the user-defined metadata and `scaling_factors`. Accessing this data for `pz` would look like:
+If a user would like to access the user-defined options on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. The case recorder does need to be explicitly added to a system in order for its metadata to be recorded. System metadata stored in `system_metadata` is accessed by system name where each system has two keys: `component_metadata` for accessing the user-defined options and `scaling_factors`. Accessing this data for `pz` would look like:
 
 .. code-block:: console
 
-    pz.metadata.declare('test data', True)
+    pz.options.declare('test data', True)
     ...
     pz_metadata = cr.system_metadata['pz']['component_metadata']
     test_data_value = pz_metadata['test data']

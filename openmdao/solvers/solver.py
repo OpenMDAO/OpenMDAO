@@ -133,8 +133,6 @@ class Solver(object):
         Options dictionary.
     recording_options : <OptionsDictionary>
         Recording options dictionary.
-    metadata : dict
-        Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
@@ -206,7 +204,6 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
-        self.metadata = {}
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
@@ -581,8 +578,6 @@ class NonlinearSolver(Solver):
         Options dictionary.
     recording_options : <OptionsDictionary>
         Recording options dictionary.
-    metadata : dict
-        Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.

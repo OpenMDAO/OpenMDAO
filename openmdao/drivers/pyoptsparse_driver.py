@@ -211,9 +211,6 @@ class pyOptSparseDriver(Driver):
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
 
-        # Metadata Setup
-        self.metadata = create_local_meta(optimizer)
-
         # Only need initial run if we have linear constraints.
         con_meta = self._cons
         if np.any([con['linear'] for con in itervalues(self._cons)]):

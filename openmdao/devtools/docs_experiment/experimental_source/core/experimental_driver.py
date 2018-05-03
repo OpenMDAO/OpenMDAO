@@ -138,15 +138,6 @@ class Driver(object):
 
         self.fail = False
 
-    @property
-    def metadata(self):
-        """
-        Get the options for this Driver.
-        """
-        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use 'options' instead.")
-        return self.options
-
     def add_recorder(self, recorder):
         """
         Add a recorder to the driver.

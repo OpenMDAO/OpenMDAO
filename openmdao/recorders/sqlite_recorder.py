@@ -390,10 +390,10 @@ class SqliteRecorder(BaseRecorder):
         # create a copy of the system's metadata excluding what is in 'metadata_excludes'
         user_metadata = OptionsDictionary()
         excludes = recording_requester.recording_options['metadata_excludes']
-        for key in recording_requester.metadata._dict:
+        for key in recording_requester.options._dict:
             if check_path(key, [], excludes, True):
-                user_metadata._dict[key] = recording_requester.metadata._dict[key]
-        user_metadata._read_only = recording_requester.metadata._read_only
+                user_metadata._dict[key] = recording_requester.options._dict[key]
+        user_metadata._read_only = recording_requester.options._read_only
         pickled_metadata = pickle.dumps(user_metadata, self._pickle_version)
 
         path = recording_requester.pathname

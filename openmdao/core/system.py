@@ -55,6 +55,10 @@ class System(object):
         Global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
+    options : OptionsDictionary
+        options dictionary
+    recording_options : OptionsDictionary
+        Recording options dictionary
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -227,10 +231,6 @@ class System(object):
         True if this system has input scaling.
     _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
-    options : OptionsDictionary
-        options dictionary
-    recording_options : OptionsDictionary
-        Recording options dictionary
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
     _norm0: float
@@ -1595,14 +1595,14 @@ class System(object):
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
 
-    @property
-    def metadata(self):
-        """
-        Get the options for this System.
-        """
-        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use 'options' instead.")
-        return self.options
+    # @property
+    # def metadata(self):
+    #     """
+    #     Get the options for this System.
+    #     """
+    #     warn_deprecation("The 'metadata' attribute provides backwards compatibility "
+    #                      "with earlier version of OpenMDAO; use 'options' instead.")
+    #     return self.options
 
     @property
     def jacobian(self):

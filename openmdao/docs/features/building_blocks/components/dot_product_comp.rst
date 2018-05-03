@@ -21,7 +21,7 @@ and the output :math:`c`, as well as specifying their units.
 .. embed-options::
     openmdao.components.dot_product_comp
     DotProductComp
-    metadata
+    options
 
 In the following example DotProductComp is used to compute instantaneous power as the
 dot product of force and velocity at 100 points simultaneously.  Note the use of

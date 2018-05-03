@@ -21,7 +21,7 @@ and the output :math:`c`, as well as specifying their units.
 .. embed-options::
     openmdao.components.matrix_vector_product_comp
     MatrixVectorProductComp
-    metadata
+    options
 
 The following code demonstrates the use of the MatrixVectorProductComp, finding the product
 of a random 3x3 matrix `M` and a 3-vector `x` at 100 points simultaneously.

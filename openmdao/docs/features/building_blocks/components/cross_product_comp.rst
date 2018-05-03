@@ -27,7 +27,7 @@ and the output :math:`c`, as well as specifying their units.
 .. embed-options::
     openmdao.components.cross_product_comp
     CrossProductComp
-    metadata
+    options
 
 In the following example DotProductComp is used to compute torque as the
 cross product of force (:math:`F`) and radius (:math:`r`) at 100 points simultaneously.
