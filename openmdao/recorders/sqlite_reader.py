@@ -10,7 +10,7 @@ import numpy as np
 
 from collections import OrderedDict
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import DriverCase, SystemCase, SolverCase
+from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, PromotedToAbsoluteMap
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
@@ -39,7 +39,11 @@ class SqliteCaseReader(BaseCaseReader):
     ----------
     format_version : int
         The version of the format assumed when loading the file.
-    abs2meta : dict
+    output2meta : dict
+        Dictionary mapping output variables to their metadata
+    input2meta : dict
+        Dictionary mapping input variables to their metadata
+    _abs2meta : dict
         Dictionary mapping variables to their metadata
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
@@ -73,17 +77,22 @@ class SqliteCaseReader(BaseCaseReader):
             self.format_version = row[0]
             self._abs2prom = None
             self._prom2abs = None
-            self.abs2meta = None
+            self._abs2meta = None
 
             if PY2:
                 self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
                 self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
-                self.abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
+                self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
             if PY3:
                 self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
                 self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
-                self.abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
         con.close()
+
+        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
+                                                 self._abs2prom, True)
+        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
+                                                self._abs2prom, False)
 
         self._load()
 
@@ -98,13 +107,12 @@ class SqliteCaseReader(BaseCaseReader):
         The `iterations` table is read to load the keys which identify
         the individual cases/iterations from the recorded file.
         """
-        self.driver_cases = DriverCases(self.filename)
-        self.system_cases = SystemCases(self.filename)
-        self.solver_cases = SolverCases(self.filename)
-
-        self.driver_cases._prom2abs = self._prom2abs
-        self.system_cases._prom2abs = self._prom2abs
-        self.solver_cases._prom2abs = self._prom2abs
+        self.driver_cases = DriverCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
+        self.system_cases = SystemCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
+        self.solver_cases = SolverCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
 
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
@@ -134,17 +142,17 @@ class SqliteCaseReader(BaseCaseReader):
                     if PY3:
                         self.driver_metadata = pickle.loads(row[0])
 
-                cur.execute("SELECT id, scaling_factors, user_metadata FROM system_metadata")
+                cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
                 for row in cur:
                     id = row[0]
                     self.system_metadata[id] = {}
 
                     if PY2:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
-                        self.system_metadata[id]['user_metadata'] = pickle.loads(str(row[2]))
+                        self.system_metadata[id]['component_metadata'] = pickle.loads(str(row[2]))
                     if PY3:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
-                        self.system_metadata[id]['user_metadata'] = pickle.loads(row[2])
+                        self.system_metadata[id]['component_metadata'] = pickle.loads(row[2])
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:
@@ -330,6 +338,7 @@ class SqliteCaseReader(BaseCaseReader):
         return self._coordinate_split_re.split(coordinate)
 
     def list_inputs(self,
+                    case=None,
                     values=True,
                     units=False,
                     hierarchical=True,
@@ -342,6 +351,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
+        case : Case, optional
+            The case whose inputs will be listed. If None, gives all inputs. Defaults to None.
         values : bool, optional
             When True, display/return input values. Default is True.
         units : bool, optional
@@ -363,8 +374,11 @@ class SqliteCaseReader(BaseCaseReader):
         list
             list of input names and other optional information about those inputs
         """
-        meta = self.abs2meta
-        sys_vars = self._get_all_sysvars(False)
+        meta = self._abs2meta
+        if case is None:
+            sys_vars = self._get_all_sysvars(False)
+        else:
+            sys_vars = self._get_case_sysvars(case, False)
         inputs = []
 
         if sys_vars is not None and len(sys_vars) > 0:
@@ -392,6 +406,7 @@ class SqliteCaseReader(BaseCaseReader):
         return inputs
 
     def list_outputs(self,
+                     case=None,
                      explicit=True, implicit=True,
                      values=True,
                      residuals=False,
@@ -410,6 +425,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
+        case : Case, optional
+            The case whose outputs will be listed. If None, gives all outputs. Defaults to None.
         explicit : bool, optional
             include outputs from explicit components. Default is True.
         implicit : bool, optional
@@ -447,10 +464,16 @@ class SqliteCaseReader(BaseCaseReader):
         list
             list of output names and other optional information about those outputs
         """
-        meta = self.abs2meta
+        meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []
         sys_vars = self._get_all_sysvars()
+
+        if case is None:
+            sys_vars = self._get_all_sysvars()
+        else:
+            sys_vars = self._get_case_sysvars(case)
+
         if sys_vars is not None and len(sys_vars) > 0:
             for name in sys_vars:
                 if residuals_tol and residuals_vars is not None and\
@@ -473,7 +496,7 @@ class SqliteCaseReader(BaseCaseReader):
                     outs['ref'] = meta[name]['ref']
                     outs['ref0'] = meta[name]['ref0']
                     outs['res_ref'] = meta[name]['res_ref']
-                if meta[name]['type'] == 'Explicit':
+                if meta[name]['explicit']:
                     expl_outputs.append((name, outs))
                 else:
                     impl_outputs.append((name, outs))
@@ -505,6 +528,44 @@ class SqliteCaseReader(BaseCaseReader):
             return impl_outputs
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def _get_case_sysvars(self, case, get_outputs=True):
+        """
+        Get the set of output or input variables and their values for a given case.
+
+        Parameters
+        ----------
+        case : Case
+            The case whose variables will be returned.
+        get_outputs : bool, optional
+            indicates if the returned set should contain outputs. If false, returns inputs.
+
+        Returns
+        -------
+        dictionary
+            dictionary of global variable names to their values. None if no system iterations
+            were recorded.
+        """
+        variables = {}
+        if get_outputs and case.outputs is None:
+            return variables
+
+        outputs = case.outputs._values if case.outputs is not None else None
+        residuals = case.residuals._values if case.residuals is not None else None
+        inputs = case.inputs._values if case.inputs is not None else None
+        if get_outputs:
+            for var_name in outputs.dtype.names:
+                variables[var_name] = {'value': outputs[var_name]}
+                if residuals is not None and var_name in residuals.dtype.names:
+                    variables[var_name]['residuals'] = residuals[var_name]
+                else:
+                    variables[var_name]['residuals'] = 'Not Recorded'
+        elif inputs is not None:
+            for var_name in inputs.dtype.names:
+                if var_name not in variables:
+                    variables[var_name] = {'value': inputs[var_name]}
+
+        return variables
 
     def _get_all_sysvars(self, get_outputs=True):
         """
@@ -561,8 +622,7 @@ class SqliteCaseReader(BaseCaseReader):
                 if get_outputs:
                     for var_name in outputs.dtype.names:
                         if var_name not in variables:
-                            if get_outputs:
-                                variables[var_name] = {'value': outputs[var_name]}
+                            variables[var_name] = {'value': outputs[var_name]}
                             if residuals is not None and var_name in residuals.dtype.names:
                                 variables[var_name]['residuals'] = residuals[var_name]
                             else:
@@ -626,7 +686,7 @@ class SqliteCaseReader(BaseCaseReader):
             return
 
         # Only local metadata but the most complete
-        meta = self.abs2meta
+        meta = self._abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()
@@ -672,18 +732,15 @@ class DriverCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        idx, counter, iteration_coordinate, timestamp, success, msg, desvars_blob, responses_blob, \
-            objectives_blob, constraints_blob, sysincludes_blob = row
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
+            outputs_blob, = row
 
-        desvars_array = blob_to_array(desvars_blob)
-        responses_array = blob_to_array(responses_blob)
-        objectives_array = blob_to_array(objectives_blob)
-        constraints_array = blob_to_array(constraints_blob)
-        sysincludes_array = blob_to_array(sysincludes_blob)
+        inputs_array = blob_to_array(inputs_blob)
+        outputs_array = blob_to_array(outputs_blob)
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          desvars_array, responses_array, objectives_array, constraints_array,
-                          sysincludes_array, self._prom2abs)
+                          inputs_array, outputs_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case
 
@@ -727,7 +784,8 @@ class SystemCases(BaseCases):
         residuals_array = blob_to_array(residuals_blob)
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          inputs_array, outputs_array, residuals_array, self._prom2abs)
+                          inputs_array, outputs_array, residuals_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case
 
@@ -763,12 +821,14 @@ class SolverCases(BaseCases):
         con.close()
 
         idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-            output_blob, residuals_blob = row
+            input_blob, output_blob, residuals_blob = row
 
+        input_array = blob_to_array(input_blob)
         output_array = blob_to_array(output_blob)
         residuals_array = blob_to_array(residuals_blob)
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          abs_err, rel_err, output_array, residuals_array, self._prom2abs)
+                          abs_err, rel_err, input_array, output_array, residuals_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case

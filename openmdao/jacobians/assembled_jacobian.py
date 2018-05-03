@@ -1,7 +1,6 @@
 """Define the AssembledJacobian class."""
 from __future__ import division, print_function
 
-import sys
 from collections import defaultdict
 
 from six import iteritems
@@ -13,9 +12,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.units import get_conversion
-from openmdao.utils.name_maps import key2abs_key
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -24,9 +21,6 @@ SUBJAC_META_DEFAULTS = {
     'approx': None,
     'dependent': False,
 }
-
-# TODO : AssembledJacobians currently don't work with some of the more advanced derivatives
-# features, including Matrix-Matrix, Parallel Derivatives, and Multiple Varsets.
 
 
 class AssembledJacobian(Jacobian):
@@ -47,33 +41,33 @@ class AssembledJacobian(Jacobian):
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
+    _matrix_class : type
+        Class used to create Matrix objects.
     _subjac_iters : dict
         Mapping of system pathname to tuple of lists of absolute key tuples used to index into
         the jacobian.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, matrix_class):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        **kwargs : dict
-            options dictionary.
+        matrix_class : type
+            Class to use to create internal matrices.
         """
         global Component
         # avoid circular imports
         from openmdao.core.component import Component
 
         super(AssembledJacobian, self).__init__()
-        self.options.declare('matrix_class', default=DenseMatrix,
-                             desc='<Matrix> class to use in this <Jacobian>.')
-        self.options.update(kwargs)
         self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
         self._keymap = {}
         self._mask_caches = {}
+        self._matrix_class = matrix_class
 
         self._subjac_iters = defaultdict(lambda: None)
 
@@ -116,43 +110,18 @@ class AssembledJacobian(Jacobian):
 
         abs2meta = system._var_abs2meta
 
-        self._int_mtx = int_mtx = self.options['matrix_class'](system.comm)
-        ext_mtx = self.options['matrix_class'](system.comm)
+        self._int_mtx = int_mtx = self._matrix_class(system.comm)
+        ext_mtx = self._matrix_class(system.comm)
 
-        out_ranges = {
+        out_ranges = self._out_ranges = {
             abs_name: self._get_var_range(abs_name, 'output') for abs_name in
                 system._var_allprocs_abs_names['output']
         }
 
-        in_ranges = {
+        in_ranges = self._in_ranges = {
             abs_name: self._get_var_range(abs_name, 'input') for abs_name in
                 system._var_allprocs_abs_names['input']
         }
-
-        # set up view ranges for all subsystems
-        for s in system.system_iter(recurse=True, include_self=True):
-            input_names = s._var_abs_names['input']
-            if input_names:
-                min_in_offset = in_ranges[input_names[0]][0]
-                max_in_offset = in_ranges[input_names[-1]][1]
-            else:
-                min_in_offset = sys.maxsize
-                max_in_offset = 0
-
-            output_names = s._var_abs_names['output']
-            if output_names:
-                min_res_offset = out_ranges[output_names[0]][0]
-                max_res_offset = out_ranges[output_names[-1]][1]
-            else:
-                min_res_offset = sys.maxsize
-                max_res_offset = 0
-
-            self._view_ranges[s.pathname] = (
-                min_res_offset, max_res_offset, min_in_offset, max_in_offset)
-
-        # # keep track of mapped keys to check for corner case where one source connects to
-        # # multiple inputs using src_indices on the same component.
-        # mapped_keys = {}
 
         abs2prom_out = system._var_abs2prom['output']
         conns = system._conn_global_abs_in2out
@@ -161,8 +130,6 @@ class AssembledJacobian(Jacobian):
 
         # create the matrix subjacs
         for abs_key, (info, shape) in iteritems(self._subjacs_info):
-            if not info['dependent']:
-                continue
             res_abs_name, wrt_abs_name = abs_key
             # because self._subjacs_info is shared among all 'related' assembled jacs,
             # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
@@ -229,9 +196,9 @@ class AssembledJacobian(Jacobian):
         abs2meta = system._var_abs2meta
         ranges = self._view_ranges[system.pathname]
 
-        ext_mtx = self.options['matrix_class'](system.comm)
+        ext_mtx = self._matrix_class(system.comm)
 
-        in_ranges = {n: self._get_var_range(n, 'input')[0] for n in
+        in_offset = {n: self._get_var_range(n, 'input')[0] for n in
                      system._var_allprocs_abs_names['input']}
 
         subjacs_info = self._subjacs_info
@@ -245,15 +212,12 @@ class AssembledJacobian(Jacobian):
                     if in_abs_name not in system._conn_global_abs_in2out:
                         abs_key = (res_abs_name, in_abs_name)
 
-                        if abs_key in subjacs_info:
-                            info, shape = subjacs_info[abs_key]
-                            if not info['dependent']:
-                                continue
-                        else:
+                        if abs_key not in subjacs_info:
                             continue
 
+                        info, shape = subjacs_info[abs_key]
                         ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
-                                            in_ranges[in_abs_name] - ranges[2], None, shape)
+                                            in_offset[in_abs_name] - ranges[2], None, shape)
 
         sizes = system._var_sizes
         iproc = system.comm.rank
@@ -353,8 +317,11 @@ class AssembledJacobian(Jacobian):
         else:
             ext_mtx = None
 
-        ranges = self._view_ranges[system.pathname]
-        int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
+        if system._views_assembled_jac:
+            ranges = self._view_ranges[system.pathname]
+            int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
+        else:
+            int_ranges = None
 
         # TODO: remove the _unscaled_context call here (and in DictionaryJacobian)
         # and do it outside so that we can avoid an unnecessary extra unscaling/rescaling
@@ -363,7 +330,6 @@ class AssembledJacobian(Jacobian):
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 if d_outputs._names and d_residuals._names:
-
                     d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
@@ -372,79 +338,26 @@ class AssembledJacobian(Jacobian):
                     try:
                         mask = self._mask_caches[d_inputs._names]
                     except KeyError:
-                        mask = _create_mask_cache(d_inputs, ext_mtx)
+                        mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
-                    if mask is not None:
-                        inputs_masked = np.ma.array(d_inputs.get_data(), mask=mask)
-
-                        # Use the special dot product function from masking module so that we
-                        # ignore masked parts.
-                        d_residuals.iadd_data(np.ma.dot(ext_mtx._matrix, inputs_masked))
-
-                    else:
-                        d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None))
+                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None, mask=mask))
 
             else:  # rev
                 dresids = d_residuals.get_data()
                 if d_outputs._names and d_residuals._names:
-
                     d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
                     # Masking
                     try:
-                        mask_cols = self._mask_caches[d_inputs._names]
+                        mask = self._mask_caches[d_inputs._names]
                     except KeyError:
-                        mask_cols = _create_mask_cache(d_inputs, ext_mtx)
-                        self._mask_caches[d_inputs._names] = mask_cols
+                        mask = ext_mtx._create_mask_cache(d_inputs)
+                        self._mask_caches[d_inputs._names] = mask
 
-                    if mask_cols is not None:
-                        # Mask need to be applied to ext_mtx so that we can ignore multiplication
-                        # by certain columns.
-                        mask = np.zeros(ext_mtx._matrix.T.shape, dtype=np.bool)
-                        mask[mask_cols, :] = True
-                        masked_mtx = np.ma.array(ext_mtx._matrix, mask=mask, fill_value=0.0)
-
-                        masked_product = np.ma.dot(masked_mtx.T, dresids).flatten()
-
-                        for set_name, data in iteritems(d_inputs._data):
-                            data += np.ma.filled(masked_product, fill_value=0.0)
-
-                    else:
-                        d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None))
-
-
-def _create_mask_cache(d_inputs, ext_mtx):
-    """
-    Create masking array for d_inputs vector.
-
-    Parameters
-    ----------
-    d_inputs : Vector
-        The inputs linear vector.
-    ext_mtx : Matrix
-        External matrix.
-
-    Returns
-    -------
-    ndarray or None
-        The mask array or None.
-    """
-    if len(d_inputs._views) > len(d_inputs._names):
-        mask = np.zeros(d_inputs._data[0].shape, dtype=np.bool)
-        sub = d_inputs._names
-        for name in d_inputs._views:
-            if name not in sub:
-                # TODO: For now, we figure out where each variable in the matrix is using
-                # the matrix metadata, but this is not ideal. The framework does not provide
-                # this information cleanly, but an upcoming refactor will address this.
-                for key, val in iteritems(ext_mtx._metadata):
-                    if key[1] == name:
-                        mask[val[1]] = True
-                        continue
-        return mask
+                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask))
 
 
 class DenseJacobian(AssembledJacobian):
@@ -452,17 +365,11 @@ class DenseJacobian(AssembledJacobian):
     Assemble dense global <Jacobian>.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(DenseJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = DenseMatrix
+        super(DenseJacobian, self).__init__(matrix_class=DenseMatrix)
 
 
 class COOJacobian(AssembledJacobian):
@@ -470,17 +377,11 @@ class COOJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Coordinate list format.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(COOJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = COOMatrix
+        super(COOJacobian, self).__init__(matrix_class=COOMatrix)
 
 
 class CSRJacobian(AssembledJacobian):
@@ -488,17 +389,11 @@ class CSRJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Row Storage format.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(CSRJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = CSRMatrix
+        super(CSRJacobian, self).__init__(matrix_class=CSRMatrix)
 
 
 class CSCJacobian(AssembledJacobian):
@@ -506,14 +401,8 @@ class CSCJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Col Storage format.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
-        super(CSCJacobian, self).__init__(**kwargs)
-        self.options['matrix_class'] = CSCMatrix
+        super(CSCJacobian, self).__init__(matrix_class=CSCMatrix)

@@ -12,7 +12,6 @@ from six.moves import cPickle as pickle
 
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.utils.mpi import MPI
-
 from openmdao.utils.record_util import values_to_array, check_path
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
@@ -88,13 +87,15 @@ class SqliteRecorder(BaseRecorder):
     _abs2meta : {'name': {}}
         Dictionary mapping absolute variable names to their metadata including units,
         bounds, and scaling.
-    _open_close_sqlite: bool
+    _open_close_sqlite : bool
         If True, open, write, and close the sqlite file. Needed for when running under MPI.
-    _pickle_version: int
+    _pickle_version : int
         The pickle protocol version to use when pickling metadata.
+    _all_procs : bool
+        If True, write to a separate sqlite file on each processor.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=2):
+    def __init__(self, filepath, append=False, pickle_version=2, all_procs=False):
         """
         Initialize the SqliteRecorder.
 
@@ -106,10 +107,12 @@ class SqliteRecorder(BaseRecorder):
             Optional. If True, append to an existing case recorder file.
         pickle_version : int
             Optional. The pickle protocol version to use when pickling metadata.
+        all_procs : bool
+            If True, run on all procs and write to a separate file on each processor.
         """
         super(SqliteRecorder, self).__init__()
 
-        if MPI and MPI.COMM_WORLD.rank > 0:
+        if MPI and MPI.COMM_WORLD.rank > 0 and not all_procs:
             self._open_close_sqlite = False
         else:
             self._open_close_sqlite = True
@@ -119,6 +122,11 @@ class SqliteRecorder(BaseRecorder):
         self._prom2abs = {'input': {}, 'output': {}}
         self._abs2meta = {}
         self._pickle_version = pickle_version
+        self._all_procs = all_procs
+
+        if all_procs:
+            self._parallel = True
+            filepath = '%s_%d' % (filepath, MPI.COMM_WORLD.rank)
 
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
@@ -142,8 +150,7 @@ class SqliteRecorder(BaseRecorder):
                                     "record_type TEXT, rowid INT)")
                 self.cursor.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                                     "counter INT,iteration_coordinate TEXT, timestamp REAL, "
-                                    "success INT, msg TEXT, desvars BLOB, responses BLOB, "
-                                    "objectives BLOB, constraints BLOB, sysincludes BLOB)")
+                                    "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
                 self.cursor.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                                     "counter INT, iteration_coordinate TEXT,  timestamp REAL, "
                                     "success INT, msg TEXT, inputs BLOB, outputs BLOB, "
@@ -151,12 +158,13 @@ class SqliteRecorder(BaseRecorder):
                 self.cursor.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                                     "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                                     "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
-                                    "solver_output BLOB, solver_residuals BLOB)")
+                                    "solver_inputs BLOB, solver_output BLOB, "
+                                    "solver_residuals BLOB)")
 
                 self.cursor.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                                     "model_viewer_data BLOB)")
                 self.cursor.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                                    "scaling_factors BLOB, user_metadata BLOB)")
+                                    "scaling_factors BLOB, component_metadata BLOB)")
                 self.cursor.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                                     "solver_options BLOB, solver_class TEXT)")
 
@@ -190,13 +198,37 @@ class SqliteRecorder(BaseRecorder):
                     self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
                                                  set(system._var_allprocs_prom2abs_list[io][v]))
 
-        # grab all of the units
+        # grab all of the units and type
         states = system._list_states_allprocs()
-        for name in system._var_allprocs_abs2meta:
+        desvars = system.get_design_vars(True)
+        responses = system.get_responses(True)
+        objectives = system.get_objectives(True)
+        constraints = system.get_constraints(True)
+        inputs = system._var_allprocs_abs_names['input']
+        outputs = system._var_allprocs_abs_names['output']
+        full_var_set = [(inputs, 'input'), (outputs, 'output'),
+                        (desvars, 'desvar'), (responses, 'response'),
+                        (objectives, 'objective'), (constraints, 'constraint')]
+
+        for var_set, var_type in full_var_set:
+            for name in var_set:
+                if name not in self._abs2meta:
+                    self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
+                    self._abs2meta[name]['type'] = set()
+                    if name in states:
+                        self._abs2meta[name]['explicit'] = False
+
+                if var_type not in self._abs2meta[name]['type']:
+                    self._abs2meta[name]['type'].add(var_type)
+                self._abs2meta[name]['explicit'] = True
+
+        for name in inputs:
             self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-            self._abs2meta[name]['type'] = 'Explicit'
+            self._abs2meta[name]['type'] = set()
+            self._abs2meta[name]['type'].add('input')
+            self._abs2meta[name]['explicit'] = True
             if name in states:
-                self._abs2meta[name]['type'] = 'Implicit'
+                self._abs2meta[name]['explicit'] = False
 
         # store the updated abs2prom and prom2abs
         abs2prom = pickle.dumps(self._abs2prom)
@@ -220,42 +252,23 @@ class SqliteRecorder(BaseRecorder):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        desvars = data['des']
-        responses = data['res']
-        objectives = data['obj']
-        constraints = data['con']
-        sysvars = data['sys']
+        outputs = data['out']
+        inputs = data['in']
 
-        # Need to gather up the values from across the ranks, if MPI
-        # if MPI:
-        #     desvars = self._gather_vars(root, desvars)
-        #     responses = self._gather_vars(root, responses)
-        #     objectives = self._gather_vars(root, objectives)
-        #     constraints = self._gather_vars(root, constraints)
-        #     sysvars = self._gather_vars(root, sysvars)
+        if MPI is None or MPI.COMM_WORLD.rank == 0 or self._all_procs:
+            outputs_array = values_to_array(outputs)
+            inputs_array = values_to_array(inputs)
 
-        if MPI is None or MPI.COMM_WORLD.rank == 0:
-            desvars_array = values_to_array(desvars)
-            responses_array = values_to_array(responses)
-            objectives_array = values_to_array(objectives)
-            constraints_array = values_to_array(constraints)
-            sysvars_array = values_to_array(sysvars)
-
-            desvars_blob = array_to_blob(desvars_array)
-            responses_blob = array_to_blob(responses_array)
-            objectives_blob = array_to_blob(objectives_array)
-            constraints_blob = array_to_blob(constraints_array)
-            sysvars_blob = array_to_blob(sysvars_array)
+            outputs_blob = array_to_blob(outputs_array)
+            inputs_blob = array_to_blob(inputs_array)
 
             with self.con:
                 self.cursor.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
-                                    "timestamp, success, msg, desvars , responses , objectives , "
-                                    "constraints, sysincludes ) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                                    "timestamp, success, msg, inputs, outputs) "
+                                    "VALUES(?,?,?,?,?,?,?)",
                                     (self._counter, self._iteration_coordinate,
                                      metadata['timestamp'], metadata['success'],
-                                     metadata['msg'], desvars_blob,
-                                     responses_blob, objectives_blob,
-                                     constraints_blob, sysvars_blob))
+                                     metadata['msg'], inputs_blob, outputs_blob))
                 self.con.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                  ('driver', self.cursor.lastrowid))
 
@@ -310,24 +323,28 @@ class SqliteRecorder(BaseRecorder):
         """
         abs = data['abs']
         rel = data['rel']
+        inputs = data['i']
         outputs = data['o']
         residuals = data['r']
 
+        inputs_array = values_to_array(inputs)
         outputs_array = values_to_array(outputs)
         residuals_array = values_to_array(residuals)
 
+        inputs_blob = array_to_blob(inputs_array)
         outputs_blob = array_to_blob(outputs_array)
         residuals_blob = array_to_blob(residuals_array)
 
         with self.con:
             self.cursor.execute("INSERT INTO solver_iterations(counter, iteration_coordinate, "
-                                "timestamp, success, msg, abs_err, rel_err, solver_output, "
-                                "solver_residuals) VALUES(?,?,?,?,?,?,?,?,?)",
+                                "timestamp, success, msg, abs_err, rel_err, "
+                                "solver_inputs, solver_output, solver_residuals) "
+                                "VALUES(?,?,?,?,?,?,?,?,?,?)",
                                 (self._counter, self._iteration_coordinate,
                                  metadata['timestamp'],
                                  metadata['success'], metadata['msg'],
                                  abs, rel,
-                                 outputs_blob, residuals_blob))
+                                 inputs_blob, outputs_blob, residuals_blob))
 
             self.cursor.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                                 ('solver', self.cursor.lastrowid))
@@ -383,7 +400,7 @@ class SqliteRecorder(BaseRecorder):
         if not path:
             path = 'root'
         with self.con:
-            self.con.execute("INSERT INTO system_metadata(id, scaling_factors, user_metadata) \
+            self.con.execute("INSERT INTO system_metadata(id, scaling_factors, component_metadata) \
                               VALUES(?,?, ?)",
                              (path, sqlite3.Binary(scaling_factors),
                               sqlite3.Binary(pickled_metadata)))

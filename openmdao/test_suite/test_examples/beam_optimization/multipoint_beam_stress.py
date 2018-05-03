@@ -10,8 +10,8 @@ from six.moves import range
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
-from openmdao.components.interp import BsplinesComp
-from openmdao.components.ks import KSComponent
+from openmdao.components.bsplines_comp import BsplinesComp
+from openmdao.components.ks_comp import KSComp
 
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
@@ -150,7 +150,7 @@ class MultipointBeamGroup(Group):
                     'displacements_comp.displacements_%d' % k,
                     'stress_comp.displacements_%d' % k)
 
-                comp = KSComponent(width=num_elements)
+                comp = KSComp(width=num_elements)
                 comp.options['upper'] = max_bending
                 sub.add_subsystem('KS_%d' % k, comp)
 

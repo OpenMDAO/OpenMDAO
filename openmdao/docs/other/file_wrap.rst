@@ -11,7 +11,7 @@ Communicating with External Codes in OpenMDAO
 =============================================
 
 
-The :ref:`ExternalCode <externalcode_feature>` example describes how to
+The :ref:`ExternalCodeComp <externalcodecomp_feature>` example describes how to
 define a component that calls an external program to perform its computation,
 passing input and output values via files.
 
@@ -522,4 +522,4 @@ you should check your external application's manual to see if there is a flag fo
 telling the code to output the full precision.
 
 
-.. tags:: ExternalCode, FileWrapping
+.. tags:: ExternalCodeComp, FileWrapping

@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
 from openmdao.api import NewtonSolver, ScipyKrylov, NonlinearBlockGS, DirectSolver
-from openmdao.api import AssembledJacobian
+from openmdao.api import DenseJacobian
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -862,7 +862,7 @@ class TestScaling(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver()
 
-        model.jacobian = AssembledJacobian()
+        model.jacobian = DenseJacobian()
 
         prob.setup(check=False)
         prob.run_model()

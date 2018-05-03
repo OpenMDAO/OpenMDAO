@@ -69,6 +69,12 @@ For example, here is a simple component that takes the input and adds one to it.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_simple
     :layout: interleave
 
+You can also create an ExecComp with multiple outputs by placing the expressions in a list.
+
+.. embed-code::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_multi_output
+    :layout: interleave
+
 You can also declare an ExecComp with arrays for inputs and outputs, but when you do, you must also
 pass in a correctly-sized array as an argument to the ExecComp call. This can be the initial value
 in the case of unconnected inputs, or just an empty array with the correct size.
@@ -100,4 +106,4 @@ connection source.
     :layout: interleave
 
 
-.. tags:: ExecComp, Examples
+.. tags:: ExecComp, Component, Examples

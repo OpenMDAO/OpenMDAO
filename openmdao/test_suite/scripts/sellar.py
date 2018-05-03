@@ -3,7 +3,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockG
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 
 class SellarMDAConnect(Group):
-    
+
 
     def setup(self):
         indeps = self.add_subsystem('indeps', IndepVarComp())
@@ -14,7 +14,8 @@ class SellarMDAConnect(Group):
         d1 = cycle.add_subsystem('d1', SellarDis1())
         d2 = cycle.add_subsystem('d2', SellarDis2())
         cycle.connect('d1.y1', 'd2.y1')
-    
+        cycle.connect('d2.y2', 'd1.y2')
+
         ######################################
         # This is a "forgotten" connection!!
         ######################################
@@ -31,7 +32,7 @@ class SellarMDAConnect(Group):
 
         self.connect('indeps.x', ['cycle.d1.x', 'obj_cmp.x'])
         self.connect('indeps.z', ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
-        self.connect('cycle.d1.y1', ['obj_cmp.y1', 'con_cmp1.y1'])        
+        self.connect('cycle.d1.y1', ['obj_cmp.y1', 'con_cmp1.y1'])
         self.connect('cycle.d2.y2', ['obj_cmp.y2', 'con_cmp2.y2'])
 
 prob = Problem()

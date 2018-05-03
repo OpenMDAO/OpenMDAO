@@ -20,6 +20,9 @@ Single-Discipline Optimization
     first_analysis.rst
     first_optimization.rst
 
+
+.. _user_guide_multi_disciplinary_opt:
+
 ------------------------------
 Multidisciplinary Optimization
 ------------------------------
@@ -32,9 +35,9 @@ Multidisciplinary Optimization
     first_mdao.rst
 
 
-----------------------------------------
+---------------------------------------
 Using the OpenMDAO Command Line Utility
-----------------------------------------
+---------------------------------------
 
 .. toctree::
     :maxdepth: 1

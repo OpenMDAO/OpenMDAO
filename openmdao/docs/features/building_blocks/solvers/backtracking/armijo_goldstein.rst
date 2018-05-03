@@ -1,8 +1,8 @@
-.. _feature_amijo_goldstein:
+.. _feature_armijo_goldstein:
 
-****************
-Armijo-Goldstein
-****************
+*****************
+ArmijoGoldsteinLS
+*****************
 
 ArmijoGoldsteinLS checks bounds and backtracks to a point that satisfies them. From there,
 further backtracking is performed, until the termination criteria are satisfied.
@@ -17,8 +17,8 @@ a system that contains an implicit component with 3 states that are confined to 
     :layout: interleave
 
 
-Armijo-Goldstein Options
-------------------------
+ArmijoGoldsteinLS Options
+-------------------------
 
 .. embed-options::
     openmdao.solvers.linesearch.backtracking
@@ -26,8 +26,8 @@ Armijo-Goldstein Options
     options
 
 
-Armijo-Goldstein Option Examples
---------------------------------
+ArmijoGoldsteinLS Option Examples
+---------------------------------
 
 **bound_enforcement**
 
@@ -126,4 +126,4 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   the component explicitly raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
   If you would rather terminate on an AnalysisError, you can set this option to False.
 
-.. tags:: linesearch, backtracking
+.. tags:: Solver, linesearch, backtracking

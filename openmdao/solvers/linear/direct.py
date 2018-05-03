@@ -44,6 +44,9 @@ def format_singluar_error(err, system, mtx):
 
     loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
 
+    # Lapack:DGETRF outputs INFO, which uses fortran numbering.
+    loc -= 1
+
     col_norm = np.linalg.norm(mtx[:, loc - 1])
     row_norm = np.linalg.norm(mtx[loc - 1, :])
 
@@ -55,10 +58,9 @@ def format_singluar_error(err, system, mtx):
     n = 0
     varname = "Unknown"
     for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
+        n += len(system._outputs._views_flat[name])
         if loc <= n:
-            varname = relname
+            varname = name
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -133,8 +135,11 @@ class DirectSolver(LinearSolver):
             mtx = system._jacobian._int_mtx
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
-                ranges = system._jacobian._view_ranges[system.pathname]
-                matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                if system._views_assembled_jac:
+                    ranges = system._jacobian._view_ranges[system.pathname]
+                    matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                else:
+                    matrix = mtx._matrix
 
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
@@ -149,14 +154,15 @@ class DirectSolver(LinearSolver):
                         raise RuntimeError(format_singluar_error(err, system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                ranges = system._jacobian._view_ranges[system.pathname]
-                matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                if system._views_assembled_jac:
+                    ranges = system._jacobian._view_ranges[system.pathname]
+                    matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+                else:
+                    matrix = mtx._matrix
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        ranges = system._jacobian._view_ranges[system.pathname]
-                        matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
                         raise RuntimeError(format_singluar_csc_error(system, matrix))
                     else:
                         reraise(*sys.exc_info())

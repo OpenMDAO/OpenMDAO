@@ -10,7 +10,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
-from openmdao.components.interp import BsplinesComp
+from openmdao.components.bsplines_comp import BsplinesComp
 
 from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import MultiComplianceComp
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp

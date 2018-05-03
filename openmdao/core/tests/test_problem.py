@@ -1,8 +1,9 @@
 """ Unit tests for the problem interface."""
 
+import sys
 import unittest
 import warnings
-from six import assertRaisesRegex
+from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 
@@ -12,7 +13,7 @@ from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlo
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
 class TestProblem(unittest.TestCase):
@@ -1190,6 +1191,153 @@ class TestProblem(unittest.TestCase):
         finally:
             Problem._post_setup_func = None
 
+    def test_list_problem_vars(self):
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        # First, with no options
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertEquals(output[1], 'Design Variables')
+        assertRegex(self, output[5], '^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertEquals(output[9], 'Constraints')
+        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[17], 'Objectives')
+        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+
+
+        # With show_promoted_name=False
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(show_promoted_name=False)
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        assertRegex(self, output[5], '^z +\|[0-9. e+-]+\| +2')
+        assertRegex(self, output[14], '^con2 +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[21], '^obj +\[[0-9. e+-]+\] +1')
+
+        # With all the optional columns
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(
+                                   desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                                'indices', 'adder', 'scaler',
+                                                'parallel_deriv_color',
+                                                'vectorize_derivs', 'simul_deriv_color',
+                                                'cache_linear_solution'],
+                                   cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                              'indices', 'adder', 'scaler', 'linear',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   objs_opts=['ref', 'ref0',
+                                              'indices', 'adder', 'scaler',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   )
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        assertRegex(self, output[3],'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
+                         'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
+                         'vectorize_derivs\s+simul_deriv_color\s+cache_linear_solution')
+        assertRegex(self, output[5],'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                         'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
+
+        # With all the optional columns and print_arrays
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.list_problem_vars(print_arrays=True,
+                                   desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                                'indices', 'adder', 'scaler',
+                                                'parallel_deriv_color',
+                                                'vectorize_derivs', 'simul_deriv_color',
+                                                'cache_linear_solution'],
+                                   cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                              'indices', 'adder', 'scaler', 'linear',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   objs_opts=['ref', 'ref0',
+                                              'indices', 'adder', 'scaler',
+                                              'parallel_deriv_color',
+                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'cache_linear_solution'],
+                                   )
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        assertRegex(self, output[6], '^\s+value:')
+        assertRegex(self, output[7], '^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[9], '^\s+lower:')
+        assertRegex(self, output[10], '^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[12], '^\s+upper:')
+        assertRegex(self, output[13], '^\s+\[[0-9. e+-]+\]')
+
+    def test_feature_list_problem_vars(self):
+        import numpy as np
+        from openmdao.api import Problem, ScipyOptimizeDriver, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.list_problem_vars(print_arrays=True,
+                               desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                                            'indices', 'adder', 'scaler',
+                                            'parallel_deriv_color',
+                                            'vectorize_derivs'],
+                               cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                                          'indices', 'adder', 'scaler', 'linear'],
+                               objs_opts=['ref', 'ref0',
+                                          'indices', 'adder', 'scaler',
+                                          'parallel_deriv_color',
+                                          'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                          'cache_linear_solution'],
+                               )
 
 if __name__ == "__main__":
     unittest.main()
