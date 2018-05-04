@@ -52,6 +52,7 @@ class PETScTransfer(DefaultTransfer):
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
+        myproc = group.comm.rank
 
         transfers = group._transfers
         vectors = group._vectors
@@ -80,6 +81,8 @@ class PETScTransfer(DefaultTransfer):
             allprocs_abs2idx_byset = group._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = group._var_sizes_byset[vec_name]['input']
             sizes_byset_out = group._var_sizes_byset[vec_name]['output']
+            offsets_byset_in = group._var_offsets_byset[vec_name]['input']
+            offsets_byset_out = group._var_offsets_byset[vec_name]['output']
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
@@ -102,6 +105,8 @@ class PETScTransfer(DefaultTransfer):
                     # Get the sizes (byset) array
                     sizes_in = sizes_byset_in[set_name_in]
                     sizes_out = sizes_byset_out[set_name_out]
+                    offsets_in = offsets_byset_in[set_name_in]
+                    offsets_out = offsets_byset_out[set_name_out]
 
                     # Read in and process src_indices
                     shape_in = meta_in['shape']
@@ -128,12 +133,13 @@ class PETScTransfer(DefaultTransfer):
 
                     # 1. Compute the output indices
                     output_inds = np.zeros(src_indices.shape[0], INT_DTYPE)
-                    ind1 = ind2 = 0
+                    start = end = 0
+                    proc_offset = 0
                     for iproc in range(group.comm.size):
-                        ind2 += sizes_out[iproc, idx_byset_out]
+                        end += sizes_out[iproc, idx_byset_out]
 
                         # The part of src on iproc
-                        on_iproc = np.logical_and(ind1 <= src_indices, src_indices < ind2)
+                        on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
                         # This converts from iproc-then-ivar to ivar-then-iproc ordering
                         # Subtract off part of previous procs
@@ -143,20 +149,15 @@ class PETScTransfer(DefaultTransfer):
                         # + np.sum(out_sizes[:iproc, :])
                         # + np.sum(out_sizes[iproc, :idx_byset_out])
                         # + inds
-                        offset = -ind1
-                        offset += np.sum(sizes_out[:iproc, :])
-                        offset += np.sum(sizes_out[iproc, :idx_byset_out])
+                        offset = offsets_out[iproc, idx_byset_out] - start
                         output_inds[on_iproc] = src_indices[on_iproc] + offset
 
-                        ind1 += sizes_out[iproc, idx_byset_out]
+                        start = end
 
                     # 2. Compute the input indices
-                    iproc = group.comm.rank
-                    ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    delta = np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind1 += delta
-                    ind2 += (delta + sizes_in[iproc, idx_byset_in])
-                    input_inds = np.arange(ind1, ind2, dtype=INT_DTYPE)
+                    input_inds = np.arange(offsets_in[myproc, idx_byset_in],
+                                           offsets_in[myproc, idx_byset_in] +
+                                           sizes_in[myproc, idx_byset_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
                     key = (set_name_in, set_name_out)

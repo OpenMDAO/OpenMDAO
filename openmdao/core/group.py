@@ -22,6 +22,7 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible
@@ -46,6 +47,11 @@ class Group(System):
     _local_system_set : set
         Set of pathnames of all fully local (not remote or distributed)
         direct or indirect subsystems.
+    _var_offsets_byset : {'input': dict of ndarray, 'output': dict of ndarray}
+        Dict of local var sizes, keyed by var_set name.  Sizes are stored in an array
+        of size nproc x num_var where nproc is the number of processors
+        in this Group's communicator and num_var is the number of allprocs variables
+        in the given var_set.  This is only defined if the Group has
     """
 
     def __init__(self, **kwargs):
@@ -64,6 +70,7 @@ class Group(System):
         super(Group, self).__init__(**kwargs)
 
         self._local_system_set = None
+        self._var_offsets_byset = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -920,6 +927,18 @@ class Group(System):
                                            "dimension of size %d.")
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
+
+        # TODO: move this somewhere else later...
+        if self._vector_class is not DefaultVector:  # we're doing PETSc transfers
+            offsets = self._var_offsets_byset = {}
+            for vec_name in self._lin_rel_vec_name_list:
+                offsets[vec_name] = off_vn = {}
+                for type_ in ['input', 'output']:
+                    off_vn[type_] = off_t = {}
+                    for vset, vsizes in iteritems(self._var_sizes_byset[vec_name][type_]):
+                        off_t[vset] = np.roll(np.cumsum(vsizes), 1).reshape(vsizes.shape)
+                        off_t[vset][0, 0] = 0
+            self._var_offsets_byset['nonlinear'] = self._var_offsets_byset['linear']
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         """
