@@ -240,7 +240,7 @@ class System(object):
     _norm0: float
         Normalization factor
     _vector_class : class
-        Class to use for data vectors.  If not specified, inherits vector class from parent.
+        Class to use for data vectors.
     """
 
     def __init__(self, **kwargs):
@@ -368,7 +368,7 @@ class System(object):
         self._has_resid_scaling = False
         self._has_input_scaling = False
 
-        self._vector_class = None
+        self._vector_class = DefaultVector
 
     def _check_reconf(self):
         """

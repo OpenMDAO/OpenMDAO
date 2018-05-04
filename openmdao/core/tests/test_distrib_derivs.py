@@ -303,7 +303,9 @@ class DistribStateImplicit(ImplicitComponent):
     of 'states'.
     """
     def setup(self):
-        self.add_input('a', val=10., units='m')
+        self.distributed = True
+
+        self.add_input('a', val=10., units='m', src_indices=[0])
 
         rank = self.comm.rank
 
@@ -383,17 +385,17 @@ class MPITests3(unittest.TestCase):
         p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
         p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
 
-        expected = numpy.array([[5.]])
+        expected = numpy.array([5.])
 
         p.setup(vector_class=PETScVector, mode='fwd')
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
-        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+        assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
 
         p.setup(vector_class=PETScVector, mode='rev')
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
-        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+        assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

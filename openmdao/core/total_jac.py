@@ -393,7 +393,7 @@ class _TotalJacInfo(object):
             # value before calling solve_linear.
             loc_i = np.full(irange.shape, -1, dtype=int)
             if gend > gstart:
-                loc = np.logical_and(irange >= gstart, irange < gend)
+                loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
                     loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
                 else:

@@ -43,6 +43,9 @@ class Group(System):
         Object used to allocate MPI processes to subsystems.
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
         Information used to determine MPI process allocation to subsystems.
+    _local_system_set : set
+        Set of pathnames of all fully local (not remote or distributed)
+        direct or indirect subsystems.
     """
 
     def __init__(self, **kwargs):
@@ -59,6 +62,8 @@ class Group(System):
         self._proc_info = {}
 
         super(Group, self).__init__(**kwargs)
+
+        self._local_system_set = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -137,6 +142,12 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+
+        Returns
+        -------
+        set
+            Set of local subsystem (direct and indirect) names.  In this case,
+            local means not remote and not distributed.
         """
         self.pathname = pathname
         self.comm = comm
@@ -202,14 +213,22 @@ class Group(System):
         # Compute _subsystems_proc_range
         self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
 
+        if MPI:
+            self._local_system_set = set()
+
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            if subsys._vector_class is None:
-                subsys._vector_class = self._vector_class
             if self.pathname:
-                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
+                loc = subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
             else:
-                subsys._setup_procs(subsys.name, sub_comm, mode)
+                loc = subsys._setup_procs(subsys.name, sub_comm, mode)
+            if MPI is not None:
+                if loc:  # only groups return a local system set
+                    self._local_system_set.update(loc)
+                elif not subsys.distributed:
+                    self._local_system_set.add(subsys.pathname)
+
+        return self._local_system_set
 
     def _setup_vars(self, recurse=True):
         """
@@ -744,6 +763,18 @@ class Group(System):
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
+
+                    if MPI and self._vector_class is not None:
+                        # check for any cross-process data transfer. Setting _vector_class to None
+                        # will cause the group to use whatever vector class was passed into
+                        # the Problem during setup.
+                        in_path = abs_in.rsplit('.', 1)[0]
+                        if in_path not in self._local_system_set:
+                            self._vector_class = None
+                        else:
+                            out_path = abs_out.rsplit('.', 1)[0]
+                            if out_path not in self._local_system_set:
+                                self._vector_class = None
 
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling:
