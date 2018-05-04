@@ -25,7 +25,7 @@ The calls to :code:`declare_partials` tell OpenMDAO which partial derivatives to
 This is always done inside the :code:`setup` method.
 In this example, not all the outputs depend on all the inputs, and you'll see that if you look at the derivative declarations.
 Any partial that is not declared is assumed to be zero.
-You may declare all the partials in just one line as follows (see the :ref:`feature doc on specifying partials <feature_specify_partials>` for more details):
+You may declare all the partials in just one line as follows (see the documentation on :ref:`specifying partials <feature_specify_partials>` for more details):
 
 .. code::
 
@@ -38,7 +38,7 @@ Generally, it is better to be more specific, and declare only the nonzero partia
 .. note::
     There are a few more options to :code:`declare_partials` that are worth taking a look at.
     There is support for when your derivatives are constant, and there is support for specifying derivatives in a sparse AIJ format.
-    The full details can be found in the :ref:`feature doc on specifying partials <feature_specify_partials>`.
+    The full details can be found in the documentation on :ref:`specifying partials <feature_specify_partials>`.
 
 After you declare the nonzero partial derivatives, you need to implement the :code:`compute_partials` method to perform the actual
 derivative computations.
@@ -75,7 +75,7 @@ Any time you implement analytic derivatives, or change the nonlinear equations o
 
     :code:`check_partials` is **really** important when you're coding derivatives.
     It has some options to give you more detailed outputs for debugging and to let you limit which components get tested.
-    You should look over the complete :ref:`check_partials doc <feature_check_partials>` before you start doing heavy development with derivatives.
+    You should look over the complete documentation on :ref:`check_partials <feature_check_partials>` before you start doing heavy development with derivatives.
 
 There is a lot of information there, but for now, just take a look at the *r(fwd-chk)* column, which shows the norm of the relative difference
 between the analytic derivatives Jacobian and one that was approximated using finite differences.

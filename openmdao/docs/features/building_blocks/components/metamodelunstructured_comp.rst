@@ -19,6 +19,16 @@ and you can also use a different surrogate model for each output.
     `MetaModelUnStructuredComp` represents a collection of surrogate models trained at the
     same locations in the design space.
 
+MetaModelUnStructuredComp Options
+---------------------------------
+
+.. embed-options::
+    openmdao.components.meta_model_unstructured_comp
+    MetaModelUnStructuredComp
+    options
+
+Simple Example
+--------------
 
 The following example demonstrates a simple `Problem` in which a
 `MetaModelUnStructuredComp` uses surrogates to mimic the sine and cosine functions.

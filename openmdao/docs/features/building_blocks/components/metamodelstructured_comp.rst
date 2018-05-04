@@ -18,16 +18,18 @@ sample points, but an order 5 quintic spline is specified), the order of the
 fitted spline will be automatically reduced for that dimension alone.
 
 Extrapolation is supported, but disabled by default. It can be enabled
-via initialization attribute (see below).
+via the :code:`extrapolate` option (see below).
 
+MetaModelStructuredComp Options
+-------------------------------
 
 .. embed-options::
     openmdao.components.meta_model_structured_comp
     MetaModelStructuredComp
     options
 
-Examples
---------
+MetaModelStructuredComp Examples
+--------------------------------
 
 A simple quick-start example is fitting the exclusive-or ("XOR") operator between
 two inputs, `x` and `y`:

@@ -438,9 +438,12 @@ class MetaModelTestCase(unittest.TestCase):
         x_train = np.linspace(0,10,20)
 
         trig.add_input('x', 0., training_data=x_train)
-        trig.add_output('sin_x', 0., surrogate=FloatKrigingSurrogate(),
-                        training_data=.5*np.sin(x_train))
-        trig.add_output('cos_x', 0., training_data=.5*np.cos(x_train))
+
+        trig.add_output('sin_x', 0.,
+                        training_data=.5*np.sin(x_train),
+                        surrogate=FloatKrigingSurrogate())
+        trig.add_output('cos_x', 0.,
+                        training_data=.5*np.cos(x_train))
 
         trig.options['default_surrogate'] = FloatKrigingSurrogate()
 

@@ -15,7 +15,7 @@ associated with a particular component must be declared in the `initialize` meth
 of the component definition. A default value can be provided as well as various checks
 for validity, such as a list of acceptable values or types.
 
-The full list of options is shown in the method signature below.
+The attributes that can be specified when declaring an option are enumerated and described below:
 
 .. automethod:: openmdao.utils.options_dictionary.OptionsDictionary.declare
     :noindex:
@@ -55,8 +55,8 @@ In this example, 'size' is required; We would have gotten an error if we:
     :layout: interleave
 
 
-Metadata Types
---------------
+Option Types
+------------
 
 Options are not limited to simple types like :code:`int`.  In the following example, the
 component takes a `Numpy` array as an option:

@@ -19,9 +19,6 @@ In this simple example, we use the SLSQP optimizer to minimize the objective of 
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_basic
     :layout: interleave
 
-Optimizer Settings
-==================
-
 pyOptSparseDriver Options
 -------------------------
 
