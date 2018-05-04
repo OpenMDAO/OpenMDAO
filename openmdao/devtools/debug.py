@@ -329,16 +329,15 @@ def config_summary(problem, stream=sys.stdout):
     printer("Nonlinear Solvers: %s" % sorted(nl_solvers))
 
 
-
 @contextmanager
-def profiling_context(outname='prof.out'):
+def profiling(outname='prof.out'):
     """
-    Context manager for profiling.
+    Context manager that runs cProfile on the wrapped code and dumps stats to the given filename.
 
     Parameters
     ----------
     outname : str
-        Name of the output file containing profiling data.
+        Name of the output file containing profiling stats.
     """
     prof = cProfile.Profile()
     prof.enable()
