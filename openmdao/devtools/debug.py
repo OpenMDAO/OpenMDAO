@@ -6,6 +6,8 @@ import sys
 import os
 
 import numpy as np
+import cProfile
+from contextlib import contextmanager
 
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
@@ -325,3 +327,23 @@ def config_summary(problem, stream=sys.stdout):
     printer("Driver type: %s" % problem.driver.__class__.__name__)
     printer("Linear Solvers: %s" % sorted(ln_solvers))
     printer("Nonlinear Solvers: %s" % sorted(nl_solvers))
+
+
+
+@contextmanager
+def profiling_context(outname='prof.out'):
+    """
+    Context manager for profiling.
+
+    Parameters
+    ----------
+    outname : str
+        Name of the output file containing profiling data.
+    """
+    prof = cProfile.Profile()
+    prof.enable()
+
+    yield prof
+
+    prof.disable()
+    prof.dump_stats(outname)
