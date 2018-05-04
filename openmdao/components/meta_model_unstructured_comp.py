@@ -48,7 +48,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         ----------
         default_surrogate : SurrogateModel
             Default surrogate model to use.
-        vec_size : None or int
+        vec_size : int
             Number of points that will be simultaneously predicted by the surrogate.
         """
         super(MetaModelUnStructuredComp, self).__init__(vec_size=vec_size)
