@@ -395,9 +395,14 @@ class _TotalJacInfo(object):
             if gend > gstart:
                 loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
-                    loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
+                    if in_var_meta['distributed']:
+                        loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
+                    else:
+                        loc_i[loc] = irange[loc] - gstart
                 else:
                     loc_i[loc] = irange[loc]
+                    if not in_var_meta['distributed']:
+                        loc_i[loc] -= gstart
 
             loc_idxs.append(loc_i)
 
