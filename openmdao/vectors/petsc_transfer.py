@@ -118,7 +118,12 @@ class PETScTransfer(DefaultTransfer):
                     global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
-                        src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
+                        owner = group._owning_rank[abs_out]
+                        # if the input is larger than the output on a single proc, we have
+                        # to just loop over the procs in the same way we do when src_indices
+                        # is defined.
+                        if meta_in['size'] > sizes_out[owner, idx_byset_out]:
+                            src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     elif src_indices.ndim == 1:
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
@@ -135,27 +140,32 @@ class PETScTransfer(DefaultTransfer):
                             src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
 
                     # 1. Compute the output indices
-                    output_inds = np.zeros(src_indices.shape[0], INT_DTYPE)
-                    start = end = 0
-                    for iproc in range(group.comm.size):
-                        end += sizes_out[iproc, idx_byset_out]
+                    if src_indices is None:
+                        start = 0 if owner is 0 else np.sum(sizes_out[:owner, idx_byset_out])
+                        offset = offsets_out[owner, idx_byset_out] - start
+                        output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                    else:
+                        output_inds = np.zeros(src_indices.size, INT_DTYPE)
+                        start = end = 0
+                        for iproc in range(group.comm.size):
+                            end += sizes_out[iproc, idx_byset_out]
 
-                        # The part of src on iproc
-                        on_iproc = np.logical_and(start <= src_indices, src_indices < end)
+                            # The part of src on iproc
+                            on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
-                        if np.any(on_iproc):
-                            # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                            # Subtract off part of previous procs
-                            # Then add all variables on previous procs
-                            # Then all previous variables on this proc
-                            # - np.sum(out_sizes[:iproc, idx_byset_out])
-                            # + np.sum(out_sizes[:iproc, :])
-                            # + np.sum(out_sizes[iproc, :idx_byset_out])
-                            # + inds
-                            offset = offsets_out[iproc, idx_byset_out] - start
-                            output_inds[on_iproc] = src_indices[on_iproc] + offset
+                            if np.any(on_iproc):
+                                # This converts from iproc-then-ivar to ivar-then-iproc ordering
+                                # Subtract off part of previous procs
+                                # Then add all variables on previous procs
+                                # Then all previous variables on this proc
+                                # - np.sum(out_sizes[:iproc, idx_byset_out])
+                                # + np.sum(out_sizes[:iproc, :])
+                                # + np.sum(out_sizes[iproc, :idx_byset_out])
+                                # + inds
+                                offset = offsets_out[iproc, idx_byset_out] - start
+                                output_inds[on_iproc] = src_indices[on_iproc] + offset
 
-                        start = end
+                            start = end
 
                     # 2. Compute the input indices
                     input_inds = np.arange(offsets_in[myproc, idx_byset_in],

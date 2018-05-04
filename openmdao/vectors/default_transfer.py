@@ -44,11 +44,11 @@ class DefaultTransfer(Transfer):
                 subsys._setup_transfers(recurse)
 
         # Pre-compute map from abs_names to the index of the containing subsystem
-        abs2isub = {'input': {}, 'output': {}}
+        abs2isub = {}
         for subsys, isub in zip(group._subsystems_myproc, group._subsystems_myproc_inds):
             for type_ in ['input', 'output']:
                 for abs_name in subsys._var_allprocs_abs_names[type_]:
-                    abs2isub[type_][abs_name] = isub
+                    abs2isub[abs_name] = isub
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -143,11 +143,11 @@ class DefaultTransfer(Transfer):
                     xfer_in[key].append(input_inds)
                     xfer_out[key].append(output_inds)
 
-                    isub = abs2isub['input'][abs_in]
+                    isub = abs2isub[abs_in]
                     fwd_xfer_in[isub][key].append(input_inds)
                     fwd_xfer_out[isub][key].append(output_inds)
-                    if rev and abs_out in abs2isub['output']:
-                        isub = abs2isub['output'][abs_out]
+                    if rev and abs_out in abs2isub:
+                        isub = abs2isub[abs_out]
                         rev_xfer_in[isub][key].append(input_inds)
                         rev_xfer_out[isub][key].append(output_inds)
 
@@ -169,7 +169,8 @@ class DefaultTransfer(Transfer):
             xfer_all = DefaultTransfer(vectors['input'][vec_name], out_vec,
                                        xfer_in, xfer_out, group.comm)
             transfers[vec_name]['fwd', None] = xfer_all
-            transfers[vec_name]['rev', None] = xfer_all
+            if rev:
+                transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
                 transfers[vec_name]['fwd', isub] = DefaultTransfer(
                     vectors['input'][vec_name], vectors['output'][vec_name],
