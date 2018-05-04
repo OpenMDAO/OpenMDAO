@@ -13,8 +13,9 @@ class LinearSystemComp(ImplicitComponent):
     """
     Component that solves a linear system, Ax=b.
 
-    Designed to handle small and dense linear systems that can be efficiently solved with
-    lu-decomposition.
+    Designed to handle small, dense linear systems that can be efficiently solved with
+    lu-decomposition. It can be vectorized to either solve for multiple right hand sides,
+    or to solve multiple linear systems.
 
     Attributes
     ----------
@@ -47,35 +48,42 @@ class LinearSystemComp(ImplicitComponent):
         """
         Matrix and RHS are inputs, solution vector is the output.
         """
-        size = self.metadata['size']
         vec_size = self.metadata['vec_size']
         vec_size_A = self.vec_size_A = vec_size if self.metadata['vectorize_A'] else 1
+        size = self.metadata['size']
+        mat_size = size * size
+        full_size = size * vec_size
 
         self._lup = []
         shape = (vec_size, size) if vec_size > 1 else (size, )
         shape_A = (vec_size_A, size, size) if vec_size_A > 1 else (size, size)
 
-        multi_eye = np.eye(size).reshape(shape_A)
-        self.add_input("A", val=np.repeat(multi_eye, vec_size_A, axis=0))
+        init_A = np.eye(size)
+        if vec_size_A > 1:
+            init_A = np.repeat(init_A.reshape(1, size, size), vec_size_A, axis=0)
+
+        self.add_input("A", val=init_A)
         self.add_input("b", val=np.ones(shape))
         self.add_output("x", shape=shape, val=.1)
 
         # Set up the derivatives.
-        size = self.metadata['size']
-        row_col = np.arange(size, dtype="int")
+        row_col = np.arange(full_size, dtype="int")
 
-        self.declare_partials('x', 'b', val=-np.ones(size), rows=row_col, cols=row_col)
+        self.declare_partials('x', 'b', val=-np.ones(full_size), rows=row_col, cols=row_col)
 
-        rows = []
-        cols = []
-        for i in range(size):
-            for j in range(size):
-                rows.append(i)
-                cols.append(i * size + j)
+        rows = np.repeat(np.arange(full_size), size)
 
-        self.declare_partials('x', 'A', val=np.ones(size**2), rows=rows, cols=cols)
+        if vec_size_A > 1:
+            cols = np.arange(mat_size * vec_size)
+        else:
+            cols = np.tile(np.arange(mat_size), vec_size)
 
-        self.declare_partials(of='x', wrt='x')
+        self.declare_partials('x', 'A', rows=rows, cols=cols)
+
+        cols = np.tile(np.arange(size), size)
+        cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), mat_size) * size
+
+        self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -90,7 +98,14 @@ class LinearSystemComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
+        if self.metadata['vec_size'] > 1:
+            if self.vec_size_A > 1:
+                residuals['x'] = np.einsum('ijk,ik->ij', inputs['A'], outputs['x']) - inputs['b']
+            else:
+                residuals['x'] = np.einsum('jk,ik->ij', inputs['A'], outputs['x']) - inputs['b']
+
+        else:
+            residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
 
     def solve_nonlinear(self, inputs, outputs):
         """
@@ -110,7 +125,8 @@ class LinearSystemComp(ImplicitComponent):
         self._lup = []
         if vec_size > 1:
             for j in range(vec_size_A):
-                self._lup.append(linalg.lu_factor(inputs['A'][j]))
+                lhs = inputs['A'][j] if vec_size_A > 1 else inputs['A']
+                self._lup.append(linalg.lu_factor(lhs))
 
             for j in range(vec_size):
                 idx = j if vec_size_A > 1 else 0
@@ -134,10 +150,13 @@ class LinearSystemComp(ImplicitComponent):
         """
         x = outputs['x']
         size = self.metadata['size']
+        vec_size = self.metadata['vec_size']
 
-        J['x', 'A'] = np.tile(x, size)
-
-        J['x', 'x'] = inputs['A']
+        J['x', 'A'] = np.tile(x, size).flat
+        if self.vec_size_A > 1:
+            J['x', 'x'] = inputs['A'].flat
+        else:
+            J['x', 'x'] = np.tile(inputs['A'].flat, vec_size)
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""
