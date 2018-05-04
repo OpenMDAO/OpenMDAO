@@ -104,9 +104,41 @@ class Component(System):
         """
         pass
 
+    def _setup_procs(self, pathname, comm):
+        """
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        """
+        self.pathname = pathname
+        self.comm = comm
+        self._subsystems_proc_range = []
+
+        # Clear out old variable information so that we can call setup on the component.
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
+
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+        self.setup()
+        self._static_mode = True
+
     def _setup_vars(self, recurse=True):
         """
-        Call setup in components and count variables, total and by var_set.
+        Count variables, total and by var_set.
 
         Parameters
         ----------

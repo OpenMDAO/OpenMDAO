@@ -192,7 +192,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def _setup_vars(self, recurse=True):
         """
-        Call setup in components and count variables, total and by var_set.
+        Count variables, total and by var_set.
 
         Also instantiates surrogates for the output variables that use the default surrogate.
 
