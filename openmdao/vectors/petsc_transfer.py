@@ -32,6 +32,7 @@ class PETScTransfer(DefaultTransfer):
             Whether to call this method in subsystems.
         """
         group._transfers = {}
+        rev = group._mode == 'rev'
 
         def merge(indices_list):
             if len(indices_list) > 0:
@@ -44,11 +45,11 @@ class PETScTransfer(DefaultTransfer):
                 subsys._setup_transfers(recurse)
 
         # Pre-compute map from abs_names to the index of the containing subsystem
-        abs2isub = {'input': {}, 'output': {}}
+        abs2isub = {}
         for subsys, isub in zip(group._subsystems_myproc, group._subsystems_myproc_inds):
             for type_ in ['input', 'output']:
                 for abs_name in subsys._var_allprocs_abs_names[type_]:
-                    abs2isub[type_][abs_name] = isub
+                    abs2isub[abs_name] = isub
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -65,8 +66,9 @@ class PETScTransfer(DefaultTransfer):
             xfer_out = {}
             fwd_xfer_in = [{} for i in range(nsub_allprocs)]
             fwd_xfer_out = [{} for i in range(nsub_allprocs)]
-            rev_xfer_in = [{} for i in range(nsub_allprocs)]
-            rev_xfer_out = [{} for i in range(nsub_allprocs)]
+            if rev:
+                rev_xfer_in = [{} for i in range(nsub_allprocs)]
+                rev_xfer_out = [{} for i in range(nsub_allprocs)]
             for set_name_in in group._num_var_byset[vec_name]['input']:
                 for set_name_out in group._num_var_byset[vec_name]['output']:
                     key = (set_name_in, set_name_out)
@@ -75,8 +77,9 @@ class PETScTransfer(DefaultTransfer):
                     for isub in range(nsub_allprocs):
                         fwd_xfer_in[isub][key] = []
                         fwd_xfer_out[isub][key] = []
-                        rev_xfer_in[isub][key] = []
-                        rev_xfer_out[isub][key] = []
+                        if rev:
+                            rev_xfer_in[isub][key] = []
+                            rev_xfer_out[isub][key] = []
 
             allprocs_abs2idx_byset = group._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = group._var_sizes_byset[vec_name]['input']
@@ -134,23 +137,23 @@ class PETScTransfer(DefaultTransfer):
                     # 1. Compute the output indices
                     output_inds = np.zeros(src_indices.shape[0], INT_DTYPE)
                     start = end = 0
-                    proc_offset = 0
                     for iproc in range(group.comm.size):
                         end += sizes_out[iproc, idx_byset_out]
 
                         # The part of src on iproc
                         on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
-                        # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                        # Subtract off part of previous procs
-                        # Then add all variables on previous procs
-                        # Then all previous variables on this proc
-                        # - np.sum(out_sizes[:iproc, idx_byset_out])
-                        # + np.sum(out_sizes[:iproc, :])
-                        # + np.sum(out_sizes[iproc, :idx_byset_out])
-                        # + inds
-                        offset = offsets_out[iproc, idx_byset_out] - start
-                        output_inds[on_iproc] = src_indices[on_iproc] + offset
+                        if np.any(on_iproc):
+                            # This converts from iproc-then-ivar to ivar-then-iproc ordering
+                            # Subtract off part of previous procs
+                            # Then add all variables on previous procs
+                            # Then all previous variables on this proc
+                            # - np.sum(out_sizes[:iproc, idx_byset_out])
+                            # + np.sum(out_sizes[:iproc, :])
+                            # + np.sum(out_sizes[iproc, :idx_byset_out])
+                            # + inds
+                            offset = offsets_out[iproc, idx_byset_out] - start
+                            output_inds[on_iproc] = src_indices[on_iproc] + offset
 
                         start = end
 
@@ -164,11 +167,11 @@ class PETScTransfer(DefaultTransfer):
                     xfer_in[key].append(input_inds)
                     xfer_out[key].append(output_inds)
 
-                    isub = abs2isub['input'][abs_in]
+                    isub = abs2isub[abs_in]
                     fwd_xfer_in[isub][key].append(input_inds)
                     fwd_xfer_out[isub][key].append(output_inds)
-                    if abs_out in abs2isub['output']:
-                        isub = abs2isub['output'][abs_out]
+                    if rev and abs_out in abs2isub:
+                        isub = abs2isub[abs_out]
                         rev_xfer_in[isub][key].append(input_inds)
                         rev_xfer_out[isub][key].append(output_inds)
 
@@ -180,8 +183,9 @@ class PETScTransfer(DefaultTransfer):
                     for isub in range(nsub_allprocs):
                         fwd_xfer_in[isub][key] = merge(fwd_xfer_in[isub][key])
                         fwd_xfer_out[isub][key] = merge(fwd_xfer_out[isub][key])
-                        rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
-                        rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
+                        if rev:
+                            rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
+                            rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
 
             out_vec = vectors['output'][vec_name]
             transfer_class = out_vec.TRANSFER
@@ -190,14 +194,16 @@ class PETScTransfer(DefaultTransfer):
             xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
                                       xfer_in, xfer_out, group.comm)
             transfers[vec_name]['fwd', None] = xfer_all
-            transfers[vec_name]['rev', None] = xfer_all
+            if rev:
+                transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
                 transfers[vec_name]['fwd', isub] = transfer_class(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
-                transfers[vec_name]['rev', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                if rev:
+                    transfers[vec_name]['rev', isub] = transfer_class(
+                        vectors['input'][vec_name], vectors['output'][vec_name],
+                        rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
 
         transfers['nonlinear'] = transfers['linear']
 
