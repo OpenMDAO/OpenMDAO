@@ -141,7 +141,7 @@ class PETScTransfer(DefaultTransfer):
 
                     # 1. Compute the output indices
                     if src_indices is None:
-                        start = 0 if owner is 0 else np.sum(sizes_out[:owner, idx_byset_out])
+                        start = 0 if owner == 0 else np.sum(sizes_out[:owner, idx_byset_out])
                         offset = offsets_out[owner, idx_byset_out] - start
                         output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                     else:
