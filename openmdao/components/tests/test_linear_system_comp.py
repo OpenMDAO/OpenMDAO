@@ -25,7 +25,7 @@ class TestLinearSystemComp(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('b', b))
 
         lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3, partial_type="matrix_free"))
+        lingrp.add_subsystem('lin', LinearSystemComp(size=3))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
@@ -97,15 +97,41 @@ class TestLinearSystemComp(unittest.TestCase):
             assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
             assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
 
-        # print
-        lin_sys_comp = LinearSystemComp(size=3, partial_type="matrix_free")
+        lin_sys_comp = LinearSystemComp(size=3)
         check_derivs(lin_sys_comp)
 
-        lin_sys_comp = LinearSystemComp(size=3, partial_type="dense")
-        check_derivs(lin_sys_comp)
+    def test_feature_basic(self):
+        import numpy as np
 
-        lin_sys_comp = LinearSystemComp(size=3, partial_type="sparse")
-        check_derivs(lin_sys_comp)
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.api import LinearSystemComp, ScipyKrylov
+
+
+        model = Group()
+
+        x = np.array([1, 2, -3])
+        A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
+        b = A.dot(x)
+
+        model.add_subsystem('p1', IndepVarComp('A', A))
+        model.add_subsystem('p2', IndepVarComp('b', b))
+
+        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', LinearSystemComp(size=3))
+
+        model.connect('p1.A', 'lin.A')
+        model.connect('p2.b', 'lin.b')
+
+        prob = Problem(model)
+        prob.setup()
+
+        lingrp.linear_solver = ScipyKrylov()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['lin.x'], x, .0001)
+        assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
 if __name__ == "__main__":
     unittest.main()
