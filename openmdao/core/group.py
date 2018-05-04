@@ -936,8 +936,12 @@ class Group(System):
                 for type_ in ['input', 'output']:
                     off_vn[type_] = off_t = {}
                     for vset, vsizes in iteritems(self._var_sizes_byset[vec_name][type_]):
-                        off_t[vset] = np.roll(np.cumsum(vsizes), 1).reshape(vsizes.shape)
-                        off_t[vset][0, 0] = 0
+                        csum = np.cumsum(vsizes)
+                        # shift the cumsum forward by one and set first entry to 0 to get
+                        # the correct offset.
+                        csum[1:] = csum[:-1]
+                        csum[0] = 0
+                        off_t[vset] = csum.reshape(vsizes.shape)
             self._var_offsets_byset['nonlinear'] = self._var_offsets_byset['linear']
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
