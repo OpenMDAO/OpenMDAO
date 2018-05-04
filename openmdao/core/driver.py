@@ -108,8 +108,8 @@ class Driver(object):
 
         Parameters
         ----------
-        **kwargs : dict
-            options dictionary.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
         self._rec_mgr = RecordingManager()
         self._vars_to_record = {

@@ -151,8 +151,8 @@ class Solver(object):
 
         Parameters
         ----------
-        **kwargs : dict
-            options dictionary.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Solver options.
         """
         self._system = None
         self._depth = 0

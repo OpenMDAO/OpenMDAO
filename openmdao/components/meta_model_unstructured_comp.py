@@ -23,11 +23,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     Attributes
     ----------
-    default_surrogate : str
-        This surrogate will be used for all outputs that don't have a specific surrogate assigned
-        to them.
     train : bool
-        If True, training will occur on the first execution.
+        If True, training will occur on the next execution.
     _input_size : int
         Keeps track of the cumulative size of all inputs.
     _surrogate_input_names : [str, ..]
@@ -40,22 +37,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Training data for outputs.
     """
 
-    def __init__(self, default_surrogate=None, vec_size=1):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        default_surrogate : SurrogateModel
-            Default surrogate model to use.
-        vec_size : None or int
-            Number of points that will be simultaneously predicted by the surrogate.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
         """
-        super(MetaModelUnStructuredComp, self).__init__(vec_size=vec_size)
-
-        # This surrogate will be used for all outputs that don't have
-        # a specific surrogate assigned to them
-        self.default_surrogate = default_surrogate
+        super(MetaModelUnStructuredComp, self).__init__(**kwargs)
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -72,6 +63,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         Declare options.
         """
+        self.options.declare('default_surrogate', types=(SurrogateModel, type(None)), default=None,
+                             desc="Surrogate that will be used for all outputs that don't have a "
+                                  "specific surrogate assigned to them.")
         self.options.declare('vec_size', types=int, default=1, lower=1,
                              desc='Number of points that will be simultaneously predicted by '
                                   'the surrogate.')
@@ -184,11 +178,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         # Create an instance of the default surrogate for outputs that did not have a surrogate
         # specified.
-        if self.default_surrogate is not None:
+        default_surrogate = self.options['default_surrogate']
+        if default_surrogate is not None:
             for name, shape in self._surrogate_output_names:
                 metadata = self._metadata(name)
                 if metadata.get('default_surrogate'):
-                    surrogate = deepcopy(self.default_surrogate)
+                    surrogate = deepcopy(default_surrogate)
                     metadata['surrogate'] = surrogate
 
         # training will occur on first execution after setup
@@ -240,7 +235,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         # All outputs must have surrogates assigned either explicitly or through the default
         # surrogate.
-        if self.default_surrogate is None:
+        if self.options['default_surrogate'] is None:
             no_sur = []
             for name, shape in self._surrogate_output_names:
                 surrogate = self._metadata(name).get('surrogate')
@@ -487,6 +482,23 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def _metadata(self, name):
         return self._var_rel2data_io[name]['metadata']
+
+    @property
+    def default_surrogate(self):
+        """
+        Get the default surrogate for this MetaModel.
+        """
+        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
+                         "instead.")
+        return self.options['default_surrogate']
+
+    @default_surrogate.setter
+    def default_surrogate(self, value):
+        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
+                         "instead.")
+        self.options['default_surrogate'] = value
 
 
 class MetaModel(MetaModelUnStructuredComp):

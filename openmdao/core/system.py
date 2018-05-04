@@ -244,7 +244,7 @@ class System(object):
         Parameters
         ----------
         **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
+            Keyword arguments that will be mapped into the System options.
         """
         self.name = ''
         self.pathname = ''

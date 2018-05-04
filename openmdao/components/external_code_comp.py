@@ -44,7 +44,7 @@ class ExternalCodeComp(ExplicitComponent):
         Parameters
         ----------
         **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
+            Keyword arguments that will be mapped into the Component options.
         """
         super(ExternalCodeComp, self).__init__(**kwargs)
 

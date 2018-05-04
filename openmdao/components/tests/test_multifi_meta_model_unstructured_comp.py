@@ -233,7 +233,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm = MultiFiMetaModelUnStructuredComp(nfi=2)
         mm.add_input('x', np.zeros((1, 2)))
         mm.add_output('y', np.zeros((1, )))
-        mm.default_surrogate = MultiFiCoKrigingSurrogate()
+
+        mm.options['default_surrogate'] = MultiFiCoKrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -293,7 +294,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm = MultiFiMetaModelUnStructuredComp(nfi=2, vec_size=2)
         mm.add_input('x', np.zeros((2, 1, 2)))
         mm.add_output('y', np.zeros((2, 1, )))
-        mm.default_surrogate = MultiFiCoKrigingSurrogate()
+
+        mm.options['default_surrogate'] = MultiFiCoKrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)

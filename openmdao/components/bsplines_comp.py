@@ -111,34 +111,17 @@ class BsplinesComp(ExplicitComponent):
     Simple B-spline component for interpolation.
     """
 
-    def __init__(self, num_control_points=10, num_points=20, vec_size=1, bspline_order=4,
-                 in_name='h_cp', out_name='h', distribution='sine'):
+    def __init__(self, **kwargs):
         """
         Initialize the BsplinesComp.
 
         Parameters
         ----------
-        num_control_points : int
-            Number of control points.
-        num_points : int
-            Number of interpolated points.
-        vec_size : int
-            The number of independent rows to interpolate.
-        bspline_order : int(4)
-            B-spline order.
-        in_name : str
-            Name to use for the input variable (control points).
-        out_name : str
-            Name to use for the output variable (interpolated points).
-        distribution : str
-            Choice of spatial distribution to use for placing the control points. It can be 'sine'
-            or 'uniform'.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
         """
-        super(BsplinesComp, self).__init__(num_control_points=num_control_points,
-                                           num_points=num_points, vec_size=vec_size,
-                                           bspline_order=bspline_order,
-                                           in_name=in_name, out_name=out_name,
-                                           distribution=distribution)
+        super(BsplinesComp, self).__init__(**kwargs)
+
         self.cite = CITATIONS
 
     def initialize(self):
