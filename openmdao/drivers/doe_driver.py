@@ -11,6 +11,8 @@ from openmdao.core.analysis_error import AnalysisError
 
 from openmdao.utils.mpi import MPI
 
+from openmdao.recorders.sqlite_recorder import SqliteRecorder
+
 
 class DOEGenerator(object):
     """
@@ -55,6 +57,8 @@ class DOEDriver(Driver):
         The case generator
     _name : str
         The name used to identify this driver in recorded cases.
+    _recorders : list
+        List of case recorders that have been added to this driver.
     """
 
     def __init__(self, generator=None):
@@ -85,9 +89,13 @@ class DOEDriver(Driver):
             self._generator = generator
             self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
 
+        self._recorders = []
+
         self.options.declare('parallel', default=False,
                              desc='True or number of cases to run in parallel. '
-                                  'If True, cases will be run on all available processors.')
+                                  'If True, cases will be run on all available processors. '
+                                  'If an integer, each case will get COMM.size/<number> '
+                                  'processors and <number> of cases will be run in parallel')
 
     def _get_name(self):
         """
@@ -200,6 +208,40 @@ class DOEDriver(Driver):
         for i, case in enumerate(self._generator(design_vars)):
             if i % size == color:
                 yield case
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the driver.
+
+        Parameters
+        ----------
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        # keep track of recorders so we can flag them as parallel
+        # if we end up running in parallel
+        self._recorders.append(recorder)
+
+        super(DOEDriver, self).add_recorder(recorder)
+
+    def _setup_recording(self):
+        """
+        Set up case recording.
+        """
+        parallel = self.options['parallel']
+        if MPI and parallel:
+            for recorder in self._recorders:
+                recorder._parallel = True
+
+                # if SqliteRecorder, write cases only on procs up to the number
+                # of parallel DOEs (i.e. on the root procs for the cases)
+                if isinstance(recorder, SqliteRecorder):
+                    if parallel is True or self._comm.rank < parallel:
+                        recorder._record_on_proc = True
+                    else:
+                        recorder._record_on_proc = False
+
+        super(DOEDriver, self)._setup_recording()
 
     def record_iteration(self):
         """
