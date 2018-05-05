@@ -393,11 +393,16 @@ class _TotalJacInfo(object):
             # value before calling solve_linear.
             loc_i = np.full(irange.shape, -1, dtype=int)
             if gend > gstart:
-                loc = np.logical_and(irange >= gstart, irange < gend)
+                loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
-                    loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
+                    if in_var_meta['distributed']:
+                        loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
+                    else:
+                        loc_i[loc] = irange[loc] - gstart
                 else:
                     loc_i[loc] = irange[loc]
+                    if not in_var_meta['distributed']:
+                        loc_i[loc] -= gstart
 
             loc_idxs.append(loc_i)
 
@@ -425,13 +430,15 @@ class _TotalJacInfo(object):
             elif matmat:
                 if name not in idx_iter_dict:
                     idx_iter_dict[name] = (None, matmat,
-                                           [np.arange(start, end, dtype=int)], self.matmat_iter)
+                                           [np.arange(start, end, dtype=int)],
+                                           self.matmat_iter)
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
             elif not simul_coloring:  # plain old single index iteration
                 idx_iter_dict[name] = (None, False,
-                                       np.arange(start, end, dtype=int), self.single_index_iter)
+                                       np.arange(start, end, dtype=int),
+                                       self.single_index_iter)
 
             tup = (name, rhsname, rel, cache_lin_sol)
             idx_map.extend([tup] * (end - start))

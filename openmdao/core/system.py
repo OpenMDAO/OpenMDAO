@@ -20,6 +20,8 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
+from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
@@ -237,6 +239,8 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _vector_class : class
+        Class to use for data vectors.
     """
 
     def __init__(self, **kwargs):
@@ -363,6 +367,8 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+
+        self._vector_class = DefaultVector
 
     def _check_reconf(self):
         """
@@ -532,6 +538,9 @@ class System(object):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
+        if self._vector_class is not None:
+            vector_class = self._vector_class
+
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
         self._root_vecs = root_vectors = {'input': OrderedDict(),
@@ -672,7 +681,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm)
+            self._setup_procs(self.pathname, comm, mode)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -771,7 +780,7 @@ class System(object):
         root_vectors = self._get_root_vectors(vector_class, initial,
                                               force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
-        self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
+        self._setup_bounds(*self._get_bounds_root_vectors(DefaultVector, initial), resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -791,7 +800,7 @@ class System(object):
         for sub in self.system_iter(recurse=True, include_self=True):
             sub._rec_mgr.record_metadata(sub)
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, mode):
         """
         Distribute processors and assign pathnames.
 
@@ -801,9 +810,13 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
         self.comm = comm
+        self._mode = mode
         self._subsystems_proc_range = []
 
         # TODO: This version only runs for Components, because it is overriden in Group, so
@@ -1123,7 +1136,10 @@ class System(object):
             raise RuntimeError(msg)
 
         for vec_name in self._rel_vec_name_list:
-            vector_class = root_vectors['output'][vec_name].__class__
+            if self._vector_class is None:
+                vector_class = root_vectors['output'][vec_name].__class__
+            else:
+                vector_class = self._vector_class
 
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
@@ -1295,7 +1311,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._transfers = {}
+        pass
 
     def _setup_solvers(self, recurse=True):
         """
@@ -2197,7 +2213,7 @@ class System(object):
         else:  # 'obj'
             if index is not None:
                 resp['size'] = 1
-                index = np.array([index], dtype=int)
+                index = np.array([index], dtype=INT_DTYPE)
             resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):
