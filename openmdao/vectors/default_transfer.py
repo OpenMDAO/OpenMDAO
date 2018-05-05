@@ -113,7 +113,7 @@ class DefaultTransfer(Transfer):
                     global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
-                        src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
+                        pass
                     elif src_indices.ndim == 1:
                         src_indices = convert_neg(src_indices, global_size_out)
                     else:
@@ -130,8 +130,11 @@ class DefaultTransfer(Transfer):
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
 
                     # 1. Compute the output indices
-                    output_inds = np.zeros(src_indices.size, INT_DTYPE)
-                    output_inds[:] = src_indices + np.sum(sizes_out[iproc, :idx_byset_out])
+                    if src_indices is None:
+                        offset = np.sum(sizes_out[iproc, :idx_byset_out])
+                        output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
+                    else:
+                        output_inds = src_indices + np.sum(sizes_out[iproc, :idx_byset_out])
 
                     # 2. Compute the input indices
                     ind1 = np.sum(sizes_in[iproc, :idx_byset_in])
