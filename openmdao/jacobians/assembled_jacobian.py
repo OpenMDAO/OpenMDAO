@@ -113,15 +113,19 @@ class AssembledJacobian(Jacobian):
         self._int_mtx = int_mtx = self._matrix_class(system.comm)
         ext_mtx = self._matrix_class(system.comm)
 
-        out_ranges = self._out_ranges = {
-            abs_name: self._get_var_range(abs_name, 'output') for abs_name in
-                system._var_allprocs_abs_names['output']
-        }
+        iproc = system.comm.rank
+        abs2idx = system._var_allprocs_abs2idx['nonlinear']
+        sizes = system._var_sizes['nonlinear']['output']
+        out_ranges = self._out_ranges = {}
+        for name in system._var_allprocs_abs_names['output']:
+            start = np.sum(sizes[iproc, :abs2idx[name]])
+            out_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
 
-        in_ranges = self._in_ranges = {
-            abs_name: self._get_var_range(abs_name, 'input') for abs_name in
-                system._var_allprocs_abs_names['input']
-        }
+        sizes = system._var_sizes['nonlinear']['input']
+        in_ranges = self._in_ranges = {}
+        for name in system._var_allprocs_abs_names['input']:
+            start = np.sum(sizes[iproc, :abs2idx[name]])
+            in_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
 
         abs2prom_out = system._var_abs2prom['output']
         conns = system._conn_global_abs_in2out
@@ -219,11 +223,10 @@ class AssembledJacobian(Jacobian):
                         ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
                                             in_offset[in_abs_name] - ranges[2], None, shape)
 
-        sizes = system._var_sizes
-        iproc = system.comm.rank
-        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
-
         if ext_mtx._submats:
+            sizes = system._var_sizes
+            iproc = system.comm.rank
+            out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
             in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
