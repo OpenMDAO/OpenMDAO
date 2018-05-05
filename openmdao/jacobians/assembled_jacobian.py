@@ -71,35 +71,6 @@ class AssembledJacobian(Jacobian):
 
         self._subjac_iters = defaultdict(lambda: None)
 
-    def _get_var_range(self, abs_name, type_):
-        """
-        Look up the variable name and <Jacobian> index range.
-
-        Parameters
-        ----------
-        abs_name : str
-            Absolute name of the variable for which we want the index range.
-        type_ : str
-            'input' or 'output'.
-
-        Returns
-        -------
-        int
-            the starting index in the Jacobian.
-        int
-            the ending index in the Jacobian.
-        """
-        system = self._system
-
-        sizes = system._var_sizes['nonlinear'][type_]
-        iproc = system.comm.rank
-        idx = system._var_allprocs_abs2idx['nonlinear'][abs_name]
-
-        ind1 = np.sum(sizes[iproc, :idx])
-        ind2 = ind1 + sizes[iproc, idx]
-
-        return ind1, ind2
-
     def _initialize(self):
         """
         Allocate the global matrices.
@@ -202,14 +173,18 @@ class AssembledJacobian(Jacobian):
 
         ext_mtx = self._matrix_class(system.comm)
 
-        in_offset = {n: self._get_var_range(n, 'input')[0] for n in
+        iproc = self._system.comm.rank
+        sizes = self._system._var_sizes['nonlinear']['input']
+        abs2idx = self._system._var_allprocs_abs2idx['nonlinear']
+        in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
                      system._var_allprocs_abs_names['input']}
 
         subjacs_info = self._subjacs_info
 
+        sizes = self._system._var_sizes['nonlinear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
-                res_offset = self._get_var_range(res_abs_name, 'output')[0]
+                res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
                 res_size = abs2meta[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
