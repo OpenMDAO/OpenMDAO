@@ -377,9 +377,9 @@ class Group(System):
                         np.sum(allprocs_counters[type_][:isub + 1]))
                     for set_name, rng in iteritems(subsystems_var_range_byset[vec_name][type_]):
                         iset = set2iset[type_][set_name]
-                        rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
-                                            np.sum(allprocs_counters_byset[type_][:isub + 1,
-                                                                                  iset]))
+                        start = np.sum(allprocs_counters_byset[type_][:isub, iset])
+                        rng[subsys.name] = (start,
+                                            start + allprocs_counters_byset[type_][isub, iset])
 
         subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
         subsystems_var_range_byset['nonlinear'] = subsystems_var_range_byset['linear']
