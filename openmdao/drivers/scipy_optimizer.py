@@ -86,11 +86,11 @@ class ScipyOptimizeDriver(Driver):
         for all except linear constraints.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize the ScipyOptimizeDriver.
         """
-        super(ScipyOptimizeDriver, self).__init__()
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -103,22 +103,6 @@ class ScipyOptimizeDriver(Driver):
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
-
-        # User Options
-        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
-                             desc='Name of optimizer to use')
-        self.options.declare('tol', 1.0e-6, lower=0.0,
-                             desc='Tolerance for termination. For detailed '
-                             'control, use solver-specific options.')
-        self.options.declare('maxiter', 200, lower=0,
-                             desc='Maximum number of iterations.')
-        self.options.declare('disp', True,
-                             desc='Set to False to prevent printing of Scipy convergence messages')
-        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
-                             desc='Compute simultaneous derivative coloring dynamically if True')
-        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
-                             desc='Number of compute_totals calls during dynamic computation of '
-                                  'simultaneous derivative coloring')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -135,6 +119,25 @@ class ScipyOptimizeDriver(Driver):
         self._exc_info = None
 
         self.cite = CITATIONS
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
+                             desc='Name of optimizer to use')
+        self.options.declare('tol', 1.0e-6, lower=0.0,
+                             desc='Tolerance for termination. For detailed '
+                             'control, use solver-specific options.')
+        self.options.declare('maxiter', 200, lower=0,
+                             desc='Maximum number of iterations.')
+        self.options.declare('disp', True,
+                             desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
     def _get_name(self):
         """

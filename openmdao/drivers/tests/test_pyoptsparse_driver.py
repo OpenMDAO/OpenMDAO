@@ -103,11 +103,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
+        prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1405,6 +1403,7 @@ class TestPyoptSparse(unittest.TestCase):
                         "Should be more than one con.c printed")
         self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 class TestPyoptSparseFeature(unittest.TestCase):
