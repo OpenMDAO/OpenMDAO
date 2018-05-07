@@ -75,7 +75,8 @@ class BoundsEnforceLS(NonlinearSolver):
         # Remove unused options from base options.
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
-        # self.options.undeclare("maxiter") # eventually want to undeclare this
+        self.options.undeclare("maxiter")
+        self.options.undeclare("err_on_maxiter")
 
     def _declare_options(self):
         """
