@@ -339,7 +339,7 @@ class TestProblem(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         # use PETScVector when using any PETSc linear solvers or running under MPI
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
         prob['x'] = 2.
         prob['y'] = 10.
 

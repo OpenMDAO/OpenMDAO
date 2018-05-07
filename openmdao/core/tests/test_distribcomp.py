@@ -486,7 +486,7 @@ class MPIFeatureTests(unittest.TestCase):
         top.connect('indep.x', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
 
-        p.setup(vector_class=PETScVector)
+        p.setup()
 
         p['indep.x'] = np.ones(size)
 

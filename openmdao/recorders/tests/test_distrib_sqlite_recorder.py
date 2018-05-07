@@ -219,7 +219,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.driver.add_recorder(self.recorder)
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
 

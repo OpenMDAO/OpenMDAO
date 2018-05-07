@@ -209,7 +209,7 @@ class DistributedAdderTest(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
