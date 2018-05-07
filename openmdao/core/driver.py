@@ -187,6 +187,7 @@ class Driver(object):
 
         self.fail = False
 
+        self._declare_options()
         self.options.update(kwargs)
 
     def add_recorder(self, recorder):
@@ -205,6 +206,14 @@ class Driver(object):
         Clean up resources prior to exit.
         """
         self._rec_mgr.close()
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+
+        This is optionally implemented by subclasses of Driver.
+        """
+        pass
 
     def _setup_comm(self, comm):
         """
