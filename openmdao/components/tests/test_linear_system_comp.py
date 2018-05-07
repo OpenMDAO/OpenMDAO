@@ -145,10 +145,7 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.run_model()
         prob.model.run_linearize()
 
-        # prob.check_partials()
-
         # Compare against calculated derivs
-        # Ainv = np.linalg.inv(A) # Don't use linalg.inv or a mathematician will die
         Ainv = np.array([[3., -2., 1.],
                          [-3., 3., -2.],
                          [1., -1., 1.]])
@@ -209,10 +206,7 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.run_model()
         prob.model.run_linearize()
 
-        # prob.check_partials()
-
         # Compare against calculated derivs
-        # Ainv = np.linalg.inv(A) # Don't use linalg.inv or a mathematician will die
         Ainv = np.array([[3., -2., 1.],
                          [-3., 3., -2.],
                          [1., -1., 1.]])
@@ -274,10 +268,7 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.run_model()
         prob.model.run_linearize()
 
-        # prob.check_partials()
-
         # Compare against calculated derivs
-        # Ainv = np.linalg.inv(A) # Don't use linalg.inv or a mathematician will die
         Ainv1 = np.array([[3., -2., 1.],
                           [-3., 3., -2.],
                           [1., -1., 1.]])
