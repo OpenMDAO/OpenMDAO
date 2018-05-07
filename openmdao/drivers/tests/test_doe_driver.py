@@ -860,7 +860,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
             pass
 
     def test_fan_in_grouped(self):
-        from openmdao.api import Problem, IndepVarComp, PETScVector
+        from openmdao.api import Problem, PETScVector
         from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
         from openmdao.api import DOEDriver, FullFactorialGenerator
