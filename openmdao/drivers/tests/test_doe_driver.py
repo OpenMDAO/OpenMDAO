@@ -166,51 +166,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
-
-        prob.setup(check=False)
-        prob.run_driver()
-        prob.cleanup()
-
-        expected = {
-            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
-            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
-            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
-            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        }
-
-        cases = CaseReader("CASES.db").driver_cases
-
-        self.assertEqual(cases.num_cases, 9)
-
-        for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[n]['f_xy'])
-
-    def test_full_factorial_option(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.driver = DOEDriver()
-        prob.driver.options['generator'] = FullFactorialGenerator(levels=3)
-
+        prob.driver = DOEDriver(generator=FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
