@@ -48,7 +48,6 @@ class SimpleGADriver(Driver):
         ----------
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
-
         """
         super(SimpleGADriver, self).__init__(**kwargs)
 
