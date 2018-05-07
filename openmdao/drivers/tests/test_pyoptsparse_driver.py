@@ -1447,8 +1447,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = "SLSQP"
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
 
         prob.driver.options['print_results'] = False
 

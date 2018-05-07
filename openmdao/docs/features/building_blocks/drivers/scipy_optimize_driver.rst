@@ -29,7 +29,7 @@ ScipyOptimizeDriver Option Examples
   of the optimizers in scipy.optimize except for 'dogleg' and 'trust-ncg'. Generally, the optimizers that
   you are most likely to use are "COBYLA" and "SLSQP", as these are the only ones that support constraints.
   Only SLSQP supports equality constraints. SLSQP also uses gradients provided by OpenMDAO, while COBYLA is
-  gradient-free.
+  gradient-free.  Here we pass the optimizer option as a keyword argument.
 
   .. embed-code::
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_optimizer
