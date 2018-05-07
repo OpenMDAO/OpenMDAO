@@ -85,6 +85,7 @@ class SellarDis2(ExplicitComponent):
 
         outputs['y2'] = y1**.5 + z1 + z2
 
+
 class SellarMDA(Group):
     """
     Group containing the Sellar MDA.
@@ -96,8 +97,8 @@ class SellarMDA(Group):
         indeps.add_output('z', np.array([5.0, 2.0]))
 
         cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-        d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
-        d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
+        cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
+        cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = NonlinearBlockGS()
@@ -246,5 +247,3 @@ class DoubleSellar(Group):
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
         self.nonlinear_solver = NewtonSolver()
         self.linear_solver = DirectSolver()
-
-

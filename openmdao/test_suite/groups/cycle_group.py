@@ -51,35 +51,35 @@ class CycleGroup(ParametericTestGroup):
             'var_shape': [(2, 3), (3,)],
         })
 
-        self.metadata.declare('num_comp', types=int, default=2,
-                              desc='Total number of components')
-        self.metadata.declare('num_var', types=int, default=1,
-                              desc='Number of variables per component')
-        self.metadata.declare('var_shape', default=(3,),
-                              desc='Shape of each variable')
-        self.metadata.declare('connection_type', default='explicit',
-                              values=['explicit', 'implicit'],
-                              desc='How to connect variables.')
-        self.metadata.declare('partial_type', default='array',
-                              values=['array', 'sparse', 'aij'],
-                              desc='type of partial derivatives')
-        self.metadata.declare('finite_difference', default=False,
-                              types=bool,
-                              desc='If the derivatives should be finite differenced.')
+        self.options.declare('num_comp', types=int, default=2,
+                             desc='Total number of components')
+        self.options.declare('num_var', types=int, default=1,
+                             desc='Number of variables per component')
+        self.options.declare('var_shape', default=(3,),
+                             desc='Shape of each variable')
+        self.options.declare('connection_type', default='explicit',
+                             values=['explicit', 'implicit'],
+                             desc='How to connect variables.')
+        self.options.declare('partial_type', default='array',
+                             values=['array', 'sparse', 'aij'],
+                             desc='type of partial derivatives')
+        self.options.declare('finite_difference', default=False,
+                             types=bool,
+                             desc='If the derivatives should be finite differenced.')
 
     def setup(self):
-        num_comp = self.metadata['num_comp']
+        num_comp = self.options['num_comp']
         if num_comp < 2:
             raise ValueError('Number of components must be at least 2.')
 
-        self.num_var = num_var = self.metadata['num_var']
-        self.var_shape = var_shape = self.metadata['var_shape']
+        self.num_var = num_var = self.options['num_var']
+        self.var_shape = var_shape = self.options['var_shape']
 
         self.size = num_var * np.prod(var_shape)
         if self.size < 3:
             raise ValueError('Product of num_var and var_shape must be at least 3.')
 
-        connection_type = self.metadata['connection_type']
+        connection_type = self.options['connection_type']
 
         first_class = ExplicitFirstComp
         middle_class = ExplicitCycleComp
@@ -106,16 +106,16 @@ class CycleGroup(ParametericTestGroup):
     def _generate_components(self, conn_type, first_class, middle_class, last_class, num_comp):
         first_name = 'first'
         last_name = 'last'
-        var_shape = self.metadata['var_shape']
-        num_var = self.metadata['num_var']
+        var_shape = self.options['var_shape']
+        num_var = self.options['num_var']
         comp_args = {
             'var_shape': var_shape,
             'num_var': num_var,
-            'jacobian_type': self.metadata['jacobian_type'],
-            'partial_type': self.metadata['partial_type'],
+            'jacobian_type': self.options['jacobian_type'],
+            'partial_type': self.options['partial_type'],
             'connection_type': conn_type,
-            'finite_difference': self.metadata['finite_difference'],
-            'num_comp': self.metadata['num_comp']
+            'finite_difference': self.options['finite_difference'],
+            'num_comp': self.options['num_comp']
         }
 
         self.add_subsystem('psi_comp', IndepVarComp('psi', PSI))

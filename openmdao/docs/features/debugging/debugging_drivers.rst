@@ -7,6 +7,14 @@ Driver Debug Printing
 When working with a model, it may sometimes be helpful to print out the design variables, constraints, and
 objectives as the :code:`Driver` iterates. OpenMDAO provides options on the :code:`Driver` to let you do that.
 
+Driver Options
+-----------------
+
+.. embed-options::
+    openmdao.core.driver
+    Driver
+    options
+
 Usage
 -----
 

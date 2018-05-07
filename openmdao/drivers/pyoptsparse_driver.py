@@ -20,7 +20,6 @@ from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.record_util import create_local_meta
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -210,9 +209,6 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
-
-        # Metadata Setup
-        self.metadata = create_local_meta(optimizer)
 
         # Only need initial run if we have linear constraints.
         con_meta = self._cons

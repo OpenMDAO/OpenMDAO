@@ -20,14 +20,19 @@ of OpenMDAO allow the incoming connection to have shape `(3,)` when `vec_size` i
 the storage order of the underlying data is the same.  The output vector `c` of
 CrossProductComp will always have shape `(vec_size, 3)`.
 
+CrossProductComp Options
+------------------------
+
 Options for CrossProductComp allow the user to rename the input variables :math:`a` and :math:`b`
 and the output :math:`c`, as well as specifying their units.
-
 
 .. embed-options::
     openmdao.components.cross_product_comp
     CrossProductComp
-    metadata
+    options
+
+CrossProductComp Example
+------------------------
 
 In the following example DotProductComp is used to compute torque as the
 cross product of force (:math:`F`) and radius (:math:`r`) at 100 points simultaneously.

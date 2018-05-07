@@ -30,28 +30,28 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
+            Keyword arguments that will be mapped into the Component options.
         """
         super(LinearSystemComp, self).__init__(**kwargs)
         self._lup = None
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('size', default=1, types=int, desc='The size of the linear system.')
-        self.metadata.declare('vec_size', types=int, default=1,
+        self.options.declare('size', default=1, types=int, desc='The size of the linear system.')
+        self.options.declare('vec_size', types=int, default=1,
                               desc='Number of linear systems to solve.')
-        self.metadata.declare('vectorize_A', default=False, types=bool,
+        self.options.declare('vectorize_A', default=False, types=bool,
                               desc='Set to True to vectorize the A matrix.')
 
     def setup(self):
         """
         Matrix and RHS are inputs, solution vector is the output.
         """
-        vec_size = self.metadata['vec_size']
-        vec_size_A = self.vec_size_A = vec_size if self.metadata['vectorize_A'] else 1
-        size = self.metadata['size']
+        vec_size = self.options['vec_size']
+        vec_size_A = self.vec_size_A = vec_size if self.options['vectorize_A'] else 1
+        size = self.options['size']
         mat_size = size * size
         full_size = size * vec_size
 
@@ -99,7 +99,7 @@ class LinearSystemComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        if self.metadata['vec_size'] > 1:
+        if self.options['vec_size'] > 1:
             if self.vec_size_A > 1:
                 residuals['x'] = np.einsum('ijk,ik->ij', inputs['A'], outputs['x']) - inputs['b']
             else:
@@ -119,7 +119,7 @@ class LinearSystemComp(ImplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A
 
         # lu factorization for use with solve_linear
@@ -150,14 +150,15 @@ class LinearSystemComp(ImplicitComponent):
             sub-jac components written to jacobian[output_name, input_name]
         """
         x = outputs['x']
-        size = self.metadata['size']
-        vec_size = self.metadata['vec_size']
+        size = self.options['size']
+        vec_size = self.options['vec_size']
 
         J['x', 'A'] = np.tile(x, size).flat
         if self.vec_size_A > 1:
             J['x', 'x'] = inputs['A'].flat
         else:
             J['x', 'x'] = np.tile(inputs['A'].flat, vec_size)
+
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""
@@ -177,7 +178,7 @@ class LinearSystemComp(ImplicitComponent):
         mode : str
             either 'fwd' or 'rev'
         """
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A
 
         if mode == 'fwd':

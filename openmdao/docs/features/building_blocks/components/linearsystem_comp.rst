@@ -7,11 +7,12 @@ LinearSystemComp
 The LinearSystemComp solves the linear system Ax = b where A and b are inputs, and x is the output.
 
 LinearSystemComp Options
-^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------
+
 .. embed-options::
     openmdao.components.linear_system_comp
     LinearSystemComp
-    metadata
+    options
 
 LinearSystemComp Example
 ------------------------

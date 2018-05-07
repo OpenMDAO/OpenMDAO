@@ -28,8 +28,6 @@ def _check_results(testcase, test, error_bound):
         actual = {key: problem[key] for key in expected_values}
         assert_rel_error(testcase, actual, expected_values, 1e-8)
 
-    #error_bound = 1e-4 if root.metadata['finite_difference'] else 1e-8
-
     expected_totals = root.expected_totals
     if expected_totals:
         # Forward Derivatives Check

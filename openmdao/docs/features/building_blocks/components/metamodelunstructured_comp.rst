@@ -19,6 +19,16 @@ and you can also use a different surrogate model for each output.
     `MetaModelUnStructuredComp` represents a collection of surrogate models trained at the
     same locations in the design space.
 
+MetaModelUnStructuredComp Options
+---------------------------------
+
+.. embed-options::
+    openmdao.components.meta_model_unstructured_comp
+    MetaModelUnStructuredComp
+    options
+
+Simple Example
+--------------
 
 The following example demonstrates a simple `Problem` in which a
 `MetaModelUnStructuredComp` uses surrogates to mimic the sine and cosine functions.
@@ -46,10 +56,10 @@ values. This training step only occurs on the first run.
 Advanced usage
 --------------
 
-You can specify the training data after instantiation if you like, by setting the component's :ref:`metadata<component_metadata>`.
-Training data is provided as metadata to the ``trig`` component using the variable
-names prefixed with ``train:``.  This can be done anytime before the `MetaModelUnStructuredComp`
-runs for the first time.
+You can specify the training data after instantiation if you like, by setting the component's
+:ref:`options<component_options>`. Training data is provided in the options to the ``trig``
+component using the variable names prefixed with ``train:``.  This can be done anytime before
+the `MetaModelUnStructuredComp` runs for the first time.
 
 The inputs and outputs of a `MetaModelUnStructuredComp` are not limited to scalar values. The
 following modified version of the example uses an array to predict sine and

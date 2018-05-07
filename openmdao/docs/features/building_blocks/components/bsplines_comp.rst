@@ -11,12 +11,13 @@ This is useful for reducing the size of an optimization problem by decreasing th
 the number of gradients it computes if you are running in forward mode. You may consider using this when you have spatially
 distributed design variables where you know that the physics gives you smooth designs that can be well approximated by B-splines.
 
-BsplinesComp accepts the following arguments during instantiation:
+BsplinesComp Options
+--------------------
 
 .. embed-options::
     openmdao.components.bsplines_comp
     BsplinesComp
-    metadata
+    options
 
 
 BsplinesComp Example

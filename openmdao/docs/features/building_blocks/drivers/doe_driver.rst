@@ -22,6 +22,13 @@ its own parameters that can be specified when it is instantiated:
 
 The generator instance is supplied as an argument to the `DOEDriver`.
 
+DOEDriver Options
+-----------------
+
+.. embed-options::
+    openmdao.drivers.doe_driver
+    DOEDriver
+    options
 
 Simple Example
 --------------
@@ -37,16 +44,6 @@ between -10 and 10, per the lower and upper bounds of those design variables.
     openmdao.drivers.tests.test_doe_driver.TestDOEDriverFeature.test_uniform
     :layout: interleave
 
-
-DOEDriver Options
------------------
-
-.. embed-options::
-    openmdao.drivers.doe_driver
-    DOEDriver
-    options
-
-
 .. _doe_driver_parallel:
 
 Running a DOE in Parallel
@@ -60,7 +57,7 @@ Here we are using the `FullFactorialGenerator` with 3 levels to generate inputs
 for our `Paraboloid` model. With two inputs, :math:`3^2=9` cases have been
 generated. In this case we are running on two processors and have specified
 :code:`options['parallel']=True` to run cases on all available processors.
-The cases have therefore been split with 5 cases run on the first processor 
+The cases have therefore been split with 5 cases run on the first processor
 and 4 cases on the second.
 
 Note that, when running in parallel, the `SqliteRecorder` will generate a separate

@@ -23,11 +23,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     Attributes
     ----------
-    default_surrogate : str
-        This surrogate will be used for all outputs that don't have a specific surrogate assigned
-        to them.
     train : bool
-        If True, training will occur on the first execution.
+        If True, training will occur on the next execution.
     _input_size : int
         Keeps track of the cumulative size of all inputs.
     _surrogate_input_names : [str, ..]
@@ -40,22 +37,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Training data for outputs.
     """
 
-    def __init__(self, default_surrogate=None, vec_size=1):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        default_surrogate : SurrogateModel
-            Default surrogate model to use.
-        vec_size : int
-            Number of points that will be simultaneously predicted by the surrogate.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
         """
-        super(MetaModelUnStructuredComp, self).__init__(vec_size=vec_size)
-
-        # This surrogate will be used for all outputs that don't have
-        # a specific surrogate assigned to them
-        self.default_surrogate = default_surrogate
+        super(MetaModelUnStructuredComp, self).__init__(**kwargs)
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -70,11 +61,14 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('vec_size', types=int, default=1, lower=1,
-                              desc='Number of points that will be simultaneously predicted by '
-                              'the surrogate.')
+        self.options.declare('default_surrogate', types=(SurrogateModel, type(None)), default=None,
+                             desc="Surrogate that will be used for all outputs that don't have a "
+                                  "specific surrogate assigned to them.")
+        self.options.declare('vec_size', types=int, default=1, lower=1,
+                             desc='Number of points that will be simultaneously predicted by '
+                                  'the surrogate.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -97,7 +91,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata for added variable
         """
         metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
@@ -111,9 +105,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._input_size += input_size
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
-            self.metadata[train_name] = training_data
+            self.options[train_name] = training_data
 
         return metadata
 
@@ -141,7 +135,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata for added variable
         """
         metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
@@ -165,9 +159,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             metadata['default_surrogate'] = True
 
         train_name = 'train:%s' % name
-        self.metadata.declare(train_name, default=None, desc='Training data for %s' % name)
+        self.options.declare(train_name, default=None, desc='Training data for %s' % name)
         if training_data is not None:
-            self.metadata[train_name] = training_data
+            self.options[train_name] = training_data
 
         return metadata
 
@@ -184,11 +178,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         # Create an instance of the default surrogate for outputs that did not have a surrogate
         # specified.
-        if self.default_surrogate is not None:
+        default_surrogate = self.options['default_surrogate']
+        if default_surrogate is not None:
             for name, shape in self._surrogate_output_names:
                 metadata = self._metadata(name)
                 if metadata.get('default_surrogate'):
-                    surrogate = deepcopy(self.default_surrogate)
+                    surrogate = deepcopy(default_surrogate)
                     metadata['surrogate'] = surrogate
 
         # training will occur on first execution after setup
@@ -209,7 +204,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         super(MetaModelUnStructuredComp, self)._setup_partials()
 
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
         if vec_size > 1:
             # Sparse specification of partials for vectorized models.
             for wrt, n_wrt in self._surrogate_input_names:
@@ -240,7 +235,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         # All outputs must have surrogates assigned either explicitly or through the default
         # surrogate.
-        if self.default_surrogate is None:
+        if self.options['default_surrogate'] is None:
             no_sur = []
             for name, shape in self._surrogate_output_names:
                 surrogate = self._metadata(name).get('surrogate')
@@ -267,7 +262,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
 
         # train first
         if self.train:
@@ -359,7 +354,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         ndarray
             2d array, self._vectorize rows of flattened input data.
         """
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
         array_real = True
 
         arr = np.zeros((vec_size, self._input_size))
@@ -387,7 +382,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        vec_size = self.metadata['vec_size']
+        vec_size = self.options['vec_size']
 
         if vec_size > 1:
             flat_inputs = self._vec_to_array_vectorized(inputs)
@@ -424,7 +419,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         num_sample = None
         for name, _ in chain(self._surrogate_input_names, self._surrogate_output_names):
             train_name = 'train:' + name
-            val = self.metadata[train_name]
+            val = self.options[train_name]
             if val is None:
                 missing_training_data.append(train_name)
                 continue
@@ -440,7 +435,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         if len(missing_training_data) > 0:
             msg = "MetaModelUnStructuredComp: The following training data sets must be " \
-                  "provided as metadata for %s: " % self.pathname + \
+                  "provided as options for %s: " % self.pathname + \
                   str(missing_training_data)
             raise RuntimeError(msg)
 
@@ -450,7 +445,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # Assemble input data.
         idx = 0
         for name, sz in self._surrogate_input_names:
-            val = self.metadata['train:' + name]
+            val = self.options['train:' + name]
             if isinstance(val[0], float):
                 inputs[:, idx] = val
                 idx += 1
@@ -466,7 +461,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             outputs = np.zeros((num_sample, output_size))
             self._training_output[name] = outputs
 
-            val = self.metadata['train:' + name]
+            val = self.options['train:' + name]
 
             if isinstance(val[0], float):
                 outputs[:, 0] = val
@@ -487,6 +482,23 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def _metadata(self, name):
         return self._var_rel2data_io[name]['metadata']
+
+    @property
+    def default_surrogate(self):
+        """
+        Get the default surrogate for this MetaModel.
+        """
+        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
+                         "instead.")
+        return self.options['default_surrogate']
+
+    @default_surrogate.setter
+    def default_surrogate(self, value):
+        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
+                         "instead.")
+        self.options['default_surrogate'] = value
 
 
 class MetaModel(MetaModelUnStructuredComp):

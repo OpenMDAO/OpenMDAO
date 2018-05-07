@@ -64,6 +64,7 @@ class ScalingExample2(ImplicitComponent):
         residuals['y1'] = 1e5 * (x1 - y1)/y1
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
+
 class ScalingExample3(ImplicitComponent):
 
     def setup(self):
@@ -80,6 +81,7 @@ class ScalingExample3(ImplicitComponent):
 
         residuals['y1'] = 1e5 * (x1 - y1)/y1
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
+
 
 class ScalingExampleVector(ImplicitComponent):
 
@@ -128,56 +130,56 @@ class ScalingTestComp(ImplicitComponent):
     """
 
     def initialize(self):
-        self.metadata.declare('row', values=[1, 2])
-        self.metadata.declare('coeffs')
-        self.metadata.declare('use_scal', types=bool)
+        self.options.declare('row', values=[1, 2])
+        self.options.declare('coeffs')
+        self.options.declare('use_scal', types=bool)
 
     def setup(self):
 
-        r1, r2, c1, c2 = self.metadata['coeffs']
+        r1, r2, c1, c2 = self.options['coeffs']
 
         # We need to start at a different initial condition for different problems.
         init_state = 1.0
 
         # Scale the output based on the column coeff.
-        if self.metadata['row'] == 1:
+        if self.options['row'] == 1:
             ref = 1. / c1
             init_state = 1.0 / c1
-        elif self.metadata['row'] == 2:
+        elif self.options['row'] == 2:
             ref = 1. / c2
             init_state = 1.0 / c2
 
         # Scale the output based on the column coeff.
-        if self.metadata['row'] == 1:
+        if self.options['row'] == 1:
             res_ref = r1
-        elif self.metadata['row'] == 2:
+        elif self.options['row'] == 2:
             res_ref = r2
 
         # Overwrite to 1 if use_scal is False
-        if not self.metadata['use_scal']:
+        if not self.options['use_scal']:
             ref = 1.0
             res_ref = 1.0
 
         self.add_input('x')
-        self.add_output('y', val = init_state, ref=ref, res_ref=res_ref)
+        self.add_output('y', val=init_state, ref=ref, res_ref=res_ref)
 
         self.declare_partials('*', '*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        r1, r2, c1, c2 = self.metadata['coeffs']
+        r1, r2, c1, c2 = self.options['coeffs']
 
-        if self.metadata['row'] == 1:
+        if self.options['row'] == 1:
             residuals['y'] = 10. * r1 * c1 * outputs['y'] + r1 * c2 * inputs['x'] - r1
-        elif self.metadata['row'] == 2:
+        elif self.options['row'] == 2:
             residuals['y'] = 10. * r2 * c2 * outputs['y'] + r2 * c1 * inputs['x'] - r2
 
     def linearize(self, inputs, outputs, jacobian):
-        r1, r2, c1, c2 = self.metadata['coeffs']
+        r1, r2, c1, c2 = self.options['coeffs']
 
-        if self.metadata['row'] == 1:
+        if self.options['row'] == 1:
             jacobian['y', 'y'] = 10. * r1 * c1
             jacobian['y', 'x'] = r1 * c2
-        if self.metadata['row'] == 2:
+        if self.options['row'] == 2:
             jacobian['y', 'y'] = 10. * r2 * c2
             jacobian['y', 'x'] = r2 * c1
 
@@ -327,16 +329,16 @@ class TestScaling(unittest.TestCase):
         class Simple(ExplicitComponent):
 
             def initialize(self):
-                self.metadata.declare('ref', default=1.0)
-                self.metadata.declare('ref0', default=0.0)
-                self.metadata.declare('res_ref', default=None)
-                self.metadata.declare('res_ref0', default=None)
+                self.options.declare('ref', default=1.0)
+                self.options.declare('ref0', default=0.0)
+                self.options.declare('res_ref', default=None)
+                self.options.declare('res_ref0', default=None)
 
             def setup(self):
 
-                ref = self.metadata['ref']
-                ref0 = self.metadata['ref0']
-                res_ref = self.metadata['res_ref']
+                ref = self.options['ref']
+                ref0 = self.options['ref0']
+                res_ref = self.options['res_ref']
 
                 self.add_input('x', val=1.0)
                 self.add_output('y', val=1.0, ref=ref, ref0=ref0, res_ref=res_ref)
@@ -660,7 +662,7 @@ class TestScaling(unittest.TestCase):
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
-                residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+                residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
                 # These are incorrect derivatives, but we aren't doing any calculations, and it makes
@@ -719,7 +721,7 @@ class TestScaling(unittest.TestCase):
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
-                residuals['extra'] = 2.0*self.metadata['mtx'].dot(outputs['x']) - 3.0*inputs['rhs']
+                residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
                 # These are incorrect derivatives, but we aren't doing any calculations, and it makes
