@@ -240,49 +240,6 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(cases.get_case(n).outputs['y'], expected[n]['y'])
             self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[n]['f_xy'])
 
-    def test_full_factorial_kwarg(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.driver = DOEDriver(generator=FullFactorialGenerator(levels=3))
-
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
-
-        prob.setup(check=False)
-        prob.run_driver()
-        prob.cleanup()
-
-        expected = {
-            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
-            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
-            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
-            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        }
-
-        cases = CaseReader("CASES.db").driver_cases
-
-        self.assertEqual(cases.num_cases, 9)
-
-        for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[n]['f_xy'])
-
     def test_full_factorial_array(self):
         prob = Problem()
         model = prob.model
@@ -435,7 +392,9 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('y', lower=ylb, upper=yub)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
+        prob.driver = DOEDriver()
+        prob.driver.options['generator'] = LatinHypercubeGenerator(samples=4, seed=0)
+
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
@@ -625,70 +584,6 @@ class TestParallelDOE(unittest.TestCase):
             pass
 
     def test_full_factorial(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
-        prob.driver.options['parallel'] =  True
-
-        prob.setup(vector_class=PETScVector)
-
-        failed, output = run_driver(prob)
-        self.assertFalse(failed)
-
-        prob.cleanup()
-
-        expected = {
-            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
-            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
-            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
-            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        }
-
-        size = prob.comm.size
-        rank = prob.comm.rank
-
-        # cases will be split across files for each proc
-        filename = "CASES.db_%d" % rank
-
-        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-        self.assertTrue(expect_msg in output)
-
-        cases = CaseReader(filename).driver_cases
-
-        # cases recorded on this proc
-        num_cases = cases.num_cases
-        self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
-
-        for n in range(num_cases):
-            case = cases.get_case(n)
-            idx = n * size + rank  # index of expected case
-
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[idx]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[idx]['y'])
-            self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[idx]['f_xy'])
-
-        # total number of cases recorded across all procs
-        num_cases = prob.comm.allgather(num_cases)
-        self.assertEqual(sum(num_cases), len(expected))
-
-    def test_full_factorial_kwargs(self):
         prob = Problem()
         model = prob.model
 
