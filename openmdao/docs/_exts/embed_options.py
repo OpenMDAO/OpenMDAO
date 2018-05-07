@@ -115,6 +115,9 @@ class EmbedOptionsDirective(Directive):
             n += 1
 
         lines.append(header, "options table", n)
+        lines.append("", "options table", n+1)  # Blank line required after table.
+        lines.append("Note: Options can be passed as keyword arguments at initialization.",
+                     "options table", n+2)
 
         # Create a node.
         node = nodes.section()

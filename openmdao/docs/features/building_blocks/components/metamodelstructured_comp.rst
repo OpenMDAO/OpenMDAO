@@ -18,16 +18,18 @@ sample points, but an order 5 quintic spline is specified), the order of the
 fitted spline will be automatically reduced for that dimension alone.
 
 Extrapolation is supported, but disabled by default. It can be enabled
-via initialization attribute (see below).
+via the :code:`extrapolate` option (see below).
 
+MetaModelStructuredComp Options
+-------------------------------
 
 .. embed-options::
     openmdao.components.meta_model_structured_comp
     MetaModelStructuredComp
-    metadata
+    options
 
-Examples
---------
+MetaModelStructuredComp Examples
+--------------------------------
 
 A simple quick-start example is fitting the exclusive-or ("XOR") operator between
 two inputs, `x` and `y`:
@@ -52,7 +54,7 @@ This is illustrated by the example:
 
 Finally, it is possible to compute gradients with respect to the given
 output training data. These gradients are not computed by default, but
-can be enabled by setting the metadata `training_data_gradients` to `True`.
+can be enabled by setting the option `training_data_gradients` to `True`.
 When this is done, for each output that is added to the component, a
 corresponding input is added to the component with the same name but with an
 `_train` suffix. This allows you to connect in the training data as an input

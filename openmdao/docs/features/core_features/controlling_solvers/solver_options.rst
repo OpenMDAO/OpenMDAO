@@ -4,8 +4,20 @@
 Using Solver Options
 ********************
 
-All solvers (both nonlinear and linear) have a number of options that you access via the `options` attribute that control its behavior.
-For instance, here is how you would change the iteration limit and convergence tolerances for the :ref: `NonlinearBlockGS <openmdao.solvers.nonlinear.nonlinear_block_gs.NonlinearBlockGS>`
+All solvers (both nonlinear and linear) have a number of options that you access via the
+`options` attribute that control its behavior:
+
+.. embed-options::
+    openmdao.solvers.solver
+    Solver
+    options
+
+
+Iteration Limit and Convergence Tolerances
+------------------------------------------
+
+Here is how you would change the iteration limit and convergence tolerances
+for :ref:`NonlinearBlockGaussSeidel <nlbgs>`.
 
 .. embed-code::
     openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_set_options
@@ -21,7 +33,7 @@ If you want to control that printing behavior you can use the `iprint` option in
 
 ----
 
-iprint = -1: Print nothing
+**iprint = -1**: Print nothing
 
 .. embed-code::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_neg1
@@ -29,7 +41,7 @@ iprint = -1: Print nothing
 
 ----
 
-iprint = 0: Print only errors or convergence failures.
+**iprint = 0**: Print only errors or convergence failures.
 
 .. embed-code::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_0
@@ -37,7 +49,7 @@ iprint = 0: Print only errors or convergence failures.
 
 ----
 
-iprint = 1: Print a convergence summary, as well as errors and convergence failures.
+**iprint = 1**: Print a convergence summary, as well as errors and convergence failures.
 
 .. embed-code::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_1
@@ -45,7 +57,7 @@ iprint = 1: Print a convergence summary, as well as errors and convergence failu
 
 -----
 
-iprint = 2: Print the residual for every solver iteration.
+**iprint = 2**: Print the residual for every solver iteration.
 
 .. embed-code::
     openmdao.solvers.tests.test_solver_iprint.TestSolverPrint.test_feature_iprint_2

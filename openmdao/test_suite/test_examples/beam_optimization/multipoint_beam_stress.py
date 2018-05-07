@@ -60,27 +60,27 @@ class MultipointBeamGroup(Group):
     """
 
     def initialize(self):
-        self.metadata.declare('E')
-        self.metadata.declare('L')
-        self.metadata.declare('b')
-        self.metadata.declare('volume')
-        self.metadata.declare('max_bending')
-        self.metadata.declare('num_elements', 5)
-        self.metadata.declare('num_cp', 50)
-        self.metadata.declare('num_load_cases', 1)
-        self.metadata.declare('parallel_derivs', False, types=bool, allow_none=True)
+        self.options.declare('E')
+        self.options.declare('L')
+        self.options.declare('b')
+        self.options.declare('volume')
+        self.options.declare('max_bending')
+        self.options.declare('num_elements', 5)
+        self.options.declare('num_cp', 50)
+        self.options.declare('num_load_cases', 1)
+        self.options.declare('parallel_derivs', False, types=bool, allow_none=True)
 
     def setup(self):
-        E = self.metadata['E']
-        L = self.metadata['L']
-        b = self.metadata['b']
-        volume = self.metadata['volume']
-        max_bending = self.metadata['max_bending']
-        num_elements = self.metadata['num_elements']
+        E = self.options['E']
+        L = self.options['L']
+        b = self.options['b']
+        volume = self.options['volume']
+        max_bending = self.options['max_bending']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
-        num_cp = self.metadata['num_cp']
-        num_load_cases = self.metadata['num_load_cases']
-        parallel_derivs = self.metadata['parallel_derivs']
+        num_cp = self.options['num_cp']
+        num_load_cases = self.options['num_load_cases']
+        parallel_derivs = self.options['parallel_derivs']
 
         inputs_comp = IndepVarComp()
         inputs_comp.add_output('h_cp', shape=num_cp)

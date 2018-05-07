@@ -1899,10 +1899,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         class CellComp(ExplicitComponent):
 
             def initialize(self):
-                self.metadata.declare('num_nodes', types=int)
+                self.options.declare('num_nodes', types=int)
 
             def setup(self):
-                n = self.metadata['num_nodes']
+                n = self.options['num_nodes']
 
                 self.add_input('I_Li', val=3.25*np.ones(n))
                 self.add_output('zSOC', val=np.ones(n))
@@ -1939,7 +1939,7 @@ class TestProblemCheckTotals(unittest.TestCase):
                 self.nonlinear_solver.options['maxiter'] = 1
 
             def initialize(self):
-                self.metadata.declare('ode_class', desc='System defining the ODE.')
+                self.options.declare('ode_class', desc='System defining the ODE.')
 
 
         p = Problem(model=GaussLobattoPhase())
