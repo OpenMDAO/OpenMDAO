@@ -152,7 +152,7 @@ class TestLinearSystemComp(unittest.TestCase):
         sol = d_residuals['lin.x']
         assert_rel_error(self, sol, x, .0001)
 
-        J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
+        J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b', 'lin.x'], return_format='flat_dict')
         assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
 

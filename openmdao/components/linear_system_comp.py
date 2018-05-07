@@ -44,6 +44,7 @@ class LinearSystemComp(ImplicitComponent):
                               desc='Number of linear systems to solve.')
         self.metadata.declare('vectorize_A', default=False, types=bool,
                               desc='Set to True to vectorize the A matrix.')
+
     def setup(self):
         """
         Matrix and RHS are inputs, solution vector is the output.
@@ -183,7 +184,8 @@ class LinearSystemComp(ImplicitComponent):
             if vec_size > 1:
                 for j in range(vec_size):
                     idx = j if vec_size_A > 1 else 0
-                    d_outputs['x'][j] = linalg.lu_solve(self._lup[idx], d_residuals['x'][j], trans=0)
+                    d_outputs['x'][j] = linalg.lu_solve(self._lup[idx], d_residuals['x'][j],
+                                                        trans=0)
             else:
                 d_outputs['x'] = linalg.lu_solve(self._lup, d_residuals['x'], trans=0)
 
@@ -191,6 +193,7 @@ class LinearSystemComp(ImplicitComponent):
             if vec_size > 1:
                 for j in range(vec_size):
                     idx = j if vec_size_A > 1 else 0
-                    d_residuals['x'][j] = linalg.lu_solve(self._lup[idx], d_outputs['x'][j], trans=1)
+                    d_residuals['x'][j] = linalg.lu_solve(self._lup[idx], d_outputs['x'][j],
+                                                          trans=1)
             else:
                 d_residuals['x'] = linalg.lu_solve(self._lup, d_outputs['x'], trans=1)
