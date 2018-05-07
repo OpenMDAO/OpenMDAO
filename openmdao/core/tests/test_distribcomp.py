@@ -245,7 +245,7 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribCompSimple(size))
         top.connect('C1.outvec', 'C2.invec')
 
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -264,7 +264,7 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(size))
         C2 = top.add_subsystem("C2", DistribInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -286,7 +286,7 @@ class MPITests(unittest.TestCase):
                                               y=np.zeros(size*commsize)))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.x')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -308,7 +308,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -330,7 +330,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -362,7 +362,7 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -389,7 +389,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()

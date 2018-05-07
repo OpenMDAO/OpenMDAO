@@ -547,7 +547,7 @@ class TestAddConstraintMPI(unittest.TestCase):
         sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(vector_class=PETScVector, mode='rev')
+            prob.setup(mode='rev')
 
         msg = "Output not found for response 'd1.junk' in system 'sub'."
         self.assertEqual(str(context.exception), msg)

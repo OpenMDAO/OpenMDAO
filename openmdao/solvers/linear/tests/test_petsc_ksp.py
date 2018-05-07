@@ -47,7 +47,7 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -80,7 +80,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'gmres'
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -111,7 +111,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -140,7 +140,7 @@ class TestPETScKrylov(unittest.TestCase):
         precon = group.linear_solver.precon = LinearBlockGS()
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -172,7 +172,7 @@ class TestPETScKrylov(unittest.TestCase):
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = DirectSolver()
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -208,7 +208,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'richardson'
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -241,7 +241,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['precon_side'] = 'left'
         group.linear_solver.options['ksp_type'] = 'richardson'
 
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -303,7 +303,7 @@ class TestPETScKrylov(unittest.TestCase):
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PETScKrylov))
 
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         p.set_solver_print(level=0)
 

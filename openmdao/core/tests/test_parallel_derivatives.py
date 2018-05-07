@@ -668,7 +668,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # run first in fwd mode
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, mode='rev')
+        p.setup(mode='rev')
         p.run_model()
 
         J = p.compute_totals(of, wrt, return_format='dict')
@@ -692,7 +692,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # run first in fwd mode
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, mode='fwd')
+        p.setup(mode='fwd')
         p.run_model()
 
         elapsed_fwd = time.time()
@@ -706,7 +706,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # now run in rev mode and compare times for deriv calculation
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, check=False, mode='rev')
+        p.setup(check=False, mode='rev')
 
         p.run_model()
 

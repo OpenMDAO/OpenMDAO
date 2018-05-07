@@ -167,7 +167,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.model.add_design_var('x')
         prob.model.add_objective('sum')
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         prob['x'] = np.ones(size)
 

@@ -616,7 +616,7 @@ class TestParallelDOE(unittest.TestCase):
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
         prob.driver.options['parallel'] =  doe_parallel
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         failed, output = run_driver(prob)
         self.assertFalse(failed)

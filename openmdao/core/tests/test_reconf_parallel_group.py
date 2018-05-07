@@ -47,7 +47,7 @@ class Test(unittest.TestCase):
         prob.model.add_subsystem('Cx0', IndepVarComp('x0'), promotes=['x0'])
         prob.model.add_subsystem('Cx1', IndepVarComp('x1'), promotes=['x1'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         #import wingdbstub
 
