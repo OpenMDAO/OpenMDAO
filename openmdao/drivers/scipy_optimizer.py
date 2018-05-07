@@ -89,6 +89,11 @@ class ScipyOptimizeDriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize the ScipyOptimizeDriver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
         super(ScipyOptimizeDriver, self).__init__(**kwargs)
 

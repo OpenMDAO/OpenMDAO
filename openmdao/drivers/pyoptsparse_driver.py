@@ -116,6 +116,11 @@ class pyOptSparseDriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize pyopt.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
         super(pyOptSparseDriver, self).__init__(**kwargs)
 

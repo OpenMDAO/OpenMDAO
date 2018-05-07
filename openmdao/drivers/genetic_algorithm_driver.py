@@ -43,6 +43,12 @@ class SimpleGADriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize the SimpleGADriver driver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
+
         """
         super(SimpleGADriver, self).__init__(**kwargs)
 
@@ -83,7 +89,6 @@ class SimpleGADriver(Driver):
                              'as four times the number of bits.')
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
-
 
     def _setup_driver(self, problem):
         """
