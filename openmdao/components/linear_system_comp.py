@@ -41,9 +41,9 @@ class LinearSystemComp(ImplicitComponent):
         """
         self.options.declare('size', default=1, types=int, desc='The size of the linear system.')
         self.options.declare('vec_size', types=int, default=1,
-                              desc='Number of linear systems to solve.')
+                             desc='Number of linear systems to solve.')
         self.options.declare('vectorize_A', default=False, types=bool,
-                              desc='Set to True to vectorize the A matrix.')
+                             desc='Set to True to vectorize the A matrix.')
 
     def setup(self):
         """
@@ -158,7 +158,6 @@ class LinearSystemComp(ImplicitComponent):
             J['x', 'x'] = inputs['A'].flat
         else:
             J['x', 'x'] = np.tile(inputs['A'].flat, vec_size)
-
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""

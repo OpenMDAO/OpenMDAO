@@ -41,6 +41,12 @@ class TestLinearSystemComp(unittest.TestCase):
         assert_rel_error(self, prob['lin.x'], x, .0001)
         assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
+        model.run_apply_nonlinear()
+
+        with model._scaled_context_all():
+            val = model.lingrp.lin._residuals['x']
+            assert_rel_error(self, val, np.zeros((3, )), tolerance=1e-8)
+
     def test_vectorized(self):
         """Check against the scipy solver."""
 
@@ -69,6 +75,12 @@ class TestLinearSystemComp(unittest.TestCase):
 
         assert_rel_error(self, prob['lin.x'], x, .0001)
         assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context_all():
+            val = model.lingrp.lin._residuals['x']
+            assert_rel_error(self, val, np.zeros((2, 3)), tolerance=1e-8)
 
     def test_vectorized_A(self):
         """Check against the scipy solver."""
@@ -99,6 +111,12 @@ class TestLinearSystemComp(unittest.TestCase):
 
         assert_rel_error(self, prob['lin.x'], x, .0001)
         assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
+
+        model.run_apply_nonlinear()
+
+        with model._scaled_context_all():
+            val = model.lingrp.lin._residuals['x']
+            assert_rel_error(self, val, np.zeros((2, 3)), tolerance=1e-8)
 
     def test_solve_linear(self):
         """Check against solve_linear."""
@@ -155,6 +173,14 @@ class TestLinearSystemComp(unittest.TestCase):
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b', 'lin.x'], return_format='flat_dict')
         assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
+
+        data = prob.check_partials(out_stream=None)
+
+        abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+            self.assertTrue(abs_error < 1.e-6)
 
     def test_solve_linear_vectorized(self):
         """Check against solve_linear."""
@@ -213,6 +239,13 @@ class TestLinearSystemComp(unittest.TestCase):
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
         assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
+
+        data = prob.check_partials(out_stream=None)
+
+        abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
 
     def test_solve_linear_vectorized_A(self):
         """Check against solve_linear."""
@@ -281,6 +314,13 @@ class TestLinearSystemComp(unittest.TestCase):
         assert_rel_error(self, J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_rel_error(self, J['lin.x', 'p2.b'], dx_db, .0001)
 
+        data = prob.check_partials(out_stream=None)
+
+        abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
+        self.assertTrue(len(abs_errors) > 0)
+        for match in abs_errors:
+            abs_error = float(match)
+
     def test_feature_basic(self):
         import numpy as np
 
@@ -311,7 +351,6 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['lin.x'], x, .0001)
-        assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
     def test_feature_vectorized(self):
         import numpy as np
@@ -343,7 +382,6 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['lin.x'], x, .0001)
-        assert_rel_error(self, prob.model._residuals.get_norm(), 0.0, 1e-10)
 
     def test_feature_vectorized_A(self):
         import numpy as np
