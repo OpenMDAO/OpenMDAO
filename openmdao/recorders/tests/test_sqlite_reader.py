@@ -1156,6 +1156,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+
 def _assert_model_matches_case(case, system):
     '''
     Check to see if the values in the case match those in the model.
