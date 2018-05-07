@@ -28,7 +28,7 @@ printed are unscaled, physical values.
       :layout: interleave
 
 We can also use the debug printing to print some basic information about the derivative calculations so that you can see
-which derivative is being solved and how long it takes, by including the 'totals' string in the "debug_print" list.
+which derivative is being solved, how long it takes, and the computed values by including the 'totals' string in the "debug_print" list.
 
   .. embed-code::
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_debug_print_option_totals

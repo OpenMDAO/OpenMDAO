@@ -5,6 +5,7 @@ from __future__ import print_function, division
 
 from collections import OrderedDict
 from copy import deepcopy
+import pprint
 from six import iteritems
 from six.moves import zip
 import sys
@@ -1027,6 +1028,11 @@ class _TotalJacInfo(object):
 
         if self.has_scaling:
             self._do_scaling(self.J_dict)
+
+        if debug_print:
+            # Debug outputs scaled derivatives.
+            sys.stdout.flush()
+            pprint.pprint(self.J_dict)
 
         recording_iteration.stack.pop()
 
