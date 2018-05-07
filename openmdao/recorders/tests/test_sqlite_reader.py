@@ -8,7 +8,8 @@ from shutil import rmtree
 from tempfile import mkdtemp, mkstemp
 
 import numpy as np
-from six import iteritems
+from six import iteritems, assertRaisesRegex
+
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearBlockGS, ScipyKrylov, \
     LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
@@ -836,6 +837,37 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         _assert_model_matches_case(case, model)
 
+    def test_load_bad_system_case(self):
+        self.setup_sellar_grouped_model()
+        prob = self.prob
+        model = prob.model
+        driver = prob.driver = ScipyOptimizeDriver()
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        model.add_recorder(self.recorder)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        case = cr.system_cases.get_case(0)
+
+        # try to load it into a completely different model
+        self.setup_sellar_model()
+        prob = self.prob
+        prob.setup(check=False)
+
+        error_msg = "Input variable, '[^']+', recorded in the case is not found in the model"
+        with assertRaisesRegex(self, KeyError, error_msg):
+            prob.load_case(case)
+
     def test_subsystem_load_system_cases(self):
         self.setup_sellar_model()
         prob = self.prob
@@ -1123,7 +1155,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
         prob.cleanup()
-
 
 def _assert_model_matches_case(case, system):
     '''
