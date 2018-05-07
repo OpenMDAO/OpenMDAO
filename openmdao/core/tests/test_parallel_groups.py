@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
-                         ExplicitComponent
+                         ExplicitComponent, DefaultVector
 
 from openmdao.utils.mpi import under_mpirun
 from openmdao.utils.mpi import MPI
@@ -277,10 +277,10 @@ class TestParallelGroups(unittest.TestCase):
 
         # check that error is thrown if not using PETScVector
         if under_mpirun():
-            msg = ("The `vector_class` argument must be `PETScVector` when "
+            msg = ("The `distributed_vector_class` argument must be `PETScVector` when "
                    "running in parallel under MPI but 'DefaultVector' was specified.")
             with self.assertRaises(ValueError) as cm:
-                prob.setup(check=False, mode='fwd')
+                prob.setup(check=False, mode='fwd', distributed_vector_class=DefaultVector)
 
             self.assertEqual(str(cm.exception), msg)
         else:

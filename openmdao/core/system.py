@@ -240,7 +240,12 @@ class System(object):
     _norm0: float
         Normalization factor
     _vector_class : class
-        Class to use for data vectors.
+        Class to use for data vectors.  After setup will contain the value of either
+        _distributed_vector_class or _local_vector_class.
+    _distributed_vector_class : class
+        Class to use for distributed data vectors.
+    _local_vector_class : class
+        Class to use for local data vectors.
     """
 
     def __init__(self, **kwargs):
@@ -368,7 +373,9 @@ class System(object):
         self._has_resid_scaling = False
         self._has_input_scaling = False
 
-        self._vector_class = DefaultVector
+        self._vector_class = None
+        self._local_vector_class = None
+        self._distributed_vector_class = None
 
     def _check_reconf(self):
         """
@@ -518,14 +525,12 @@ class System(object):
 
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
+    def _get_root_vectors(self, initial, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
         Parameters
         ----------
-        vector_class : Vector
-            The Vector class used to instantiate the root vectors.
         initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
         force_alloc_complex : bool
@@ -538,9 +543,6 @@ class System(object):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        if self._vector_class is not None:
-            vector_class = self._vector_class
-
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
         self._root_vecs = root_vectors = {'input': OrderedDict(),
@@ -566,6 +568,8 @@ class System(object):
                 self._scale_factors = self._compute_root_scale_factors()
             else:
                 self._scale_factors = {}
+
+            vector_class = self._vector_class
 
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]['output']
@@ -635,10 +639,12 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode)
-        self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
+                    distributed_vector_class=self._distributed_vector_class,
+                    local_vector_class=self._local_vector_class)
+        self._final_setup(self.comm, setup_mode=setup_mode)
 
-    def _setup(self, comm, setup_mode, mode):
+    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class):
         """
         Perform setup for this system and its descendant systems.
 
@@ -655,6 +661,12 @@ class System(object):
             Must be one of 'full', 'reconf', or 'update'.
         mode : str or None
             Derivative direction, either 'fwd', or 'rev', or None
+        distributed_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in interprocess communication.
+        local_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in intraprocess communication.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -665,6 +677,8 @@ class System(object):
             self.pathname = ''
             self.comm = comm
             self._relevant = None
+            self._distributed_vector_class = distributed_vector_class
+            self._local_vector_class = local_vector_class
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             initial = False
@@ -732,7 +746,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_case_recording(recurse)
 
-    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
+    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -747,8 +761,6 @@ class System(object):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        vector_class : type
-            reference to an actual <Vector> class; not an instance.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         force_alloc_complex : bool
@@ -777,8 +789,7 @@ class System(object):
         ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset = \
             self._get_initial_global(initial)
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
-        root_vectors = self._get_root_vectors(vector_class, initial,
-                                              force_alloc_complex=force_alloc_complex)
+        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(DefaultVector, initial), resize=resize)
 
@@ -1086,7 +1097,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._conn_abs_in2out = {}
+        pass
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         """

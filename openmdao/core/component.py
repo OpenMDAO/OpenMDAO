@@ -190,6 +190,21 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
 
+    def _setup_connections(self, recurse=True):
+        """
+        Compute dict of all implicit and explicit connections owned by this system.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        self._conn_abs_in2out = {}
+        if self.distributed:
+            self._vector_class = self._distributed_vector_class
+        else:
+            self._vector_class = self._local_vector_class
+
     def _setup_var_sizes(self, recurse=True):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.

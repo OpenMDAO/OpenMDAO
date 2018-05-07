@@ -174,6 +174,7 @@ class Group(System):
         self._static_mode = True
 
         if MPI:
+            self._var_offsets_byset = {}
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
             # Call the load balancing algorithm
@@ -225,6 +226,9 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
+            subsys._local_vector_class = self._local_vector_class
+            subsys._distributed_vector_class = self._distributed_vector_class
+
             if self.pathname:
                 loc = subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
             else:
@@ -741,9 +745,7 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_connections()
-        abs_in2out = self._conn_abs_in2out
-
+        abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
 
@@ -759,6 +761,8 @@ class Group(System):
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 
+        self._vector_class = None
+
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
@@ -771,17 +775,16 @@ class Group(System):
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
 
-                    if MPI and self._vector_class is not None:
-                        # check for any cross-process data transfer. Setting _vector_class to None
-                        # will cause the group to use whatever vector class was passed into
-                        # the Problem during setup.
+                    if MPI and self._vector_class is None:
+                        # check for any cross-process data transfer.  If found, use
+                        # self._distributed_vector_class as our vector class.
                         in_path = abs_in.rsplit('.', 1)[0]
                         if in_path not in self._local_system_set:
-                            self._vector_class = None
+                            self._vector_class = self._distributed_vector_class
                         else:
                             out_path = abs_out.rsplit('.', 1)[0]
                             if out_path not in self._local_system_set:
-                                self._vector_class = None
+                                self._vector_class = self._distributed_vector_class
 
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling:
@@ -816,6 +819,10 @@ class Group(System):
                                 needs_input_scaling = np.any(res_ref != 1.0)
 
                 self._has_input_scaling = needs_input_scaling
+
+        if self._vector_class is None:
+            # our vectors are just local vectors.
+            self._vector_class = self._local_vector_class
 
         # Now that both implicit & explicit connections have been added,
         # check unit/shape compatibility, but only for connections that are
@@ -929,7 +936,7 @@ class Group(System):
                                                      i, d_size))
 
         # TODO: move this somewhere else later...
-        if self._vector_class is not DefaultVector:  # we're doing PETSc transfers
+        if self._vector_class is not self._local_vector_class:  # we're doing distrib transfers
             offsets = self._var_offsets_byset = {}
             for vec_name in self._lin_rel_vec_name_list:
                 offsets[vec_name] = off_vn = {}
@@ -1031,15 +1038,7 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        # get the transfer class
-        if self._vector_class is None:
-            for vec_name, vec in iteritems(self._vectors['output']):
-                transfer_class = vec.TRANSFER
-                break
-        else:
-            transfer_class = self._vector_class.TRANSFER
-
-        transfer_class._setup_transfers(self, recurse=recurse)
+        self._vector_class.TRANSFER._setup_transfers(self, recurse=recurse)
 
     def add(self, name, subsys, promotes=None):
         """
