@@ -33,13 +33,11 @@ class TestKeplersEquation(unittest.TestCase):
 
         bal = BalanceComp()
 
-        bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M')
+        def guess_function(inputs, outputs):
+            return inputs['M']
 
-        # Override the guess_nonlinear method, always initialize E to the value of M
-        def guess_func(inputs, outputs, residuals):
-            outputs['E'] = inputs['M']
-
-        bal.guess_nonlinear = guess_func
+        bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M',
+                        guess_func=guess_function)
 
         # ExecComp used to compute the LHS of Kepler's equation.
         lhs_comp = ExecComp('lhs=E - ecc * sin(E)',
