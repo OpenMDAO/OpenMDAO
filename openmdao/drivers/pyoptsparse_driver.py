@@ -20,7 +20,6 @@ from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.record_util import create_local_meta
 import openmdao.utils.coloring as coloring_mod
 
 
