@@ -2,9 +2,9 @@
 
 .. _balancecomp_feature:
 
-*****************
-Balance Component
-*****************
+***********
+BalanceComp
+***********
 
 `BalanceComp` is a specialized implementation of `ImplicitComponent` that
 is intended to provide a simple way to implement most implicit equations
@@ -37,7 +37,7 @@ of the implicit state variable.
 The BalanceComp supports vectorized implicit states, simply provide a default
 value or shape when adding the balance that reflects the correct shape.
 
-Balance accepts the following other arguments (which are all passed
+BalanceComp accepts the following other arguments (which are all passed
 to ``add_balance`` during initialization):
 
 =========== ======================== ===================================================================================
@@ -57,7 +57,7 @@ kwargs      dict or named arguments  Additional arguments to be passed for the c
 Example:  Scalar Root Finding
 -----------------------------
 
-The following example uses the Balance Component to implicitly solve the
+The following example uses a BalanceComp to implicitly solve the
 equation:
 
 .. math::
@@ -82,7 +82,7 @@ Alternatively, we could simplify the code by using the :code:`mult_val` argument
 Example:  Vectorized Root Finding
 ---------------------------------
 
-The following example uses the Balance Component to implicitly solve the equation:
+The following example uses a BalanceComp to implicitly solve the equation:
 
 .. math::
 
@@ -97,4 +97,4 @@ they need not be connected.
     :layout: interleave
 
 
-.. tags:: BalanceComp
+.. tags:: BalanceComp, Component

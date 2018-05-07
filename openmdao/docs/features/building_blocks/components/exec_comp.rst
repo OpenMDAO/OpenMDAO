@@ -106,4 +106,4 @@ connection source.
     :layout: interleave
 
 
-.. tags:: ExecComp, Examples
+.. tags:: ExecComp, Component, Examples
