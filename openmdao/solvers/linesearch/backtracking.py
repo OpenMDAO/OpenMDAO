@@ -72,6 +72,10 @@ class BoundsEnforceLS(NonlinearSolver):
 
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
+        # Remove unused options from base options.
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
+        # self.options.undeclare("maxiter") # eventually want to undeclare this
 
     def _declare_options(self):
         """

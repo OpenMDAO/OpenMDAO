@@ -13,6 +13,22 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(LinearRunOnce, self).__init__(**kwargs)
+
+        # Remove unused options from base options.
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
+        # self.options.undeclare("maxiter") # eventually want to undeclare this
+
     def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
