@@ -200,8 +200,8 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(err.exception),
                          "'_bad_name' is not a valid system name.")
 
-        # 'name', 'pathname', 'comm' and 'metadata' are reserved names
-        for reserved in ['name', 'pathname', 'comm', 'metadata']:
+        # 'name', 'pathname', 'comm' and 'options' are reserved names
+        for reserved in ['name', 'pathname', 'comm', 'options']:
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, Group())
             self.assertEqual(str(err.exception),

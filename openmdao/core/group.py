@@ -97,7 +97,7 @@ class Group(System):
             name
             pathname
             comm
-            metadata
+            options
         """
         pass
 
@@ -117,7 +117,7 @@ class Group(System):
             name
             pathname
             comm
-            metadata
+            options
             system hieararchy with attribute access
         """
         pass

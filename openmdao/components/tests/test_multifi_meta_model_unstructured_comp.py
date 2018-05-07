@@ -34,12 +34,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:x_fi2'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:x_fi3'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x'] = [0.0, 0.4, 1.0]
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x_fi2'] = [0.0, 0.4, 1.0]
+        mm.options['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x_fi3'] = [0.0, 0.4, 1.0]
+        mm.options['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
 
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
@@ -59,15 +59,15 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:x2'] = [0.0, 0.4, 1.0, 999.0]
-        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:x_fi2'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:x2_fi2'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:x_fi3'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:x2_fi3'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x'] = [0.0, 0.4, 1.0]
+        mm.options['train:x2'] = [0.0, 0.4, 1.0, 999.0]
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x_fi2'] = [0.0, 0.4, 1.0]
+        mm.options['train:x2_fi2'] = [0.0, 0.4, 1.0]
+        mm.options['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x_fi3'] = [0.0, 0.4, 1.0]
+        mm.options['train:x2_fi3'] = [0.0, 0.4, 1.0]
+        mm.options['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
 
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
@@ -87,15 +87,15 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195, 3.14159]
-        mm.metadata['train:x_fi2'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:x_fi3'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x'] = [0.0, 0.4, 1.0]
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195, 3.14159]
+        mm.options['train:x_fi2'] = [0.0, 0.4, 1.0]
+        mm.options['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:y_fi2'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x_fi3'] = [0.0, 0.4, 1.0]
+        mm.options['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:y_fi3'] = [3.02720998, 0.11477697, 15.82973195]
 
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
@@ -113,12 +113,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        self.assertEqual(mm.metadata['train:x'], None)
-        self.assertEqual(mm.metadata['train:x_fi2'], None)
-        self.assertEqual(mm.metadata['train:x_fi3'], None)
-        self.assertEqual(mm.metadata['train:y'], None)
-        self.assertEqual(mm.metadata['train:y_fi2'], None)
-        self.assertEqual(mm.metadata['train:y_fi3'], None)
+        self.assertEqual(mm.options['train:x'], None)
+        self.assertEqual(mm.options['train:x_fi2'], None)
+        self.assertEqual(mm.options['train:x_fi3'], None)
+        self.assertEqual(mm.options['train:y'], None)
+        self.assertEqual(mm.options['train:y_fi2'], None)
+        self.assertEqual(mm.options['train:y_fi3'], None)
 
     def test_one_dim_one_fidelity_training(self):
         mm = MultiFiMetaModelUnStructuredComp()
@@ -131,8 +131,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = [0.0, 0.4, 1.0]
-        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:x'] = [0.0, 0.4, 1.0]
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
 
         expected_xtrain=[np.array([[0.0], [0.4], [1.0]])]
         expected_ytrain=[np.array([[3.02720998], [0.11477697], [15.82973195]])]
@@ -158,11 +158,11 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x']= [0.0, 0.4, 1.0]
-        mm.metadata['train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6,
+        mm.options['train:x']= [0.0, 0.4, 1.0]
+        mm.options['train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6,
                                   0.7, 0.8, 0.9, 0.0, 0.4, 1.0]
-        mm.metadata['train:y'] = [3.02720998, 0.11477697, 15.82973195]
-        mm.metadata['train:y_fi2'] = [-9.32828839, -8.31986355, -7.00778837,
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+        mm.options['train:y_fi2'] = [-9.32828839, -8.31986355, -7.00778837,
                                   -4.54535129, -4.0747189 , -5.30287702,
                                   -4.47456522, 1.85597517, -8.48639501,
                                   -5.94261151, 7.91486597]
@@ -193,14 +193,14 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x1']     = [1.0, 2.0, 3.0]
-        mm.metadata['train:x1_fi2'] = [1.1, 2.1, 3.1, 1.0, 2.0, 3.0]
-        mm.metadata['train:x2']     = [1.0, 2.0, 3.0]
-        mm.metadata['train:x2_fi2'] = [2.1, 2.2, 2.3, 1.0, 2.0, 3.0]
-        mm.metadata['train:y1']     = [0.0, 0.1, 0.2]
-        mm.metadata['train:y1_fi2'] = [3.0, 3.1, 3.3, 3.4, 3.5 ,3.6]
-        mm.metadata['train:y2']     = [4.0, 4.0, 4.0]
-        mm.metadata['train:y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
+        mm.options['train:x1']     = [1.0, 2.0, 3.0]
+        mm.options['train:x1_fi2'] = [1.1, 2.1, 3.1, 1.0, 2.0, 3.0]
+        mm.options['train:x2']     = [1.0, 2.0, 3.0]
+        mm.options['train:x2_fi2'] = [2.1, 2.2, 2.3, 1.0, 2.0, 3.0]
+        mm.options['train:y1']     = [0.0, 0.1, 0.2]
+        mm.options['train:y1_fi2'] = [3.0, 3.1, 3.3, 3.4, 3.5 ,3.6]
+        mm.options['train:y2']     = [4.0, 4.0, 4.0]
+        mm.options['train:y2_fi2'] = [4.0, 4.1, 4.3, 4.4, 4.5 ,4.6]
 
         prob.run_model()
         expected_xtrain=[np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
@@ -233,7 +233,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm = MultiFiMetaModelUnStructuredComp(nfi=2)
         mm.add_input('x', np.zeros((1, 2)))
         mm.add_output('y', np.zeros((1, )))
-        mm.default_surrogate = MultiFiCoKrigingSurrogate()
+
+        mm.options['default_surrogate'] = MultiFiCoKrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -273,10 +274,10 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         y = np.array([[branin(case) for case in x[0]],
                       [branin_low_fidelity(case) for case in x[1]]])
 
-        mm.metadata['train:x'] = x[0]
-        mm.metadata['train:y'] = y[0]
-        mm.metadata['train:x_fi2'] = x[1]
-        mm.metadata['train:y_fi2'] = y[1]
+        mm.options['train:x'] = x[0]
+        mm.options['train:y'] = y[0]
+        mm.options['train:x_fi2'] = x[1]
+        mm.options['train:y_fi2'] = y[1]
 
         prob['mm.x'] = np.array([[2./3., 1./3.]])
         prob.run_model()
@@ -293,16 +294,17 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm = MultiFiMetaModelUnStructuredComp(nfi=2, vec_size=2)
         mm.add_input('x', np.zeros((2, 1, 2)))
         mm.add_output('y', np.zeros((2, 1, )))
-        mm.default_surrogate = MultiFiCoKrigingSurrogate()
+
+        mm.options['default_surrogate'] = MultiFiCoKrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        mm.metadata['train:x'] = x[0]
-        mm.metadata['train:y'] = y[0]
-        mm.metadata['train:x_fi2'] = x[1]
-        mm.metadata['train:y_fi2'] = y[1]
+        mm.options['train:x'] = x[0]
+        mm.options['train:y'] = y[0]
+        mm.options['train:x_fi2'] = x[1]
+        mm.options['train:y_fi2'] = y[1]
 
         prob['mm.x'] = np.array([[[2./3., 1./3.]], [[1./3., 2./3.]]])
         prob.run_model()
@@ -331,12 +333,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        self.assertEqual(mm.metadata['train:x'], None)
-        self.assertEqual(mm.metadata['train:x_fi2'], None)
-        self.assertEqual(mm.metadata['train:x_fi3'], None)
-        self.assertEqual(mm.metadata['train:y'], None)
-        self.assertEqual(mm.metadata['train:y_fi2'], None)
-        self.assertEqual(mm.metadata['train:y_fi3'], None)
+        self.assertEqual(mm.options['train:x'], None)
+        self.assertEqual(mm.options['train:x_fi2'], None)
+        self.assertEqual(mm.options['train:x_fi3'], None)
+        self.assertEqual(mm.options['train:y'], None)
+        self.assertEqual(mm.options['train:y_fi2'], None)
+        self.assertEqual(mm.options['train:y_fi3'], None)
 
     def test_multifi_meta_model_deprecated(self):
         # run same test as above, only with the deprecated component,
@@ -360,12 +362,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
-        self.assertEqual(mm.metadata['train:x'], None)
-        self.assertEqual(mm.metadata['train:x_fi2'], None)
-        self.assertEqual(mm.metadata['train:x_fi3'], None)
-        self.assertEqual(mm.metadata['train:y'], None)
-        self.assertEqual(mm.metadata['train:y_fi2'], None)
-        self.assertEqual(mm.metadata['train:y_fi3'], None)
+        self.assertEqual(mm.options['train:x'], None)
+        self.assertEqual(mm.options['train:x_fi2'], None)
+        self.assertEqual(mm.options['train:x_fi3'], None)
+        self.assertEqual(mm.options['train:y'], None)
+        self.assertEqual(mm.options['train:y_fi2'], None)
+        self.assertEqual(mm.options['train:y_fi3'], None)
 
 if __name__ == "__main__":
     unittest.main()

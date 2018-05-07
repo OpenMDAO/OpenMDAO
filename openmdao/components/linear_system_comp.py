@@ -29,29 +29,29 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
+            Keyword arguments that will be mapped into the Component options.
         """
         super(LinearSystemComp, self).__init__(**kwargs)
         self._lup = None
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('size', default=1, types=int, desc='the size of the linear system')
-        self.metadata.declare('partial_type', default='dense',
-                              values=['dense', 'sparse', 'matrix_free'],
-                              desc='the way the derivatives are defined')
+        self.options.declare('size', default=1, types=int, desc='the size of the linear system')
+        self.options.declare('partial_type', default='dense',
+                             values=['dense', 'sparse', 'matrix_free'],
+                             desc='the way the derivatives are defined')
 
     def setup(self):
         """
         Matrix and RHS are inputs, solution vector is the output.
         """
-        size = self.metadata['size']
+        size = self.options['size']
 
         self._lup = None
 
-        if self.metadata['partial_type'] == "matrix_free":
+        if self.options['partial_type'] == "matrix_free":
             self.apply_linear = self._mat_vec_prod
 
         self.add_input("A", val=np.eye(size))
@@ -60,9 +60,9 @@ class LinearSystemComp(ImplicitComponent):
 
         # Set up the derivatives according to the user specified mode.
 
-        partial_type = self.metadata['partial_type']
+        partial_type = self.options['partial_type']
 
-        size = self.metadata['size']
+        size = self.options['size']
         row_col = np.arange(size, dtype="int")
 
         if partial_type == 'sparse':
@@ -130,12 +130,12 @@ class LinearSystemComp(ImplicitComponent):
         J : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
-        partial_type = self.metadata['partial_type']
+        partial_type = self.options['partial_type']
         if partial_type == "matrix_free":
             return
 
         x = outputs['x']
-        size = self.metadata['size']
+        size = self.options['size']
         if partial_type == "dense":
             dx_dA = np.zeros((size, size**2))
 
@@ -162,7 +162,7 @@ class LinearSystemComp(ImplicitComponent):
         Compute jac-vector product.
 
         linear operator for the partial derivative jacobian, only used if the 'partial_type'
-        metadata is set to 'matrix_free'.
+        option is set to 'matrix_free'.
 
         Parameters
         ----------

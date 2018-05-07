@@ -101,7 +101,7 @@ class Component(System):
             name
             pathname
             comm
-            metadata
+            options
         """
         pass
 

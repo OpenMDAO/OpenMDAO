@@ -111,72 +111,55 @@ class BsplinesComp(ExplicitComponent):
     Simple B-spline component for interpolation.
     """
 
-    def __init__(self, num_control_points=10, num_points=20, vec_size=1, bspline_order=4,
-                 in_name='h_cp', out_name='h', distribution='sine'):
+    def __init__(self, **kwargs):
         """
         Initialize the BsplinesComp.
 
         Parameters
         ----------
-        num_control_points : int
-            Number of control points.
-        num_points : int
-            Number of interpolated points.
-        vec_size : int
-            The number of independent rows to interpolate.
-        bspline_order : int(4)
-            B-spline order.
-        in_name : str
-            Name to use for the input variable (control points).
-        out_name : str
-            Name to use for the output variable (interpolated points).
-        distribution : str
-            Choice of spatial distribution to use for placing the control points. It can be 'sine'
-            or 'uniform'.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
         """
-        super(BsplinesComp, self).__init__(num_control_points=num_control_points,
-                                           num_points=num_points, vec_size=vec_size,
-                                           bspline_order=bspline_order,
-                                           in_name=in_name, out_name=out_name,
-                                           distribution=distribution)
+        super(BsplinesComp, self).__init__(**kwargs)
+
         self.cite = CITATIONS
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('num_control_points', types=int, default=10,
-                              desc="Number of control points.")
-        self.metadata.declare('num_points', types=int, default=20,
-                              desc="Number of interpolated points.")
-        self.metadata.declare('vec_size', types=int, default=1,
-                              desc='The number of independent rows to interpolate.')
-        self.metadata.declare('bspline_order', 4, types=int, desc="B-spline order.")
-        self.metadata.declare('in_name', types=str, default='h_cp',
-                              desc="Name to use for the input variable (control points).")
-        self.metadata.declare('out_name', types=str, default='h',
-                              desc="Name to use for the output variable (interpolated points).")
-        self.metadata.declare('distribution', default='sine', values=['uniform', 'sine'],
-                              desc="Choice of spatial distribution to use for placing the control "
-                              "points. It can be 'sine' or 'uniform'.")
+        self.options.declare('num_control_points', types=int, default=10,
+                             desc="Number of control points.")
+        self.options.declare('num_points', types=int, default=20,
+                             desc="Number of interpolated points.")
+        self.options.declare('vec_size', types=int, default=1,
+                             desc='The number of independent rows to interpolate.')
+        self.options.declare('bspline_order', 4, types=int, desc="B-spline order.")
+        self.options.declare('in_name', types=str, default='h_cp',
+                             desc="Name to use for the input variable (control points).")
+        self.options.declare('out_name', types=str, default='h',
+                             desc="Name to use for the output variable (interpolated points).")
+        self.options.declare('distribution', default='sine', values=['uniform', 'sine'],
+                             desc="Choice of spatial distribution to use for placing the control "
+                                  "points. It can be 'sine' or 'uniform'.")
 
     def setup(self):
         """
         Set up the B-spline component.
         """
-        meta = self.metadata
-        num_control_points = meta['num_control_points']
-        num_points = meta['num_points']
-        vec_size = meta['vec_size']
-        in_name = meta['in_name']
-        out_name = meta['out_name']
+        opts = self.options
+        num_control_points = opts['num_control_points']
+        num_points = opts['num_points']
+        vec_size = opts['vec_size']
+        in_name = opts['in_name']
+        out_name = opts['out_name']
 
         self.add_input(in_name, val=np.random.rand(vec_size, num_control_points))
         self.add_output(out_name, val=np.random.rand(vec_size, num_points))
 
         jac = get_bspline_mtx(num_control_points, num_points,
-                              order=meta['bspline_order'],
-                              distribution=meta['distribution']).tocoo()
+                              order=opts['bspline_order'],
+                              distribution=opts['distribution']).tocoo()
 
         data, rows, cols = tile_sparse_jac(jac.data, jac.row, jac.col,
                                            num_points, num_control_points, vec_size)
@@ -199,13 +182,13 @@ class BsplinesComp(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
-        meta = self.metadata
-        num_control_points = meta['num_control_points']
-        num_points = meta['num_points']
-        vec_size = meta['vec_size']
+        opts = self.options
+        num_control_points = opts['num_control_points']
+        num_points = opts['num_points']
+        vec_size = opts['vec_size']
 
         out_shape = (vec_size, num_points)
         in_shape = (vec_size, num_control_points)
 
-        out = self.jac * inputs[meta['in_name']].reshape(np.prod(in_shape))
-        outputs[meta['out_name']] = out.reshape(out_shape)
+        out = self.jac * inputs[opts['in_name']].reshape(np.prod(in_shape))
+        outputs[opts['out_name']] = out.reshape(out_shape)

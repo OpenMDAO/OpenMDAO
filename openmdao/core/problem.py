@@ -1282,6 +1282,31 @@ class Problem(object):
 
         print()
 
+    def load_case(self, case):
+        """
+        Pull all input and output variables from a case into the model.
+
+        Parameters
+        ----------
+        case : Case object
+            A Case from a CaseRecorder file.
+        """
+        inputs = case.inputs._values if case.inputs is not None else None
+        for name, val in zip(inputs.dtype.names, inputs):
+            if name not in self.model._var_abs_names['input']:
+                raise KeyError("Input variable, '{}', recorded in the case is not "
+                               "found in the model".format(name))
+            self[name] = val
+
+        outputs = case.outputs._values if case.outputs is not None else None
+        for name, val in zip(outputs.dtype.names, outputs):
+            if name not in self.model._var_abs_names['output']:
+                raise KeyError("Output variable, '{}', recorded in the case is not "
+                               "found in the model".format(name))
+            self[name] = val
+
+        return
+
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,

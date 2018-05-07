@@ -83,41 +83,38 @@ class KSComp(ExplicitComponent):
     is less than or equal to zero.
     """
 
-    def __init__(self, width=1, vec_size=1):
+    def __init__(self, **kwargs):
         """
         Initialize the KS component.
 
         Parameters
         ----------
-        width : dict of keyword arguments
-            'Width of constraint vector.
-        vec_size : int
-            The number of rows to independently aggregate.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
         """
-        super(KSComp, self).__init__(width=width, vec_size=vec_size)
-
-        self.options.declare('lower_flag', False,
-                             desc="Set to True to reverse sign of input constraints.")
-        self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
-        self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")
+        super(KSComp, self).__init__(**kwargs)
 
         self.cite = CITATIONS
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('width', types=int, default=1, desc='Width of constraint vector.')
-        self.metadata.declare('vec_size', types=int, default=1,
-                              desc='The number of rows to independently aggregate.')
+        self.options.declare('width', types=int, default=1, desc='Width of constraint vector.')
+        self.options.declare('vec_size', types=int, default=1,
+                             desc='The number of rows to independently aggregate.')
+        self.options.declare('lower_flag', False,
+                             desc="Set to True to reverse sign of input constraints.")
+        self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
+        self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")
 
     def setup(self):
         """
         Declare inputs, outputs, and derivatives for the KS component.
         """
-        meta = self.metadata
-        width = meta['width']
-        vec_size = meta['vec_size']
+        opts = self.options
+        width = opts['width']
+        vec_size = opts['vec_size']
 
         # Inputs
         self.add_input('g', shape=(vec_size, width),
@@ -146,9 +143,9 @@ class KSComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         opt = self.options
-        meta = self.metadata
-        vec_size = meta['vec_size']
-        width = meta['width']
+        opts = self.options
+        vec_size = opts['vec_size']
+        width = opts['width']
 
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
@@ -156,7 +153,7 @@ class KSComp(ExplicitComponent):
 
         self.derivs = np.empty((vec_size, width))
 
-        for j in range(meta['vec_size']):
+        for j in range(opts['vec_size']):
             outputs['KS'][j, :] = self._ks.compute(con_val[j, :], opt['rho'])
             self.derivs[j, :] = self._ks.derivatives()[0]
 
