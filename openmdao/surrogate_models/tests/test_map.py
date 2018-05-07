@@ -22,9 +22,9 @@ class CompressorMap(MetaModelUnStructured):
 class TestMap(unittest.TestCase):
 
     def test_comp_map(self):
-        # create compressor map and save reference to metadata (for training data)
+        # create compressor map and save reference to options (for training data)
         c = CompressorMap()
-        m = c.metadata
+        m = c.options
 
         # add compressor map to problem
         p = Problem()

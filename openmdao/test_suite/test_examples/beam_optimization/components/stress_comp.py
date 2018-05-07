@@ -16,14 +16,14 @@ from openmdao.api import ExplicitComponent
 class MultiStressComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('num_elements', types=int)
-        self.metadata.declare('num_rhs', types=int)
-        self.metadata.declare('E')
+        self.options.declare('num_elements', types=int)
+        self.options.declare('num_rhs', types=int)
+        self.options.declare('E')
 
     def setup(self):
-        num_elements = self.metadata['num_elements']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
-        num_rhs = self.metadata['num_rhs']
+        num_rhs = self.options['num_rhs']
 
         self.add_input('h', shape=num_elements)
 
@@ -35,9 +35,9 @@ class MultiStressComp(ExplicitComponent):
             self.declare_partials(of='stress_%d' % j, wrt='h')
 
     def compute(self, inputs, outputs):
-        num_rhs = self.metadata['num_rhs']
+        num_rhs = self.options['num_rhs']
         tk = inputs['h'] * 0.5
-        E = self.metadata['E']
+        E = self.options['E']
 
         for j in range(num_rhs):
             ang = inputs['displacements_%d' % j][1::2]
@@ -45,12 +45,12 @@ class MultiStressComp(ExplicitComponent):
             outputs['stress_%d' % j] = tk * E * d_ang
 
     def compute_partials(self, inputs, partials):
-        num_elements = self.metadata['num_elements']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
         num_states = num_nodes * 2
-        num_rhs = self.metadata['num_rhs']
+        num_rhs = self.options['num_rhs']
         tk = inputs['h'] * 0.5
-        E = self.metadata['E']
+        E = self.options['E']
 
         for j in range(num_rhs):
             ang = inputs['displacements_%d' % j][1::2]

@@ -413,6 +413,34 @@ def run_model(prob):
     return strout.getvalue()
 
 
+def run_driver(prob):
+    """
+    Call `run_driver` on problem and capture output.
+
+    Parameters
+    ----------
+    prob : Problem
+        an instance of Problem
+
+    Returns
+    -------
+    boolean
+        Failure flag; True if failed to converge, False is successful.
+    string
+        output from calling `run_driver` on the Problem, captured from stdout
+    """
+    stdout = sys.stdout
+    strout = StringIO()
+
+    sys.stdout = strout
+    try:
+        failed = prob.run_driver()
+    finally:
+        sys.stdout = stdout
+
+    return failed, strout.getvalue()
+
+
 @contextlib.contextmanager
 def printoptions(*args, **kwds):
     """

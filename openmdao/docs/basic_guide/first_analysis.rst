@@ -60,7 +60,8 @@ You see two methods defined:
     - `compute`: calculation of all output values for the given inputs
 
 In the `setup` method you define the inputs and outputs of the component,
-and in this case you also ask OpenMDAO to approximate all the partial derivatives (derivatives of outputs with respect to inputs) with finite difference.
+and in this case you also ask OpenMDAO to approximate all the partial derivatives (derivatives of outputs with respect to inputs)
+using the `finite difference method <https://en.wikipedia.org/wiki/Finite_difference_method>`_.
 
 .. note::
 

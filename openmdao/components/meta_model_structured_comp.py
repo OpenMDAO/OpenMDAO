@@ -617,16 +617,16 @@ class MetaModelStructuredComp(ExplicitComponent):
                   " installed version is %s." % scipy_version
             warnings.warn(msg)
 
-        self.metadata.declare('extrapolate', types=bool, default=False,
-                              desc='Sets whether extrapolation should be performed \
-                                              when an input is out of bounds.')
-        self.metadata.declare('training_data_gradients', types=bool,
-                              default=False, desc='Sets whether gradients with \
-                              respect to output training data should be computed.')
-        self.metadata.declare('num_nodes', types=int, default=1, desc='Number \
-                                               of points to evaluate at once.')
-        self.metadata.declare('method', values=('cubic', 'slinear', 'quintic'),
-                              default="cubic", desc='Spline interpolation order.')
+        self.options.declare('extrapolate', types=bool, default=False,
+                             desc='Sets whether extrapolation should be performed '
+                                  'when an input is out of bounds.')
+        self.options.declare('training_data_gradients', types=bool, default=False,
+                             desc='Sets whether gradients with respect to output '
+                                  'training data should be computed.')
+        self.options.declare('num_nodes', types=int, default=1,
+                             desc='Number of points to evaluate at once.')
+        self.options.declare('method', values=('cubic', 'slinear', 'quintic'),
+                             default="cubic", desc='Spline interpolation order.')
 
         self.pnames = []
         self.params = []
@@ -647,13 +647,13 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict
             Additional agruments for add_input.
         """
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
         super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
         self.params.append(np.asarray(training_data))
 
-        self.sh = tuple([self.metadata['num_nodes']] + [i.size for i in self.params])
+        self.sh = tuple([self.options['num_nodes']] + [i.size for i in self.params])
 
     def add_output(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -670,20 +670,20 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict
             Additional agruments for add_output.
         """
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
         super(MetaModelStructuredComp, self).add_output(name, val * np.ones(n), **kwargs)
 
         self.interps[name] = _RegularGridInterp(self.params,
                                                 training_data,
-                                                method=self.metadata['method'],
-                                                bounds_error=not self.metadata['extrapolate'],
+                                                method=self.options['method'],
+                                                bounds_error=not self.options['extrapolate'],
                                                 fill_value=None,
                                                 spline_dim_error=False)
 
         self._ki = self.interps[name]._ki
         arange = np.arange(n)
         self.declare_partials(name, self.pnames, rows=arange, cols=arange)
-        if self.metadata['training_data_gradients']:
+        if self.options['training_data_gradients']:
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
             self.declare_partials(name, "%s_train" % name)
@@ -707,10 +707,10 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name in self.interps:
-            if self.metadata['training_data_gradients']:
+            if self.options['training_data_gradients']:
                 values = inputs["%s_train" % out_name]
-                method = self.metadata['method']
-                bounds_error = not self.metadata['extrapolate']
+                method = self.options['method']
+                bounds_error = not self.options['extrapolate']
                 self.interps[out_name] = _RegularGridInterp(self.params,
                                                             values,
                                                             method=method,
@@ -748,9 +748,9 @@ class MetaModelStructuredComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        if self.metadata['training_data_gradients']:
+        if self.options['training_data_gradients']:
             dy_ddata = np.zeros(self.sh)
-            for j in range(self.metadata['num_nodes']):
+            for j in range(self.options['num_nodes']):
                 for i, axis in enumerate(self.params):
                     e_i = np.eye(axis.size)
                     interp = make_interp_spline(axis,
@@ -768,7 +768,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             for i, p in enumerate(self.pnames):
                 partials[out_name, p] = dval[i]
 
-            if self.metadata['training_data_gradients']:
+            if self.options['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
 
 

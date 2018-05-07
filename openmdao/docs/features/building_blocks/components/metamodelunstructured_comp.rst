@@ -19,6 +19,16 @@ and you can also use a different surrogate model for each output.
     `MetaModelUnStructuredComp` represents a collection of surrogate models trained at the
     same locations in the design space.
 
+MetaModelUnStructuredComp Options
+---------------------------------
+
+.. embed-options::
+    openmdao.components.meta_model_unstructured_comp
+    MetaModelUnStructuredComp
+    options
+
+Simple Example
+--------------
 
 The following example demonstrates a simple `Problem` in which a
 `MetaModelUnStructuredComp` uses surrogates to mimic the sine and cosine functions.
@@ -46,10 +56,10 @@ values. This training step only occurs on the first run.
 Advanced usage
 --------------
 
-You can specify the training data after instantiation if you like, by setting the component's :ref:`metadata<component_metadata>`.
-Training data is provided as metadata to the ``trig`` component using the variable
-names prefixed with ``train:``.  This can be done anytime before the `MetaModelUnStructuredComp`
-runs for the first time.
+You can specify the training data after instantiation if you like, by setting the component's
+:ref:`options<component_options>`. Training data is provided in the options to the ``trig``
+component using the variable names prefixed with ``train:``.  This can be done anytime before
+the `MetaModelUnStructuredComp` runs for the first time.
 
 The inputs and outputs of a `MetaModelUnStructuredComp` are not limited to scalar values. The
 following modified version of the example uses an array to predict sine and
@@ -63,13 +73,14 @@ alternative to specifying it later.
 
 In addition, it's possible to vectorize the input and output variables so that you can
 make multiple predictions for the inputs and outputs in a single execution of the
-`MetaModelUnStructuredComp`. This is done by setting the ``vectorize`` argument when
-constructing the `MetaModelUnStructuredComp` component.  The following example vectorizes the ``trig``
+`MetaModelUnStructuredComp` component. This is done by setting the ``vec_size`` argument when
+constructing the `MetaModelUnStructuredComp` component and giving it the number of predictions to make.  The following example vectorizes the ``trig``
 component so that it makes three predictions at a time.  In this case, the input is
 three independent values of ``x`` and the output is the corresponding predicted values
 for the sine and cosine functions at those three points.  Note that a vectorized
 `MetaModelUnStructuredComp` component requires the first dimension of all input and output variables
-to be the same size as specified in the ``vectorize`` argument.
+to be the same size as specified in the ``vec_size`` argument.
+
 
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature_vector2d

@@ -275,7 +275,7 @@ class KrigingSurrogate(SurrogateModel):
 
         # Z = einsum('i,ij->ij', X, Y) is equivalent to, but much faster and
         # memory efficient than, diag(X).dot(Y) for vector X and 2D array Y.
-        # I.e. Z[i,j] = X[i]*Y[i,j]
+        # i.e., Z[i,j] = X[i]*Y[i,j]
         gradr = r * -2 * np.einsum('i,ij->ij', thetas, (x_n - self.X).T)
         jac = np.einsum('i,j,ij->ij', self.Y_std, 1. /
                         self.X_std, gradr.dot(self.alpha).T)
