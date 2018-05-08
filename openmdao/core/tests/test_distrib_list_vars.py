@@ -163,13 +163,6 @@ class DistributedAdderTest(unittest.TestCase):
     def test_distributed_list_vars(self):
 
         from openmdao.utils.general_utils import set_pyoptsparse_opt
-        from openmdao.utils.mpi import MPI
-
-        if MPI:
-            from openmdao.api import PETScVector
-            vector_class = PETScVector
-        else:
-            PETScVector = None
 
         # check that pyoptsparse is installed. if it is, try to use SLSQP.
         OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -178,7 +171,7 @@ class DistributedAdderTest(unittest.TestCase):
             from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
         else:
             raise unittest.SkipTest("pyOptSparseDriver is required.")
-            
+
         from openmdao.core.parallel_group import ParallelGroup
         from openmdao.components.exec_comp import ExecComp
 

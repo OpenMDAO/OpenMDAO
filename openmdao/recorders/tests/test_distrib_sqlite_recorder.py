@@ -12,7 +12,6 @@ from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
-    vector_class = PETScVector
 else:
     PETScVector = None
 

@@ -9,6 +9,7 @@ import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives, ExecComp, ScipyKrylov
@@ -531,7 +532,7 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc is required.")
 class TestAddConstraintMPI(unittest.TestCase):
 
     N_PROCS = 2

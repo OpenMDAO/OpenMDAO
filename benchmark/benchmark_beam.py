@@ -4,7 +4,6 @@ This benchmark documents a performance problem with data transfers that needs to
 import unittest
 
 from openmdao.api import Problem
-from openmdao.parallel_api import PETScVector
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group_slow import MultipointBeamGroup as MBGSlow
 

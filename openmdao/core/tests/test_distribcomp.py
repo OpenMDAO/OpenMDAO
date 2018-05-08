@@ -495,14 +495,14 @@ class MPIFeatureTests(unittest.TestCase):
         assert_rel_error(self, p['C3.out'], -5.)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestGroupMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_promote_distrib(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, PETScVector
+        from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
 
         class MyComp(ExplicitComponent):
             def setup(self):
@@ -520,7 +520,7 @@ class TestGroupMPI(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
-        p = Problem(model=Group())
+        p = Problem()
 
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
@@ -529,7 +529,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
-        p.setup(PETScVector)
+        p.setup()
         p.run_model()
 
         # each rank holds the assigned portion of the input array

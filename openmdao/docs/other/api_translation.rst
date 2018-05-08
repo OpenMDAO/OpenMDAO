@@ -369,7 +369,7 @@ Setup a Problem Using the PETScVector
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_petsc_setup
+      openmdao.core.tests.test_problem.TestProblem.test_feature_basic_setup
       vector_class
       vector_class
 
@@ -460,6 +460,3 @@ Setting Derivative Computation Mode
     prob.setup()
     prob.run()
     prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
-
-
-

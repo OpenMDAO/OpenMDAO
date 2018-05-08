@@ -44,10 +44,10 @@ class Group(System):
         Object used to allocate MPI processes to subsystems.
     _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
         Information used to determine MPI process allocation to subsystems.
-    _local_system_set : set
+    _local_system_set : set or None
         Set of pathnames of all fully local (not remote or distributed)
         direct or indirect subsystems.
-    _var_offsets_byset : {'input': dict of ndarray, 'output': dict of ndarray}
+    _var_offsets_byset : {'input': dict of ndarray, 'output': dict of ndarray} or None
         Dict of local var sizes, keyed by var_set name.  Sizes are stored in an array
         of size nproc x num_var where nproc is the number of processors
         in this Group's communicator and num_var is the number of allprocs variables
@@ -149,12 +149,6 @@ class Group(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-
-        Returns
-        -------
-        set
-            Set of local subsystem (direct and indirect) names.  In this case,
-            local means not remote and not distributed.
         """
         self.pathname = pathname
         self.comm = comm
@@ -174,7 +168,7 @@ class Group(System):
         self._static_mode = True
 
         if MPI:
-            self._var_offsets_byset = {}
+            self._var_offsets_byset = None
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
             # Call the load balancing algorithm
@@ -221,8 +215,7 @@ class Group(System):
         # Compute _subsystems_proc_range
         self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
 
-        if MPI:
-            self._local_system_set = set()
+        self._local_system_set = set()
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -230,16 +223,9 @@ class Group(System):
             subsys._distributed_vector_class = self._distributed_vector_class
 
             if self.pathname:
-                loc = subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
+                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
             else:
-                loc = subsys._setup_procs(subsys.name, sub_comm, mode)
-            if MPI is not None:
-                if loc:  # only groups return a local system set
-                    self._local_system_set.update(loc)
-                elif not subsys.distributed:
-                    self._local_system_set.add(subsys.pathname)
-
-        return self._local_system_set
+                subsys._setup_procs(subsys.name, sub_comm, mode)
 
     def _setup_vars(self, recurse=True):
         """
@@ -754,6 +740,17 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._setup_connections(recurse)
 
+        if MPI:
+            # collect set of local (not remote, not distributed) subsystems so we can
+            # identify cross-process connections, which require the use of distributed
+            # instead of purely local vector and transfer objects.
+            self._local_system_set = set()
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    self._local_system_set.update(s._local_system_set)
+                elif not s.distributed:
+                    self._local_system_set.add(s.pathname)
+
         if pathname == '':
             path_len = 0
         else:
@@ -935,8 +932,18 @@ class Group(System):
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
 
-        # TODO: move this somewhere else later...
-        if self._vector_class is not self._local_vector_class:  # we're doing distrib transfers
+    def _get_varset_offsets(self):
+        """
+        Compute distributed offsets for variables in var sets.
+
+        Only PETScTransfer currently requests these.
+
+        Returns
+        -------
+        dict
+            Arrays of offsets keyed by vec_name, deriv direction, and var_set.
+        """
+        if self._var_offsets_byset is None:
             offsets = self._var_offsets_byset = {}
             for vec_name in self._lin_rel_vec_name_list:
                 offsets[vec_name] = off_vn = {}
@@ -949,7 +956,9 @@ class Group(System):
                         csum[1:] = csum[:-1]
                         csum[0] = 0
                         off_t[vset] = csum.reshape(vsizes.shape)
-            self._var_offsets_byset['nonlinear'] = self._var_offsets_byset['linear']
+            offsets['nonlinear'] = offsets['linear']
+
+        return self._var_offsets_byset
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         """

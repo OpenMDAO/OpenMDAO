@@ -538,15 +538,18 @@ class Problem(object):
 
         if vector_class is not None:
             warn_deprecation("'vector_class' has been deprecated. Use "
-                             "'distributed_vector_class' instead.")
+                             "'distributed_vector_class' and/or 'local_vector_class' instead.")
             distributed_vector_class = vector_class
 
         # PETScVector is required for MPI
-        if PETScVector and comm.size > 1 and distributed_vector_class is not PETScVector:
-            msg = ("The `distributed_vector_class` argument must be `PETScVector` when "
-                   "running in parallel under MPI but '%s' was specified."
-                   % distributed_vector_class.__name__)
-            raise ValueError(msg)
+        if comm.size > 1:
+            if PETScVector is None:
+                raise ValueError("Attempting to run in parallel under MPI but PETScVector could not"
+                                 "be imported.")
+            elif distributed_vector_class is not PETScVector:
+                raise ValueError("The `distributed_vector_class` argument must be `PETScVector` "
+                                 "when running in parallel under MPI but '%s' was specified."
+                                 % distributed_vector_class.__name__)
 
         if mode not in ['fwd', 'rev']:
             msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode

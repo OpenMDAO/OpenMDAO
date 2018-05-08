@@ -24,7 +24,7 @@ from openmdao.utils.logger_utils import TestLogger
 
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
@@ -306,7 +306,7 @@ class TestParallelGroups(unittest.TestCase):
             self.assertTrue(msg in testlogger.get('info')[0])
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MatMatParDevTestCase(unittest.TestCase):
     N_PROCS = 2
 

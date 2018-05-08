@@ -84,8 +84,9 @@ class PETScTransfer(DefaultTransfer):
             allprocs_abs2idx_byset = group._var_allprocs_abs2idx_byset[vec_name]
             sizes_byset_in = group._var_sizes_byset[vec_name]['input']
             sizes_byset_out = group._var_sizes_byset[vec_name]['output']
-            offsets_byset_in = group._var_offsets_byset[vec_name]['input']
-            offsets_byset_out = group._var_offsets_byset[vec_name]['output']
+            offsets = group._get_varset_offsets()
+            offsets_byset_in = offsets[vec_name]['input']
+            offsets_byset_out = offsets[vec_name]['output']
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):

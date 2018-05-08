@@ -8,7 +8,7 @@ from six import assertRaisesRegex, StringIO, assertRegex
 import numpy as np
 
 from openmdao.core.group import get_relevant_vars
-from openmdao.api import Problem, Group, IndepVarComp, PETScVector, NonlinearBlockGS, ScipyOptimizeDriver, \
+from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
      ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -297,7 +297,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
-    def test_feature_numpyvec_setup(self):
+    def test_feature_basic_setup(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -327,9 +327,8 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
-    @unittest.skipUnless(PETScVector, "PETSc is required.")
     def test_feature_petsc_setup(self):
-        from openmdao.api import Problem, Group, IndepVarComp, PETScVector
+        from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
@@ -338,7 +337,7 @@ class TestProblem(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        # use PETScVector when using any PETSc linear solvers or running under MPI
+        # PETScVectors will be used automatically where needed. No need to set manually.
         prob.setup()
         prob['x'] = 2.
         prob['y'] = 10.
