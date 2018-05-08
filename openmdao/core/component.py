@@ -199,7 +199,6 @@ class Component(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._conn_abs_in2out = {}
         if self.distributed:
             self._vector_class = self._distributed_vector_class
         else:

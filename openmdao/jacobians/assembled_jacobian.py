@@ -99,7 +99,7 @@ class AssembledJacobian(Jacobian):
             in_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
 
         abs2prom_out = system._var_abs2prom['output']
-        conns = system._conn_global_abs_in2out
+        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
         keymap = self._keymap
         abs_key2shape = self._abs_key2shape
 
@@ -180,6 +180,7 @@ class AssembledJacobian(Jacobian):
                      system._var_allprocs_abs_names['input']}
 
         subjacs_info = self._subjacs_info
+        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
         sizes = self._system._var_sizes['nonlinear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
@@ -188,7 +189,7 @@ class AssembledJacobian(Jacobian):
                 res_size = abs2meta[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
-                    if in_abs_name not in system._conn_global_abs_in2out:
+                    if in_abs_name not in conns:
                         abs_key = (res_abs_name, in_abs_name)
 
                         if abs_key not in subjacs_info:
@@ -222,7 +223,7 @@ class AssembledJacobian(Jacobian):
         if subjac_iters is None:
             keymap = self._keymap
             seen = set()
-            global_conns = system._conn_global_abs_in2out
+            global_conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
             input_names = system._var_abs_names['input']
 

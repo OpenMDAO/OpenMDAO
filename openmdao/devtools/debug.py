@@ -317,7 +317,7 @@ def config_summary(problem, stream=sys.stdout):
     else:
         printer("Output variables: %5d" % noutputs)
 
-    if setup_done:
+    if setup_done and isinstance(model, Group):
         printer()
         conns = model._conn_global_abs_in2out
         printer("Total connections: %d   Total transfer data size: %d" %

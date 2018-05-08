@@ -41,7 +41,7 @@ class PETScTransfer(DefaultTransfer):
                 return _empty_idx_array
 
         if recurse:
-            for subsys in group._subsystems_myproc:
+            for subsys in group._subgroups_myproc:
                 subsys._setup_transfers(recurse)
 
         # Pre-compute map from abs_names to the index of the containing subsystem

@@ -176,7 +176,7 @@ class Problem(object):
                 proms = self.model._var_allprocs_prom2abs_list
                 meta = self.model._var_abs2meta
                 if name in meta:
-                    if name in self.model._conn_abs_in2out:
+                    if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
                         val = meta[src_name]['value']
                     else:
@@ -184,7 +184,7 @@ class Problem(object):
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
-                    if abs_name in self.model._conn_abs_in2out:
+                    if isinstance(self.model, Group) and abs_name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[abs_name]
                         # So, if the inputs and outputs are promoted to the same name, then we
                         # allow getitem, but if they aren't, then we raise an error due to non

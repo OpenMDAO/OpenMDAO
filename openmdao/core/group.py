@@ -25,7 +25,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
-from openmdao.utils.units import is_compatible
+from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.graph_utils import all_connected_nodes
 
@@ -52,6 +52,18 @@ class Group(System):
         of size nproc x num_var where nproc is the number of processors
         in this Group's communicator and num_var is the number of allprocs variables
         in the given var_set.  This is only defined if the Group has
+    _subgroups_myproc : list
+        List of local subgroups.
+    _manual_connections : dict
+        Dictionary of input_name: (output_name, src_indices) connections.
+    _static_manual_connections : dict
+        Dictionary that stores all explicit connections added outside of setup.
+    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned by this system
+        or any descendant system. The data is the same across all processors.
+    _conn_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned
+        by this system only. The data is the same across all processors.
     """
 
     def __init__(self, **kwargs):
@@ -71,6 +83,11 @@ class Group(System):
 
         self._local_system_set = None
         self._var_offsets_byset = None
+        self._subgroups_myproc = None
+        self._manual_connections = {}
+        self._static_manual_connections = {}
+        self._conn_global_abs_in2out = {}
+        self._conn_abs_in2out = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -121,6 +138,121 @@ class Group(System):
             system hieararchy with attribute access
         """
         pass
+
+    def _get_scope(self, excl_sub=None):
+        try:
+            return self._scope_cache[excl_sub]
+        except KeyError:
+            pass
+
+        if excl_sub is None:
+            # All myproc outputs
+            scope_out = frozenset(self._var_abs_names['output'])
+
+            # All myproc inputs connected to an output in this system
+            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
+                self._var_abs_names['input'])
+
+        else:
+            # All myproc outputs not in excl_sub
+            scope_out = frozenset(self._var_abs_names['output']).difference(
+                excl_sub._var_abs_names['output'])
+
+            # All myproc inputs connected to an output in this system but not in excl_sub
+            scope_in = set()
+            for abs_in in self._var_abs_names['input']:
+                if abs_in in self._conn_global_abs_in2out:
+                    abs_out = self._conn_global_abs_in2out[abs_in]
+
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
+                        scope_in.add(abs_in)
+            scope_in = frozenset(scope_in)
+
+        self._scope_cache[excl_sub] = (scope_out, scope_in)
+        return scope_out, scope_in
+
+    def _compute_root_scale_factors(self):
+        """
+        Compute scale factors for all variables.
+
+        Returns
+        -------
+        dict
+            Mapping of each absoute var name to its corresponding scaling factor tuple.
+        """
+        scale_factors = super(Group, self)._compute_root_scale_factors()
+
+        if self._has_input_scaling:
+            abs2meta_in = self._var_abs2meta
+            allprocs_meta_out = self._var_allprocs_abs2meta
+            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
+                meta_out = allprocs_meta_out[abs_out]
+                if abs_in not in abs2meta_in:
+                    # we only perform scaling on local arrays, so skip
+                    continue
+
+                meta_in = abs2meta_in[abs_in]
+
+                ref = meta_out['ref']
+                ref0 = meta_out['ref0']
+
+                src_indices = meta_in['src_indices']
+
+                if src_indices is not None:
+                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                        global_shape_out = meta_out['global_shape']
+                        if src_indices.ndim != 1:
+                            shape_in = meta_in['shape']
+                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
+                                src_indices = src_indices.flatten()
+                                src_indices = convert_neg(src_indices, src_indices.size)
+                            else:
+                                entries = [list(range(x)) for x in shape_in]
+                                cols = np.vstack(src_indices[i] for i in product(*entries))
+                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                                           for i in range(cols.shape[1])]
+                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+
+                        # TODO: if either ref or ref0 are not scalar and the output is
+                        # distributed, we need to do a scatter
+                        # to obtain the values needed due to global src_indices
+                        if meta_out['distributed']:
+                            raise RuntimeError("vector scalers with distrib vars "
+                                               "not supported yet.")
+
+                        ref = ref[src_indices]
+                        ref0 = ref0[src_indices]
+
+                # Compute scaling arrays for inputs using a0 and a1
+                # Example:
+                #   Let x, x_src, x_tgt be the dimensionless variable,
+                #   variable in source units, and variable in target units, resp.
+                #   x_src = a0 + a1 x
+                #   x_tgt = b0 + b1 x
+                #   x_tgt = g(x_src) = d0 + d1 x_src
+                #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
+                #   b0 = d0 + d1 a0
+                #   b0 = g(a0)
+                #   b1 = d0 + d1 a1 - d0
+                #   b1 = g(a1) - g(0)
+
+                units_in = meta_in['units']
+                units_out = meta_out['units']
+
+                if units_in is None or units_out is None or units_in == units_out:
+                    a0 = ref0
+                    a1 = ref - ref0
+                else:
+                    factor, offset = get_conversion(units_out, units_in)
+                    a0 = (ref0 + offset) * factor
+                    a1 = (ref - ref0) * factor
+
+                scale_factors[abs_in] = {
+                    ('input', 'phys'): (a0, a1),
+                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
+                }
+
+        return scale_factors
 
     def _configure(self):
         """
@@ -226,6 +358,61 @@ class Group(System):
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
             else:
                 subsys._setup_procs(subsys.name, sub_comm, mode)
+
+        # build a list of local subgroups to speed up later loops
+        self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
+
+    def _check_reconf_update(self):
+        """
+        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+        """
+        # See if any local subsystem has reconfigured
+        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+
+        # See if any subsystem on this or any other processor has configured
+        if self.comm.size > 1:
+            reconf = self.comm.allreduce(reconf) > 0
+
+        if reconf:
+            # Perform an update setup
+            with self._unscaled_context_all():
+                self.resetup('update')
+
+            # Reset the _reconfigured attribute to False
+            for subsys in self._subsystems_myproc:
+                subsys._reconfigured = False
+
+            self._reconfigured = True
+
+    def _list_states(self):
+        """
+        Return list of all states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_myproc:
+            states.extend(subsys._list_states())
+
+        return states
+
+    def _list_states_allprocs(self):
+        """
+        Return list of all states at and below this system across all procs.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_allprocs:
+            states.extend(subsys._list_states_allprocs())
+
+        return states
 
     def _setup_vars(self, recurse=True):
         """
@@ -663,7 +850,7 @@ class Group(System):
 
         # Recursion
         if recurse:
-            for subsys in self._subsystems_myproc:
+            for subsys in self._subgroups_myproc:
                 if subsys.name in new_conns:
                     subsys._setup_global_connections(recurse=recurse,
                                                      conns=new_conns[subsys.name])
@@ -676,7 +863,7 @@ class Group(System):
         conn_list.extend(iteritems(abs_in2out))
         global_abs_in2out.update(abs_in2out)
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._subgroups_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
             conn_list.extend(iteritems(subsys._conn_global_abs_in2out))
 

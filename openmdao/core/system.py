@@ -24,7 +24,6 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
@@ -116,14 +115,6 @@ class System(object):
         owned by this system and num_var is the number of allprocs variables.
     _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
         Same as above, but by var_set name.
-    _manual_connections : dict
-        Dictionary of input_name: (output_name, src_indices) connections.
-    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned by this system
-        or any descendant system. The data is the same across all processors.
-    _conn_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned
-        by this system only. The data is the same across all processors.
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
@@ -202,8 +193,6 @@ class System(object):
         These data structures are never reset during reconfiguration.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
-    _static_manual_connections : dict
-        Dictionary that stores all explicit connections added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
@@ -308,10 +297,6 @@ class System(object):
         self._var_sizes = None
         self._var_sizes_byset = None
 
-        self._manual_connections = {}
-        self._conn_global_abs_in2out = {}
-        self._conn_abs_in2out = {}
-
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_num_vars_byset = {'input': {}, 'output': {}}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
@@ -350,7 +335,6 @@ class System(object):
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
-        self._static_manual_connections = {}
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
@@ -407,23 +391,7 @@ class System(object):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
         """
-        # See if any local subsystem has reconfigured
-        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
-
-        # See if any subsystem on this or any other processor has configured
-        if self.comm.size > 1:
-            reconf = self.comm.allreduce(reconf) > 0
-
-        if reconf:
-            # Perform an update setup
-            with self._unscaled_context_all():
-                self.resetup('update')
-
-            # Reset the _reconfigured attribute to False
-            for subsys in self._subsystems_myproc:
-                subsys._reconfigured = False
-
-            self._reconfigured = True
+        self._reconfigured = False
 
     def reconfigure(self):
         """
@@ -987,7 +955,7 @@ class System(object):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        self._conn_global_abs_in2out = {}
+        pass
 
     def _setup_vec_names(self, mode, vec_names=None, vois=None):
         """
@@ -1226,7 +1194,6 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        abs2meta_in = self._var_abs2meta
         allprocs_meta_out = self._var_allprocs_abs2meta
 
         for abs_name in self._var_allprocs_abs_names['output']:
@@ -1241,75 +1208,6 @@ class System(object):
                 ('residual', 'phys'): (0.0, res_ref),
                 ('residual', 'norm'): (0.0, 1.0 / res_ref),
             }
-
-        if self._has_input_scaling:
-            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
-                meta_out = allprocs_meta_out[abs_out]
-                if abs_in not in abs2meta_in:
-                    # we only perform scaling on local arrays, so skip
-                    continue
-
-                meta_in = abs2meta_in[abs_in]
-
-                ref = meta_out['ref']
-                ref0 = meta_out['ref0']
-
-                src_indices = meta_in['src_indices']
-
-                if src_indices is not None:
-                    if not (np.isscalar(ref) and np.isscalar(ref0)):
-                        global_shape_out = meta_out['global_shape']
-                        if src_indices.ndim != 1:
-                            shape_in = meta_in['shape']
-                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
-                                src_indices = src_indices.flatten()
-                                src_indices = convert_neg(src_indices, src_indices.size)
-                            else:
-                                entries = [list(range(x)) for x in shape_in]
-                                cols = np.vstack(src_indices[i] for i in product(*entries))
-                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                           for i in range(cols.shape[1])]
-                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
-
-                        # TODO: if either ref or ref0 are not scalar and the output is
-                        # distributed, we need to do a scatter
-                        # to obtain the values needed due to global src_indices
-                        if meta_out['distributed']:
-                            raise RuntimeError("vector scalers with distrib vars "
-                                               "not supported yet.")
-
-                        ref = ref[src_indices]
-                        ref0 = ref0[src_indices]
-
-                # Compute scaling arrays for inputs using a0 and a1
-                # Example:
-                #   Let x, x_src, x_tgt be the dimensionless variable,
-                #   variable in source units, and variable in target units, resp.
-                #   x_src = a0 + a1 x
-                #   x_tgt = b0 + b1 x
-                #   x_tgt = g(x_src) = d0 + d1 x_src
-                #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
-                #   b0 = d0 + d1 a0
-                #   b0 = g(a0)
-                #   b1 = d0 + d1 a1 - d0
-                #   b1 = g(a1) - g(0)
-
-                units_in = meta_in['units']
-                units_out = meta_out['units']
-
-                if units_in is None or units_out is None or units_in == units_out:
-                    a0 = ref0
-                    a1 = ref - ref0
-                else:
-                    factor, offset = get_conversion(units_out, units_in)
-                    a0 = (ref0 + offset) * factor
-                    a1 = (ref - ref0) * factor
-
-                scale_factors[abs_in] = {
-                    ('input', 'phys'): (a0, a1),
-                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
-                }
-
         return scale_factors
 
     def _setup_transfers(self, recurse=True):
@@ -1591,36 +1489,19 @@ class System(object):
 
         return maps
 
-    def _get_scope(self, excl_sub=None):
+    def _get_scope(self):
         try:
-            return self._scope_cache[excl_sub]
+            return self._scope_cache[None]
         except KeyError:
             pass
 
-        if excl_sub is None:
-            # All myproc outputs
-            scope_out = frozenset(self._var_abs_names['output'])
+        # All myproc outputs
+        scope_out = frozenset(self._var_abs_names['output'])
 
-            # All myproc inputs connected to an output in this system
-            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_abs_names['input'])
+        # All myproc inputs connected to an output in this system
+        scope_in = frozenset()
 
-        else:
-            # All myproc outputs not in excl_sub
-            scope_out = frozenset(self._var_abs_names['output']).difference(
-                excl_sub._var_abs_names['output'])
-
-            # All myproc inputs connected to an output in this system but not in excl_sub
-            scope_in = set()
-            for abs_in in self._var_abs_names['input']:
-                if abs_in in self._conn_global_abs_in2out:
-                    abs_out = self._conn_global_abs_in2out[abs_in]
-
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
-                        scope_in.add(abs_in)
-            scope_in = frozenset(scope_in)
-
-        self._scope_cache[excl_sub] = (scope_out, scope_in)
+        self._scope_cache[None] = (scope_out, scope_in)
         return scope_out, scope_in
 
     @property
@@ -2997,11 +2878,7 @@ class System(object):
         list
             List of all states.
         """
-        states = []
-        for subsys in self._subsystems_myproc:
-            states.extend(subsys._list_states())
-
-        return states
+        return []
 
     def _list_states_allprocs(self):
         """
@@ -3012,11 +2889,7 @@ class System(object):
         list
             List of all states.
         """
-        states = []
-        for subsys in self._subsystems_allprocs:
-            states.extend(subsys._list_states_allprocs())
-
-        return states
+        return []
 
     def add_recorder(self, recorder, recurse=False):
         """
