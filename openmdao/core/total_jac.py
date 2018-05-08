@@ -1235,7 +1235,9 @@ class _TotalJacInfo(object):
                 for j, wrt in enumerate(inputs):
                     pprint.pprint({(of, wrt): J[out_slice, in_meta[wrt][0]]})
 
+        print('')
         sys.stdout.flush()
+
 
 def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
     """
