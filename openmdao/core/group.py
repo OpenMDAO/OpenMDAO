@@ -64,6 +64,10 @@ class Group(System):
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
+    _transfers : dict of dict of Transfers
+        First key is the vec_name, second key is (mode, isub) where
+        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
+        or isub can be None for the full, simultaneous transfer.
     """
 
     def __init__(self, **kwargs):
@@ -88,6 +92,7 @@ class Group(System):
         self._static_manual_connections = {}
         self._conn_global_abs_in2out = {}
         self._conn_abs_in2out = {}
+        self._transfers = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1146,6 +1151,45 @@ class Group(System):
             offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets_byset
+
+    def _transfer(self, vec_name, mode, isub=None):
+        """
+        Perform a vector transfer.
+
+        Parameters
+        ----------
+        vec_name : str
+            Name of the vector RHS on which to perform a transfer.
+        mode : str
+            Either 'fwd' or 'rev'
+        isub : None or int
+            If None, perform a full transfer.
+            If int, perform a partial transfer for linear Gauss--Seidel.
+        """
+        vec_inputs = self._vectors['input'][vec_name]
+
+        if mode == 'fwd':
+            if self._has_input_scaling:
+                vec_inputs.scale('norm')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                vec_inputs.scale('phys')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+        else:  # rev
+            if self._has_input_scaling:
+                vec_inputs.scale('phys')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                vec_inputs.scale('norm')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         """

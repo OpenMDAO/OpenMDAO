@@ -136,10 +136,6 @@ class System(object):
         The outputs vector; points to _vectors['output']['nonlinear'].
     _residuals : <Vector>
         The residuals vector; points to _vectors['residual']['nonlinear'].
-    _transfers : dict of dict of Transfers
-        First key is the vec_name, second key is (mode, isub) where
-        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
-        or isub can be None for the full, simultaneous transfer.
     _lower_bounds : <Vector>
         Vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
@@ -308,7 +304,6 @@ class System(object):
         self._inputs = None
         self._outputs = None
         self._residuals = None
-        self._transfers = {}
 
         self._lower_bounds = None
         self._upper_bounds = None
@@ -759,7 +754,8 @@ class System(object):
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
         root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
-        self._setup_bounds(*self._get_bounds_root_vectors(DefaultVector, initial), resize=resize)
+        self._setup_bounds(*self._get_bounds_root_vectors(self._local_vector_class, initial),
+                           resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -1077,12 +1073,9 @@ class System(object):
                 '"force_alloc_complex" to True during setup.'
             raise RuntimeError(msg)
 
-        for vec_name in self._rel_vec_name_list:
-            if self._vector_class is None:
-                vector_class = root_vectors['output'][vec_name].__class__
-            else:
-                vector_class = self._vector_class
+        vector_class = self._vector_class
 
+        for vec_name in self._rel_vec_name_list:
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
@@ -1316,45 +1309,6 @@ class System(object):
 
         for abs_name in self._var_abs_names['output']:
             self._outputs._views[abs_name][:] = abs2meta[abs_name]['value']
-
-    def _transfer(self, vec_name, mode, isub=None):
-        """
-        Perform a vector transfer.
-
-        Parameters
-        ----------
-        vec_name : str
-            Name of the vector RHS on which to perform a transfer.
-        mode : str
-            Either 'fwd' or 'rev'
-        isub : None or int
-            If None, perform a full transfer.
-            If int, perform a partial transfer for linear Gauss--Seidel.
-        """
-        vec_inputs = self._vectors['input'][vec_name]
-
-        if mode == 'fwd':
-            if self._has_input_scaling:
-                vec_inputs.scale('norm')
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-                vec_inputs.scale('phys')
-            else:
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-        else:  # rev
-            if self._has_input_scaling:
-                vec_inputs.scale('phys')
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-                vec_inputs.scale('norm')
-            else:
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
 
     def _get_maps(self, prom_names):
         """
