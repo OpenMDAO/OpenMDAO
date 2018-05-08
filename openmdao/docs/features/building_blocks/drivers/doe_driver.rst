@@ -20,7 +20,7 @@ its own parameters that can be specified when it is instantiated:
     which is an updated version of `pyDOE`_.  See the original `pyDOE`_ page for
     information on those algorithms.
 
-The generator instance is supplied as an argument to the `DOEDriver`.
+The generator instance may be supplied as an argument to the `DOEDriver` or as an option.
 
 DOEDriver Options
 -----------------
