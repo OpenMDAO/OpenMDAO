@@ -31,6 +31,7 @@ from openmdao.utils.write_outputs import write_outputs
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = object()
+_empty_frozen_set = frozenset()
 
 
 class System(object):
@@ -1493,16 +1494,8 @@ class System(object):
         try:
             return self._scope_cache[None]
         except KeyError:
-            pass
-
-        # All myproc outputs
-        scope_out = frozenset(self._var_abs_names['output'])
-
-        # All myproc inputs connected to an output in this system
-        scope_in = frozenset()
-
-        self._scope_cache[None] = (scope_out, scope_in)
-        return scope_out, scope_in
+            self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
+            return self._scope_cache[None]
 
     @property
     def metadata(self):
