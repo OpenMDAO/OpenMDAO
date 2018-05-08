@@ -168,6 +168,23 @@ class TestOptionsDict(unittest.TestCase):
         expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for option 'x'")
         assertRegex(self, str(context.exception), expected_msg)
 
+    def test_undeclare(self):
+        # create an entry in the dict
+        self.dict.declare('test', types=int)
+        self.dict['test'] = 1
+
+        # prove it's in the dict
+        self.assertEqual(self.dict['test'], 1)
+
+        # remove entry from the dict
+        self.dict.undeclare("test")
+
+        # prove it is no longer in the dict
+        with self.assertRaises(KeyError) as context:
+            self.dict['test']
+
+        expected_msg = "\"Option 'test' cannot be found\""
+        self.assertEqual(expected_msg, str(context.exception))
 
 if __name__ == "__main__":
     unittest.main()

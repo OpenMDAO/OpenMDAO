@@ -97,4 +97,16 @@ they need not be connected.
     :layout: interleave
 
 
+Example:  Providing an Initial Guess for a State Variable
+---------------------------------------------------------
+
+As mentioned above, there is an optional argument to :code:`add_balance` called :code:`guess_func` which can
+provide an initial guess for a state variable.
+
+The Kepler example script shows how :code:`guess_func` can be used.
+
+.. embed-code::
+    openmdao.test_suite.test_examples.test_keplers_equation.TestKeplersEquation.test_result
+    :layout: interleave
+
 .. tags:: BalanceComp, Component
