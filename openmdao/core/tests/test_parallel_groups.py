@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
-                         ExplicitComponent, DefaultVector
+                         ExplicitComponent, ImplicitComponent, DefaultVector
 
 from openmdao.utils.mpi import under_mpirun
 from openmdao.utils.mpi import MPI
@@ -304,6 +304,42 @@ class TestParallelGroups(unittest.TestCase):
             self.assertTrue(msg in testlogger.get('error')[0])
             self.assertTrue(msg in testlogger.get('warning')[0])
             self.assertTrue(msg in testlogger.get('info')[0])
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelListStates(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_list_states_allprocs(self):
+        class StateComp(ImplicitComponent):
+
+            def initialize(self):
+                self.mtx = np.array([
+                    [0.99, 0.01],
+                    [0.01, 0.99],
+                ])
+
+            def setup(self):
+                self.add_input('rhs', val=np.ones(2))
+                self.add_output('x', val=np.zeros(2))
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = self.mtx.dot(outputs['x']) - inputs['rhs']
+
+            def solve_nonlinear(self, inputs, outputs):
+                outputs['x'] = np.linalg.solve(self.mtx, inputs['rhs'])
+
+        p = Problem(model=ParallelGroup())
+        p.model.add_subsystem('C1', StateComp())
+        p.model.add_subsystem('C2', StateComp())
+        p.model.add_subsystem('C3', ExecComp('y=2.0*x'))
+        p.model.add_subsystem('C4', StateComp())
+        p.setup()
+        p.final_setup()
+        self.assertEqual(p.model._list_states_allprocs(), ['C1.x', 'C2.x', 'C4.x'])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

@@ -1408,6 +1408,14 @@ class System(object):
         return maps
 
     def _get_scope(self):
+        """
+        Find the input and output variables that are needed for a particular matvec product.
+
+        Returns
+        -------
+        (set, set)
+            Sets of output and input variables.
+        """
         try:
             return self._scope_cache[None]
         except KeyError:

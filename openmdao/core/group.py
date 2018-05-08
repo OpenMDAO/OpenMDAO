@@ -48,10 +48,11 @@ class Group(System):
         Set of pathnames of all fully local (not remote or distributed)
         direct or indirect subsystems.
     _var_offsets_byset : {'input': dict of ndarray, 'output': dict of ndarray} or None
-        Dict of local var sizes, keyed by var_set name.  Sizes are stored in an array
+        Dict of distributed offsets, keyed by var_set name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
         in this Group's communicator and num_var is the number of allprocs variables
-        in the given var_set.  This is only defined if the Group has
+        in the given var_set.  This is only defined if the Group owns one or more interprocess
+        connections.
     _subgroups_myproc : list
         List of local subgroups.
     _manual_connections : dict
@@ -145,6 +146,19 @@ class Group(System):
         pass
 
     def _get_scope(self, excl_sub=None):
+        """
+        Find the input and output variables that are needed for a particular matvec product.
+
+        Parameters
+        ----------
+        excl_sub : <System>
+            A subsystem whose variables should be excluded from the matvec product.
+
+        Returns
+        -------
+        (set, set)
+            Sets of output and input variables.
+        """
         try:
             return self._scope_cache[excl_sub]
         except KeyError:
@@ -205,6 +219,13 @@ class Group(System):
 
                 if src_indices is not None:
                     if not (np.isscalar(ref) and np.isscalar(ref0)):
+                        # TODO: if either ref or ref0 are not scalar and the output is
+                        # distributed, we need to do a scatter
+                        # to obtain the values needed due to global src_indices
+                        if meta_out['distributed']:
+                            raise RuntimeError("vector scalers with distrib vars "
+                                               "not supported yet.")
+
                         global_shape_out = meta_out['global_shape']
                         if src_indices.ndim != 1:
                             shape_in = meta_in['shape']
@@ -217,13 +238,6 @@ class Group(System):
                                 dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
                                            for i in range(cols.shape[1])]
                                 src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
-
-                        # TODO: if either ref or ref0 are not scalar and the output is
-                        # distributed, we need to do a scatter
-                        # to obtain the values needed due to global src_indices
-                        if meta_out['distributed']:
-                            raise RuntimeError("vector scalers with distrib vars "
-                                               "not supported yet.")
 
                         ref = ref[src_indices]
                         ref0 = ref0[src_indices]
@@ -391,7 +405,7 @@ class Group(System):
 
     def _list_states(self):
         """
-        Return list of all states at and below this system.
+        Return list of all local states at and below this system.
 
         Returns
         -------
@@ -402,7 +416,7 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             states.extend(subsys._list_states())
 
-        return states
+        return sorted(states)
 
     def _list_states_allprocs(self):
         """
@@ -413,11 +427,12 @@ class Group(System):
         list
             List of all states.
         """
-        states = []
-        for subsys in self._subsystems_allprocs:
-            states.extend(subsys._list_states_allprocs())
+        all_states = set()
+        byproc = self.comm.allgather(self._list_states())
+        for proc_states in byproc:
+            all_states.update(proc_states)
 
-        return states
+        return sorted(all_states)
 
     def _setup_vars(self, recurse=True):
         """
