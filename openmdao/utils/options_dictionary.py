@@ -148,6 +148,19 @@ class OptionsDictionary(object):
         if default_provided:
             self._assert_valid(name, default)
 
+    def undeclare(self, name):
+        """
+        Remove entry from the OptionsDictionary, for classes that don't use that option.
+
+        Parameters
+        ----------
+        name : str
+            The name of a key, the entry of which will be removed from the internal dictionary.
+
+        """
+        if name in self._dict:
+            del self._dict[name]
+
     def update(self, in_dict):
         """
         Update the internal dictionary with the given one.
