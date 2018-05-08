@@ -427,10 +427,13 @@ class Group(System):
         list
             List of all states.
         """
-        all_states = set()
-        byproc = self.comm.allgather(self._list_states())
-        for proc_states in byproc:
-            all_states.update(proc_states)
+        if MPI:
+            all_states = set()
+            byproc = self.comm.allgather(self._list_states())
+            for proc_states in byproc:
+                all_states.update(proc_states)
+        else:
+            all_states = self._list_states()
 
         return sorted(all_states)
 
