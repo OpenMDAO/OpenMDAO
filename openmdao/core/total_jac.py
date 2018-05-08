@@ -5,6 +5,7 @@ from __future__ import print_function, division
 
 from collections import OrderedDict
 from copy import deepcopy
+import pprint
 from six import iteritems
 from six.moves import zip
 import sys
@@ -1028,6 +1029,10 @@ class _TotalJacInfo(object):
         if self.has_scaling:
             self._do_scaling(self.J_dict)
 
+        if debug_print:
+            # Debug outputs scaled derivatives.
+            self._print_derivatives()
+
         recording_iteration.stack.pop()
 
         return self.J_final
@@ -1206,6 +1211,32 @@ class _TotalJacInfo(object):
         else:
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
+
+    def _print_derivatives(self):
+        """
+        Print out the derivatives when debug_print is True.
+        """
+        inputs = self.input_list
+        outputs = self.output_list
+        if self.return_format == 'dict':
+            J = self.J_dict
+            for of in inputs:
+                for wrt in outputs:
+                    pprint.pprint({(of, wrt): J[of][wrt]})
+
+        else:
+            abs2meta = self.model._var_allprocs_abs2meta
+            in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
+            out_meta = self.out_meta
+            J = self.J
+
+            for i, of in enumerate(outputs):
+                out_slice = out_meta[of][0]
+                for j, wrt in enumerate(inputs):
+                    pprint.pprint({(of, wrt): J[out_slice, in_meta[wrt][0]]})
+
+        print('')
+        sys.stdout.flush()
 
 
 def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
