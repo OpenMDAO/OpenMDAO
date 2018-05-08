@@ -55,8 +55,10 @@ class System(object):
         Global name of the system, including the path.
     comm : MPI.Comm or <FakeComm>
         MPI communicator object.
-    metadata : <OptionsDictionary>
-        Dictionary of user-defined arguments.
+    options : OptionsDictionary
+        options dictionary
+    recording_options : OptionsDictionary
+        Recording options dictionary
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -229,10 +231,6 @@ class System(object):
         True if this system has input scaling.
     _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
-    options : OptionsDictionary
-        options dictionary
-    recording_options : OptionsDictionary
-        Recording options dictionary
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
     _norm0: float
@@ -246,15 +244,16 @@ class System(object):
         Parameters
         ----------
         **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
+            Keyword arguments that will be mapped into the System options.
         """
         self.name = ''
         self.pathname = ''
         self.comm = None
-        self.metadata = OptionsDictionary()
 
         # System options
         self.options = OptionsDictionary()
+
+        # Case recording options
         self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the system level')
@@ -357,7 +356,7 @@ class System(object):
         self._scope_cache = {}
 
         self.initialize()
-        self.metadata.update(kwargs)
+        self.options.update(kwargs)
 
         self._has_guess = False
         self._has_output_scaling = False
@@ -1563,6 +1562,15 @@ class System(object):
 
         self._scope_cache[excl_sub] = (scope_out, scope_in)
         return scope_out, scope_in
+
+    @property
+    def metadata(self):
+        """
+        Get the options for this System.
+        """
+        warn_deprecation("The 'metadata' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use 'options' instead.")
+        return self.options
 
     @property
     def jacobian(self):

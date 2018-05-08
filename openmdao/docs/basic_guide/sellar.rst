@@ -57,20 +57,20 @@ OpenMDAO how to pass data between them.
     openmdao.test_suite.components.sellar_feature.SellarMDA
 
 
-We're working with a new type of class: :ref:`Group <feature_grouping_components>`.
+We're working with a new class: :ref:`Group <feature_grouping_components>`.
 This is the container that lets you build up complex model hierarchies.
 Groups can contain other groups, components, or combinations of groups and components.
 
 You can directly create instances of :code:`Group` to work with, or you can subclass from it to define your own custom
-groups. We're doing both of these things, above. First, we defined our own custom :code:`Group` subclass called :code:`SellarMDA`.
+groups. We're doing both of these things above. First, we defined our own custom :code:`Group` subclass called :code:`SellarMDA`.
 In our run script, we created an instance of :code:`SellarMDA` to actually run it.
 Then, inside the :code:`setup` method of :code:`SellarMDA` we're also working directly with a :code:`Group` instance by adding the subsystem :code:`cycle`:
 
 .. code::
 
     cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-    d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
-    d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
+    cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
+    cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
 
     # Nonlinear Block Gauss-Seidel is a gradient-free solver
     cycle.nonlinear_solver = NonlinearBlockGS()
@@ -101,11 +101,11 @@ You can pick which kind of solver you would like to use to converge the MDA. The
 The :code:`NonlinearBlockGaussSeidel` solver, also sometimes called a "fixed-point iteration solver," is a gradient-free method
 that works well in many situations.
 More tightly-coupled problems, or problems with instances of :ref:`ImplicitComponent <comp-type-3-implicitcomp>`
-that don't implement their own :code:'solve_nonlinear' method, will require the :code:`Newton` solver.
+that don't implement their own :code:`solve_nonlinear` method, will require the :code:`Newton` solver.
 
 .. note::
     OpenMDAO comes with other nonlinear solvers you can use if they suit your problem.
-    Here's the :ref:`full list of OpenMDAO's nonlinear solvers <feature_nonlinear_solvers>`.
+    Here is the complete list of OpenMDAO's :ref:`nonlinear solvers <feature_nonlinear_solvers>`.
 
 
 The subgroup, named :code:`cycle`, is useful here, because it contains the multidisciplinary coupling of the Sellar problem.
@@ -124,8 +124,7 @@ ExecComp is a helper component for quickly defining components for simple equati
 -----------------------------------------------------------------------------------
 
 A lot of times in your models, you need to define a new variable as a simple function of other variables.
-OpenMDAO provides a helper component to make this easier, called :code:`ExecComp`.
-It's fairly flexible, allowing you to work with scalars or arrays, to work with units, and to call basic math functions (e.g. *sin* or *exp*).
-
-.. note::
-    For detailed docs on how to use :code:`ExecComp`, check out the :ref:`ExecComp feature doc <feature_exec_comp>`.
+OpenMDAO provides a helper component to make this easier, called :ref:`ExecComp <feature_exec_comp>`.
+It's fairly flexible, allowing you to work with scalars or arrays, to work with units, and to call basic math
+functions (e.g. *sin* or *exp*).  We have used :code:`ExecComp` in this model to calculate our
+objectives and constraints.

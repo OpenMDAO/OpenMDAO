@@ -29,22 +29,22 @@ class CrossProductComp(ExplicitComponent):
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('vec_size', types=int, default=1,
-                              desc='The number of points at which the dot product is computed')
-        self.metadata.declare('a_name', types=string_types, default='a',
-                              desc='The variable name for vector a.')
-        self.metadata.declare('b_name', types=string_types, default='b',
-                              desc='The variable name for vector b.')
-        self.metadata.declare('c_name', types=string_types, default='c',
-                              desc='The variable name for vector c.')
-        self.metadata.declare('a_units', types=string_types, default=None, allow_none=True,
-                              desc='The units for vector a.')
-        self.metadata.declare('b_units', types=string_types, default=None, allow_none=True,
-                              desc='The units for vector b.')
-        self.metadata.declare('c_units', types=string_types, default=None, allow_none=True,
-                              desc='The units for vector c.')
+        self.options.declare('vec_size', types=int, default=1,
+                             desc='The number of points at which the dot product is computed')
+        self.options.declare('a_name', types=string_types, default='a',
+                             desc='The variable name for vector a.')
+        self.options.declare('b_name', types=string_types, default='b',
+                             desc='The variable name for vector b.')
+        self.options.declare('c_name', types=string_types, default='c',
+                             desc='The variable name for vector c.')
+        self.options.declare('a_units', types=string_types, default=None, allow_none=True,
+                             desc='The units for vector a.')
+        self.options.declare('b_units', types=string_types, default=None, allow_none=True,
+                             desc='The units for vector b.')
+        self.options.declare('c_units', types=string_types, default=None, allow_none=True,
+                             desc='The units for vector c.')
 
         self._k = np.array([[0, 0, 0, -1, 0, 1],
                             [0, 1, 0, 0, -1, 0],
@@ -54,22 +54,22 @@ class CrossProductComp(ExplicitComponent):
         """
         Declare inputs, outputs, and derivatives for the cross product component.
         """
-        meta = self.metadata
-        vec_size = meta['vec_size']
+        opts = self.options
+        vec_size = opts['vec_size']
 
         shape = (vec_size, 3) if vec_size > 1 else (3,)
 
-        self.add_input(name=meta['a_name'],
+        self.add_input(name=opts['a_name'],
                        shape=shape,
-                       units=meta['a_units'])
+                       units=opts['a_units'])
 
-        self.add_input(name=meta['b_name'],
+        self.add_input(name=opts['b_name'],
                        shape=shape,
-                       units=meta['b_units'])
+                       units=opts['b_units'])
 
-        self.add_output(name=meta['c_name'],
+        self.add_output(name=opts['c_name'],
                         val=np.ones(shape=shape),
-                        units=meta['c_units'])
+                        units=opts['c_units'])
 
         row_idxs = np.repeat(np.arange(vec_size * 3, dtype=int), 2)
         col_idxs = np.empty((0,), dtype=int)
@@ -77,10 +77,10 @@ class CrossProductComp(ExplicitComponent):
         for i in range(vec_size):
             col_idxs = np.concatenate((col_idxs, M + i * 3))
 
-        self.declare_partials(of=meta['c_name'], wrt=meta['a_name'],
+        self.declare_partials(of=opts['c_name'], wrt=opts['a_name'],
                               rows=row_idxs, cols=col_idxs, val=0)
 
-        self.declare_partials(of=meta['c_name'], wrt=meta['b_name'],
+        self.declare_partials(of=opts['c_name'], wrt=opts['b_name'],
                               rows=row_idxs, cols=col_idxs, val=0)
 
     def compute(self, inputs, outputs):
@@ -94,10 +94,10 @@ class CrossProductComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        meta = self.metadata
-        a = inputs[meta['a_name']]
-        b = inputs[meta['b_name']]
-        outputs[meta['c_name']] = np.cross(a, b)
+        opts = self.options
+        a = inputs[opts['a_name']]
+        b = inputs[opts['b_name']]
+        outputs[opts['c_name']] = np.cross(a, b)
 
     def compute_partials(self, inputs, partials):
         """
@@ -110,12 +110,12 @@ class CrossProductComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        meta = self.metadata
-        a = inputs[meta['a_name']]
-        b = inputs[meta['b_name']]
+        opts = self.options
+        a = inputs[opts['a_name']]
+        b = inputs[opts['b_name']]
 
         # Use the following for sparse partials
-        partials[meta['c_name'], meta['a_name']] = \
+        partials[opts['c_name'], opts['a_name']] = \
             np.einsum('...j,ji->...i', b, self._k * -1).ravel()
-        partials[meta['c_name'], meta['b_name']] = \
+        partials[opts['c_name'], opts['b_name']] = \
             np.einsum('...j,ji->...i', a, self._k).ravel()

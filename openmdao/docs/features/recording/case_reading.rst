@@ -66,11 +66,11 @@ If we had not promoted `pz.z`, we would use:
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
 
-If a user would like to access the user-defined metadata on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. The case recorder does need to be explicitly added to a system in order for its metadata to be recorded. System metadata stored in `system_metadata` is accessed by system name where each system has two keys: `component_metadata` for accessing the user-defined metadata and `scaling_factors`. Accessing this data for `pz` would look like:
+If a user would like to access the user-defined options on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. The case recorder does need to be explicitly added to a system in order for its metadata to be recorded. System metadata stored in `system_metadata` is accessed by system name where each system has two keys: `component_metadata` for accessing the user-defined options and `scaling_factors`. Accessing this data for `pz` would look like:
 
 .. code-block:: console
 
-    pz.metadata.declare('test data', True)
+    pz.options.declare('test data', True)
     ...
     pz_metadata = cr.system_metadata['pz']['component_metadata']
     test_data_value = pz_metadata['test data']
@@ -145,3 +145,22 @@ By default, both methods will give all inputs or outputs recorded in system iter
 
     all_outputs = cr.list_outputs()
     all_inputs cr.list_outputs()
+
+*Loading Cases into Problems*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are some situations where it would be useful to load in a recorded case back into a Problem. The
+:code:`Problem.load_case` method is provided for this. The :code:`Problem.load_case` method supports loading in all
+forms of cases including systems, drivers, and solver cases.
+
+One possible use case is if you have a long running optimization and, for whatever reason, the run dies before it
+completes. It would be great to go back to the last recorded case for the entire model System, load it in to the
+Problem, and then do some debugging to determine what went wrong.
+
+Here is an example that shows how you might want to use this method. Notice that this code actually has two separate
+runs of the model.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_feature_load_system_case_for_restart
+    :layout: interleave
+

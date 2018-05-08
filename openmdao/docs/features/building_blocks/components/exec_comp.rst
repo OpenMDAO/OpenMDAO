@@ -97,7 +97,7 @@ You can also access built-in Numpy functions by using the prefix "numpy." with t
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_numpy
     :layout: interleave
 
-You can also declare metadata like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
+You can also declare options like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
 where we declare all our inputs to be inches to trigger conversion from a variable expressed in feet in one
 connection source.
 

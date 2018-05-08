@@ -1,8 +1,8 @@
-""" Definition of the Paraboloid component, which evaluates the equation
-(x-3)^2 + xy + (y+4)^2 = 3
+"""
+Demonstration of a model using the Paraboloid component.
 """
 from __future__ import division, print_function
-from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.api import ExplicitComponent
 
 
 class Paraboloid(ExplicitComponent):
@@ -23,7 +23,7 @@ class Paraboloid(ExplicitComponent):
         """
         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
 
-        Optimal solution (minimum): x = 6.6667; y = -7.3333
+        Minimum at: x = 6.6667; y = -7.3333
         """
         x = inputs['x']
         y = inputs['y']

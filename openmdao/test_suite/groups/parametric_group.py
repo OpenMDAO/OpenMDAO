@@ -37,14 +37,14 @@ class ParametericTestGroup(Group):
 
         super(ParametericTestGroup, self).__init__()
 
-        self.metadata.declare('vector_class', default='default',
-                              values=['default', 'petsc'],
-                              desc='Which vector implementation to use.')
-        self.metadata.declare('assembled_jac', default=True,
-                              types=bool,
-                              desc='If an assemebled Jacobian should be used.')
-        self.metadata.declare('jacobian_type', default='matvec',
-                              values=['dense', 'matvec', 'sparse-coo', 'sparse-csr', 'sparse-csc'],
-                              desc='Controls the type of the assembled jacobian.')
+        self.options.declare('vector_class', default='default',
+                             values=['default', 'petsc'],
+                             desc='Which vector implementation to use.')
+        self.options.declare('assembled_jac', default=True,
+                             types=bool,
+                             desc='If an assemebled Jacobian should be used.')
+        self.options.declare('jacobian_type', default='matvec',
+                             values=['dense', 'matvec', 'sparse-coo', 'sparse-csr', 'sparse-csc'],
+                             desc='Controls the type of the assembled jacobian.')
 
-        self.metadata.update(kwargs)
+        self.options.update(kwargs)

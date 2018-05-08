@@ -51,7 +51,7 @@ class ParameterizedTestCases(unittest.TestCase):
             actual = {key: problem[key] for key in iterkeys(expected_values)}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
-        error_bound = 1e-4 if root.metadata['finite_difference'] else 1e-8
+        error_bound = 1e-4 if root.options['finite_difference'] else 1e-8
 
         expected_totals = root.expected_totals
         if expected_totals:

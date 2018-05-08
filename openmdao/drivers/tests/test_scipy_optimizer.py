@@ -4,13 +4,12 @@ import unittest
 import sys
 import warnings
 
-from six import StringIO
-
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
-     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
+    ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import run_driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
@@ -142,10 +141,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = ScipyOptimizer(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -971,15 +967,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue()
+        self.assertFalse(failed, "Optimization failed.")
+
         self.assertTrue('Solving variable: comp.f_xy' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
@@ -1009,15 +1000,12 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue().split('\n')
+        self.assertFalse(failed, "Optimization failed.")
+
+        output = output.split('\n')
+
         self.assertTrue(output.count("Design Vars") > 1,
                         "Should be more than one design vars header printed")
         self.assertTrue(output.count("Nonlinear constraints") > 1,
@@ -1067,6 +1055,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver.run()
         self.assertEqual(len(prob.driver._lincongrad_cache), 1)
 
+
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
@@ -1107,9 +1096,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['disp'] = True
+        prob.driver = ScipyOptimizeDriver(optimizer='COBYLA')
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
