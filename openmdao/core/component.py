@@ -105,6 +105,45 @@ class Component(System):
         """
         pass
 
+    def _setup_procs(self, pathname, comm, mode):
+        """
+        Distribute processors and assign pathnames.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
+        """
+        self.pathname = pathname
+        self.comm = comm
+        self._mode = mode
+        self._subsystems_proc_range = []
+
+        # Clear out old variable information so that we can call setup on the component.
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2data_io = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
+
+        self._static_mode = False
+        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        for type_ in ['input', 'output']:
+            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
+        self._design_vars.update(self._static_design_vars)
+        self._responses.update(self._static_responses)
+        self.setup()
+        self._static_mode = True
+
+        if self.distributed:
+            self._vector_class = self._distributed_vector_class
+        else:
+            self._vector_class = self._local_vector_class
+
     def _setup_vars(self, recurse=True):
         """
         Call setup in components and count variables, total and by var_set.
@@ -189,20 +228,6 @@ class Component(System):
 
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
-
-    def _setup_connections(self, recurse=True):
-        """
-        Compute dict of all implicit and explicit connections owned by this system.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        if self.distributed:
-            self._vector_class = self._distributed_vector_class
-        else:
-            self._vector_class = self._local_vector_class
 
     def _setup_var_sizes(self, recurse=True):
         """
