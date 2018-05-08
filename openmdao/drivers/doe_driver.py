@@ -53,22 +53,23 @@ class DOEDriver(Driver):
 
     Attributes
     ----------
-    _generator : DOEGenerator
-        The case generator
     _name : str
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
     """
 
-    def __init__(self, generator=None):
+    def __init__(self, generator=None, **kwargs):
         """
         Constructor.
 
         Parameters
         ----------
         generator : DOEGenerator or None
-            The case generator. If None, no cases will be generated.
+            The case generator.
+
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
         if generator and not isinstance(generator, DOEGenerator):
             if inspect.isclass(generator):
@@ -80,33 +81,26 @@ class DOEDriver(Driver):
                                 "but an instance of %s was found."
                                 % type(generator).__name__)
 
-        super(DOEDriver, self).__init__()
+        super(DOEDriver, self).__init__(**kwargs)
 
-        if generator is None:
-            self._generator = DOEGenerator()
-            self._name = 'DOEDriver_None'
-        else:
-            self._generator = generator
-            self._name = 'DOEDriver_' + type(generator).__name__.replace('Generator', '')
+        if generator is not None:
+            self.options['generator'] = generator
 
+        self._name = ''
         self._recorders = []
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
+                             desc='The case generator. If default, no cases are generated.')
 
         self.options.declare('parallel', default=False,
                              desc='True or number of cases to run in parallel. '
                                   'If True, cases will be run on all available processors. '
                                   'If an integer, each case will get COMM.size/<number> '
                                   'processors and <number> of cases will be run in parallel')
-
-    def _get_name(self):
-        """
-        Get the name of this DOE driver and case generator.
-
-        Returns
-        -------
-        str
-            The name of this DOE driver and case generator.
-        """
-        return self._name
 
     def _setup_comm(self, comm):
         """
@@ -136,6 +130,36 @@ class DOEDriver(Driver):
 
         return model_comm
 
+    def _set_name(self):
+        """
+        Set the name of this DOE driver and its case generator.
+
+        Returns
+        -------
+        str
+            The name of this DOE driver and its case generator.
+        """
+        generator = self.options['generator']
+
+        gen_type = type(generator).__name__.replace('Generator', '')
+        if gen_type == 'DOEGenerator':
+            self._name = 'DOEDriver'  # Empty generator
+        else:
+            self._name = 'DOEDriver_' + gen_type
+
+        return self._name
+
+    def _get_name(self):
+        """
+        Get the name of this DOE driver and its case generator.
+
+        Returns
+        -------
+        str
+            The name of this DOE driver and its case generator.
+        """
+        return self._name
+
     def run(self):
         """
         Generate cases and run the model for each set of generated input values.
@@ -147,10 +171,13 @@ class DOEDriver(Driver):
         """
         self.iter_count = 0
 
+        # set driver name with current generator
+        self._set_name()
+
         if self._comm:
             case_gen = self._parallel_generator
         else:
-            case_gen = self._generator
+            case_gen = self.options['generator']
 
         for case in case_gen(self._designvars):
             self._run_case(case)
@@ -172,7 +199,7 @@ class DOEDriver(Driver):
         for dv_name, dv_val in case:
             self.set_design_var(dv_name, dv_val)
 
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+        with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
                 failure_flag, _, _ = self._problem.model._solve_nonlinear()
                 metadata['success'] = not failure_flag
@@ -205,7 +232,8 @@ class DOEDriver(Driver):
         size = self._comm.size // self.options['parallel']
         color = self._color
 
-        for i, case in enumerate(self._generator(design_vars)):
+        generator = self.options['generator']
+        for i, case in enumerate(generator(design_vars)):
             if i % size == color:
                 yield case
 
