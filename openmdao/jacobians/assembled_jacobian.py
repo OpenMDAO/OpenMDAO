@@ -172,15 +172,15 @@ class AssembledJacobian(Jacobian):
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self._matrix_class(system.comm)
+        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
         iproc = self._system.comm.rank
         sizes = self._system._var_sizes['nonlinear']['input']
         abs2idx = self._system._var_allprocs_abs2idx['nonlinear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
-                     system._var_allprocs_abs_names['input']}
+                     system._var_abs_names['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
-        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
         sizes = self._system._var_sizes['nonlinear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
