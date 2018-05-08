@@ -7,6 +7,7 @@ from collections import OrderedDict
 import os
 import pprint
 import re
+import sys
 
 import numpy as np
 
@@ -642,6 +643,8 @@ class NonlinearSolver(Solver):
                 f.write(out_str)
                 print("Inputs and outputs at start of iteration have been "
                       "saved to '%s'." % filename)
+
+            sys.stdout.flush()
 
         return fail, abs_err, rel_err
 
