@@ -1223,8 +1223,8 @@ class _TotalJacInfo(object):
             for of in inputs:
                 for wrt in outputs:
                     pprint.pprint({(of, wrt): J[of][wrt]})
-        else:
 
+        else:
             abs2meta = self.model._var_allprocs_abs2meta
             in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
             out_meta = self.out_meta
