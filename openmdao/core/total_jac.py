@@ -1031,8 +1031,7 @@ class _TotalJacInfo(object):
 
         if debug_print:
             # Debug outputs scaled derivatives.
-            sys.stdout.flush()
-            pprint.pprint(self.J_dict)
+            self._print_debug_derivatives()
 
         recording_iteration.stack.pop()
 
@@ -1213,6 +1212,30 @@ class _TotalJacInfo(object):
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
 
+    def _print_debug_derivatives(self):
+        """
+        Print out the derivatives when debug_print is True.
+        """
+        inputs = self.input_list
+        outputs = self.output_list
+        if self.return_format == 'dict':
+            J = self.J_dict
+            for of in inputs:
+                for wrt in outputs:
+                    pprint.pprint({(of, wrt): J[of][wrt]})
+        else:
+
+            abs2meta = self.model._var_allprocs_abs2meta
+            in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
+            out_meta = self.out_meta
+            J = self.J
+
+            for i, of in enumerate(outputs):
+                out_slice = out_meta[of][0]
+                for j, wrt in enumerate(inputs):
+                    pprint.pprint({(of, wrt): J[out_slice, in_meta[wrt][0]]})
+
+        sys.stdout.flush()
 
 def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
     """
