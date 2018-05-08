@@ -199,20 +199,19 @@ class PETScTransfer(DefaultTransfer):
                             rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
 
             out_vec = vectors['output'][vec_name]
-            transfer_class = out_vec.TRANSFER
 
             transfers[vec_name] = {}
-            xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
-                                      xfer_in, xfer_out, group.comm)
+            xfer_all = PETScTransfer(vectors['input'][vec_name], out_vec,
+                                     xfer_in, xfer_out, group.comm)
             transfers[vec_name]['fwd', None] = xfer_all
             if rev:
                 transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = transfer_class(
+                transfers[vec_name]['fwd', isub] = PETScTransfer(
                     vectors['input'][vec_name], vectors['output'][vec_name],
                     fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
                 if rev:
-                    transfers[vec_name]['rev', isub] = transfer_class(
+                    transfers[vec_name]['rev', isub] = PETScTransfer(
                         vectors['input'][vec_name], vectors['output'][vec_name],
                         rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
 
