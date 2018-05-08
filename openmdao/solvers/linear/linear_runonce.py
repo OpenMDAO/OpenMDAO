@@ -27,7 +27,6 @@ class LinearRunOnce(LinearBlockGS):
         # Remove unused options from base options.
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
-        # self.options.undeclare("maxiter") # eventually want to undeclare this
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
