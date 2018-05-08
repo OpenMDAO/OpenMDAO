@@ -1031,7 +1031,7 @@ class _TotalJacInfo(object):
 
         if debug_print:
             # Debug outputs scaled derivatives.
-            self._print_debug_derivatives()
+            self._print_derivatives()
 
         recording_iteration.stack.pop()
 
@@ -1212,7 +1212,7 @@ class _TotalJacInfo(object):
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
 
-    def _print_debug_derivatives(self):
+    def _print_derivatives(self):
         """
         Print out the derivatives when debug_print is True.
         """
