@@ -40,11 +40,16 @@ class SimpleGADriver(Driver):
          Random state (or seed-number) which controls the seed and random draws.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize the SimpleGADriver driver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
-        super(SimpleGADriver, self).__init__()
+        super(SimpleGADriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['integer_design_vars'] = True
@@ -58,7 +63,16 @@ class SimpleGADriver(Driver):
         self.supports['simultaneous_derivatives'] = False
         self.supports['active_set'] = False
 
-        # User Options
+        self._desvar_idx = {}
+        self._ga = None
+
+        # random state can be set for predictability during testing
+        self._randomstate = None
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
         self.options.declare('bits', default={}, types=(dict),
                              desc='Number of bits of resolution. Default is an empty dict, where '
                              'every unspecified variable is assumed to be integer, and the number '
@@ -74,12 +88,6 @@ class SimpleGADriver(Driver):
                              'as four times the number of bits.')
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
-
-        self._desvar_idx = {}
-        self._ga = None
-
-        # random state can be set for predictability during testing
-        self._randomstate = None
 
     def _setup_driver(self, problem):
         """

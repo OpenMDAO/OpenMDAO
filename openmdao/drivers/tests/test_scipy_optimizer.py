@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
-     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
+    ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -141,10 +141,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = ScipyOptimizer(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1058,6 +1055,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver.run()
         self.assertEqual(len(prob.driver._lincongrad_cache), 1)
 
+
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
     def test_feature_basic(self):
@@ -1098,9 +1096,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['disp'] = True
+        prob.driver = ScipyOptimizeDriver(optimizer='COBYLA')
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

@@ -166,7 +166,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver = DOEDriver(generator=FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
@@ -348,7 +348,9 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('y', lower=ylb, upper=yub)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
+        prob.driver = DOEDriver()
+        prob.driver.options['generator'] = LatinHypercubeGenerator(samples=4, seed=0)
+
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
         prob.setup(check=False)
@@ -549,9 +551,8 @@ class TestParallelDOE(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), parallel=True)
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
-        prob.driver.options['parallel'] =  True
 
         prob.setup(vector_class=PETScVector)
 
@@ -859,7 +860,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
             pass
 
     def test_fan_in_grouped(self):
-        from openmdao.api import Problem, IndepVarComp, PETScVector
+        from openmdao.api import Problem, PETScVector
         from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
         from openmdao.api import DOEDriver, FullFactorialGenerator
