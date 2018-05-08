@@ -456,8 +456,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.nonlinear_solver = NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 3
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
-        ls.options['maxiter'] = 10
+        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
         top.set_solver_print(level=0)
 
         top.setup(check=False)
