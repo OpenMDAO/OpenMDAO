@@ -13,7 +13,7 @@ class LinearSystemComp(ImplicitComponent):
     """
     Component that solves a linear system, Ax=b.
 
-    Designed to handle small, dense linear systems that can be efficiently solved with
+    Designed to handle small, dense linear systems (Ax=B) that can be efficiently solved with
     lu-decomposition. It can be vectorized to either solve for multiple right hand sides,
     or to solve multiple linear systems.
 
