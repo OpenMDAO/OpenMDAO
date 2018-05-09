@@ -4,6 +4,8 @@
 The System Setup Stack: Understanding When to Use setup and configure
 *********************************************************************
 
+This document explains what happens during the OpenMDAO setup process
+
 One question that is often asked is: why can't we just put all of our model building in our group's
 `__init__` method so that everything is there when I instantiate the class? The answer is, when
 running a parallel model under MPI, certain systems might only be executed on certain processors.
@@ -12,7 +14,7 @@ not local. The only way to do this is to isolate the model building process into
 (`setup`) and only call it on the processors where you need the footprint for that group. While
 not everyone will run their models in parallel, it is a good practice to follow the stricter
 guideline so that, if someone wants to include your model in a larger parallel model, they won't
-be forced to refactor.
+be forced to refactor it.
 
 .. _theory_setup_vs_configure:
 
@@ -78,8 +80,8 @@ still more things to do before the model can run. In `final_setup`, the followin
 
  - All vectors for the nonlinear and linear systems are created and allocated
  - Data transfers are created (i.e., scatters for MPI)
- - Solvers are setup
- - Jacobians are setup and allocated
- - Recorders are setup
- - Drivers are setup
+ - Solvers are set up
+ - Jacobians are set up and allocated
+ - Recorders are set up
+ - Drivers are set up
  - Initial values are loaded into the inputs and outputs vectors
