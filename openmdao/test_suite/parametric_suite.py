@@ -177,9 +177,9 @@ class ParameterizedInstance(object):
 
         group = MODELS[self._group_type](**args)
 
-        if args['vector_class'] == 'default':
+        if args['local_vector_class'] == 'default':
             vec_class = DefaultVector
-        elif args['vector_class'] == 'petsc':
+        elif args['local_vector_class'] == 'petsc':
             vec_class = PETScVector
             if PETScVector is None:
                 raise SkipTest('PETSc not available.')
@@ -204,7 +204,7 @@ class ParameterizedInstance(object):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(vec_class, check=check)
+        prob.setup(check=check, local_vector_class=vec_class)
 
         fail, rele, abse = prob.run_model()
         if fail:

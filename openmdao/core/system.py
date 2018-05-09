@@ -20,9 +20,10 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration, \
     get_formatted_iteration_coordinate
+from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import get_conversion
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
@@ -30,6 +31,7 @@ from openmdao.utils.write_outputs import write_outputs
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = object()
+_empty_frozen_set = frozenset()
 
 
 class System(object):
@@ -114,14 +116,6 @@ class System(object):
         owned by this system and num_var is the number of allprocs variables.
     _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
         Same as above, but by var_set name.
-    _manual_connections : dict
-        Dictionary of input_name: (output_name, src_indices) connections.
-    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned by this system
-        or any descendant system. The data is the same across all processors.
-    _conn_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned
-        by this system only. The data is the same across all processors.
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
@@ -142,10 +136,6 @@ class System(object):
         The outputs vector; points to _vectors['output']['nonlinear'].
     _residuals : <Vector>
         The residuals vector; points to _vectors['residual']['nonlinear'].
-    _transfers : dict of dict of Transfers
-        First key is the vec_name, second key is (mode, isub) where
-        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
-        or isub can be None for the full, simultaneous transfer.
     _lower_bounds : <Vector>
         Vector of lower bounds, scaled and dimensionless.
     _upper_bounds : <Vector>
@@ -200,8 +190,6 @@ class System(object):
         These data structures are never reset during reconfiguration.
     _static_subsystems_allprocs : [<System>, ...]
         List of subsystems that stores all subsystems added outside of setup.
-    _static_manual_connections : dict
-        Dictionary that stores all explicit connections added outside of setup.
     _static_design_vars : dict of dict
         Driver design variables added outside of setup.
     _static_responses : dict of dict
@@ -235,6 +223,13 @@ class System(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _vector_class : class
+        Class to use for data vectors.  After setup will contain the value of either
+        _distributed_vector_class or _local_vector_class.
+    _distributed_vector_class : class
+        Class to use for distributed data vectors.
+    _local_vector_class : class
+        Class to use for local data vectors.
     """
 
     def __init__(self, **kwargs):
@@ -299,10 +294,6 @@ class System(object):
         self._var_sizes = None
         self._var_sizes_byset = None
 
-        self._manual_connections = {}
-        self._conn_global_abs_in2out = {}
-        self._conn_abs_in2out = {}
-
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_num_vars_byset = {'input': {}, 'output': {}}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
@@ -313,7 +304,6 @@ class System(object):
         self._inputs = None
         self._outputs = None
         self._residuals = None
-        self._transfers = {}
 
         self._lower_bounds = None
         self._upper_bounds = None
@@ -341,7 +331,6 @@ class System(object):
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
-        self._static_manual_connections = {}
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
 
@@ -362,6 +351,10 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+
+        self._vector_class = None
+        self._local_vector_class = None
+        self._distributed_vector_class = None
 
     def _check_reconf(self):
         """
@@ -394,23 +387,7 @@ class System(object):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
         """
-        # See if any local subsystem has reconfigured
-        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
-
-        # See if any subsystem on this or any other processor has configured
-        if self.comm.size > 1:
-            reconf = self.comm.allreduce(reconf) > 0
-
-        if reconf:
-            # Perform an update setup
-            with self._unscaled_context_all():
-                self.resetup('update')
-
-            # Reset the _reconfigured attribute to False
-            for subsys in self._subsystems_myproc:
-                subsys._reconfigured = False
-
-            self._reconfigured = True
+        self._reconfigured = False
 
     def reconfigure(self):
         """
@@ -511,14 +488,12 @@ class System(object):
 
             return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
 
-    def _get_root_vectors(self, vector_class, initial, force_alloc_complex=False):
+    def _get_root_vectors(self, initial, force_alloc_complex=False):
         """
         Get the root vectors for the nonlinear and linear vectors for the model.
 
         Parameters
         ----------
-        vector_class : Vector
-            The Vector class used to instantiate the root vectors.
         initial : bool
             Whether we are reconfiguring - i.e., whether the model has been previously setup.
         force_alloc_complex : bool
@@ -556,6 +531,8 @@ class System(object):
                 self._scale_factors = self._compute_root_scale_factors()
             else:
                 self._scale_factors = {}
+
+            vector_class = self._vector_class
 
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]['output']
@@ -625,10 +602,12 @@ class System(object):
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         """
-        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode)
-        self._final_setup(self.comm, self._outputs.__class__, setup_mode=setup_mode)
+        self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
+                    distributed_vector_class=self._distributed_vector_class,
+                    local_vector_class=self._local_vector_class)
+        self._final_setup(self.comm, setup_mode=setup_mode)
 
-    def _setup(self, comm, setup_mode, mode):
+    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class):
         """
         Perform setup for this system and its descendant systems.
 
@@ -645,6 +624,12 @@ class System(object):
             Must be one of 'full', 'reconf', or 'update'.
         mode : str or None
             Derivative direction, either 'fwd', or 'rev', or None
+        distributed_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in interprocess communication.
+        local_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in intraprocess communication.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -655,6 +640,8 @@ class System(object):
             self.pathname = ''
             self.comm = comm
             self._relevant = None
+            self._distributed_vector_class = distributed_vector_class
+            self._local_vector_class = local_vector_class
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             initial = False
@@ -671,7 +658,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm)
+            self._setup_procs(self.pathname, comm, mode)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -722,7 +709,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_case_recording(recurse)
 
-    def _final_setup(self, comm, vector_class, setup_mode, force_alloc_complex=False):
+    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """
         Perform final setup for this system and its descendant systems.
 
@@ -737,8 +724,6 @@ class System(object):
         ----------
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        vector_class : type
-            reference to an actual <Vector> class; not an instance.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
         force_alloc_complex : bool
@@ -767,10 +752,10 @@ class System(object):
         ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset = \
             self._get_initial_global(initial)
         self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
-        root_vectors = self._get_root_vectors(vector_class, initial,
-                                              force_alloc_complex=force_alloc_complex)
+        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
-        self._setup_bounds(*self._get_bounds_root_vectors(vector_class, initial), resize=resize)
+        self._setup_bounds(*self._get_bounds_root_vectors(self._local_vector_class, initial),
+                           resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -789,39 +774,6 @@ class System(object):
 
         for sub in self.system_iter(recurse=True, include_self=True):
             sub._rec_mgr.record_metadata(sub)
-
-    def _setup_procs(self, pathname, comm):
-        """
-        Distribute processors and assign pathnames.
-
-        Parameters
-        ----------
-        pathname : str
-            Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
-            MPI communicator object.
-        """
-        self.pathname = pathname
-        self.comm = comm
-        self._subsystems_proc_range = []
-
-        # TODO: This version only runs for Components, because it is overriden in Group, so
-        # maybe we should move this to Component?
-
-        # Clear out old variable information so that we can call setup on the component.
-        self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2data_io = {}
-        self._design_vars = OrderedDict()
-        self._responses = OrderedDict()
-
-        self._static_mode = False
-        self._var_rel2data_io.update(self._static_var_rel2data_io)
-        for type_ in ['input', 'output']:
-            self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
-        self._design_vars.update(self._static_design_vars)
-        self._responses.update(self._static_responses)
-        self.setup()
-        self._static_mode = True
 
     def _setup_vars(self, recurse=True):
         """
@@ -963,7 +915,7 @@ class System(object):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        self._conn_global_abs_in2out = {}
+        pass
 
     def _setup_vec_names(self, mode, vec_names=None, vois=None):
         """
@@ -1072,7 +1024,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._conn_abs_in2out = {}
+        pass
 
     def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
         """
@@ -1121,9 +1073,9 @@ class System(object):
                 '"force_alloc_complex" to True during setup.'
             raise RuntimeError(msg)
 
-        for vec_name in self._rel_vec_name_list:
-            vector_class = root_vectors['output'][vec_name].__class__
+        vector_class = self._vector_class
 
+        for vec_name in self._rel_vec_name_list:
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
@@ -1199,7 +1151,6 @@ class System(object):
             ('input', 'norm'): (0.0, 1.0)
         })
 
-        abs2meta_in = self._var_abs2meta
         allprocs_meta_out = self._var_allprocs_abs2meta
 
         for abs_name in self._var_allprocs_abs_names['output']:
@@ -1214,75 +1165,6 @@ class System(object):
                 ('residual', 'phys'): (0.0, res_ref),
                 ('residual', 'norm'): (0.0, 1.0 / res_ref),
             }
-
-        if self._has_input_scaling:
-            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
-                meta_out = allprocs_meta_out[abs_out]
-                if abs_in not in abs2meta_in:
-                    # we only perform scaling on local arrays, so skip
-                    continue
-
-                meta_in = abs2meta_in[abs_in]
-
-                ref = meta_out['ref']
-                ref0 = meta_out['ref0']
-
-                src_indices = meta_in['src_indices']
-
-                if src_indices is not None:
-                    if not (np.isscalar(ref) and np.isscalar(ref0)):
-                        global_shape_out = meta_out['global_shape']
-                        if src_indices.ndim != 1:
-                            shape_in = meta_in['shape']
-                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
-                                src_indices = src_indices.flatten()
-                                src_indices = convert_neg(src_indices, src_indices.size)
-                            else:
-                                entries = [list(range(x)) for x in shape_in]
-                                cols = np.vstack(src_indices[i] for i in product(*entries))
-                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                           for i in range(cols.shape[1])]
-                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
-
-                        # TODO: if either ref or ref0 are not scalar and the output is
-                        # distributed, we need to do a scatter
-                        # to obtain the values needed due to global src_indices
-                        if meta_out['distributed']:
-                            raise RuntimeError("vector scalers with distrib vars "
-                                               "not supported yet.")
-
-                        ref = ref[src_indices]
-                        ref0 = ref0[src_indices]
-
-                # Compute scaling arrays for inputs using a0 and a1
-                # Example:
-                #   Let x, x_src, x_tgt be the dimensionless variable,
-                #   variable in source units, and variable in target units, resp.
-                #   x_src = a0 + a1 x
-                #   x_tgt = b0 + b1 x
-                #   x_tgt = g(x_src) = d0 + d1 x_src
-                #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
-                #   b0 = d0 + d1 a0
-                #   b0 = g(a0)
-                #   b1 = d0 + d1 a1 - d0
-                #   b1 = g(a1) - g(0)
-
-                units_in = meta_in['units']
-                units_out = meta_out['units']
-
-                if units_in is None or units_out is None or units_in == units_out:
-                    a0 = ref0
-                    a1 = ref - ref0
-                else:
-                    factor, offset = get_conversion(units_out, units_in)
-                    a0 = (ref0 + offset) * factor
-                    a1 = (ref - ref0) * factor
-
-                scale_factors[abs_in] = {
-                    ('input', 'phys'): (a0, a1),
-                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
-                }
-
         return scale_factors
 
     def _setup_transfers(self, recurse=True):
@@ -1294,7 +1176,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._transfers = {}
+        pass
 
     def _setup_solvers(self, recurse=True):
         """
@@ -1428,45 +1310,6 @@ class System(object):
         for abs_name in self._var_abs_names['output']:
             self._outputs._views[abs_name][:] = abs2meta[abs_name]['value']
 
-    def _transfer(self, vec_name, mode, isub=None):
-        """
-        Perform a vector transfer.
-
-        Parameters
-        ----------
-        vec_name : str
-            Name of the vector RHS on which to perform a transfer.
-        mode : str
-            Either 'fwd' or 'rev'
-        isub : None or int
-            If None, perform a full transfer.
-            If int, perform a partial transfer for linear Gauss--Seidel.
-        """
-        vec_inputs = self._vectors['input'][vec_name]
-
-        if mode == 'fwd':
-            if self._has_input_scaling:
-                vec_inputs.scale('norm')
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-                vec_inputs.scale('phys')
-            else:
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-        else:  # rev
-            if self._has_input_scaling:
-                vec_inputs.scale('phys')
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-                vec_inputs.scale('norm')
-            else:
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
-
     def _get_maps(self, prom_names):
         """
         Define variable maps based on promotes lists.
@@ -1564,37 +1407,20 @@ class System(object):
 
         return maps
 
-    def _get_scope(self, excl_sub=None):
+    def _get_scope(self):
+        """
+        Find the input and output variables that are needed for a particular matvec product.
+
+        Returns
+        -------
+        (set, set)
+            Sets of output and input variables.
+        """
         try:
-            return self._scope_cache[excl_sub]
+            return self._scope_cache[None]
         except KeyError:
-            pass
-
-        if excl_sub is None:
-            # All myproc outputs
-            scope_out = frozenset(self._var_abs_names['output'])
-
-            # All myproc inputs connected to an output in this system
-            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_abs_names['input'])
-
-        else:
-            # All myproc outputs not in excl_sub
-            scope_out = frozenset(self._var_abs_names['output']).difference(
-                excl_sub._var_abs_names['output'])
-
-            # All myproc inputs connected to an output in this system but not in excl_sub
-            scope_in = set()
-            for abs_in in self._var_abs_names['input']:
-                if abs_in in self._conn_global_abs_in2out:
-                    abs_out = self._conn_global_abs_in2out[abs_in]
-
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
-                        scope_in.add(abs_in)
-            scope_in = frozenset(scope_in)
-
-        self._scope_cache[excl_sub] = (scope_out, scope_in)
-        return scope_out, scope_in
+            self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
+            return self._scope_cache[None]
 
     @property
     def metadata(self):
@@ -2205,7 +2031,7 @@ class System(object):
         else:  # 'obj'
             if index is not None:
                 resp['size'] = 1
-                index = np.array([index], dtype=int)
+                index = np.array([index], dtype=INT_DTYPE)
             resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):
@@ -2970,11 +2796,7 @@ class System(object):
         list
             List of all states.
         """
-        states = []
-        for subsys in self._subsystems_myproc:
-            states.extend(subsys._list_states())
-
-        return states
+        return []
 
     def _list_states_allprocs(self):
         """
@@ -2985,11 +2807,7 @@ class System(object):
         list
             List of all states.
         """
-        states = []
-        for subsys in self._subsystems_allprocs:
-            states.extend(subsys._list_states_allprocs())
-
-        return states
+        return []
 
     def add_recorder(self, recorder, recurse=False):
         """
