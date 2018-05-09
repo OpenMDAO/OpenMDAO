@@ -1,6 +1,6 @@
 """
 A component that computes y = func(x), where func
-is a function given as metadata.
+is a function given as an option.
 """
 
 from types import FunctionType
@@ -10,7 +10,7 @@ from openmdao.api import ExplicitComponent
 class UnitaryFunctionComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('func', types=FunctionType)
+        self.options.declare('func', types=FunctionType)
 
     def setup(self):
         self.add_input('x')
@@ -18,5 +18,5 @@ class UnitaryFunctionComp(ExplicitComponent):
         self.declare_partials('y', 'x', method='fd')
 
     def compute(self, inputs, outputs):
-        func = self.metadata['func']
+        func = self.options['func']
         outputs['y'] = func(inputs['x'])

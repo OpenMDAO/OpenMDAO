@@ -14,11 +14,6 @@ from openmdao.utils.assert_utils import assert_rel_error
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
 
-class ExternalCodeCompForTesting(ExternalCodeComp):
-    def __init__(self):
-        super(ExternalCodeCompForTesting, self).__init__()
-
-
 class TestExternalCodeComp(unittest.TestCase):
 
     def setUp(self):
@@ -28,10 +23,9 @@ class TestExternalCodeComp(unittest.TestCase):
         shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
                     os.path.join(self.tempdir, 'extcode_example.py'))
 
-        self.extcode = ExternalCodeCompForTesting()
         self.prob = Problem()
 
-        self.prob.model.add_subsystem('extcode', self.extcode)
+        self.extcode = self.prob.model.add_subsystem('extcode', ExternalCodeComp())
 
     def tearDown(self):
         os.chdir(self.startdir)
@@ -183,6 +177,14 @@ class TestExternalCodeComp(unittest.TestCase):
             file_contents = out.read()
         self.assertTrue('SOME_ENV_VAR_VALUE' in file_contents,
                         "'SOME_ENV_VAR_VALUE' missing from '%s'" % file_contents)
+
+
+class TestExternalCodeCompArgs(unittest.TestCase):
+
+    def test_kwargs(self):
+        extcode = ExternalCodeComp(poll_delay=999)
+
+        self.assertTrue(extcode.options['poll_delay'] == 999)
 
 
 class ParaboloidExternalCodeComp(ExternalCodeComp):
@@ -488,6 +490,7 @@ class TestDeprecatedExternalCode(unittest.TestCase):
         dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         self.prob.run_model()
+
 
 if __name__ == "__main__":
     unittest.main()

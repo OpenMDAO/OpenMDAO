@@ -12,7 +12,6 @@ from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
-    vector_class = PETScVector
 else:
     PETScVector = None
 
@@ -167,7 +166,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.model.add_design_var('x')
         prob.model.add_objective('sum')
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         prob['x'] = np.ones(size)
 
@@ -219,7 +218,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.driver.add_recorder(self.recorder)
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
@@ -227,9 +226,9 @@ class DistributedRecorderTest(unittest.TestCase):
         #   current values in the problem. This next section is about getting those values
 
         # These involve collective gathers so all ranks need to run this
-        expected_desvars = prob.driver.get_design_var_values()
-        expected_objectives = prob.driver.get_objective_values()
-        expected_constraints = prob.driver.get_constraint_values()
+        expected_outputs = prob.driver.get_design_var_values()
+        expected_outputs.update(prob.driver.get_objective_values())
+        expected_outputs.update(prob.driver.get_constraint_values())
 
         # Determine the expected values for the sysincludes
         # this gets all of the outputs but just locally
@@ -259,14 +258,8 @@ class DistributedRecorderTest(unittest.TestCase):
                 'par.G2.Cy.y': dct['par.G2.Cy.y'],
             }
 
-
-        expected_outputs = expected_desvars
-        expected_outputs.update(expected_objectives)
-        expected_outputs.update(expected_constraints)
-        if prob.comm.rank == 0:
             expected_outputs.update(expected_includes)
 
-        if prob.comm.rank == 0:
             coordinate = [0, 'SLSQP', (48,)]
             self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 

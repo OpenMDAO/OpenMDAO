@@ -94,7 +94,7 @@ class DistributedAdderTest(unittest.TestCase):
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
         summer = prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         prob['x'] = np.ones(size)
 

@@ -6,10 +6,10 @@ from openmdao.api import ExplicitComponent
 class GlobalStiffnessMatrixComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('num_elements', types=int)
+        self.options.declare('num_elements', types=int)
 
     def setup(self):
-        num_elements = self.metadata['num_elements']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
 
         self.add_input('K_local', shape=(num_elements, 4, 4))
@@ -32,7 +32,7 @@ class GlobalStiffnessMatrixComp(ExplicitComponent):
         self.set_check_partial_options('K_local', step=1e0)
 
     def compute(self, inputs, outputs):
-        num_elements = self.metadata['num_elements']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
 
         outputs['K'][:, :] = 0.

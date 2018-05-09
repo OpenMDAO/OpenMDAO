@@ -348,7 +348,7 @@ class MPITests(unittest.TestCase):
 
         prob.set_solver_print(level=2)
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         # Conclude setup but don't run model.
         prob.final_setup()

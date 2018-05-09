@@ -18,12 +18,10 @@ from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 
-if MPI:
-    from openmdao.api import PETScVector
-    vector_class = PETScVector
-else:
-    from openmdao.api import DefaultVector
-    vector_class = DefaultVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class ParaboloidTricky(ExplicitComponent):
@@ -1899,10 +1897,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         class CellComp(ExplicitComponent):
 
             def initialize(self):
-                self.metadata.declare('num_nodes', types=int)
+                self.options.declare('num_nodes', types=int)
 
             def setup(self):
-                n = self.metadata['num_nodes']
+                n = self.options['num_nodes']
 
                 self.add_input('I_Li', val=3.25*np.ones(n))
                 self.add_output('zSOC', val=np.ones(n))
@@ -1939,7 +1937,7 @@ class TestProblemCheckTotals(unittest.TestCase):
                 self.nonlinear_solver.options['maxiter'] = 1
 
             def initialize(self):
-                self.metadata.declare('ode_class', desc='System defining the ODE.')
+                self.options.declare('ode_class', desc='System defining the ODE.')
 
 
         p = Problem(model=GaussLobattoPhase())
@@ -1960,7 +1958,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -1970,7 +1968,7 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         prob = Problem()
         group = prob.model = FanInSubbedIDVC()
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.set_solver_print(level=0)
         prob.run_model()
 

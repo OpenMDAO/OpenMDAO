@@ -14,7 +14,7 @@ class OptionsDictionary(object):
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
         2. the supports attribute in drivers
-        3. the metadata attribute in systems
+        3. the options attribute in systems
 
     Attributes
     ----------
@@ -48,7 +48,7 @@ class OptionsDictionary(object):
         Parameters
         ----------
         name : str
-            The key for the declared entry.
+            The key for the declared option.
         value : object
             The default or user-set value to check for value, type, lower, and upper.
         """
@@ -63,19 +63,19 @@ class OptionsDictionary(object):
             # If only values is declared
             if values is not None:
                 if value not in values:
-                    raise ValueError("Entry '{}'\'s value is not one of {}".format(name, values))
+                    raise ValueError("Option '{}'\'s value is not one of {}".format(name, values))
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
-                    raise TypeError("Entry '{}' has the wrong type ({})".format(name, types))
+                    raise TypeError("Option '{}' has the wrong type ({})".format(name, types))
 
             if upper is not None:
                 if value > upper:
-                    msg = ("Value of {} exceeds maximum of {} for entry 'x'")
+                    msg = ("Value of {} exceeds maximum of {} for option 'x'")
                     raise ValueError(msg.format(value, upper))
             if lower is not None:
                 if value < lower:
-                    msg = ("Value of {} exceeds minimum of {} for entry 'x'")
+                    msg = ("Value of {} exceeds minimum of {} for option 'x'")
                     raise ValueError(msg.format(value, lower))
 
         # General function test
@@ -148,6 +148,19 @@ class OptionsDictionary(object):
         if default_provided:
             self._assert_valid(name, default)
 
+    def undeclare(self, name):
+        """
+        Remove entry from the OptionsDictionary, for classes that don't use that option.
+
+        Parameters
+        ----------
+        name : str
+            The name of a key, the entry of which will be removed from the internal dictionary.
+
+        """
+        if name in self._dict:
+            del self._dict[name]
+
     def update(self, in_dict):
         """
         Update the internal dictionary with the given one.
@@ -178,7 +191,7 @@ class OptionsDictionary(object):
         Parameters
         ----------
         key : str
-            name of the entry.
+            name of the option.
 
         Returns
         -------
@@ -189,14 +202,14 @@ class OptionsDictionary(object):
 
     def __setitem__(self, name, value):
         """
-        Set an entry in the local dictionary.
+        Set an option in the local dictionary.
 
         Parameters
         ----------
         name : str
-            name of the entry.
+            name of the option.
         value : -
-            value of the entry to be value- and type-checked if declared.
+            value of the option to be value- and type-checked if declared.
         """
         if self._read_only:
             msg = "Tried to set '{}' on a read-only OptionsDictionary."
@@ -213,24 +226,24 @@ class OptionsDictionary(object):
 
     def __getitem__(self, name):
         """
-        Get an entry from the local dict, global dict, or declared default.
+        Get an option from the local dict, global dict, or declared default.
 
         Parameters
         ----------
         name : str
-            name of the entry.
+            name of the option.
 
         Returns
         -------
         value : -
-            value of the entry.
+            value of the option.
         """
-        # If the entry has been set in this system, return the set value
+        # If the option has been set in this system, return the set value
         try:
             meta = self._dict[name]
             if meta['has_been_set']:
                 return meta['value']
             else:
-                raise RuntimeError("Entry '{}' is required but has not been set.".format(name))
+                raise RuntimeError("Option '{}' is required but has not been set.".format(name))
         except KeyError:
-            raise KeyError("Entry '{}' cannot be found".format(name))
+            raise KeyError("Option '{}' cannot be found".format(name))

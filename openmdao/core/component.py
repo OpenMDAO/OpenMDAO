@@ -17,6 +17,7 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 
 
@@ -100,11 +101,11 @@ class Component(System):
             name
             pathname
             comm
-            metadata
+            options
         """
         pass
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, mode):
         """
         Execute first phase of the setup process.
 
@@ -116,9 +117,13 @@ class Component(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
         self.comm = comm
+        self._mode = mode
         self._subsystems_proc_range = []
 
         # Clear out old variable information so that we can call setup on the component.
@@ -135,6 +140,11 @@ class Component(System):
         self._responses.update(self._static_responses)
         self.setup()
         self._static_mode = True
+
+        if self.distributed:
+            self._vector_class = self._distributed_vector_class
+        else:
+            self._vector_class = self._local_vector_class
 
     def _setup_vars(self, recurse=True):
         """
@@ -370,14 +380,15 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape, src_indices)
+        metadata['value'], metadata['shape'], src_indices = ensure_compatible(name, val, shape,
+                                                                              src_indices)
         metadata['size'] = np.prod(metadata['shape'])
 
         # src_indices: None or ndarray
         if src_indices is None:
             metadata['src_indices'] = None
         else:
-            metadata['src_indices'] = np.atleast_1d(src_indices)
+            metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
         metadata['flat_src_indices'] = flat_src_indices
 
         # units: taken as is
@@ -501,7 +512,7 @@ class Component(System):
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'] = ensure_compatible(name, val, shape)
+        metadata['value'], metadata['shape'], _ = ensure_compatible(name, val, shape)
         metadata['size'] = np.prod(metadata['shape'])
 
         # units, res_units: taken as is
@@ -784,8 +795,8 @@ class Component(System):
             val = val.astype(safe_dtype, copy=False)
 
         if dependent and rows is not None:
-            rows = np.array(rows, dtype=int, copy=False)
-            cols = np.array(cols, dtype=int, copy=False)
+            rows = np.array(rows, dtype=INT_DTYPE, copy=False)
+            cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
             if rows.shape != cols.shape:
                 raise ValueError('rows and cols must have the same shape,'

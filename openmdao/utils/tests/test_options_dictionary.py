@@ -19,7 +19,7 @@ class TestOptionsDict(unittest.TestCase):
             self.dict['test'] = ''
 
         class_or_type = 'class' if PY3 else 'type'
-        expected_msg = "Entry 'test' has the wrong type (<{} 'int'>)".format(class_or_type)
+        expected_msg = "Option 'test' has the wrong type (<{} 'int'>)".format(class_or_type)
         self.assertEqual(expected_msg, str(context.exception))
 
         # make sure bools work
@@ -114,7 +114,7 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             self.dict['missing']
 
-        expected_msg = "\"Entry 'missing' cannot be found\""
+        expected_msg = "\"Option 'missing' cannot be found\""
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_get_default(self):
@@ -139,7 +139,7 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['test'] = object()
 
-        expected_msg = ("Entry 'test''s value is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
+        expected_msg = ("Option 'test''s value is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
                         " <object object at 0x[0-9A-Fa-f]+>\]")
         assertRegex(self, str(context.exception), expected_msg)
 
@@ -159,15 +159,32 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = 3.0
 
-        expected_msg = ("Value of 3.0 exceeds maximum of 2.0 for entry 'x'")
+        expected_msg = ("Value of 3.0 exceeds maximum of 2.0 for option 'x'")
         assertRegex(self, str(context.exception), expected_msg)
 
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = -3.0
 
-        expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for entry 'x'")
+        expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for option 'x'")
         assertRegex(self, str(context.exception), expected_msg)
 
+    def test_undeclare(self):
+        # create an entry in the dict
+        self.dict.declare('test', types=int)
+        self.dict['test'] = 1
+
+        # prove it's in the dict
+        self.assertEqual(self.dict['test'], 1)
+
+        # remove entry from the dict
+        self.dict.undeclare("test")
+
+        # prove it is no longer in the dict
+        with self.assertRaises(KeyError) as context:
+            self.dict['test']
+
+        expected_msg = "\"Option 'test' cannot be found\""
+        self.assertEqual(expected_msg, str(context.exception))
 
 if __name__ == "__main__":
     unittest.main()

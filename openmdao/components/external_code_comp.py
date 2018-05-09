@@ -37,43 +37,50 @@ class ExternalCodeComp(ExplicitComponent):
         Exit status of the child process.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Intialize the ExternalCodeComp component.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
         """
-        super(ExternalCodeComp, self).__init__()
+        super(ExternalCodeComp, self).__init__(**kwargs)
 
-        self.STDOUT = STDOUT
-        self.DEV_NULL = DEV_NULL
-
-        # Input options for this Component
-        self.options.declare('command', [], desc='command to be executed')
-        self.options.declare('env_vars', {},
-                             desc='Environment variables required by the command')
-        self.options.declare('poll_delay', 0.0, lower=0.0,
-                             desc='Delay between polling for command completion. A value of zero '
-                             'will use an internally computed default')
-        self.options.declare('timeout', 0.0, lower=0.0,
-                             desc='Maximum time to wait for command completion. A value of zero '
-                             'implies an infinite wait')
-        self.options.declare('external_input_files', [],
-                             desc='(optional) list of input file names to check the existence '
-                             'of before solve_nonlinear')
-        self.options.declare('external_output_files', [],
-                             desc='(optional) list of input file names to check the existence of '
-                             'after solve_nonlinear')
-        self.options.declare('fail_hard', True,
-                             desc="If True, external code errors raise a 'hard' exception "
-                             "(RuntimeError).  Otherwise raise a 'soft' exception "
-                             "(AnalysisError).")
-        self.options.declare('allowed_return_codes', [0],
-                             desc="Set of return codes that are considered successful.")
-
-        # Outputs of the run of the component or items that will not work with the OptionsDictionary
-        self.return_code = 0  # Return code from the command
-        self.stdin = self.DEV_NULL
+        self.stdin = DEV_NULL
         self.stdout = None
         self.stderr = "external_code_comp_error.out"
+
+        self.DEV_NULL = DEV_NULL
+        self.STDOUT = STDOUT
+
+        self.return_code = 0
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('command', [], desc='command to be executed')
+        self.options.declare('env_vars', {}, desc='Environment variables required by the command')
+        self.options.declare('poll_delay', 0.0, lower=0.0,
+                             desc='Delay between polling for command completion. A value of zero '
+                                  'will use an internally computed default')
+        self.options.declare('timeout', 0.0, lower=0.0,
+                             desc='Maximum time to wait for command completion. A value of zero '
+                                  'implies an infinite wait')
+        self.options.declare('external_input_files', [],
+                             desc='(optional) list of input file names to check the existence '
+                                  'of before solve_nonlinear')
+        self.options.declare('external_output_files', [],
+                             desc='(optional) list of input file names to check the existence of '
+                                  'after solve_nonlinear')
+        self.options.declare('fail_hard', True,
+                             desc="If True, external code errors raise a 'hard' exception "
+                                  "(RuntimeError).  Otherwise raise a 'soft' exception "
+                                  "(AnalysisError).")
+        self.options.declare('allowed_return_codes', [0],
+                             desc="Set of return codes that are considered successful.")
 
     def check_config(self, logger):
         """
