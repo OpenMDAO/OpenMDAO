@@ -41,8 +41,9 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
     def test_undeclared_options(self):
-        # Test that using options that should not exist in class, cause an error if they
-        #  are set in NonlinearRunOnce. atol and rtol are not allowed in NonlinearRunOnce
+        # Test that using options that should not exist in the class, cause an
+        # error if they are set while instantiating NonlinearRunOnce.
+        # atol and rtol are not used in NonlinearRunOnce
         from openmdao.api import Problem, Group, NonlinearRunOnce
 
         prob = Problem()

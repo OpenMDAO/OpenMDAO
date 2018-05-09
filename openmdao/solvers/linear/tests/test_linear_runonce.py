@@ -46,7 +46,8 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class, cause an
-        # error if they are set in LinearRunOnce. atol and rtol are not allowed in LinearRunOnce
+        # error if they are set when instantiating LinearRunOnce.
+        # atol and rtol are not used in LinearRunOnce
         from openmdao.api import Problem, Group, LinearRunOnce
 
         prob = Problem()
