@@ -1162,6 +1162,203 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
+    def test_system_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        obj_cmp = model.obj_cmp
+
+        recorder = SqliteRecorder(self.filename)
+        obj_cmp.add_recorder(recorder)
+        obj_cmp.recording_options['includes'] = ['*']
+        obj_cmp.recording_options['excludes'] = ['obj_cmp.x']
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = CaseReader(self.filename)
+        first_system_case = cr.system_cases.get_case(0)
+        recorded_inputs = first_system_case.inputs.keys
+        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
+
+    def test_driver_options(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.suppress_solver_output = True
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        recorder = SqliteRecorder(self.filename)
+        driver.add_recorder(recorder)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = CaseReader(self.filename)
+        first_driver_case = cr.driver_cases.get_case(0)
+        recorded_objectives = first_driver_case.get_objectives().keys
+        recorded_constraints = first_driver_case.get_constraints().keys
+        recorded_desvars = first_driver_case.get_desvars().keys
+
+        self.assertEqual(set(recorded_objectives), {'obj'})
+        self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
+        self.assertEqual(set(recorded_desvars), {'x', 'z'})
+
+    def test_system_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.nonlinear_solver = NonlinearBlockGS()
+
+        obj_cmp = model.obj_cmp
+
+        recorder = SqliteRecorder(self.filename)
+        obj_cmp.add_recorder(recorder)
+        obj_cmp.recording_options['includes'] = ['*']
+        obj_cmp.recording_options['excludes'] = ['obj_cmp.x']
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = CaseReader(self.filename)
+        first_system_case = cr.system_cases.get_case(0)
+        recorded_inputs = first_system_case.inputs.keys
+        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
+
+    def test_driver_options_with_values(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                   upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.suppress_solver_output = True
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        recorder = SqliteRecorder(self.filename)
+        driver.add_recorder(recorder)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = CaseReader(self.filename)
+        first_driver_case = cr.driver_cases.get_case(0)
+        recorded_objectives = first_driver_case.get_objectives()
+        recorded_constraints = first_driver_case.get_constraints()
+        recorded_desvars = first_driver_case.get_desvars()
+
+        self.assertEqual(set(recorded_objectives.keys), {'obj'})
+        self.assertEqual(set(recorded_constraints.keys), {'con1', 'con2'})
+        self.assertEqual(set(recorded_desvars.keys), {'x', 'z'})   
+
+        self.assertAlmostEqual(list(recorded_objectives['obj']), [28.58830817])     
+        self.assertAlmostEqual(list(recorded_desvars['x']), [1.])
+
+    def test_solver_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        solver = model.nonlinear_solver = NonlinearBlockGS()
+
+        recorder = SqliteRecorder(self.filename)
+        solver.add_recorder(recorder)
+        solver.recording_options['record_abs_error'] = True
+
+        prob.setup()
+        prob.run_model()
+
+        cr = CaseReader(self.filename)
+        first_solver_case = cr.solver_cases.get_case(0)
+        
+        recorded_abs_error = first_solver_case.abs_err
+        self.assertAlmostEqual(recorded_abs_error, 2.2545141)
+
 
 def _assert_model_matches_case(case, system):
     '''
