@@ -362,9 +362,9 @@ class System(object):
         Declare options before kwargs are processed in the init method.
 
         This is optionally implemented by subclasses of Component or Group
-        that themselves are intended to subclassed by the end user. The options
-        of the intermediate class are declared here so there is no conflict
-        with options declared in the `initialize` method.
+        that themselves are intended to be subclassed by the end user. The
+        options of the intermediate class are declared here leaving the
+        `initialize` method available for user-defined options.
         """
         pass
 
