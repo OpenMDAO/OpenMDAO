@@ -1,4 +1,63 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.3
+
+May 13, 2018
+
+New Features:
+--------------
+- Driver has new `debug_print` option that write design vars, objective, and constraints to std out for each iteration
+- Solvers has new `debug_print` option that will report the initial condition of the solver if it fails to converge
+
+- SimpleGAdriver will now compute a pop size based on  4*sum(bits) + 1 if pop_size=0
+- new problem methods <problem>.get_val() and <problem>.set_val() allow the user to specify a unit and we'll convert to the correct unit (or throw an error if the unit is not compatible)
+- OpenMDAO command line utility now works under MPI
+- list_problem_vars() method on problem will report all design vars, objectives, and constraints.
+
+- New Analytic Derivatives Features
+    - Major re-write of the documentation on how to work with analytic derivatives
+    - User can now assign AssembledJacobians. (Big speedup for a lot of lower-order or serial problems)
+    - Automatic calculation of total jacobian sparsity for optimizers that support it (lower compute cost when using SNOPT)
+    - Automatic simultaneous coloring algorithm for separable problems to speed up serial derivatives calculations.
+    - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers
+
+- New Components in the Standard Library:
+    - BsplineComp
+    - KSComp
+    - CrossProductComp
+    - DotProductComp
+    - MatrixVectorProductComp
+- LinearSystemComp has been vectorized
+
+- New CaseRecording/CaseReading Features
+    - CaseRecorder now saves metadata/options from all groups and components
+    - CaseReader now supports list_inputs and list_outputs methods
+    - User can iterate over cases from case reader in either flat or hierarchical modes
+    - User can re-load a case back into a model via the load_case() method
+
+
+Backwards-Compatible API Changes:
+-----------------------------------
+- Changed all instances of `metadata` to `options`. <system>.metadata has now been deprecated
+- Class Name changes (old class names were deprecated):
+    - UnstructuredMetaModel -> UnstructuredMetaModelComp
+    - StructuredMetaModel -> StructuredMetaModelComp
+    - ExternalCode -> ExternalCodeComp
+- Driver metadata/options can now be set via init args (can still be set as options as well)
+- User no longer needs to specify PETSCvector for parallel cases (the framework figures it out now)
+
+Backwards-Incompatible API changes:
+-----------------------------------
+- Redesign of the case-reader API. Unification of all cases, and simpler iteration over case hierarchies
+
+
+Bug Fixes:
+-----------
+- Fixed bug in component level FD that caused it to call the model too many times
+- Added proper error check for situation when user creates a variable name with illegal characters
+- Better error msg when adding objective or constraints with variables that don't exist under MPI execution
+- Vectorization for MetaModelUnstructuredComp was super duper broken. Its fixed now.
+
+################################################################################################
 Release Notes for OpenMDAO 2.2.1
 
 April 2, 2018
