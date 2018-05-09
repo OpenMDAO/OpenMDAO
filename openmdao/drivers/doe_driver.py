@@ -96,7 +96,7 @@ class DOEDriver(Driver):
         self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
                              desc='The case generator. If default, no cases are generated.')
 
-        self.options.declare('parallel', default=False,
+        self.options.declare('parallel', default=False, types=(bool, int), lower=0,
                              desc='True or number of cases to run in parallel. '
                                   'If True, cases will be run on all available processors. '
                                   'If an integer, each case will get COMM.size/<number> '
@@ -116,12 +116,41 @@ class DOEDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
+        import sys
         parallel = self.options['parallel']
         if MPI and parallel:
             self._comm = comm
+            comm_size = comm.size
 
-            size = comm.size // parallel
-            color = self._color = comm.rank % size
+            if parallel == 1:
+                size = 1
+                color = self._color = comm.rank
+                print('size:', size)
+                sys.stdout.flush()
+            else:
+                size = comm_size // parallel
+                print('comm_size:', comm_size)
+                sys.stdout.flush()
+                print('parallel:', parallel)
+                sys.stdout.flush()
+                print('size * parallel:', size * parallel)
+                sys.stdout.flush()
+                if comm_size != size * parallel:
+                    raise RuntimeError("The number of processors is not evenly divisable by "
+                                       "the specified number of parallel cases.\n Provide a "
+                                       "number of processors that is a multiple of %d, or "
+                                       "specify a number of parallel cases that divides "
+                                       "into %d." % (parallel, comm_size))
+                color = self._color = comm.rank % size
+
+            print('comm_size:', comm_size)
+            sys.stdout.flush()
+            print('parallel:', parallel)
+            sys.stdout.flush()
+            print('size:', size)
+            sys.stdout.flush()
+            print('color:', color)
+            sys.stdout.flush()
 
             model_comm = comm.Split(color)
         else:
