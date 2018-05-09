@@ -730,7 +730,9 @@ class LinearSolver(Solver):
 
         self._rhs_vecs = {}
         for vec_name in self._system._rel_vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            self._rhs_vecs[vec_name] = rhs = {}
+            for varset, data in iteritems(b_vecs[vec_name]._data):
+                rhs[varset] = data.copy()
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -778,7 +780,9 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name].set_vec(b_vecs[vec_name])
+            rhs = self._rhs_vecs[vec_name]
+            for varset, data in iteritems(b_vecs[vec_name]._data):
+                rhs[varset][:] = data
 
         if self.options['maxiter'] > 1:
             self._run_apply()
@@ -818,9 +822,11 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
+            rhs = self._rhs_vecs[vec_name]
             if vec_name in system._rel_vec_names:
                 b_vec = b_vecs[vec_name]
-                b_vec -= self._rhs_vecs[vec_name]
+                for varset, data in iteritems(rhs):
+                    b_vec._data[varset] -= data
                 norm += b_vec.get_norm()**2
 
         return norm ** 0.5
