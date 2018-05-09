@@ -89,7 +89,7 @@ class BoundsEnforceLS(NonlinearSolver):
                     "back to their bounds.")
 
         # Remove unused options from base options here, so that users
-        #  attempting to set them will get KeyErrors.
+        # attempting to set them will get KeyErrors.
         opt.undeclare("atol")
         opt.undeclare("rtol")
         opt.undeclare("maxiter")
