@@ -344,6 +344,7 @@ class System(object):
 
         self._scope_cache = {}
 
+        self._declare_options()
         self.initialize()
         self.options.update(kwargs)
 
@@ -355,6 +356,17 @@ class System(object):
         self._vector_class = None
         self._local_vector_class = None
         self._distributed_vector_class = None
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+
+        This is optionally implemented by subclasses of Component or Group
+        that themselves are intended to subclassed by the end user. The options
+        of the intermediate class are declared here so there is no conflict
+        with options declared in the `initialize` method.
+        """
+        pass
 
     def _check_reconf(self):
         """

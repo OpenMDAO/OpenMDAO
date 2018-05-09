@@ -57,9 +57,13 @@ class ExternalCodeComp(ExplicitComponent):
 
         self.return_code = 0
 
-    def initialize(self):
+    def _declare_options(self):
         """
-        Declare options.
+        Declare options before kwargs are processed in the init method.
+
+        Options are declared here because this class is intended to be subclassed
+        by the end user (so there is no conflict with options declared in the
+        `initialize` method).
         """
         self.options.declare('command', [], desc='command to be executed')
         self.options.declare('env_vars', {}, desc='Environment variables required by the command')
