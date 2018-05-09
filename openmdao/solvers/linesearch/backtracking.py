@@ -72,11 +72,6 @@ class BoundsEnforceLS(NonlinearSolver):
 
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
-        # Remove unused options from base options.
-        self.options.undeclare("atol")
-        self.options.undeclare("rtol")
-        self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_maxiter")
 
     def _declare_options(self):
         """
@@ -92,6 +87,13 @@ class BoundsEnforceLS(NonlinearSolver):
         opt.declare('print_bound_enforce', default=False,
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
+
+        # Remove unused options from base options here, so that users
+        #  attempting to set them will get KeyErrors.
+        opt.undeclare("atol")
+        opt.undeclare("rtol")
+        opt.undeclare("maxiter")
+        opt.undeclare("err_on_maxiter")
 
     def _run_iterator(self):
         """

@@ -40,6 +40,31 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
         # Make sure value is fine.
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
+    def test_undeclared_options(self):
+        # Test that using options that should not exist in class, cause an
+        # error if they are passed into LinearRunOnce. atol and rtol are not allowed in LinearRunOnce
+        from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        with self.assertRaises(KeyError) as context:
+            model.linear_solver = NonlinearRunOnce(atol=1.0)
+
+        self.assertEqual(str(context.exception), "\"Key 'atol' cannot be set because it "
+                                                 "has not been declared.\"")
+
+        with self.assertRaises(KeyError) as context:
+            model.linear_solver = NonlinearRunOnce(rtol=2.0)
+
+        self.assertEqual(str(context.exception), "\"Key 'rtol' cannot be set because it "
+                                                 "has not been declared.\"")
+
     def test_feature_solver(self):
         from openmdao.api import Problem, Group, NonlinearRunOnce, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
