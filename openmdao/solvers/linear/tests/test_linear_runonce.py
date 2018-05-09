@@ -46,16 +46,11 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class, cause an
-        # error if they are passed into LinearRunOnce. atol and rtol are not allowed in LinearRunOnce
-        from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
-        from openmdao.test_suite.components.paraboloid import Paraboloid
+        # error if they are set in LinearRunOnce. atol and rtol are not allowed in LinearRunOnce
+        from openmdao.api import Problem, Group, LinearRunOnce
 
         prob = Problem()
         model = prob.model = Group()
-
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         with self.assertRaises(KeyError) as context:
             model.linear_solver = LinearRunOnce(atol=1.0)

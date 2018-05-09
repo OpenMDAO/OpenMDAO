@@ -466,7 +466,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class, cause an
-        # error if they are passed into BoundsEnforceLS
+        # error if they are passed into BoundsEnforceLS.
+        # atol, rtol, maxiter, and err_on_maxiter are not used in BoundsEnforceLS
 
         top = self.top
 
