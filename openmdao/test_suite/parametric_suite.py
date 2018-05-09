@@ -177,18 +177,21 @@ class ParameterizedInstance(object):
 
         group = MODELS[self._group_type](**args)
 
-        if args['local_vector_class'] == 'default':
+        local_vec_class = args.get('local_vector_class', 'default')
+        if local_vec_class == 'default':
             vec_class = DefaultVector
-        elif args['local_vector_class'] == 'petsc':
+        elif local_vec_class == 'petsc':
             vec_class = PETScVector
             if PETScVector is None:
                 raise SkipTest('PETSc not available.')
+        else:
+            raise RuntimeError("Unrecognized local_vector_class '%s'" % local_vec_class)
 
         self.problem = prob = Problem(group)
 
         if args['assembled_jac']:
 
-            jacobian_type = args['jacobian_type']
+            jacobian_type = args.get('jacobian_type', 'dense')
             if jacobian_type == 'dense':
                 prob.model.jacobian = DenseJacobian()
             elif jacobian_type == 'sparse-coo':
