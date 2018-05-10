@@ -667,7 +667,7 @@ class Component(System):
             default value is the value of DEFAULT_FD_OPTIONS['form'].
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
+            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc'].
         """
         try:
             method_func = _supported_methods[method]
