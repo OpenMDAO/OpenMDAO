@@ -85,6 +85,8 @@ class LinearRunOnce(LinearBlockGS):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(LinearRunOnce, self)._declare_options()
+
         # changing the default maxiter from the base class
         self.options.declare('maxiter', default=0, values=(0,),
                              desc='maximum number of iterations '

@@ -3,7 +3,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, CSCJacobian, NewtonSolver, \
-    ScipyKrylov, LinearRunOnce, DenseJacobian
+    ScipyKrylov, LinearRunOnce, DenseJacobian, LinearBlockGS
 
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 
@@ -32,7 +32,7 @@ def _baseline(mode):
     return objective, jac
 
 
-def _masking_case(mode):
+def _mixed_case(mode):
     p = Problem()
 
     dv = p.model.add_subsystem('dv', IndepVarComp(), promotes=['*'])
@@ -57,7 +57,6 @@ def _masking_case(mode):
     newton = p.model.nonlinear_solver = NewtonSolver()
     newton.linear_solver = ScipyKrylov()
     newton.linear_solver.precon = LinearBlockGS()
-    # newton.linear_solver.options['assembled_jac'] = None
 
     p.model.linear_solver = ScipyKrylov()
     p.model.linear_solver.precon = DirectSolver()
@@ -72,18 +71,18 @@ def _masking_case(mode):
 
 
 class MixingJacsTestCase(unittest.TestCase):
-    def test_csc_masking_fwd(self):
+    def test_mixed_fwd(self):
         base_objective, base_jac = _baseline('fwd')
-        obj, jac = _masking_case('fwd')
+        obj, jac = _mixed_case('fwd')
 
         assert_almost_equal(base_objective, obj, decimal=7)
 
         for key in jac:
             assert_almost_equal(base_jac[key], jac[key], decimal=7)
 
-    def test_csc_masking_rev(self):
+    def test_mixed_rev(self):
         base_objective, base_jac = _baseline('rev')
-        obj, jac = _masking_case('rev')
+        obj, jac = _mixed_case('rev')
 
         assert_almost_equal(base_objective, obj, decimal=7)
 
@@ -91,4 +90,4 @@ class MixingJacsTestCase(unittest.TestCase):
             assert_almost_equal(base_jac[key], jac[key], decimal=7)
 
 if __name__ == '__main__':
-    obj, jac = _masking_case('rev')
+    unittest.main()

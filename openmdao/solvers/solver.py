@@ -710,6 +710,14 @@ class LinearSolver(Solver):
         super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('assembled_jac', default=None,
+                             values=[None, 'csc', 'dense'],
+                             desc='Sets the type of assembled jacobian used by this solver.')
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.

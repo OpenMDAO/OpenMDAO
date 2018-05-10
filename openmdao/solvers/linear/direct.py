@@ -117,6 +117,8 @@ class DirectSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(DirectSolver, self)._declare_options()
+
         self.options.declare('err_on_singular', default=True,
                              desc="Raise an error if LU decomposition is singular.")
 

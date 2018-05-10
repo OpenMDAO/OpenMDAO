@@ -48,6 +48,8 @@ class ScipyKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(ScipyKrylov, self)._declare_options()
+
         self.options.declare('solver', default='gmres', values=tuple(_SOLVER_TYPES.keys()),
                              desc='function handle for actual solver')
 

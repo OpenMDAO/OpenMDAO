@@ -199,6 +199,8 @@ class PETScKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(PETScKrylov, self)._declare_options()
+
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
