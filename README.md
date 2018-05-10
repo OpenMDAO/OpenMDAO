@@ -40,12 +40,12 @@ Important Note:
 
 While the API is MOSTLY stable, we reserve the right to change things as needed.
 
-We will be making very frequent updates to this code. If you’re going to try it,
+We will be making frequent updates to this code. If you’re going to try it,
 make sure you pull these updates often.
 
 
-Features of OpenMDAO 1.7.x Not Yet in 2.x
------------------------------------------
+Features of OpenMDAO 1.7.4 Not Yet in 2.x.y
+-------------------------------------------
 
 Be aware that this is an Alpha.
 Not all the features of 1.7.4 exist in 2.x.y yet.
@@ -53,8 +53,7 @@ Not all the features of 1.7.4 exist in 2.x.y yet.
 Here is a list of things that have not yet been developed in 2.x:
 
 * Pass-by-object variables
-* automatic ordering of groups/components based on data connections
-* DOE (Design of Experiment) driver and all other case drivers
+* Automatic ordering of groups/components based on data connections
 * Parallel Finite Difference
 * File variables
 * Active-set constraint calculation disabling
