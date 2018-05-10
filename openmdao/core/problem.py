@@ -617,7 +617,8 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=1e-6, form=DEFAULT_FD_OPTIONS['form'],
+                       method='fd', step=DEFAULT_FD_OPTIONS['step'],
+                       form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False,
                        show_only_incorrect=False):
@@ -644,11 +645,10 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is None.
+            Step size for approximation. Default is the value of DEFAULT_FD_OPTIONS['step']
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
-            the value of DEFAULT_FD_OPTIONS['form']
+            default value is the value of DEFAULT_FD_OPTIONS['form'].
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
