@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, CSCJacobian, NewtonSolver, \
-    ScipyKrylov, LinearRunOnce, DenseJacobian, LinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, \
+    ScipyKrylov, LinearRunOnce, LinearBlockGS
 
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 
@@ -46,12 +46,10 @@ def _mixed_case(mode):
 
     p.setup(mode=mode)
 
-    p.model.double_sellar.g1.linear_solver = DirectSolver()
-    p.model.double_sellar.g1.linear_solver.options['assembled_jac'] = 'csc'
+    p.model.double_sellar.g1.linear_solver = DirectSolver(assembled_jac='csc')
     p.model.double_sellar.g1.nonlinear_solver = NewtonSolver()
 
-    p.model.double_sellar.g2.linear_solver = DirectSolver()
-    p.model.double_sellar.g2.linear_solver.options['assembled_jac'] = 'csc'
+    p.model.double_sellar.g2.linear_solver = DirectSolver(assembled_jac='csc')
     p.model.double_sellar.g2.nonlinear_solver = NewtonSolver()
 
     newton = p.model.nonlinear_solver = NewtonSolver()
@@ -59,8 +57,7 @@ def _mixed_case(mode):
     newton.linear_solver.precon = LinearBlockGS()
 
     p.model.linear_solver = ScipyKrylov()
-    p.model.linear_solver.precon = DirectSolver()
-    p.model.linear_solver.options['assembled_jac'] = 'dense'
+    p.model.linear_solver.precon = DirectSolver(assembled_jac='dense')
 
     p.run_model()
 

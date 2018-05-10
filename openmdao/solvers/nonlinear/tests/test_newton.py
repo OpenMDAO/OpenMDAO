@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
-    DirectSolver, DenseJacobian, AnalysisError, CSCJacobian
+    DirectSolver, AnalysisError
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
@@ -302,22 +302,19 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_basic(self):
         prob = Problem(model=DoubleSellar())
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.jacobian = DenseJacobian()
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = DirectSolver()
+        g1.linear_solver = DirectSolver(assembled_jac='dense')
 
         g2 = model.g2
-        g2.jacobian = DenseJacobian()
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = DirectSolver()
+        g2.linear_solver = DirectSolver(assembled_jac='dense')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -332,24 +329,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_basic_csc(self):
         prob = Problem(model=DoubleSellar())
         model = prob.model
-        model.jacobian = CSCJacobian()
 
         g1 = model.g1
-        g1.jacobian = DenseJacobian()
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = DirectSolver()
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g1.linear_solver = DirectSolver(assembled_jac='dense')
 
         g2 = model.g2
-        g2.jacobian = DenseJacobian()
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = DirectSolver()
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g2.linear_solver = DirectSolver(assembled_jac='dense')
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='csc')
 
         prob.setup()
         prob.run_model()
@@ -362,22 +352,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_basic_dense_jac(self):
         prob = Problem(model=DoubleSellar())
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -390,22 +375,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_basic_dense_jac_scaling(self):
         prob = Problem(model=DoubleSellar(units=None, scaling=True))
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -418,22 +398,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_basic_dense_jac_units_scaling(self):
         prob = Problem(model=DoubleSellar(units=True, scaling=True))
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -446,21 +421,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_assembled_jac_top(self):
         prob = Problem(model=DoubleSellar())
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = ScipyKrylov()
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = ScipyKrylov()
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -473,21 +444,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_assembled_jac_top_csc(self):
         prob = Problem(model=DoubleSellar())
         model = prob.model
-        model.jacobian = CSCJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = ScipyKrylov()
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = ScipyKrylov()
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='csc')
 
         prob.setup()
         prob.run_model()
@@ -500,21 +467,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_assembled_jac_top_implicit(self):
         prob = Problem(model=DoubleSellarImplicit())
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -527,21 +490,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_assembled_jac_top_implicit_scaling(self):
         prob = Problem(model=DoubleSellarImplicit(scaling=True))
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -554,21 +513,17 @@ class TestNewton(unittest.TestCase):
     def test_solve_subsystems_assembled_jac_top_implicit_scaling_units(self):
         prob = Problem(model=DoubleSellarImplicit(units=True, scaling=True))
         model = prob.model
-        model.jacobian = DenseJacobian()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g1.linear_solver = DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup()
         prob.run_model()
@@ -583,14 +538,11 @@ class TestNewton(unittest.TestCase):
         model = prob.model
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = DirectSolver()
-        g1.jacobian = DenseJacobian()
+        g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
+        g1.linear_solver = DirectSolver(assembled_jac='dense')
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
+        g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()

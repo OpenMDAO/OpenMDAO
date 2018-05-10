@@ -36,11 +36,6 @@ class ImplicitComponent(Component):
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
 
-        # TODO : Uncomment these out to set default to DenseJacobian, once we have resolved further
-        # issues and if we decide it makes sense.
-        # self._jacobian = DenseJacobian()
-        # self._owns_assembled_jac = True
-
     def _configure(self):
         """
         Configure this system to assign children settings.

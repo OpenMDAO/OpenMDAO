@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, CSCJacobian, NewtonSolver, \
-    ScipyKrylov, LinearRunOnce, DenseJacobian
+from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, \
+    ScipyKrylov, LinearRunOnce
 
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 
@@ -47,12 +47,10 @@ def _masking_case(mode):
 
     p.setup(mode=mode)
 
-    p.model.double_sellar.g1.jacobian = CSCJacobian()
-    p.model.double_sellar.g1.linear_solver = DirectSolver()
+    p.model.double_sellar.g1.linear_solver = DirectSolver(assembled_jac='csc')
     p.model.double_sellar.g1.nonlinear_solver = NewtonSolver()
 
-    p.model.double_sellar.g2.jacobian = CSCJacobian()
-    p.model.double_sellar.g2.linear_solver = DirectSolver()
+    p.model.double_sellar.g2.linear_solver = DirectSolver(assembled_jac='csc')
     p.model.double_sellar.g2.nonlinear_solver = NewtonSolver()
 
     p.model.nonlinear_solver = NewtonSolver()

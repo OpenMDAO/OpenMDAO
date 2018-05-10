@@ -8,7 +8,7 @@ import numpy as np
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, IndepVarComp, \
-    DirectSolver, NewtonSolver, ScipyKrylov, DenseJacobian, ExecComp, NonlinearBlockGS
+    DirectSolver, NewtonSolver, ScipyKrylov, ExecComp, NonlinearBlockGS
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
@@ -41,10 +41,9 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = self.linear_solver_class()
+        model.linear_solver = self.linear_solver_class(assembled_jac='dense')
         prob.set_solver_print(level=0)
 
-        prob.model.jacobian = DenseJacobian()
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0
@@ -133,8 +132,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
 
-        comp.linear_solver = self.linear_solver_class()
-        comp.jacobian = DenseJacobian()
+        comp.linear_solver = self.linear_solver_class(assembled_jac='dense')
 
         prob.setup(check=False, mode='fwd')
 

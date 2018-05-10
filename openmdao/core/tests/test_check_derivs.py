@@ -7,8 +7,8 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS, CSCJacobian, DirectSolver, ExecComp, \
-                         ScipyKrylov, CSCJacobian, NewtonSolver
+                         ImplicitComponent, NonlinearBlockGS, DirectSolver, ExecComp, \
+                         ScipyKrylov, NewtonSolver
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -1944,8 +1944,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         p.model.add_objective('time', index=-1)
 
-        p.model.jacobian = CSCJacobian()
-        p.model.linear_solver=ScipyKrylov()
+        p.model.linear_solver=ScipyKrylov(assembled_jac='csc')
 
         p.setup(mode='fwd')
         p.set_solver_print(level=0)

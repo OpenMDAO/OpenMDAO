@@ -3,7 +3,6 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
-from openmdao.jacobians.assembled_jacobian import DenseJacobian
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
@@ -179,7 +178,7 @@ class TestAssertUtils(unittest.TestCase):
         except AssertionError as err:
             expected_err = \
 '''The following groups use dictionary jacobians:
-    
+
     cycle'''
             self.assertEqual(str(err), expected_err)
         else:
@@ -198,7 +197,7 @@ class TestAssertUtils(unittest.TestCase):
         model.connect('des_vars.y', 'parab_comp.y')
 
         prob = Problem(model)
-        prob.model.jacobian = DenseJacobian()
+        prob.model.linear_solver.options['assembed_jac'] = 'dense'
 
         prob.setup(check=False)
 

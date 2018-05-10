@@ -13,7 +13,6 @@ from scipy.sparse import coo_matrix, csr_matrix
 from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
-                         DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian, \
                          LinearBlockGS, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -194,15 +193,15 @@ def _test_func_name(func, num, param):
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
-        [DenseJacobian, CSRJacobian, CSCJacobian, COOJacobian],
+        ['dense', 'csc'],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize
         ), testcase_func_name=_test_func_name
     )
-    def test_src_indices(self, jacobian_class, comp_jac_class, nested, lincalls):
+    def test_src_indices(self, assembled_jac, comp_jac_class, nested, lincalls):
 
-        self._setup_model(jacobian_class, comp_jac_class, nested, lincalls)
+        self._setup_model(assembled_jac, comp_jac_class, nested, lincalls)
 
         # if we multiply our jacobian (at x,y = ones) by our work vec of 1's,
         # we get fwd_check
@@ -219,7 +218,7 @@ class TestJacobian(unittest.TestCase):
         self._check_fwd(self.prob, fwd_check)
         self._check_rev(self.prob, rev_check)
 
-    def _setup_model(self, jac_class, comp_jac_class, nested, lincalls):
+    def _setup_model(self, assembled_jac, comp_jac_class, nested, lincalls):
         self.prob = prob = Problem(model=Group())
         if nested:
             top = prob.model.add_subsystem('G1', Group())
@@ -237,11 +236,11 @@ class TestJacobian(unittest.TestCase):
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
-        top.jacobian = jac_class()
         top.nonlinear_solver = NewtonSolver()
         top.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=100)
         top.linear_solver = ScipyKrylov(
-            maxiter=200, atol=1e-10, rtol=1e-10)
+            maxiter=200, atol=1e-10, rtol=1e-10, assembled_jac=assembled_jac)
+
         prob.set_solver_print(level=0)
 
         prob.setup(check=False)
@@ -326,37 +325,6 @@ class TestJacobian(unittest.TestCase):
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
         assert_rel_error(self, jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
-
-    def test_component_assembled_jac(self):
-        prob = Problem()
-        model = prob.model = Group()
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        d1 = prob.model.d1
-
-        d1.jacobian = DenseJacobian()
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False)
-        prob.run_model()
-
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_group_assembled_jac_with_ext_mat(self):
 
@@ -447,10 +415,8 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = LinearBlockGS()
         sup.linear_solver = LinearBlockGS()
 
-        sub1.jacobian = CSCJacobian()
-        sub1.linear_solver = DirectSolver()
-        sub2.jacobian = CSCJacobian()
-        sub2.linear_solver = DirectSolver()
+        sub1.linear_solver = DirectSolver(assembled_jac='csc')
+        sub2.linear_solver = DirectSolver(assembled_jac='csc')
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
@@ -472,7 +438,7 @@ class TestJacobian(unittest.TestCase):
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
         prob.model.nonlinear_solver = NewtonSolver()
-        c3.jacobian = DenseJacobian()
+        prob.model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.model.connect('indep.x', 'C1.a')
         prob.model.connect('indep.x', 'C2.a')
@@ -501,46 +467,14 @@ class TestJacobian(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        prob.model.jacobian = DenseJacobian()
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup(check=False)
         prob.final_setup()
 
-        prob.model.jacobian = DenseJacobian()
+        model.linear_solver.options['assembled_jac'] = 'csc'
 
         msg = ": jacobian has changed and setup was not called."
-        with assertRaisesRegex(self, Exception, msg):
-            prob.run_model()
-
-    def test_jacobian_changed_component(self):
-        prob = Problem()
-        model = prob.model = Group()
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
-
-        prob.setup(check=False)
-        prob.final_setup()
-
-        d1 = prob.model.d1
-        d1.jacobian = DenseJacobian()
-
-        msg = "d1: jacobian has changed and setup was not called."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -556,8 +490,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
         prob.model.nonlinear_solver = NewtonSolver()
-        G1.jacobian = DenseJacobian()
-        G1.linear_solver = DirectSolver()
+        G1.linear_solver = DirectSolver(assembled_jac='dense')
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection
@@ -585,11 +518,9 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
         #prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.jacobian = DenseJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        G1.jacobian = CSCJacobian()
-        G1.linear_solver = DirectSolver()
+        G1.linear_solver = DirectSolver(assembled_jac='csc')
         G1.nonlinear_solver = NewtonSolver()
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
@@ -662,7 +593,7 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = DenseJacobian()
+        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -684,7 +615,7 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'sub.comp.x')
         model.connect('p2.y', 'sub.comp.y')
 
-        model.jacobian = DenseJacobian()
+        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -708,7 +639,7 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = DenseJacobian()
+        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -728,7 +659,7 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = DenseJacobian()
+        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
         prob.final_setup()
@@ -754,7 +685,7 @@ class TestJacobian(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        model.jacobian = DenseJacobian()
+        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -801,8 +732,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
                                         z=np.zeros(size//2)))
 
-        prob.model.jacobian = DenseJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
         prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')
@@ -826,8 +756,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
                                         z=np.zeros(size//2)))
 
-        prob.model.jacobian = CSCJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assembled_jac='csc')
 
         prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')
@@ -854,8 +783,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size), y=np.zeros(size),
                                         z=np.zeros(size)))
 
-        prob.model.jacobian = CSCJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assembled_jac='csc')
 
         prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')

@@ -9,8 +9,6 @@ from parameterized import parameterized
 from unittest import SkipTest
 
 from openmdao.core.problem import Problem
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
-                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.test_suite.groups.cycle_group import CycleGroup
@@ -162,6 +160,7 @@ class ParameterizedInstance(object):
         self.linear_solver_options = {'maxiter': 200,
                                       'atol': 1e-10,
                                       'rtol': 1e-10,
+                                      'assembled_jac': None,
                                       }
 
     def setup(self, check=False):
@@ -190,16 +189,14 @@ class ParameterizedInstance(object):
         self.problem = prob = Problem(group)
 
         if args['assembled_jac']:
-
             jacobian_type = args.get('jacobian_type', 'dense')
+
             if jacobian_type == 'dense':
-                prob.model.jacobian = DenseJacobian()
-            elif jacobian_type == 'sparse-coo':
-                prob.model.jacobian = COOJacobian()
-            elif jacobian_type == 'sparse-csr':
-                prob.model.jacobian = CSRJacobian()
+                self.linear_solver_options['assembled_jac'] = 'dense'
             elif jacobian_type == 'sparse-csc':
-                prob.model.jacobian = CSCJacobian()
+                self.linear_solver_options['assembled_jac'] = 'csc'
+            else:
+                raise RuntimeError("Invalid assembled_jac: '%s'." % jacobian_type)
 
         prob.model.linear_solver = self.linear_solver_class(**self.linear_solver_options)
 

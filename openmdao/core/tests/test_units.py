@@ -5,7 +5,7 @@ import warnings
 
 from six import iteritems
 
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DirectSolver
 from openmdao.api import ExecComp
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
@@ -31,8 +31,8 @@ class TestUnitConversion(unittest.TestCase):
         """Test that output values and total derivatives are correct."""
         prob = Problem(model=UnitConvGroup())
 
-        prob.model.jacobian = DenseJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
         prob.run_model()

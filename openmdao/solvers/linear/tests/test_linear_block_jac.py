@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, DenseJacobian, \
+from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, \
     ExecComp, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -26,10 +26,9 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = LinearBlockJac()
+        model.linear_solver = LinearBlockJac(assembled_jac='dense')
         prob.set_solver_print(level=0)
 
-        prob.model.jacobian = DenseJacobian()
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0

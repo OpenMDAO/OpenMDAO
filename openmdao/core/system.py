@@ -14,7 +14,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
@@ -1448,16 +1448,17 @@ class System(object):
         """
         Get the Jacobian object assigned to this system (or None if unassigned).
         """
-        return self._jacobian
+        raise RuntimeError("jacobian is no longer accessible from System. Instead, use"
+                           " options['assembed_jac'] on the linear solver.")
 
     @jacobian.setter
     def jacobian(self, jacobian):
         """
         Set the Jacobian.
         """
-        self._owns_assembled_jac = isinstance(jacobian, AssembledJacobian)
-        self._jacobian = jacobian
-        self._jacobian_changed = True
+        raise RuntimeError("jacobian is no longer accessible from System. Instead, use"
+                           " options['assembed_jac'] = val on the linear solver, where val is "
+                           "one of [None, 'dense', 'csc'].")
 
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):

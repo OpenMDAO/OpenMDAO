@@ -9,7 +9,7 @@ from six import iteritems
 from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
-                         COOJacobian, ScipyKrylov, DirectSolver, DenseJacobian
+                         ScipyKrylov, DirectSolver
 
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -177,8 +177,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         self.problem = Problem(model=model)
         self.problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov()
-        model.jacobian = COOJacobian()
+        model.linear_solver = ScipyKrylov(assembled_jac='csc')
 
     def test_dependence(self):
         problem = self.problem
@@ -266,8 +265,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem = Problem(model=model)
         problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov()
-        model.jacobian = COOJacobian()
+        model.linear_solver = ScipyKrylov(assembled_jac='csc')
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
@@ -434,7 +432,7 @@ class TestJacobianForDocs(unittest.TestCase):
     def test_const_jacobian(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, DenseJacobian
+        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
         from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
 
         model = Group()
@@ -446,8 +444,7 @@ class TestJacobianForDocs(unittest.TestCase):
 
         problem = Problem(model=model)
         model.suppress_solver_output = True
-        model.linear_solver = DirectSolver()
-        model.jacobian = DenseJacobian()
+        model.linear_solver = DirectSolver(assembled_jac='dense')
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)

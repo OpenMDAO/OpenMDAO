@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, DenseJacobian
+from openmdao.api import Group, IndepVarComp, Problem
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -466,18 +466,12 @@ class LinearSolverTests(object):
             # Test derivatives across a converged Sellar model.
 
             prob = Problem()
-            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(), nl_atol=1e-12)
+            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(assembled_jac='dense'),
+                                               nl_atol=1e-12)
 
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
-
-            prob.model.sub.d1.jacobian = DenseJacobian()
-            prob.model.sub.d2.jacobian = DenseJacobian()
-            prob.model.sub.state_eq_group.state_eq.jacobian = DenseJacobian()
-            prob.model.obj_cmp.jacobian = DenseJacobian()
-            prob.model.con_cmp1.jacobian = DenseJacobian()
-            prob.model.con_cmp2.jacobian = DenseJacobian()
 
             prob.run_model()
 
@@ -501,18 +495,12 @@ class LinearSolverTests(object):
                 assert_rel_error(self, J[key], val, .00001)
 
             prob = Problem()
-            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(), nl_atol=1e-12)
+            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(assembled_jac='dense'),
+                                               nl_atol=1e-12)
 
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='rev')
-
-            prob.model.sub.d1.jacobian = DenseJacobian()
-            prob.model.sub.d2.jacobian = DenseJacobian()
-            prob.model.sub.state_eq_group.state_eq.jacobian = DenseJacobian()
-            prob.model.obj_cmp.jacobian = DenseJacobian()
-            prob.model.con_cmp1.jacobian = DenseJacobian()
-            prob.model.con_cmp2.jacobian = DenseJacobian()
 
             prob.run_model()
 

@@ -7,8 +7,7 @@ from parameterized import parameterized
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DenseJacobian, CSCJacobian, \
-     ParallelGroup
+     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, ParallelGroup
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
@@ -579,9 +578,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov()
+        sub.linear_solver = ScipyKrylov(assembled_jac='dense')
 
-        model.jacobian = DenseJacobian()
         model.approx_totals(method='fd', step=1e-5)
 
         prob.setup(check=False)
@@ -619,9 +617,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov()
+        sub.linear_solver = ScipyKrylov(assembled_jac='csc')
 
-        model.jacobian = CSCJacobian()
         model.approx_totals(method='fd', step=1e-5)
 
         prob.setup(check=False)
