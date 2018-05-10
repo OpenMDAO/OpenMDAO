@@ -190,7 +190,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
         prob.run_driver()
 
         # Optimal solution
@@ -350,7 +350,7 @@ class MPIFeatureTests(unittest.TestCase):
         prob.driver.options['bits'] = {'p1.xC': 8}
         prob.driver.options['run_parallel'] = True
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
         prob.run_driver()
 
         # Optimal solution

@@ -32,7 +32,7 @@ if __name__ == '__main__' and PETScVector is not None:
     prob.driver.options['tol'] = 1e-9
     prob.driver.options['disp'] = True
 
-    prob.setup(vector_class=PETScVector)
+    prob.setup()
 
     prob.run_driver()
 

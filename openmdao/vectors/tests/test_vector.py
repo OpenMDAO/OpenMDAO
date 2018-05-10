@@ -61,7 +61,7 @@ class TestVector(unittest.TestCase):
         comp.add_output('v1', val=1.0)
         comp.add_output('v2', val=2.0)
         p.model.add_subsystem('des_vars', comp, promotes=['*'])
-        p.setup(vector_class=PETScVector)
+        p.setup()
         p.final_setup()
 
         new_vec = p.model._outputs._clone()

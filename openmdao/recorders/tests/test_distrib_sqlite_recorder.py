@@ -12,7 +12,6 @@ from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
-    vector_class = PETScVector
 else:
     PETScVector = None
 
@@ -167,7 +166,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.model.add_design_var('x')
         prob.model.add_objective('sum')
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         prob['x'] = np.ones(size)
 
@@ -219,7 +218,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.driver.add_recorder(self.recorder)
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
