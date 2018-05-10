@@ -42,6 +42,7 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
     """
     Print trace info, indenting based on call depth.
     """
+    global _printer
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
@@ -49,7 +50,10 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
                 f = cStringIO()
-                _indented_print(f_locals, d[name], 0, file=f)
+                save = _printer
+                _printer = _get_printer(f)
+                _indented_print(f_locals, d[name], 0)
+                _printer = save
                 s = "  %s%s%s{%s}" % (sindent, name, sep, f.getvalue())
             else:
                 s = "  %s%s%s%s" % (sindent, name, sep, d[name])
