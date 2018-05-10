@@ -8,12 +8,10 @@ from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBloc
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_rel_error
 
-if MPI:
+try:
     from openmdao.api import PETScVector
-    vector_class = PETScVector
-else:
-    vector_class = DefaultVector
-
+except:
+    PETScVector = None
 
 def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, mode='fwd'):
     p = Problem()
@@ -25,8 +23,6 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
         weights = [1.0]*nsubs
 
     model = p.model
-
-    #import wingdbstub
 
     model.add_subsystem('indep', IndepVarComp('x', 1.0))
     par = model.add_subsystem('par', ParallelGroup())
@@ -44,7 +40,7 @@ def _build_model(nsubs, min_procs=None, max_procs=None, weights=None, top=None, 
     model.add_design_var('indep.x')
     model.add_objective('objective.y')
 
-    p.setup(vector_class=vector_class, mode=mode, check=False)
+    p.setup(mode=mode, check=False)
     p.final_setup()
 
     return p
@@ -160,7 +156,7 @@ class ProcTestCase3(unittest.TestCase):
         model.add_design_var('indep.x')
         model.add_objective('objective.y')
 
-        p.setup(vector_class=vector_class, check=False)
+        p.setup(check=False)
         p.final_setup()
 
         all_inds = _get_which_procs(p.model)

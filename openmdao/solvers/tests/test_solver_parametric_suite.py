@@ -122,7 +122,6 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         assert_rel_error(self, result[5], prob.model.expected_solution[1], 1e-15)
 
     @parametric_suite(
-        vector_class=['default'],
         assembled_jac=[False, True],
         jacobian_type=['dense'],
         partial_type=['array', 'sparse', 'aij'],

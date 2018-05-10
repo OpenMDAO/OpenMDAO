@@ -63,6 +63,10 @@ class NonlinearRunOnce(NonlinearSolver):
         self.options.declare('maxiter', default=0, values=(0,),
                              desc='maximum number of iterations '
                                   '(this solver does not iterate)')
+        # Remove unused options from base options here, so that users
+        #  attempting to set them will get KeyErrors.
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
 
 
 class NonLinearRunOnce(NonlinearRunOnce):

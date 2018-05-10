@@ -182,9 +182,26 @@ class TestExternalCodeComp(unittest.TestCase):
 class TestExternalCodeCompArgs(unittest.TestCase):
 
     def test_kwargs(self):
+        # check kwargs are passed to options
         extcode = ExternalCodeComp(poll_delay=999)
 
         self.assertTrue(extcode.options['poll_delay'] == 999)
+
+        # check subclass kwargs are also passed to options
+        class MyComp(ExternalCodeComp):
+            def initialize(self):
+                self.options.declare('my_arg', 'foo', desc='subclass option')
+
+        my_comp = MyComp(poll_delay=999, my_arg='bar')
+
+        self.assertTrue(my_comp.options['poll_delay'] == 999)
+        self.assertTrue(my_comp.options['my_arg'] == 'bar')
+
+        # check that options are those declared in both classes
+        extcode_opts = set(extcode.options._dict.keys())
+        my_comp_opts = set(my_comp.options._dict.keys())
+
+        self.assertEqual(my_comp_opts.difference(extcode_opts), set(('my_arg',)))
 
 
 class ParaboloidExternalCodeComp(ExternalCodeComp):

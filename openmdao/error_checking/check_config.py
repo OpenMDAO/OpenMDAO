@@ -137,6 +137,9 @@ def _check_dup_comp_inputs(problem, logger):
     logger : object
         The object that manages logging output.
     """
+    if isinstance(problem.model, Component):
+        return
+
     input_srcs = problem.model._conn_global_abs_in2out
     src2inps = defaultdict(list)
     for inp, src in iteritems(input_srcs):
@@ -174,7 +177,10 @@ def _check_hanging_inputs(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    input_srcs = problem.model._conn_global_abs_in2out
+    if isinstance(problem.model, Component):
+        input_srcs = {}
+    else:
+        input_srcs = problem.model._conn_global_abs_in2out
 
     prom_ins = problem.model._var_allprocs_prom2abs_list['input']
     unconns = []

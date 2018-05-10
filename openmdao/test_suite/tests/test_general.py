@@ -4,7 +4,7 @@ To test more than one option, pass in an Iterable of requested options.
 All Parametric Groups
 ---------------------
 'group_type': Controls which type of ParametricGroups to test. Will test all groups if not specified
-'vector_class': One of ['default', 'petsc'], which vector class to use for the problem. ('default')
+'local_vector_class': One of ['default', 'petsc'], which local vector class to use for the problem. ('default')
 'assembled_jac': bool. If an assembled jacobian should be used. (True)
 'jacobian_type': One of ['matvec', 'dense', 'sparse-coo', 'sparse-csr', 'sparse-csc']. How the Jacobians are used.
                  Controls the type of AssembledJacobian. ('matvec')
