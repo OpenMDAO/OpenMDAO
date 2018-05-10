@@ -26,10 +26,6 @@ class LinearRunOnce(LinearBlockGS):
         """
         super(LinearRunOnce, self).__init__(**kwargs)
 
-        # Remove unused options from base options.
-        self.options.undeclare("atol")
-        self.options.undeclare("rtol")
-
     def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
@@ -91,3 +87,8 @@ class LinearRunOnce(LinearBlockGS):
         self.options.declare('maxiter', default=0, values=(0,),
                              desc='maximum number of iterations '
                                   '(this solver does not iterate)')
+
+        # Remove unused options from base options here, so that users
+        # attempting to set them will get KeyErrors.
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")

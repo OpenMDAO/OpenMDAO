@@ -138,7 +138,7 @@ class TestUserDefinedSolver(unittest.TestCase):
         model.linear_solver = PETScKrylov()
         model.linear_solver.precon = LinearRunOnce()
 
-        p.setup(vector_class=PETScVector, mode='rev', check=False)
+        p.setup(mode='rev', check=False)
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
@@ -170,7 +170,7 @@ class TestUserDefinedSolver(unittest.TestCase):
 
         model.linear_solver = LinearUserDefined(custom_method)
 
-        p.setup(vector_class=PETScVector, mode='rev', check=False)
+        p.setup(mode='rev', check=False)
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 
@@ -187,7 +187,7 @@ class TestUserDefinedSolver(unittest.TestCase):
         model.linear_solver = PETScKrylov()
         model.linear_solver.precon = LinearRunOnce()
 
-        p.setup(vector_class=PETScVector, mode='rev', check=False)
+        p.setup(mode='rev', check=False)
 
         model.icomp.linear_solver.precon = LinearUserDefined()
 
@@ -313,7 +313,7 @@ class TestUserDefinedSolver(unittest.TestCase):
         model.linear_solver = PETScKrylov()
         model.linear_solver.precon = LinearRunOnce()
 
-        prob.setup(vector_class=PETScVector, mode='rev', check=False)
+        prob.setup(mode='rev', check=False)
         prob.run_model()
         jac = prob.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
 

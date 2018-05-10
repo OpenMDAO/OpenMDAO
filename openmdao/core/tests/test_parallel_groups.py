@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
-                         ExplicitComponent
+                         ExplicitComponent, ImplicitComponent, DefaultVector
 
 from openmdao.utils.mpi import under_mpirun
 from openmdao.utils.mpi import MPI
@@ -24,7 +24,7 @@ from openmdao.utils.logger_utils import TestLogger
 
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
@@ -35,7 +35,7 @@ class TestParallelGroups(unittest.TestCase):
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
 
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -47,7 +47,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
@@ -61,7 +61,7 @@ class TestParallelGroups(unittest.TestCase):
     #def test_fan_out_grouped_varsets(self):
         #prob = Problem(FanOutGroupedVarSets())
 
-        #prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        #prob.setup(check=False, mode='fwd')
         #prob.set_solver_print(level=0)
         #prob.run_model()
 
@@ -73,7 +73,7 @@ class TestParallelGroups(unittest.TestCase):
         #assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         #assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-        #prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        #prob.setup(check=False, mode='rev')
         #prob.run_model()
 
         #J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
@@ -88,7 +88,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = FanInGrouped2()
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -104,7 +104,7 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
@@ -137,7 +137,7 @@ class TestParallelGroups(unittest.TestCase):
         model.connect("p1.x", "parallel.c1.x")
         model.connect("p2.x", "parallel.c2.x")
 
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -147,7 +147,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = Diamond()
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -161,7 +161,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
@@ -175,7 +175,7 @@ class TestParallelGroups(unittest.TestCase):
 
         prob = Problem()
         prob.model = ConvergeDiverge()
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -187,7 +187,7 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
@@ -242,7 +242,7 @@ class TestParallelGroups(unittest.TestCase):
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
 
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -254,7 +254,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
@@ -277,10 +277,10 @@ class TestParallelGroups(unittest.TestCase):
 
         # check that error is thrown if not using PETScVector
         if under_mpirun():
-            msg = ("The `vector_class` argument must be `PETScVector` when "
+            msg = ("The `distributed_vector_class` argument must be `PETScVector` when "
                    "running in parallel under MPI but 'DefaultVector' was specified.")
             with self.assertRaises(ValueError) as cm:
-                prob.setup(check=False, mode='fwd')
+                prob.setup(check=False, mode='fwd', distributed_vector_class=DefaultVector)
 
             self.assertEqual(str(cm.exception), msg)
         else:
@@ -289,7 +289,7 @@ class TestParallelGroups(unittest.TestCase):
         # check that we get setup messages only on proc 0
         msg = 'Only want to see this on rank 0'
         testlogger = TestLogger()
-        prob.setup(vector_class=PETScVector, check=True, mode='fwd',
+        prob.setup(check=True, mode='fwd',
                    logger=testlogger)
         prob.final_setup()
 
@@ -306,7 +306,43 @@ class TestParallelGroups(unittest.TestCase):
             self.assertTrue(msg in testlogger.get('info')[0])
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelListStates(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_list_states_allprocs(self):
+        class StateComp(ImplicitComponent):
+
+            def initialize(self):
+                self.mtx = np.array([
+                    [0.99, 0.01],
+                    [0.01, 0.99],
+                ])
+
+            def setup(self):
+                self.add_input('rhs', val=np.ones(2))
+                self.add_output('x', val=np.zeros(2))
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['x'] = self.mtx.dot(outputs['x']) - inputs['rhs']
+
+            def solve_nonlinear(self, inputs, outputs):
+                outputs['x'] = np.linalg.solve(self.mtx, inputs['rhs'])
+
+        p = Problem(model=ParallelGroup())
+        p.model.add_subsystem('C1', StateComp())
+        p.model.add_subsystem('C2', StateComp())
+        p.model.add_subsystem('C3', ExecComp('y=2.0*x'))
+        p.model.add_subsystem('C4', StateComp())
+        p.setup()
+        p.final_setup()
+        self.assertEqual(p.model._list_states_allprocs(), ['C1.x', 'C2.x', 'C4.x'])
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MatMatParDevTestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -323,7 +359,7 @@ class MatMatParDevTestCase(unittest.TestCase):
         p.model.add_design_var('indeps.y', vectorize_derivs=True, parallel_deriv_color='foo')
         par.add_objective('C2.y')
         par.add_constraint('C1.y', lower=0.0)
-        p.setup(vector_class=PETScVector, mode='fwd')
+        p.setup(mode='fwd')
         p.run_model()
 
         # prior to bug fix, this would raise an exception

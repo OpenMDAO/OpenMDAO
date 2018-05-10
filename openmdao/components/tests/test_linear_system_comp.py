@@ -320,9 +320,8 @@ class TestLinearSystemComp(unittest.TestCase):
 
         model = Group()
 
-        x = np.array([1, 2, -3])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
-        b = A.dot(x)
+        b = np.array([1.0, 2.0, -3.0])
 
         model.add_subsystem('p1', IndepVarComp('A', A))
         model.add_subsystem('p2', IndepVarComp('b', b))
@@ -338,10 +337,9 @@ class TestLinearSystemComp(unittest.TestCase):
 
         lingrp.linear_solver = ScipyKrylov()
 
-        prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['lin.x'], x, .0001)
+        assert_rel_error(self, prob['lin.x'], np.array([0.36423841, -0.00662252, -0.4205298 ]), .0001)
 
     def test_feature_vectorized(self):
         import numpy as np
@@ -351,9 +349,8 @@ class TestLinearSystemComp(unittest.TestCase):
 
         model = Group()
 
-        x = np.array([[1, 2, -3], [2, -1, 4]])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
-        b = np.einsum('jk,ik->ij', A, x)
+        b = np.array([[2.0, -3.0, 4.0], [1.0, 0.0, -1.0]])
 
         model.add_subsystem('p1', IndepVarComp('A', A))
         model.add_subsystem('p2', IndepVarComp('b', b))
@@ -369,10 +366,11 @@ class TestLinearSystemComp(unittest.TestCase):
 
         lingrp.linear_solver = ScipyKrylov()
 
-        prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['lin.x'], x, .0001)
+        assert_rel_error(self, prob['lin.x'], np.array([[ 0.10596026, -0.16556291,  0.48675497],
+                                                        [ 0.19205298, -0.11258278, -0.14900662]]),
+                         .0001)
 
     def test_feature_vectorized_A(self):
         import numpy as np
@@ -382,10 +380,9 @@ class TestLinearSystemComp(unittest.TestCase):
 
         model = Group()
 
-        x = np.array([[1, 2, -3], [2, -1, 4]])
         A = np.array([[[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]],
                       [[2.0, 3.0, 4.0], [1.0, -1.0, -2.0], [3.0, 2.0, -2.0]]])
-        b = np.einsum('ijk,ik->ij', A, x)
+        b = np.array([[-5.0, 2.0, 3.0], [-1.0, 1.0, -3.0]])
 
         model.add_subsystem('p1', IndepVarComp('A', A))
         model.add_subsystem('p2', IndepVarComp('b', b))
@@ -401,10 +398,11 @@ class TestLinearSystemComp(unittest.TestCase):
 
         lingrp.linear_solver = ScipyKrylov()
 
-        prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['lin.x'], x, .0001)
+        assert_rel_error(self, prob['lin.x'], np.array([[-0.78807947,  0.66887417,  0.47350993],
+                                                        [ 0.7       , -1.8       ,  0.75      ]]),
+                         .0001)
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@ import os
 import json
 from collections import OrderedDict
 import pprint
+import sys
 import warnings
 
 from six import iteritems, itervalues, string_types
@@ -999,6 +1000,8 @@ class Driver(object):
                     print("None")
                 print()
 
+        sys.stdout.flush()
+
     def _post_run_model_debug_print(self):
         """
         Optionally print some debugging information after the model runs.
@@ -1032,6 +1035,8 @@ class Driver(object):
                 else:
                     print("None")
                 print()
+
+        sys.stdout.flush()
 
 
 class RecordingDebugging(Recording):
