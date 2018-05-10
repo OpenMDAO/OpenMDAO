@@ -106,7 +106,15 @@ By default, both methods will give all inputs or outputs recorded in system iter
 .. code-block:: console
 
     all_outputs = cr.list_outputs()
-    all_inputs cr.list_outputs()
+    all_inputs = cr.list_inputs()
+
+Additionally, for quick access to values recorded there are :code:`inputs` and :code:`outputs` dictionaries on every Case. For example,
+if you wanted to quickly grab the value of output `x` on the last Driver case you could use:
+
+.. code-block:: console
+
+    last_driver_case = cr.driver_cases.get_case(-1)
+    x_val = last_driver_case.outputs['x']
 
 Loading Cases into Problems
 ---------------------------

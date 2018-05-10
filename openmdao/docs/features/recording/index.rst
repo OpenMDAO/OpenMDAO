@@ -1,3 +1,5 @@
+.. _case_recording:
+
 **************
 Recording Data
 **************
@@ -9,5 +11,3 @@ Recording Data
     getting_values.rst
     getting_metadata.rst
     iterating_hierarchically.rst
-    basic_recording.rst
-    case_reading.rst
