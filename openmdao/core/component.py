@@ -778,9 +778,7 @@ class Component(System):
             if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
 
-            make_copies = (multiple_items
-                           or len(of_matches) > 1
-                           or len(wrt_matches) > 1)
+            make_copies = multiple_items or len(of_matches) > 1 or len(wrt_matches) > 1
             # Setting this to true means that future loop iterations (i.e. if there are multiple
             # items in either of or wrt) will make copies.
             multiple_items = True

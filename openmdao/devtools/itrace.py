@@ -118,7 +118,7 @@ def _trace_call(frame, arg, stack, context):
 
     indent = tab * (len(stack)-1)
     if verbose:
-        _printer("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _printer("%s--> %s (%d)" % (indent, fullname, method_counts[fullname]))
         _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     else:
         _printer("%s%s" % (indent, fullname))
