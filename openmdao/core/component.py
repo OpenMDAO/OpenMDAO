@@ -625,7 +625,8 @@ class Component(System):
                 info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
-                         method='exact', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                         method='exact', step=DEFAULT_FD_OPTIONS['step'],
+                         form=DEFAULT_FD_OPTIONS['form'],
                          step_calc=DEFAULT_FD_OPTIONS['step_calc']):
         """
         Declare information about this component's subjacobians.
@@ -660,11 +661,10 @@ class Component(System):
             'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
             defined analytic derivatives. Default is 'exact'.
         step : float
-            Step size for approximation. Default is None.
+            Step size for approximation. Default is the value of DEFAULT_FD_OPTIONS['step'].
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
-            the value of DEFAULT_FD_OPTIONS['form']
+            default value is the value of DEFAULT_FD_OPTIONS['form'].
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']

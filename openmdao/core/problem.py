@@ -617,7 +617,7 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                       method='fd', step=1e-6, form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False,
                        show_only_incorrect=False):
@@ -1043,7 +1043,7 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_totals(method=method, **fd_args)
+            model.approx_totals(method=method, step=step, form=form, step_calc=step_calc)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
             Jfd = total_info.compute_totals_approx(initialize=True)
 

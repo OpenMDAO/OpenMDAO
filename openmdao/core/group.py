@@ -196,7 +196,7 @@ class Group(System):
         Returns
         -------
         dict
-            Mapping of each absoute var name to its corresponding scaling factor tuple.
+            Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
         scale_factors = super(Group, self)._compute_root_scale_factors()
 
@@ -1726,7 +1726,8 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_totals(self, method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+    def approx_totals(self, method='fd', step=DEFAULT_FD_OPTIONS['step'],
+                      form=DEFAULT_FD_OPTIONS['form'],
                       step_calc=DEFAULT_FD_OPTIONS['step_calc']):
         """
         Approximate derivatives for a Group using the specified approximation method.
@@ -1737,11 +1738,10 @@ class Group(System):
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
         step : float
-            Step size for approximation. Default is None.
+            Step size for approximation. Default is the value of DEFAULT_FD_OPTIONS['step'].
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
-            the value of DEFAULT_FD_OPTIONS['form']
+            default value is the value of DEFAULT_FD_OPTIONS['form'].
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
