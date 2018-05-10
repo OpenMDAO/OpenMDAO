@@ -11,7 +11,7 @@ import numpy as np
 from scipy.sparse import issparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.utils.units import valid_units
@@ -625,7 +625,8 @@ class Component(System):
                 info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
-                         method='exact', **kwargs):
+                         method='exact', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                         step_calc=DEFAULT_FD_OPTIONS['step_calc']):
         """
         Declare information about this component's subjacobians.
 
@@ -658,8 +659,15 @@ class Component(System):
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
             defined analytic derivatives. Default is 'exact'.
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
+        step : float
+            Step size for approximation. Default is None.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. The
+            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
+            the value of DEFAULT_FD_OPTIONS['form']
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
         """
         try:
             method_func = _supported_methods[method]
@@ -688,6 +696,11 @@ class Component(System):
 
             # Need to declare the Jacobian element too.
             self._declared_partials.append((of, wrt, True, rows, cols, val))
+
+            kwargs = {'step': step,
+                      'form': form,
+                      'step_calc': step_calc
+                      }
 
             self._approximated_partials.append((of, wrt, method, kwargs))
 

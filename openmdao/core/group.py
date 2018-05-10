@@ -14,7 +14,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -22,7 +22,6 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible, get_conversion
@@ -1727,7 +1726,8 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_totals(self, method='fd', **kwargs):
+    def approx_totals(self, method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                      step_calc=DEFAULT_FD_OPTIONS['step_calc']):
         """
         Approximate derivatives for a Group using the specified approximation method.
 
@@ -1736,8 +1736,15 @@ class Group(System):
         method : str
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
+        step : float
+            Step size for approximation. Default is None.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. The
+            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
+            the value of DEFAULT_FD_OPTIONS['form']
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
         """
         self._approx_schemes = OrderedDict()
         supported_methods = {'fd': FiniteDifference,
@@ -1750,8 +1757,12 @@ class Group(System):
         if method not in self._approx_schemes:
             self._approx_schemes[method] = supported_methods[method]()
 
+        kwargs = {'step': step,
+                  'form': form,
+                  'step_calc': step_calc
+                  }
         self._owns_approx_jac = True
-        self._owns_approx_jac_meta = dict(kwargs)
+        self._owns_approx_jac_meta = kwargs
 
     def _setup_jacobians(self, jacobian=None, recurse=True):
         """
