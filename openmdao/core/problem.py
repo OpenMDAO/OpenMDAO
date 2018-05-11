@@ -625,8 +625,6 @@ class Problem(object):
         """
         Check partial derivatives comprehensively for all components in your model.
 
-        NOTE: `DEFAULT_FD_OPTIONS` can be accesssed via `openmdao.api.DEFAULT_FD_OPTIONS`.
-
         Parameters
         ----------
         out_stream : file-like object

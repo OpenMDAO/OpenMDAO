@@ -1736,8 +1736,6 @@ class Group(System):
         """
         Approximate derivatives for a Group using the specified approximation method.
 
-        NOTE: `DEFAULT_FD_OPTIONS` and `DEFAULT_CS_OPTIONS` can be accessed via `openmdao.api`.
-
         Parameters
         ----------
         method : str
