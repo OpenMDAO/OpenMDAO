@@ -4,9 +4,25 @@
 The System Setup Stack: Understanding When to Use setup and configure
 *********************************************************************
 
-This document explains what happens during the OpenMDAO setup process
+This document explains what happens during the OpenMDAO setup process, and how some of the model
+API methods interact during that process.
 
-One question that is often asked is: why can't we just put all of our model building in our group's
+The purpose of the setup process is to prepare the data structures that OpenMDAO need to efficiently
+run your model or driver. In particular, this includes setting up the vectors used for passing data
+to inputs, converging solvers, and calculating derivatives. It also includes setting up the MPI
+communicators.
+
+Setup also performs some level of model checking, mainly for critical errors. More extensive model
+checking can be done by setting "check" to True when calling `setup`, or by using the :ref:`openmdao command
+line check<om-command>`. It is recommend that you do this before your first full run of the model.
+
+The OpenMDAO `Group` API includes three methods that are invoked during the setup process: `setup`, `configure`, and
+`initialize`. Most of the time, setup is all you need to build a group. The specific use case for
+configure is shown below in the next section. The configure method is only used for declaring options for your
+group (and also in `Component`), and their placement here allows them to be passed into the group as
+instantiation arguments.
+
+One question that is often asked is: why can't we just put all of our model building code into our group's
 `__init__` method so that everything is there when I instantiate the class? The answer is, when
 running a parallel model under MPI, certain systems might only be executed on certain processors.
 To save memory across the model, these systems are not fully set up on processors where they are
@@ -20,6 +36,21 @@ be forced to refactor it.
 
 Usage of setup vs. configure
 ----------------------------
+
+The need for two methods for setting up a group arose from a need to sometimes change the linear or
+nonlinear solvers in a subgroup after it has been added. When setup is called on the `problem`, the
+setup method in each group is called recursively from top to bottom of the hierarchy. For example,
+a group may contain several components and groups. Setup is first called in that top group, during
+which, those components and groups are instantiated. However, the setup methods belonging to those sub-components
+and groups cannot be called until the top group's setup finishes. This means they are in a state where
+components and groups that are declared in the subgroup don't exist yet.
+
+To remedy this, there is a second api method called `configure` that lets you make changes to your subsystems
+after they have been created. The `configure` method is only needed with groups, and it is called
+recursively from the bottom of the hierarchy to the top, so that at any level, you can be sure that
+configure has already run for all your subsystems. This assures that changes made in higher level assemblies
+take precedence over those in lower level ones. Top precedence is given to changes made after calling setup
+on the `Problem`.
 
 Here is a quick guide covering what you can do in the setup and configure methods.
 
@@ -42,7 +73,7 @@ Here is a quick guide covering what you can do in the setup and configure method
  - Set execution order in subsystems
  - Add a case recorder to a subsystem or a solver in a subsystem.
 
-**Things you sould never do in configure**
+**Things you should never do in configure**
 
  - Add subsystems
  - Delete subsystems
@@ -65,8 +96,10 @@ phases is to allow you to perform certain actions after setup:
  - Assign Jacobians
  - Add training data to metamodels
 
-If you do anything that changes the model hiearchy, such as adding a component to a group, then you will need to
-run `setup` again. During setup, the following happens:
+If you do anything that changes the model hierarchy, such as adding a component to a group, then you will need to
+run `setup` again.
+
+During setup, the following things happen:
 
  - MPI processors are allocated
  - For each custom Group, setup function is called recursively from top to bottom
