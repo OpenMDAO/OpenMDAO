@@ -1421,8 +1421,31 @@ class TestSqliteCaseReader(unittest.TestCase):
     
     def test_circuit_with_recorder(self):
 
-        from openmdao.api import Problem, IndepVarComp, SqliteRecorder, CaseReader
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, CaseReader, SqliteRecorder
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
+
+        class Circuit(Group):
+
+            def setup(self):
+                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
+                self.add_subsystem('n2', Node())  # leaving defaults
+
+                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
+                self.add_subsystem('R2', Resistor(R=10000.))
+                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
+
+                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
+                self.connect('R1.I', 'n1.I_out:0')
+                self.connect('R2.I', 'n1.I_out:1')
+
+                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
+                self.connect('R2.I', 'n2.I_in:0')
+                self.connect('D1.I', 'n2.I_out:0')
+
+                self.nonlinear_solver = NewtonSolver()
+                self.nonlinear_solver.options['iprint'] = 2
+                self.nonlinear_solver.options['maxiter'] = 20
+                self.linear_solver = DirectSolver()
 
         p = Problem()
         model = p.model
@@ -1434,23 +1457,16 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.connect('source.I', 'circuit.I_in')
         model.connect('ground.V', 'circuit.Vg')
 
-        # set up the recorder and attach it to our driver
         recorder = SqliteRecorder(self.filename)
         p.driver.add_recorder(recorder)
 
         p.setup()
 
-        # you can change the NewtonSolver settings in circuit after setup is called
-        newton = p.model.circuit.nonlinear_solver
-        newton.options['maxiter'] = 50
-        newton.options['iprint'] = 0
-
         # set some initial guesses
         p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1e-3
+        p['circuit.n2.V'] = 1.
 
         p.run_driver()
-        p.cleanup()
 
         # create the case reader
         cr = CaseReader(self.filename)
@@ -1458,8 +1474,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         # grab the data recorded in the first driver iteration
         first_driver_case = cr.driver_cases.get_case(0)
 
-        self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.98744708)
-        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09987447)
+        self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90830282)
+        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908303)
 
 def _assert_model_matches_case(case, system):
     '''
