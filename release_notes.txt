@@ -5,10 +5,11 @@ May 13, 2018
 
 New Features:
 --------------
+- DOEDriver for serial and parallel cases
 - Driver has new `debug_print` option that write design vars, objective, and constraints to std out for each iteration
 - Solvers has new `debug_print` option that will report the initial condition of the solver if it fails to converge
 
-- SimpleGAdriver will now compute a pop size based on  4*sum(bits) + 1 if pop_size=0
+- SimpleGAdriver will now compute a pop size based on  [4*sum(bits) + 1] if pop_size=0
 - new problem methods <problem>.get_val() and <problem>.set_val() allow the user to specify a unit and we'll convert to the correct unit (or throw an error if the unit is not compatible)
 - OpenMDAO command line utility now works under MPI
 - list_problem_vars() method on problem will report all design vars, objectives, and constraints.
@@ -21,12 +22,12 @@ New Features:
     - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers
 
 - New Components in the Standard Library:
-    - BsplineComp
-    - KSComp
     - CrossProductComp
     - DotProductComp
     - MatrixVectorProductComp
 - LinearSystemComp has been vectorized
+- KSComp has been vectorized
+- BsplineComp has been vectorized
 
 - New CaseRecording/CaseReading Features
     - CaseRecorder now saves metadata/options from all groups and components
@@ -48,7 +49,8 @@ Backwards-Compatible API Changes:
 Backwards-Incompatible API changes:
 -----------------------------------
 - Redesign of the case-reader API. Unification of all cases, and simpler iteration over case hierarchies
-
+- `partial_type` argument for LinearSystemComponent has been removed
+- `maxiter` option from BoundsEnforceLS has been removed
 
 Bug Fixes:
 -----------
