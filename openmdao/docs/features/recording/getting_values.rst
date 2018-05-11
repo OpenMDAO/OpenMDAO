@@ -77,8 +77,8 @@ If we had not promoted `pz.z`, we would use:
 Getting Variables and Values
 ----------------------------
 Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`,
-and :code:`get_responses()` which, as their names imply, will return the corresponding set of variables and their values on that case. In the situation where the user may want to print the
-design variables on the first driver case they could use:
+and :code:`get_responses()` which, as their names imply, will return the corresponding set of variables and their values on that case.
+
 Here's an example that shows how to use these methods to see what variables were recorded on the first driver iteration and get their values.
 
 .. embed-code::
@@ -108,13 +108,14 @@ By default, both methods will give all inputs or outputs recorded in system iter
     all_outputs = cr.list_outputs()
     all_inputs = cr.list_inputs()
 
-Additionally, for quick access to values recorded there are :code:`inputs` and :code:`outputs` dictionaries on every Case. For example,
-if you wanted to quickly grab the value of output `x` on the last Driver case you could use:
+Additionally, for quick access to values recorded there are :code:`inputs` and :code:`outputs` dictionaries on every Case and :code:`residuals` on System and Solver cases. If you wanted to quickly grab the value and residual of output `x`
+on the last solver iteration you would use:
 
 .. code-block:: console
 
-    last_driver_case = cr.driver_cases.get_case(-1)
-    x_val = last_driver_case.outputs['x']
+    last_solver_case = cr.solver_cases.get_case(-1)
+    x_val = last_solver_case.outputs['x']
+    x_residual = last_solver_case.residuals['x']
 
 Loading Cases into Problems
 ---------------------------
