@@ -1738,16 +1738,15 @@ class Group(System):
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
         step : float
-            Step size for approximation. Defaults to None, but if unset, will take on the value of
-            either DEFAULT_FD_OPTIONS['step'] or DEFAULT_CS_OPTIONS['step'], based on `method`.
+            Step size for approximation. Defaults to None, in which case, the approximation
+            method provides its default value.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
-            None, but if unset, will take on the value of either DEFAULT_FD_OPTIONS['form'] or
-            DEFAULT_CS_OPTIONS['form'], based on `method`.
+            None, in which case, the approximation method provides its default value.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Defaults to None, but if unset, will take on the value of either
-            DEFAULT_FD_OPTIONS['step_calc'] or DEFAULT_CS_OPTIONS['step_calc'], based on `method`.
+            relative. Defaults to None, in which case, the approximation method
+            provides its default value.
         """
         self._approx_schemes = OrderedDict()
         supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),

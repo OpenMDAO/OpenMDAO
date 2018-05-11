@@ -1,9 +1,5 @@
 """Key OpenMDAO classes can be imported from here."""
 
-# Approximation Schemes
-from openmdao.approximation_schemes.finite_difference import DEFAULT_FD_OPTIONS
-from openmdao.approximation_schemes.complex_step import DEFAULT_CS_OPTIONS
-
 # Core
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
