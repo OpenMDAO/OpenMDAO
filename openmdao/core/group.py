@@ -1763,13 +1763,24 @@ class Group(System):
         if method not in self._approx_schemes:
             self._approx_schemes[method] = supported_methods[method][0]()
 
-        default_args = supported_methods[method][1]
+        default_opts = supported_methods[method][1]
 
-        kwargs = {'step': step if step else default_args['step'],
-                  'form': form if form else default_args['form'],
-                  }
-        if method == 'fd':
-            kwargs['step_calc'] = default_args['step_calc']
+        kwargs = {}
+        if step:
+            if 'step' in default_opts:
+                kwargs['step'] = step
+            else:
+                raise RuntimeError("'step' is not a valid option for '%s'" % method)
+        if form:
+            if 'form' in default_opts:
+                kwargs['form'] = form
+            else:
+                raise RuntimeError("'form' is not a valid option for '%s'" % method)
+        if step_calc:
+            if 'step_calc' in default_opts:
+                kwargs['step_calc'] = step_calc
+            else:
+                raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
 
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs

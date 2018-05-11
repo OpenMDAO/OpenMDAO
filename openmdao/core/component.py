@@ -24,7 +24,7 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 # Suppored methods for derivatives
 _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
                       'cs': (ComplexStep, DEFAULT_CS_OPTIONS),
-                      'exact': (None, None)}
+                      'exact': (None, {})}
 
 
 # Certain characters are not valid in variable names.
@@ -661,18 +661,18 @@ class Component(System):
             'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
             defined analytic derivatives. Default is 'exact'.
         step : float
-            Step size for approximation. Defaults to None, in which case, the approximation
+            Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
-            to None, in which case, the approximation method provides its default value.
+            to None, in which case the approximation method provides its default value.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Defaults to None, in which case, the approximation method provides
+            relative. Defaults to None, in which case the approximation method provides
             its default value.
         """
         try:
-            method_func, default_args = _supported_methods[method]
+            method_func, default_opts = _supported_methods[method]
         except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, supported_methods.keys()))
@@ -699,11 +699,22 @@ class Component(System):
             # Need to declare the Jacobian element too.
             self._declared_partials.append((of, wrt, True, rows, cols, val))
 
-            kwargs = {'step': step if step else default_args['step'],
-                      'form': form if form else default_args['form'],
-                      }
-            if method == 'fd':
-                kwargs['step_calc'] = default_args['step_calc']
+            kwargs = {}
+            if step:
+                if 'step' in default_opts:
+                    kwargs['step'] = step
+                else:
+                    raise RuntimeError("'step' is not a valid option for '%s'" % method)
+            if form:
+                if 'form' in default_opts:
+                    kwargs['form'] = form
+                else:
+                    raise RuntimeError("'form' is not a valid option for '%s'" % method)
+            if step_calc:
+                if 'step_calc' in default_opts:
+                    kwargs['step_calc'] = step_calc
+                else:
+                    raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
 
             self._approximated_partials.append((of, wrt, method, kwargs))
 

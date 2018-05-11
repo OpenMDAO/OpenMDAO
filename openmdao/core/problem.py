@@ -1043,7 +1043,8 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_totals(method=method, step=step, form=form, step_calc=step_calc)
+            model.approx_totals(method=method, step=step, form=form,
+                                step_calc=step_calc if method is 'fd' else None)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
             Jfd = total_info.compute_totals_approx(initialize=True)
 
