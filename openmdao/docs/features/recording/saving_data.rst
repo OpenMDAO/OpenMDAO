@@ -58,9 +58,10 @@ Driver Recording Options
     Driver
     recording_options
 
-Recording on a Driver is very similar to recording on a System though it has a few additional recording options.
+Recording on a Driver is very similar to recording on a System, though it has a few additional recording options.
 The options 'record_objectives', 'record_constraints', 'record_desvars', and 'record_responses' are all still limited by
-'excludes', but they do take precedence over 'includes' as shown below.
+'excludes', but they do take precedence over 'includes', as shown below where 'includes'
+is empty but objectives, constraints, and desvars are still recorded.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_driver_options
