@@ -1,6 +1,8 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
+from six import iteritems
+
 from openmdao.utils.general_utils import warn_deprecation
 
 # unique object to check if default is given
@@ -36,6 +38,109 @@ class OptionsDictionary(object):
         """
         self._dict = {}
         self._read_only = read_only
+
+    def __rst__(self):
+        """
+        Generate reStructuredText view of the options table.
+
+        Returns
+        -------
+        list of str
+            A rendition of the options as an rST table.
+        """
+        outputs = []
+        for option_name, option_data in sorted(iteritems(self._dict)):
+            name = option_name
+            default = option_data['value'] if option_data['value'] is not _undefined \
+                else '**Required**'
+            values = option_data['values']
+            types = option_data['types']
+            desc = option_data['desc']
+
+            # if the default is an object instance, replace with the (unqualified) object type
+            default_str = str(default)
+            idx = default_str.find(' object at ')
+            if idx >= 0 and default_str[0] is '<':
+                parts = default_str[:idx].split('.')
+                default = parts[-1]
+
+            if types is None:
+                types = "N/A"
+
+            elif types is not None:
+                if not isinstance(types, (tuple, list)):
+                    types = (types,)
+
+                types = [type_.__name__ for type_ in types]
+
+            if values is None:
+                values = "N/A"
+
+            elif values is not None:
+                if not isinstance(values, (tuple, list)):
+                    values = (values,)
+
+                values = [value for value in values]
+
+            outputs.append([name, default, values, types, desc])
+
+        lines = []
+
+        col_heads = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
+
+        max_sizes = {}
+        for j, col in enumerate(col_heads):
+            max_sizes[j] = len(col)
+
+        for output in outputs:
+            for j, item in enumerate(output):
+                length = len(str(item))
+                if max_sizes[j] < length:
+                    max_sizes[j] = length
+
+        header = ""
+        titles = ""
+        for key, val in iteritems(max_sizes):
+            header += '=' * val + ' '
+
+        for j, head in enumerate(col_heads):
+            titles += "%s " % head
+            size = max_sizes[j]
+            space = size - len(head)
+            if space > 0:
+                titles += space*' '
+
+        lines.append(header)
+        lines.append(titles)
+        lines.append(header)
+
+        n = 3
+        for output in outputs:
+            line = ""
+            for j, item in enumerate(output):
+                line += "%s " % str(item)
+                size = max_sizes[j]
+                space = size - len(str(item))
+                if space > 0:
+                    line += space*' '
+
+            lines.append(line)
+            n += 1
+
+        lines.append(header)
+
+        return lines
+
+    def __repr__(self):
+        """
+        Generate string representation of the options table.
+
+        Returns
+        -------
+        str
+            A rendition of the options as an rST table.
+        """
+        return '\n'.join(self.__rst__())
 
     def _assert_valid(self, name, value):
         """
