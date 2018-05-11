@@ -4,21 +4,21 @@
 The System Setup Stack: Understanding When to Use setup and configure
 *********************************************************************
 
-This document explains what happens during the OpenMDAO setup process, and how some of the model
+This document explains what happens during the OpenMDAO `Problem` `setup` process, and how some of the model
 API methods interact during that process.
 
-The purpose of the setup process is to prepare the data structures that OpenMDAO need to efficiently
+The purpose of the `setup` process is to prepare the data structures that OpenMDAO needs to efficiently
 run your model or driver. In particular, this includes setting up the vectors used for passing data
 to inputs, converging solvers, and calculating derivatives. It also includes setting up the MPI
 communicators.
 
 Setup also performs some level of model checking, mainly for critical errors. More extensive model
 checking can be done by setting "check" to True when calling `setup`, or by using the :ref:`openmdao command
-line check<om-command>`. It is recommend that you do this before your first full run of the model.
+line check<om-command>`. It is recommended that you do this before your first full run of the model.
 
-The OpenMDAO `Group` API includes three methods that are invoked during the setup process: `setup`, `configure`, and
-`initialize`. Most of the time, setup is all you need to build a group. The specific use case for
-configure is shown below in the next section. The configure method is only used for declaring options for your
+The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process: `setup`, `configure`, and
+`initialize`. Most of the time, `setup` is all you need to build a group. The specific use case for
+`configure` is shown below in the next section. The `initialize` method is only used for declaring options for your
 group (and also in `Component`), and their placement here allows them to be passed into the group as
 instantiation arguments.
 
@@ -38,21 +38,21 @@ Usage of setup vs. configure
 ----------------------------
 
 The need for two methods for setting up a group arose from a need to sometimes change the linear or
-nonlinear solvers in a subgroup after it has been added. When setup is called on the `problem`, the
-setup method in each group is called recursively from top to bottom of the hierarchy. For example,
+nonlinear solvers in a subgroup after it has been added. When `setup` is called on the `problem`, the
+`setup` method in each group is called recursively from top to bottom of the hierarchy. For example,
 a group may contain several components and groups. Setup is first called in that top group, during
-which, those components and groups are instantiated. However, the setup methods belonging to those sub-components
-and groups cannot be called until the top group's setup finishes. This means they are in a state where
+which, those components and groups are instantiated. However, the `setup` methods belonging to those sub-components
+and groups cannot be called until the top group's `setup` finishes. This means they are in a state where
 components and groups that are declared in the subgroup don't exist yet.
 
 To remedy this, there is a second api method called `configure` that lets you make changes to your subsystems
 after they have been created. The `configure` method is only needed with groups, and it is called
 recursively from the bottom of the hierarchy to the top, so that at any level, you can be sure that
-configure has already run for all your subsystems. This assures that changes made in higher level assemblies
-take precedence over those in lower level ones. Top precedence is given to changes made after calling setup
+`configure` has already run for all your subsystems. This assures that changes made in higher-level groups
+take precedence over those in lower-level ones. Top precedence is given to changes made after calling `setup`
 on the `Problem`.
 
-Here is a quick guide covering what you can do in the setup and configure methods.
+Here is a quick guide covering what you can do in the `setup` and `configure` methods.
 
 **setup**
 
@@ -78,16 +78,20 @@ Here is a quick guide covering what you can do in the setup and configure method
  - Add subsystems
  - Delete subsystems
 
+ Keep in mind that, when `configure` is being run, you are already done calling `setup` on every group
+ and component in the model, so if you add something here, setup will never be called, and it will
+ never be fully integrated into the model hierarchy.
+
 Problem setup and final_setup
 -----------------------------
 
 OpenMDAO 2.0 introduces a new change to the setup process in which the original monolithic process
 is split into two separate phases triggered by the methods: `setup` and `final_setup`. The `final_setup` method is
 however something you will probably never have to call, as it is called automatically the first time that
-you call `run_model` or `run_driver` after running setup. The reason that the setup process was split into two
-phases is to allow you to perform certain actions after setup:
+you call `run_model` or `run_driver` after running `setup`. The reason that the `setup` process was split into two
+phases is to allow you to perform certain actions after `setup`:
 
-**Post setup actions**
+**Post-setup actions**
 
  - Set values of unconnected inputs and indepvarcomps
  - Change settings on solvers

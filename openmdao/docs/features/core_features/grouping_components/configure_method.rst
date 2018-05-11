@@ -26,5 +26,5 @@ system.
 Uses of setup vs. configure
 ---------------------------
 
-To understand when to use setup and when to use configure, see the :ref:`Theory Manual entry on how the setup stack.<theory_setup_stack>`.
+To understand when to use setup and when to use configure, see the :ref:`Theory Manual entry on how the setup stack works.<theory_setup_stack>`.
 
