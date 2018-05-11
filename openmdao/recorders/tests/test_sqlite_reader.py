@@ -364,6 +364,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_reading_driver_metadata(self):
         self.setup_sellar_model_with_optimization()
 
+        # make sure we record metadata
         self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.add_recorder(self.recorder)
 
@@ -373,7 +374,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
+        # access list of connections stored in metadata
         self.assertEqual(len(cr.driver_metadata['connections_list']), 11)
+
+        # access the model tree stored in metadata
         self.assertEqual(len(cr.driver_metadata['tree']), 4)
 
     def test_reading_metadata(self):
@@ -1403,9 +1407,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
 
-        d1.add_recorder(self.recorder)
+        # declare two options
         d1.options.declare('options value 1', 1)
         d1.options.declare('options value to ignore', 2)
+        
+        d1.add_recorder(self.recorder)
+
+        # don't record the second option on d1
         d1.recording_options['options_excludes'] = ['options value to ignore']
 
         self.prob.setup(check=False)
@@ -1415,7 +1423,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         d1_options = cr.system_metadata['d1']['component_options']
+
+        # option 1 is recorded
         self.assertEqual(d1_options['options value 1'], 1)
+
+        # option 2 is not recorded
         self.assertFalse('options value to ignore' in d1_options)
 
     
