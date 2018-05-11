@@ -107,7 +107,9 @@ class Component(System):
 
     def _setup_procs(self, pathname, comm, mode):
         """
-        Distribute processors and assign pathnames.
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
 
         Parameters
         ----------
@@ -146,7 +148,7 @@ class Component(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Call setup in components and count variables, total and by var_set.
+        Count variables, total and by var_set.
 
         Parameters
         ----------

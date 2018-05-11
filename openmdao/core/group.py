@@ -289,7 +289,10 @@ class Group(System):
 
     def _setup_procs(self, pathname, comm, mode):
         """
-        Distribute processors and assign pathnames.
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the group. This method recurses
+        downward through the model.
 
         Parameters
         ----------
@@ -315,7 +318,10 @@ class Group(System):
         self._manual_connections.update(self._static_manual_connections)
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
+
+        # Call setup function for this group.
         self.setup()
+
         self._static_mode = True
 
         if MPI:
@@ -439,7 +445,7 @@ class Group(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Call setup in components and count variables, total and by var_set.
+        Count variables, total and by var_set.
 
         Parameters
         ----------
