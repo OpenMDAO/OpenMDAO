@@ -263,7 +263,7 @@ class System(object):
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                        '(processed post-includes)')
-        self.recording_options.declare('metadata_excludes', types=list, default=[],
+        self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 
         # Case recording related
