@@ -13,7 +13,7 @@ from six.moves import range
 import numpy as np
 import networkx as nx
 
-from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component
@@ -1726,11 +1726,11 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_totals(self, method='fd', step=DEFAULT_FD_OPTIONS['step'],
-                      form=DEFAULT_FD_OPTIONS['form'],
-                      step_calc=DEFAULT_FD_OPTIONS['step_calc']):
+    def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
         Approximate derivatives for a Group using the specified approximation method.
+
+        NOTE: `DEFAULT_FD_OPTIONS` and `DEFAULT_CS_OPTIONS` can be accessed via `openmdao.api`.
 
         Parameters
         ----------
@@ -1738,29 +1738,36 @@ class Group(System):
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
         step : float
-            Step size for approximation. Default is the value of DEFAULT_FD_OPTIONS['step'].
+            Step size for approximation. Defaults to None, but if unset, will take on the value of
+            either DEFAULT_FD_OPTIONS['step'] or DEFAULT_CS_OPTIONS['step'], based on `method`.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form'].
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
+            None, but if unset, will take on the value of either DEFAULT_FD_OPTIONS['form'] or
+            DEFAULT_CS_OPTIONS['form'], based on `method`.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc'].
+            relative. Defaults to None, but if unset, will take on the value of either
+            DEFAULT_FD_OPTIONS['step_calc'] or DEFAULT_CS_OPTIONS['step_calc'], based on `method`.
         """
         self._approx_schemes = OrderedDict()
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
+        supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
+                             'cs': (ComplexStep, DEFAULT_CS_OPTIONS)}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, supported_methods.keys()))
 
         if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
+            self._approx_schemes[method] = supported_methods[method][0]()
 
-        kwargs = {'step': step,
-                  'form': form,
-                  'step_calc': step_calc
+        default_args = supported_methods[method][1]
+
+        kwargs = {'step': step if step else default_args['step'],
+                  'form': form if form else default_args['form'],
                   }
+        if method == 'fd':
+            kwargs['step_calc'] = default_args['step_calc']
+
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
