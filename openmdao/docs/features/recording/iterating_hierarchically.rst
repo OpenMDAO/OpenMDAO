@@ -13,7 +13,7 @@ to iterate over all cases of a certain type.
         case = cr.driver_cases.get_case(case_key)
         ...
 
-The Case Reader also provides a :code:`get_cases` method, which provides a way to iterate
+The Case Reader also has a :code:`get_cases` method, which provides a way to iterate
 over Driver and Solver cases in order with a choice of iterating hierarchically or flat
 (using the :code:`recurse` parameter).
 
