@@ -645,13 +645,13 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is the value of DEFAULT_FD_OPTIONS['step'].
+            Step size for approximation. Default is the default value of step for the 'fd' method.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form'].
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            is the default value of step for the 'fd' method.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc'].
+            relative. Default is the default value of step for the 'fd' method.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
