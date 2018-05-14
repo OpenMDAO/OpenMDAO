@@ -539,21 +539,6 @@ class TestParallelDOE(unittest.TestCase):
         except OSError:
             pass
 
-    def test_parallel_error(self):
-        prob = Problem()
-
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.options['parallel'] =  3
-
-        with self.assertRaises(RuntimeError) as context:
-            prob.setup()
-
-        self.assertEqual(str(context.exception),
-                         "The number of processors is not evenly divisable by the "
-                         "specified number of parallel cases.\n Provide a number of "
-                         "processors that is a multiple of 3, or specify a number "
-                         "of parallel cases that divides into 4.")
-
     def test_full_factorial(self):
         prob = Problem()
         model = prob.model
@@ -619,75 +604,6 @@ class TestParallelDOE(unittest.TestCase):
 
     def test_fan_in_grouped(self):
         doe_parallel = 2
-
-        prob = Problem(FanInGrouped())
-        model = prob.model
-
-        model.add_design_var('iv.x1', lower=0.0, upper=1.0)
-        model.add_design_var('iv.x2', lower=0.0, upper=1.0)
-
-        model.add_objective('c3.y')
-
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
-        prob.driver.options['parallel'] =  doe_parallel
-
-        prob.setup(check=False)
-
-        failed, output = run_driver(prob)
-        self.assertFalse(failed)
-
-        prob.cleanup()
-
-        expected = {
-            0: {'iv.x1': np.array([0.]), 'iv.x2': np.array([0.]), 'c3.y': np.array([ 0.0])},
-            1: {'iv.x1': np.array([.5]), 'iv.x2': np.array([0.]), 'c3.y': np.array([-3.0])},
-            2: {'iv.x1': np.array([1.]), 'iv.x2': np.array([0.]), 'c3.y': np.array([-6.0])},
-
-            3: {'iv.x1': np.array([0.]), 'iv.x2': np.array([.5]), 'c3.y': np.array([17.5])},
-            4: {'iv.x1': np.array([.5]), 'iv.x2': np.array([.5]), 'c3.y': np.array([14.5])},
-            5: {'iv.x1': np.array([1.]), 'iv.x2': np.array([.5]), 'c3.y': np.array([11.5])},
-
-            6: {'iv.x1': np.array([0.]), 'iv.x2': np.array([1.]), 'c3.y': np.array([35.0])},
-            7: {'iv.x1': np.array([.5]), 'iv.x2': np.array([1.]), 'c3.y': np.array([32.0])},
-            8: {'iv.x1': np.array([1.]), 'iv.x2': np.array([1.]), 'c3.y': np.array([29.0])},
-        }
-
-        rank = prob.comm.rank
-        size = prob.comm.size // doe_parallel
-
-        num_cases = 0
-
-        # cases will be split across files for each proc up to the number requested
-        if rank < doe_parallel:
-            filename = "CASES.db_%d" % rank
-
-            expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
-            self.assertTrue(expect_msg in output)
-
-            cases = CaseReader(filename).driver_cases
-
-            # cases recorded on this proc
-            num_cases = cases.num_cases
-            self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
-
-            for n in range(num_cases):
-                case = cases.get_case(n)
-                idx = n * size + rank  # index of expected case
-
-                self.assertEqual(cases.get_case(n).outputs['iv.x1'], expected[idx]['iv.x1'])
-                self.assertEqual(cases.get_case(n).outputs['iv.x2'], expected[idx]['iv.x2'])
-                self.assertEqual(cases.get_case(n).outputs['c3.y'], expected[idx]['c3.y'])
-        else:
-            self.assertFalse("Cases from rank %d are being written" % rank in output)
-
-        # total number of cases recorded across all requested procs
-        num_cases = prob.comm.allgather(num_cases)
-        self.assertEqual(sum(num_cases), len(expected))
-
-    @unittest.skip("broken")
-    def test_fan_in_grouped_error(self):
-        doe_parallel = True
 
         prob = Problem(FanInGrouped())
         model = prob.model
