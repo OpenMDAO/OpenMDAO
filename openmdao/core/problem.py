@@ -617,7 +617,8 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                       method='fd', step=DEFAULT_FD_OPTIONS['step'],
+                       form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False,
                        show_only_incorrect=False):
@@ -644,14 +645,13 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is None.
+            Step size for approximation. Default is the default value of step for the 'fd' method.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
-            the value of DEFAULT_FD_OPTIONS['form']
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            is the default value of step for the 'fd' method.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
+            relative. Default is the default value of step for the 'fd' method.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
@@ -1043,7 +1043,8 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_totals(method=method, **fd_args)
+            model.approx_totals(method=method, step=step, form=form,
+                                step_calc=step_calc if method is 'fd' else None)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
             Jfd = total_info.compute_totals_approx(initialize=True)
 

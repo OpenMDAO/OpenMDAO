@@ -667,7 +667,7 @@ class System(object):
 
         self._mode = mode
 
-        # If we're only updating and not recursing, processors don't need to be redistributed
+        # If we're only updating and not recursing, processors don't need to be redistributed.
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
             self._setup_procs(self.pathname, comm, mode)
@@ -789,7 +789,7 @@ class System(object):
 
     def _setup_vars(self, recurse=True):
         """
-        Call setup in components and count variables, total and by var_set.
+        Count variables, total and by var_set.
 
         Parameters
         ----------
