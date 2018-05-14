@@ -59,7 +59,7 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
 
         prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         stdout = sys.stdout
         strout = StringIO()

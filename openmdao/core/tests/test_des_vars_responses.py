@@ -9,9 +9,15 @@ import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives, ExecComp, ScipyKrylov
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestDesVarsResponses(unittest.TestCase):
@@ -511,6 +517,41 @@ class TestConstraintOnModel(unittest.TestCase):
         # passing an iterator for indices should be valid
         prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                           indices=range(2))
+
+    def test_error_eq_ineq_con(self):
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
+                                      indices='foo')
+
+        msg = "Constraint 'con1' cannot be both equality and inequality."
+        self.assertEqual(str(context.exception), msg)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc is required.")
+class TestAddConstraintMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_add_bad_con(self):
+        # From a bug, this message didn't work in mpi.
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('sub', SellarDerivatives())
+        sub.nonlinear_solver = NonlinearBlockGS()
+
+        sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup(mode='rev')
+
+        msg = "Output not found for response 'd1.junk' in system 'sub'."
+        self.assertEqual(str(context.exception), msg)
 
 
 class TestObjectiveOnModel(unittest.TestCase):

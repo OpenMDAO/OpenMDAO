@@ -27,7 +27,7 @@ class RunOnceCounter(LinearRunOnce):
         super(RunOnceCounter, self)._iter_execute()
         self._solve_count += 1
 
-def run_opt(driver_class, color_info=None, **options):
+def run_opt(driver_class, color_info=None, sparsity=None, **options):
 
     # note: size must be an even number
     SIZE = 10
@@ -94,6 +94,8 @@ def run_opt(driver_class, color_info=None, **options):
     # # setup coloring
     if color_info is not None:
         p.driver.set_simul_deriv_color(color_info)
+    elif sparsity is not None:
+        p.driver.set_total_jac_sparsity(sparsity)
 
     p.setup(mode='fwd')
     p.run_driver()
@@ -108,12 +110,12 @@ class SimulColoringTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
 
-        color_info = ([
-           [20],   # uncolored column list
+        color_info = [[
+           [20],   # uncolored columns
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
            [10, 12, 14, 16, 18],   # color 3
-           [11, 13, 15, 17, 19],   # color 4
+           [11, 13, 15, 17, 19]   # color 4
         ],
         [
            [1, 11, 12, 17],   # column 0
@@ -136,35 +138,35 @@ class SimulColoringTestCase(unittest.TestCase):
            [8, 20],   # column 17
            [9, 16, 21],   # column 18
            [10, 21],   # column 19
-           None,   # column 20
+           None   # column 20
         ],
-        {'circle.area': {'indeps.r': ([0], [0], (1, 1)),
-                         'indeps.x': ([], [], (1, 10)),
-                         'indeps.y': ([], [], (1, 10))},
-         'delta_theta_con.g': {'indeps.r': ([], [], (5, 1)),
-                               'indeps.x': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                            (5, 10)),
-                               'indeps.y': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                            (5, 10))},
-         'l_conx.g': {'indeps.r': ([], [], (1, 1)),
-                      'indeps.x': ([0], [0], (1, 10)),
-                      'indeps.y': ([], [], (1, 10))},
-         'r_con.g': {'indeps.r': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                  (10, 1)),
-                     'indeps.x': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  (10, 10)),
-                     'indeps.y': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  (10, 10))},
-         'theta_con.g': {'indeps.r': ([], [], (5, 1)),
-                         'indeps.x': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10)),
-                         'indeps.y': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10))}}
-        )
-
+        {
+        "circle.area": {
+           "indeps.x": [[], [], [1, 10]],
+           "indeps.y": [[], [], [1, 10]],
+           "indeps.r": [[0], [0], [1, 1]]
+        },
+        "r_con.g": {
+           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+        },
+        "l_conx.g": {
+           "indeps.x": [[0], [0], [1, 10]],
+           "indeps.y": [[], [], [1, 10]],
+           "indeps.r": [[], [], [1, 1]]
+        },
+        "theta_con.g": {
+           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+           "indeps.r": [[], [], [5, 1]]
+        },
+        "delta_theta_con.g": {
+           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+           "indeps.r": [[], [], [5, 1]]
+        }
+        }]
         p_color = run_opt(pyOptSparseDriver, color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -175,6 +177,24 @@ class SimulColoringTestCase(unittest.TestCase):
         # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_simul_coloring_snopt(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False,
+                          dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:
@@ -187,12 +207,12 @@ class SimulColoringTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        color_info = ([
-           [20],   # uncolored column list
+        color_info = [[
+           [20],   # uncolored columns
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
            [10, 12, 14, 16, 18],   # color 3
-           [11, 13, 15, 17, 19],   # color 4
+           [11, 13, 15, 17, 19]   # color 4
         ],
         [
            [1, 11, 12, 17],   # column 0
@@ -215,34 +235,35 @@ class SimulColoringTestCase(unittest.TestCase):
            [8, 20],   # column 17
            [9, 16, 21],   # column 18
            [10, 21],   # column 19
-           None,   # column 20
+           None   # column 20
         ],
-        {'circle.area': {'indeps.r': ([0], [0], (1, 1)),
-                         'indeps.x': ([], [], (1, 10)),
-                         'indeps.y': ([], [], (1, 10))},
-         'delta_theta_con.g': {'indeps.r': ([], [], (5, 1)),
-                               'indeps.x': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                            (5, 10)),
-                               'indeps.y': ([0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
-                                            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                            (5, 10))},
-         'l_conx.g': {'indeps.r': ([], [], (1, 1)),
-                      'indeps.x': ([0], [0], (1, 10)),
-                      'indeps.y': ([], [], (1, 10))},
-         'r_con.g': {'indeps.r': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                  (10, 1)),
-                     'indeps.x': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  (10, 10)),
-                     'indeps.y': ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                                  (10, 10))},
-         'theta_con.g': {'indeps.r': ([], [], (5, 1)),
-                         'indeps.x': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10)),
-                         'indeps.y': ([0, 1, 2, 3, 4], [0, 2, 4, 6, 8], (5, 10))}}
-        )
+        {
+        "circle.area": {
+           "indeps.x": [[], [], [1, 10]],
+           "indeps.y": [[], [], [1, 10]],
+           "indeps.r": [[0], [0], [1, 1]]
+        },
+        "r_con.g": {
+           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+        },
+        "l_conx.g": {
+           "indeps.x": [[0], [0], [1, 10]],
+           "indeps.y": [[], [], [1, 10]],
+           "indeps.r": [[], [], [1, 1]]
+        },
+        "theta_con.g": {
+           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+           "indeps.r": [[], [], [5, 1]]
+        },
+        "delta_theta_con.g": {
+           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+           "indeps.r": [[], [], [5, 1]]
+        }
+        }]
 
         p_color = run_opt(pyOptSparseDriver, color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -257,6 +278,33 @@ class SimulColoringTestCase(unittest.TestCase):
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
 
+    def test_dynamic_simul_coloring_pyoptsparse_slsqp(self):
+        try:
+            from pyoptsparse import OPT
+        except ImportError:
+            raise unittest.SkipTest("This test requires pyoptsparse.")
+
+        try:
+            OPT('SLSQP')
+        except:
+            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
+
+        p_color = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False,
+                          dynamic_simul_derivs=True)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
+
 
 class SimulColoringScipyTestCase(unittest.TestCase):
 
@@ -265,36 +313,36 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, optimizer='SLSQP', disp=False)
 
-        color_info = ([
-           [20],   # uncolored column list
-           [0, 2, 4, 6, 8],   # color 1
-           [1, 3, 5, 7, 9],   # color 2
-           [10, 12, 14, 16, 18],   # color 3
-           [11, 13, 15, 17, 19],   # color 4
-        ],
-        [
-           [1, 11, 16, 21],   # column 0
-           [2, 16],   # column 1
-           [3, 12, 17],   # column 2
-           [4, 17],   # column 3
-           [5, 13, 18],   # column 4
-           [6, 18],   # column 5
-           [7, 14, 19],   # column 6
-           [8, 19],   # column 7
-           [9, 15, 20],   # column 8
-           [10, 20],   # column 9
-           [1, 11, 16],   # column 10
-           [2, 16],   # column 11
-           [3, 12, 17],   # column 12
-           [4, 17],   # column 13
-           [5, 13, 18],   # column 14
-           [6, 18],   # column 15
-           [7, 14, 19],   # column 16
-           [8, 19],   # column 17
-           [9, 15, 20],   # column 18
-           [10, 20],   # column 19
-           None,   # column 20
-        ])
+        color_info = [[
+               [20],   # uncolored columns
+               [0, 2, 4, 6, 8],   # color 1
+               [1, 3, 5, 7, 9],   # color 2
+               [10, 12, 14, 16, 18],   # color 3
+               [11, 13, 15, 17, 19]   # color 4
+            ],
+            [
+               [1, 11, 16, 21],   # column 0
+               [2, 16],   # column 1
+               [3, 12, 17],   # column 2
+               [4, 17],   # column 3
+               [5, 13, 18],   # column 4
+               [6, 18],   # column 5
+               [7, 14, 19],   # column 6
+               [8, 19],   # column 7
+               [9, 15, 20],   # column 8
+               [10, 20],   # column 9
+               [1, 11, 16],   # column 10
+               [2, 16],   # column 11
+               [3, 12, 17],   # column 12
+               [4, 17],   # column 13
+               [5, 13, 18],   # column 14
+               [6, 18],   # column 15
+               [7, 14, 19],   # column 16
+               [8, 19],   # column 17
+               [9, 15, 20],   # column 18
+               [10, 20],   # column 19
+               None   # column 20
+            ], None]
 
         p_color = run_opt(ScipyOptimizeDriver, color_info, optimizer='SLSQP', disp=False)
 
@@ -306,6 +354,23 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
+
+    def test_dynamic_simul_coloring(self):
+
+        # first, run w/o coloring
+        p = run_opt(ScipyOptimizeDriver, optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
     def test_simul_coloring_example(self):
 
@@ -412,6 +477,94 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.run_driver()
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
+
+class SparsityTestCase(unittest.TestCase):
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_sparsity_snopt(self):
+        # first, run w/o sparsity
+        p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
+
+        sparsity = {
+            "circle.area": {
+               "indeps.x": [[], [], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[0], [0], [1, 1]]
+            },
+            "r_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+            },
+            "theta_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "delta_theta_con.g": {
+               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "l_conx.g": {
+               "indeps.x": [[0], [0], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[], [], [1, 1]]
+            }
+        }
+
+        p_sparsity = run_opt(pyOptSparseDriver, sparsity=sparsity, optimizer='SNOPT', print_results=False)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
+
+    def test_sparsity_pyoptsparse_slsqp(self):
+        try:
+            from pyoptsparse import OPT
+        except ImportError:
+            raise unittest.SkipTest("This test requires pyoptsparse.")
+
+        try:
+            OPT('SLSQP')
+        except:
+            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
+
+        sparsity = {
+            "circle.area": {
+               "indeps.x": [[], [], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[0], [0], [1, 1]]
+            },
+            "r_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+            },
+            "theta_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "delta_theta_con.g": {
+               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "l_conx.g": {
+               "indeps.x": [[0], [0], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[], [], [1, 1]]
+            }
+        }
+
+        p_sparsity = run_opt(pyOptSparseDriver, sparsity=sparsity, optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
+
+        # run w/o coloring
+        p = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False)
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
 
 if __name__ == '__main__':
     unittest.main()

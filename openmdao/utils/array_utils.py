@@ -4,9 +4,10 @@ Utils for dealing with arrays.
 from __future__ import print_function, division
 
 import sys
-import numpy as np
 import six
 from six.moves import range
+
+import numpy as np
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):
@@ -145,3 +146,90 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
             tab = ' ' * start
             stream.write('%s|%s\n' % (tab, name))
             start += prob.driver._designvars[name]['size']
+
+
+def array_connection_compatible(shape1, shape2):
+    """
+    Return True if the two arrays shapes are compatible.
+
+    Array shapes are compatible if the underlying data has the same size and is
+    stored in the same contiguous order for the two shapes.
+
+    Parameters
+    ----------
+    shape1 : tuple of int
+        Shape of the first array.
+    shape2 : tuple of int
+        Shape of the second array.
+
+    Returns
+    -------
+    bool
+        True if the two shapes are compatible for connection, else False.
+    """
+    ashape1 = np.asarray(shape1, dtype=int)
+    ashape2 = np.asarray(shape2, dtype=int)
+
+    size1 = np.prod(ashape1)
+    size2 = np.prod(ashape2)
+
+    # Shapes are not connection-compatible if size is different
+    if size1 != size2:
+        return False
+
+    nz1 = np.where(ashape1 > 1)[0]
+    nz2 = np.where(ashape2 > 1)[0]
+
+    if len(nz1) > 0:
+        fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1) + 1]
+    else:
+        fundamental_shape1 = np.ones((1,))
+
+    if len(nz2) > 0:
+        fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
+    else:
+        fundamental_shape2 = np.ones((1,))
+
+    return np.all(fundamental_shape1 == fundamental_shape2)
+
+
+def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
+    """
+    Assemble a sprase csr jacobian for a vectorized component.
+
+    Parameters
+    ----------
+    data : ndarray
+        Array of values
+    rows : index array
+        Array of row indices.
+    cols : index array
+        Array of column indices.
+    nrow : int
+        Number of rows in sub jacobian.
+    ncol : int
+        Number of columns in sub jacobian.
+    num_nodes : int
+        Number of vectorized copies to tile.
+
+    Returns
+    -------
+    ndarray, ndarray, ndarray
+        CSR Sparse jacobian of size num_nodes*nrow by num_nodes*ncol
+    """
+    nnz = len(rows)
+
+    if np.isscalar(data):
+        data = data * np.ones(nnz)
+
+    if not np.isscalar(nrow):
+        nrow = np.prod(nrow)
+
+    if not np.isscalar(ncol):
+        ncol = np.prod(ncol)
+
+    data = np.tile(data, num_nodes)
+    rows = np.tile(rows, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * nrow
+    cols = np.tile(cols, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * ncol
+
+    return data, rows, cols

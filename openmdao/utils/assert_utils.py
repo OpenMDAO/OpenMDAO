@@ -11,8 +11,6 @@ from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name
 
-from numpy.testing import assert_allclose
-
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     """

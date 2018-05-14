@@ -1,3 +1,4 @@
+.. _feature_pyoptsparse:
 
 *****************
 pyOptSparseDriver
@@ -18,9 +19,6 @@ In this simple example, we use the SLSQP optimizer to minimize the objective of 
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_basic
     :layout: interleave
 
-Optimizer Settings
-==================
-
 pyOptSparseDriver Options
 -------------------------
 
@@ -29,10 +27,10 @@ pyOptSparseDriver Options
     pyOptSparseDriver
     options
 
-
-The optimizers have a small number of unified options that can be controlled using the "options" dictionary. We have already shown how
-to set the optimizer name. Next, the `print_results` option can be used to turn on or off the echoing of the pyOptSparse results when
-the optimization finishes. The default is True, but here, we turn it off.
+pyOptSparseDriver has a small number of unified options that can be specified as keyword arguments when
+it is instantiated or by using the "options" dictionary. We have already shown how to set the
+`optimizer` option. Next we see how the `print_results` option can be used to turn on or off the echoing
+of the results when the optimization finishes. The default is True, but here, we turn it off.
 
 .. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_settings_print
@@ -80,9 +78,8 @@ Setting a limit on the number of major iterations. Here, we set it to just a few
 You can learn more about the available options in the SNOPT_Manual_.
 
 
-.. toctree::
-    :maxdepth: 1
-
 .. _mdolab: https://github.com/mdolab/pyoptsparse
 
 .. _SNOPT_Manual: http://www.sbsi-sol-optimize.com/manuals/SNOPT%20Manual.pdf
+
+.. tags:: Driver, Optimizer, Optimization

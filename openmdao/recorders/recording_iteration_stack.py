@@ -58,6 +58,7 @@ def get_formatted_iteration_coordinate():
         rank = MPI.COMM_WORLD.rank
     else:
         rank = 0
+
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate

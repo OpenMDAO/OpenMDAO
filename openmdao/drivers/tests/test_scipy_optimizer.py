@@ -4,15 +4,15 @@ import unittest
 import sys
 import warnings
 
-from six import StringIO
-
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, ScipyOptimizer, ExplicitComponent
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+    ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import run_driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 
@@ -141,10 +141,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = ScipyOptimizer()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = ScipyOptimizer(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -944,6 +941,39 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_rel_error(self, prob['x'], 7.16667, 1e-6)
         assert_rel_error(self, prob['y'], -7.833334, 1e-6)
 
+    def test_debug_print_option_totals(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('Solving variable: con.c' in output)
+
     def test_debug_print_option(self):
 
         prob = Problem()
@@ -970,15 +1000,12 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue().split('\n')
+        self.assertFalse(failed, "Optimization failed.")
+
+        output = output.split('\n')
+
         self.assertTrue(output.count("Design Vars") > 1,
                         "Should be more than one design vars header printed")
         self.assertTrue(output.count("Nonlinear constraints") > 1,
@@ -995,6 +1022,38 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                         "Should be more than one con.c printed")
         self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
+
+    def test_sellar_mdf_linear_con_directsolver(self):
+        # This test makes sure that we call solve_nonlinear first if we have any linear constraints
+        # to cache.
+        prob = Problem()
+        model = prob.model = SellarDerivatives()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-3
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+        model.add_constraint('x', upper=11.0, linear=True)
+
+        prob.setup(check=False, mode='rev')
+        prob.set_solver_print(level=0)
+
+        failed = prob.run_driver()
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+
+        self.assertEqual(len(prob.driver._lincongrad_cache), 1)
+        # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
+        prob.driver.run()
+        self.assertEqual(len(prob.driver._lincongrad_cache), 1)
 
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
@@ -1037,9 +1096,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['disp'] = True
+        prob.driver = ScipyOptimizeDriver(optimizer='COBYLA')
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1123,6 +1180,37 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.driver.options['disp'] = False
 
         prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        prob.run_driver()
+
+    def test_debug_print_option_totals(self):
+
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyOptimizeDriver, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

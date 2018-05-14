@@ -69,6 +69,12 @@ For example, here is a simple component that takes the input and adds one to it.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_simple
     :layout: interleave
 
+You can also create an ExecComp with multiple outputs by placing the expressions in a list.
+
+.. embed-code::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_multi_output
+    :layout: interleave
+
 You can also declare an ExecComp with arrays for inputs and outputs, but when you do, you must also
 pass in a correctly-sized array as an argument to the ExecComp call. This can be the initial value
 in the case of unconnected inputs, or just an empty array with the correct size.
@@ -91,7 +97,7 @@ You can also access built-in Numpy functions by using the prefix "numpy." with t
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_numpy
     :layout: interleave
 
-You can also declare metadata like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
+You can also declare options like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
 where we declare all our inputs to be inches to trigger conversion from a variable expressed in feet in one
 connection source.
 
@@ -100,4 +106,4 @@ connection source.
     :layout: interleave
 
 
-.. tags:: ExecComp, Examples
+.. tags:: ExecComp, Component, Examples

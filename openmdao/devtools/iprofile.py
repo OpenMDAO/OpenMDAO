@@ -76,7 +76,7 @@ def setup(methods=None, finalize=True):
         entry is the method name or glob pattern and the second is a tuple of class
         objects used for isinstance checking.  The default set of methods is:
 
-        ::
+        .. code-block:: python
 
             [
                 "*": (System, Jacobian, Matrix, Solver, Driver, Problem),

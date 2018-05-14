@@ -8,10 +8,8 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 from __future__ import print_function
 
 import sys
-from math import isnan
-from six import iteritems, reraise
-
 import numpy as np
+from six import iteritems, reraise
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
@@ -89,6 +87,13 @@ class BoundsEnforceLS(NonlinearSolver):
         opt.declare('print_bound_enforce', default=False,
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
+
+        # Remove unused options from base options here, so that users
+        # attempting to set them will get KeyErrors.
+        opt.undeclare("atol")
+        opt.undeclare("rtol")
+        opt.undeclare("maxiter")
+        opt.undeclare("err_on_maxiter")
 
     def _run_iterator(self):
         """

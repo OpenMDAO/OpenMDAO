@@ -1,24 +1,19 @@
 from __future__ import print_function
 
 import os
-import pstats
 import sys
-import traceback
 import time
 import webbrowser
-import fnmatch
 import threading
-import argparse
 import json
-from six import StringIO, iteritems, itervalues
+from six import iteritems, itervalues
 import tornado.ioloop
 import tornado.web
 from collections import defaultdict, deque
 from itertools import groupby
 
 from openmdao.devtools.iprofile import _process_profile, _iprof_py_file
-from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
-     _setup_func_group
+from openmdao.devtools.iprof_utils import func_group, _setup_func_group
 from openmdao.utils.mpi import MPI
 
 
@@ -29,6 +24,7 @@ def _launch_browser(port):
     time.sleep(1)
     webbrowser.get().open('http://localhost:%s' % port)
 
+
 def _startThread(fn):
     """
     Start a daemon thread running the given function.
@@ -38,6 +34,7 @@ def _startThread(fn):
     thread.start()
     return thread
 
+
 def _parent_key(d):
     """
     Return the function path of the parent of function specified by 'id' in the given dict.
@@ -46,6 +43,7 @@ def _parent_key(d):
     if len(parts) == 1:
         return ''
     return parts[0]
+
 
 def _stratify(call_data, sortby='time'):
     """
@@ -211,7 +209,7 @@ def _iprof_exec(options):
 
         print("starting server on port %d" % options.port)
 
-        serve_thread  = _startThread(tornado.ioloop.IOLoop.current().start)
+        serve_thread = _startThread(tornado.ioloop.IOLoop.current().start)
         launch_thread = _startThread(lambda: _launch_browser(options.port))
 
         while serve_thread.isAlive():

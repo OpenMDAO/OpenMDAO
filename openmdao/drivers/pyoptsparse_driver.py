@@ -9,9 +9,9 @@ additional MPI capability.
 from __future__ import print_function
 from collections import OrderedDict
 import traceback
-import warnings
+import json
 
-from six import iteritems, itervalues
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -20,7 +20,7 @@ from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.record_util import create_local_meta
+import openmdao.utils.coloring as coloring_mod
 
 
 # names of optimizers that use gradients
@@ -82,17 +82,6 @@ class pyOptSparseDriver(Driver):
 
         two_sided_constraints
 
-    Options
-    -------
-    options['optimizer'] :  str('SLSQP')
-        Name of optimizers to use.
-    options['print_results'] :  bool(True)
-        Print pyOpt results if True
-    options['gradient method'] :  str('openmdao', 'pyopt_fd', 'snopt_fd')
-        Finite difference implementation to use ('snopt_fd' may only be used with SNOPT)
-    options['title'] :  str('Optimization using pyOpt_sparse')
-        Title of this optimization run
-
     Attributes
     ----------
     fail : bool
@@ -124,11 +113,16 @@ class pyOptSparseDriver(Driver):
         Contains all response info.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize pyopt.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
-        super(pyOptSparseDriver, self).__init__()
+        super(pyOptSparseDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -137,21 +131,11 @@ class pyOptSparseDriver(Driver):
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
         self.supports['simultaneous_derivatives'] = True
+        self.supports['total_jac_sparsity'] = True
 
         # What we don't support yet
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
-
-        # User Options
-        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
-                             desc='Name of optimizers to use')
-        self.options.declare('title', default='Optimization using pyOpt_sparse',
-                             desc='Title of this optimization run')
-        self.options.declare('print_results', types=bool, default=True,
-                             desc='Print pyOpt results if True')
-        self.options.declare('gradient method', default='openmdao',
-                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
-                             desc='Finite difference implementation to use')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
@@ -171,6 +155,25 @@ class pyOptSparseDriver(Driver):
         self.fail = False
 
         self.cite = CITATIONS
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
+                             desc='Name of optimizers to use')
+        self.options.declare('title', default='Optimization using pyOpt_sparse',
+                             desc='Title of this optimization run')
+        self.options.declare('print_results', types=bool, default=True,
+                             desc='Print pyOpt results if True')
+        self.options.declare('gradient method', default='openmdao',
+                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
+                             desc='Finite difference implementation to use')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
     def _setup_driver(self, problem):
         """
@@ -192,6 +195,8 @@ class pyOptSparseDriver(Driver):
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
 
+        self._setup_tot_jac_sparsity()
+
     def run(self):
         """
         Excute pyOptsparse.
@@ -208,12 +213,10 @@ class pyOptSparseDriver(Driver):
         model = problem.model
         relevant = model._relevant
         self.pyopt_solution = None
+        self._total_jac = None
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
-
-        # Metadata Setup
-        self.metadata = create_local_meta(optimizer)
 
         # Only need initial run if we have linear constraints.
         con_meta = self._cons
@@ -224,6 +227,10 @@ class pyOptSparseDriver(Driver):
                 rec.abs = 0.0
                 rec.rel = 0.0
             self.iter_count += 1
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            coloring_mod.dynamic_simul_coloring(self, do_sparsity=True)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -326,6 +333,7 @@ class pyOptSparseDriver(Driver):
 
         except ImportError:
             msg = "Optimizer %s is not available in this installation." % optimizer
+
             raise ImportError(msg)
 
         # Set optimization options
@@ -569,46 +577,25 @@ class pyOptSparseDriver(Driver):
                      and not ('linear' in meta and meta['linear']))
         return order
 
-    def _setup_simul_coloring(self, mode='fwd'):
+    def _setup_tot_jac_sparsity(self):
         """
-        Set up metadata for simultaneous derivative solution.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
+        Set up total jacobian subjac sparsity.
         """
-        super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
-
-        if self._simul_coloring_info is None:
+        if self._total_jac_sparsity is None:
             return
 
-        tup = self._simul_coloring_info
-        column_lists, row_map = tup[:2]
-        if len(tup) > 2:
-            sparsity = tup[2]
-        else:
-            sparsity = None
+        if isinstance(self._total_jac_sparsity, string_types):
+            with open(self._total_jac_sparsity, 'r') as f:
+                self._total_jac_sparsity = json.load(f)
+
         self._res_jacs = {}
-
-        if sparsity is None:
-            warnings.warn("pyOptSparseDriver is being used with simultaneous derivatives but "
-                          "no sparsity structure was provided.  Providing the sparsity structure "
-                          "can signficantly improve performance.  "
-                          "(run 'openmdao simul_coloring' from the command line with the "
-                          "-s option)")
-            return
-
-        for res, resdict in iteritems(sparsity):
+        for res, resdict in iteritems(self._total_jac_sparsity):
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}
             for dv, (rows, cols, shape) in iteritems(resdict):
                 rows = np.array(rows, dtype=int)
                 cols = np.array(cols, dtype=int)
-
-                # print("sparsity for %s, %s: %d of %s" % (res, dv, rows.size,
-                #                                         (shape[0] * shape[1])))
 
                 self._res_jacs[res][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],

@@ -1,8 +1,8 @@
 .. _defining_icomps_tutorial:
 
-****************************************
-Building Models with Implicit Components
-****************************************
+****************************************************
+Building Models with Solvers and Implicit Components
+****************************************************
 
 This tutorial will show you how to define implicit components and build models with them.
 We'll use a nonlinear circuit analysis example problem.
@@ -39,7 +39,7 @@ ExplicitComponents - Resistor and Diode
 
 The :code:`Resistor` and :code:`Diode` components will each compute their current, given the voltages on either side.
 These calculations are analytic functions, so we'll inherit from :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
-These components will each declare some metadata to allow you to pass in the relevant physical constants, and to
+These components will each declare some options to allow you to pass in the relevant physical constants, and to
 allow you to give some reasonable default values.
 
 .. embed-code::
@@ -49,8 +49,8 @@ allow you to give some reasonable default values.
      openmdao.test_suite.test_examples.test_circuit_analysis.Diode
 
 .. note::
-    Since we've provided default values for the metadata, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
-    Check out the :ref:`Features <Features>` section for more details on how to use :ref:`component metadata <component_metadata>`.
+    Since we've provided default values for the options, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
+    Check out the :ref:`Features <Features>` section for more details on how to use :ref:`component options <component_options>`.
 
 
 ImplicitComponent - Node
@@ -152,7 +152,7 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
 
 .. note::
 
-    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_amijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
+    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_armijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
     For many problems you might want to use :ref:`BoundsEnforceLS <feature_bounds_enforce>` instead, which only activates the
     line search to enforce upper and lower bounds on the outputs in the model.
 

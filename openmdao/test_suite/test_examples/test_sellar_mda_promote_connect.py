@@ -27,8 +27,8 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                 indeps.add_output('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-                d1 = cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
-                d2 = cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
+                cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z', 'y2'], promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'], promotes_outputs=['y2'])
 
                 # Nonlinear Block Gauss Seidel is a gradient free solver
                 cycle.nonlinear_solver = NonlinearBlockGS()
@@ -72,8 +72,8 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                 indeps.add_output('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', Group())
-                d1 = cycle.add_subsystem('d1', SellarDis1())
-                d2 = cycle.add_subsystem('d2', SellarDis2())
+                cycle.add_subsystem('d1', SellarDis1())
+                cycle.add_subsystem('d2', SellarDis2())
                 cycle.connect('d1.y1', 'd2.y1')
                 cycle.connect('d2.y2', 'd1.y2')
 
@@ -123,8 +123,8 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                 indeps.add_output('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-                d1 = cycle.add_subsystem('d1', SellarDis1())
-                d2 = cycle.add_subsystem('d2', SellarDis2())
+                cycle.add_subsystem('d1', SellarDis1())
+                cycle.add_subsystem('d2', SellarDis2())
                 cycle.connect('d1.y1', 'd2.y1')
                 cycle.connect('d2.y2', 'd1.y2')
 
@@ -160,5 +160,3 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

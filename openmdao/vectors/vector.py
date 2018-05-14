@@ -1,10 +1,10 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
-import numpy as np
 
+import os
+import numpy as np
 from six import iteritems, PY3
 
-from openmdao.utils.general_utils import ensure_compatible
 from openmdao.utils.name_maps import name2abs_name
 
 
@@ -14,6 +14,12 @@ _type_map = {
     'output': 'output',
     'residual': 'output'
 }
+
+# This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
+if os.environ.get('OPENMDAO_USE_BIG_INTS'):
+    INT_DTYPE = np.dtype(np.int64)
+else:
+    INT_DTYPE = np.dtype(np.int32)
 
 
 class VectorInfo(object):
@@ -673,92 +679,3 @@ class Vector(object):
             print(' ' * 3, prom_name, view)
         print('-' * 35)
         print()
-
-
-class Transfer(object):
-    """
-    Base Transfer class.
-
-    Implementations:
-
-    - <DefaultTransfer>
-    - <PETScTransfer>
-
-    Attributes
-    ----------
-    _in_inds : int ndarray
-        input indices for the transfer.
-    _out_inds : int ndarray
-        output indices for the transfer.
-    _comm : MPI.Comm or FakeComm
-        communicator of the system that owns this transfer.
-    """
-
-    def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            pointer to the input vector.
-        out_vec : <Vector>
-            pointer to the output vector.
-        in_inds : int ndarray
-            input indices for the transfer.
-        out_inds : int ndarray
-            output indices for the transfer.
-        comm : MPI.Comm or <FakeComm>
-            communicator of the system that owns this transfer.
-        """
-        self._in_inds = in_inds
-        self._out_inds = out_inds
-        self._comm = comm
-
-        self._initialize_transfer(in_vec, out_vec)
-
-    def __str__(self):
-        """
-        Return a string representation of the Transfer object.
-
-        Returns
-        -------
-        str
-            String rep of this object.
-        """
-        try:
-            return "%s(in=%s, out=%s" % (self.__class__.__name__, self._in_inds, self._out_inds)
-        except Exception as err:
-            return "<error during call to Transfer.__str__: %s" % err
-
-    def _initialize_transfer(self, in_vec, out_vec):
-        """
-        Set up the transfer; do any necessary pre-computation.
-
-        Optionally implemented by the subclass.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            reference to the input vector.
-        out_vec : <Vector>
-            reference to the output vector.
-        """
-        pass
-
-    def __call__(self, in_vec, out_vec, mode='fwd'):
-        """
-        Perform transfer.
-
-        Must be implemented by the subclass.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            pointer to the input vector.
-        out_vec : <Vector>
-            pointer to the output vector.
-        mode : str
-            'fwd' or 'rev'.
-        """
-        pass

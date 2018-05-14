@@ -245,7 +245,7 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribCompSimple(size))
         top.connect('C1.outvec', 'C2.invec')
 
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -264,7 +264,7 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(size))
         C2 = top.add_subsystem("C2", DistribInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -286,7 +286,7 @@ class MPITests(unittest.TestCase):
                                               y=np.zeros(size*commsize)))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.x')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -308,7 +308,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -330,7 +330,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -362,7 +362,7 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -389,7 +389,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -486,7 +486,7 @@ class MPIFeatureTests(unittest.TestCase):
         top.connect('indep.x', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
 
-        p.setup(vector_class=PETScVector)
+        p.setup()
 
         p['indep.x'] = np.ones(size)
 
@@ -495,14 +495,14 @@ class MPIFeatureTests(unittest.TestCase):
         assert_rel_error(self, p['C3.out'], -5.)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestGroupMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_promote_distrib(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, PETScVector
+        from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
 
         class MyComp(ExplicitComponent):
             def setup(self):
@@ -520,7 +520,7 @@ class TestGroupMPI(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
-        p = Problem(model=Group())
+        p = Problem()
 
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
@@ -529,7 +529,7 @@ class TestGroupMPI(unittest.TestCase):
                               promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
-        p.setup(PETScVector)
+        p.setup()
         p.run_model()
 
         # each rank holds the assigned portion of the input array
