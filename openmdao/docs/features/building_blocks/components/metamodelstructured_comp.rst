@@ -52,6 +52,14 @@ This is illustrated by the example:
     openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_shape
     :layout: code, output
 
+You can also predict multiple independent output points by setting the `num_nodes` argument to be equal to the number of
+points you want to predict. Here, we set it to 2 and predict 2 points with `MetaModelStructuredComp`:
+
+.. embed-code::
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_vectorized
+    :layout: code, output
+
+
 Finally, it is possible to compute gradients with respect to the given
 output training data. These gradients are not computed by default, but
 can be enabled by setting the option `training_data_gradients` to `True`.

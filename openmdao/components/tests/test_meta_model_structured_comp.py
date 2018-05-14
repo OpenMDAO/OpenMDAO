@@ -1,6 +1,10 @@
+"""
+Unit tests for the structured metamodel component.
+"""
 from __future__ import division, print_function, absolute_import
 
 from six import assertRaisesRegex
+from copy import deepcopy
 
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
@@ -442,8 +446,8 @@ class TestRegularGridInterpolator(unittest.TestCase):
     """Tests the functionality of the regular grid interpolator."""
 
     def setUp(self):
-      self.config = _RegularGridInterp._interp_methods()
-      self.spline_methods, self.valid_methods, self.interp_configs = self.config
+        self.config = _RegularGridInterp._interp_methods()
+        self.valid_methods, self.interp_configs = self.config
 
     def _get_sample_4d_large(self):
         def f(x, y, z, w):
@@ -551,12 +555,12 @@ class TestRegularGridInterpolator(unittest.TestCase):
         sample = np.asarray([[0.1, 0.1, 1., .9]])
 
         # spline methods dont support complex values
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             self.assertRaises(ValueError, _RegularGridInterp, points, values,
                               method)
 
     def test_minimum_required_gridsize(self):
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             k = self.interp_configs[method]
             x = np.linspace(0, 1, k)
             y = np.linspace(0, 1, k)
@@ -644,7 +648,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 2)
         actual = np.array(df(*test_pt))
         tol = 1e-1
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             if method == 'slinear':
                 tol = 1.5
             interp = _RegularGridInterp(points, values, method)
@@ -661,7 +665,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         # verifies that gradients with respect to xi are returned if cached
         points, values, func, df = self. _get_sample_2d()
         np.random.seed(4321)
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             interp = _RegularGridInterp(points, values, method)
             x = np.array([0.9, 0.1])
             interp._xi = x
@@ -677,7 +681,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 2)
         actual = func(*test_pt)
         tol = 1e-2
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             if method == 'slinear':
                 tol = 0.5
             interp = _RegularGridInterp(points, values, method)
@@ -692,7 +696,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         actual = func(*test_pt)
         gradient = np.array(df(*test_pt))
         tol = 1e-1
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             k = self.interp_configs[method]
             if method == 'slinear':
                 tol = 2
@@ -713,7 +717,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         np.random.seed(1)
         test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
         actual = func(*test_pt.T)
-        for method in self.spline_methods:
+        for method in self.valid_methods:
             tol = 1e-1
             if method == 'slinear':
                 tol = 0.5
@@ -748,6 +752,65 @@ class TestRegularGridInterpolator(unittest.TestCase):
         self.assertRaises(ValueError, _RegularGridInterp,
                           (x, y), values, fill_value=1 + 2j)
 
+    def test_error_messages(self):
+        # For coverage. Most of these errors are probably not reachable in openmdao, but
+        # proper unit testing requires them for standalone usage of the Interpolation.
+        points, values = self._get_sample_4d_large()
+
+        sample = np.asarray([[0.1, 0.1, 1., .9], [0.2, 0.1, .45, .8],
+                             [0.5, 0.5, .5, .5]])
+
+        with self.assertRaises(ValueError) as cm:
+            interp = _RegularGridInterp(points, values.tolist(), method='junk')
+
+        msg = ('Method "junk" is not defined. Valid methods are "quintic", "slinear", "cubic".')
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            interp = _RegularGridInterp(points, values.tolist()[1])
+
+        msg = ('There are 4 point arrays, but values has 3 dimensions')
+        self.assertEqual(str(cm.exception), msg)
+
+        badpoints = deepcopy(points)
+        badpoints[0][0] = 55.0
+        with self.assertRaises(ValueError) as cm:
+            interp = _RegularGridInterp(badpoints, values.tolist())
+
+        msg = ('The points in dimension 0 must be strictly ascending')
+        self.assertEqual(str(cm.exception), msg)
+
+        badpoints[0] = np.vstack((np.arange(6), np.arange(6)))
+        with self.assertRaises(ValueError) as cm:
+            interp = _RegularGridInterp(badpoints, values.tolist())
+
+        msg = ('The points in dimension 0 must be 1-dimensional')
+        self.assertEqual(str(cm.exception), msg)
+
+        badpoints[0] = (np.arange(4))
+        with self.assertRaises(ValueError) as cm:
+            interp = _RegularGridInterp(badpoints, values.tolist())
+
+        msg = ('There are 4 points and 6 values in dimension 0')
+        self.assertEqual(str(cm.exception), msg)
+
+        badvalues = np.array(values, dtype=np.complex)
+        with self.assertRaises(ValueError) as cm:
+            interp = _RegularGridInterp(badpoints, badvalues.tolist())
+
+        msg = ("method 'slinear' does not support complex values.")
+        self.assertEqual(str(cm.exception), msg)
+
+        interp = _RegularGridInterp(points, values.tolist())
+        x = [0.5, 0, 0.5, 0.9]
+
+        with self.assertRaises(ValueError) as cm:
+            computed = interp(x, method='junk')
+
+        msg = ('Method "junk" is not defined. Valid methods are "quintic", "slinear", "cubic".')
+        self.assertEqual(str(cm.exception), msg)
+
+        self.assertEqual(set(interp.methods()), set(["quintic", "cubic", "slinear"]))
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestRegularGridMap(unittest.TestCase):
@@ -798,6 +861,42 @@ class TestRegularGridMap(unittest.TestCase):
         tol = 1e-6
         assert_rel_error(self, f, -0.05624571, tol)
         assert_rel_error(self, g, 1.02068754, tol)
+
+    def test_deriv1_swap(self):
+        # Bugfix test that we can add outputs before inputs.
+
+        model = Group()
+        ivc = IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = MetaModelStructuredComp(method='slinear', extrapolate=True)
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        prob = Problem(model)
+        prob.setup()
+        prob['x'] = 1.0
+        prob['y'] = 0.75
+        prob['z'] = -1.7
+
+        # run at default pt
+        self.run_and_check_derivs(prob)
 
     def test_deriv2(self):
         self.prob['x'] = 10.0
@@ -869,7 +968,7 @@ class TestRegularGridMap(unittest.TestCase):
         msg = "Error interpolating output '[f|g]' in 'comp' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
         with assertRaisesRegex(self, ValueError, msg):
-           self.run_and_check_derivs(self.prob)
+            self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):
         model = Group()
@@ -926,6 +1025,37 @@ class TestRegularGridMap(unittest.TestCase):
             if derivs['comp'][i]['J_fwd'].sum() != 0.0:
                 rel_err = max(derivs['comp'][i]['rel error'])
                 self.assertLessEqual(rel_err, tol)
+
+    def test_error_msg_vectorized(self):
+        # Tests bug in error message where it doesn't give the correct node value.
+
+        x_bp = np.array([0., 1.])
+        y_data = np.array([0., 4.])
+        nn = 5
+
+        class MMComp(MetaModelStructuredComp):
+
+            def setup(self):
+                nn = self.options['num_nodes']
+                self.add_input(name='x', val=np.ones(nn), units=None, training_data=x_bp)
+
+                self.add_output(name='y', val=np.zeros(nn), units=None, training_data=y_data)
+
+        p = Problem()
+
+        ivc = IndepVarComp()
+        ivc.add_output('x', val=np.linspace(.5, 1.1, nn))
+
+        p.model.add_subsystem('ivc', ivc, promotes=['x'])
+        p.model.add_subsystem('MM', MMComp(num_nodes=nn), promotes=['x', 'y'])
+
+        p.setup()
+
+        with self.assertRaises(ValueError) as cm:
+            p.run_model()
+
+        msg = ("Error interpolating output 'y' in 'MM' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
+        self.assertEqual(str(cm.exception), msg)
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
@@ -1016,6 +1146,47 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
 
         # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
+
+    @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
+    def test_vectorized(self):
+        import numpy as np
+        from openmdao.api import Group, Problem, IndepVarComp
+        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+
+        # create input param training data, of sizes 25, 5, and 10 points resp.
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 5)
+        p3 = np.linspace(0, 1, 10)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f = np.sqrt(P1) + P2 * P3
+
+        # Create regular grid interpolator instance
+        interp = MetaModelStructuredComp(method='cubic', num_nodes=2)
+        interp.add_input('p1', 0.5, training_data=p1)
+        interp.add_input('p2', 0.0, training_data=p2)
+        interp.add_input('p3', 3.14, training_data=p3)
+
+        interp.add_output('f', 0.0, training_data=f)
+
+        # Set up the OpenMDAO model
+        model = Group()
+        model.add_subsystem('comp', interp, promotes=["*"])
+        prob = Problem(model)
+        prob.setup()
+
+        # set inputs
+        prob['p1'] = np.array([55.12, 12.0])
+        prob['p2'] = np.array([-2.14, 3.5])
+        prob['p3'] = np.array([0.323, 0.5])
+
+        prob.run_model()
+
+        computed = prob['f']
+        actual = np.array([6.73306472, 5.2118645])
+
+        assert_almost_equal(computed, actual)
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_training_derivatives(self):
