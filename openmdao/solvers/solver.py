@@ -14,7 +14,7 @@ import numpy as np
 from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
@@ -232,6 +232,17 @@ class Solver(object):
         """
         pass
 
+    def _setup_jacobians(self, parent_jacobian=None):
+        """
+        Set and populate assembled jacobian, if we have one.
+
+        Parameters
+        ----------
+        parent_jacobian : <AssembledJacobian> or None
+            The global jacobian to populate.
+        """
+        pass
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -258,8 +269,7 @@ class Solver(object):
             else:  # it's a LinearSolver
                 residuals = self._system._vectors['residual']['linear']
 
-            myresiduals = {n for n in residuals._names
-                           if check_path(n, incl, excl)}
+            myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_outputs']:
             if isinstance(self, NonlinearSolver):
@@ -275,8 +285,7 @@ class Solver(object):
             else:
                 inputs = self._system._vectors['input']['linear']
 
-            myinputs = {n for n in inputs._names
-                        if check_path(n, incl, excl)}
+            myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
             'in': myinputs,
@@ -699,6 +708,8 @@ class LinearSolver(Solver):
     ----------
     _rel_systems : set of str
         Names of systems relevant to the current solve.
+    _assembled_jac : AssembledJacobian or None
+        If not None, the AssembledJacobian instance used by this solver.
     """
 
     def __init__(self, **kwargs):
@@ -712,6 +723,7 @@ class LinearSolver(Solver):
         """
         super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
+        self._assembled_jac = None
 
     def _declare_options(self):
         """
@@ -744,6 +756,37 @@ class LinearSolver(Solver):
             self._rhs_vecs[vec_name] = rhs = {}
             for varset, data in iteritems(b_vecs[vec_name]._data):
                 rhs[varset] = data.copy()
+
+        # set up jacobian
+        newjac = self.options['assembled_jac']
+        if newjac == 'dense':
+            self._assembled_jac = DenseJacobian()
+        elif newjac == 'csc':
+            self._assembled_jac = CSCJacobian()
+        # else jacobians will be local to components.
+
+        if self._assembled_jac is not None:
+            self._assembled_jac._system = system
+
+    def _setup_jacobians(self, parent_jacobian=None):
+        """
+        Set and populate our assembled jacobian, if we have one.
+
+        Parameters
+        ----------
+        parent_jacobian : <AssembledJacobian> or None
+            The global jacobian to populate.
+        """
+        # if we have an assembled jac at this level and an assembled jac above us, then
+        # our jacs (and any of our children's assembled jacs) will share their internal
+        # subjac dicts.  Each will maintain its own internal Matrix objects though.
+        if parent_jacobian is not None and self._assembled_jac is not None:
+            parent_jacobian._subjacs.update(self._assembled_jac._subjacs)
+            parent_jacobian._subjacs_info.update(self._assembled_jac._subjacs_info)
+            self._assembled_jac._subjacs = parent_jacobian._subjacs
+            self._assembled_jac._subjacs_info = parent_jacobian._subjacs_info
+            self._assembled_jac._keymap = parent_jacobian._keymap
+            self._assembled_jac._view_ranges = parent_jacobian._view_ranges
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -811,7 +854,8 @@ class LinearSolver(Solver):
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems, self._mode,
+                             scope_out, scope_in)
 
         recording_iteration.stack.pop()
 

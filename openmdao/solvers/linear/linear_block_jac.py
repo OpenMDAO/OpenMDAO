@@ -22,13 +22,14 @@ class LinearBlockJac(BlockLinearSolver):
         subs = [s for s in system._subsystems_myproc
                 if self._rel_systems is None or s.pathname in self._rel_systems]
 
+        jac = self._assembled_jac
         if mode == 'fwd':
             for vec_name in vec_names:
                 system._transfer(vec_name, mode)
 
             for subsys in subs:
                 scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(vec_names, self._rel_systems, mode,
+                subsys._apply_linear(jac, vec_names, self._rel_systems, mode,
                                      scope_out, scope_in)
 
             for vec_name in vec_names:
@@ -44,7 +45,7 @@ class LinearBlockJac(BlockLinearSolver):
         else:  # rev
             for subsys in subs:
                 scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(vec_names, self._rel_systems, mode,
+                subsys._apply_linear(jac, vec_names, self._rel_systems, mode,
                                      scope_out, scope_in)
 
             for vec_name in vec_names:

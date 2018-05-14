@@ -522,7 +522,7 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         bal = BalanceComp()
 

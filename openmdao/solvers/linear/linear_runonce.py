@@ -51,7 +51,7 @@ class LinearRunOnce(LinearBlockGS):
         self._rel_systems = rel_systems
         system = self._system
 
-        if isinstance(system._jacobian, AssembledJacobian):
+        if isinstance(system.jacobian, AssembledJacobian):
             raise RuntimeError("A block linear solver '%s' is being used with "
                                "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))

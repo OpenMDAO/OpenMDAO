@@ -68,6 +68,7 @@ class AssembledJacobian(Jacobian):
         self._keymap = {}
         self._mask_caches = {}
         self._matrix_class = matrix_class
+        # self._init_done = False
 
         self._subjac_iters = defaultdict(lambda: None)
 
@@ -75,8 +76,12 @@ class AssembledJacobian(Jacobian):
         """
         Allocate the global matrices.
         """
-        # var_indices are the *global* indices for variables on this proc
         system = self._system
+
+        # if self._init_done:
+            # raise RuntimeError("%s: assembled jac already initalized!" % system.pathname)
+
+        # var_indices are the *global* indices for variables on this proc
         is_top = system.pathname == ''
 
         abs2meta = system._var_abs2meta
@@ -88,15 +93,19 @@ class AssembledJacobian(Jacobian):
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
         sizes = system._var_sizes['nonlinear']['output']
         out_ranges = self._out_ranges = {}
+        start = end = 0
         for name in system._var_allprocs_abs_names['output']:
-            start = np.sum(sizes[iproc, :abs2idx[name]])
-            out_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
+            end += sizes[iproc, abs2idx[name]]
+            out_ranges[name] = (start, end)
+            start = end
 
         sizes = system._var_sizes['nonlinear']['input']
         in_ranges = self._in_ranges = {}
+        start = end = 0
         for name in system._var_allprocs_abs_names['input']:
-            start = np.sum(sizes[iproc, :abs2idx[name]])
-            in_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
+            end += sizes[iproc, abs2idx[name]]
+            in_ranges[name] = (start, end)
+            start = end
 
         abs2prom_out = system._var_abs2prom['output']
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
@@ -158,10 +167,11 @@ class AssembledJacobian(Jacobian):
             ext_mtx = None
 
         self._ext_mtx[system.pathname] = ext_mtx
+        # self._init_done = True
 
     def _init_view(self, system):
         """
-        Determine the _ext_mtx for a sub-view of the assemble jacobian.
+        Determine the _ext_mtx for a sub-view of the assembled jacobian.
 
         Parameters
         ----------

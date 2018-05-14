@@ -15,6 +15,7 @@ import networkx as nx
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -284,6 +285,8 @@ class Group(System):
 
             if subsys._has_guess:
                 self._has_guess = True
+            if subsys.matrix_free:
+                self.matrix_free = True
 
         self.configure()
 
@@ -1595,12 +1598,14 @@ class Group(System):
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
 
-    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         rel_systems : set of str
@@ -1619,41 +1624,41 @@ class Group(System):
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
         with Recording(name + '._apply_linear', self.iter_count, self):
-            with self.jacobian_context() as J:
-                # Use global Jacobian
-                if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
+            if jac:
+                with self.jacobian_context(jac):
                     for vec_name in vec_names:
                         with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                             d_inputs, d_outputs, d_residuals = vecs
-                            J._apply(d_inputs, d_outputs, d_residuals, mode)
-                # Apply recursion
-                else:
+                            jac._apply(d_inputs, d_outputs, d_residuals, mode)
+            # Apply recursion
+            else:
+                if rel_systems is not None:
+                    irrelevant_subs = [s for s in self._subsystems_myproc
+                                       if s.pathname not in rel_systems]
+                if mode == 'fwd':
+                    for vec_name in vec_names:
+                        self._transfer(vec_name, mode)
                     if rel_systems is not None:
-                        irrelevant_subs = [s for s in self._subsystems_myproc
-                                           if s.pathname not in rel_systems]
-                    if mode == 'fwd':
-                        for vec_name in vec_names:
-                            self._transfer(vec_name, mode)
+                        for s in irrelevant_subs:
+                            # zero out dvecs of irrelevant subsystems
+                            # TODO: it's not completely clear that this is
+                            #       necessary in fwd mode.  I wasn't able to
+                            #       produce convergence failures during testing
+                            #       in fwd mode.
+                            s._vectors['residual']['linear'].set_const(0.0)
+
+                for subsys in self._subsystems_myproc:
+                    if rel_systems is None or subsys.pathname in rel_systems:
+                        subsys._apply_linear(jac, vec_names, rel_systems, mode,
+                                             scope_out, scope_in)
+
+                if mode == 'rev':
+                    for vec_name in vec_names:
+                        self._transfer(vec_name, mode)
                         if rel_systems is not None:
                             for s in irrelevant_subs:
                                 # zero out dvecs of irrelevant subsystems
-                                # TODO: it's not completely clear that this is
-                                #       necessary in fwd mode.  I wasn't able to
-                                #       produce convergence failures during testing
-                                #       in fwd mode.
-                                s._vectors['residual']['linear'].set_const(0.0)
-
-                    for subsys in self._subsystems_myproc:
-                        if rel_systems is None or subsys.pathname in rel_systems:
-                            subsys._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
-
-                    if mode == 'rev':
-                        for vec_name in vec_names:
-                            self._transfer(vec_name, mode)
-                            if rel_systems is not None:
-                                for s in irrelevant_subs:
-                                    # zero out dvecs of irrelevant subsystems
-                                    s._vectors['output']['linear'].set_const(0.0)
+                                s._vectors['output']['linear'].set_const(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -1686,40 +1691,43 @@ class Group(System):
 
         return result
 
-    def _linearize(self, do_nl=True, do_ln=True):
+    def _linearize(self, jac, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         do_nl : boolean
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        with self.jacobian_context() as J:
+        J = self.jacobian if jac is None else jac
 
-            sub_do_nl = (self._nonlinear_solver is not None) and \
-                        (self._nonlinear_solver._linearize_children())
-            sub_do_ln = (self._linear_solver is not None) and \
-                        (self._linear_solver._linearize_children())
-
-            # Group finite difference
-            if self._owns_approx_jac:
+        # Group finite difference
+        if self._owns_approx_jac:
+            with self.jacobian_context(J):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
                         approximation.compute_approximations(self, jac=J, deriv_type='total')
 
                 J._update()
 
-            else:
-                # Only linearize subsystems if we aren't approximating the derivs at this level.
-                for subsys in self._subsystems_myproc:
-                    subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
+        else:
+            sub_do_nl = (self._nonlinear_solver is not None) and \
+                        (self._nonlinear_solver._linearize_children())
+            sub_do_ln = (self._linear_solver is not None) and \
+                        (self._linear_solver._linearize_children())
 
-                # Update jacobian
-                if self._owns_assembled_jac or self._views_assembled_jac:
-                    J._update()
+            # Only linearize subsystems if we aren't approximating the derivs at this level.
+            for subsys in self._subsystems_myproc:
+                subsys._linearize(jac, do_nl=sub_do_nl, do_ln=sub_do_ln)
+
+            # Update jacobian
+            if self._owns_assembled_jac or self._views_assembled_jac:
+                J._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()
@@ -1769,9 +1777,15 @@ class Group(System):
         """
         self._jacobian_changed = False
 
+        J = None if self.linear_solver is None else self.linear_solver._assembled_jac
+
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
+            if J is None:
+                self._jacobian = J = DictionaryJacobian()
+                J._system = self
+
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
             pro2abs = self._var_allprocs_prom2abs_list
@@ -1803,7 +1817,7 @@ class Group(System):
                 else:
                     wrt.add(var)
 
-            with self.jacobian_context() as J:
+            with self.jacobian_context(J):
                 for key in product(of, wrt.union(of)):
                     if key in self._subjacs_info:
                         meta = self._subjacs_info[key]
@@ -1845,9 +1859,9 @@ class Group(System):
 
             approx._init_approximations()
 
-            self._jacobian._system = self
+            # self._jacobian._system = self
             self._views_assembled_jac = False
-            self._jacobian._initialize()
+            J._initialize()
 
         super(Group, self)._setup_jacobians(jacobian, recurse)
 

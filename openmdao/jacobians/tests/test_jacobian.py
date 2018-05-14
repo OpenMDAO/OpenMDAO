@@ -318,8 +318,8 @@ class TestJacobian(unittest.TestCase):
         prob.model.run_linearize()
 
         expected = constructor(value)
-        with prob.model._subsystems_allprocs[0].jacobian_context() as J:
-            jac_out = J['out', 'in'] * -1
+        J = prob.model._subsystems_allprocs[0].jacobian
+        jac_out = J['out', 'in'] * -1
 
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)
@@ -438,7 +438,7 @@ class TestJacobian(unittest.TestCase):
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
         prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver.options['assembled_jac'] = 'dense'
+        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
         prob.model.connect('indep.x', 'C1.a')
         prob.model.connect('indep.x', 'C2.a')
@@ -597,7 +597,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -619,7 +619,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -643,7 +643,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -689,7 +689,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 

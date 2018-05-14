@@ -601,20 +601,6 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
-    def _all_components_provide_jacobians(self):
-        """
-        Are all components providing jacobians.
-
-        Returns
-        -------
-        boolean
-            True if all Components use jacobian-free linear operators; False otherwise.
-        """
-        for comp in self.model.system_iter(typ=Component, include_self=True):
-            if comp.matrix_free:
-                return False
-        return True
-
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
@@ -733,7 +719,7 @@ class Problem(object):
                 with comp._unscaled_context():
                     subjacs = comp._jacobian._subjacs
                     if explicit:
-                        comp._negate_jac()
+                        comp._negate_jac(comp._jacobian)
 
                     of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -781,7 +767,7 @@ class Problem(object):
                                 flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(['linear'], _contains_all, mode)
+                                comp._apply_linear(None, ['linear'], _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -866,7 +852,7 @@ class Problem(object):
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
                     if explicit:
-                        comp._negate_jac()
+                        comp._negate_jac(comp._jacobian)
 
         model._inputs.set_vec(input_cache)
         model._outputs.set_vec(output_cache)
@@ -969,7 +955,7 @@ class Problem(object):
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options,
                                   suppress_output=suppress_output, indep_key=indep_key,
-                                  all_comps_provide_jacs=self._all_components_provide_jacobians(),
+                                  all_comps_provide_jacs=not self.model.matrix_free,
                                   show_only_incorrect=show_only_incorrect)
 
         return partials_data

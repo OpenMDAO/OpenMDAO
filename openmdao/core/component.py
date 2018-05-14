@@ -14,6 +14,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches
@@ -37,9 +38,6 @@ class Component(System):
 
     Attributes
     ----------
-    matrix_free : Bool
-        This is set to True if the component overrides the appropriate function with a user-defined
-        matrix vector product with the Jacobian.
     distributed : bool
         This is True if the component has variables that are distributed across multiple
         processes.
@@ -76,7 +74,6 @@ class Component(System):
         """
         # put these here to prevent them from possibly overriding values set
         # by the user in initialize().
-        self.matrix_free = False
         self.distributed = False
 
         super(Component, self).__init__(**kwargs)
@@ -92,6 +89,8 @@ class Component(System):
         self._declared_partials = []
         self._approximated_partials = []
         self._declared_partial_checks = []
+        self._jacobian = DictionaryJacobian()
+        self._jacobian._system = self
 
     def setup(self):
         """
@@ -786,26 +785,28 @@ class Component(System):
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
         """
-        if dependent and val is not None and not issparse(val):
-            val = np.atleast_1d(val)
-            # np.promote_types  will choose the smallest dtype that can contain both arguments
-            safe_dtype = np.promote_types(val.dtype, float)
-            val = val.astype(safe_dtype, copy=False)
+        if dependent:
+            if val is not None and not issparse(val):
+                val = np.atleast_1d(val)
+                # np.promote_types  will choose the smallest dtype that can contain both arguments
+                safe_dtype = np.promote_types(val.dtype, float)
+                val = val.astype(safe_dtype, copy=False)
 
-        if dependent and rows is not None:
-            rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-            cols = np.array(cols, dtype=INT_DTYPE, copy=False)
+            if rows is not None:
+                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
+                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
-            if rows.shape != cols.shape:
-                raise ValueError('rows and cols must have the same shape,'
-                                 ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
+                if rows.shape != cols.shape:
+                    raise ValueError('rows and cols must have the same shape,'
+                                     ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
 
-            if val is not None and val.shape != (1,) and rows.shape != val.shape:
-                raise ValueError('If rows and cols are specified, val must be a scalar or have the '
-                                 'same shape, val: {}, rows/cols: {}'.format(val.shape, rows.shape))
+                if val is not None and val.shape != (1,) and rows.shape != val.shape:
+                    raise ValueError('If rows and cols are specified, val must be a scalar or '
+                                     'have the same shape, val: {}, '
+                                     'rows/cols: {}'.format(val.shape, rows.shape))
 
-            if val is None:
-                val = np.zeros_like(rows, dtype=float)
+                if val is None:
+                    val = np.zeros_like(rows, dtype=float)
 
         pattern_matches = self._find_partial_matches(of, wrt)
 
@@ -923,21 +924,34 @@ class Component(System):
                         out_size, in_size,
                         val_out, val_in))
 
-    def _set_partials_meta(self):
+    def _set_partials_meta(self, jacs):
         """
         Set subjacobian info into our jacobian.
+
+        Parameters
+        ----------
+        jacs : list of Jacobian
+            Jacobians needing metadata update.
         """
-        with self.jacobian_context() as J:
-            for key, meta in iteritems(self._subjacs_info):
-                if not meta['dependent']:
-                    continue
-                self._check_partials_meta(key, meta)
+        old_systems = []
+        for J in jacs:
+            old_systems.append(J._system)
+            J._system = self
+
+        for key, meta in iteritems(self._subjacs_info):
+            if not meta['dependent']:
+                continue
+            self._check_partials_meta(key, meta)
+            for J in jacs:
                 J._set_partials_meta(key, meta)
 
-                if 'method' in meta:
-                    method = meta['method']
-                    if method:
-                        self._approx_schemes[method].add_approximation(key, meta)
+            if 'method' in meta:
+                method = meta['method']
+                if method:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+        for i, J in enumerate(jacs):
+            J._system = old_systems[i]
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

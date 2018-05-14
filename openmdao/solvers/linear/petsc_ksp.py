@@ -230,6 +230,23 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
 
+    def _setup_jacobians(self, parent_jacobian=None):
+        """
+        Set and populate our assembled jacobian, if we have one.
+
+        Parameters
+        ----------
+        parent_jacobian : <AssembledJacobian> or None
+            The global jacobian to populate.
+        """
+        super(PETScKrylov, self)._setup_jacobians(parent_jacobian)
+
+        if self.precon is not None:
+            if self._assembled_jac is None:
+                self.precon._setup_jacobians(parent_jacobian)
+            else:
+                self.precon._setup_jacobians(self._assembled_jac)
+
     def _set_solver_print(self, level=2, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
@@ -287,7 +304,8 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
+                             scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)

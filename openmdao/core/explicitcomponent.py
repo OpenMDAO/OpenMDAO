@@ -149,37 +149,56 @@ class ExplicitComponent(Component):
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
                                                          var_set=var_set)
 
-    def _negate_jac(self):
+    def _negate_jac(self, J):
         """
         Negate this component's part of the jacobian.
+
+        Parameters
+        ----------
+        J : Jacobian
+            The jacobian to be negated.
         """
-        if self._jacobian._subjacs:
+        if J._subjacs:
             for res_name in self._var_abs_names['output']:
                 for in_name in self._var_abs_names['input']:
                     abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
+                    if abs_key in J._subjacs:
+                        J._multiply_subjac(abs_key, -1.)
 
-    def _set_partials_meta(self):
+    def _set_partials_meta(self, jacs):
         """
         Set subjacobian info into our jacobian.
+
+        Parameters
+        ----------
+        jacs : list of Jacobian
+            Jacobians needing metadata update.
         """
         abs2prom = self._var_abs2prom
 
-        with self.jacobian_context() as J:
-            for abs_key, meta in iteritems(self._subjacs_info):
-                if meta['value'] is None:
-                    out_size = self._var_abs2meta[abs_key[0]]['size']
-                    in_size = self._var_abs2meta[abs_key[1]]['size']
-                    meta['value'] = np.zeros((out_size, in_size))
+        old_systems = []
+        for J in jacs:
+            old_systems.append(J._system)
+            J._system = self
 
-                J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
+        for abs_key, meta in iteritems(self._subjacs_info):
+            if meta['value'] is None:
+                out_size = self._var_abs2meta[abs_key[0]]['size']
+                in_size = self._var_abs2meta[abs_key[1]]['size']
+                meta['value'] = np.zeros((out_size, in_size))
 
-                if 'method' in meta and meta['method']:
+            is_input = abs_key[1] in abs2prom['input']
+            for J in jacs:
+                J._set_partials_meta(abs_key, meta, is_input)
 
-                    # Don't approximate output wrt output.
-                    if abs_key[1] not in self._var_allprocs_abs_names['output']:
-                        self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
+            if 'method' in meta and meta['method']:
+
+                # Don't approximate output wrt output.
+                if abs_key[1] not in self._var_allprocs_abs_names['output']:
+                    self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
+
+        for i, J in enumerate(jacs):
+            J._system = old_systems[i]
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
@@ -225,12 +244,14 @@ class ExplicitComponent(Component):
                 failed = self.compute(self._inputs, self._outputs)
         return bool(failed), 0., 0.
 
-    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use jac.
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         rel_systems : set of str
@@ -244,6 +265,8 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        J = self._jacobian if jac is None else jac
+
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name not in self._rel_vec_names:
@@ -253,7 +276,7 @@ class ExplicitComponent(Component):
                     d_inputs, d_outputs, d_residuals = vecs
 
                     # Jacobian and vectors are all scaled, unitless
-                    with self.jacobian_context() as J:
+                    with self.jacobian_context(J):
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                     # if we're not matrix free, we can skip the bottom of
@@ -332,12 +355,14 @@ class ExplicitComponent(Component):
                                 self._vectors['output'][vec_name])
         return False, 0., 0.
 
-    def _linearize(self, do_nl=False, do_ln=False):
+    def _linearize(self, jac=None, do_nl=False, do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         do_nl : boolean
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
@@ -346,7 +371,9 @@ class ExplicitComponent(Component):
         if not self._has_compute_partials and not self._approx_schemes:
             return
 
-        with self.jacobian_context() as J:
+        J = self._jacobian if jac is None else jac
+
+        with self.jacobian_context(J):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 # Since the residuals are already negated, this call should come before negate_jac
@@ -358,14 +385,14 @@ class ExplicitComponent(Component):
                 if self._has_compute_partials:
                     # negate constant subjacs (and others that will get overwritten)
                     # back to normal
-                    self._negate_jac()
+                    self._negate_jac(J)
                     self.compute_partials(self._inputs, J)
 
                     # re-negate the jacobian
-                    self._negate_jac()
+                    self._negate_jac(J)
 
-            if self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            #if jac:
+                #jac._update()
 
     def compute(self, inputs, outputs):
         """

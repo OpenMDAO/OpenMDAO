@@ -160,11 +160,10 @@ class Vector(object):
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
-        if alloc_complex:
-            self._imag_data = {}
-            self._imag_views = {}
-            self._complex_view_cache = {}
-            self._imag_views_flat = {}
+        self._imag_data = {}
+        self._imag_views = {}
+        self._complex_view_cache = {}
+        self._imag_views_flat = {}
 
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or

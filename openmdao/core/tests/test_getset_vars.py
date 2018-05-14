@@ -3,7 +3,7 @@
 import unittest
 from six import assertRaisesRegex
 
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -107,6 +107,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         g = Group()
         g.add_subsystem('c', c)
+        g.linear_solver = DirectSolver(assembled_jac='dense')
 
         model = Group()
         model.add_subsystem('g', g)
@@ -160,27 +161,27 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(outputs['g.c.y'], 5.0)
 
         msg = 'Variable name pair \("{}", "{}"\) not found.'
-        with g.jacobian_context() as jac:
+        jac = g.linear_solver._assembled_jac
 
-            # d(output)/d(input)
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-                jac['y', 'x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-                self.assertEqual(jac['y', 'x'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-                jac['g.c.y', 'g.c.x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-                self.assertEqual(jac['g.c.y', 'g.c.x'], 5.0)
+        # d(output)/d(input)
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+            jac['y', 'x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+            self.assertEqual(jac['y', 'x'], 5.0)
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+            jac['g.c.y', 'g.c.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+            self.assertEqual(jac['g.c.y', 'g.c.x'], 5.0)
 
-            # d(output)/d(output)
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-                jac['y', 'y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-                self.assertEqual(jac['y', 'y'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-                jac['g.c.y', 'g.c.y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-                self.assertEqual(jac['g.c.y', 'g.c.y'], 5.0)
+        # d(output)/d(output)
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
+            jac['y', 'y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
+            self.assertEqual(jac['y', 'y'], 5.0)
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+            jac['g.c.y', 'g.c.y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+            self.assertEqual(jac['g.c.y', 'g.c.y'], 5.0)
 
     def test_with_promotion_errors(self):
         """
@@ -194,6 +195,7 @@ class TestGetSetVariables(unittest.TestCase):
         g.add_subsystem('c1', c1, promotes=['*'])
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
+        g.linear_solver = DirectSolver(assembled_jac='dense')
 
         model = Group()
         model.add_subsystem('g', g, promotes=['*'])
@@ -231,27 +233,28 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = 'Variable name pair \("{}", "{}"\) not found.'
-        with g.jacobian_context() as jac:
+        
+        jac = g.linear_solver._assembled_jac
 
-            # d(outputs)/d(inputs)
-            with self.assertRaises(Exception) as context:
-                jac['y', 'x'] = 5.0
-            self.assertEqual(str(context.exception), msg2)
-            
-            with self.assertRaises(Exception) as context:
-                self.assertEqual(jac['y', 'x'], 5.0)
-            self.assertEqual(str(context.exception), msg2)
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
+        
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-                jac['g.c2.y', 'g.c2.x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-                self.assertEqual(jac['g.c2.y', 'g.c2.x'], 5.0)
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+            jac['g.c2.y', 'g.c2.x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+            self.assertEqual(jac['g.c2.y', 'g.c2.x'], 5.0)
 
-            # d(outputs)/d(outputs)
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-                jac['g.c2.y', 'g.c2.y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-                self.assertEqual(jac['g.c2.y', 'g.c2.y'], 5.0)
+        # d(outputs)/d(outputs)
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+            jac['g.c2.y', 'g.c2.y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+            self.assertEqual(jac['g.c2.y', 'g.c2.y'], 5.0)
 
 
     def test_nested_promotion_errors(self):
@@ -265,6 +268,7 @@ class TestGetSetVariables(unittest.TestCase):
         g = Group()
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
+        g.linear_solver = DirectSolver(assembled_jac='dense')
 
         model = Group()
         model.add_subsystem('c1', c1, promotes=['*'])
@@ -308,16 +312,15 @@ class TestGetSetVariables(unittest.TestCase):
 
         msg2 = "The promoted name x is invalid because it refers to multiple inputs: [g.c2.x, g.c3.x] that are not connected to an output variable."
 
-        with g.jacobian_context() as jac:
+        jac = g.linear_solver._assembled_jac
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with self.assertRaises(Exception) as context:
-                jac['y', 'x'] = 5.0
-            self.assertEqual(str(context.exception), msg2)
-
-            with self.assertRaises(Exception) as context:
-                self.assertEqual(jac['y', 'x'], 5.0)
-            self.assertEqual(str(context.exception), msg2)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
         # -------------------------------------------------------------------
 
@@ -330,16 +333,14 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(p['g.x'], 5.0)
         self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with self.assertRaises(Exception) as context:
-                jac['y', 'x'] = 5.0
-            self.assertEqual(str(context.exception), msg2)
-
-            with self.assertRaises(Exception) as context:
-                self.assertEqual(jac['y', 'x'], 5.0)
-            self.assertEqual(str(context.exception), msg2)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
         # -------------------------------------------------------------------
 
@@ -375,16 +376,14 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(p['g.x'], 5.0)
         self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with self.assertRaises(Exception) as context:
-                jac['y', 'x'] = 5.0
-            self.assertEqual(str(context.exception), msg2)
-
-            with self.assertRaises(Exception) as context:
-                self.assertEqual(jac['y', 'x'], 5.0)        # Start from a clean state again
-            self.assertEqual(str(context.exception), msg2)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)        # Start from a clean state again
+        self.assertEqual(str(context.exception), msg2)
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
@@ -395,16 +394,14 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(p['g.x'], 5.0)
         self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with self.assertRaises(Exception) as context:
-                jac['y', 'x'] = 5.0
-            self.assertEqual(str(context.exception), msg2)
-
-            with self.assertRaises(Exception) as context:
-                self.assertEqual(jac['y', 'x'], 5.0)
-            self.assertEqual(str(context.exception), msg2)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
 
 if __name__ == '__main__':

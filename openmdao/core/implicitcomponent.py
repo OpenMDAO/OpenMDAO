@@ -112,12 +112,14 @@ class ImplicitComponent(Component):
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
-    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         rel_systems : set of str
@@ -131,6 +133,8 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        J = self._jacobian if jac is None else jac
+
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
@@ -139,7 +143,7 @@ class ImplicitComponent(Component):
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
-                with self.jacobian_context() as J:
+                with self.jacobian_context(J):
                     J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # if we're not matrix free, we can skip the bottom of
@@ -242,18 +246,22 @@ class ImplicitComponent(Component):
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
-    def _linearize(self, do_nl=True, do_ln=True):
+    def _linearize(self, jac, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         do_nl : boolean
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        with self.jacobian_context() as J:
+        J = self._jacobian if jac is None else jac
+
+        with self.jacobian_context(J):
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
                 # override FD'd values.

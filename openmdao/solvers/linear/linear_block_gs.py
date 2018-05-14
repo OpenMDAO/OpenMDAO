@@ -31,7 +31,7 @@ class LinearBlockGS(BlockLinearSolver):
                 for vec_name in vec_names:
                     system._transfer(vec_name, mode, isub)
                 scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(vec_names, self._rel_systems, mode, scope_out, scope_in)
+                subsys._apply_linear(None, vec_names, self._rel_systems, mode, scope_out, scope_in)
                 for vec_name in vec_names:
                     if vec_name in subsys._rel_vec_names:
                         b_vec = system._vectors['residual'][vec_name]
@@ -60,4 +60,4 @@ class LinearBlockGS(BlockLinearSolver):
                             b_vec._data[varset] += data
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
                 scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(vec_names, self._rel_systems, mode, scope_out, scope_in)
+                subsys._apply_linear(None, vec_names, self._rel_systems, mode, scope_out, scope_in)

@@ -114,6 +114,18 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
+    def _setup_jacobians(self, parent_jacobian=None):
+        """
+        Set and populate assembled jacobian, if we have one.
+
+        Parameters
+        ----------
+        parent_jacobian : <AssembledJacobian> or None
+            The global jacobian to populate.
+        """
+        if self.linear_solver is not None and self.linear_solver is not self._system.linear_solver:
+            self.linear_solver._setup_jacobians(parent_jacobian)
+
     def _set_solver_print(self, level=2, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
@@ -231,7 +243,7 @@ class NewtonSolver(NonlinearSolver):
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
-        system._linearize()
+        system._linearize(self.linear_solver._assembled_jac)
 
         self.linear_solver.solve(['linear'], 'fwd')
 
