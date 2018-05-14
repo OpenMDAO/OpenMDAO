@@ -757,9 +757,6 @@ class TestRegularGridInterpolator(unittest.TestCase):
         # proper unit testing requires them for standalone usage of the Interpolation.
         points, values = self._get_sample_4d_large()
 
-        sample = np.asarray([[0.1, 0.1, 1., .9], [0.2, 0.1, .45, .8],
-                             [0.5, 0.5, .5, .5]])
-
         with self.assertRaises(ValueError) as cm:
             interp = _RegularGridInterp(points, values.tolist(), method='junk')
 
