@@ -39,6 +39,17 @@ class OptionsDictionary(object):
         self._dict = {}
         self._read_only = read_only
 
+    def __repr__(self):
+        """
+        Returns a dictionary representation of the options.
+
+        Returns
+        -------
+        dict
+            The options dictionary.
+        """
+        return self._dict
+
     def __rst__(self):
         """
         Generate reStructuredText view of the options table.
@@ -131,16 +142,38 @@ class OptionsDictionary(object):
 
         return lines
 
-    def __repr__(self):
+    def __str__(self, width=100):
         """
         Generate string representation of the options table.
+
+        Parameters
+        ----------
+        width : int
+            The maximum width of the text.
 
         Returns
         -------
         str
-            A rendition of the options as an rST table.
+            A rendition of the options as text.
         """
-        return '\n'.join(self.__rst__())
+        rst = self.__rst__()
+        cols = [len(header) for header in rst[0].split()]
+        desc_col = sum(cols[:-1]) + len(cols) - 1
+        desc_len = width - desc_col
+
+        text = []
+        for row in rst:
+            if len(row) > width:
+                text.append(row[:width])
+                if not row.startswith('==='):
+                    row = row[width:].rstrip()
+                    while(len(row) > 0):
+                        text.append(' '*desc_col + row[:desc_len])
+                        row = row[desc_len:]
+            else:
+                text.append(row)
+
+        return '\n'.join(text)
 
     def _assert_valid(self, name, value):
         """
