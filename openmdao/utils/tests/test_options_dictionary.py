@@ -3,6 +3,8 @@ import unittest
 import warnings
 from six import PY3, assertRegex
 
+from openmdao.core.explicitcomponent import ExplicitComponent
+
 
 class TestOptionsDict(unittest.TestCase):
 
@@ -10,27 +12,32 @@ class TestOptionsDict(unittest.TestCase):
         self.dict = OptionsDictionary()
 
     def test_reprs(self):
-        self.dict.declare('test', types=int, desc='Test integer value')
+        my_comp = ExplicitComponent()
+
+        self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
         self.dict.declare('flag', default=False, types=bool)
+        self.dict.declare('comp', default=my_comp, types=ExplicitComponent)
         self.dict.declare('long_desc', types=str,
-                          desc='This description is ridiculously long and verbose, so much '
-                               'so that it takes up multiple lines in the options table.')
+                          desc='This description is long and verbose, so it '
+                               'takes up multiple lines in the options table.')
 
         self.assertEqual(self.dict.__repr__(), self.dict._dict)
 
-        self.assertEqual(self.dict.__str__(width=80), '\n'.join([
-            "========= ============ ================= ================ ======================",
-            "Option    Default      Acceptable Values Acceptable Types Description           ",
-            "========= ============ ================= ================ ======================",
-            "flag      False        N/A               ['bool']                               ",
-            "long_desc **Required** N/A               ['str']          This description is ri",
-            "                                                          diculously long and ve",
-            "                                                          rbose, so much so that",
-            "                                                           it takes up multiple ",
-            "                                                          lines in the options t",
-            "                                                          able.",
-            "test      **Required** N/A               ['int']          Test integer value    ",
-            "========= ============ ================= ================ ======================"
+        self.assertEqual(self.dict.__str__(width=84), '\n'.join([
+            "========= ================= ================= ===================== ================",
+            "Option    Default           Acceptable Values Acceptable Types      Description     ",
+            "========= ================= ================= ===================== ================",
+            "comp      ExplicitComponent N/A               ['ExplicitComponent']                 ",
+            "flag      False             N/A               ['bool']                              ",
+            "long_desc **Required**      N/A               ['str']               This description",
+            "                                                                     is long and ver",
+            "                                                                    bose, so it take",
+            "                                                                    s up multiple li",
+            "                                                                    nes in the optio",
+            "                                                                    ns table.",
+            "test      **Required**      ['a', 'b']        N/A                   Test integer val",
+            "                                                                    ue",
+            "========= ================= ================= ===================== ================",
         ]))
 
     def test_type_checking(self):

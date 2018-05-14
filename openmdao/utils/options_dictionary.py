@@ -161,6 +161,10 @@ class OptionsDictionary(object):
         desc_col = sum(cols[:-1]) + len(cols) - 1
         desc_len = width - desc_col
 
+        # if it won't fit in allowed width, just return the rST
+        if desc_len < 0:
+            return '\n'.join(rst)
+
         text = []
         for row in rst:
             if len(row) > width:
