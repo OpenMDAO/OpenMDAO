@@ -634,7 +634,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         self.options.declare('training_data_gradients', types=bool, default=False,
                              desc='Sets whether gradients with respect to output '
                                   'training data should be computed.')
-        self.options.declare('num_nodes', types=int, default=1,
+        self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
         self.options.declare('method', values=('cubic', 'slinear', 'quintic'),
                              default="cubic", desc='Spline interpolation order.')
@@ -654,7 +654,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict
             Additional agruments for add_input.
         """
-        n = self.options['num_nodes']
+        n = self.options['vec_size']
         super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
@@ -675,7 +675,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict
             Additional agruments for add_output.
         """
-        n = self.options['num_nodes']
+        n = self.options['vec_size']
         super(MetaModelStructuredComp, self).add_output(name, val * np.ones(n), **kwargs)
 
         self.training_outputs[name] = training_data
@@ -704,7 +704,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             self._ki = self.interps[name]._ki
 
         if self.options['training_data_gradients']:
-            self.sh = tuple([self.options['num_nodes']] + [i.size for i in self.params])
+            self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
         super(MetaModelStructuredComp, self)._setup_vars()
 
@@ -720,7 +720,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         super(MetaModelStructuredComp, self)._setup_partials()
-        n = self.options['num_nodes']
+        n = self.options['vec_size']
 
         for name in self._outputs:
             arange = np.arange(n)
@@ -784,7 +784,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         if self.options['training_data_gradients']:
             dy_ddata = np.zeros(self.sh)
-            for j in range(self.options['num_nodes']):
+            for j in range(self.options['vec_size']):
                 for i, axis in enumerate(self.params):
                     e_i = np.eye(axis.size)
                     interp = make_interp_spline(axis, e_i, k=self._ki[i], axis=0)

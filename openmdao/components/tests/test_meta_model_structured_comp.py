@@ -985,7 +985,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         comp = MetaModelStructuredComp(training_data_gradients=True,
                                        method='cubic',
-                                       num_nodes=3)
+                                       vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
 
@@ -1033,7 +1033,7 @@ class TestRegularGridMap(unittest.TestCase):
         class MMComp(MetaModelStructuredComp):
 
             def setup(self):
-                nn = self.options['num_nodes']
+                nn = self.options['vec_size']
                 self.add_input(name='x', val=np.ones(nn), units=None, training_data=x_bp)
 
                 self.add_output(name='y', val=np.zeros(nn), units=None, training_data=y_data)
@@ -1044,7 +1044,7 @@ class TestRegularGridMap(unittest.TestCase):
         ivc.add_output('x', val=np.linspace(.5, 1.1, nn))
 
         p.model.add_subsystem('ivc', ivc, promotes=['x'])
-        p.model.add_subsystem('MM', MMComp(num_nodes=nn), promotes=['x', 'y'])
+        p.model.add_subsystem('MM', MMComp(vec_size=nn), promotes=['x', 'y'])
 
         p.setup()
 
@@ -1160,7 +1160,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         f = np.sqrt(P1) + P2 * P3
 
         # Create regular grid interpolator instance
-        interp = MetaModelStructuredComp(method='cubic', num_nodes=2)
+        interp = MetaModelStructuredComp(method='cubic', vec_size=2)
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
