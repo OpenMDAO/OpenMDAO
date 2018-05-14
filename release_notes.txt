@@ -7,11 +7,14 @@ New Features:
 --------------
 - Drivers have new `debug_print` option that writes design vars, objective, and constraints to stdout for each iteration.
 - Solvers have new `debug_print` option that will report the initial condition of the solver if it fails to converge.
+- DOEDriver for serial and parallel cases.
+
 
 - SimpleGAdriver will now compute a pop size based on 4*sum(bits) + 1 if pop_size=0
 - New problem methods `<problem>.get_val()` and `<problem>.set_val()` allow the user to specify a unit, and we'll convert to the correct unit (or throw an error if the unit is not compatible).
 - OpenMDAO command line utility now works under MPI.
 - `list_problem_vars()` method on problem will report all design vars, objectives, and constraints.
+
 
 - New Analytic Derivatives Features
     - Major re-write of the Feature documentation on the Core Feature, "Working with Analytic Derivatives."
@@ -20,12 +23,16 @@ New Features:
     - Automatic simultaneous coloring algorithm for separable problems to speed up serial derivatives calculations.
     - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers
 
-- New Components in the Standard Library:
-    - BsplineComp
-    - KSComp
+- New Components in the standard library:
     - CrossProductComp
     - DotProductComp
     - MatrixVectorProductComp
+
+- Updates to existing components in standard library
+    - LinearSystemComp has been vectorized
+    - KSComp has been vectorized
+    - BsplineComp has been vectorized
+
 
 - LinearSystemComp has been vectorized.
 
@@ -51,8 +58,10 @@ Backwards-Compatible API Changes:
 
 Backwards-Incompatible API changes:
 -----------------------------------
-- Re-design of the CaseReader API. Unification of all cases, and simpler iteration over case hierarchies.
 
+- Re-design of the CaseReader API. Unification of all cases, and simpler iteration over case hierarchies.
+- `partial_type` argument for LinearSystemComponent has been removed
+- `maxiter` option from BoundsEnforceLS has been removed
 
 Bug Fixes:
 -----------
@@ -60,6 +69,8 @@ Bug Fixes:
 - Added proper error check for situation when user creates a variable name containing illegal characters.
 - Better error msg when adding objectives or constraints with variables that don't exist under MPI execution.
 - Vectorization for MetaModelUnStructuredComp was super-duper broken. Its fixed now.
+
+
 
 ################################################################################################
 Release Notes for OpenMDAO 2.2.1
