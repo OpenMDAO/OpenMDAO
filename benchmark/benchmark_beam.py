@@ -4,7 +4,6 @@ This benchmark documents a performance problem with data transfers that needs to
 import unittest
 
 from openmdao.api import Problem
-from openmdao.parallel_api import PETScVector
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group_slow import MultipointBeamGroup as MBGSlow
 
@@ -29,7 +28,7 @@ class BenchBeamSlowNP1(unittest.TestCase):
                                      num_elements=num_elements, num_cp=num_cp,
                                      num_load_cases=num_load_cases))
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         prob.run_model()
 
@@ -54,7 +53,7 @@ class BenchBeamSlowNP2(unittest.TestCase):
                                      num_elements=num_elements, num_cp=num_cp,
                                      num_load_cases=num_load_cases))
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         prob.run_model()
 
@@ -79,7 +78,7 @@ class BenchBeamSlowNP4(unittest.TestCase):
                                      num_elements=num_elements, num_cp=num_cp,
                                      num_load_cases=num_load_cases))
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         prob.run_model()
 
@@ -104,7 +103,7 @@ class BenchBeamNP1(unittest.TestCase):
                                                  num_elements=num_elements, num_cp=num_cp,
                                                  num_load_cases=num_load_cases))
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         prob.run_model()
 
@@ -129,7 +128,7 @@ class BenchBeamNP2(unittest.TestCase):
                                                  num_elements=num_elements, num_cp=num_cp,
                                                  num_load_cases=num_load_cases))
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         prob.run_model()
 
@@ -154,6 +153,6 @@ class BenchBeamNP4(unittest.TestCase):
                                                  num_elements=num_elements, num_cp=num_cp,
                                                  num_load_cases=num_load_cases))
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
 
         prob.run_model()

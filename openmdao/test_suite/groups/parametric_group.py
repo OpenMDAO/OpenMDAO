@@ -29,7 +29,7 @@ class ParametericTestGroup(Group):
         self.total_wrt = None
         self.expected_values = None
         self.default_params = {
-            'vector_class': ['default', 'petsc'],
+            'local_vector_class': ['default', 'petsc'],
             'assembled_jac': [True, False],
             'jacobian_type': ['matvec', 'dense', 'sparse-coo', 'sparse-csr',
                               'sparse-csc'],
@@ -37,9 +37,9 @@ class ParametericTestGroup(Group):
 
         super(ParametericTestGroup, self).__init__()
 
-        self.options.declare('vector_class', default='default',
+        self.options.declare('local_vector_class', default='default',
                              values=['default', 'petsc'],
-                             desc='Which vector implementation to use.')
+                             desc='Which local vector implementation to use.')
         self.options.declare('assembled_jac', default=True,
                              types=bool,
                              desc='If an assemebled Jacobian should be used.')

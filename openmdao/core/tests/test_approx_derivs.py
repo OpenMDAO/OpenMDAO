@@ -648,7 +648,7 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         prob = Problem()
         prob.model = FanInSubbedIDVC()
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.model.approx_totals()
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -694,7 +694,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class, mode='fwd')
+        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -727,7 +727,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         sub.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class, mode='fwd')
+        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -771,7 +771,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         sub.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class, mode='fwd')
+        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -818,7 +818,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class)
+        prob.setup(check=False, local_vector_class=vec_class)
         prob.run_model()
         model.run_linearize()
 
@@ -855,7 +855,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         sub2.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class)
+        prob.setup(check=False, local_vector_class=vec_class)
         prob.run_model()
 
         assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
@@ -872,7 +872,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
-        prob.setup(check=False, vector_class=vec_class, mode='rev')
+        prob.setup(check=False, mode='rev', local_vector_class=vec_class)
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
@@ -911,7 +911,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # Had to make this step larger so that solver would reconverge adequately.
         model.approx_totals(method='cs', step=1.0e-1)
 
-        prob.setup(check=False, vector_class=vec_class)
+        prob.setup(check=False, local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 

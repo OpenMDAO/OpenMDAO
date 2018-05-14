@@ -16,11 +16,6 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis2
 
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
-
 
 class SimpleGroup(Group):
 

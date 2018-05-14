@@ -3,11 +3,64 @@ import unittest
 import warnings
 from six import PY3, assertRegex
 
+from openmdao.core.explicitcomponent import ExplicitComponent
+
 
 class TestOptionsDict(unittest.TestCase):
 
     def setUp(self):
         self.dict = OptionsDictionary()
+
+    def test_reprs(self):
+        class MyComp(ExplicitComponent):
+            pass
+
+        my_comp = MyComp()
+
+        self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
+        self.dict.declare('flag', default=False, types=bool)
+        self.dict.declare('comp', default=my_comp, types=ExplicitComponent)
+        self.dict.declare('long_desc', types=str,
+                          desc='This description is long and verbose, so it '
+                               'takes up multiple lines in the options table.')
+
+        self.assertEqual(self.dict.__repr__(), self.dict._dict)
+
+        self.assertEqual(self.dict.__str__(width=83), '\n'.join([
+            "========= ============ ================= ===================== ====================",
+            "Option    Default      Acceptable Values Acceptable Types      Description         ",
+            "========= ============ ================= ===================== ====================",
+            "comp      MyComp       N/A               ['ExplicitComponent']                     ",
+            "flag      False        N/A               ['bool']                                  ",
+            "long_desc **Required** N/A               ['str']               This description is ",
+            "                                                               long and verbose, so",
+            "                                                                it takes up multipl",
+            "                                                               e lines in the optio",
+            "                                                               ns table.",
+            "test      **Required** ['a', 'b']        N/A                   Test integer value  ",
+            "========= ============ ================= ===================== ====================",
+        ]))
+
+        # if the table can't be represented in specified width, then we get the full width version
+        self.assertEqual(self.dict.__str__(width=40), '\n'.join([
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+            "Option    Default      Acceptable Values Acceptable Types      Description          "
+            "                                                                     ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+            "comp      MyComp       N/A               ['ExplicitComponent']                      "
+            "                                                                     ",
+            "flag      False        N/A               ['bool']                                   "
+            "                                                                     ",
+            "long_desc **Required** N/A               ['str']               This description is l"
+            "ong and verbose, so it takes up multiple lines in the options table. ",
+            "test      **Required** ['a', 'b']        N/A                   Test integer value   "
+            "                                                                     ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+        ]))
+
 
     def test_type_checking(self):
         self.dict.declare('test', types=int, desc='Test integer value')
@@ -51,7 +104,7 @@ class TestOptionsDict(unittest.TestCase):
                          "'types' and 'values' were both specified for option 'test3'.")
 
     def test_isvalid(self):
-        self.dict.declare('even_test', types=int, is_valid=lambda x: x%2 == 0)
+        self.dict.declare('even_test', types=int, is_valid=lambda x: x % 2 == 0)
         self.dict['even_test'] = 2
         self.dict['even_test'] = 4
 
@@ -65,7 +118,7 @@ class TestOptionsDict(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
+            self.dict.declare('even_test', type_=int, is_valid=lambda x: x % 2 == 0)
             self.assertEqual(len(w), 1)
             self.assertEqual(str(w[-1].message), "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead.")
 
@@ -185,6 +238,7 @@ class TestOptionsDict(unittest.TestCase):
 
         expected_msg = "\"Option 'test' cannot be found\""
         self.assertEqual(expected_msg, str(context.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,12 +31,8 @@ class ReconfGroup(Group):
         self.add_subsystem('C1', ExecComp('z = 1 / 3. * y + x0'), promotes=['x0'])
         self.add_subsystem('C2', ExecComp('z = 1 / 4. * y + x1'), promotes=['x1'])
 
-        if self.parallel:
-            self.connect('C1.z', 'C2.y')
-            self.connect('C2.z', 'C1.y')
-        else:
-            self.connect('C1.z', 'C2.y', src_indices=[self.comm.rank])
-            self.connect('C2.z', 'C1.y', src_indices=[self.comm.rank])
+        self.connect('C1.z', 'C2.y')
+        self.connect('C2.z', 'C1.y')
 
         self.parallel = not self.parallel
 
@@ -51,7 +47,7 @@ class Test(unittest.TestCase):
         prob.model.add_subsystem('Cx0', IndepVarComp('x0'), promotes=['x0'])
         prob.model.add_subsystem('Cx1', IndepVarComp('x1'), promotes=['x1'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         # First, run with full setup, so ReconfGroup should be a parallel group
         prob['x0'] = 6.

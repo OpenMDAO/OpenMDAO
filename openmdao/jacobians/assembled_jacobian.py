@@ -71,35 +71,6 @@ class AssembledJacobian(Jacobian):
 
         self._subjac_iters = defaultdict(lambda: None)
 
-    def _get_var_range(self, abs_name, type_):
-        """
-        Look up the variable name and <Jacobian> index range.
-
-        Parameters
-        ----------
-        abs_name : str
-            Absolute name of the variable for which we want the index range.
-        type_ : str
-            'input' or 'output'.
-
-        Returns
-        -------
-        int
-            the starting index in the Jacobian.
-        int
-            the ending index in the Jacobian.
-        """
-        system = self._system
-
-        sizes = system._var_sizes['nonlinear'][type_]
-        iproc = system.comm.rank
-        idx = system._var_allprocs_abs2idx['nonlinear'][abs_name]
-
-        ind1 = np.sum(sizes[iproc, :idx])
-        ind2 = ind1 + sizes[iproc, idx]
-
-        return ind1, ind2
-
     def _initialize(self):
         """
         Allocate the global matrices.
@@ -113,18 +84,22 @@ class AssembledJacobian(Jacobian):
         self._int_mtx = int_mtx = self._matrix_class(system.comm)
         ext_mtx = self._matrix_class(system.comm)
 
-        out_ranges = self._out_ranges = {
-            abs_name: self._get_var_range(abs_name, 'output') for abs_name in
-                system._var_allprocs_abs_names['output']
-        }
+        iproc = system.comm.rank
+        abs2idx = system._var_allprocs_abs2idx['nonlinear']
+        sizes = system._var_sizes['nonlinear']['output']
+        out_ranges = self._out_ranges = {}
+        for name in system._var_allprocs_abs_names['output']:
+            start = np.sum(sizes[iproc, :abs2idx[name]])
+            out_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
 
-        in_ranges = self._in_ranges = {
-            abs_name: self._get_var_range(abs_name, 'input') for abs_name in
-                system._var_allprocs_abs_names['input']
-        }
+        sizes = system._var_sizes['nonlinear']['input']
+        in_ranges = self._in_ranges = {}
+        for name in system._var_allprocs_abs_names['input']:
+            start = np.sum(sizes[iproc, :abs2idx[name]])
+            in_ranges[name] = (start, start + sizes[iproc, abs2idx[name]])
 
         abs2prom_out = system._var_abs2prom['output']
-        conns = system._conn_global_abs_in2out
+        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
         keymap = self._keymap
         abs_key2shape = self._abs_key2shape
 
@@ -197,19 +172,24 @@ class AssembledJacobian(Jacobian):
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self._matrix_class(system.comm)
+        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
-        in_offset = {n: self._get_var_range(n, 'input')[0] for n in
-                     system._var_allprocs_abs_names['input']}
+        iproc = self._system.comm.rank
+        sizes = self._system._var_sizes['nonlinear']['input']
+        abs2idx = self._system._var_allprocs_abs2idx['nonlinear']
+        in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
+                     system._var_abs_names['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
+        sizes = self._system._var_sizes['nonlinear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
-                res_offset = self._get_var_range(res_abs_name, 'output')[0]
+                res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
                 res_size = abs2meta[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
-                    if in_abs_name not in system._conn_global_abs_in2out:
+                    if in_abs_name not in conns:
                         abs_key = (res_abs_name, in_abs_name)
 
                         if abs_key not in subjacs_info:
@@ -219,11 +199,10 @@ class AssembledJacobian(Jacobian):
                         ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
                                             in_offset[in_abs_name] - ranges[2], None, shape)
 
-        sizes = system._var_sizes
-        iproc = system.comm.rank
-        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
-
         if ext_mtx._submats:
+            sizes = system._var_sizes
+            iproc = system.comm.rank
+            out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
             in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
@@ -244,7 +223,7 @@ class AssembledJacobian(Jacobian):
         if subjac_iters is None:
             keymap = self._keymap
             seen = set()
-            global_conns = system._conn_global_abs_in2out
+            global_conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
             input_names = system._var_abs_names['input']
 

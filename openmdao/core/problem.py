@@ -176,7 +176,7 @@ class Problem(object):
                 proms = self.model._var_allprocs_prom2abs_list
                 meta = self.model._var_abs2meta
                 if name in meta:
-                    if name in self.model._conn_abs_in2out:
+                    if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
                         val = meta[src_name]['value']
                     else:
@@ -184,7 +184,7 @@ class Problem(object):
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
-                    if abs_name in self.model._conn_abs_in2out:
+                    if isinstance(self.model, Group) and abs_name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[abs_name]
                         # So, if the inputs and outputs are promoted to the same name, then we
                         # allow getitem, but if they aren't, then we raise an error due to non
@@ -494,8 +494,9 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=False, logger=None, mode='rev',
-              force_alloc_complex=False):
+    def setup(self, vector_class=None, check=False, logger=None, mode='rev',
+              force_alloc_complex=False, distributed_vector_class=PETScVector,
+              local_vector_class=DefaultVector):
         """
         Set up the model hierarchy.
 
@@ -507,7 +508,8 @@ class Problem(object):
         Parameters
         ----------
         vector_class : type
-            reference to an actual <Vector> class; not an instance.
+            Reference to an actual <Vector> class; not an instance. This is deprecated. Use
+            distributed_vector_class instead.
         check : boolean
             whether to run config check after setup is complete.
         logger : object
@@ -519,6 +521,12 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
+        distributed_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in interprocess communication.
+        local_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in intraprocess communication.
 
         Returns
         -------
@@ -528,12 +536,20 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        if vector_class is not None:
+            warn_deprecation("'vector_class' has been deprecated. Use "
+                             "'distributed_vector_class' and/or 'local_vector_class' instead.")
+            distributed_vector_class = vector_class
+
         # PETScVector is required for MPI
-        if PETScVector and comm.size > 1 and vector_class is not PETScVector:
-            msg = ("The `vector_class` argument must be `PETScVector` when "
-                   "running in parallel under MPI but '%s' was specified."
-                   % vector_class.__name__)
-            raise ValueError(msg)
+        if comm.size > 1:
+            if PETScVector is None:
+                raise ValueError("Attempting to run in parallel under MPI but PETScVector could not"
+                                 "be imported.")
+            elif distributed_vector_class is not PETScVector:
+                raise ValueError("The `distributed_vector_class` argument must be `PETScVector` "
+                                 "when running in parallel under MPI but '%s' was specified."
+                                 % distributed_vector_class.__name__)
 
         if mode not in ['fwd', 'rev']:
             msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
@@ -543,10 +559,9 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
-        model._setup(model_comm, 'full', mode)
+        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class)
 
         # Cache all args for final setup.
-        self._vector_class = vector_class
         self._check = check
         self._logger = logger
         self._force_alloc_complex = force_alloc_complex
@@ -565,17 +580,9 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        vector_class = self._vector_class
-        force_alloc_complex = self._force_alloc_complex
-
-        self._tot_jac_info_cache = defaultdict(lambda: None)
-
-        comm = self.comm
-        mode = self._mode
-
         if self._setup_status < 2:
-            self.model._final_setup(comm, vector_class, 'full',
-                                    force_alloc_complex=force_alloc_complex)
+            self.model._final_setup(self.comm, 'full',
+                                    force_alloc_complex=self._force_alloc_complex)
 
         self.driver._setup_driver(self)
 
@@ -583,7 +590,7 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if self._check and comm.rank == 0:
+        if self._check and self.comm.rank == 0:
             check_config(self, self._logger)
 
         if self._setup_status < 2:
@@ -610,7 +617,8 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                       method='fd', step=DEFAULT_FD_OPTIONS['step'],
+                       form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False,
                        show_only_incorrect=False):
@@ -637,14 +645,13 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is None.
+            Step size for approximation. Default is the default value of step for the 'fd' method.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
-            the value of DEFAULT_FD_OPTIONS['form']
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            is the default value of step for the 'fd' method.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
+            relative. Default is the default value of step for the 'fd' method.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
@@ -1036,7 +1043,8 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_totals(method=method, **fd_args)
+            model.approx_totals(method=method, step=step, form=form,
+                                step_calc=step_calc if method is 'fd' else None)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
             Jfd = total_info.compute_totals_approx(initialize=True)
 

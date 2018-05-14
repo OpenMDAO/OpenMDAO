@@ -182,7 +182,7 @@ class TestNonlinearBlockJacobiMPI(unittest.TestCase):
 
         prob.driver = AEDriver()
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         handled = prob.run_driver()
         self.assertTrue(handled)

@@ -53,7 +53,7 @@ def find_citations(prob):
     citations = OrderedDict()
     _check_cite(prob, citations)
     _check_cite(prob.driver, citations)
-    _check_cite(prob._vector_class, citations)
+    _check_cite(prob.model._vector_class, citations)
 
     # recurse down the model
     for subsys in prob.model.system_iter(include_self=True, recurse=True):

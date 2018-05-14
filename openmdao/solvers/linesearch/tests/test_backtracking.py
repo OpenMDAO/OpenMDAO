@@ -414,7 +414,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
     def test_error_handling(self):
-        # Make sure the debug_print doen't bomb out.
+        # Make sure the debug_print doesn't bomb out.
 
         class Bad(ExplicitComponent):
 
@@ -464,6 +464,35 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         # Make sure we don't raise an error when we reach the final debug print.
         top.run_model()
 
+    def test_undeclared_options(self):
+        # Test that using options that should not exist in class, cause an
+        # error if they are set when instantiating BoundsEnforceLS.
+        # atol, rtol, maxiter, and err_on_maxiter are not used in BoundsEnforceLS
+
+        top = self.top
+
+        with self.assertRaises(KeyError) as context:
+            top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', atol=1.0)
+
+        self.assertEqual(str(context.exception), "\"Key 'atol' cannot be set because it "
+                                                 "has not been declared.\"")
+
+        with self.assertRaises(KeyError) as context:
+            top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', rtol=2.0)
+
+        self.assertEqual(str(context.exception), "\"Key 'rtol' cannot be set because it "
+                                                 "has not been declared.\"")
+
+        with self.assertRaises(KeyError) as context:
+            top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', maxiter=1)
+
+        self.assertEqual(str(context.exception), "\"Key 'maxiter' cannot be set because it "
+                                                 "has not been declared.\"")
+        with self.assertRaises(KeyError) as context:
+            top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar', err_on_maxiter=True)
+
+        self.assertEqual(str(context.exception), "\"Key 'err_on_maxiter' cannot be set because it "
+                                                 "has not been declared.\"")
 
 class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 

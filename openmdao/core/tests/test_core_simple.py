@@ -2,13 +2,9 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector, PETScVector
 from openmdao.utils.assert_utils import assert_rel_error
 
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
 
 #      (A) -> x
 # x -> (B) -> f
@@ -114,7 +110,7 @@ class TestPETScVec(Test):
     def setUp(self):
         group = GroupG()
         group.add_subsystems()
-        self.p = Problem(group).setup(PETScVector)
+        self.p = Problem(group).setup(local_vector_class=PETScVector)
         self.p.set_solver_print(level=0)
         self.p.final_setup()
 
