@@ -162,7 +162,7 @@ class OptionsDictionary(object):
         desc_len = width - desc_col
 
         # if it won't fit in allowed width, just return the rST
-        if desc_len < 0:
+        if desc_len < 10:
             return '\n'.join(rst)
 
         text = []
