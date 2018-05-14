@@ -1,5 +1,5 @@
 ################################################################################################
-Release Notes for OpenMDAO 2.3
+Release Notes for OpenMDAO 2.3.0
 
 May 14, 2018
 
@@ -38,9 +38,9 @@ New Features:
 
 Backwards-Compatible API Changes:
 -----------------------------------
-- Changed all instances of `metadata` to `options`. <system>.metadata has now been deprecated
+- Changed all instances of `metadata` to `options`. `<system>.metadata` has now been deprecated
 
-- Class Name changes to components, so all end in "Comp" (old class names were deprecated):
+- Class name changes to Components, so all end in "Comp" (old class names have been deprecated):
     - MetaModelStructured -> MetaModelStructuredComp
     - MetaModelUnStructured -> MetaModelUnStructuredComp
     - MultiFiMetaModelUnStructured -> MultiFiMetaModelUnStructuredComp
@@ -51,7 +51,7 @@ Backwards-Compatible API Changes:
 
 Backwards-Incompatible API changes:
 -----------------------------------
-- Redesign of the CaseReader API. Unification of all cases, and simpler iteration over case hierarchies.
+- Re-design of the CaseReader API. Unification of all cases, and simpler iteration over case hierarchies.
 
 
 Bug Fixes:
