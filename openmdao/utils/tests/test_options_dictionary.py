@@ -26,7 +26,6 @@ class TestOptionsDict(unittest.TestCase):
 
         self.assertEqual(self.dict.__repr__(), self.dict._dict)
 
-        print(self.dict.__str__(width=83))
         self.assertEqual(self.dict.__str__(width=83), '\n'.join([
             "========= ============ ================= ===================== ====================",
             "Option    Default      Acceptable Values Acceptable Types      Description         ",
