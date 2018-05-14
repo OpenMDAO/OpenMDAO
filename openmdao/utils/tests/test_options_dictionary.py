@@ -12,7 +12,10 @@ class TestOptionsDict(unittest.TestCase):
         self.dict = OptionsDictionary()
 
     def test_reprs(self):
-        my_comp = ExplicitComponent()
+        class MyComp(ExplicitComponent):
+            pass
+
+        my_comp = MyComp()
 
         self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
         self.dict.declare('flag', default=False, types=bool)
@@ -23,41 +26,40 @@ class TestOptionsDict(unittest.TestCase):
 
         self.assertEqual(self.dict.__repr__(), self.dict._dict)
 
-        self.assertEqual(self.dict.__str__(width=84), '\n'.join([
-            "========= ================= ================= ===================== ================",
-            "Option    Default           Acceptable Values Acceptable Types      Description     ",
-            "========= ================= ================= ===================== ================",
-            "comp      ExplicitComponent N/A               ['ExplicitComponent']                 ",
-            "flag      False             N/A               ['bool']                              ",
-            "long_desc **Required**      N/A               ['str']               This description",
-            "                                                                     is long and ver",
-            "                                                                    bose, so it take",
-            "                                                                    s up multiple li",
-            "                                                                    nes in the optio",
-            "                                                                    ns table.",
-            "test      **Required**      ['a', 'b']        N/A                   Test integer val",
-            "                                                                    ue",
-            "========= ================= ================= ===================== ================",
+        print(self.dict.__str__(width=83))
+        self.assertEqual(self.dict.__str__(width=83), '\n'.join([
+            "========= ============ ================= ===================== ====================",
+            "Option    Default      Acceptable Values Acceptable Types      Description         ",
+            "========= ============ ================= ===================== ====================",
+            "comp      MyComp       N/A               ['ExplicitComponent']                     ",
+            "flag      False        N/A               ['bool']                                  ",
+            "long_desc **Required** N/A               ['str']               This description is ",
+            "                                                               long and verbose, so",
+            "                                                                it takes up multipl",
+            "                                                               e lines in the optio",
+            "                                                               ns table.",
+            "test      **Required** ['a', 'b']        N/A                   Test integer value  ",
+            "========= ============ ================= ===================== ====================",
         ]))
 
         # if the table can't be represented in specified width, then we get the full width version
         self.assertEqual(self.dict.__str__(width=40), '\n'.join([
-            "========= ================= ================= ===================== ================"
-            "========================================================================= ",
-            "Option    Default           Acceptable Values Acceptable Types      Description     "
-            "                                                                          ",
-            "========= ================= ================= ===================== ================"
-            "========================================================================= ",
-            "comp      ExplicitComponent N/A               ['ExplicitComponent']                 "
-            "                                                                          ",
-            "flag      False             N/A               ['bool']                              "
-            "                                                                          ",
-            "long_desc **Required**      N/A               ['str']               This description"
-            " is long and verbose, so it takes up multiple lines in the options table. ",
-            "test      **Required**      ['a', 'b']        N/A                   Test integer val"
-            "ue                                                                        ",
-            "========= ================= ================= ===================== ================"
-            "========================================================================= ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+            "Option    Default      Acceptable Values Acceptable Types      Description          "
+            "                                                                     ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+            "comp      MyComp       N/A               ['ExplicitComponent']                      "
+            "                                                                     ",
+            "flag      False        N/A               ['bool']                                   "
+            "                                                                     ",
+            "long_desc **Required** N/A               ['str']               This description is l"
+            "ong and verbose, so it takes up multiple lines in the options table. ",
+            "test      **Required** ['a', 'b']        N/A                   Test integer value   "
+            "                                                                     ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
         ]))
 
 
