@@ -40,6 +40,27 @@ class TestOptionsDict(unittest.TestCase):
             "========= ================= ================= ===================== ================",
         ]))
 
+        # if the table can't be represented in specified width, then we get the full width version
+        self.assertEqual(self.dict.__str__(width=40), '\n'.join([
+            "========= ================= ================= ===================== ================"
+            "========================================================================= ",
+            "Option    Default           Acceptable Values Acceptable Types      Description     "
+            "                                                                          ",
+            "========= ================= ================= ===================== ================"
+            "========================================================================= ",
+            "comp      ExplicitComponent N/A               ['ExplicitComponent']                 "
+            "                                                                          ",
+            "flag      False             N/A               ['bool']                              "
+            "                                                                          ",
+            "long_desc **Required**      N/A               ['str']               This description"
+            " is long and verbose, so it takes up multiple lines in the options table. ",
+            "test      **Required**      ['a', 'b']        N/A                   Test integer val"
+            "ue                                                                        ",
+            "========= ================= ================= ===================== ================"
+            "========================================================================= ",
+        ]))
+
+
     def test_type_checking(self):
         self.dict.declare('test', types=int, desc='Test integer value')
 
