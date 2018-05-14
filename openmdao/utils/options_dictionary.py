@@ -41,7 +41,7 @@ class OptionsDictionary(object):
 
     def __repr__(self):
         """
-        Returns a dictionary representation of the options.
+        Return a dictionary representation of the options.
 
         Returns
         -------
@@ -119,7 +119,7 @@ class OptionsDictionary(object):
             size = max_sizes[j]
             space = size - len(head)
             if space > 0:
-                titles += space*' '
+                titles += space * ' '
 
         lines.append(header)
         lines.append(titles)
@@ -133,7 +133,7 @@ class OptionsDictionary(object):
                 size = max_sizes[j]
                 space = size - len(str(item))
                 if space > 0:
-                    line += space*' '
+                    line += space * ' '
 
             lines.append(line)
             n += 1
@@ -144,7 +144,7 @@ class OptionsDictionary(object):
 
     def __str__(self, width=100):
         """
-        Generate string representation of the options table.
+        Generate text string representation of the options table.
 
         Parameters
         ----------
@@ -154,7 +154,7 @@ class OptionsDictionary(object):
         Returns
         -------
         str
-            A rendition of the options as text.
+            A text representation of the options table.
         """
         rst = self.__rst__()
         cols = [len(header) for header in rst[0].split()]
@@ -168,7 +168,7 @@ class OptionsDictionary(object):
                 if not row.startswith('==='):
                     row = row[width:].rstrip()
                     while(len(row) > 0):
-                        text.append(' '*desc_col + row[:desc_len])
+                        text.append(' ' * desc_col + row[:desc_len])
                         row = row[desc_len:]
             else:
                 text.append(row)
