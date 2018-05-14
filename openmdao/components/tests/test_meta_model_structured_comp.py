@@ -760,8 +760,8 @@ class TestRegularGridInterpolator(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             interp = _RegularGridInterp(points, values.tolist(), method='junk')
 
-        msg = ('Method "junk" is not defined. Valid methods are "quintic", "slinear", "cubic".')
-        self.assertEqual(str(cm.exception), msg)
+        msg = ('Method "junk" is not defined. Valid methods are')
+        self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
             interp = _RegularGridInterp(points, values.tolist()[1])
@@ -804,8 +804,8 @@ class TestRegularGridInterpolator(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             computed = interp(x, method='junk')
 
-        msg = ('Method "junk" is not defined. Valid methods are "quintic", "slinear", "cubic".')
-        self.assertEqual(str(cm.exception), msg)
+        msg = ('Method "junk" is not defined. Valid methods are')
+        self.assertTrue(str(cm.exception).startswith(msg))
 
         self.assertEqual(set(interp.methods()), set(["quintic", "cubic", "slinear"]))
 
