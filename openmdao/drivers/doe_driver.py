@@ -66,7 +66,7 @@ class DOEDriver(Driver):
         Parameters
         ----------
         generator : DOEGenerator or None
-            The case generator.
+            The case generator. If None, no cases will be generated.
 
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
