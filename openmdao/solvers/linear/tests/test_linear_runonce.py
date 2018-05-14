@@ -44,6 +44,27 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
+    def test_undeclared_options(self):
+        # Test that using options that should not exist in class, cause an
+        # error if they are set when instantiating LinearRunOnce.
+        # atol and rtol are not used in LinearRunOnce
+        from openmdao.api import Problem, Group, LinearRunOnce
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        with self.assertRaises(KeyError) as context:
+            model.linear_solver = LinearRunOnce(atol=1.0)
+
+        self.assertEqual(str(context.exception), "\"Key 'atol' cannot be set because it "
+                                                 "has not been declared.\"")
+
+        with self.assertRaises(KeyError) as context:
+            model.linear_solver = LinearRunOnce(rtol=1.0)
+
+        self.assertEqual(str(context.exception), "\"Key 'rtol' cannot be set because it "
+                                                 "has not been declared.\"")
+
     def test_feature_solver(self):
         from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
         from openmdao.test_suite.components.paraboloid import Paraboloid

@@ -259,10 +259,10 @@ class LGLFit(ExplicitComponent):
     an approximation of arclength.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', types=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.x_lgl, self.w_lgl = lgl(n)
 
@@ -288,10 +288,10 @@ class LGLFit(ExplicitComponent):
 class DefectComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', types=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.add_input('y_truth', val=np.zeros(n-1), desc='actual values at midpoint nodes')
         self.add_input('y_approx', val=np.zeros(n-1), desc='interpolated values at midpoint nodes')
@@ -308,10 +308,10 @@ class DefectComp(ExplicitComponent):
 class ArcLengthFunction(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', types=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.add_input('yp_lgl', val=np.zeros(n), desc='approximated derivative at LGL nodes')
         self.add_output('f_arclength', val=np.zeros(n), desc='The integrand of the arclength function')
@@ -332,10 +332,10 @@ class ArcLengthQuadrature(ExplicitComponent):
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', types=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.add_input('f_arclength', val=np.zeros(n), desc='The integrand of the arclength function')
         self.add_output('arclength', val=0.0, desc='The integrated arclength')
@@ -352,7 +352,7 @@ class ArcLengthQuadrature(ExplicitComponent):
         self.declare_partials(of='arclength', wrt='f_arclength', dependent=True, val=da_df)
 
     def compute(self, inputs, outputs):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         f = inputs['f_arclength']
 
@@ -363,10 +363,10 @@ class ArcLengthQuadrature(ExplicitComponent):
 class Phase(Group):
 
     def initialize(self):
-        self.metadata.declare('order', types=int, default=10)
+        self.options.declare('order', types=int, default=10)
 
     def setup(self):
-        order = self.metadata['order']
+        order = self.options['order']
         n = order + 1
 
         # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
@@ -403,19 +403,19 @@ class Phase(Group):
 class Summer(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('n_phases', types=int)
+        self.options.declare('n_phases', types=int)
 
     def setup(self):
         self.add_output('total_arc_length')
 
-        for i in range(self.metadata['n_phases']):
+        for i in range(self.options['n_phases']):
             i_name = 'arc_length:p%d' % i
             self.add_input(i_name)
             self.declare_partials('total_arc_length', i_name, val=1.)
 
     def compute(self, inputs, outputs):
         outputs['total_arc_length'] = 0
-        for i in range(self.metadata['n_phases']):
+        for i in range(self.options['n_phases']):
             outputs['total_arc_length'] += inputs['arc_length:p%d' % i]
 
 def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
@@ -489,6 +489,80 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
 
 
 class MatMatTestCase(unittest.TestCase):
+
+
+    def test_feature_vectorized_derivs(self):
+        import numpy as np
+        from openmdao.api import ExplicitComponent, ExecComp, IndepVarComp, Problem, ScipyOptimizeDriver
+
+        SIZE = 5
+
+        class ExpensiveAnalysis(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('x', val=np.ones(SIZE))
+                self.add_input('y', val=np.ones(SIZE))
+
+                self.add_output('f', shape=1)
+
+                self.declare_partials('f', 'x')
+                self.declare_partials('f', 'y')
+
+            def compute(self, inputs, outputs):
+
+                outputs['f'] = np.sum(inputs['x']**inputs['y'])
+
+            def compute_partials(self, inputs, J):
+
+                J['f', 'x'] = inputs['y']*inputs['x']**(inputs['y']-1)
+                J['f', 'y'] = (inputs['x']**inputs['y'])*np.log(inputs['x'])
+
+        class CheapConstraint(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('y', val=np.ones(SIZE))
+                self.add_output('g', shape=SIZE)
+
+                row_col = np.arange(SIZE, dtype=int)
+                self.declare_partials('g', 'y', rows=row_col, cols=row_col)
+
+                self.limit = 2*np.arange(SIZE)
+
+            def compute(self, inputs, outputs):
+
+                outputs['g'] = inputs['y']**2 - self.limit
+
+            def compute_partials(self, inputs, J):
+
+                J['g', 'y'] = 2*inputs['y']
+
+
+        p = Problem()
+
+        dvs = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dvs.add_output('x', 2*np.ones(SIZE))
+        dvs.add_output('y', 2*np.ones(SIZE))
+
+        p.model.add_subsystem('obj', ExpensiveAnalysis(), promotes=['x', 'y', 'f'])
+        p.model.add_subsystem('constraint', CheapConstraint(), promotes=['y', 'g'])
+
+        p.model.add_design_var('x', lower=.1, upper=10000)
+        p.model.add_design_var('y', lower=-1000, upper=10000)
+        p.model.add_constraint('g', upper=0, vectorize_derivs=True)
+        p.model.add_objective('f')
+
+
+        p.setup(mode='rev')
+
+        p.run_model()
+
+        p.driver = ScipyOptimizeDriver()
+        p.run_driver()
+
+        assert_rel_error(self, p['x'], [0.10000691, 0.1, 0.1, 0.1, 0.1], 1e-5)
+        assert_rel_error(self, p['y'], [0, 1.41421, 2.0, 2.44948, 2.82842], 1e-5)
 
     def test_simple_multi_fwd(self):
         p, expected = simple_model(order=20, vectorize=True)

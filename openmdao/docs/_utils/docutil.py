@@ -369,7 +369,7 @@ def is_output_node(node):
     output_functions = [
         'setup', 'run_model', 'run_driver',
         'check_partials', 'check_totals',
-        'list_inputs', 'list_outputs',
+        'list_inputs', 'list_outputs', 'list_problem_vars'
     ]
 
     if node.type == 'atomtrailers' and len(node.value) in (3, 4):
@@ -437,6 +437,7 @@ def insert_output_start_stop_indicators(src):
                        '.check_totals(',
                        '.list_inputs(',
                        '.list_outputs(',
+                       '.list_problem_vars(',
                        ]
 
     newlines = []

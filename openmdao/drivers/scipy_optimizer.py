@@ -6,7 +6,6 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
-
 from six import itervalues, iteritems, reraise
 from six.moves import range
 
@@ -15,6 +14,7 @@ from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
+import openmdao.utils.coloring as coloring_mod
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -53,17 +53,6 @@ class ScipyOptimizeDriver(Driver):
         equality_constraints
         inequality_constraints
 
-    Options
-    -------
-    options['disp'] :  bool(True)
-        Set to False to prevent printing of Scipy convergence messages
-    options['maxiter'] : int(200)
-        Maximum number of iterations.
-    options['optimizer'] : str('SLSQP')
-        Name of optimizer to use
-    options['tol'] :  float(1e-06)
-        Tolerance for termination. For detailed control, use solver-specific options.
-
     Attributes
     ----------
     fail : bool
@@ -97,11 +86,16 @@ class ScipyOptimizeDriver(Driver):
         for all except linear constraints.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize the ScipyOptimizeDriver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
-        super(ScipyOptimizeDriver, self).__init__()
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -114,17 +108,6 @@ class ScipyOptimizeDriver(Driver):
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
-
-        # User Options
-        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
-                             desc='Name of optimizer to use')
-        self.options.declare('tol', 1.0e-6, lower=0.0,
-                             desc='Tolerance for termination. For detailed '
-                             'control, use solver-specific options.')
-        self.options.declare('maxiter', 200, lower=0,
-                             desc='Maximum number of iterations.')
-        self.options.declare('disp', True,
-                             desc='Set to False to prevent printing of Scipy convergence messages')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -141,6 +124,25 @@ class ScipyOptimizeDriver(Driver):
         self._exc_info = None
 
         self.cite = CITATIONS
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
+                             desc='Name of optimizer to use')
+        self.options.declare('tol', 1.0e-6, lower=0.0,
+                             desc='Tolerance for termination. For detailed '
+                             'control, use solver-specific options.')
+        self.options.declare('maxiter', 200, lower=0,
+                             desc='Maximum number of iterations.')
+        self.options.declare('disp', True,
+                             desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
     def _get_name(self):
         """
@@ -200,9 +202,11 @@ class ScipyOptimizeDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        problem = self._problem
         opt = self.options['optimizer']
-        model = self._problem.model
+        model = problem.model
         self.iter_count = 0
+        self._total_jac = None
 
         # Initial Run
         model._solve_nonlinear()
@@ -316,6 +320,10 @@ class ScipyOptimizeDriver(Driver):
             jac = self._gradfunc
         else:
             jac = None
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            coloring_mod.dynamic_simul_coloring(self)
 
         # optimize
         try:

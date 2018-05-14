@@ -7,7 +7,8 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS
+                         ImplicitComponent, NonlinearBlockGS, CSCJacobian, DirectSolver, ExecComp, \
+                         ScipyKrylov, CSCJacobian, NewtonSolver
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -17,12 +18,10 @@ from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 
-if MPI:
-    from openmdao.api import PETScVector
-    vector_class = PETScVector
-else:
-    from openmdao.api import DefaultVector
-    vector_class = DefaultVector
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class ParaboloidTricky(ExplicitComponent):
@@ -1865,8 +1864,101 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fwd'], [[0.0, 1.0]], 1e-5)
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
+    def test_bug_fd_with_sparse(self):
+        # This bug was found via the x57 model in pointer.
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+        class TimeComp(ExplicitComponent):
+
+            def setup(self):
+                self.node_ptau = node_ptau = np.array([-1., 0., 1.])
+
+                self.add_input('t_duration', val=1.)
+                self.add_output('time', shape=len(node_ptau))
+
+                # Setup partials
+                nn = 3
+                rs = np.arange(nn)
+                cs = np.zeros(nn)
+
+                self.declare_partials(of='time', wrt='t_duration', rows=rs, cols=cs, val=1.0)
+
+            def compute(self, inputs, outputs):
+                node_ptau = self.node_ptau
+                t_duration = inputs['t_duration']
+
+                outputs['time'][:] = 0.5 * (node_ptau + 33) * t_duration
+
+            def compute_partials(self, inputs, jacobian):
+                node_ptau = self.node_ptau
+
+                jacobian['time', 't_duration'] = 0.5 * (node_ptau + 33)
+
+
+        class CellComp(ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('num_nodes', types=int)
+
+            def setup(self):
+                n = self.options['num_nodes']
+
+                self.add_input('I_Li', val=3.25*np.ones(n))
+                self.add_output('zSOC', val=np.ones(n))
+
+                # Partials
+                ar = np.arange(n)
+                self.declare_partials(of='zSOC', wrt='I_Li', rows=ar, cols=ar)
+
+            def compute(self, inputs, outputs):
+                I_Li = inputs['I_Li']
+                outputs['zSOC'] = -I_Li / (3600.0)
+
+            def compute_partials(self, inputs, partials):
+                partials['zSOC', 'I_Li'] = -1./(3600.0)
+
+
+        class GaussLobattoPhase(Group):
+
+            def setup(self):
+                self.connect('t_duration', 'time.t_duration')
+
+                indep = IndepVarComp()
+                indep.add_output('t_duration', val=1.0)
+                self.add_subsystem('time_extents', indep, promotes_outputs=['*'])
+                self.add_design_var('t_duration', 5.0, 25.0)
+
+                time_comp = TimeComp()
+                self.add_subsystem('time', time_comp, promotes_outputs=['time'])
+
+                self.add_subsystem(name='cell', subsys=CellComp(num_nodes=3))
+
+                self.linear_solver = ScipyKrylov()
+                self.nonlinear_solver = NewtonSolver()
+                self.nonlinear_solver.options['maxiter'] = 1
+
+            def initialize(self):
+                self.options.declare('ode_class', desc='System defining the ODE.')
+
+
+        p = Problem(model=GaussLobattoPhase())
+
+        p.model.add_objective('time', index=-1)
+
+        p.model.jacobian = CSCJacobian()
+        p.model.linear_solver=ScipyKrylov()
+
+        p.setup(mode='fwd')
+        p.set_solver_print(level=0)
+        p.run_model()
+
+        # Make sure we don't bomb out with an error.
+        J = p.check_totals(out_stream=None)
+
+        assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+
+
+@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -1876,7 +1968,7 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         prob = Problem()
         group = prob.model = FanInSubbedIDVC()
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.set_solver_print(level=0)
         prob.run_model()
 

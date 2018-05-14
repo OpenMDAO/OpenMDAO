@@ -447,9 +447,9 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = LinearBlockGS()
         sup.linear_solver = LinearBlockGS()
 
-        sub1.jacobian = DenseJacobian()
+        sub1.jacobian = CSCJacobian()
         sub1.linear_solver = DirectSolver()
-        sub2.jacobian = DenseJacobian()
+        sub2.jacobian = CSCJacobian()
         sub2.linear_solver = DirectSolver()
         prob.set_solver_print(level=0)
 
@@ -544,7 +544,7 @@ class TestJacobian(unittest.TestCase):
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
-    def test_assembled_jacobian_submat_indexing(self):
+    def test_assembled_jacobian_submat_indexing_dense(self):
         prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp())
         indeps.add_output('x', 1.0)
@@ -558,6 +558,39 @@ class TestJacobian(unittest.TestCase):
         prob.model.nonlinear_solver = NewtonSolver()
         G1.jacobian = DenseJacobian()
         G1.linear_solver = DirectSolver()
+
+        # before the fix, we got bad offsets into the _ext_mtx matrix.
+        # to get entries in _ext_mtx, there must be at least one connection
+        # to an input in the system that owns the AssembledJacobian, from
+        # a source that is outside of that system. In this case, the 'indeps'
+        # system is outside of the 'G1' group which owns the AssembledJacobian.
+        prob.model.connect('indeps.y', 'G1.C1.x')
+        prob.model.connect('indeps.z', 'G1.C2.x')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        assert_rel_error(self, prob['G1.C1.y'], 50.0)
+        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+
+    def test_assembled_jacobian_submat_indexing_csc(self):
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        indeps.add_output('x', 1.0)
+        indeps.add_output('y', 5.0)
+        indeps.add_output('z', 9.0)
+
+        G1 = prob.model.add_subsystem('G1', Group())
+        G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
+        G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
+
+        #prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.jacobian = DenseJacobian()
+        prob.model.linear_solver = DirectSolver()
+
+        G1.jacobian = CSCJacobian()
+        G1.linear_solver = DirectSolver()
+        G1.nonlinear_solver = NewtonSolver()
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection

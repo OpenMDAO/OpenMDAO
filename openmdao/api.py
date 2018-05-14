@@ -11,14 +11,25 @@ from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.external_code import ExternalCode
+from openmdao.components.bsplines_comp import BsplinesComp
+from openmdao.components.cross_product_comp import CrossProductComp
+from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.exec_comp import ExecComp
+from openmdao.components.external_code_comp import ExternalCode
+from openmdao.components.external_code_comp import ExternalCodeComp
+from openmdao.components.ks_comp import KSComp
+from openmdao.components.ks_comp import KSComponent
 from openmdao.components.linear_system_comp import LinearSystemComp
-from openmdao.components.meta_model_unstructured import MetaModelUnStructured
-from openmdao.components.multifi_meta_model import MultiFiMetaModelUnStructured
-from openmdao.components.meta_model_structured import MetaModelStructured
-from openmdao.components.meta_model_unstructured import MetaModel
-from openmdao.components.multifi_meta_model import MultiFiMetaModel
+from openmdao.components.matrix_vector_product_comp import MatrixVectorProductComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructured
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.components.meta_model_unstructured_comp import MetaModel
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured
+from openmdao.components.multifi_meta_model_unstructured_comp \
+    import MultiFiMetaModelUnStructuredComp
+
 
 # Solvers
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
@@ -68,6 +79,9 @@ except ImportError:
     pass
 from openmdao.drivers.scipy_optimizer import ScipyOptimizer, ScipyOptimizeDriver
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
+from openmdao.drivers.doe_driver import DOEDriver
+from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGenerator, \
+    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary

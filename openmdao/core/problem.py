@@ -24,7 +24,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.mpi import FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.units import get_conversion
 from openmdao.vectors.default_vector import DefaultVector
@@ -176,7 +176,7 @@ class Problem(object):
                 proms = self.model._var_allprocs_prom2abs_list
                 meta = self.model._var_abs2meta
                 if name in meta:
-                    if name in self.model._conn_abs_in2out:
+                    if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
                         val = meta[src_name]['value']
                     else:
@@ -184,7 +184,7 @@ class Problem(object):
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
-                    if abs_name in self.model._conn_abs_in2out:
+                    if isinstance(self.model, Group) and abs_name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[abs_name]
                         # So, if the inputs and outputs are promoted to the same name, then we
                         # allow getitem, but if they aren't, then we raise an error due to non
@@ -494,8 +494,9 @@ class Problem(object):
         """
         self.driver.cleanup()
 
-    def setup(self, vector_class=DefaultVector, check=False, logger=None, mode='rev',
-              force_alloc_complex=False):
+    def setup(self, vector_class=None, check=False, logger=None, mode='rev',
+              force_alloc_complex=False, distributed_vector_class=PETScVector,
+              local_vector_class=DefaultVector):
         """
         Set up the model hierarchy.
 
@@ -507,7 +508,8 @@ class Problem(object):
         Parameters
         ----------
         vector_class : type
-            reference to an actual <Vector> class; not an instance.
+            Reference to an actual <Vector> class; not an instance. This is deprecated. Use
+            distributed_vector_class instead.
         check : boolean
             whether to run config check after setup is complete.
         logger : object
@@ -519,6 +521,12 @@ class Problem(object):
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
             after a reconfiguration) you may need to set this to True.
+        distributed_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in interprocess communication.
+        local_vector_class : type
+            Reference to the <Vector> class or factory function used to instantiate vectors
+            and associated transfers involved in intraprocess communication.
 
         Returns
         -------
@@ -528,12 +536,20 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        if vector_class is not None:
+            warn_deprecation("'vector_class' has been deprecated. Use "
+                             "'distributed_vector_class' and/or 'local_vector_class' instead.")
+            distributed_vector_class = vector_class
+
         # PETScVector is required for MPI
-        if PETScVector and comm.size > 1 and vector_class is not PETScVector:
-            msg = ("The `vector_class` argument must be `PETScVector` when "
-                   "running in parallel under MPI but '%s' was specified."
-                   % vector_class.__name__)
-            raise ValueError(msg)
+        if comm.size > 1:
+            if PETScVector is None:
+                raise ValueError("Attempting to run in parallel under MPI but PETScVector could not"
+                                 "be imported.")
+            elif distributed_vector_class is not PETScVector:
+                raise ValueError("The `distributed_vector_class` argument must be `PETScVector` "
+                                 "when running in parallel under MPI but '%s' was specified."
+                                 % distributed_vector_class.__name__)
 
         if mode not in ['fwd', 'rev']:
             msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
@@ -541,10 +557,11 @@ class Problem(object):
 
         self._mode = mode
 
-        model._setup(comm, 'full', mode)
+        model_comm = self.driver._setup_comm(comm)
+
+        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class)
 
         # Cache all args for final setup.
-        self._vector_class = vector_class
         self._check = check
         self._logger = logger
         self._force_alloc_complex = force_alloc_complex
@@ -563,17 +580,9 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        vector_class = self._vector_class
-        force_alloc_complex = self._force_alloc_complex
-
-        self._tot_jac_info_cache = defaultdict(lambda: None)
-
-        comm = self.comm
-        mode = self._mode
-
         if self._setup_status < 2:
-            self.model._final_setup(comm, vector_class, 'full',
-                                    force_alloc_complex=force_alloc_complex)
+            self.model._final_setup(self.comm, 'full',
+                                    force_alloc_complex=self._force_alloc_complex)
 
         self.driver._setup_driver(self)
 
@@ -581,7 +590,7 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if self._check and comm.rank == 0:
+        if self._check and self.comm.rank == 0:
             check_config(self, self._logger)
 
         if self._setup_status < 2:
@@ -608,7 +617,8 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
                        abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=None, form=DEFAULT_FD_OPTIONS['form'],
+                       method='fd', step=DEFAULT_FD_OPTIONS['step'],
+                       form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
                        force_dense=True, suppress_output=False,
                        show_only_incorrect=False):
@@ -635,14 +645,13 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is None.
+            Step size for approximation. Default is the default value of step for the 'fd' method.
         form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. The
-            default value is the value of DEFAULT_FD_OPTIONS['form']. Default is
-            the value of DEFAULT_FD_OPTIONS['form']
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            is the default value of step for the 'fd' method.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. The default value is the value of DEFAULT_FD_OPTIONS['step_calc']
+            relative. Default is the default value of step for the 'fd' method.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         suppress_output : bool
@@ -703,11 +712,12 @@ class Problem(object):
             model._outputs.set_vec(output_cache)
             # Make sure we're in a valid state
             model.run_apply_nonlinear()
-            model.run_linearize()
 
             jac_key = 'J_' + mode
 
             for comp in comps:
+
+                comp.run_linearize()
 
                 # Skip IndepVarComps
                 if isinstance(comp, IndepVarComp):
@@ -1033,7 +1043,8 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
-            model.approx_totals(method=method, **fd_args)
+            model.approx_totals(method=method, step=step, form=form,
+                                step_calc=step_calc if method is 'fd' else None)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
             Jfd = total_info.compute_totals_approx(initialize=True)
 
@@ -1054,7 +1065,7 @@ class Problem(object):
                                   {'': fd_args}, totals=True, suppress_output=suppress_output)
         return data['']
 
-    def compute_totals(self, of=None, wrt=None, return_format='flat_dict'):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1070,6 +1081,8 @@ class Problem(object):
             Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).
+        debug_print : bool
+            Set to True to print out some debug information during linear solve.
 
         Returns
         -------
@@ -1084,7 +1097,8 @@ class Problem(object):
                 total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
                 return total_info.compute_totals_approx(initialize=True)
             else:
-                total_info = _TotalJacInfo(self, of, wrt, False, return_format)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+                                           debug_print=debug_print)
                 return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1108,6 +1122,194 @@ class Problem(object):
             self._solver_print_cache.append((level, depth, type_))
 
         self.model._set_solver_print(level=level, depth=depth, type_=type_)
+
+    def list_problem_vars(self,
+                          show_promoted_name=True,
+                          print_arrays=False,
+                          desvar_opts=[],
+                          cons_opts=[],
+                          objs_opts=[],
+                          ):
+        """
+        Print all design variables and responses (objectives and constraints).
+
+        Parameters
+        ----------
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        desvar_opts : list of str
+            List of optional columns to be displayed in the desvars table.
+            Allowed values are:
+            ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
+            'vectorize_derivs', 'simul_coloring', 'cache_linear_solution']
+        cons_opts : list of str
+            List of optional columns to be displayed in the cons table.
+            Allowed values are:
+            ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
+            'linear', 'parallel_deriv_color', 'vectorize_derivs', 'simul_coloring', 'simul_map',
+            'cache_linear_solution']
+        objs_opts : list of str
+            List of optional columns to be displayed in the objs table.
+            Allowed values are:
+            ['ref', 'ref0', 'indices', 'adder', 'scaler',
+            'parallel_deriv_color', 'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+            'cache_linear_solution']
+
+        """
+        default_col_names = ['name', 'value', 'size']
+
+        # Design vars
+        desvars = self.model.get_design_vars()
+        header = "Design Variables"
+        col_names = default_col_names + desvar_opts
+        self._write_var_info_table(header, col_names, desvars,
+                                   show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+        # Constraints
+        cons = self.model.get_constraints()
+        header = "Constraints"
+        col_names = default_col_names + cons_opts
+        self._write_var_info_table(header, col_names, cons, show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+        objs = self.model.get_objectives()
+        header = "Objectives"
+        col_names = default_col_names + objs_opts
+        self._write_var_info_table(header, col_names, objs, show_promoted_name=show_promoted_name,
+                                   print_arrays=print_arrays,
+                                   col_spacing=2)
+
+    def _write_var_info_table(self, header, col_names, vars, print_arrays=False,
+                              show_promoted_name=True, col_spacing=1):
+        """
+        Write a table of information for the data in vars.
+
+        Parameters
+        ----------
+        header : str
+            The header line for the table.
+        col_names : list of str
+            List of column labels.
+        vars : OrderedDict
+            Keys are variable names and values are metadata for the variables.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        show_promoted_name : bool
+            If True, then show the promoted names of the variables.
+        col_spacing : int
+            Number of spaces between columns in the table.
+        """
+        abs2prom = self.model._var_abs2prom
+
+        # Get the values for all the elements in the tables
+        rows = []
+        for name, meta in iteritems(vars):
+            row = {}
+            for col_name in col_names:
+                if col_name == 'name':
+                    if show_promoted_name:
+                        row[col_name] = name
+                    else:
+                        if name in abs2prom['input']:
+                            row[col_name] = abs2prom['input'][name]
+                        else:
+                            row[col_name] = abs2prom['output'][name]
+                elif col_name == 'value':
+                    row[col_name] = self[name]
+                else:
+                    row[col_name] = meta[col_name]
+            rows.append(row)
+
+        col_space = ' ' * col_spacing
+        print("-" * len(header))
+        print(header)
+        print("-" * len(header))
+
+        # loop through the rows finding the max widths
+        max_width = {}
+        for col_name in col_names:
+            max_width[col_name] = len(col_name)
+        for row in rows:
+            for col_name in col_names:
+                cell = row[col_name]
+                if isinstance(cell, np.ndarray) and cell.size > 1:
+                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                else:
+                    out = str(cell)
+                max_width[col_name] = max(len(out), max_width[col_name])
+
+        # print col headers
+        header_div = ''
+        header_col_names = ''
+        for col_name in col_names:
+            header_div += '-' * max_width[col_name] + col_space
+            header_col_names += pad_name(col_name, max_width[col_name], quotes=False) + col_space
+        print(header_col_names)
+        print(header_div[:-1])
+
+        # print rows with var info
+        for row in rows:
+            have_array_values = []  # keep track of which values are arrays
+            row_string = ''
+            for col_name in col_names:
+                cell = row[col_name]
+                if isinstance(cell, np.ndarray) and cell.size > 1:
+                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    have_array_values.append(col_name)
+                else:
+                    out = str(cell)
+                row_string += pad_name(out, max_width[col_name], quotes=False) + col_space
+            print(row_string)
+
+            if print_arrays:
+                left_column_width = max_width['name']
+                for col_name in have_array_values:
+                    print("{}{}:".format((left_column_width + col_spacing) * ' ', col_name))
+                    cell = row[col_name]
+                    out_str = str(cell)
+                    indented_lines = [(left_column_width + col_spacing) * ' ' +
+                                      s for s in out_str.splitlines()]
+                    print('\n'.join(indented_lines) + '\n')
+
+        print()
+
+    def load_case(self, case):
+        """
+        Pull all input and output variables from a case into the model.
+
+        Parameters
+        ----------
+        case : Case object
+            A Case from a CaseRecorder file.
+        """
+        inputs = case.inputs._values if case.inputs is not None else None
+        for name, val in zip(inputs.dtype.names, inputs):
+            if name not in self.model._var_abs_names['input']:
+                raise KeyError("Input variable, '{}', recorded in the case is not "
+                               "found in the model".format(name))
+            self[name] = val
+
+        outputs = case.outputs._values if case.outputs is not None else None
+        for name, val in zip(outputs.dtype.names, outputs):
+            if name not in self.model._var_abs_names['output']:
+                raise KeyError("Output variable, '{}', recorded in the case is not "
+                               "found in the model".format(name))
+            self[name] = val
+
+        return
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

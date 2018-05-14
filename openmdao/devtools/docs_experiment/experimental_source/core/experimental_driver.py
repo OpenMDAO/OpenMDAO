@@ -18,31 +18,14 @@ class Driver(object):
     """
     Top-level container for the systems and drivers.
 
-    Options
-    -------
-    recording_options['record_metadata'] :  bool(True)
-        Tells recorder whether to record variable attribute metadata.
-    recording_options['record_desvars'] :  bool(True)
-        Tells recorder whether to record the desvars of the Driver.
-    recording_options['record_responses'] :  bool(False)
-        Tells recorder whether to record the responses of the Driver.
-    recording_options['record_objectives'] :  bool(False)
-        Tells recorder whether to record the objectives of the Driver.
-    recording_options['record_constraints'] :  bool(False)
-        Tells recorder whether to record the constraints of the Driver.
-    recording_options['includes'] :  list of strings("*")
-        Patterns for variables to include in recording.
-    recording_options['excludes'] :  list of strings('')
-        Patterns for variables to exclude in recording (processed after includes).
-
     Attributes
     ----------
     fail : bool
         Reports whether the driver ran successfully.
     iter_count : int
         Keep track of iterations for case recording.
-    metadata : list
-        List of metadata
+    options : list
+        List of options
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
@@ -143,7 +126,7 @@ class Driver(object):
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
 
         self.iter_count = 0
-        self.metadata = None
+        self.options = None
         self._model_viewer_data = None
         self.cite = ""
 

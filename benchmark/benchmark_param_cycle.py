@@ -28,8 +28,6 @@ def _check_results(testcase, test, error_bound):
         actual = {key: problem[key] for key in expected_values}
         assert_rel_error(testcase, actual, expected_values, 1e-8)
 
-    #error_bound = 1e-4 if root.metadata['finite_difference'] else 1e-8
-
     expected_totals = root.expected_totals
     if expected_totals:
         # Forward Derivatives Check
@@ -46,7 +44,6 @@ class BM(unittest.TestCase):
     def benchmark_comp200_var5_nlbs_lbgs(self):
         suite = _build(
             solver_class=NonlinearBlockGS, linear_solver_class=LinearBlockGS,
-            vector_class='default',
             assembled_jac=False,
             jacobian_type='dense',
             connection_type='explicit',
@@ -63,7 +60,6 @@ class BM(unittest.TestCase):
             solver_class=NewtonSolver, linear_solver_class=LinearBlockGS,
             solver_options={'maxiter': 20},
             linear_solver_options={'maxiter': 200, 'atol': 1e-10, 'rtol': 1e-10},
-            vector_class='default',
             assembled_jac=False,
             jacobian_type='dense',
             connection_type='explicit',
@@ -79,7 +75,6 @@ class BM(unittest.TestCase):
         suite = _build(
             solver_class=NewtonSolver, linear_solver_class=DirectSolver,
             linear_solver_options={'maxiter': 0},
-            vector_class='default',
             assembled_jac=True,
             jacobian_type='dense',
             connection_type='explicit',
@@ -95,7 +90,6 @@ class BM(unittest.TestCase):
         suite = _build(
             solver_class=NewtonSolver, linear_solver_class=DirectSolver,
             linear_solver_options={'maxiter': 0},
-            vector_class='default',
             assembled_jac=True,
             jacobian_type='dense',
             connection_type='explicit',

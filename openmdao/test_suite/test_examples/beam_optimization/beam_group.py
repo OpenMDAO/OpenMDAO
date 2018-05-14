@@ -15,18 +15,18 @@ from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp 
 class BeamGroup(Group):
 
     def initialize(self):
-        self.metadata.declare('E')
-        self.metadata.declare('L')
-        self.metadata.declare('b')
-        self.metadata.declare('volume')
-        self.metadata.declare('num_elements', int)
+        self.options.declare('E')
+        self.options.declare('L')
+        self.options.declare('b')
+        self.options.declare('volume')
+        self.options.declare('num_elements', int)
 
     def setup(self):
-        E = self.metadata['E']
-        L = self.metadata['L']
-        b = self.metadata['b']
-        volume = self.metadata['volume']
-        num_elements = self.metadata['num_elements']
+        E = self.options['E']
+        L = self.options['L']
+        b = self.options['b']
+        volume = self.options['volume']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
 
         force_vector = np.zeros(2 * num_nodes)

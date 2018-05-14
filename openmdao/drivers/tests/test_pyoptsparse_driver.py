@@ -3,8 +3,6 @@
 import sys
 import unittest
 
-from six.moves import cStringIO as StringIO
-
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent, \
@@ -13,7 +11,7 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 
 
 # check that pyoptsparse is installed
@@ -105,11 +103,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
+        prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1142,6 +1138,9 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
+        # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
+        prob.driver.run()
+
     def test_analysis_error_objfunc(self):
 
         # Component raises an analysis error during some runs, and pyopt
@@ -1318,6 +1317,41 @@ class TestPyoptSparse(unittest.TestCase):
 
         # pyopt's failure message differs by platform and is not informative anyway
 
+    def test_debug_print_option_totals(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('Solving variable: con.c' in output)
+
     def test_debug_print_option(self):
 
         prob = Problem()
@@ -1345,15 +1379,13 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue().split('\n')
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        output = output.split('\n')
+
         self.assertTrue(output.count("Design Vars") > 1,
                         "Should be more than one design vars header printed")
         self.assertTrue(output.count("Nonlinear constraints") > 1,
@@ -1371,6 +1403,7 @@ class TestPyoptSparse(unittest.TestCase):
                         "Should be more than one con.c printed")
         self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 class TestPyoptSparseFeature(unittest.TestCase):
@@ -1414,8 +1447,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = "SLSQP"
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
 
         prob.driver.options['print_results'] = False
 
@@ -1733,14 +1765,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        stdout = sys.stdout
-        strout = StringIO()
-
-        sys.stdout = strout
-        try:
-            failed = prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
@@ -1752,7 +1777,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         self.assertEqual(model.cycle.d1.failed, 2)
 
         # Checking that iprint stack gets routinely cleaned.
-        output = strout.getvalue().split('\n')
+        output = output.split('\n')
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
 
 

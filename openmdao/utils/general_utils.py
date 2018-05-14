@@ -108,7 +108,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                          "Expected %s but got %s." %
                          (name, shape, ind_shape[:len(shape)]))
 
-    return value, shape
+    return value, shape, indices
 
 
 def determine_adder_scaler(ref0, ref, adder, scaler):
@@ -411,6 +411,34 @@ def run_model(prob):
         sys.stdout = stdout
 
     return strout.getvalue()
+
+
+def run_driver(prob):
+    """
+    Call `run_driver` on problem and capture output.
+
+    Parameters
+    ----------
+    prob : Problem
+        an instance of Problem
+
+    Returns
+    -------
+    boolean
+        Failure flag; True if failed to converge, False is successful.
+    string
+        output from calling `run_driver` on the Problem, captured from stdout
+    """
+    stdout = sys.stdout
+    strout = StringIO()
+
+    sys.stdout = strout
+    try:
+        failed = prob.run_driver()
+    finally:
+        sys.stdout = stdout
+
+    return failed, strout.getvalue()
 
 
 @contextlib.contextmanager

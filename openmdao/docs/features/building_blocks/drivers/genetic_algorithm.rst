@@ -21,8 +21,8 @@ discrete design variables.
     openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_basic
     :layout: interleave
 
-Optimizer Settings
-==================
+SimpleGADriver Options
+----------------------
 
 .. embed-options::
     openmdao.drivers.genetic_algorithm_driver
@@ -49,3 +49,5 @@ evaluations for a new generation can be performed in parallel by turning on the 
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.MPIFeatureTests.test_option_parallel
     :layout: interleave
+
+.. tags:: Driver, Optimizer, Optimization

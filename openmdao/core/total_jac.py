@@ -5,9 +5,13 @@ from __future__ import print_function, division
 
 from collections import OrderedDict
 from copy import deepcopy
-import numpy as np
-from six import iteritems, itervalues
+import pprint
+from six import iteritems
 from six.moves import zip
+import sys
+import time
+
+import numpy as np
 
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -22,31 +26,18 @@ class _TotalJacInfo(object):
 
     Attributes
     ----------
-    model : <System>
-        The top level System of the System tree.
     comm : MPI.Comm or <FakeComm>
         The global communicator.
-    relevant : dict
-        Map of absolute var name to vars that are relevant to it.
-    mode : str
-        If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
-    out_meta : dict
-        Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
-    owning_ranks : dict
-        Map of absolute var name to the MPI process that owns it.
-    idx2name : dict
-        Map of row/col index to variable name.  Used only if simul coloring is active.
-    idx2local : dict
-        Map of row/col index to index within a variable.  Used only if simul coloring is active.
-    output_vec : Dict of vectors keyed by vec_name.
-        Designated output vectors based on value of fwd.
-    simul_coloring : tuple of the form (column_lists, row_map, sparsity) or None
-        Contains all data necessary to simultaneously solve for groups of total derivatives.
+    debug_print : bool
+        When True, print out debug and timing information for each derivative solved.
     has_lin_cons : bool
         If True, this total jacobian contains linear constraints.
-    output_list : list of str
-        List of names of output variables for this total jacobian.  In fwd mode, outputs
-        are responses.  In rev mode, outputs are design variables.
+    idx_iter_dict : dict
+        A dict containing an entry for each outer iteration of the total jacobian computation.
+    idx2local : dict
+        Map of row/col index to index within a variable.  Used only if simul coloring is active.
+    idx2name : dict
+        Map of row/col index to variable name.  Used only if simul coloring is active.
     J : ndarray
         The dense array form of the total jacobian.
     J_dict : dict
@@ -55,13 +46,34 @@ class _TotalJacInfo(object):
         If return_format is 'array', Jfinal is J.  Otherwise it's either a nested dict (if
         return_format is 'dict') or a flat dict (return_format 'flat_dict') with views into
         the array jacobian.
-    idx_iter_dict : dict
-        A dict containing an entry for each outer iteration of the total jacobian computation.
     lin_sol_cache : dict
         Dict of indices keyed to solution vectors.
+    mode : str
+        If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
+    model : <System>
+        The top level System of the System tree.
+    out_meta : dict
+        Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
+    output_list : list of str
+        List of names of output variables for this total jacobian.  In fwd mode, outputs
+        are responses.  In rev mode, outputs are design variables.
+    output_vec : Dict of vectors keyed by vec_name.
+        Designated output vectors based on value of fwd.
+    owning_ranks : dict
+        Map of absolute var name to the MPI process that owns it.
+    par_deriv : dict
+        Cache containing names of desvars or responses for each parallel derivative color.
+    relevant : dict
+        Map of absolute var name to vars that are relevant to it.
+    return_format : str
+        Indicates the desired return format of the total jacobian. Can have value of
+        'array', 'dict', or 'flat_dict'.
+    simul_coloring : tuple of the form (column_lists, row_map, sparsity) or None
+        Contains all data necessary to simultaneously solve for groups of total derivatives.
     """
 
-    def __init__(self, problem, of, wrt, global_names, return_format, approx=False):
+    def __init__(self, problem, of, wrt, global_names, return_format, approx=False,
+                 debug_print=False):
         """
         Initialize object.
 
@@ -80,6 +92,8 @@ class _TotalJacInfo(object):
             'array', 'dict', or 'flat_dict'.
         approx : bool
             If True, the object will compute approx total jacobians.
+        debug_print : bool
+            Set to True to print out debug and timing information for each derivative solved.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -94,6 +108,8 @@ class _TotalJacInfo(object):
         self.lin_sol_cache = {}
         self.design_vars = design_vars = driver._designvars
         self.responses = responses = driver._responses
+        self.debug_print = debug_print
+        self.par_deriv = {}
 
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
@@ -335,6 +351,11 @@ class _TotalJacInfo(object):
                 if matmat or parallel_deriv_color:
                     rhsname = name
 
+                    if parallel_deriv_color and self.debug_print:
+                        if parallel_deriv_color not in self.par_deriv:
+                            self.par_deriv[parallel_deriv_color] = []
+                        self.par_deriv[parallel_deriv_color].append(name)
+
                 in_idxs = meta['indices'] if 'indices' in meta else None
 
                 if in_idxs is None:
@@ -373,11 +394,16 @@ class _TotalJacInfo(object):
             # value before calling solve_linear.
             loc_i = np.full(irange.shape, -1, dtype=int)
             if gend > gstart:
-                loc = np.logical_and(irange >= gstart, irange < gend)
+                loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
-                    loc_i[loc] = np.arange(0, gend - gstart, dtype=int)[loc]
+                    if in_var_meta['distributed']:
+                        loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
+                    else:
+                        loc_i[loc] = irange[loc] - gstart
                 else:
                     loc_i[loc] = irange[loc]
+                    if not in_var_meta['distributed']:
+                        loc_i[loc] -= gstart
 
             loc_idxs.append(loc_i)
 
@@ -405,13 +431,15 @@ class _TotalJacInfo(object):
             elif matmat:
                 if name not in idx_iter_dict:
                     idx_iter_dict[name] = (None, matmat,
-                                           [np.arange(start, end, dtype=int)], self.matmat_iter)
+                                           [np.arange(start, end, dtype=int)],
+                                           self.matmat_iter)
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color name." %
                                        name)
             elif not simul_coloring:  # plain old single index iteration
                 idx_iter_dict[name] = (None, False,
-                                       np.arange(start, end, dtype=int), self.single_index_iter)
+                                       np.arange(start, end, dtype=int),
+                                       self.single_index_iter)
 
             tup = (name, rhsname, rel, cache_lin_sol)
             idx_map.extend([tup] * (end - start))
@@ -944,6 +972,8 @@ class _TotalJacInfo(object):
             Derivatives in form requested by 'return_format'.
         """
         recording_iteration.stack.append(('_compute_totals', 0))
+        debug_print = self.debug_print
+        par_deriv = self.par_deriv
 
         has_lin_cons = self.has_lin_cons
 
@@ -965,7 +995,8 @@ class _TotalJacInfo(object):
         model._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for _, _, idxs, idx_iter in itervalues(self.idx_iter_dict):
+        for key, meta in iteritems(self.idx_iter_dict):
+            _, _, idxs, idx_iter = meta
             for inds, input_setter, jac_setter in idx_iter(idxs):
                 # this sets dinputs for the current par_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
@@ -977,6 +1008,16 @@ class _TotalJacInfo(object):
 
                 rel_systems, vec_names, cache_key = input_setter(inds)
 
+                if debug_print:
+                    if par_deriv and key in par_deriv:
+                        varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
+                        print('Solving color:', key, varlist)
+                    else:
+                        print('Solving variable:', key)
+
+                    sys.stdout.flush()
+                    t0 = time.time()
+
                 # restore old linear solution if cache_linear_solution was set by the user for
                 # any input variables involved in this linear solution.
                 if cache_key is not None and not has_lin_cons:
@@ -986,10 +1027,18 @@ class _TotalJacInfo(object):
                 else:
                     model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
 
+                if debug_print:
+                    print('Elapsed Time:', time.time() - t0, '\n')
+                    sys.stdout.flush()
+
                 jac_setter(inds)
 
         if self.has_scaling:
             self._do_scaling(self.J_dict)
+
+        if debug_print:
+            # Debug outputs scaled derivatives.
+            self._print_derivatives()
 
         recording_iteration.stack.pop()
 
@@ -1040,13 +1089,9 @@ class _TotalJacInfo(object):
 
         model._setup_jacobians(recurse=False)
 
-        # Need to temporarily disable size checking to support indices in des_vars and quantities.
-        model.jacobian._override_checks = True
-
         # Linearize Model
         model._linearize()
 
-        model.jacobian._override_checks = False
         approx_jac = model._jacobian._subjacs
 
         of_idx = model._owns_approx_of_idx
@@ -1173,6 +1218,32 @@ class _TotalJacInfo(object):
         else:
             raise RuntimeError("Derivative scaling by the driver only supports the 'dict' and "
                                "'array' formats at present.")
+
+    def _print_derivatives(self):
+        """
+        Print out the derivatives when debug_print is True.
+        """
+        inputs = self.input_list
+        outputs = self.output_list
+        if self.return_format == 'dict':
+            J = self.J_dict
+            for of in inputs:
+                for wrt in outputs:
+                    pprint.pprint({(of, wrt): J[of][wrt]})
+
+        else:
+            abs2meta = self.model._var_allprocs_abs2meta
+            in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
+            out_meta = self.out_meta
+            J = self.J
+
+            for i, of in enumerate(outputs):
+                out_slice = out_meta[of][0]
+                for j, wrt in enumerate(inputs):
+                    pprint.pprint({(of, wrt): J[out_slice, in_meta[wrt][0]]})
+
+        print('')
+        sys.stdout.flush()
 
 
 def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):

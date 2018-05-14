@@ -16,11 +16,6 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis2
 
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
-
 
 class SimpleGroup(Group):
 
@@ -200,8 +195,8 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(err.exception),
                          "'_bad_name' is not a valid system name.")
 
-        # 'name', 'pathname', 'comm' and 'metadata' are reserved names
-        for reserved in ['name', 'pathname', 'comm', 'metadata']:
+        # 'name', 'pathname', 'comm' and 'options' are reserved names
+        for reserved in ['name', 'pathname', 'comm', 'options']:
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, Group())
             self.assertEqual(str(err.exception),

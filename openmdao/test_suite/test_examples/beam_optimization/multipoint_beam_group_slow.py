@@ -10,7 +10,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, ParallelGroup, ExecComp
-from openmdao.components.interp import BsplinesComp
+from openmdao.components.bsplines_comp import BsplinesComp
 
 from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import MultiComplianceComp
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
@@ -56,23 +56,23 @@ def divide_cases(ncases, nprocs):
 class MultipointBeamGroup(Group):
 
     def initialize(self):
-        self.metadata.declare('E')
-        self.metadata.declare('L')
-        self.metadata.declare('b')
-        self.metadata.declare('volume')
-        self.metadata.declare('num_elements', 5)
-        self.metadata.declare('num_cp', 50)
-        self.metadata.declare('num_load_cases', 1)
+        self.options.declare('E')
+        self.options.declare('L')
+        self.options.declare('b')
+        self.options.declare('volume')
+        self.options.declare('num_elements', 5)
+        self.options.declare('num_cp', 50)
+        self.options.declare('num_load_cases', 1)
 
     def setup(self):
-        E = self.metadata['E']
-        L = self.metadata['L']
-        b = self.metadata['b']
-        volume = self.metadata['volume']
-        num_elements = self.metadata['num_elements']
+        E = self.options['E']
+        L = self.options['L']
+        b = self.options['b']
+        volume = self.options['volume']
+        num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
-        num_cp = self.metadata['num_cp']
-        num_load_cases = self.metadata['num_load_cases']
+        num_cp = self.options['num_cp']
+        num_load_cases = self.options['num_load_cases']
 
         inputs_comp = IndepVarComp()
         inputs_comp.add_output('h_cp', shape=num_cp)

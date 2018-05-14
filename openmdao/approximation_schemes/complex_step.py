@@ -1,7 +1,6 @@
 """Complex Step derivative approximations."""
 from __future__ import division, print_function
 
-from collections import namedtuple
 from itertools import groupby
 from six.moves import range
 
@@ -120,6 +119,11 @@ class ComplexStep(ApproximationScheme):
         out_tmp = system._outputs.get_data()
         results_clone = current_vec._clone(True)
 
+        # To support driver src_indices, we need to override some checks in Jacobian, but do it
+        # selectively.
+        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
+            not isinstance(jac, dict)
+
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
@@ -170,7 +174,11 @@ class ComplexStep(ApproximationScheme):
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
+                if uses_src_indices:
+                    jac._override_checks = True
                 jac[rel_key] = subjac
+                if uses_src_indices:
+                    jac._override_checks = False
 
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
