@@ -13,8 +13,8 @@ from six.moves import range
 import numpy as np
 import networkx as nx
 
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
@@ -22,7 +22,6 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
 from openmdao.utils.units import is_compatible, get_conversion
@@ -197,7 +196,7 @@ class Group(System):
         Returns
         -------
         dict
-            Mapping of each absoute var name to its corresponding scaling factor tuple.
+            Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
         scale_factors = super(Group, self)._compute_root_scale_factors()
 
@@ -1733,7 +1732,7 @@ class Group(System):
         if self._linear_solver is not None and do_ln:
             self._linear_solver._linearize()
 
-    def approx_totals(self, method='fd', **kwargs):
+    def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
         Approximate derivatives for a Group using the specified approximation method.
 
@@ -1742,22 +1741,49 @@ class Group(System):
         method : str
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
+        step : float
+            Step size for approximation. Defaults to None, in which case, the approximation
+            method provides its default value.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
+            None, in which case, the approximation method provides its default value.
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. Defaults to None, in which case, the approximation method
+            provides its default value.
         """
         self._approx_schemes = OrderedDict()
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
+        supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
+                             'cs': (ComplexStep, DEFAULT_CS_OPTIONS)}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, supported_methods.keys()))
 
         if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
+            self._approx_schemes[method] = supported_methods[method][0]()
+
+        default_opts = supported_methods[method][1]
+
+        kwargs = {}
+        if step:
+            if 'step' in default_opts:
+                kwargs['step'] = step
+            else:
+                raise RuntimeError("'step' is not a valid option for '%s'" % method)
+        if form:
+            if 'form' in default_opts:
+                kwargs['form'] = form
+            else:
+                raise RuntimeError("'form' is not a valid option for '%s'" % method)
+        if step_calc:
+            if 'step_calc' in default_opts:
+                kwargs['step_calc'] = step_calc
+            else:
+                raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
 
         self._owns_approx_jac = True
-        self._owns_approx_jac_meta = dict(kwargs)
+        self._owns_approx_jac_meta = kwargs
 
     def _setup_jacobians(self, jacobian=None, recurse=True):
         """
