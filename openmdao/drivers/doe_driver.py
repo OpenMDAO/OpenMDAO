@@ -119,12 +119,12 @@ class DOEDriver(Driver):
         parallel = self.options['parallel']
         if MPI and parallel:
             self._comm = comm
-            comm_size = comm.size
 
             if parallel == 1:  # True == 1
                 size = 1
                 color = self._color = comm.rank
             else:
+                comm_size = comm.size
                 size = comm_size // parallel
                 if comm_size != size * parallel:
                     raise RuntimeError("The number of processors is not evenly divisable by "
