@@ -121,8 +121,6 @@ class _RegularGridInterp(object):
 
         Returns
         -------
-        key iterator
-            Valid interpolation name strings.
         list
             Valid interpolation name strings.
         dict
