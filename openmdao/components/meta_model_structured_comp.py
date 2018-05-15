@@ -3,7 +3,7 @@ from __future__ import division, print_function, absolute_import
 
 import warnings
 
-from six import raise_from
+from six import raise_from, iteritems
 from six.moves import range, zip
 
 from scipy import __version__ as scipy_version
@@ -121,8 +121,6 @@ class _RegularGridInterp(object):
 
         Returns
         -------
-        key iterator
-            Valid interpolation name strings.
         list
             Valid interpolation name strings.
         dict
@@ -136,10 +134,9 @@ class _RegularGridInterp(object):
             "quintic": 5,
         }
 
-        spline_interps = interpolator_configs.keys()
-        all_methods = list(spline_interps)
+        all_methods = list(interpolator_configs.keys())
 
-        return spline_interps, all_methods, interpolator_configs
+        return all_methods, interpolator_configs
 
     @staticmethod
     def methods():
@@ -194,7 +191,7 @@ class _RegularGridInterp(object):
             warnings.warn(msg)
 
         configs = _RegularGridInterp._interp_methods()
-        self._spline_methods, self._all_methods, self._interp_config = configs
+        self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
             all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
             raise ValueError('Method "%s" is not defined. Valid methods are '
@@ -214,6 +211,9 @@ class _RegularGridInterp(object):
             if not np.issubdtype(values.dtype, np.inexact):
                 values = values.astype(float)
 
+        if np.iscomplexobj(values[:]):
+            raise ValueError("method '%s' does not support complex values." % method)
+
         self.fill_value = fill_value
         if fill_value is not None:
             fill_value_dtype = np.asarray(fill_value).dtype
@@ -223,6 +223,7 @@ class _RegularGridInterp(object):
                 raise ValueError("fill_value must be either 'None' or "
                                  "of a type compatible with values")
 
+        k = self._interp_config[method]
         self._ki = []
         for i, p in enumerate(points):
             n_p = len(p)
@@ -236,7 +237,6 @@ class _RegularGridInterp(object):
                 raise ValueError("There are %d points and %d values in "
                                  "dimension %d" % (len(p), values.shape[i], i))
 
-            k = self._interp_config[method]
             self._ki.append(k)
             if n_p <= k:
                 if not spline_dim_error:
@@ -248,9 +248,6 @@ class _RegularGridInterp(object):
                                      "dimension."
                                      "" % (n_p, i, method, k + 1))
 
-        if np.iscomplexobj(values[:]):
-            raise ValueError(
-                "method '%s' does not support complex values." % method)
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
         self._xi = None
@@ -303,30 +300,27 @@ class _RegularGridInterp(object):
             for i, p in enumerate(xi.T):
                 if not np.logical_and(np.all(self.grid[i][0] <= p),
                                       np.all(p <= self.grid[i][-1])):
+                    p1 = np.where(self.grid[i][0] > p)[0]
+                    p2 = np.where(p > self.grid[i][-1])[0]
+                    # First violating entry is enough to direct the user.
+                    violated_idx = set(p1).union(p2).pop()
+                    value = p[violated_idx]
                     raise OutOfBoundsError("One of the requested xi is out of bounds",
-                                           i, p[0], self.grid[i][0], self.grid[i][-1])
+                                           i, value, self.grid[i][0], self.grid[i][-1])
 
         indices, norm_distances, out_of_bounds = self._find_indices(xi.T)
 
-        if np.iscomplexobj(self.values[:]):
-            raise ValueError("method '%s' does not support complex values.")
         ki = self._ki
         if method != self.method:
             # re-validate dimensions vs spline order
 
+            k = self._interp_config[method]
             ki = []
             for i, p in enumerate(self.grid):
                 n_p = len(p)
-                k = self._interp_config[method]
                 ki.append(k)
                 if n_p <= k:
-                    if not self._spline_dim_error:
-                        ki[-1] = n_p - 1
-                    else:
-                        raise ValueError("There are %d points in dimension"
-                                         " %d, but method %s requires at "
-                                         "least % d points per dimension."
-                                         "" % (n_p, i, method, k + 1))
+                    ki[-1] = n_p - 1
 
         interpolator = make_interp_spline
         result = self._evaluate_splines(self.values[:].T,
@@ -344,8 +338,7 @@ class _RegularGridInterp(object):
                               self.values.shape[ndim:])
 
     def _evaluate_splines(self, data_values, xi, indices, interpolator, method,
-                          ki, compute_gradients=True,
-                          first_dim_gradient=False):
+                          ki, compute_gradients=True):
         """
         Perform interpolation using the given interpolator.
 
@@ -368,8 +361,6 @@ class _RegularGridInterp(object):
         compute_gradients : bool, optional
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
-        first_dim_gradient : bool, optional
-            Set to True to calculate first dimension gradients. Default is False.
 
         Returns
         -------
@@ -405,17 +396,6 @@ class _RegularGridInterp(object):
                                                          xi[:, i],
                                                          ki[i],
                                                          compute_gradients)
-
-        if first_dim_gradient:
-            top_grad = self._evaluate_splines(first_derivs,
-                                              self.grid,
-                                              indices,
-                                              interpolator,
-                                              method,
-                                              ki,
-                                              compute_gradients=False,
-                                              first_dim_gradient=True)
-            all_gradients[:, -1] = top_grad[-1]
 
         # the rest of the dimensions have to be on a per point-in-xi basis
         for j, x in enumerate(xi):
@@ -575,9 +555,6 @@ class _RegularGridInterp(object):
         # Determine if the needed gradients have been cached already
         if not method:
             method = self.method
-        if method not in self._spline_methods:
-            raise ValueError("method '%s' does not support gradient"
-                             " calculations. " % method)
 
         if (self._xi is None) or \
                 (not np.array_equal(xi, self._xi)) or \
@@ -606,7 +583,39 @@ class MetaModelStructuredComp(ExplicitComponent):
     Extrapolation is supported, but disabled by default. It can be enabled
     via initialization attribute (see below).
 
+    Attributes
+    ----------
+    interps : dict
+        Dictionary of interpolations for each output.
+    params : list
+        List containing training data for each input.
+    pnames : list
+        Cached list of input names.
+    sh : tuple
+        Cached shape of the gradient of the outputs wrt the training inputs.
+    training_outputs : dict
+        Dictionary of training data each output.
+    _ki : dict
+        Dictionary of interpolation orders for each output.
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
+        """
+        super(MetaModelStructuredComp, self).__init__(**kwargs)
+
+        self.pnames = []
+        self.params = []
+        self.training_outputs = {}
+        self.interps = {}
+        self._ki = {}
+        self.sh = ()
 
     def initialize(self):
         """
@@ -623,14 +632,10 @@ class MetaModelStructuredComp(ExplicitComponent):
         self.options.declare('training_data_gradients', types=bool, default=False,
                              desc='Sets whether gradients with respect to output '
                                   'training data should be computed.')
-        self.options.declare('num_nodes', types=int, default=1,
+        self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
         self.options.declare('method', values=('cubic', 'slinear', 'quintic'),
                              default="cubic", desc='Spline interpolation order.')
-
-        self.pnames = []
-        self.params = []
-        self.interps = {}
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -647,13 +652,11 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict
             Additional agruments for add_input.
         """
-        n = self.options['num_nodes']
+        n = self.options['vec_size']
         super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
         self.params.append(np.asarray(training_data))
-
-        self.sh = tuple([self.options['num_nodes']] + [i.size for i in self.params])
 
     def add_output(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -670,29 +673,58 @@ class MetaModelStructuredComp(ExplicitComponent):
         **kwargs : dict
             Additional agruments for add_output.
         """
-        n = self.options['num_nodes']
+        n = self.options['vec_size']
         super(MetaModelStructuredComp, self).add_output(name, val * np.ones(n), **kwargs)
 
-        self.interps[name] = _RegularGridInterp(self.params,
-                                                training_data,
-                                                method=self.options['method'],
-                                                bounds_error=not self.options['extrapolate'],
-                                                fill_value=None,
-                                                spline_dim_error=False)
+        self.training_outputs[name] = training_data
 
-        self._ki = self.interps[name]._ki
-        arange = np.arange(n)
-        self.declare_partials(name, self.pnames, rows=arange, cols=arange)
         if self.options['training_data_gradients']:
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
-            self.declare_partials(name, "%s_train" % name)
 
-    def setup(self):
+    def _setup_vars(self, recurse=True):
         """
-        Set up the interpolation component within its problem instance.
+        Instantiate surrogates for the output variables that use the default surrogate.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
         """
-        pass
+        for name, train_data in iteritems(self.training_outputs):
+            self.interps[name] = _RegularGridInterp(self.params,
+                                                    train_data,
+                                                    method=self.options['method'],
+                                                    bounds_error=not self.options['extrapolate'],
+                                                    fill_value=None,
+                                                    spline_dim_error=False)
+
+            self._ki = self.interps[name]._ki
+
+        if self.options['training_data_gradients']:
+            self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
+
+        super(MetaModelStructuredComp, self)._setup_vars()
+
+    def _setup_partials(self, recurse=True):
+        """
+        Process all partials and approximations that the user declared.
+
+        Metamodel needs to declare its partials after inputs and outputs are known.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(MetaModelStructuredComp, self)._setup_partials()
+        n = self.options['vec_size']
+
+        for name in self._outputs:
+            arange = np.arange(n)
+            self._declare_partials(of=name, wrt=self.pnames, rows=arange, cols=arange)
+            if self.options['training_data_gradients']:
+                self._declare_partials(of=name, wrt="%s_train" % name)
 
     def compute(self, inputs, outputs):
         """
@@ -750,13 +782,10 @@ class MetaModelStructuredComp(ExplicitComponent):
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         if self.options['training_data_gradients']:
             dy_ddata = np.zeros(self.sh)
-            for j in range(self.options['num_nodes']):
+            for j in range(self.options['vec_size']):
                 for i, axis in enumerate(self.params):
                     e_i = np.eye(axis.size)
-                    interp = make_interp_spline(axis,
-                                                e_i,
-                                                k=self._ki[i],
-                                                axis=0)
+                    interp = make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
                     if i == 0:
                         val = interp(pt[j, i])
                     else:
