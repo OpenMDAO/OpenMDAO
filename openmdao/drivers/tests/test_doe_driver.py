@@ -876,7 +876,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             pass
 
     def test_full_factorial(self):
-        from openmdao.api import Problem, IndepVarComp, PETScVector
+        from openmdao.api import Problem, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         from openmdao.api import DOEDriver, FullFactorialGenerator
@@ -969,7 +969,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
             pass
 
     def test_fan_in_grouped(self):
-        from openmdao.api import Problem, PETScVector
+        from openmdao.api import Problem
         from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
         from openmdao.api import DOEDriver, FullFactorialGenerator
