@@ -182,7 +182,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         stream = cStringIO()
-        data = prob.check_partials(out_stream=stream, suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         subheads = data[''][('y', 'x1')]
         self.assertTrue('J_fwd' in subheads)
@@ -226,7 +226,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -272,7 +272,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partials(suppress_output=True)
+        data = p.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -317,7 +317,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.nonlinear_solver = NonlinearRunOnce()
 
         p.setup()
-        data = p.check_partials(suppress_output=True)
+        data = p.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -385,7 +385,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        data = p.check_partials(suppress_output=True)
+        data = p.check_partials(out_stream=None)
         identity = np.eye(4)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_fwd'], identity, 1e-15)
         assert_rel_error(self, data['pt'][('bar', 'foo')]['J_rev'], identity, 1e-15)
@@ -411,7 +411,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -443,7 +443,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):
@@ -496,7 +496,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         assert_rel_error(self, data['comp']['y', 'extra']['J_fwd'], np.zeros((2, 2)))
         assert_rel_error(self, data['comp']['y', 'extra']['J_rev'], np.zeros((2, 2)))
@@ -600,7 +600,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -623,7 +623,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, step=1e-2)
+        data = prob.check_partials(out_stream=None, step=1e-2)
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -649,7 +649,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         with self.assertRaises(RuntimeError) as context:
-            data = prob.check_partials(suppress_output=True)
+            data = prob.check_partials(out_stream=None)
 
         msg = 'In order to check partials with complex step, you need to set ' + \
             '"force_alloc_complex" to True during setup.'
@@ -673,7 +673,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
@@ -695,7 +695,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, method='cs')
+        data = prob.check_partials(out_stream=None, method='cs')
 
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
@@ -719,7 +719,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -742,7 +742,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, form='central')
+        data = prob.check_partials(out_stream=None, form='central')
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -767,7 +767,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -790,7 +790,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True, step_calc='rel')
+        data = prob.check_partials(out_stream=None, step_calc='rel')
 
         # This will fail unless you set the global step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -845,7 +845,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         # Note 'aba' gets the better value from the second options call with the *a wildcard.
         assert_rel_error(self, data['comp']['y', 'ab']['J_fd'][0][0], 507.3901, 1e-4)
@@ -1289,7 +1289,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
         print(data)
 
     def test_set_step_on_comp(self):
@@ -1748,17 +1748,13 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         stream = cStringIO()
-        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream,
-                                   suppress_output=True)
+        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream)
 
         data = totals['con_cmp2.con2', 'px.x']
         self.assertTrue('J_fwd' in data)
         self.assertTrue('rel error' in data)
         self.assertTrue('abs error' in data)
         self.assertTrue('magnitude' in data)
-
-        lines = stream.getvalue().splitlines()
-        self.assertEqual(len(lines), 0)
 
     def test_two_desvar_as_con(self):
         prob = Problem()
@@ -1972,7 +1968,7 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        J = prob.check_totals(suppress_output=True)
+        J = prob.check_totals(out_stream=None)
         assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x']['J_fwd'], [[2.0]], 1.0e-6)
         assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
         assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)

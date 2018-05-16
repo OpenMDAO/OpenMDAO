@@ -43,7 +43,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
         atol = 1.e-6
         rtol = 1.e-6
         assert_check_partials(data, atol, rtol)
@@ -76,7 +76,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         atol = 1.e-6
         rtol = 1.e-6
@@ -126,7 +126,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(suppress_output=True)
+        data = prob.check_partials(out_stream=None)
 
         atol = 1.e-6
         rtol = 1.e-6
@@ -179,7 +179,7 @@ class TestAssertUtils(unittest.TestCase):
         except AssertionError as err:
             expected_err = \
 '''The following groups use dictionary jacobians:
-    
+
     cycle'''
             self.assertEqual(str(err), expected_err)
         else:

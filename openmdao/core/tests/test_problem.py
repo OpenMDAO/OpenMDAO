@@ -426,7 +426,7 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # check derivatives of all obj+constraints w.r.t all design variables
-        totals = prob.check_totals(suppress_output=True)
+        totals = prob.check_totals(out_stream=None)
         print(totals)
 
     def test_feature_check_totals_cs(self):
