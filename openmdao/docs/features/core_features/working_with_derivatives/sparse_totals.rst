@@ -41,7 +41,7 @@ for later inspection.
 Static Determination of Sparsity
 ================================
 
-To get rid of the runtime cost of computing the coloring, you can precompute it using the
+To get rid of the runtime cost of computing the sparsity, you can precompute it using the
 :code:`openmdao sparsity` command line tool.  The sparsity dictionary will be displayed on
 the terminal and can be cut-and-pasted into your python script, or you can specify an output
 file on the command line and the sparsity dictionary will be written in JSON format to the
