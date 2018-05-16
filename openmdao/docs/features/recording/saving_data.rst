@@ -15,7 +15,7 @@ SqliteRecorder exists), and name the output file that you would like to write to
 
 .. code-block:: console
 
-    self.my_recorder = SqliteRecorder("filename")
+    my_recorder = SqliteRecorder("filename")
 
 
 Setting Recording Options

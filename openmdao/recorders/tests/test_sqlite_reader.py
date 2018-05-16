@@ -1241,44 +1241,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
         self.assertEqual(set(recorded_desvars), {'x', 'z'})
 
-    def test_system_options(self):
-        import numpy as np
-
-        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        model.nonlinear_solver = NonlinearBlockGS()
-
-        obj_cmp = model.obj_cmp
-
-        recorder = SqliteRecorder(self.filename)
-        obj_cmp.add_recorder(recorder)
-        obj_cmp.recording_options['includes'] = ['*']
-        obj_cmp.recording_options['excludes'] = ['obj_cmp.x']
-
-        prob.setup()
-        prob.run_driver()
-
-        cr = CaseReader(self.filename)
-        first_system_case = cr.system_cases.get_case(0)
-        recorded_inputs = first_system_case.inputs.keys
-        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
-
     def test_driver_options_with_values(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -1358,44 +1320,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         
         recorded_abs_error = first_solver_case.abs_err
         self.assertAlmostEqual(recorded_abs_error, 2.2545141)
-
-    def test_system_metadata_basic(self):
-        import numpy as np
-
-        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        model.nonlinear_solver = NonlinearBlockGS()
-
-        obj_cmp = model.obj_cmp
-
-        recorder = SqliteRecorder(self.filename)
-        obj_cmp.add_recorder(recorder)
-        obj_cmp.recording_options['includes'] = ['*']
-        obj_cmp.recording_options['excludes'] = ['obj_cmp.x']
-
-        prob.setup()
-        prob.run_driver()
-
-        cr = CaseReader(self.filename)
-        first_system_case = cr.system_cases.get_case(0)
-        recorded_inputs = first_system_case.inputs.keys
-        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
 
     def test_reading_system_metadata_basic(self):
         self.setup_sellar_model()
