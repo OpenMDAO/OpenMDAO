@@ -66,7 +66,7 @@ class DOEDriver(Driver):
         Parameters
         ----------
         generator : DOEGenerator or None
-            The case generator. If None, no cases will be generated.
+            The case generator.
 
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
@@ -96,7 +96,7 @@ class DOEDriver(Driver):
         self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
                              desc='The case generator. If default, no cases are generated.')
 
-        self.options.declare('parallel', default=False,
+        self.options.declare('parallel', default=False, types=(bool, int), lower=0,
                              desc='True or number of cases to run in parallel. '
                                   'If True, cases will be run on all available processors. '
                                   'If an integer, each case will get COMM.size/<number> '
@@ -120,8 +120,19 @@ class DOEDriver(Driver):
         if MPI and parallel:
             self._comm = comm
 
-            size = comm.size // parallel
-            color = self._color = comm.rank % size
+            if parallel == 1:  # True == 1
+                size = 1
+                color = self._color = comm.rank
+            else:
+                comm_size = comm.size
+                size = comm_size // parallel
+                if comm_size != size * parallel:
+                    raise RuntimeError("The number of processors is not evenly divisable by "
+                                       "the specified number of parallel cases.\n Provide a "
+                                       "number of processors that is a multiple of %d, or "
+                                       "specify a number of parallel cases that divides "
+                                       "into %d." % (parallel, comm_size))
+                color = self._color = comm.rank % size
 
             model_comm = comm.Split(color)
         else:

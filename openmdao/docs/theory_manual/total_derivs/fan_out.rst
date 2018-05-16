@@ -7,7 +7,7 @@ Parallelizing Derivative Solves of Multipoint Models At a Small Memory Cost
 A fan-out structure in a model is when you have a data path through the model that starts out serial and then reaches a point where multiple components can be run in parallel.
 This model structure is common in engineering problems, particularly in multi-point problems where you want to evaluate the performance of a given system at multiple operating conditions during a single analysis.
 
-For example, consider simple example problem as follows:
+For example, consider a simple example problem as follows:
 
 .. figure:: dependent_model.png
    :align: center
@@ -17,7 +17,8 @@ For example, consider simple example problem as follows:
    A very simple model with a fan-out structure.
 
 Assume that the variables :code:`x` and :code:`y` are size 100 array variables computed by inexpensive components.
-These are upstream of the expensive implicit analyses (e.g. some kind of PDE solver) computing the state variables very large implicit variables :code:`s1` and :code:`s2` (noted in yellow similar to the coloring in an N2 diagram).
+These are upstream of the expensive implicit analyses (e.g. some kind of PDE solver) computing the very large
+implicit variables :code:`s1` and :code:`s2` (noted in yellow similar to the coloring in an N2 diagram).
 Lastly there are two scalar variables :code:`z1` and :code:`z2`, computed using the converged values for :code:`s1` and :code:`s2`.
 
 The components that compute :code:`s1,z1` and :code:`s2,z2` have no dependence on each other so we put them into a :ref:`parallel group<feature_parallel_group>` and each group can run on its own processor (or set of processors).
@@ -34,7 +35,7 @@ However, the block-diagonal structure for :code:`s1,z1` and :code:`s2,z2` means 
    :alt: Jacobian structure for fan-out models
 
 
-If we want to compute the derivatives :math:`\frac{dz1}{dx}` and :math:`\frac{dz2}{dx}`, then reverse moden is preferred because it requires 2 linear solves instead of 100, but there is an inherent inefficiency that will limit the parallel scalability of reverse mode that needs to be considered as well.
+If we want to compute the derivatives :math:`\frac{dz1}{dx}` and :math:`\frac{dz2}{dx}`, then reverse mode is preferred because it requires 2 linear solves instead of 100, but there is an inherent inefficiency that will limit the parallel scalability of reverse mode that needs to be considered as well.
 Given the feed-forward structure of this model, the :ref:`LinearRunOnce<lnrunonce>` solver is recommended, which will use a back-substitution-style algorithm to solve for total derivatives in reverse mode.
 Looking at the linear system needed to solve in reverse mode, we see that the dense column for :code:`y` in the partial derivative Jacobian has now become a dense row ---in reverse mode you use :math:`\left[ \frac{\partial R}{\partial U} \right]^T` --- and because we're using back-propagation, that dense row now occurs *after* the two parallel constraints in the execution order (remember that order is reversed from the forward pass).
 You can see that in each of the two solution vectors, the entries for :code:`y` and :code:`x` are highlighted as nonzero, and hence they would overlap if you tried to perform both linear solves at the same time.
