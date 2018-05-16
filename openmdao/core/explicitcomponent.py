@@ -187,12 +187,12 @@ class ExplicitComponent(Component):
                 in_size = self._var_abs2meta[abs_key[1]]['size']
                 meta['value'] = np.zeros((out_size, in_size))
 
+            # if wrt is an input, we need to negate the subjac
             is_input = abs_key[1] in abs2prom['input']
             for J in jacs:
                 J._set_partials_meta(abs_key, meta, is_input)
 
             if 'method' in meta and meta['method']:
-
                 # Don't approximate output wrt output.
                 if abs_key[1] not in self._var_allprocs_abs_names['output']:
                     self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
@@ -267,6 +267,7 @@ class ExplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
+        # print(self.pathname, "_apply_linear", type(J).__name__, id(J))
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name not in self._rel_vec_names:
@@ -372,6 +373,7 @@ class ExplicitComponent(Component):
             return
 
         J = self._jacobian if jac is None else jac
+        # print(self.pathname, "_linearize", type(J).__name__, id(J))
 
         with self.jacobian_context(J):
             with self._unscaled_context(
@@ -391,8 +393,8 @@ class ExplicitComponent(Component):
                     # re-negate the jacobian
                     self._negate_jac(J)
 
-            #if jac:
-                #jac._update()
+            for jac in self._assembled_jacs:
+                jac._update()
 
     def compute(self, inputs, outputs):
         """

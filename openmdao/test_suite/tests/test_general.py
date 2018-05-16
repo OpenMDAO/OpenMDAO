@@ -6,12 +6,10 @@ All Parametric Groups
 'group_type': Controls which type of ParametricGroups to test. Will test all groups if not specified
 'local_vector_class': One of ['default', 'petsc'], which local vector class to use for the problem. ('default')
 'assembled_jac': bool. If an assembled jacobian should be used. (True)
-'jacobian_type': One of ['matvec', 'dense', 'sparse-coo', 'sparse-csr', 'sparse-csc']. How the Jacobians are used.
+'jacobian_type': One of ['matvec', 'dense', 'sparse-csc']. How the Jacobians are used.
                  Controls the type of AssembledJacobian. ('matvec')
                     - 'matvec': Uses compute_jacvec_product.
                     - 'dense': Uses an ndarray.
-                    - 'sparse-coo': Uses a COOrdinate format sparse matrix.
-                    - 'sparse-csr': Uses a Compressed Sparse Row sparse format.
                     - 'sparse-csc': Uses a Compressed Sparse Col sparse format.
 
 CycleGroup ('group_type': 'cycle')

@@ -94,6 +94,7 @@ class SimpleCompConst(ExplicitComponent):
 
         self.declare_partials('f', 'x', val=1.)
         self.declare_partials('f', 'z', val=np.ones((1, 4)))
+        # y[13] is a glob pattern for ['y1', 'y3']
         self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
         self.declare_partials('g', 'y2', val=[1., 1., 1., 1.], cols=[0, 0, 1, 1], rows=[0, 2, 1, 3])
         self.declare_partials('g', 'x', val=sp.sparse.coo_matrix(((1., 1.), ((0, 3), (0, 0)))))
@@ -189,8 +190,8 @@ class TestJacobianFeatures(unittest.TestCase):
 
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
-        model._linearize()
-        jac = model._jacobian._int_mtx._matrix
+        model._linearize(model.jacobian)
+        jac = model.jacobian._int_mtx._matrix
 
         # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
         # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),
@@ -457,11 +458,11 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_rel_error(self, totals['f', 'y1'], np.zeros((1, 2)))
         assert_rel_error(self, totals['f', 'y2'], np.zeros((1, 2)))
         assert_rel_error(self, totals['f', 'y3'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
         assert_rel_error(self, totals['g', 'z'], np.zeros((4, 4)))
         assert_rel_error(self, totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
         assert_rel_error(self, totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
         assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
 
     def test_sparse_jacobian_in_place(self):
         import numpy as np

@@ -56,8 +56,8 @@ def _mixed_case(mode):
     newton.linear_solver = ScipyKrylov()
     newton.linear_solver.precon = LinearBlockGS()
 
-    p.model.linear_solver = ScipyKrylov()
-    p.model.linear_solver.precon = DirectSolver(assembled_jac='dense')
+    p.model.linear_solver = ScipyKrylov(assembled_jac='dense')
+    p.model.linear_solver.precon = DirectSolver()
 
     p.run_model()
 

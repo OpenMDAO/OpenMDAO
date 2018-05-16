@@ -360,6 +360,8 @@ class System(object):
         self._local_vector_class = None
         self._distributed_vector_class = None
 
+        self._assembled_jacs = ()
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -779,7 +781,7 @@ class System(object):
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
-        self._setup_jacobians(recurse=recurse)
+        self._setup_jacobians()
 
         self._setup_case_recording(recurse=recurse)
 
@@ -1226,7 +1228,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
 
-    def _setup_jacobians(self, jacobian=None, recurse=True):
+    def _setup_jacobians(self, parent_asm_jacs=()):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1234,95 +1236,78 @@ class System(object):
         ----------
         jacobian : <AssembledJacobian> or None
             The global jacobian to populate for this system.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         self._jacobian_changed = False
-
-        if self._linear_solver is not None:
-            self._linear_solver._setup_jacobians(jacobian)
-        if self._nonlinear_solver is not None:
-            self._nonlinear_solver._setup_jacobians(jacobian)
-
-        jacs = []
         if self._jacobian is not None:
-            jacs.append(self._jacobian)
+            self._jacobian.stuff = set()
 
+        alljacs = set()
         if self._linear_solver is not None:
+            alljacs.update(self.linear_solver._get_assembled_jacs())
             my_asm_jac = self.linear_solver._assembled_jac
             if my_asm_jac is not None:
                 my_asm_jac._system = self
-                jacs.append(my_asm_jac)
-            if self._nonlinear_solver is not None and self._nonlinear_solver.linear_solver is not self._linear_solver:
-                if self._nonlinear_solver.linear_solver._assembled_jac is not None:
-                    jacs.append(self._nonlinear_solver.linear_solver._assembled_jac)
         else:
             my_asm_jac = None
-            if jacobian is not None:
-                jacs.append(jacobian)
-                
-        #if my_asm_jac is None and jacobian is None:
-            #self._jacobian = DictionaryJacobian()
-            #self._jacobian._system = self
-            #jacs.append(self._jacobian)
+
+        if self._nonlinear_solver is not None:
+            alljacs.update(self._nonlinear_solver._get_assembled_jacs())
+
+        if self._jacobian is not None:
+            alljacs.add(self._jacobian)
+
+        asm_jacs = [j for j in alljacs if isinstance(j, AssembledJacobian)]
 
         self._owns_assembled_jac = my_asm_jac is not None
         self._views_assembled_jac = self._owns_assembled_jac
 
-        if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
-            if self.nonlinear_solver.linear_solver is not None:
-                if self.nonlinear_solver.linear_solver._assembled_jac is not None:
-                    self._views_assembled_jac = True
-                    if my_asm_jac is None:
-                        jacs.append(jacobian)
-                    if self.nonlinear_solver.linear_solver._assembled_jac is not my_asm_jac:
-                        jacs.append(self.nonlinear_solver.linear_solver._assembled_jac)
+        if not self._owns_approx_jac and asm_jacs:
+            if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
+                # TODO: not sure we need to set this to True unless nonlinear solver's linear solver
+                #       has an assembled jac
+                self._views_assembled_jac = True
 
-        if self._owns_assembled_jac:
+        # not that for a Group, the following does nothing
+        self._set_partials_meta(alljacs)
+        self._set_partials_meta(parent_asm_jacs)
 
+        self._assembled_jacs = asm_jacs
+
+        # print(self.pathname, [type(j).__name__ for j in asm_jacs], [type(j).__name__
+        #       for j in parent_asm_jacs])
+
+        if asm_jacs:
             # At present, we don't support a AssembledJacobian in a group
             # if any subcomponents are matrix-free.
             if self.matrix_free:
-                raise RuntimeError("AssembledJacobian not supported if subcomponent is matrix-free.")
+                raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
-            jacobian = my_asm_jac
-
-        self._set_partials_meta(jacs)
-
-        if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(jacobian, recurse)
+                subsys._setup_jacobians(asm_jacs)
+        else:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_jacobians(parent_asm_jacs)
 
-        if self._owns_assembled_jac:
-            my_asm_jac._system = self
-            my_asm_jac._initialize()
-            out_ranges = my_asm_jac._out_ranges
-            in_ranges = my_asm_jac._in_ranges
+        # if we have an assembled jac at this level and an assembled jac above us, then
+        # our jacs (and any of our children's assembled jacs) will share their internal
+        # subjac dicts.  Each will maintain its own internal Matrix objects though.
+        for par_asm_jac in parent_asm_jacs:
+            for asm_jac in asm_jacs:
+                par_asm_jac._subjacs.update(asm_jac._subjacs)
+                par_asm_jac._subjacs_info.update(asm_jac._subjacs_info)
+                asm_jac._subjacs = par_asm_jac._subjacs
+                asm_jac._subjacs_info = par_asm_jac._subjacs_info
+                asm_jac._keymap = par_asm_jac._keymap
+                asm_jac._view_ranges = par_asm_jac._view_ranges
 
-            for s in self.system_iter(recurse=True, include_self=True):
-                if (s.linear_solver is not None and s.linear_solver._assembled_jac is my_asm_jac and
-                        s._views_assembled_jac):
-                    # set up view range for current subsystem
-                    input_names = s._var_abs_names['input']
-                    if input_names:
-                        min_in_offset = in_ranges[input_names[0]][0]
-                        max_in_offset = in_ranges[input_names[-1]][1]
-                    else:
-                        min_in_offset = sys.maxsize
-                        max_in_offset = 0
+        if self._views_assembled_jac:
+            for asm_jac in parent_asm_jacs:
+                asm_jac._init_view(self)
 
-                    output_names = s._var_abs_names['output']
-                    if output_names:
-                        min_res_offset = out_ranges[output_names[0]][0]
-                        max_res_offset = out_ranges[output_names[-1]][1]
-                    else:
-                        min_res_offset = sys.maxsize
-                        max_res_offset = 0
-
-                    my_asm_jac._view_ranges[s.pathname] = (
-                        min_res_offset, max_res_offset, min_in_offset, max_in_offset)
-
-                    my_asm_jac._init_view(s)
+        # allocate internal matrices now that we have all of the subjac metadata
+        for asm_jac in asm_jacs:
+            asm_jac._initialize()
+            asm_jac._init_view(self)
 
     def set_initial_values(self):
         """
@@ -1461,14 +1446,12 @@ class System(object):
         """
         Get the Jacobian object assigned to this system (or None if unassigned).
         """
-        if self.linear_solver is None:
-            return self._jacobian
-        else:
+        if self.linear_solver is not None:
             asjac = self.linear_solver._assembled_jac
-            if asjac is None:
-                return self._jacobian
-            else:
+            if asjac is not None:
                 return asjac
+
+        return self._jacobian
 
     @jacobian.setter
     def jacobian(self, jacobian):
@@ -1476,7 +1459,7 @@ class System(object):
         Set the Jacobian.
         """
         raise RuntimeError("jacobian is no longer settable from System. Instead, use"
-                           " options['assembed_jac'] = val on the linear solver, where val is "
+                           " options['assembled_jac'] = val on the linear solver, where val is "
                            "one of [None, 'dense', 'csc'].")
 
     @contextmanager
@@ -1673,9 +1656,9 @@ class System(object):
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
-        # if self._jacobian_changed:
-        #     raise RuntimeError("%s: jacobian has changed and setup was not "
-        #                        "called." % self.pathname)
+        if self._jacobian_changed:
+            raise RuntimeError("%s: jacobian has changed and setup was not "
+                               "called." % self.pathname)
         oldsys = jac._system
         jac._system = self
         yield jac

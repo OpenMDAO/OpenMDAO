@@ -218,7 +218,8 @@ class DirectSolver(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, 'fwd', scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, 'fwd',
+                             scope_out, scope_in)
 
         # put new value in out_vec
         b_vec.get_data(out_vec)

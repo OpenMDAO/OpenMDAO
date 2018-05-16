@@ -195,7 +195,7 @@ class ParameterizedInstance(object):
                 self.linear_solver_options['assembled_jac'] = 'dense'
             elif jacobian_type == 'sparse-csc':
                 self.linear_solver_options['assembled_jac'] = 'csc'
-            else:
+            elif jacobian_type != 'matvec':
                 raise RuntimeError("Invalid assembled_jac: '%s'." % jacobian_type)
 
         prob.model.linear_solver = self.linear_solver_class(**self.linear_solver_options)

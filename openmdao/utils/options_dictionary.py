@@ -23,8 +23,6 @@ class OptionsDictionary(object):
         types, desc, lower, and upper.
     _read_only : bool
         If True, setting (via __setitem__ or update) is not permitted.
-    _was_set : set
-        Names of all variables that have been set or have a default are found here.
     """
 
     def __init__(self, read_only=False):
@@ -38,10 +36,54 @@ class OptionsDictionary(object):
         """
         self._dict = {}
         self._read_only = read_only
-        self._was_set = set()
+
+    def _assert_valid(self, name, value):
+        """
+        Check whether the given value is valid, where the key has already been declared.
+
+        The optional checks consist of ensuring: the value is one of a list of acceptable values,
+        the type of value is one of a list of acceptable types, value is not less than lower,
+        value is not greater than upper, and value satisfies is_valid.
+
+        Parameters
+        ----------
+        name : str
+            The key for the declared option.
+        value : object
+            The default or user-set value to check for value, type, lower, and upper.
+        """
+        meta = self._dict[name]
+        values = meta['values']
+        types = meta['types']
+        lower = meta['lower']
+        upper = meta['upper']
+        is_valid = meta['is_valid']
+
+        if not (value is None and meta['allow_none']):
+            # If only values is declared
+            if values is not None:
+                if value not in values:
+                    raise ValueError("Option '{}'\'s value is not one of {}".format(name, values))
+            # If only types is declared
+            elif types is not None:
+                if not isinstance(value, types):
+                    raise TypeError("Option '{}' has the wrong type ({})".format(name, types))
+
+            if upper is not None:
+                if value > upper:
+                    msg = ("Value of {} exceeds maximum of {} for option 'x'")
+                    raise ValueError(msg.format(value, upper))
+            if lower is not None:
+                if value < lower:
+                    msg = ("Value of {} exceeds minimum of {} for option 'x'")
+                    raise ValueError(msg.format(value, lower))
+
+        # General function test
+        if is_valid is not None and not is_valid(value):
+            raise ValueError("Function is_valid returns False for {}.".format(name))
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, is_valid=None, allow_none=False):
+                upper=None, lower=None, is_valid=None, allow_none=False, callback=None):
         r"""
         Declare an option.
 
@@ -72,6 +114,9 @@ class OptionsDictionary(object):
             General check function that returns True if valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
+        callback : function or None
+            If not None, call this function of the form func(name, old_val, new_val) whenever this
+            option is set.
         """
         if type_ is not None:
             warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
@@ -88,6 +133,8 @@ class OptionsDictionary(object):
             raise RuntimeError("'types' and 'values' were both specified for option '%s'." %
                                name)
 
+        default_provided = default is not _undefined
+
         self._dict[name] = {
             'value': default,
             'values': values,
@@ -96,12 +143,14 @@ class OptionsDictionary(object):
             'upper': upper,
             'lower': lower,
             'is_valid': is_valid,
+            'has_been_set': default_provided,
             'allow_none': allow_none,
+            'callback': callback,
         }
 
         # If a default is given, check for validity
-        if default is not _undefined:
-            self[name] = default
+        if default_provided:
+            self._assert_valid(name, default)
 
     def undeclare(self, name):
         """
@@ -115,8 +164,6 @@ class OptionsDictionary(object):
         """
         if name in self._dict:
             del self._dict[name]
-        if name in self._was_set:
-            self._was_set.remove(name)
 
     def update(self, in_dict):
         """
@@ -172,43 +219,17 @@ class OptionsDictionary(object):
             msg = "Tried to set '{}' on a read-only OptionsDictionary."
             raise KeyError(msg.format(name))
 
-        try:
-            meta = self._dict[name]
-        except KeyError:
+        # The key must have been declared.
+        if name not in self._dict:
             msg = "Key '{}' cannot be set because it has not been declared."
             raise KeyError(msg.format(name))
 
-        if not (value is None and meta['allow_none']):
-            values = meta['values']
-
-            # If only values is declared
-            if values is not None:
-                if value not in values:
-                    raise ValueError("Option '{}'\'s value is not one of {}".format(name, values))
-            else:
-                types = meta['types']
-                # If only types is declared
-                if types is not None:
-                    if not isinstance(value, types):
-                        raise TypeError("Option '{}' has the wrong type ({})".format(name, types))
-
-            upper = meta['upper']
-            if upper is not None and value > upper:
-                msg = "Value of {} exceeds maximum of {} for option 'x'"
-                raise ValueError(msg.format(value, upper))
-
-            lower = meta['lower']
-            if lower is not None and value < lower:
-                msg = "Value of {} exceeds minimum of {} for option 'x'"
-                raise ValueError(msg.format(value, lower))
-
-        # General function test
-        is_valid = meta['is_valid']
-        if is_valid is not None and not is_valid(value):
-            raise ValueError("Function is_valid returns False for {}.".format(name))
-
+        self._assert_valid(name, value)
+        meta = self._dict[name]
+        if meta['callback'] is not None:
+            meta['callback'](name, meta['value'], value)
         meta['value'] = value
-        self._was_set.add(name)
+        meta['has_been_set'] = True
 
     def __getitem__(self, name):
         """
@@ -226,8 +247,9 @@ class OptionsDictionary(object):
         """
         # If the option has been set in this system, return the set value
         try:
-            if name in self._was_set:
-                return self._dict[name]['value']
+            meta = self._dict[name]
+            if meta['has_been_set']:
+                return meta['value']
             else:
                 raise RuntimeError("Option '{}' is required but has not been set.".format(name))
         except KeyError:

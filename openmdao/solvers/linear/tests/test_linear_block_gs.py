@@ -41,23 +41,11 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = self.linear_solver_class(assembled_jac='dense')
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False, mode='fwd')
-
-        prob['width'] = 2.0
-        prob.run_model()
-
-        of = ['area']
-        wrt = ['length']
-
         with self.assertRaises(RuntimeError) as context:
-            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+            model.linear_solver = self.linear_solver_class(assembled_jac='dense')
 
         self.assertEqual(str(context.exception),
-                         "A block linear solver 'LN: LNBGS' is being used with"
-                         " an AssembledJacobian in system ''")
+                         "Linear solver 'LN: LNBGS' doesn't support assembled jacobians.")
 
     def test_simple_implicit(self):
         # This verifies that we can perform lgs around an implicit comp and get the right answer
@@ -132,7 +120,8 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
 
-        comp.linear_solver = self.linear_solver_class(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        comp.linear_solver = self.linear_solver_class()
 
         prob.setup(check=False, mode='fwd')
 
@@ -140,7 +129,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
             prob.compute_totals(of=['comp.x'], wrt=['p.a'])
 
         self.assertEqual(str(context.exception),
-                         "A block linear solver 'LN: LNBGS' is being used with"
+                         "Linear solver 'LN: LNBGS' is being used with"
                          " an AssembledJacobian in system 'comp'")
 
     def test_full_desvar_with_index_obj_relevance_bug(self):

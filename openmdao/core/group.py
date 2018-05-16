@@ -1623,8 +1623,16 @@ class Group(System):
 
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
+        # if self.linear_solver is not None and self.linear_solver._assembled_jac:
+        #     jac = self.linear_solver._assembled_jac
+
         with Recording(name + '._apply_linear', self.iter_count, self):
-            if jac:
+            if self._owns_approx_jac:
+                jac = self._jacobian
+            elif self._owns_assembled_jac or self._views_assembled_jac:
+                jac = self._assembled_jacs[0]
+            if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
+                # print(self.pathname, "_apply_linear", type(jac).__name__, id(jac))
                 with self.jacobian_context(jac):
                     for vec_name in vec_names:
                         with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
@@ -1632,6 +1640,7 @@ class Group(System):
                             jac._apply(d_inputs, d_outputs, d_residuals, mode)
             # Apply recursion
             else:
+                # print(self.pathname, "_apply_linear, recursive")
                 if rel_systems is not None:
                     irrelevant_subs = [s for s in self._subsystems_myproc
                                        if s.pathname not in rel_systems]
@@ -1704,16 +1713,18 @@ class Group(System):
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        J = self.jacobian if jac is None else jac
+        # print(self.pathname, "_linearize", type(jac).__name__, id(jac))
 
         # Group finite difference
         if self._owns_approx_jac:
-            with self.jacobian_context(J):
+            if jac is None:
+                jac = self._jacobian
+            with self.jacobian_context(jac):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
-                        approximation.compute_approximations(self, jac=J, deriv_type='total')
+                        approximation.compute_approximations(self, jac=jac, deriv_type='total')
 
-                J._update()
+                jac._update()
 
         else:
             sub_do_nl = (self._nonlinear_solver is not None) and \
@@ -1726,8 +1737,16 @@ class Group(System):
                 subsys._linearize(jac, do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
-            if self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            for asm_jac in self._assembled_jacs:
+                asm_jac._update()
+            # if jac is not None:
+            #     jac.update()
+            # elif self._owns_assembled_jac:
+            #     self.linear_solver._assembled_jac._update()
+            # elif self._views_assembled_jac:
+            #     njac = self.nonlinear_solver._get_assembled_jacs()
+            #     if njac:
+            #         njac.pop()._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()
@@ -1761,7 +1780,7 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = dict(kwargs)
 
-    def _setup_jacobians(self, jacobian=None, recurse=True):
+    def _setup_jacobians(self, parent_asm_jacs=(), recurse=True):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1770,21 +1789,21 @@ class Group(System):
 
         Parameters
         ----------
-        jacobian : <AssembledJacobian> or None
+        parent_asm_jacs : list of <AssembledJacobian>
             The global jacobian to populate for this system.
         recurse : bool
             Whether to call this method in subsystems.
         """
         self._jacobian_changed = False
 
-        J = None if self.linear_solver is None else self.linear_solver._assembled_jac
-
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
-            if J is None:
+            if self._jacobian is None:
                 self._jacobian = J = DictionaryJacobian()
                 J._system = self
+            else:
+                J = self._jacobian
 
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
@@ -1863,7 +1882,7 @@ class Group(System):
             self._views_assembled_jac = False
             J._initialize()
 
-        super(Group, self)._setup_jacobians(jacobian, recurse)
+        super(Group, self)._setup_jacobians(parent_asm_jacs)
 
     def compute_sys_graph(self, comps_only=False):
         """

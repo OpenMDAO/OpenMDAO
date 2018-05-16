@@ -242,6 +242,11 @@ class TestJacobian(unittest.TestCase):
             maxiter=200, atol=1e-10, rtol=1e-10, assembled_jac=assembled_jac)
 
         prob.set_solver_print(level=0)
+        
+        top.add_design_var('indep.a')
+        top.add_design_var('indep.b')
+        top.add_constraint('C1.f')
+        top.add_objective('C2.f')
 
         prob.setup(check=False)
 
@@ -585,6 +590,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
+        model.linear_solver = DirectSolver()
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -597,7 +603,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -605,6 +611,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
+        model.linear_solver = DirectSolver()
 
         sub = model.add_subsystem('sub', Group())
 
@@ -619,7 +626,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -631,6 +638,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
+        model.linear_solver = DirectSolver()
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -643,7 +651,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 
@@ -651,6 +659,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
+        model.linear_solver = DirectSolver()
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -677,6 +686,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
+        model.linear_solver = DirectSolver()
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -689,7 +699,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.setup()
 
-        msg = "AssembledJacobian not supported if subcomponent is matrix-free."
+        msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
 

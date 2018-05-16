@@ -210,6 +210,9 @@ class Solver(object):
 
         self.cite = ""
 
+    def _get_assembled_jacs(self):
+        return set()
+
     def add_recorder(self, recorder):
         """
         Add a recorder to the driver's RecordingManager.
@@ -725,13 +728,44 @@ class LinearSolver(Solver):
         self._rel_systems = None
         self._assembled_jac = None
 
+    def _get_assembled_jacs(self):
+        if self._assembled_jac is None:
+            return ()
+        return set([self._assembled_jac])
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
         """
         self.options.declare('assembled_jac', default=None,
                              values=[None, 'csc', 'dense'],
+                             callback=self._new_jac,
                              desc='Sets the type of assembled jacobian used by this solver.')
+
+        self.supports.declare('assembled_jac', types=bool, default=True)
+
+    def _new_jac(self, name, old_value, new_value):
+        """
+        Notify system that jacobian has changed.
+
+        Parameters
+        ----------
+        name : str
+            Name of the option that has changed.
+        old_value : object
+            Original value of the option.
+        new_value : object
+            New value assigned to the option.
+        """
+        if name == 'assembled_jac' and not self.supports['assembled_jac']:
+            if self._system is not None:
+                sysname = "in system '%s' " % self._system.pathname
+            else:
+                sysname = ''
+            raise RuntimeError("Linear solver '%s' %sdoesn't support assembled jacobians." %
+                               (self.SOLVER, sysname))
+        if old_value != new_value and self._system is not None:
+            self._system._jacobian_changed = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -758,15 +792,13 @@ class LinearSolver(Solver):
                 rhs[varset] = data.copy()
 
         # set up jacobian
-        newjac = self.options['assembled_jac']
-        if newjac == 'dense':
-            self._assembled_jac = DenseJacobian()
-        elif newjac == 'csc':
-            self._assembled_jac = CSCJacobian()
-        # else jacobians will be local to components.
-
-        if self._assembled_jac is not None:
-            self._assembled_jac._system = system
+        if self.supports['assembled_jac']:
+            newjac = self.options['assembled_jac']
+            if newjac == 'dense':
+                self._assembled_jac = DenseJacobian(system)
+            elif newjac == 'csc':
+                self._assembled_jac = CSCJacobian(system)
+            # else jacobians will be local to components.
 
     def _setup_jacobians(self, parent_jacobian=None):
         """
@@ -777,16 +809,26 @@ class LinearSolver(Solver):
         parent_jacobian : <AssembledJacobian> or None
             The global jacobian to populate.
         """
+        if self._assembled_jac is not None and not self.supports['assembled_jac']:
+            raise RuntimeError("Linear solver '%s' is being used with "
+                               "an AssembledJacobian in system '%s'" %
+                               (self.SOLVER, self._system.pathname))
+
         # if we have an assembled jac at this level and an assembled jac above us, then
         # our jacs (and any of our children's assembled jacs) will share their internal
         # subjac dicts.  Each will maintain its own internal Matrix objects though.
-        if parent_jacobian is not None and self._assembled_jac is not None:
-            parent_jacobian._subjacs.update(self._assembled_jac._subjacs)
-            parent_jacobian._subjacs_info.update(self._assembled_jac._subjacs_info)
-            self._assembled_jac._subjacs = parent_jacobian._subjacs
-            self._assembled_jac._subjacs_info = parent_jacobian._subjacs_info
-            self._assembled_jac._keymap = parent_jacobian._keymap
-            self._assembled_jac._view_ranges = parent_jacobian._view_ranges
+        if parent_jacobian is not None:
+            if self._assembled_jac is not None and self._assembled_jac is not parent_jacobian:
+                print(type(self.assembled_jac).__name__, id(self.assembled_jac), "is a view of",
+                      type(parent_jacobian).__name__, id(parent_jacobian))
+                parent_jacobian._subjacs.update(self._assembled_jac._subjacs)
+                parent_jacobian._subjacs_info.update(self._assembled_jac._subjacs_info)
+                self._assembled_jac._subjacs = parent_jacobian._subjacs
+                self._assembled_jac._subjacs_info = parent_jacobian._subjacs_info
+                self._assembled_jac._keymap = parent_jacobian._keymap
+                self._assembled_jac._view_ranges = parent_jacobian._view_ranges
+            # else:
+            #     self._assembled_jac = parent_jacobian
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -892,19 +934,9 @@ class BlockLinearSolver(LinearSolver):
     A base class for LinearBlockGS and LinearBlockJac.
     """
 
-    def _iter_initialize(self):
+    def _declare_options(self):
         """
-        Perform any necessary pre-processing operations.
-
-        Returns
-        -------
-        float
-            initial error.
-        float
-            error at the first iteration.
+        Declare options before kwargs are processed in the init method.
         """
-        if isinstance(self._system._jacobian, AssembledJacobian):
-            raise RuntimeError("A block linear solver '%s' is being used with "
-                               "an AssembledJacobian in system '%s'" %
-                               (self.SOLVER, self._system.pathname))
-        return super(BlockLinearSolver, self)._iter_initialize()
+        super(BlockLinearSolver, self)._declare_options()
+        self.supports['assembled_jac'] = False

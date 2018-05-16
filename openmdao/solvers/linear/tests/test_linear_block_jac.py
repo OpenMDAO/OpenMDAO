@@ -26,23 +26,10 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = LinearBlockJac(assembled_jac='dense')
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False, mode='fwd')
-
-        prob['width'] = 2.0
-        prob.run_model()
-
-        of = ['area']
-        wrt = ['length']
-
         with self.assertRaises(RuntimeError) as context:
-            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-
+            model.linear_solver = LinearBlockJac(assembled_jac='dense')
             self.assertEqual(str(context.exception),
-                             "A block linear solver 'LN: LNBJ' is being used with"
-                             " an AssembledJacobian in system ''")
+                             "Linear solver 'LN: LNBJ' doesn't support assembled jacobians.")
 
 
 class TestBJacSolverFeature(unittest.TestCase):

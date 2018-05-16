@@ -135,6 +135,7 @@ class ImplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
+        # print(self.pathname, "_apply_linear", type(J).__name__, id(J))
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
@@ -246,7 +247,7 @@ class ImplicitComponent(Component):
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
-    def _linearize(self, jac, do_nl=True, do_ln=True):
+    def _linearize(self, jac=None, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -261,6 +262,7 @@ class ImplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
+        # print(self.pathname, "_linearize", type(J).__name__, id(J))
         with self.jacobian_context(J):
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
@@ -269,8 +271,8 @@ class ImplicitComponent(Component):
                     approximation.compute_approximations(self, jac=J)
                 self.linearize(self._inputs, self._outputs, J)
 
-            if self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            for jac in self._assembled_jacs:
+                jac._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()

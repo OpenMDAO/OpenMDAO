@@ -48,7 +48,7 @@ class AssembledJacobian(Jacobian):
         the jacobian.
     """
 
-    def __init__(self, matrix_class):
+    def __init__(self, matrix_class, system=None):
         """
         Initialize all attributes.
 
@@ -61,33 +61,25 @@ class AssembledJacobian(Jacobian):
         # avoid circular imports
         from openmdao.core.component import Component
 
-        super(AssembledJacobian, self).__init__()
+        super(AssembledJacobian, self).__init__(system)
         self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
         self._keymap = {}
         self._mask_caches = {}
         self._matrix_class = matrix_class
+        self._in_ranges = None
+        self._out_ranges = None
         # self._init_done = False
 
         self._subjac_iters = defaultdict(lambda: None)
+        self._init_ranges()
 
-    def _initialize(self):
+    def _init_ranges(self):
         """
-        Allocate the global matrices.
+        Compute row/col ranges for variables of the owning system.
         """
         system = self._system
-
-        # if self._init_done:
-            # raise RuntimeError("%s: assembled jac already initalized!" % system.pathname)
-
-        # var_indices are the *global* indices for variables on this proc
-        is_top = system.pathname == ''
-
-        abs2meta = system._var_abs2meta
-
-        self._int_mtx = int_mtx = self._matrix_class(system.comm)
-        ext_mtx = self._matrix_class(system.comm)
 
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
@@ -106,6 +98,27 @@ class AssembledJacobian(Jacobian):
             end += sizes[iproc, abs2idx[name]]
             in_ranges[name] = (start, end)
             start = end
+
+    def _initialize(self):
+        """
+        Allocate the global matrices.
+        """
+        system = self._system
+
+        # var_indices are the *global* indices for variables on this proc
+        is_top = system.pathname == ''
+
+        abs2meta = system._var_abs2meta
+
+        self._int_mtx = int_mtx = self._matrix_class(system.comm)
+        ext_mtx = self._matrix_class(system.comm)
+
+        iproc = system.comm.rank
+        abs2idx = system._var_allprocs_abs2idx['nonlinear']
+        out_sizes = system._var_sizes['nonlinear']['output']
+        in_sizes = system._var_sizes['nonlinear']['input']
+        out_ranges = self._out_ranges
+        in_ranges = self._in_ranges
 
         abs2prom_out = system._var_abs2prom['output']
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
@@ -146,6 +159,7 @@ class AssembledJacobian(Jacobian):
                     abs_key2 = (res_abs_name, out_abs_name)
                     keymap[abs_key] = abs_key2
 
+                    # TODO: check to see if we actually need this since we have shape already
                     shape = abs_key2shape(abs_key2)
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
@@ -155,19 +169,17 @@ class AssembledJacobian(Jacobian):
                     ext_mtx._add_submat(abs_key, info, res_offset,
                                         in_ranges[wrt_abs_name][0], None, shape)
 
-        sizes = system._var_sizes
         iproc = system.comm.rank
-        out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
+        out_size = np.sum(out_sizes[iproc, :])
 
         int_mtx._build(out_size, out_size)
         if ext_mtx._submats:
-            in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
+            in_size = np.sum(in_sizes[iproc, :])
             ext_mtx._build(out_size, in_size)
         else:
             ext_mtx = None
 
         self._ext_mtx[system.pathname] = ext_mtx
-        # self._init_done = True
 
     def _init_view(self, system):
         """
@@ -178,8 +190,32 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
+        if self._in_ranges is None:
+            # we haven't been initialized yet
+            self._initialize()
+
         abs2meta = system._var_abs2meta
-        ranges = self._view_ranges[system.pathname]
+        in_ranges = self._in_ranges
+        out_ranges = self._out_ranges
+
+        input_names = system._var_abs_names['input']
+        if input_names:
+            min_in_offset = in_ranges[input_names[0]][0]
+            max_in_offset = in_ranges[input_names[-1]][1]
+        else:
+            min_in_offset = sys.maxsize
+            max_in_offset = 0
+
+        output_names = system._var_abs_names['output']
+        if output_names:
+            min_res_offset = out_ranges[output_names[0]][0]
+            max_res_offset = out_ranges[output_names[-1]][1]
+        else:
+            min_res_offset = sys.maxsize
+            max_res_offset = 0
+
+        ranges = self._view_ranges[system.pathname] = (
+            min_res_offset, max_res_offset, min_in_offset, max_in_offset)
 
         ext_mtx = self._matrix_class(system.comm)
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
@@ -220,18 +256,13 @@ class AssembledJacobian(Jacobian):
 
         self._ext_mtx[system.pathname] = ext_mtx
 
-    def _update(self):
-        """
-        Read the user's sub-Jacobians and set into the global matrix.
-        """
-        system = self._system
-        int_mtx = self._int_mtx
-        ext_mtx = self._ext_mtx[system.pathname]
-        subjacs = self._subjacs
-
+    def _get_subjac_iters(self, system):
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
             keymap = self._keymap
+            int_mtx = self._int_mtx
+            ext_mtx = self._ext_mtx[system.pathname]
+            subjacs = self._subjacs
             seen = set()
             global_conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
@@ -271,9 +302,20 @@ class AssembledJacobian(Jacobian):
                         elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
-            self._subjac_iters[system.pathname] = (iters, iters_in_ext)
-        else:
-            iters, iters_in_ext = subjac_iters
+            self._subjac_iters[system.pathname] = subjac_iters = (iters, iters_in_ext)
+
+        return subjac_iters
+
+    def _update(self):
+        """
+        Read the user's sub-Jacobians and set into the global matrix.
+        """
+        system = self._system
+        int_mtx = self._int_mtx
+        ext_mtx = self._ext_mtx[system.pathname]
+        subjacs = self._subjacs
+
+        iters, iters_in_ext = self._get_subjac_iters(system)
 
         for key1, key2, do_add in iters:
             if do_add:
@@ -354,11 +396,11 @@ class DenseJacobian(AssembledJacobian):
     Assemble dense global <Jacobian>.
     """
 
-    def __init__(self):
+    def __init__(self, system=None):
         """
         Initialize all attributes.
         """
-        super(DenseJacobian, self).__init__(matrix_class=DenseMatrix)
+        super(DenseJacobian, self).__init__(system=system, matrix_class=DenseMatrix)
 
 
 class COOJacobian(AssembledJacobian):
@@ -366,11 +408,11 @@ class COOJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Coordinate list format.
     """
 
-    def __init__(self):
+    def __init__(self, system=None):
         """
         Initialize all attributes.
         """
-        super(COOJacobian, self).__init__(matrix_class=COOMatrix)
+        super(COOJacobian, self).__init__(matrix_class=COOMatrix, system=system)
 
 
 class CSRJacobian(AssembledJacobian):
@@ -378,11 +420,11 @@ class CSRJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Row Storage format.
     """
 
-    def __init__(self):
+    def __init__(self, system=None):
         """
         Initialize all attributes.
         """
-        super(CSRJacobian, self).__init__(matrix_class=CSRMatrix)
+        super(CSRJacobian, self).__init__(matrix_class=CSRMatrix, system=system)
 
 
 class CSCJacobian(AssembledJacobian):
@@ -390,8 +432,8 @@ class CSCJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Col Storage format.
     """
 
-    def __init__(self):
+    def __init__(self, system=None):
         """
         Initialize all attributes.
         """
-        super(CSCJacobian, self).__init__(matrix_class=CSCMatrix)
+        super(CSCJacobian, self).__init__(matrix_class=CSCMatrix, system=system)

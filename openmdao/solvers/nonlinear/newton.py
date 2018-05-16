@@ -114,17 +114,10 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
-    def _setup_jacobians(self, parent_jacobian=None):
-        """
-        Set and populate assembled jacobian, if we have one.
-
-        Parameters
-        ----------
-        parent_jacobian : <AssembledJacobian> or None
-            The global jacobian to populate.
-        """
+    def _get_assembled_jacs(self):
         if self.linear_solver is not None and self.linear_solver is not self._system.linear_solver:
-            self.linear_solver._setup_jacobians(parent_jacobian)
+            return self.linear_solver._get_assembled_jacs()
+        return set()
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -182,6 +175,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
+        # print("newton _linearize")
         if not self._linear_solver_from_parent:
             self.linear_solver._linearize()
 

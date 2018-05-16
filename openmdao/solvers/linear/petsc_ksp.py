@@ -214,6 +214,14 @@ class PETScKrylov(LinearSolver):
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
 
+    def _get_assembled_jacs(self):
+        assembled_jacs = set()
+        if self._assembled_jac is not None:
+            assembled_jacs.add(self._assembled_jac)
+        if self.precon is not None:
+            assembled_jacs.update(self.precon._get_assembled_jacs())
+        return assembled_jacs
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.

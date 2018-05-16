@@ -143,7 +143,7 @@ class IndepVarComp(ExplicitComponent):
                   'res_ref': res_ref, 'var_set': var_set}
         self._indep_external.append((name, val, kwargs))
 
-    def _linearize(self, jac, do_nl=False, do_ln=False):
+    def _linearize(self, jac=None, do_nl=False, do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 

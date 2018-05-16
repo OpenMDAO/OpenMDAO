@@ -44,6 +44,14 @@ class ScipyKrylov(LinearSolver):
         # initialize preconditioner to None
         self.precon = None
 
+    def _get_assembled_jacs(self):
+        assembled_jacs = set()
+        if self._assembled_jac is not None:
+            assembled_jacs.add(self._assembled_jac)
+        if self.precon is not None:
+            assembled_jacs.update(self.precon._get_assembled_jacs())
+        return assembled_jacs
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -158,7 +166,8 @@ class ScipyKrylov(LinearSolver):
 
         x_vec.set_data(in_vec)
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
+                             scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_vec)
