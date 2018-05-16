@@ -133,7 +133,7 @@ class Driver(object):
         self.options.declare('debug_print', types=list, is_valid=_is_debug_print_opts_valid,
                              desc="List of what type of Driver variables to print at each "
                                   "iteration. Valid items in list are 'desvars', 'ln_cons', "
-                                  "'nl_cons', 'objs'",
+                                  "'nl_cons', 'objs', 'totals'",
                              default=[])
 
         # Case recording options
