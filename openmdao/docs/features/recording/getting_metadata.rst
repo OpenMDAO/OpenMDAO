@@ -46,7 +46,7 @@ to record, they can be excluded using the 'options_excludes' recording option on
     :layout: interleave
 
 .. note::
-    Each system object must have a recorder explicitly attached in order for its metadata and options to be reorded
+    Each system object must have a recorder explicitly attached in order for its metadata and options to be recorded.
 
 Variable Metadata
 -----------------
