@@ -606,7 +606,7 @@ def dynamic_sparsity(driver):
     """
     problem = driver._problem
     driver._total_jac = None
-    repeats = driver.options['dynamic_simul_derivs_repeats']
+    repeats = driver.options['dynamic_derivs_repeats']
 
     # save the sparsity.json file for later inspection
     with open("sparsity.json", "w") as f:
@@ -629,7 +629,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False):
     """
     problem = driver._problem
     driver._total_jac = None
-    repeats = driver.options['dynamic_simul_derivs_repeats']
+    repeats = driver.options['dynamic_derivs_repeats']
 
     # save the coloring.json file for later inspection
     with open("coloring.json", "w") as f:

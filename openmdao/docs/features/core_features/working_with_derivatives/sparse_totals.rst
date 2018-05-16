@@ -6,13 +6,46 @@ Computing Sparsity of Total Derivatives
 
 
 If your total derivative jacobian is sparse, certain optimizers, e.g., the SNOPT optimizer
-in :ref:`pyOptSparseDriver<feature_pyoptsparse>`, can take advantage of this to improve the performance of computing total
-derivatives.  Detailed sparsity of each sub-jacobian in the total jacobian can be computed
-automatically using the :code:`openmdao sparsity` command line tool.  The sparsity dictionary can
-be displayed on the terminal and can be cut-and-pasted into your python script, or you can
-specify an output file on the command line and the sparsity dictionary will be written in JSON
-format to the specified file.  Here's an example of writing the sparsity information to the
-terminal:
+in :ref:`pyOptSparseDriver<feature_pyoptsparse>`, can take advantage of this to improve the
+performance of computing total derivatives.
+
+Computing the sparsity of the jacobian can be performed either statically or dynamically.
+
+
+Dynamic Determination of Sparsity
+=================================
+
+Sparsity can be computed at runtime, shortly after the driver begins the optimization.
+This has the advantage of simplicity and robustness to changes in the model, but adds
+the cost of the sparsity computation to the run time of the optimization.  For a typical
+optimization, however, this cost will be small.  Activating dynamic sparsity detection
+is simple.  Just set the `dynamic_derivs_sparsity` option on the driver.  For example:
+
+.. code-block:: python
+
+    prob.driver.options['dynamic_derivs_sparsity'] = True
+
+If you want to change the number of compute_totals calls that the algorithm uses to
+compute the jacobian sparsity (default is 3), you can set the `dynamic_derivs_repeats`
+option. For example:
+
+.. code-block:: python
+
+    prob.driver.options['dynamic_derivs_repeats'] = 2
+
+
+Whenever a dynamic sparsity is computed, the sparsity is written to a file called *sparsity.json*
+for later inspection.
+
+
+Static Determination of Sparsity
+================================
+
+To get rid of the runtime cost of computing the coloring, you can precompute it using the
+:code:`openmdao sparsity` command line tool.  The sparsity dictionary will be displayed on
+the terminal and can be cut-and-pasted into your python script, or you can specify an output
+file on the command line and the sparsity dictionary will be written in JSON format to the
+specified file.  Here's an example of writing the sparsity information to the terminal:
 
 .. embed-shell-cmd::
     :cmd: openmdao sparsity circle_opt.py

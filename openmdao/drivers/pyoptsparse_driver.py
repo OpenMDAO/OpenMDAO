@@ -169,11 +169,11 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
-        self.options.declare('dynamic_sparsity', default=False, types=bool,
+        self.options.declare('dynamic_derivs_sparsity', default=False, types=bool,
                              desc='Compute derivative sparsity dynamically if True')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True')
-        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of compute_totals calls during dynamic computation of '
                                   'simultaneous derivative coloring or derivatives sparsity')
 
@@ -234,7 +234,7 @@ class pyOptSparseDriver(Driver):
         if coloring_mod._use_sparsity:
             if self.options['dynamic_simul_derivs']:
                 coloring_mod.dynamic_simul_coloring(self, do_sparsity=True)
-            elif self.options['dynamic_sparsity']:
+            elif self.options['dynamic_derivs_sparsity']:
                 coloring_mod.dynamic_sparsity(self)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)

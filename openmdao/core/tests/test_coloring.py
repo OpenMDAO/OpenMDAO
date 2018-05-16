@@ -532,8 +532,8 @@ class SparsityTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
 
         # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False,
-                            dynamic_sparsity=True)
+        p_dynamic = run_opt(pyOptSparseDriver, dynamic_derivs_sparsity=True,
+                            optimizer='SNOPT', print_results=False)
 
         # run with provided sparsity
         p_sparsity = run_opt(pyOptSparseDriver, sparsity=self.sparsity,
@@ -558,11 +558,11 @@ class SparsityTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False)
 
         # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False,
-                             dynamic_sparsity=True)
+        p_dynamic = run_opt(pyOptSparseDriver, dynamic_derivs_sparsity=True,
+                            optimizer='SLSQP', print_results=False)
 
         # run with specified sparsity
-        p_sparsity = run_opt(pyOptSparseDriver, sparsity=sparsity,
+        p_sparsity = run_opt(pyOptSparseDriver, sparsity=self.sparsity,
                              optimizer='SLSQP', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
