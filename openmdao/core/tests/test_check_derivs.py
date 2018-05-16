@@ -14,6 +14,7 @@ from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
@@ -1952,6 +1953,55 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
         assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+
+    def test_vector_scaled_derivs(self):
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        comp = model.add_subsystem('comp', DoubleArrayComp())
+        model.connect('px.x', 'comp.x1')
+
+        model.add_design_var('px.x', ref=np.array([2.0, 3.0]), ref0=np.array([0.5, 1.5]))
+        model.add_objective('comp.y1', ref=np.array([[7.0, 11.0]]), ref0=np.array([5.2, 6.3]))
+        model.add_constraint('comp.y2', lower=0.0, upper=1.0, ref=np.array([[2.0, 4.0]]), ref0=np.array([1.2, 2.3]))
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # First, test that we get scaled results in compute and check totals.
+
+        derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='dict',
+                                     driver_scaling=True)
+
+        oscale = np.array([1.0/(7.0-5.2), 1.0/(11.0-6.3)])
+        iscale = np.array([2.0-0.5, 3.0-1.5])
+        J = np.zeros((2, 2))
+        J[:] = comp.JJ[0:2, 0:2]
+
+        # doing this manually so that I don't inadvertantly make an error in the vector math in both the code and test.
+        J[0, 0] *= oscale[0]*iscale[0]
+        J[0, 1] *= oscale[0]*iscale[1]
+        J[1, 0] *= oscale[1]*iscale[0]
+        J[1, 1] *= oscale[1]*iscale[1]
+        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+
+        cderiv = prob.check_totals(driver_scaling=True, out_stream=None)
+        assert_rel_error(self, cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
+
+        # cleanup after FD
+        prob.run_model()
+
+        # Now, test that default is unscaled.
+
+        derivs = prob.compute_totals(of=['comp.y1'], wrt=['px.x'], return_format='dict')
+
+        J = comp.JJ[0:2, 0:2]
+        assert_rel_error(self, J, derivs['comp.y1']['px.x'], 1.0e-3)
+
+        cderiv = prob.check_totals(out_stream=None)
+        assert_rel_error(self, cderiv['comp.y1', 'px.x']['J_fwd'], J, 1.0e-3)
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")

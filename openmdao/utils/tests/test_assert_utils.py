@@ -177,10 +177,7 @@ class TestAssertUtils(unittest.TestCase):
             assert_no_dict_jacobians(prob.model, include_self=True, recurse=True)
 
         except AssertionError as err:
-            expected_err = \
-'''The following groups use dictionary jacobians:
-
-    cycle'''
+            expected_err = "The following groups use dictionary jacobians:\n    \n    cycle"
             self.assertEqual(str(err), expected_err)
         else:
             self.fail('Exception expected.')

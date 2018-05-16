@@ -84,6 +84,31 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, totals['comp.f_xy']['p1.x'][0][0], -4.0)
         assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
+    def test_feature_simple_run_once_compute_totals_scaled(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('comp', Paraboloid())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        model.add_design_var('p1.x', 3.0, ref0=50.0)
+        model.add_design_var('p2.y', -4.0)
+        model.add_objective('comp.f_xy')
+
+        prob.setup()
+        prob.run_model()
+
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], driver_scaling=True)
+        assert_rel_error(self, totals[('comp.f_xy','p1.x')][0][0], 196.0)
+        assert_rel_error(self, totals[('comp.f_xy','p2.y')][0][0], 3.0)
+
     def test_feature_simple_run_once_set_deriv_mode(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -404,6 +429,29 @@ class TestProblem(unittest.TestCase):
 
         # check derivatives of all obj+constraints w.r.t all design variables
         prob.check_totals()
+
+    def test_feature_check_totals_from_driver_scaled(self):
+        from openmdao.api import Problem, NonlinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', lower=-100, upper=100, ref=100.0, ref0=-100.0)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0, ref=3.0)
+        prob.model.add_constraint('con2', upper=0.0, ref=20.0)
+
+        prob.setup()
+
+        # We don't call run_driver() here because we don't
+        # actually want the optimizer to run
+        prob.run_model()
+
+        # check derivatives of all driver vars using the declared scaling
+        prob.check_totals(driver_scaling=True)
 
     def test_feature_check_totals_suppress(self):
         from openmdao.api import Problem, NonlinearBlockGS

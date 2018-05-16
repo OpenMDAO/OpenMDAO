@@ -971,7 +971,7 @@ class Problem(object):
         return partials_data
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
-                     abs_err_tol=1e-6, rel_err_tol=1e-6,
+                     driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                      method='fd', step=1e-6, form='forward', step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
@@ -989,6 +989,9 @@ class Problem(object):
             Set to None to suppress.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
+        driver_scaling : bool
+            Set to True to scale derivative values by the quantities specified when the desvars and
+            responses were added. Default if False, which is unscaled.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1027,7 +1030,8 @@ class Problem(object):
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                       driver_scaling=driver_scaling)
             Jcalc = total_info.compute_totals()
 
             # Approximate FD
@@ -1038,7 +1042,8 @@ class Problem(object):
             }
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method is 'fd' else None)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
+                                       driver_scaling=driver_scaling)
             Jfd = total_info.compute_totals_approx(initialize=True)
 
         # Assemble and Return all metrics.
@@ -1057,7 +1062,8 @@ class Problem(object):
                                   [model], {'': fd_args}, totals=True)
         return data['']
 
-    def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
+                       driver_scaling=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1075,6 +1081,9 @@ class Problem(object):
             tuples of form (of, wrt).
         debug_print : bool
             Set to True to print out some debug information during linear solve.
+        driver_scaling : bool
+            Set to True to scale derivative values by the quantities specified when the desvars and
+            responses were added. Default if False, which is unscaled.
 
         Returns
         -------
@@ -1086,11 +1095,12 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+                                           approx=True, driver_scaling=driver_scaling)
                 return total_info.compute_totals_approx(initialize=True)
             else:
                 total_info = _TotalJacInfo(self, of, wrt, False, return_format,
-                                           debug_print=debug_print)
+                                           debug_print=debug_print, driver_scaling=driver_scaling)
                 return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
