@@ -561,7 +561,7 @@ class SparsityTestCase(unittest.TestCase):
         p_dynamic = run_opt(pyOptSparseDriver, dynamic_derivs_sparsity=True,
                             optimizer='SLSQP', print_results=False)
 
-        # run with specified sparsity
+        # run with provided sparsity
         p_sparsity = run_opt(pyOptSparseDriver, sparsity=self.sparsity,
                              optimizer='SLSQP', print_results=False)
 
