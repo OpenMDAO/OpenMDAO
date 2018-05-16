@@ -6,7 +6,7 @@ Metadata will be recorded on every object that has a recorder attached as long
 as the 'record_metadata' recording option is set to `True`. This metadata can be
 accessed via :code:`driver_metadata`, :code:`solver_metadata`, and :code:`system_metadata`
 on the case reader. Additionally, user-defined options stored in System objects
-are also recorded and stored in :code:`system_metadata`.
+are also recorded and can be accessed via :code:`system_metadata`.
 
 *Driver Metadata*
 ~~~~~~~~~~~~~~~~~
