@@ -71,7 +71,7 @@ If all components in your model are using the :ref:`compute_partials <comp-type-
 methods to provide OpenMDAO with their partial derivatives, then you do not need to do anything else in order to support vectorized derivatives solves.
 
 Internally, OpenMDAO will switch from doing matrix-vector products to vectorized matrix-matrix products.
-Essentially in either case, if you stored the partial-derivative Jacobian in a variable :code:`A`, and your vector as variable :code:`b` will always do
+Essentially in either case, if you stored the partial-derivative Jacobian in a variable :code:`A` and your vector as variable :code:`b`, OpenMDAO will always do
 
 .. code::
 
