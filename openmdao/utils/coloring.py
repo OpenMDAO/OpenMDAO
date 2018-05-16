@@ -445,7 +445,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     tol : float
         Tolerance used to determine if an array entry is nonzero.
     show_jac : bool
-        If True, display a visualiation of the final total jacobian used to compute the coloring.
+        If True, display a visualization of the final total jacobian used to compute the coloring.
     stream : file-like or None
         Stream where output coloring info will be written.
     setup : bool

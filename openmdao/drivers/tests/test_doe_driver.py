@@ -151,8 +151,9 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 5)
 
         for n in range(cases.num_cases):
-            assert_rel_error(self, cases.get_case(n).outputs['x'], expected[n]['x'], 1e-4)
-            assert_rel_error(self, cases.get_case(n).outputs['y'], expected[n]['y'], 1e-4)
+            outputs = cases.get_case(n).outputs
+            assert_rel_error(self, outputs['x'], expected[n]['x'], 1e-4)
+            assert_rel_error(self, outputs['y'], expected[n]['y'], 1e-4)
 
     def test_full_factorial(self):
         prob = Problem()
@@ -192,9 +193,10 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 9)
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[n]['f_xy'])
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['x'], expected[n]['x'])
+            self.assertEqual(outputs['y'], expected[n]['y'])
+            self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
 
     def test_full_factorial_array(self):
         prob = Problem()
@@ -230,8 +232,9 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 9)
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).outputs['xy'][0], expected[n]['xy'][0])
-            self.assertEqual(cases.get_case(n).outputs['xy'][1], expected[n]['xy'][1])
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['xy'][0], expected[n]['xy'][0])
+            self.assertEqual(outputs['xy'][1], expected[n]['xy'][1])
 
     def test_plackett_burman(self):
         prob = Problem()
@@ -264,9 +267,10 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[n]['f_xy'])
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['x'], expected[n]['x'])
+            self.assertEqual(outputs['y'], expected[n]['y'])
+            self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
 
     def test_box_behnken(self):
         upper = 10.
@@ -323,9 +327,10 @@ class TestDOEDriver(unittest.TestCase):
         }
 
         for n in range(cases.num_cases):
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[n]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[n]['y'])
-            self.assertEqual(cases.get_case(n).outputs['z'], expected[n]['z'])
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['x'], expected[n]['x'])
+            self.assertEqual(outputs['y'], expected[n]['y'])
+            self.assertEqual(outputs['z'], expected[n]['z'])
 
     def test_latin_hypercube(self):
         samples = 4
@@ -384,8 +389,9 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            x = cases.get_case(n).outputs['x']
-            y = cases.get_case(n).outputs['y']
+            outputs = cases.get_case(n).outputs
+            x = outputs['x']
+            y = outputs['y']
 
             bucket = int((x+x_offset)/(x_bucket_size/samples))
             x_buckets_filled.add(bucket)
@@ -450,8 +456,9 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(cases.num_cases, 4)
 
         for n in range(cases.num_cases):
-            x = cases.get_case(n).outputs['xy'][0]
-            y = cases.get_case(n).outputs['xy'][1]
+            outputs = cases.get_case(n).outputs
+            x = outputs['xy'][0]
+            y = outputs['xy'][1]
 
             bucket = int((x+x_offset)/(x_bucket_size/samples))
             x_buckets_filled.add(bucket)
@@ -509,8 +516,9 @@ class TestDOEDriver(unittest.TestCase):
         valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
         for n in range(cases.num_cases):
-            x = float(cases.get_case(n).outputs['indep.x'])
-            y = float(cases.get_case(n).outputs['indep.y'])
+            outputs = cases.get_case(n).outputs
+            x = float(outputs['indep.x'])
+            y = float(outputs['indep.y'])
 
             x_buckets_filled.add(int(x/bucket_size))
             y_buckets_filled.add(int(y/bucket_size))
@@ -538,6 +546,38 @@ class TestParallelDOE(unittest.TestCase):
             shutil.rmtree(self.tempdir)
         except OSError:
             pass
+
+    def test_indivisable_error(self):
+        prob = Problem()
+
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.options['parallel'] =  3
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        self.assertEqual(str(context.exception),
+                         "The number of processors is not evenly divisable by the "
+                         "specified number of parallel cases.\n Provide a number of "
+                         "processors that is a multiple of 3, or specify a number "
+                         "of parallel cases that divides into 4.")
+
+    def test_minprocs_error(self):
+        prob = Problem(FanInGrouped())
+
+        # require 2 procs for the ParallelGroup
+        prob.model._proc_info['sub'] = (2, None, 1.0)
+
+        # run cases on all procs
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.options['parallel'] =  True
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup()
+
+        self.assertEqual(str(context.exception),
+                         ": MPI process allocation failed: can't meet min_procs "
+                         "required for the following subsystems: ['sub']")
 
     def test_full_factorial(self):
         prob = Problem()
@@ -591,18 +631,19 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
         for n in range(num_cases):
-            case = cases.get_case(n)
+            outputs = cases.get_case(n).outputs
             idx = n * size + rank  # index of expected case
 
-            self.assertEqual(cases.get_case(n).outputs['x'], expected[idx]['x'])
-            self.assertEqual(cases.get_case(n).outputs['y'], expected[idx]['y'])
-            self.assertEqual(cases.get_case(n).outputs['f_xy'], expected[idx]['f_xy'])
+            self.assertEqual(outputs['x'], expected[idx]['x'])
+            self.assertEqual(outputs['y'], expected[idx]['y'])
+            self.assertEqual(outputs['f_xy'], expected[idx]['f_xy'])
 
         # total number of cases recorded across all procs
         num_cases = prob.comm.allgather(num_cases)
         self.assertEqual(sum(num_cases), len(expected))
 
     def test_fan_in_grouped(self):
+        # run 2 cases at a time, each using 2 of our 4 procs
         doe_parallel = 2
 
         prob = Problem(FanInGrouped())
@@ -657,14 +698,82 @@ class TestParallelDOE(unittest.TestCase):
             self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
             for n in range(num_cases):
-                case = cases.get_case(n)
                 idx = n * size + rank  # index of expected case
 
-                self.assertEqual(cases.get_case(n).outputs['iv.x1'], expected[idx]['iv.x1'])
-                self.assertEqual(cases.get_case(n).outputs['iv.x2'], expected[idx]['iv.x2'])
-                self.assertEqual(cases.get_case(n).outputs['c3.y'], expected[idx]['c3.y'])
+                outputs = cases.get_case(n).outputs
+
+                self.assertEqual(outputs['iv.x1'], expected[idx]['iv.x1'])
+                self.assertEqual(outputs['iv.x2'], expected[idx]['iv.x2'])
+                self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
         else:
             self.assertFalse("Cases from rank %d are being written" % rank in output)
+
+        # total number of cases recorded across all requested procs
+        num_cases = prob.comm.allgather(num_cases)
+        self.assertEqual(sum(num_cases), len(expected))
+
+    def test_fan_in_grouped_serial(self):
+        # run cases on all procs (parallel model will run on single proc)
+        doe_parallel = True
+
+        prob = Problem(FanInGrouped())
+        model = prob.model
+
+        model.add_design_var('iv.x1', lower=0.0, upper=1.0)
+        model.add_design_var('iv.x2', lower=0.0, upper=1.0)
+
+        model.add_objective('c3.y')
+
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.options['parallel'] =  doe_parallel
+
+        prob.setup(check=False)
+
+        failed, output = run_driver(prob)
+        self.assertFalse(failed)
+
+        prob.cleanup()
+
+        expected = {
+            0: {'iv.x1': np.array([0.]), 'iv.x2': np.array([0.]), 'c3.y': np.array([ 0.0])},
+            1: {'iv.x1': np.array([.5]), 'iv.x2': np.array([0.]), 'c3.y': np.array([-3.0])},
+            2: {'iv.x1': np.array([1.]), 'iv.x2': np.array([0.]), 'c3.y': np.array([-6.0])},
+
+            3: {'iv.x1': np.array([0.]), 'iv.x2': np.array([.5]), 'c3.y': np.array([17.5])},
+            4: {'iv.x1': np.array([.5]), 'iv.x2': np.array([.5]), 'c3.y': np.array([14.5])},
+            5: {'iv.x1': np.array([1.]), 'iv.x2': np.array([.5]), 'c3.y': np.array([11.5])},
+
+            6: {'iv.x1': np.array([0.]), 'iv.x2': np.array([1.]), 'c3.y': np.array([35.0])},
+            7: {'iv.x1': np.array([.5]), 'iv.x2': np.array([1.]), 'c3.y': np.array([32.0])},
+            8: {'iv.x1': np.array([1.]), 'iv.x2': np.array([1.]), 'c3.y': np.array([29.0])},
+        }
+
+        rank = prob.comm.rank
+        size = prob.comm.size // doe_parallel
+
+        num_cases = 0
+
+        # cases will be split across files for each proc up to the number requested
+        filename = "CASES.db_%d" % rank
+
+        expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
+        self.assertTrue(expect_msg in output)
+
+        cases = CaseReader(filename).driver_cases
+
+        # cases recorded on this proc
+        num_cases = cases.num_cases
+        self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
+
+        for n in range(num_cases):
+            idx = n * size + rank  # index of expected case
+
+            outputs = cases.get_case(n).outputs
+
+            self.assertEqual(outputs['iv.x1'], expected[idx]['iv.x1'])
+            self.assertEqual(outputs['iv.x2'], expected[idx]['iv.x2'])
+            self.assertEqual(outputs['c3.y'], expected[idx]['c3.y'])
 
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)
@@ -715,8 +824,8 @@ class TestDOEDriverFeature(unittest.TestCase):
 
         values = []
         for n in range(cases.num_cases):
-            case = cases.get_case(n)
-            values.append((case.outputs['x'], case.outputs['y'], case.outputs['f_xy']))
+            outputs = cases.get_case(n).outputs
+            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
         print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
@@ -767,7 +876,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             pass
 
     def test_full_factorial(self):
-        from openmdao.api import Problem, IndepVarComp, PETScVector
+        from openmdao.api import Problem, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         from openmdao.api import DOEDriver, FullFactorialGenerator
@@ -807,8 +916,8 @@ class TestParallelDOEFeature(unittest.TestCase):
 
         values = []
         for n in range(cases.num_cases):
-            case = cases.get_case(n)
-            values.append((case.outputs['x'], case.outputs['y'], case.outputs['f_xy']))
+            outputs = cases.get_case(n).outputs
+            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
         self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
             self.expect_text)
@@ -860,7 +969,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
             pass
 
     def test_fan_in_grouped(self):
-        from openmdao.api import Problem, PETScVector
+        from openmdao.api import Problem
         from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
         from openmdao.api import DOEDriver, FullFactorialGenerator
@@ -879,6 +988,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("CASES.db"))
 
+        # run 2 cases at a time, each using 2 of our 4 procs
         doe_parallel = prob.driver.options['parallel'] = 2
 
         prob.setup()
@@ -895,8 +1005,8 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
             values = []
             for n in range(cases.num_cases):
-                case = cases.get_case(n)
-                values.append((case.outputs['iv.x1'], case.outputs['iv.x2'], case.outputs['c3.y']))
+                outputs = cases.get_case(n).outputs
+                values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
 
             self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
                 self.expect_text)
