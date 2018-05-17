@@ -124,6 +124,9 @@ class DirectSolver(LinearSolver):
         self.options.undeclare("maxiter")
         self.options.undeclare("err_on_maxiter")
 
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
+
     def _linearize(self):
         """
         Perform factorization.
