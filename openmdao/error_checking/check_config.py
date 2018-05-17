@@ -260,7 +260,7 @@ def _check_solvers(problem, logger):
             is_iter_nl = True
         else:
             is_iter_nl = (
-                (sys.nonlinear_solver and sys.nonlinear_solver.options['maxiter'] > 1) or
+                (sys.nonlinear_solver and 'maxiter' in sys.nonlinear_solver.options) or
                 (has_states and overrides_method('solve_nonlinear', sys, ImplicitComponent))
             )
             iter_nl_depth = depth if is_iter_nl else np.inf
@@ -269,7 +269,7 @@ def _check_solvers(problem, logger):
             is_iter_ln = True
         else:
             is_iter_ln = (
-                (sys.linear_solver and (sys.linear_solver.options['maxiter'] > 1 or
+                (sys.linear_solver and ('maxiter' in sys.linear_solver.options or
                  isinstance(sys.linear_solver, DirectSolver))) or
                 (has_states and overrides_method('solve_linear', sys, ImplicitComponent))
             )
