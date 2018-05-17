@@ -31,7 +31,7 @@ class TestQuadImplicit(unittest.TestCase):
 
         p.setup()
 
-        check = p.check_partials(suppress_output=True)
+        check = p.check_partials(out_stream=None)
 
         for out_name, of in check.items():
             for i_name, wrt in of.items():
