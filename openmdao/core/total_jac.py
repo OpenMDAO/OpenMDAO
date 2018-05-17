@@ -73,7 +73,7 @@ class _TotalJacInfo(object):
     """
 
     def __init__(self, problem, of, wrt, global_names, return_format, approx=False,
-                 debug_print=False):
+                 debug_print=False, driver_scaling=True):
         """
         Initialize object.
 
@@ -94,6 +94,9 @@ class _TotalJacInfo(object):
             If True, the object will compute approx total jacobians.
         debug_print : bool
             Set to True to print out debug and timing information for each derivative solved.
+        driver_scaling : bool
+            If True (default), scale derivative values by the quantities specified when the desvars
+            and responses were added. If False, leave them unscaled.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -103,7 +106,7 @@ class _TotalJacInfo(object):
         self.relevant = model._relevant
         self.mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
-        self.has_scaling = driver._has_scaling
+        self.has_scaling = driver._has_scaling and driver_scaling
         self.return_format = return_format
         self.lin_sol_cache = {}
         self.design_vars = design_vars = driver._designvars
