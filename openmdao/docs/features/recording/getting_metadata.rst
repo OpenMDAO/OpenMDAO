@@ -36,7 +36,7 @@ Systems record both scaling factors and options within 'scaling_factors' and 'co
 respectively, in :code:`system_metadata`. Much like with solvers, this metadata is accessed by
 the system's global pathname.
 
-The component options includes user-defined options that were defined
+The component options include user-defined options that were defined
 through the :code:`system.options.declare` method. By default, everything in options is
 pickled and recorded. If there are options that cannot be pickled or you simply do not wish
 to record, they can be excluded using the 'options_excludes' recording option on the system.
@@ -52,7 +52,7 @@ Variable Metadata
 -----------------
 
 Variable metadata is also made available through the CaseReader in :code:`output2meta` and :code:`input2meta`.
-For each variable the 'units', 'type', 'explicit', 'lower', and 'upper' are stored. note that this is recorded
+For each variable the 'units', 'type', 'explicit', 'lower', and 'upper' are stored. Note that this is recorded
 for all variables, independent of the objects which have the recorder attached.
 
 For example, if we had an output variable 'z' we could access its metadata with:

@@ -30,7 +30,7 @@ recorder creates a local SQLite database file when the optimization is run.
     recorder = SqliteRecorder(case_filename)
     p.driver.add_recorder(recorder)
 
-Create a Case Reader and Reading Data
+Creating a Case Reader and Reading Data
 -------------------------------------
 
 Once we run the optimization we can read the data from the file using a case reader.

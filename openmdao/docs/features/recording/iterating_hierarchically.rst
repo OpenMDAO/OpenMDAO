@@ -14,7 +14,7 @@ to iterate over all cases of a certain type.
         ...
 
 The Case Reader also has a :code:`get_cases` method, which provides a way to iterate
-over Driver and Solver cases in order with a choice of iterating hierarchically or flat
+over Driver and Solver cases in order with a choice of iterating in either a hierarchical or a flat manner 
 (using the :code:`recurse` parameter).
 
 .. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.get_cases
