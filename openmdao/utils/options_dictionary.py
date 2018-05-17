@@ -48,7 +48,7 @@ class OptionsDictionary(object):
         dict
             The options dictionary.
         """
-        return self._dict
+        return self._dict.__repr__()
 
     def __rst__(self):
         """
@@ -225,7 +225,7 @@ class OptionsDictionary(object):
             raise ValueError("Function is_valid returns False for {}.".format(name))
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, is_valid=None, allow_none=False, callback=None):
+                upper=None, lower=None, is_valid=None, allow_none=False):
         r"""
         Declare an option.
 
@@ -256,9 +256,6 @@ class OptionsDictionary(object):
             General check function that returns True if valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
-        callback : function or None
-            If not None, call this function of the form func(name, old_val, new_val) whenever this
-            option is set.
         """
         if type_ is not None:
             warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
@@ -287,7 +284,6 @@ class OptionsDictionary(object):
             'is_valid': is_valid,
             'has_been_set': default_provided,
             'allow_none': allow_none,
-            'callback': callback,
         }
 
         # If a default is given, check for validity
@@ -368,8 +364,6 @@ class OptionsDictionary(object):
 
         self._assert_valid(name, value)
         meta = self._dict[name]
-        if meta['callback'] is not None:
-            meta['callback'](name, meta['value'], value)
         meta['value'] = value
         meta['has_been_set'] = True
 

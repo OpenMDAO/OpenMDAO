@@ -233,6 +233,8 @@ class System(object):
         Class to use for distributed data vectors.
     _local_vector_class : class
         Class to use for local data vectors.
+    _assembled_jacs : list
+        List of AssembledJacobians at this level of the system tree.
     """
 
     def __init__(self, **kwargs):
@@ -1234,12 +1236,10 @@ class System(object):
 
         Parameters
         ----------
-        jacobian : <AssembledJacobian> or None
-            The global jacobian to populate for this system.
+        parent_asm_jacs : list of <AssembledJacobian>
+            The global jacobian(s) to populate for this system.
         """
         self._jacobian_changed = False
-        if self._jacobian is not None:
-            self._jacobian.stuff = set()
 
         alljacs = set()
         if self._linear_solver is not None:
@@ -1253,10 +1253,7 @@ class System(object):
         if self._nonlinear_solver is not None:
             alljacs.update(self._nonlinear_solver._get_assembled_jacs())
 
-        if self._jacobian is not None:
-            alljacs.add(self._jacobian)
-
-        asm_jacs = [j for j in alljacs if isinstance(j, AssembledJacobian)]
+        asm_jacs = list(alljacs)
 
         self._owns_assembled_jac = my_asm_jac is not None
         self._views_assembled_jac = self._owns_assembled_jac
@@ -1267,17 +1264,20 @@ class System(object):
                 #       has an assembled jac
                 self._views_assembled_jac = True
 
-        # not that for a Group, the following does nothing
+        # note that for a Group, _set_partials_meta does nothing
         if asm_jacs:
-            self._set_partials_meta(asm_jacs)
-        elif self._jacobian:
-            self._set_partials_meta([self._jacobian])
-        self._set_partials_meta(parent_asm_jacs)
+            jacs = asm_jacs[:]
+        elif parent_asm_jacs:
+            jacs = parent_asm_jacs[:]
+        else:
+            jacs = []
+
+        if self._jacobian is not None:
+            jacs.append(self._jacobian)
+
+        self._set_partials_meta(jacs)
 
         self._assembled_jacs = asm_jacs
-
-        # print(self.pathname, [type(j).__name__ for j in asm_jacs], [type(j).__name__
-        #       for j in parent_asm_jacs])
 
         if asm_jacs:
             # At present, we don't support a AssembledJacobian in a group

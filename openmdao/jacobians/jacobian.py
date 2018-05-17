@@ -33,12 +33,16 @@ class Jacobian(object):
     def __init__(self, system=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
         self._system = system
         self._subjacs = OrderedDict()
         self._subjacs_info = OrderedDict()
         self._override_checks = False
-        self.stuff = set()
 
     def _abs_key2shape(self, abs_key):
         """
@@ -252,5 +256,3 @@ class Jacobian(object):
             self._set_abs(abs_key, val)
             if negate:
                 self._multiply_subjac(abs_key, -1.0)
-                assert abs_key not in self.stuff
-                self.stuff.add(abs_key)

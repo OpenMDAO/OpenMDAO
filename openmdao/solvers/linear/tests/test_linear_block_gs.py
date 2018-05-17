@@ -41,11 +41,14 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
+        model.linear_solver = self.linear_solver_class(assembled_jac='dense')
+        prob.setup(check=False)
+
         with self.assertRaises(RuntimeError) as context:
-            model.linear_solver = self.linear_solver_class(assembled_jac='dense')
+            prob.run_model()
 
         self.assertEqual(str(context.exception),
-                         "Linear solver 'LN: LNBGS' doesn't support assembled jacobians.")
+                         "Linear solver 'LN: LNBGS' in system '' doesn't support assembled jacobians.")
 
     def test_simple_implicit(self):
         # This verifies that we can perform lgs around an implicit comp and get the right answer
@@ -112,25 +115,6 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
         self.assertLess(res, 2.0e-2)
-
-    def test_error_under_assembled_jac(self):
-        prob = Problem()
-        model = prob.model
-        model.add_subsystem('p', IndepVarComp('a', 5.0))
-        comp = model.add_subsystem('comp', SimpleImp())
-        model.connect('p.a', 'comp.a')
-
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
-        comp.linear_solver = self.linear_solver_class()
-
-        prob.setup(check=False, mode='fwd')
-
-        with self.assertRaises(RuntimeError) as context:
-            prob.compute_totals(of=['comp.x'], wrt=['p.a'])
-
-        self.assertEqual(str(context.exception),
-                         "Linear solver 'LN: LNBGS' is being used with"
-                         " an AssembledJacobian in system 'comp'")
 
     def test_full_desvar_with_index_obj_relevance_bug(self):
         prob = Problem()

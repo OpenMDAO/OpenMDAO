@@ -46,6 +46,10 @@ class AssembledJacobian(Jacobian):
     _subjac_iters : dict
         Mapping of system pathname to tuple of lists of absolute key tuples used to index into
         the jacobian.
+    _in_ranges : dict
+        Column ranges for inputs.
+    _out_ranges : dict
+        Row ranges for outputs.
     """
 
     def __init__(self, matrix_class, system=None):
@@ -56,6 +60,8 @@ class AssembledJacobian(Jacobian):
         ----------
         matrix_class : type
             Class to use to create internal matrices.
+        system : System
+            Parent system to this jacobian.
         """
         global Component
         # avoid circular imports
@@ -399,6 +405,11 @@ class DenseJacobian(AssembledJacobian):
     def __init__(self, system=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
         super(DenseJacobian, self).__init__(system=system, matrix_class=DenseMatrix)
 
@@ -411,6 +422,11 @@ class COOJacobian(AssembledJacobian):
     def __init__(self, system=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
         super(COOJacobian, self).__init__(matrix_class=COOMatrix, system=system)
 
@@ -423,6 +439,11 @@ class CSRJacobian(AssembledJacobian):
     def __init__(self, system=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
         super(CSRJacobian, self).__init__(matrix_class=CSRMatrix, system=system)
 
@@ -435,5 +456,10 @@ class CSCJacobian(AssembledJacobian):
     def __init__(self, system=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
         super(CSCJacobian, self).__init__(matrix_class=CSCMatrix, system=system)

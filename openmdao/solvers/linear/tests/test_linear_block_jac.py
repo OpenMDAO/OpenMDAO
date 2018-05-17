@@ -26,8 +26,11 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
+        model.linear_solver = LinearBlockJac(assembled_jac='dense')
+        prob.setup(check=False)
+
         with self.assertRaises(RuntimeError) as context:
-            model.linear_solver = LinearBlockJac(assembled_jac='dense')
+            prob.run_model()
             self.assertEqual(str(context.exception),
                              "Linear solver 'LN: LNBJ' doesn't support assembled jacobians.")
 

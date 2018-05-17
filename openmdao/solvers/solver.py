@@ -739,7 +739,6 @@ class LinearSolver(Solver):
         """
         self.options.declare('assembled_jac', default=None,
                              values=[None, 'csc', 'dense'],
-                             callback=self._new_jac,
                              desc='Sets the type of assembled jacobian used by this solver.')
 
         self.supports.declare('assembled_jac', types=bool, default=True)
@@ -791,44 +790,18 @@ class LinearSolver(Solver):
             for varset, data in iteritems(b_vecs[vec_name]._data):
                 rhs[varset] = data.copy()
 
+        newjac = self.options['assembled_jac']
+
         # set up jacobian
         if self.supports['assembled_jac']:
-            newjac = self.options['assembled_jac']
             if newjac == 'dense':
                 self._assembled_jac = DenseJacobian(system)
             elif newjac == 'csc':
                 self._assembled_jac = CSCJacobian(system)
             # else jacobians will be local to components.
-
-    def _setup_jacobians(self, parent_jacobian=None):
-        """
-        Set and populate our assembled jacobian, if we have one.
-
-        Parameters
-        ----------
-        parent_jacobian : <AssembledJacobian> or None
-            The global jacobian to populate.
-        """
-        if self._assembled_jac is not None and not self.supports['assembled_jac']:
-            raise RuntimeError("Linear solver '%s' is being used with "
-                               "an AssembledJacobian in system '%s'" %
-                               (self.SOLVER, self._system.pathname))
-
-        # # if we have an assembled jac at this level and an assembled jac above us, then
-        # # our jacs (and any of our children's assembled jacs) will share their internal
-        # # subjac dicts.  Each will maintain its own internal Matrix objects though.
-        # if parent_jacobian is not None:
-        #     if self._assembled_jac is not None and self._assembled_jac is not parent_jacobian:
-        #         print(type(self.assembled_jac).__name__, id(self.assembled_jac), "is a view of",
-        #               type(parent_jacobian).__name__, id(parent_jacobian))
-        #         parent_jacobian._subjacs.update(self._assembled_jac._subjacs)
-        #         parent_jacobian._subjacs_info.update(self._assembled_jac._subjacs_info)
-        #         self._assembled_jac._subjacs = parent_jacobian._subjacs
-        #         self._assembled_jac._subjacs_info = parent_jacobian._subjacs_info
-        #         self._assembled_jac._keymap = parent_jacobian._keymap
-        #         self._assembled_jac._view_ranges = parent_jacobian._view_ranges
-        #     # else:
-        #     #     self._assembled_jac = parent_jacobian
+        elif newjac is not None:
+            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
+                               "jacobians." % (self.SOLVER, self._system.pathname))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
