@@ -33,7 +33,7 @@ _registered = False  # prevents multiple atexit registrations
 _printer = None
 
 MAXLINE = 80
-tab = '    '
+tab = '   '
 time0 = None
 
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")

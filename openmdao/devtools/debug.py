@@ -208,12 +208,26 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_jacs:
-            jactype = type(s._jacobian).__name__ if s._jacobian is not None else None
-            if (s._jacobian is not None and s._jacobian not in seenJacs and
-                    jactype != 'DictionaryJacobian'):
-                seenJacs.add(s._jacobian)
+            lnjacs = () if s.linear_solver is None else s.linear_solver._get_assembled_jacs()
+            nljacs = () if s.nonlinear_solver is None else s.nonlinear_solver._get_assembled_jacs()
+            if lnjacs:
+                types = sorted(set(type(j).__name__ for j in lnjacs))
+                cprint(" LN_jac: ")
+                if len(types) == 1:
+                    cprint(', '.join(types), color=Fore.MAGENTA + Style.BRIGHT)
+                else:
+                    cprint(types[0], color=Fore.MAGENTA + Style.BRIGHT)
+            if nljacs:
+                types = sorted(set(type(j).__name__ for j in nljacs))
+                cprint(" NL_jac: ")
+                if len(types) == 1:
+                    cprint(', '.join(types), color=Fore.MAGENTA + Style.BRIGHT)
+                else:
+                    cprint(types[0], color=Fore.MAGENTA + Style.BRIGHT)
+
+            if s._jacobian is None:
                 cprint("  Jac: ")
-                cprint(jactype, color=Fore.MAGENTA + Style.BRIGHT)
+                cprint('None', color=Fore.MAGENTA + Style.BRIGHT)
 
         cprint('', end='\n')
 

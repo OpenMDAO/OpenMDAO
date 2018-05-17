@@ -141,6 +141,7 @@ def _setup_func_group():
         ],
         'linear': [
             ('_apply_linear', (System,)),
+            ('_setup_jacobians', (System, Solver)),
             ('_solve_linear', (System,)),
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
@@ -151,7 +152,9 @@ def _setup_func_group():
             ('solve', (LinearSolver, NewtonSolver)),
             ('_update', (Jacobian,)),
             ('_apply', (Jacobian,)),
-            ('compute_totals', (_TotalJacInfo,)),
+            ('_initialize', (Jacobian,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
             ('compute_jacvec_product', (System,)),
         ],
         'solver': [
