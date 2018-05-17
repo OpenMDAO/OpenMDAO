@@ -213,10 +213,7 @@ def _setup(options):
         method_counts = defaultdict(int)
         class_counts = defaultdict(lambda: -1)
         id2count = {}
-        if verbose or memory or leaks:
-            do_ret = _trace_return
-        else:
-            do_ret = None
+        do_ret = _trace_return
 
         if memory:
             if psutil is None:

@@ -1634,7 +1634,7 @@ class Group(System):
         with Recording(name + '._apply_linear', self.iter_count, self):
             if self._owns_approx_jac:
                 jac = self._jacobian
-            elif self._owns_assembled_jac or self._views_assembled_jac:
+            elif jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
                 jac = self._assembled_jacs[0]
             if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                 # print(self.pathname, "_apply_linear", type(jac).__name__, id(jac))
@@ -1737,13 +1737,17 @@ class Group(System):
             sub_do_ln = (self._linear_solver is not None) and \
                         (self._linear_solver._linearize_children())
 
+            if jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
+                jac = self._assembled_jacs[0]
+
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:
                 subsys._linearize(jac, do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
             for asm_jac in self._assembled_jacs:
-                asm_jac._update()
+                with self.jacobian_context(asm_jac):
+                    asm_jac._update()
             # if jac is not None:
             #     jac.update()
             # elif self._owns_assembled_jac:
