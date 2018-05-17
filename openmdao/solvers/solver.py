@@ -814,21 +814,21 @@ class LinearSolver(Solver):
                                "an AssembledJacobian in system '%s'" %
                                (self.SOLVER, self._system.pathname))
 
-        # if we have an assembled jac at this level and an assembled jac above us, then
-        # our jacs (and any of our children's assembled jacs) will share their internal
-        # subjac dicts.  Each will maintain its own internal Matrix objects though.
-        if parent_jacobian is not None:
-            if self._assembled_jac is not None and self._assembled_jac is not parent_jacobian:
-                print(type(self.assembled_jac).__name__, id(self.assembled_jac), "is a view of",
-                      type(parent_jacobian).__name__, id(parent_jacobian))
-                parent_jacobian._subjacs.update(self._assembled_jac._subjacs)
-                parent_jacobian._subjacs_info.update(self._assembled_jac._subjacs_info)
-                self._assembled_jac._subjacs = parent_jacobian._subjacs
-                self._assembled_jac._subjacs_info = parent_jacobian._subjacs_info
-                self._assembled_jac._keymap = parent_jacobian._keymap
-                self._assembled_jac._view_ranges = parent_jacobian._view_ranges
-            # else:
-            #     self._assembled_jac = parent_jacobian
+        # # if we have an assembled jac at this level and an assembled jac above us, then
+        # # our jacs (and any of our children's assembled jacs) will share their internal
+        # # subjac dicts.  Each will maintain its own internal Matrix objects though.
+        # if parent_jacobian is not None:
+        #     if self._assembled_jac is not None and self._assembled_jac is not parent_jacobian:
+        #         print(type(self.assembled_jac).__name__, id(self.assembled_jac), "is a view of",
+        #               type(parent_jacobian).__name__, id(parent_jacobian))
+        #         parent_jacobian._subjacs.update(self._assembled_jac._subjacs)
+        #         parent_jacobian._subjacs_info.update(self._assembled_jac._subjacs_info)
+        #         self._assembled_jac._subjacs = parent_jacobian._subjacs
+        #         self._assembled_jac._subjacs_info = parent_jacobian._subjacs_info
+        #         self._assembled_jac._keymap = parent_jacobian._keymap
+        #         self._assembled_jac._view_ranges = parent_jacobian._view_ranges
+        #     # else:
+        #     #     self._assembled_jac = parent_jacobian
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

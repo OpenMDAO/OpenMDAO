@@ -1268,7 +1268,10 @@ class System(object):
                 self._views_assembled_jac = True
 
         # not that for a Group, the following does nothing
-        self._set_partials_meta(alljacs)
+        if asm_jacs:
+            self._set_partials_meta(asm_jacs)
+        elif self._jacobian:
+            self._set_partials_meta([self._jacobian])
         self._set_partials_meta(parent_asm_jacs)
 
         self._assembled_jacs = asm_jacs

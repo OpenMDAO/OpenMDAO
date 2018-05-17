@@ -146,7 +146,7 @@ def _setup_func_group():
             ('_solve_linear', (System,)),
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
-            ('_set_partials_meta', (System,)),
+            ('_set_partials_meta', (System, Jacobian)),
             ('jacobian_context', (System,)),
             ('_linearize', (System, Solver)),
             ('_negate_jac', (ExplicitComponent,)),
