@@ -176,6 +176,7 @@ class ExplicitComponent(Component):
         """
         abs2prom = self._var_abs2prom
 
+        # set context of jacobians once to avoid doing inside of loop
         old_systems = []
         for J in jacs:
             old_systems.append(J._system)
@@ -197,6 +198,7 @@ class ExplicitComponent(Component):
                 if abs_key[1] not in self._var_allprocs_abs_names['output']:
                     self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
 
+        # reset context of jacobians
         for i, J in enumerate(jacs):
             J._system = old_systems[i]
 
