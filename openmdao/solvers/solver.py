@@ -743,29 +743,6 @@ class LinearSolver(Solver):
 
         self.supports.declare('assembled_jac', types=bool, default=True)
 
-    def _new_jac(self, name, old_value, new_value):
-        """
-        Notify system that jacobian has changed.
-
-        Parameters
-        ----------
-        name : str
-            Name of the option that has changed.
-        old_value : object
-            Original value of the option.
-        new_value : object
-            New value assigned to the option.
-        """
-        if name == 'assembled_jac' and not self.supports['assembled_jac']:
-            if self._system is not None:
-                sysname = "in system '%s' " % self._system.pathname
-            else:
-                sysname = ''
-            raise RuntimeError("Linear solver '%s' %sdoesn't support assembled jacobians." %
-                               (self.SOLVER, sysname))
-        if old_value != new_value and self._system is not None:
-            self._system._jacobian_changed = True
-
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.

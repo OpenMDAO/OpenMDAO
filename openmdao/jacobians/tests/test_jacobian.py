@@ -475,7 +475,6 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = ScipyKrylov(assembled_jac='dense')
 
         prob.setup(check=False)
-        prob.final_setup()
 
         model.linear_solver.options['assembled_jac'] = 'csc'
 
