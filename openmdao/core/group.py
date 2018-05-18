@@ -1830,14 +1830,13 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
+        J = self._jacobian
+
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
-            if self._jacobian is None:
-                self._jacobian = J = DictionaryJacobian()
-                J._system = self
-            else:
-                J = self._jacobian
+            if J is None:
+                self._jacobian = J = DictionaryJacobian(system=self)
 
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
@@ -1912,9 +1911,10 @@ class Group(System):
 
             approx._init_approximations()
 
-            # self._jacobian._system = self
             self._views_assembled_jac = False
             J._initialize()
+        else:
+            self._jacobian = None
 
         super(Group, self)._setup_jacobians(parent_asm_jacs)
 

@@ -14,18 +14,14 @@ class TestLinearRunOnceSolver(unittest.TestCase):
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
         prob = Problem()
-        prob.model = ConvergeDivergeGroups()
+        model = prob.model = ConvergeDivergeGroups()
 
-        prob.model.linear_solver = LinearRunOnce()
+        model.linear_solver = LinearRunOnce()
+        model.g1.linear_solver = LinearRunOnce()
+        model.g1.g2.linear_solver = LinearRunOnce()
+        model.g3.linear_solver = LinearRunOnce()
+
         prob.set_solver_print(level=0)
-
-        g1 = prob.model.g1
-        g2 = g1.g2
-        g3 = prob.model.g3
-        g1.linear_solver = LinearRunOnce()
-        g2.linear_solver = LinearRunOnce()
-        g3.linear_solver = LinearRunOnce()
-
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -45,32 +41,24 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
     def test_undeclared_options(self):
-        # Test that using options that should not exist in class, cause an
-        # error if they are set when instantiating LinearRunOnce.
-        # atol and rtol are not used in LinearRunOnce
-        from openmdao.api import Problem, Group, LinearRunOnce
+        # Test that using options that should not exist in class cause an error
+        solver = LinearRunOnce()
 
-        prob = Problem()
-        model = prob.model = Group()
+        msg = "\"Key '%s' cannot be set because it has not been declared.\""
 
-        with self.assertRaises(KeyError) as context:
-            model.linear_solver = LinearRunOnce(atol=1.0)
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+            with self.assertRaises(KeyError) as context:
+                solver.options[option] = 1
 
-        self.assertEqual(str(context.exception), "\"Key 'atol' cannot be set because it "
-                                                 "has not been declared.\"")
+            self.assertEqual(str(context.exception), msg % option)
 
-        with self.assertRaises(KeyError) as context:
-            model.linear_solver = LinearRunOnce(rtol=1.0)
-
-        self.assertEqual(str(context.exception), "\"Key 'rtol' cannot be set because it "
-                                                 "has not been declared.\"")
 
     def test_feature_solver(self):
         from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
@@ -88,6 +76,7 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

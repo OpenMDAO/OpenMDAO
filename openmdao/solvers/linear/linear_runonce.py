@@ -83,12 +83,11 @@ class LinearRunOnce(LinearBlockGS):
         """
         super(LinearRunOnce, self)._declare_options()
 
-        # changing the default maxiter from the base class
-        self.options.declare('maxiter', default=0, values=(0,),
-                             desc='maximum number of iterations '
-                                  '(this solver does not iterate)')
-
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
+
+        # this solver does not iterate
+        self.options.undeclare("maxiter")
+        self.options.undeclare("err_on_maxiter")
