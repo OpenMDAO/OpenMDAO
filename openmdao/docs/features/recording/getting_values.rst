@@ -41,7 +41,7 @@ You can get a list of the case IDs using the :code:`list_cases` method:
     for case_key in case_keys:
         print('Case:', case_key)
 
-The :code:`get_case` method provides a way to get at individual cases. 
+The :code:`get_case` method provides a way to get at individual cases.
 
 .. automethod:: openmdao.recorders.sqlite_reader.DriverCases.get_case
     :noindex:
@@ -82,7 +82,7 @@ and :code:`get_responses()` which, as their names imply, will return the corresp
 Here's an example that shows how to use these methods to see what variables were recorded on the first driver iteration and get their values.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_driver_options_with_values
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_options_with_values
     :layout: interleave
 
 Additionally, just like :ref:`listing variables <listing-variables>` on System objects, there is a :code:`list_inputs` method and a :code:`list_outputs` method on the CaseReader.
@@ -132,5 +132,5 @@ Here is an example that shows how you might want to use this method. Notice that
 runs of the model.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_feature_load_system_case_for_restart
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_load_system_case_for_restart
     :layout: interleave
