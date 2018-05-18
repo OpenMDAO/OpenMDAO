@@ -867,7 +867,6 @@ class _TotalJacInfo(object):
                         deriv_val = np.empty(slc.stop - slc.start)
                     self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
 
-                # print("deriv_val:", output_name, input_name, deriv_val)
                 if fwd:
                     J[slc, i] = deriv_val
                 else:
@@ -912,7 +911,6 @@ class _TotalJacInfo(object):
                     indices = out_meta[output_name][1]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
-                    # print("deriv_val:", i, output_name, input_name, deriv_val)
                     J[row, i] = deriv_val[idx2local[row]]
 
     def matmat_jac_setter(self, inds):

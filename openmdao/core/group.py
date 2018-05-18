@@ -1637,7 +1637,6 @@ class Group(System):
             elif jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
                 jac = self._assembled_jacs[0]
             if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
-                # print(self.pathname, "_apply_linear", type(jac).__name__, id(jac))
                 with self.jacobian_context(jac):
                     for vec_name in vec_names:
                         with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
@@ -1645,7 +1644,6 @@ class Group(System):
                             jac._apply(d_inputs, d_outputs, d_residuals, mode)
             # Apply recursion
             else:
-                # print(self.pathname, "_apply_linear, recursive")
                 if rel_systems is not None:
                     irrelevant_subs = [s for s in self._subsystems_myproc
                                        if s.pathname not in rel_systems]
@@ -1655,10 +1653,6 @@ class Group(System):
                     if rel_systems is not None:
                         for s in irrelevant_subs:
                             # zero out dvecs of irrelevant subsystems
-                            # TODO: it's not completely clear that this is
-                            #       necessary in fwd mode.  I wasn't able to
-                            #       produce convergence failures during testing
-                            #       in fwd mode.
                             s._vectors['residual']['linear'].set_const(0.0)
 
                 for subsys in self._subsystems_myproc:
@@ -1718,8 +1712,6 @@ class Group(System):
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        # print(self.pathname, "_linearize", type(jac).__name__, id(jac))
-
         # Group finite difference
         if self._owns_approx_jac:
             if jac is None:
@@ -1748,14 +1740,6 @@ class Group(System):
             for asm_jac in self._assembled_jacs:
                 with self.jacobian_context(asm_jac):
                     asm_jac._update()
-            # if jac is not None:
-            #     jac.update()
-            # elif self._owns_assembled_jac:
-            #     self.linear_solver._assembled_jac._update()
-            # elif self._views_assembled_jac:
-            #     njac = self.nonlinear_solver._get_assembled_jacs()
-            #     if njac:
-            #         njac.pop()._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()

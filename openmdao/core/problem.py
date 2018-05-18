@@ -1086,7 +1086,6 @@ class Problem(object):
         if self._setup_status < 2:
             self.final_setup()
 
-        # print("Problem.compute_totals", type(self.model.jacobian))
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
                 total_info = _TotalJacInfo(self, of, wrt, False, return_format,

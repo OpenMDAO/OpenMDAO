@@ -291,7 +291,6 @@ class ExplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
-        # print(self.pathname, "_apply_linear", type(J).__name__, id(J))
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name not in self._rel_vec_names:
@@ -397,7 +396,6 @@ class ExplicitComponent(Component):
             return
 
         J = self._jacobian if jac is None else jac
-        # print(self.pathname, "_linearize", type(J).__name__, id(J))
 
         with self.jacobian_context(J):
             with self._unscaled_context(

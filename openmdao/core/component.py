@@ -89,8 +89,7 @@ class Component(System):
         self._declared_partials = []
         self._approximated_partials = []
         self._declared_partial_checks = []
-        self._jacobian = DictionaryJacobian()
-        self._jacobian._system = self
+        self._jacobian = DictionaryJacobian(system=self)
 
     def setup(self):
         """

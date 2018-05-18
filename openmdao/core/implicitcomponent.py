@@ -135,7 +135,6 @@ class ImplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
-        # print(self.pathname, "_apply_linear", type(J).__name__, id(J))
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:
                 continue
@@ -262,7 +261,6 @@ class ImplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
-        # print(self.pathname, "_linearize", type(J).__name__, id(J))
         with self.jacobian_context(J):
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
