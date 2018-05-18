@@ -195,11 +195,6 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        if self._in_ranges is None:
-            # we haven't been initialized yet
-            self._initialize()
-            raise RuntimeError("FOO")
-
         abs2meta = system._var_abs2meta
         in_ranges = self._in_ranges
         out_ranges = self._out_ranges
