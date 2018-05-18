@@ -108,13 +108,13 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver()
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 0)
 
@@ -131,7 +131,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(UniformGenerator(num_samples=5, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -146,7 +146,7 @@ class TestDOEDriver(unittest.TestCase):
             4: {'x': np.array([ 9.27325521]), 'y': np.array([-2.33116962])},
         }
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 5)
 
@@ -168,7 +168,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(generator=FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -188,7 +188,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 9)
 
@@ -209,7 +209,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -227,7 +227,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'xy': np.array([ 50.,  50.])},
         }
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 9)
 
@@ -249,7 +249,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(PlackettBurmanGenerator())
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -262,7 +262,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 4)
 
@@ -293,13 +293,13 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('a')
 
         prob.driver = DOEDriver(BoxBehnkenGenerator(center=center))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
         # which 2 factors are varied thru the 4 possible combinations of high & low.
@@ -356,7 +356,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.driver = DOEDriver()
         prob.driver.options['generator'] = LatinHypercubeGenerator(samples=4, seed=0)
 
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -384,7 +384,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([-0.72559325]), 'y': np.array([-2.27558409])},
         }
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 4)
 
@@ -423,7 +423,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
@@ -451,7 +451,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'xy': np.array([-7.25593248, -11.37792043])},
         }
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 4)
 
@@ -494,13 +494,13 @@ class TestDOEDriver(unittest.TestCase):
         model.add_objective('comp.f_xy')
 
         prob.driver = DOEDriver(LatinHypercubeGenerator(samples=samples, criterion='c'))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup(check=False)
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, samples)
 
@@ -592,7 +592,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3), parallel=True)
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup()
 
@@ -619,7 +619,7 @@ class TestParallelDOE(unittest.TestCase):
         rank = prob.comm.rank
 
         # cases will be split across files for each proc
-        filename = "CASES.db_%d" % rank
+        filename = "cases.sql_%d" % rank
 
         expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
         self.assertTrue(expect_msg in output)
@@ -655,7 +655,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('c3.y')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
         prob.driver.options['parallel'] =  doe_parallel
 
         prob.setup(check=False)
@@ -686,7 +686,7 @@ class TestParallelDOE(unittest.TestCase):
 
         # cases will be split across files for each proc up to the number requested
         if rank < doe_parallel:
-            filename = "CASES.db_%d" % rank
+            filename = "cases.sql_%d" % rank
 
             expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
             self.assertTrue(expect_msg in output)
@@ -725,7 +725,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_objective('c3.y')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
         prob.driver.options['parallel'] =  doe_parallel
 
         prob.setup(check=False)
@@ -755,7 +755,7 @@ class TestParallelDOE(unittest.TestCase):
         num_cases = 0
 
         # cases will be split across files for each proc up to the number requested
-        filename = "CASES.db_%d" % rank
+        filename = "cases.sql_%d" % rank
 
         expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
         self.assertTrue(expect_msg in output)
@@ -812,13 +812,13 @@ class TestDOEDriverFeature(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(UniformGenerator(num_samples=5))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("CASES.db").driver_cases
+        cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 5)
 
@@ -898,7 +898,7 @@ class TestParallelDOEFeature(unittest.TestCase):
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.options['parallel'] =  True
 
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -908,8 +908,8 @@ class TestParallelDOEFeature(unittest.TestCase):
 
         # check recorded cases from each case file
         rank = MPI.COMM_WORLD.rank
-        filename = "CASES.db_%d" % rank
-        self.assertEqual(filename, "CASES.db_%d" % rank)
+        filename = "cases.sql_%d" % rank
+        self.assertEqual(filename, "cases.sql_%d" % rank)
 
         cases = CaseReader(filename).driver_cases
         self.assertEqual(cases.num_cases, 5 if rank == 0 else 4)
@@ -986,7 +986,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
         model.add_objective('c3.y')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("CASES.db"))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         # run 2 cases at a time, each using 2 of our 4 procs
         doe_parallel = prob.driver.options['parallel'] = 2
@@ -999,7 +999,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
         # check recorded cases from each case file
         if rank < doe_parallel:
-            filename = "CASES.db_%d" % rank
+            filename = "cases.sql_%d" % rank
 
             cases = CaseReader(filename).driver_cases
 
