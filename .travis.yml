@@ -81,7 +81,7 @@ install:
 - python setup.py install;
 - cd ..;
 
-- if [ -n "$PETSc" ]; then
+- if [ "$PETSc" ]; then
     pip install mpi4py;
     pip install petsc4py==$PETSc;
   fi
