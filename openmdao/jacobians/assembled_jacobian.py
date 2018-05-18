@@ -198,6 +198,7 @@ class AssembledJacobian(Jacobian):
         if self._in_ranges is None:
             # we haven't been initialized yet
             self._initialize()
+            raise RuntimeError("FOO")
 
         abs2meta = system._var_abs2meta
         in_ranges = self._in_ranges
