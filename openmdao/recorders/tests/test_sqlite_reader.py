@@ -218,8 +218,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(cr, SqliteCaseReader), msg='CaseReader not'
                         ' returning the correct subclass.')
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_reading_driver_cases(self):
         """ Tests that the reader returns params correctly. """
         self.setup_sellar_model_with_optimization()
@@ -450,8 +450,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         self.assertEqual(
-                sorted(cr.system_metadata.keys()),
-                sorted(['root', 'mda.d1', 'pz'])
+            sorted(cr.system_metadata.keys()),
+            sorted(['root', 'mda.d1', 'pz'])
         )
 
         self.assertEqual(cr.system_metadata['root']['component_options']['test1'], 1)
@@ -482,15 +482,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         self.assertEqual(
-                sorted(cr.solver_metadata.keys()),
-                sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
+            sorted(cr.solver_metadata.keys()),
+            sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
         )
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
         self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_reading_driver_recording_with_system_vars(self):
 
         self.setup_sellar_grouped_model()
@@ -806,11 +806,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_responses = expected_objectives.copy()
         expected_responses.update(expected_constraints)
 
-        for expected_set, actual_set in (
-            (expected_desvars, desvars),
-            (expected_objectives, objectives),
-            (expected_constraints, constraints),
-            (expected_responses, responses)):
+        for expected_set, actual_set in ((expected_desvars, desvars),
+                                         (expected_objectives, objectives),
+                                         (expected_constraints, constraints),
+                                         (expected_responses, responses)):
 
             self.assertEqual(len(expected_set), len(actual_set.keys))
             for k in actual_set:
@@ -939,7 +938,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         _assert_model_matches_case(case, model)
 
-
     def test_optimization_load_system_cases(self):
 
         self.setup_sellar_grouped_model()
@@ -960,8 +958,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_before = model.list_inputs(values=True, units=True )
-        outputs_before = model.list_outputs(values=True, units=True )
+        inputs_before = model.list_inputs(values=True, units=True)
+        outputs_before = model.list_outputs(values=True, units=True)
 
         cr = CaseReader(self.filename)
         # get third case
@@ -984,8 +982,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        inputs_after = model.list_inputs(values=True, units=True )
-        outputs_after = model.list_outputs(values=True, units=True )
+        inputs_after = model.list_inputs(values=True, units=True)
+        outputs_after = model.list_outputs(values=True, units=True)
         iter_count_after = driver.iter_count
 
         for before, after in zip(inputs_before, inputs_after):
@@ -996,7 +994,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Should take one less iteration since we gave it a head start in the second run
         self.assertEqual(iter_count_before, iter_count_after + 1)
-
 
     def test_load_solver_cases(self):
 
@@ -1080,247 +1077,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         _assert_model_matches_case(case, model)
 
-    def test_feature_load_system_case_for_restart(self):
-
-        #######################################################################
-        # Do the initial optimization run
-        #######################################################################
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                   upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
-
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
-
-        case_recorder_filename = 'cases.sql'
-        recorder = SqliteRecorder(case_recorder_filename)
-
-        model.add_recorder(recorder)
-
-        model.recording_options['record_inputs'] = True
-        model.recording_options['record_outputs'] = True
-        model.recording_options['record_residuals'] = True
-        model.recording_options['record_metadata'] = False
-        model.recording_options['options_excludes'] = ['*']
-
-        prob.setup(check=False)
-        prob.run_driver()
-        prob.cleanup()
-
-        #######################################################################
-        # Assume that the optimization given above failed before it finished.
-        # To debug the problem, we can run the script again, but this time using
-        # the last recorded case as a starting point.
-        #######################################################################
-        from openmdao.api import Problem, ScipyOptimizeDriver, CaseReader
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                   upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
-
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
-
-        model.recording_options['record_inputs'] = True
-        model.recording_options['record_outputs'] = True
-        model.recording_options['record_residuals'] = True
-        model.recording_options['record_metadata'] = False
-        model.recording_options['options_excludes'] = ['*']
-
-        prob.setup(check=False)
-
-        case_recorder_filename = 'cases.sql'
-        cr = CaseReader(case_recorder_filename)
-        # Load the last case written
-        last_case = cr.system_cases.get_case(-1)
-        prob.load_case(last_case)
-
-        prob.run_driver()
-        prob.cleanup()
-
-    def test_system_options(self):
-        import numpy as np
-
-        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        model.nonlinear_solver = NonlinearBlockGS()
-
-        obj_cmp = model.obj_cmp
-
-        recorder = SqliteRecorder(self.filename)
-        obj_cmp.add_recorder(recorder)
-        obj_cmp.recording_options['includes'] = ['*']
-        obj_cmp.recording_options['excludes'] = ['obj_cmp.x']
-
-        prob.setup()
-        prob.run_driver()
-
-        cr = CaseReader(self.filename)
-        first_system_case = cr.system_cases.get_case(0)
-        recorded_inputs = first_system_case.inputs.keys
-        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
-
-    def test_driver_options(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                   upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
-
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
-
-        recorder = SqliteRecorder(self.filename)
-        driver.add_recorder(recorder)
-        driver.recording_options['includes'] = []
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_desvars'] = True
-
-        prob.setup()
-        prob.run_driver()
-
-        cr = CaseReader(self.filename)
-        first_driver_case = cr.driver_cases.get_case(0)
-        recorded_objectives = first_driver_case.get_objectives().keys
-        recorded_constraints = first_driver_case.get_constraints().keys
-        recorded_desvars = first_driver_case.get_desvars().keys
-
-        self.assertEqual(set(recorded_objectives), {'obj'})
-        self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars), {'x', 'z'})
-
-    def test_driver_options_with_values(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                   upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
-
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
-
-        recorder = SqliteRecorder(self.filename)
-        driver.add_recorder(recorder)
-        driver.recording_options['includes'] = []
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_desvars'] = True
-
-        prob.setup()
-        prob.run_driver()
-
-        cr = CaseReader(self.filename)
-        first_driver_case = cr.driver_cases.get_case(0)
-        recorded_objectives = first_driver_case.get_objectives()
-        recorded_constraints = first_driver_case.get_constraints()
-        recorded_desvars = first_driver_case.get_desvars()
-
-        self.assertEqual(set(recorded_objectives.keys), {'obj'})
-        self.assertEqual(set(recorded_constraints.keys), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars.keys), {'x', 'z'})   
-
-        self.assertAlmostEqual(recorded_objectives['obj'][0], 28.58830817)     
-        self.assertAlmostEqual(recorded_desvars['x'][0], 1.)
-
-    def test_solver_options(self):
-        import numpy as np
-
-        from openmdao.api import Problem, IndepVarComp, ExecComp, NonlinearBlockGS, SqliteRecorder, CaseReader
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        solver = model.nonlinear_solver = NonlinearBlockGS()
-
-        recorder = SqliteRecorder(self.filename)
-        solver.add_recorder(recorder)
-        solver.recording_options['record_abs_error'] = True
-
-        prob.setup()
-        prob.run_model()
-
-        cr = CaseReader(self.filename)
-        first_solver_case = cr.solver_cases.get_case(0)
-        
-        recorded_abs_error = first_solver_case.abs_err
-        self.assertAlmostEqual(recorded_abs_error, 2.2545141)
-
     def test_reading_system_metadata_basic(self):
         self.setup_sellar_model()
 
@@ -1334,7 +1090,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # declare two options
         d1.options.declare('options value 1', 1)
         d1.options.declare('options value to ignore', 2)
-        
+
         d1.add_recorder(self.recorder)
 
         # don't record the second option on d1
@@ -1354,64 +1110,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         # option 2 is not recorded
         self.assertFalse('options value to ignore' in d1_options)
 
-    
-    def test_circuit_with_recorder(self):
-
-        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, CaseReader, SqliteRecorder
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
-
-        class Circuit(Group):
-
-            def setup(self):
-                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
-                self.add_subsystem('n2', Node())  # leaving defaults
-
-                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
-                self.add_subsystem('R2', Resistor(R=10000.))
-                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
-
-                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
-                self.connect('R1.I', 'n1.I_out:0')
-                self.connect('R2.I', 'n1.I_out:1')
-
-                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
-                self.connect('R2.I', 'n2.I_in:0')
-                self.connect('D1.I', 'n2.I_out:0')
-
-                self.nonlinear_solver = NewtonSolver()
-                self.nonlinear_solver.options['iprint'] = 2
-                self.nonlinear_solver.options['maxiter'] = 20
-                self.linear_solver = DirectSolver()
-
-        p = Problem()
-        model = p.model
-
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
-
-        recorder = SqliteRecorder(self.filename)
-        p.driver.add_recorder(recorder)
-
-        p.setup()
-
-        # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
-
-        p.run_driver()
-
-        # create the case reader
-        cr = CaseReader(self.filename)
-
-        # grab the data recorded in the first driver iteration
-        first_driver_case = cr.driver_cases.get_case(0)
-
-        self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90830282)
-        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908303)
 
 def _assert_model_matches_case(case, system):
     '''

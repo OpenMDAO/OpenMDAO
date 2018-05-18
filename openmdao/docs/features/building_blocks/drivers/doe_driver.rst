@@ -36,7 +36,7 @@ UniformGenerator implements the simplest method and will generate a requested nu
 samples randomly selected from a uniform distribution across the valid range for each
 design variable. This example demonstrates its use with a model built on the
 :ref:`Paraboloid<tutorial_paraboloid_analysis>` Component.
-An :ref:`SqliteRecorder<basic_recording>` is used to capture the cases that were generated.
+An :ref:`SqliteRecorder<saving_data>` is used to capture the cases that were generated.
 We can see that that the model was evaluated at random values of :code:`x` and :code:`y`
 between -10 and 10, per the lower and upper bounds of those design variables.
 
