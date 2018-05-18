@@ -149,10 +149,10 @@ class SqliteCaseReader(BaseCaseReader):
 
                     if PY2:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(str(row[1]))
-                        self.system_metadata[id]['component_metadata'] = pickle.loads(str(row[2]))
+                        self.system_metadata[id]['component_options'] = pickle.loads(str(row[2]))
                     if PY3:
                         self.system_metadata[id]['scaling_factors'] = pickle.loads(row[1])
-                        self.system_metadata[id]['component_metadata'] = pickle.loads(row[2])
+                        self.system_metadata[id]['component_options'] = pickle.loads(row[2])
 
                 cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
                 for row in cur:

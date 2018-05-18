@@ -1,6 +1,6 @@
-**************************
-Working with Recorded Data
-**************************
+***********************************
+Getting Values with the Case Reader
+***********************************
 
 A `CaseReader` class is provided to read the data from a case recorder file. Currently, OpenMDAO only has a
 single format of `CaseRecorder`, `SqliteRecorder`.  In the future, we will implement an `HDF5Recorder`, but `CaseReader`
@@ -24,13 +24,16 @@ any of the following:
     #. System iterations
     #. Solver iterations
 
+Retrieving Cases
+----------------
+
 Assume that a recorder was attached to the `Driver` for the `Problem`. To find out how many cases were recorded:
 
 .. code-block:: console
 
     print('Number of driver cases recorded =', cr.driver_cases.num_cases )
 
-You can get a list of the case IDs using the `list_cases` method:
+You can get a list of the case IDs using the :code:`list_cases` method:
 
 .. code-block:: console
 
@@ -38,7 +41,12 @@ You can get a list of the case IDs using the `list_cases` method:
     for case_key in case_keys:
         print('Case:', case_key)
 
-The `get_case` method provides a way to get at individual cases. The argument to this method can either be:
+The :code:`get_case` method provides a way to get at individual cases. 
+
+.. automethod:: openmdao.recorders.sqlite_reader.DriverCases.get_case
+    :noindex:
+
+The argument to this method can either be:
 
     #. Integer - in which case the argument is an index into the cases. Negative numbers can be used as indices just
             as is normally done in Python.
@@ -66,62 +74,16 @@ If we had not promoted `pz.z`, we would use:
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
     print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['pz.z'])
 
-If a user would like to access the user-defined options on a given system or the scaling factors, the CaseReader also has a `system_metadata` dictionary. The case recorder does need to be explicitly added to a system in order for its metadata to be recorded. System metadata stored in `system_metadata` is accessed by system name where each system has two keys: `component_metadata` for accessing the user-defined options and `scaling_factors`. Accessing this data for `pz` would look like:
+Getting Variables and Values
+----------------------------
+Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`,
+and :code:`get_responses()` which, as their names imply, will return the corresponding set of variables and their values on that case.
 
-.. code-block:: console
+Here's an example that shows how to use these methods to see what variables were recorded on the first driver iteration and get their values.
 
-    pz.options.declare('test data', True)
-    ...
-    pz_metadata = cr.system_metadata['pz']['component_metadata']
-    test_data_value = pz_metadata['test data']
-
-    pz_scaling = cr.system_metadata['pz']['scaling_factors']
-
-
-
-Finally, if a user would like to access variable metadata there is a `output2meta` dictionary and a `input2meta` dictionary on the CaseReader. For example, if the user wanted the units of the `pz.z` variable they would use:
-
-.. code-block:: console
-
-    z_units = cr.output2meta['z']['units']
-
-*Iterating Over Cases*
-~~~~~~~~~~~~~~~~~~~~~~
-
-The :code:`get_cases` method provides a way to iterate over Driver and Solver cases in order.
-
-.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.get_cases
-    :noindex:
-
-For example, if the user wanted to iterate over all Driver and Solver cases they would use:
-
-.. code-block:: console
-
-    for case in cr.get_cases(recursive=True):
-        timestamp = case.timestamp
-        ...
-
-If the user wanted to iterate over all solver cases that are descendents of the first driver case they could use:
-
-.. code-block:: console
-
-    for case in cr.get_cases(parent='rank0:SLSQP|0', recursive=True):
-        timestamp = case.timestamp
-        ...
-
-Note that this generator can return both Driver and Solver cases, which have different attributes.
-
-*Listing Variables*
-~~~~~~~~~~~~~~~~~~~
-Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`, and :code:`get_responses()` which, as their names imply, will return the corresponding set of variables and their values on that case. In the situation where the user may want to print the design variables on the first driver case they could use:
-
-.. code-block:: console
-
-    print("-----------desvars-----------")
-    first_case = cr.driver_cases.get_case(0)
-    desvars = first_case.get_desvars()
-    for des in desvars:
-        print(des + ': ' + str(desvars[des]))
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_driver_options_with_values
+    :layout: interleave
 
 Additionally, just like :ref:`listing variables <listing-variables>` on System objects, there is a :code:`list_inputs` method and a :code:`list_outputs` method on the CaseReader.
 
@@ -144,10 +106,19 @@ By default, both methods will give all inputs or outputs recorded in system iter
 .. code-block:: console
 
     all_outputs = cr.list_outputs()
-    all_inputs cr.list_outputs()
+    all_inputs = cr.list_inputs()
 
-*Loading Cases into Problems*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Additionally, for quick access to values recorded there are :code:`inputs` and :code:`outputs` dictionaries on every Case and :code:`residuals` on System and Solver cases. If you wanted to quickly grab the value and residual of output `x`
+on the last solver iteration you would use:
+
+.. code-block:: console
+
+    last_solver_case = cr.solver_cases.get_case(-1)
+    x_val = last_solver_case.outputs['x']
+    x_residual = last_solver_case.residuals['x']
+
+Loading Cases into Problems
+---------------------------
 
 There are some situations where it would be useful to load in a recorded case back into a Problem. The
 :code:`Problem.load_case` method is provided for this. The :code:`Problem.load_case` method supports loading in all
@@ -163,4 +134,3 @@ runs of the model.
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_feature_load_system_case_for_restart
     :layout: interleave
-

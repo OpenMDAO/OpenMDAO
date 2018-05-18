@@ -35,7 +35,7 @@ So even if you are using an iterative linear solver, such as :ref:`ScipyKrylov<s
 
 Sparse Assembled Jacobian
 --------------------------
-In the majority of cases, if an assmbled Jacobian is appropriate for your model then you want to use the :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>`.
+In the majority of cases, if an assembled Jacobian is appropriate for your model then you want to use the :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>`.
 The :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>` only allocates memory for the non-zero partial derivatives.
 How does OpenMDAO know which partials are non-zero?
 The authors of the components in your model declared them using either a :ref:`dense<feature_specify_partials>` or :ref:`sparse<feature_sparse_partials>` form of :code:`delcare_partials`.

@@ -1,5 +1,9 @@
 from __future__ import print_function
 
+import os
+import shutil
+import tempfile
+
 import unittest
 import numpy as np
 import math
@@ -27,6 +31,7 @@ class RunOnceCounter(LinearRunOnce):
         super(RunOnceCounter, self)._iter_execute()
         self._solve_count += 1
 
+
 def run_opt(driver_class, color_info=None, sparsity=None, **options):
 
     # note: size must be an even number
@@ -41,7 +46,7 @@ def run_opt(driver_class, color_info=None, sparsity=None, **options):
     indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
                                       0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
     indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                      -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+                                     -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
     indeps.add_output('r', .7)
 
     p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
@@ -481,12 +486,12 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
 class SparsityTestCase(unittest.TestCase):
 
-    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_sparsity_snopt(self):
-        # first, run w/o sparsity
-        p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='SparsityTestCase-')
+        os.chdir(self.tempdir)
 
-        sparsity = {
+        self.sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
                "indeps.y": [[], [], [1, 10]],
@@ -514,9 +519,28 @@ class SparsityTestCase(unittest.TestCase):
             }
         }
 
-        p_sparsity = run_opt(pyOptSparseDriver, sparsity=sparsity, optimizer='SNOPT', print_results=False)
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_sparsity_snopt(self):
+        # first, run without sparsity
+        p = run_opt(pyOptSparseDriver, optimizer='SNOPT', print_results=False)
+
+        # run with dynamic sparsity
+        p_dynamic = run_opt(pyOptSparseDriver, dynamic_derivs_sparsity=True,
+                            optimizer='SNOPT', print_results=False)
+
+        # run with provided sparsity
+        p_sparsity = run_opt(pyOptSparseDriver, sparsity=self.sparsity,
+                             optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_dynamic['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
 
     def test_sparsity_pyoptsparse_slsqp(self):
@@ -530,40 +554,20 @@ class SparsityTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        sparsity = {
-            "circle.area": {
-               "indeps.x": [[], [], [1, 10]],
-               "indeps.y": [[], [], [1, 10]],
-               "indeps.r": [[0], [0], [1, 1]]
-            },
-            "r_con.g": {
-               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
-            },
-            "theta_con.g": {
-               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-               "indeps.r": [[], [], [5, 1]]
-            },
-            "delta_theta_con.g": {
-               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-               "indeps.r": [[], [], [5, 1]]
-            },
-            "l_conx.g": {
-               "indeps.x": [[0], [0], [1, 10]],
-               "indeps.y": [[], [], [1, 10]],
-               "indeps.r": [[], [], [1, 1]]
-            }
-        }
-
-        p_sparsity = run_opt(pyOptSparseDriver, sparsity=sparsity, optimizer='SLSQP', print_results=False)
-        assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
-
-        # run w/o coloring
+        # first, run without sparsity
         p = run_opt(pyOptSparseDriver, optimizer='SLSQP', print_results=False)
+
+        # run with dynamic sparsity
+        p_dynamic = run_opt(pyOptSparseDriver, dynamic_derivs_sparsity=True,
+                            optimizer='SLSQP', print_results=False)
+
+        # run with provided sparsity
+        p_sparsity = run_opt(pyOptSparseDriver, sparsity=self.sparsity,
+                             optimizer='SLSQP', print_results=False)
+
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_dynamic['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
 
 
 if __name__ == '__main__':
