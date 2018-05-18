@@ -406,7 +406,7 @@ class DenseJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(DenseJacobian, self).__init__(system=system, matrix_class=DenseMatrix)
+        super(DenseJacobian, self).__init__(DenseMatrix, system=system)
 
 
 class COOJacobian(AssembledJacobian):
@@ -423,7 +423,7 @@ class COOJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(COOJacobian, self).__init__(matrix_class=COOMatrix, system=system)
+        super(COOJacobian, self).__init__(COOMatrix, system=system)
 
 
 class CSRJacobian(AssembledJacobian):
@@ -440,7 +440,7 @@ class CSRJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(CSRJacobian, self).__init__(matrix_class=CSRMatrix, system=system)
+        super(CSRJacobian, self).__init__(CSRMatrix, system=system)
 
 
 class CSCJacobian(AssembledJacobian):
@@ -457,4 +457,4 @@ class CSCJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(CSCJacobian, self).__init__(matrix_class=CSCMatrix, system=system)
+        super(CSCJacobian, self).__init__(CSCMatrix, system=system)

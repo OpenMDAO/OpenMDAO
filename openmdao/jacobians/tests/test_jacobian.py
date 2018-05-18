@@ -243,11 +243,6 @@ class TestJacobian(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        top.add_design_var('indep.a')
-        top.add_design_var('indep.b')
-        top.add_constraint('C1.f')
-        top.add_objective('C2.f')
-
         prob.setup(check=False)
 
         prob.run_model()
@@ -561,7 +556,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.linear_solver = DirectSolver()
+        model.linear_solver = DirectSolver(assembled_jac='dense')
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -569,8 +564,6 @@ class TestJacobian(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
-
-        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -582,7 +575,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.linear_solver = DirectSolver()
+        model.linear_solver = DirectSolver(assembled_jac='dense')
 
         sub = model.add_subsystem('sub', Group())
 
@@ -592,8 +585,6 @@ class TestJacobian(unittest.TestCase):
 
         model.connect('p1.x', 'sub.comp.x')
         model.connect('p2.y', 'sub.comp.y')
-
-        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -609,7 +600,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.linear_solver = DirectSolver()
+        model.linear_solver = DirectSolver(assembled_jac='dense')
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -617,8 +608,6 @@ class TestJacobian(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
-
-        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 
@@ -630,7 +619,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.linear_solver = DirectSolver()
+        model.linear_solver = DirectSolver(assembled_jac='dense')
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -638,8 +627,6 @@ class TestJacobian(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
-
-        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
         prob.final_setup()
@@ -657,7 +644,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         model = prob.model = Group()
-        model.linear_solver = DirectSolver()
+        model.linear_solver = DirectSolver(assembled_jac='dense')
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -665,8 +652,6 @@ class TestJacobian(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
-
-        model.linear_solver.options['assembled_jac'] = 'dense'
 
         prob.setup()
 

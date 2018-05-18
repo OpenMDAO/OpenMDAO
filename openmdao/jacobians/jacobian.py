@@ -210,6 +210,9 @@ class Jacobian(object):
             self._subjacs[abs_key] = subjac
 
     def _initialize(self):
+        """
+        Allocate the global matrices.
+        """
         pass
 
     def _update(self):
