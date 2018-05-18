@@ -1393,7 +1393,7 @@ class Group(System):
         if match is None or match.group() != name:
             raise NameError("'%s' is not a valid system name." % name)
 
-        subsys.name = name
+        subsys.name = subsys.pathname = name
 
         if isinstance(promotes, string_types) or \
            isinstance(promotes_inputs, string_types) or \
@@ -1830,8 +1830,6 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._jacobian_changed = False
-
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:

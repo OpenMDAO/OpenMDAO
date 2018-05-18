@@ -148,8 +148,6 @@ class System(object):
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
-    _jacobian_changed : bool
-        If True, the jacobian has changed since the last call to setup.
     _owns_assembled_jac : bool
         If True, we are owners of the AssembledJacobian in our linear solver.
     _owns_approx_jac : bool
@@ -317,7 +315,6 @@ class System(object):
         self._linear_solver = None
 
         self._jacobian = None
-        self._jacobian_changed = True
         self._approx_schemes = OrderedDict()
         self._owns_assembled_jac = False
         self._subjacs_info = {}
@@ -1239,8 +1236,6 @@ class System(object):
         parent_asm_jacs : list of <AssembledJacobian>
             The global jacobian(s) to populate for this system.
         """
-        self._jacobian_changed = False
-
         alljacs = set()
         if self._linear_solver is not None:
             alljacs.update(self.linear_solver._get_assembled_jacs())
@@ -1461,9 +1456,9 @@ class System(object):
         """
         Set the Jacobian.
         """
-        raise RuntimeError("jacobian is no longer settable from System. Instead, use"
+        raise RuntimeError("%s: jacobian is no longer settable from System. Instead, use"
                            " options['assembled_jac'] = val on the linear solver, where val is "
-                           "one of [None, 'dense', 'csc'].")
+                           "one of [None, 'dense', 'csc']." % self.pathname)
 
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):
@@ -1659,9 +1654,6 @@ class System(object):
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
-        if self._jacobian_changed:
-            raise RuntimeError("%s: jacobian has changed and setup was not "
-                               "called." % self.pathname)
         oldsys = jac._system
         jac._system = self
         yield jac

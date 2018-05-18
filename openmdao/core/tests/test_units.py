@@ -678,7 +678,6 @@ class TestUnitConversion(unittest.TestCase):
 
         ## Make sure we can calculate a good derivative in the presence of pollution
 
-        #sub._jacobian_changed = True
         #sub.linear_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
         #rhs_buf = {None : np.array([3.5, 1.7])}
         #sol_buf = sub.linear_solver.solve(rhs_buf, sub, mode='fwd')[None]
