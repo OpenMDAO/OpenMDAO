@@ -1628,14 +1628,11 @@ class Group(System):
 
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
-        # if self.linear_solver is not None and self.linear_solver._assembled_jac:
-        #     jac = self.linear_solver._assembled_jac
-
         with Recording(name + '._apply_linear', self.iter_count, self):
             if self._owns_approx_jac:
                 jac = self._jacobian
             elif jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
-                jac = self._assembled_jacs[0]
+                jac = self._assembled_jac
             if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
                 with self.jacobian_context(jac):
                     for vec_name in vec_names:
@@ -1730,16 +1727,16 @@ class Group(System):
                         (self._linear_solver._linearize_children())
 
             if jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
-                jac = self._assembled_jacs[0]
+                jac = self._assembled_jac
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:
                 subsys._linearize(jac, do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
-            for asm_jac in self._assembled_jacs:
-                with self.jacobian_context(asm_jac):
-                    asm_jac._update()
+            if self._assembled_jac is not None:
+                with self.jacobian_context(self._assembled_jac):
+                    self._assembled_jac._update()
 
         if self._nonlinear_solver is not None and do_nl:
             self._nonlinear_solver._linearize()

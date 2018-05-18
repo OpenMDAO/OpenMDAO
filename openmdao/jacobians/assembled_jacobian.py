@@ -76,7 +76,6 @@ class AssembledJacobian(Jacobian):
         self._matrix_class = matrix_class
         self._in_ranges = None
         self._out_ranges = None
-        # self._init_done = False
 
         self._subjac_iters = defaultdict(lambda: None)
         self._init_ranges()
@@ -165,8 +164,8 @@ class AssembledJacobian(Jacobian):
                     abs_key2 = (res_abs_name, out_abs_name)
                     keymap[abs_key] = abs_key2
 
-                    # TODO: check to see if we actually need this since we have shape already
-                    shape = abs_key2shape(abs_key2)
+                    if src_indices is not None:
+                        shape = abs_key2shape(abs_key2)
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)

@@ -231,8 +231,8 @@ class System(object):
         Class to use for distributed data vectors.
     _local_vector_class : class
         Class to use for local data vectors.
-    _assembled_jacs : list
-        List of AssembledJacobians at this level of the system tree.
+    _assembled_jac : AssembledJacobian or None
+        AssembledJacobian at this level of the system tree.
     """
 
     def __init__(self, **kwargs):
@@ -359,7 +359,7 @@ class System(object):
         self._local_vector_class = None
         self._distributed_vector_class = None
 
-        self._assembled_jacs = ()
+        self._assembled_jac = None
 
     def _declare_options(self):
         """
@@ -1248,6 +1248,11 @@ class System(object):
         if self._nonlinear_solver is not None:
             alljacs.update(self._nonlinear_solver._get_assembled_jacs())
 
+        if len(alljacs) > 1:
+            raise RuntimeError("%s: multiple assembled jacobians %s are being used in the same "
+                               "system." % (self.pathname,
+                                            [type(j).__name__ for j in sorted(alljacs)]))
+
         asm_jacs = list(alljacs)
 
         self._owns_assembled_jac = my_asm_jac is not None
@@ -1259,9 +1264,9 @@ class System(object):
                 #       has an assembled jac
                 self._views_assembled_jac = True
 
-        # note that for a Group, _set_partials_meta does nothing
         if asm_jacs:
             jacs = asm_jacs[:]
+            self._assembled_jac = asm_jacs[0]
         elif parent_asm_jacs:
             jacs = parent_asm_jacs[:]
         else:
@@ -1270,13 +1275,12 @@ class System(object):
         if self._jacobian is not None:
             jacs.append(self._jacobian)
 
+        # note that for a Group, _set_partials_meta does nothing
         self._set_partials_meta(jacs)
 
-        self._assembled_jacs = asm_jacs
-
+        # At present, we don't support a AssembledJacobian in a group
+        # if any subcomponents are matrix-free.
         if asm_jacs:
-            # At present, we don't support a AssembledJacobian in a group
-            # if any subcomponents are matrix-free.
             if self.matrix_free:
                 raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
