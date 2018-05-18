@@ -99,6 +99,9 @@ script:
     make all;
   fi
 
+# display version of installed packages
+- pip list
+
 # run the tests from down here to see if it can work without being at top level
 # only do coverage on the upload machine.
 - if [ "$UPLOAD_DOCS" ]; then
