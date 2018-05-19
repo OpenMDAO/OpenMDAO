@@ -64,8 +64,7 @@ However, there are a few rules of thumb that can be used to guide most cases:
 
     #. direct solvers are very simple to use and for smaller problems is likely to be the best option.
     The only downside is that the cost of computing the factorization scales with :math:`n^3` where :math:`n` is the length of your variable vector and so the compute cost can get out of control.
-    If :math:`n` < 20000 try this solver first.
-
+    If :math:`n` < 2000 try this solver first.
     #. iterative solvers are more difficult to use because they do not always succeed in finding a good solution to the linear problem.
     Often times they require preconditioners in order to be effective.
     However, with adequate preconditioning iterative solvers can dramatically out perform direct solvers for even moderate sized problems.
