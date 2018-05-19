@@ -50,6 +50,8 @@ Backwards-Compatible API Changes:
 - Driver metadata/options can now be set via init args (can still be set as options as well).
 - User no longer needs to specify PETSCvector for parallel cases (the framework figures it out now).
 
+- check_totals and check_partials no longer support the `supress_output` argument. Use `out_stream=None` instead.
+
 Backwards-Incompatible API changes:
 -----------------------------------
 - Re-design of the CaseReader API. Unification of all cases, and simpler iteration over case hierarchies.
