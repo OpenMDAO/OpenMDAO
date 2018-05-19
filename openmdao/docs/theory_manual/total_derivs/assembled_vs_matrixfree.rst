@@ -19,7 +19,9 @@ figure out what kind of linear solver structure is needed.
 Assembled-Jacobian Problems
 ---------------------------
 Using an assembled Jacobian means that OpenMDAO will explicitly allocate the memory for the entire Jacobian matrix up front, and then hold onto that and re-use it throughout the run.
-This has several computational advantages, but the major one is that it helps to reduce framework overhead for models with deep model hierarchies and large numbers of variables.
+This has several computational advantages, but the major one is that it helps to reduce framework overhead for models with deep model hierarchies and large numbers of scalar or short array variables.
+If the total length of your output vector is less than 2000 you should most likely use an assembled Jacobian.
+
 
 You should strongly consider using an assembled Jacobian if all the components in your model provide derivatives using the :ref:`compute_partials <comp-type-2-explicitcomp>` or :ref:`linearize <comp-type-3-implicitcomp>` methods.
 These methods are explicitly computing the elements of that Jacobian matrix, and so it makes sense to collect them into an actual matrix memory representation.
@@ -54,6 +56,8 @@ Sellar is only a tiny toy problem, but in a real problem with thousands of varia
 
     The partial derivative Jacobian for the Sellar problem has only 18 non-zero values in it. It is 37% sparse.
 
+If you chose to use the :ref:`DirectSolver`, then it will use scipy's sparse `splu`_  method to solve linear system for total derivatives.
+
 Dense Assembled Jacobian
 ------------------------
 A :ref:`DenseJacobian<openmdao.jacobians.assembled_jacobian.py>` allocates a dense :math:`n \times n` matrix, where :math:`n` is the sum of the sizes of all output variables in your model, to store partial derivatives in.
@@ -68,7 +72,7 @@ So while there are some problems where it is appropriate, in most situations you
 
 .. _lu_factor: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.lu_factor.html
 .. _lu_solve: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.lu_solve.html#scipy.linalg.lu_solve
-
+.. _splu: https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.sparse.linalg.splu.html
 
 --------------------
 Matrix-Free Problems

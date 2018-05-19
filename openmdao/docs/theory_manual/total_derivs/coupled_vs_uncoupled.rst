@@ -46,7 +46,7 @@ In other words, there will be non-zero entries both above and below the diagonal
     :align: center
     :width: 50%
 
-    The linear system for a coupled system must be solved using either a direct factorization or an iterative linear solver.
+    The linear solver for a coupled system must be solved using either a direct factorization or an iterative linear solver.
 
 Consequently, these linear systems **cannot** be solved with the :ref:`LinearRunOnce<lnrunonce>`.
 There are two basic categories of linear solver that can be used in this situation:
@@ -57,10 +57,20 @@ There are two basic categories of linear solver that can be used in this situati
 Direct solvers make use of a the Jacobian matrix, assembled in memory, in order to compute an inverse or a factorization that can be used to solve the linear system.
 Conversely, iterative linear solvers find the solution to the linear system without ever needing to access the Jacobian matrix directly.
 They search for solution vectors that drive the linear residual to 0 using only matrix-vector products.
-
-The decision about which type of solver to use is heavily model-dependent, and is discussed in a later section of the Theory Manual.
 The key idea is that **some** kind of linear solver is needed when there is coupling in your model.
 
+Which type of solver is best for your model use is heavily case-dependent and sometimes can be a difficult question to answer absolutely.
+However, there are a few rules of thumb that can be used to guide most cases:
+
+    #. direct solvers are very simple to use and for smaller problems is likely to be the best option.
+    The only downside is that the cost of computing the factorization scales with :math:`n^3` where :math:`n` is the length of your variable vector and so the compute cost can get out of control.
+    If :math:`n` < 20000 try this solver first.
+
+    #. iterative solvers are more difficult to use because they do not always succeed in finding a good solution to the linear problem.
+    Often times they require preconditioners in order to be effective.
+    However, with adequate preconditioning iterative solvers can dramatically out perform direct solvers for even moderate sized problems.
+    The trade off you make is computational speed for complexity in getting the solver to work.
+    Iterative solvers can also offer significant memory savings, since there isn't a need to allocate one large matrix for all the partials.
 
 .. note::
 
