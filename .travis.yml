@@ -38,14 +38,50 @@ addons:
     ssh_known_hosts:
     - web543.webfaction.com
 
+cache:
+  apt: true
+  directories:
+    - $HOME/.cache/pip
+    - $HOME/pyoptsparse
+    - $HOME/miniconda
+    - $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse
+
 notifications:
   slack:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-- wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh
-- chmod +x miniconda.sh
-- ./miniconda.sh -b  -p /home/travis/miniconda;
+
+- if [ -f /home/travis/miniconda/bin/python ]; then
+    CACHED_CONDA=1;
+    echo "cached miniconda found -- nothing to do";
+  else
+    CACHED_CONDA=0;
+    rm -rf /home/travis/miniconda;
+  fi
+
+- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
+    CACHED_PYOPTSPARSE=1;
+    echo "cached pyoptsparse found -- nothing to do";
+  else
+    CACHED_PYOPTSPARSE=0;
+    rm -rf $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse;
+  fi
+
+- if [ -f /home/travis/.cache/pip ]; then
+    CACHED_PIP=1;
+    echo "cached pip found -- nothing to do";
+  else
+    CACHED_PIP=0;
+    rm -rf $HOME/.cache/pip;
+  fi
+
+- if [ "CACHED_CONDA" = "0" ]; then
+    wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p /home/travis/miniconda;
+  fi
+
 - export PATH=/home/travis/miniconda/bin:$PATH
 
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
@@ -62,37 +98,50 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-- conda install --yes python=$PY
-- conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip
-- pip install --upgrade pip
+- if [ "$CACHED_CONDA" = "0" ]; then
+    conda install --yes python=$PY;
+    conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+  fi
+
+- if [ "$CACHED_PIP" = "0" ]; then
+    pip install --upgrade pip;
+  fi
 
 # install pyoptsparse
-- git clone https://github.com/mdolab/pyoptsparse.git;
-- cd pyoptsparse;
-# get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$MASTER_BUILD" ]; then
+- if [ "$CACHED_PYOPTSPARSE" = "0" ]; then
+    git clone https://github.com/mdolab/pyoptsparse.git;
+    cd pyoptsparse;
+  fi
+    # get SNOPT source, securely, if SNOPT_LOCATION is set.
+- if [ "$MASTER_BUILD" && "$CACHED_PYOPTSPARSE" = "0" ]; then
     cd pyoptsparse/pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
     cd ../../..;
   fi
 # return to building pyoptsparse
-- python setup.py install;
-- cd ..;
+- if [ "$CACHED_PYOPTSPARSE" = "0" ]; then
+    python setup.py install;
+    cd ..;
+  fi
 
-- if [ "$PETSc" ]; then
+- if [ "$PETSc" && "$CACHED_PIP" = "0" ]; then
     pip install mpi4py;
     pip install petsc4py==$PETSc;
   fi
 
-- pip install redbaron
-- pip install git+https://github.com/OpenMDAO/testflo.git
-- pip install coverage
-- pip install git+https://github.com/swryan/coveralls-python@work
-- pip install .  # Not using -e on purpose here, to catch pkging errors
+- if [ "$CACHED_PIP" = "0" ]; then
+    pip install redbaron;
+    pip install git+https://github.com/OpenMDAO/testflo.git;
+    pip install coverage;
+    pip install git+https://github.com/swryan/coveralls-python@work;
+  fi
+
+- pip install .;  # Not using -e on purpose here, to catch pkging errors
 
 # do this after petsc install to avoid weird petsc install failure
-- conda install --yes matplotlib
-
+- if [ "$CACHED_CONDA" = "0" ]; then
+    conda install --yes matplotlib;
+  fi
 script:
 # make docs first
 - cd openmdao/docs;
