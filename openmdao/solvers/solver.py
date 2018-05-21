@@ -724,9 +724,9 @@ class LinearSolver(Solver):
         **kwargs : dict
             options dictionary.
         """
-        super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
         self._assembled_jac = None
+        super(LinearSolver, self).__init__(**kwargs)
 
     def _get_assembled_jacs(self):
         if self._assembled_jac is None:
