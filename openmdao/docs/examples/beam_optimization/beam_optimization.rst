@@ -47,15 +47,14 @@ We first show the Group that contains all the Component instances for the model.
 Implementation: list of components
 ----------------------------------
 
-There are 7 components that compute:
+There are 6 components that compute:
 
 1. moment of inertia for each element
 2. local stiffness matrix for each element
-3. global stiffness matrix
-4. solution of the :math:`Kd=f` linear system augmented with the Lagrange multipliers
-5. extraction of just the displacements in the :math:`d` vector
-6. compliance
-7. volume
+3. solution of the :math:`Kd=f` linear system augmented with the Lagrange multipliers
+4. extraction of just the displacements in the :math:`d` vector
+5. compliance
+6. volume
 
 .. embed-code::
     openmdao.test_suite.test_examples.beam_optimization.components.moment_comp
