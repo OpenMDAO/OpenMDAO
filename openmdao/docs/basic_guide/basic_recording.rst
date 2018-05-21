@@ -1,3 +1,5 @@
+.. _basic_recording:
+
 **************************
 Recording and Reading Data
 **************************
@@ -15,7 +17,7 @@ The Run Script
 **************
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_circuit_with_recorder
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_circuit_with_recorder
     :layout: interleave
 
 Creating and Attaching a Recorder
@@ -31,7 +33,7 @@ recorder creates a local SQLite database file when the optimization is run.
     p.driver.add_recorder(recorder)
 
 Creating a Case Reader and Reading Data
--------------------------------------
+---------------------------------------
 
 Once we run the optimization we can read the data from the file using a case reader.
 By attaching the recorder to our driver we've recorded the results of each driver iteration

@@ -140,7 +140,7 @@ class ScipyOptimizeDriver(Driver):
                              desc='Set to False to prevent printing of Scipy convergence messages')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True')
-        self.options.declare('dynamic_simul_derivs_repeats', default=3, types=int,
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of compute_totals calls during dynamic computation of '
                                   'simultaneous derivative coloring')
 

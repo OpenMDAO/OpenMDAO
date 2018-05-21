@@ -620,15 +620,14 @@ class Problem(object):
                        method='fd', step=DEFAULT_FD_OPTIONS['step'],
                        form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
-                       force_dense=True, suppress_output=False,
-                       show_only_incorrect=False):
+                       force_dense=True, show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
         Parameters
         ----------
         out_stream : file-like object
-            Where to send human readable output. Default is None.
+            Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
         comps : None or list_like
             List of component names to check the partials of (all others will be skipped). Set to
@@ -654,8 +653,6 @@ class Problem(object):
             relative. Default is the default value of step for the 'fd' method.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
-        suppress_output : bool
-            Set to True to suppress all output. Default is False.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
 
@@ -963,21 +960,19 @@ class Problem(object):
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
-        if out_stream == _DEFAULT_OUT_STREAM and not suppress_output:
+        if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
-                                  compact_print, comps, all_fd_options,
-                                  suppress_output=suppress_output, indep_key=indep_key,
+                                  compact_print, comps, all_fd_options, indep_key=indep_key,
                                   all_comps_provide_jacs=self._all_components_provide_jacobians(),
                                   show_only_incorrect=show_only_incorrect)
 
         return partials_data
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
-                     abs_err_tol=1e-6,
-                     rel_err_tol=1e-6, method='fd', step=1e-6, form='forward', step_calc='abs',
-                     suppress_output=False):
+                     driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                     method='fd', step=1e-6, form='forward', step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -990,10 +985,13 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         out_stream : file-like object
-            Where to send human readable output. Default is None.
+            Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
+        driver_scaling : bool
+            Set to True to scale derivative values by the quantities specified when the desvars and
+            responses were added. Default if False, which is unscaled.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1011,8 +1009,6 @@ class Problem(object):
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
-        suppress_output : bool
-            Set to True to suppress all output. Default is False.
 
         Returns
         -------
@@ -1034,7 +1030,8 @@ class Problem(object):
         with self.model._scaled_context_all():
 
             # Calculate Total Derivatives
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict')
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                       driver_scaling=driver_scaling)
             Jcalc = total_info.compute_totals()
 
             # Approximate FD
@@ -1045,7 +1042,8 @@ class Problem(object):
             }
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method is 'fd' else None)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True)
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
+                                       driver_scaling=driver_scaling)
             Jfd = total_info.compute_totals_approx(initialize=True)
 
         # Assemble and Return all metrics.
@@ -1057,15 +1055,15 @@ class Problem(object):
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
-        if out_stream == _DEFAULT_OUT_STREAM and not suppress_output:
+        if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         _assemble_derivative_data(data, rel_err_tol, abs_err_tol, out_stream, compact_print,
-                                  [model],
-                                  {'': fd_args}, totals=True, suppress_output=suppress_output)
+                                  [model], {'': fd_args}, totals=True)
         return data['']
 
-    def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False):
+    def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
+                       driver_scaling=False):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1083,6 +1081,9 @@ class Problem(object):
             tuples of form (of, wrt).
         debug_print : bool
             Set to True to print out some debug information during linear solve.
+        driver_scaling : bool
+            Set to True to scale derivative values by the quantities specified when the desvars and
+            responses were added. Default if False, which is unscaled.
 
         Returns
         -------
@@ -1094,11 +1095,12 @@ class Problem(object):
 
         with self.model._scaled_context_all():
             if self.model._owns_approx_jac:
-                total_info = _TotalJacInfo(self, of, wrt, False, return_format, approx=True)
+                total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+                                           approx=True, driver_scaling=driver_scaling)
                 return total_info.compute_totals_approx(initialize=True)
             else:
                 total_info = _TotalJacInfo(self, of, wrt, False, return_format,
-                                           debug_print=debug_print)
+                                           debug_print=debug_print, driver_scaling=driver_scaling)
                 return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
@@ -1314,7 +1316,7 @@ class Problem(object):
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
-                              suppress_output=False, indep_key=None, all_comps_provide_jacs=False,
+                              indep_key=None, all_comps_provide_jacs=False,
                               show_only_incorrect=False):
     """
     Compute the relative and absolute errors in the given derivatives and print to the out_stream.
@@ -1338,8 +1340,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Dictionary containing the options for the approximation.
     totals : bool
         Set to True if we are doing check_totals to skip a bunch of stuff.
-    suppress_output : bool
-        Set to True to suppress all output. Just calculate errors and add the keys.
     indep_key : dict of sets, optional
         Keyed by component name, contains the of/wrt keys that are declared not dependent.
     all_comps_provide_jacs : bool, optional
@@ -1348,6 +1348,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         Set to True if output should print only the subjacs found to be incorrect.
     """
     nan = float('nan')
+    suppress_output = out_stream is None
 
     if compact_print:
         if totals:
