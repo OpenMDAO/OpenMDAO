@@ -64,9 +64,6 @@ There are 7 components that compute:
     openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp
 
 .. embed-code::
-    openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp
-
-.. embed-code::
     openmdao.test_suite.test_examples.beam_optimization.components.states_comp
 
 .. embed-code::
