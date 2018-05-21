@@ -3,6 +3,8 @@ from six.moves import range
 
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
+from scipy.sparse import coo_matrix
+from scipy.sparse.linalg import splu
 
 from openmdao.api import ImplicitComponent
 
@@ -33,24 +35,24 @@ class StatesComp(ImplicitComponent):
     def apply_nonlinear(self, inputs, outputs, residuals):
         force_vector = np.concatenate([self.options['force_vector'], np.zeros(2)])
 
-        self.K = self.assemble_dense_K(inputs)
+        self.K = self.assemble_CSC_K(inputs)
         residuals['d'] = np.dot(self.K, outputs['d']) - force_vector
 
     def solve_nonlinear(self, inputs, outputs):
         force_vector = np.concatenate([self.options['force_vector'], np.zeros(2)])
 
-        self.K = self.assemble_dense_K(inputs)
-        self.lu = lu_factor(self.K)
+        self.K = self.assemble_CSC_K(inputs)
+        self.lu = splu(self.K)
 
-        outputs['d'] = lu_solve(self.lu, force_vector)
+        outputs['d'] = self.lu.solve(force_vector)
 
     def linearize(self, inputs, outputs, partials):
         num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
         size = 2 * num_nodes + 2
 
-        self.K = self.assemble_dense_K(inputs)
-        self.lu = lu_factor(self.K)
+        self.K = self.assemble_CSC_K(inputs)
+        self.lu = splu(self.K)
 
         i_elem = np.tile(np.arange(4), 4)
         i_d = np.tile(i_elem, num_elements) + np.repeat(np.arange(num_elements), 16) * 2
@@ -65,7 +67,7 @@ class StatesComp(ImplicitComponent):
         else:
             d_residuals['d'] = lu_solve(self.lu, d_outputs['d'], trans=1)
 
-    def assemble_dense_K(self, inputs):
+    def assemble_CSC_K(self, inputs):
         """
         Assemble the stiffness matrix.
 
@@ -76,21 +78,30 @@ class StatesComp(ImplicitComponent):
         """
         num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
-        K = self.K
-        K[:] = 0.0
+        num_entry = num_elements * 16
+        ndim = num_entry + 4
 
-        for ind in range(num_elements):
-            ind1_ = 2 * ind
-            ind2_ = 2 * ind + 4
+        data = np.empty((ndim, ))
+        cols = np.empty((ndim, ))
+        rows = np.empty((ndim, ))
 
-            K[ind1_:ind2_, ind1_:ind2_] += inputs['K_local'][ind, :, :]
+        data[:num_entry] = inputs['K_local'].flat
+        rows[:num_entry]  = np.tile(np.repeat(np.arange(4), 4), num_elements) + \
+                                    np.repeat(np.arange(num_elements), 16) * 4
+        cols[:num_entry]  = np.tile(np.tile(np.arange(4), 4), num_elements) + \
+                            np.repeat(np.arange(num_elements), 16) * 4
 
-        K[2 * num_nodes + 0, 0] = 1.0
-        K[2 * num_nodes + 1, 1] = 1.0
-        K[0, 2 * num_nodes + 0] = 1.0
-        K[1, 2 * num_nodes + 1] = 1.0
+        data[-4:] = 1.0
+        rows[-4] = 2 * num_nodes
+        rows[-3] = 2 * num_nodes + 1
+        rows[-2] = 0.0
+        rows[-1] = 1.0
+        cols[-4] = 0.0
+        cols[-3] = 1.0
+        cols[-2] = 2 * num_nodes
+        cols[-1] = 2 * num_nodes + 1
 
-        return K
+        return coo_matrix((data, (rows, cols)), shape=(ndim, ndim)).tocsc()
 
 
 class MultiStatesComp(ImplicitComponent):
