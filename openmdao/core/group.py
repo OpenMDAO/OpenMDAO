@@ -1797,7 +1797,7 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
-    def _setup_jacobians(self, parent_asm_jacs=(), recurse=True):
+    def _setup_jacobians(self, parent_asm_jacs=()):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1808,8 +1808,6 @@ class Group(System):
         ----------
         parent_asm_jacs : list of <AssembledJacobian>
             The global jacobian to populate for this system.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         J = self._jacobian
 

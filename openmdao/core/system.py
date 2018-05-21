@@ -1242,11 +1242,13 @@ class System(object):
             my_asm_jac = self.linear_solver._assembled_jac
             if my_asm_jac is not None:
                 my_asm_jac._system = self
+            self._linear_solver._setup_jacobians(my_asm_jac)
         else:
             my_asm_jac = None
 
         if self._nonlinear_solver is not None:
             alljacs.update(self._nonlinear_solver._get_assembled_jacs())
+            self._nonlinear_solver._setup_jacobians(my_asm_jac)
 
         if len(alljacs) > 1:
             raise RuntimeError("%s: multiple assembled jacobians %s are being used in the same "

@@ -737,6 +737,18 @@ class LinearSolver(Solver):
             return _emptyset
         return set([self._assembled_jac])
 
+    def _setup_jacobians(self, parent_jacobian=None):
+        """
+        Set and populate our assembled jacobian, if we have one.
+
+        Parameters
+        ----------
+        parent_jacobian : <AssembledJacobian> or None
+            The global jacobian to populate.
+        """
+        if self._assembled_jac is None:
+            self._assembled_jac = parent_jacobian
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.

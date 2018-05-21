@@ -250,10 +250,7 @@ class PETScKrylov(LinearSolver):
         super(PETScKrylov, self)._setup_jacobians(parent_jacobian)
 
         if self.precon is not None:
-            if self._assembled_jac is None:
-                self.precon._setup_jacobians(parent_jacobian)
-            else:
-                self.precon._setup_jacobians(self._assembled_jac)
+            self.precon._setup_jacobians(self._assembled_jac)
 
     def _set_solver_print(self, level=2, type_='all'):
         """
