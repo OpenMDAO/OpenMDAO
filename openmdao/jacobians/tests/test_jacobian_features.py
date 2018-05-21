@@ -178,7 +178,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         self.problem = Problem(model=model)
         self.problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov(assembled_jac='csc')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
 
     def test_dependence(self):
         problem = self.problem
@@ -266,7 +266,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem = Problem(model=model)
         problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov(assembled_jac='csc')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
@@ -436,7 +436,7 @@ class TestJacobianForDocs(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
         from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
 
-        model = Group()
+        model = Group(assembled_jac_type='dense')
         comp = IndepVarComp()
         for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
                           ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
@@ -445,7 +445,7 @@ class TestJacobianForDocs(unittest.TestCase):
 
         problem = Problem(model=model)
         model.suppress_solver_output = True
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)

@@ -105,9 +105,9 @@ class TestGetSetVariables(unittest.TestCase):
         """
         c = ExecComp('y=2*x')
 
-        g = Group()
+        g = Group(assembled_jac_type='dense')
         g.add_subsystem('c', c)
-        g.linear_solver = DirectSolver(assembled_jac='dense')
+        g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
         model.add_subsystem('g', g)
@@ -191,11 +191,11 @@ class TestGetSetVariables(unittest.TestCase):
         c2 = ExecComp('y=2*x')
         c3 = ExecComp('z=3*x')
 
-        g = Group()
+        g = Group(assembled_jac_type='dense')
         g.add_subsystem('c1', c1, promotes=['*'])
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
-        g.linear_solver = DirectSolver(assembled_jac='dense')
+        g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
         model.add_subsystem('g', g, promotes=['*'])
@@ -233,14 +233,14 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = 'Variable name pair \("{}", "{}"\) not found.'
-        
+
         jac = g.linear_solver._assembled_jac
 
         # d(outputs)/d(inputs)
         with self.assertRaises(Exception) as context:
             jac['y', 'x'] = 5.0
         self.assertEqual(str(context.exception), msg2)
-        
+
         with self.assertRaises(Exception) as context:
             self.assertEqual(jac['y', 'x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
@@ -265,10 +265,10 @@ class TestGetSetVariables(unittest.TestCase):
         c2 = ExecComp('y=2*x')
         c3 = ExecComp('z=3*x')
 
-        g = Group()
+        g = Group(assembled_jac_type='dense')
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
-        g.linear_solver = DirectSolver(assembled_jac='dense')
+        g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
         model.add_subsystem('c1', c1, promotes=['*'])

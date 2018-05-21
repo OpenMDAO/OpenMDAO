@@ -167,7 +167,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver(assembled_jac='dense')
+        teg.linear_solver = DirectSolver(assemble_jac=True)
+        teg.options['assembled_jac_type'] = 'dense'
 
         teg.nonlinear_solver = NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True

@@ -104,7 +104,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -124,7 +124,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -147,7 +147,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -171,7 +171,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -198,7 +198,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp('x', val=np.ones(n), use_mult=True, mult_val=2.0)
 
@@ -216,7 +216,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -239,7 +239,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -259,7 +259,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -282,7 +282,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -302,7 +302,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -325,7 +325,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -349,7 +349,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -373,7 +373,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp('x', rhs_val=4.0)
 
@@ -386,7 +386,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -409,7 +409,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -433,7 +433,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -456,7 +456,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -480,7 +480,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.XSQ')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -504,7 +504,7 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem()
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -528,7 +528,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -548,7 +548,7 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -568,7 +568,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
@@ -591,7 +591,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         exec_comp = ExecComp('y=b*x+c',
                              b={'value': np.random.uniform(0.01,100, size=n)},
@@ -606,7 +606,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 

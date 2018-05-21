@@ -31,17 +31,18 @@ def _build_model(mode, implicit=False):
 
 
 def _add_solvers(p):
-    p.model.double_sellar.g1.linear_solver = DirectSolver(assembled_jac='csc')
+    p.model.double_sellar.g1.linear_solver = DirectSolver(assemble_jac=True)
     p.model.double_sellar.g1.nonlinear_solver = NewtonSolver()
 
-    p.model.double_sellar.g2.linear_solver = DirectSolver(assembled_jac='csc')
+    p.model.double_sellar.g2.linear_solver = DirectSolver(assemble_jac=True)
     p.model.double_sellar.g2.nonlinear_solver = NewtonSolver()
 
     newton = p.model.nonlinear_solver = NewtonSolver()
     newton.linear_solver = ScipyKrylov()
     newton.linear_solver.precon = LinearBlockGS()
 
-    p.model.linear_solver = ScipyKrylov(assembled_jac='dense')
+    p.model.options['assembled_jac_type'] = 'dense'
+    p.model.linear_solver = ScipyKrylov(assemble_jac=True)
     p.model.linear_solver.precon = DirectSolver()
 
 

@@ -185,7 +185,7 @@ class TestAssertUtils(unittest.TestCase):
 
     def test_assert_no_dict_jacobians_exception_not_expected(self):
 
-        model = Group()
+        model = Group(assembled_jac_type='dense')
         ivc = IndepVarComp()
         ivc.add_output('x', 3.0)
         ivc.add_output('y', -4.0)
@@ -196,7 +196,7 @@ class TestAssertUtils(unittest.TestCase):
         model.connect('des_vars.y', 'parab_comp.y')
 
         prob = Problem(model)
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.setup(check=False)
 

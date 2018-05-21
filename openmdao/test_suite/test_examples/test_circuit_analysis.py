@@ -133,10 +133,11 @@ class TestCircuit(unittest.TestCase):
                 self.nonlinear_solver = NewtonSolver()
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
-                ##############################
-                # Assemble at the group level
-                ##############################
-                self.linear_solver = DirectSolver(assembled_jac='csc')
+                ##################################################################
+                # Assemble at the group level. Default assembled jac type is 'csc'
+                ##################################################################
+                self.options['assembled_jac_type'] = 'csc'
+                self.linear_solver = DirectSolver(assemble_jac=True)
 
         p = Problem()
         model = p.model

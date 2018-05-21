@@ -20,13 +20,13 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_globaljac_err(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = Group(assembled_jac_type='dense')
         model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                             promotes=['length'])
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = LinearBlockJac(assembled_jac='dense')
+        model.linear_solver = LinearBlockJac(assemble_jac=True)
         prob.setup(check=False)
 
         with self.assertRaises(RuntimeError) as context:

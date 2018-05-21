@@ -835,7 +835,7 @@ class TestScaling(unittest.TestCase):
                 jacobian['y', 'y'] = 3.0
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = Group(assembled_jac_type='dense')
 
         model.add_subsystem('p1', IndepVarComp('x', 6.0))
         model.add_subsystem('comp', SimpleComp())
@@ -861,7 +861,7 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.setup(check=False)
         prob.run_model()

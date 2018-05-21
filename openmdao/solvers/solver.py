@@ -212,9 +212,12 @@ class Solver(object):
 
         self.cite = ""
 
-    def _get_assembled_jacs(self):
-        global _emptyset
-        return _emptyset
+    def _assembled_jac_solver_iter(self):
+        """
+        Return an empty generator of lin solvers using assembled jacs.
+        """
+        for i in ():
+            yield
 
     def add_recorder(self, recorder):
         """
@@ -731,11 +734,12 @@ class LinearSolver(Solver):
         self._assembled_jac = None
         super(LinearSolver, self).__init__(**kwargs)
 
-    def _get_assembled_jacs(self):
-        global _emptyset
-        if self._assembled_jac is None:
-            return _emptyset
-        return set([self._assembled_jac])
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.options['assemble_jac']:
+            yield self
 
     def _setup_jacobians(self, parent_jacobian=None):
         """
@@ -753,9 +757,8 @@ class LinearSolver(Solver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('assembled_jac', default=None,
-                             values=[None, 'csc', 'dense'],
-                             desc='Sets the type of assembled jacobian used by this solver.')
+        self.options.declare('assemble_jac', default=False, types=bool,
+                             desc='Activates use of assembled jacobian by this solver.')
 
         self.supports.declare('assembled_jac', types=bool, default=True)
 
@@ -783,18 +786,21 @@ class LinearSolver(Solver):
             for varset, data in iteritems(b_vecs[vec_name]._data):
                 rhs[varset] = data.copy()
 
-        newjac = self.options['assembled_jac']
+        assembles = self.options['assemble_jac']
 
-        # set up jacobian
-        if self.supports['assembled_jac']:
-            if newjac == 'dense':
-                self._assembled_jac = DenseJacobian(system)
-            elif newjac == 'csc':
-                self._assembled_jac = CSCJacobian(system)
-            # else jacobians will be local to components.
-        elif newjac is not None:
-            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                               "jacobians." % (self.SOLVER, self._system.pathname))
+        if assembles:
+            newjac = system.options['assembled_jac_type']
+
+            # set up jacobian
+            if self.supports['assembled_jac']:
+                if newjac == 'dense':
+                    self._assembled_jac = DenseJacobian(system)
+                elif newjac == 'csc':
+                    self._assembled_jac = CSCJacobian(system)
+                # else jacobians will be local to components.
+            elif newjac is not None:
+                raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
+                                   "jacobians." % (self.SOLVER, self._system.pathname))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

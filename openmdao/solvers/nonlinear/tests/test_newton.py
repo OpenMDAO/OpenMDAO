@@ -306,15 +306,18 @@ class TestNewton(unittest.TestCase):
         g1 = model.g1
         g1.nonlinear_solver = NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = DirectSolver(assembled_jac='dense')
+        g1.linear_solver = DirectSolver(assemble_jac=True)
+        g1.options['assembled_jac_type'] = 'dense'
 
         g2 = model.g2
         g2.nonlinear_solver = NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = DirectSolver(assembled_jac='dense')
+        g2.linear_solver = DirectSolver(assemble_jac=True)
+        g2.options['assembled_jac_type'] = 'dense'
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         model.nonlinear_solver.options['solve_subsystems'] = True
 
@@ -332,14 +335,16 @@ class TestNewton(unittest.TestCase):
 
         g1 = model.g1
         g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
-        g1.linear_solver = DirectSolver(assembled_jac='dense')
+        g1.options['assembled_jac_type'] = 'dense'
+        g1.linear_solver = DirectSolver(assemble_jac=True)
 
         g2 = model.g2
         g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
-        g2.linear_solver = DirectSolver(assembled_jac='dense')
+        g2.linear_solver = DirectSolver(assemble_jac=True)
+        g2.options['assembled_jac_type'] = 'dense'
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='csc')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
 
         prob.setup()
         prob.run_model()
@@ -362,7 +367,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -385,7 +391,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -408,7 +415,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -431,7 +439,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -454,7 +463,7 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='csc')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
 
         prob.setup()
         prob.run_model()
@@ -477,7 +486,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -500,7 +510,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -523,7 +534,8 @@ class TestNewton(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver(solve_subsystems=True)
-        model.linear_solver = ScipyKrylov(assembled_jac='dense')
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         prob.setup()
         prob.run_model()
@@ -539,7 +551,8 @@ class TestNewton(unittest.TestCase):
 
         g1 = model.g1
         g1.nonlinear_solver = NewtonSolver(rtol=1.0e-5)
-        g1.linear_solver = DirectSolver(assembled_jac='dense')
+        g1.linear_solver = DirectSolver(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
 
         g2 = model.g2
         g2.nonlinear_solver = NewtonSolver(rtol=1.0e-5)

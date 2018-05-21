@@ -1941,7 +1941,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         p.model.add_objective('time', index=-1)
 
-        p.model.linear_solver=ScipyKrylov(assembled_jac='csc')
+        p.model.linear_solver=ScipyKrylov(assemble_jac=True)
 
         p.setup(mode='fwd')
         p.set_solver_print(level=0)

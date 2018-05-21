@@ -168,17 +168,17 @@ class ExplicitComponent(Component):
                     if abs_key in J._subjacs:
                         J._multiply_subjac(abs_key, -1.)
 
-    def _setup_jacobians(self, parent_asm_jacs=()):
+    def _setup_jacobians(self, parent_asm_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
         Parameters
         ----------
-        parent_asm_jacs : list of <AssembledJacobian>
-            The global jacobian(s) to populate for this system.
+        parent_asm_jac : AssembledJacobian or None
+            The assembled jacobian from a parent group to populate for this system.
         """
         self._negated_subjacs = set()
-        super(ExplicitComponent, self)._setup_jacobians(parent_asm_jacs)
+        super(ExplicitComponent, self)._setup_jacobians(parent_asm_jac)
 
     def _set_partials_meta(self, jacs):
         """

@@ -214,13 +214,15 @@ class PETScKrylov(LinearSolver):
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
 
-    def _get_assembled_jacs(self):
-        assembled_jacs = set()
-        if self._assembled_jac is not None:
-            assembled_jacs.add(self._assembled_jac)
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.options['assemble_jac']:
+            yield self
         if self.precon is not None:
-            assembled_jacs.update(self.precon._get_assembled_jacs())
-        return assembled_jacs
+            for s in self.precon._assembled_jac_solver_iter():
+                yield s
 
     def _setup_solvers(self, system, depth):
         """
@@ -237,20 +239,6 @@ class PETScKrylov(LinearSolver):
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system, self._depth + 1)
-
-    def _setup_jacobians(self, parent_jacobian=None):
-        """
-        Set and populate our assembled jacobian, if we have one.
-
-        Parameters
-        ----------
-        parent_jacobian : <AssembledJacobian> or None
-            The global jacobian to populate.
-        """
-        super(PETScKrylov, self)._setup_jacobians(parent_jacobian)
-
-        if self.precon is not None:
-            self.precon._setup_jacobians(self._assembled_jac)
 
     def _set_solver_print(self, level=2, type_='all'):
         """

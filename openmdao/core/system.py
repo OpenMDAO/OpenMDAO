@@ -27,11 +27,17 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = object()
 _empty_frozen_set = frozenset()
+
+_asm_jac_types = {
+    'csc': CSCJacobian,
+    'dense': DenseJacobian,
+}
 
 
 class System(object):
@@ -250,6 +256,10 @@ class System(object):
 
         # System options
         self.options = OptionsDictionary()
+
+        self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
+                             desc='Linear solver(s) in this group, if using an assembled '
+                                  'jacobian, will use this type.')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -1227,50 +1237,48 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
 
-    def _setup_jacobians(self, parent_asm_jacs=()):
+    def _setup_jacobians(self, parent_asm_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
         Parameters
         ----------
-        parent_asm_jacs : list of <AssembledJacobian>
-            The global jacobian(s) to populate for this system.
+        parent_asm_jac : AssembledJacobian or None
+            The assembled jacobian from a parent group to populate for this system.
         """
-        alljacs = set()
-        if self._linear_solver is not None:
-            alljacs.update(self.linear_solver._get_assembled_jacs())
-            my_asm_jac = self.linear_solver._assembled_jac
-            if my_asm_jac is not None:
-                my_asm_jac._system = self
-            self._linear_solver._setup_jacobians(my_asm_jac)
-        else:
-            my_asm_jac = None
+        asm_jac_solvers = []
+        if self.linear_solver is not None:
+            asm_jac_solvers.extend(self.linear_solver._assembled_jac_solver_iter())
 
-        if self._nonlinear_solver is not None:
-            alljacs.update(self._nonlinear_solver._get_assembled_jacs())
-            self._nonlinear_solver._setup_jacobians(my_asm_jac)
+        nl_asm_jac_solvers = []
+        if self.nonlinear_solver is not None:
+            nl_asm_jac_solvers.extend(self.nonlinear_solver._assembled_jac_solver_iter())
 
-        if len(alljacs) > 1:
-            raise RuntimeError("%s: multiple assembled jacobians %s are being used in the same "
-                               "system." % (self.pathname,
-                                            [type(j).__name__ for j in sorted(alljacs)]))
-
-        asm_jacs = list(alljacs)
+        my_asm_jac = asm_jac = None
+        if asm_jac_solvers:
+            my_asm_jac = asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+            for s in asm_jac_solvers:
+                s._assembled_jac = asm_jac
+        if nl_asm_jac_solvers:
+            if asm_jac is None:
+                asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+            for s in nl_asm_jac_solvers:
+                s._assembled_jac = asm_jac
 
         self._owns_assembled_jac = my_asm_jac is not None
         self._views_assembled_jac = self._owns_assembled_jac
 
-        if not self._owns_approx_jac and asm_jacs:
+        if not self._owns_approx_jac and asm_jac is not None:
             if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
                 # TODO: not sure we need to set this to True unless nonlinear solver's linear solver
                 #       has an assembled jac
                 self._views_assembled_jac = True
 
-        if asm_jacs:
-            jacs = asm_jacs[:]
-            self._assembled_jac = asm_jacs[0]
-        elif parent_asm_jacs:
-            jacs = parent_asm_jacs[:]
+        if my_asm_jac is not None:
+            self._assembled_jac = my_asm_jac
+            jacs = [my_asm_jac]
+        elif parent_asm_jac is not None:
+            jacs = [parent_asm_jac]
         else:
             jacs = []
 
@@ -1282,34 +1290,32 @@ class System(object):
 
         # At present, we don't support a AssembledJacobian in a group
         # if any subcomponents are matrix-free.
-        if asm_jacs:
+        if asm_jac is not None:
             if self.matrix_free:
                 raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(asm_jacs)
+                subsys._setup_jacobians(asm_jac)
         else:
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(parent_asm_jacs)
+                subsys._setup_jacobians(parent_asm_jac)
 
         # if we have an assembled jac at this level and an assembled jac above us, then
-        # our jacs (and any of our children's assembled jacs) will share their internal
+        # our jac (and any of our children's assembled jacs) will share their internal
         # subjac dicts.  Each will maintain its own internal Matrix objects though.
-        for par_asm_jac in parent_asm_jacs:
-            for asm_jac in asm_jacs:
-                par_asm_jac._subjacs.update(asm_jac._subjacs)
-                par_asm_jac._subjacs_info.update(asm_jac._subjacs_info)
-                asm_jac._subjacs = par_asm_jac._subjacs
-                asm_jac._subjacs_info = par_asm_jac._subjacs_info
-                asm_jac._keymap = par_asm_jac._keymap
-                asm_jac._view_ranges = par_asm_jac._view_ranges
+        if parent_asm_jac is not None and asm_jac is not None:
+            parent_asm_jac._subjacs.update(asm_jac._subjacs)
+            parent_asm_jac._subjacs_info.update(asm_jac._subjacs_info)
+            asm_jac._subjacs = parent_asm_jac._subjacs
+            asm_jac._subjacs_info = parent_asm_jac._subjacs_info
+            asm_jac._keymap = parent_asm_jac._keymap
+            asm_jac._view_ranges = parent_asm_jac._view_ranges
 
-        if self._views_assembled_jac:
-            for asm_jac in parent_asm_jacs:
-                asm_jac._init_view(self)
+        if parent_asm_jac is not None and self._views_assembled_jac:
+            parent_asm_jac._init_view(self)
 
         # allocate internal matrices now that we have all of the subjac metadata
-        for asm_jac in asm_jacs:
+        if asm_jac is not None:
             asm_jac._initialize()
             asm_jac._init_view(self)
 

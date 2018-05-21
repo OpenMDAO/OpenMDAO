@@ -239,7 +239,8 @@ class TestJacobian(unittest.TestCase):
         top.nonlinear_solver = NewtonSolver()
         top.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=100)
         top.linear_solver = ScipyKrylov(
-            maxiter=200, atol=1e-10, rtol=1e-10, assembled_jac=assembled_jac)
+            maxiter=200, atol=1e-10, rtol=1e-10, assemble_jac=True)
+        top.options['assembled_jac_type'] = assembled_jac
 
         prob.set_solver_print(level=0)
 
@@ -415,8 +416,8 @@ class TestJacobian(unittest.TestCase):
         model.linear_solver = LinearBlockGS()
         sup.linear_solver = LinearBlockGS()
 
-        sub1.linear_solver = DirectSolver(assembled_jac='csc')
-        sub2.linear_solver = DirectSolver(assembled_jac='csc')
+        sub1.linear_solver = DirectSolver(assemble_jac=True)
+        sub2.linear_solver = DirectSolver(assemble_jac=True)
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
@@ -431,14 +432,14 @@ class TestJacobian(unittest.TestCase):
     def test_assembled_jac_bad_key(self):
         # this test fails if AssembledJacobian._update sets in_start with 'output' instead of 'input'
         prob = Problem()
-        prob.model = Group()
+        prob.model = Group(assembled_jac_type='dense')
         prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
         prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b'))
         c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c'))
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
 
         prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.connect('indep.x', 'C1.a')
         prob.model.connect('indep.x', 'C2.a')
@@ -450,7 +451,7 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
     def test_assembled_jacobian_submat_indexing_dense(self):
-        prob = Problem()
+        prob = Problem(model=Group(assembled_jac_type='dense'))
         indeps = prob.model.add_subsystem('indeps', IndepVarComp())
         indeps.add_output('x', 1.0)
         indeps.add_output('y', 5.0)
@@ -461,7 +462,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
         prob.model.nonlinear_solver = NewtonSolver()
-        G1.linear_solver = DirectSolver(assembled_jac='dense')
+        G1.linear_solver = DirectSolver(assemble_jac=True)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection
@@ -478,7 +479,7 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, prob['G1.C2.y'], 243.0)
 
     def test_assembled_jacobian_submat_indexing_csc(self):
-        prob = Problem()
+        prob = Problem(model=Group(assembled_jac_type='dense'))
         indeps = prob.model.add_subsystem('indeps', IndepVarComp())
         indeps.add_output('x', 1.0)
         indeps.add_output('y', 5.0)
@@ -489,9 +490,9 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
         #prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        G1.linear_solver = DirectSolver(assembled_jac='csc')
+        G1.linear_solver = DirectSolver(assemble_jac=True)
         G1.nonlinear_solver = NewtonSolver()
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
@@ -555,8 +556,8 @@ class TestJacobian(unittest.TestCase):
         # One level deep
 
         prob = Problem()
-        model = prob.model = Group()
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model = prob.model = Group(assembled_jac_type='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -574,8 +575,8 @@ class TestJacobian(unittest.TestCase):
         # Nested
 
         prob = Problem()
-        model = prob.model = Group()
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model = prob.model = Group(assembled_jac_type='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         sub = model.add_subsystem('sub', Group())
 
@@ -599,8 +600,8 @@ class TestJacobian(unittest.TestCase):
                 pass
 
         prob = Problem()
-        model = prob.model = Group()
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model = prob.model = Group(assembled_jac_type='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -618,8 +619,8 @@ class TestJacobian(unittest.TestCase):
         # Make sure regular comps don't give an error.
 
         prob = Problem()
-        model = prob.model = Group()
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model = prob.model = Group(assembled_jac_type='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -643,8 +644,8 @@ class TestJacobian(unittest.TestCase):
         # One level deep
 
         prob = Problem()
-        model = prob.model = Group()
-        model.linear_solver = DirectSolver(assembled_jac='dense')
+        model = prob.model = Group(assembled_jac_type='dense')
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
@@ -691,14 +692,14 @@ class TestJacobian(unittest.TestCase):
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
         size = 4
-        prob = Problem()
+        prob = Problem(model=Group(assembled_jac_type='dense'))
         indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
 
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
                                         z=np.zeros(size//2)))
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')
@@ -722,7 +723,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
                                         z=np.zeros(size//2)))
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='csc')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')
@@ -749,7 +750,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size), y=np.zeros(size),
                                         z=np.zeros(size)))
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='csc')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.add_objective('G1.C1.z')
         prob.model.add_design_var('indeps.x')

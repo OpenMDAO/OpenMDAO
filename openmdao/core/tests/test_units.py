@@ -29,9 +29,9 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_dense_jac(self):
         """Test that output values and total derivatives are correct."""
-        prob = Problem(model=UnitConvGroup())
+        prob = Problem(model=UnitConvGroup(assembled_jac_type='dense'))
 
-        prob.model.linear_solver = DirectSolver(assembled_jac='dense')
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')

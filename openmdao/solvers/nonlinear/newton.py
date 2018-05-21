@@ -114,10 +114,13 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
-    def _get_assembled_jacs(self):
-        if self.linear_solver is not None and self.linear_solver is not self._system.linear_solver:
-            return self.linear_solver._get_assembled_jacs()
-        return set()
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.linear_solver is not None:
+            for s in self.linear_solver._assembled_jac_solver_iter():
+                yield s
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -175,7 +178,6 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        # print("newton _linearize")
         if not self._linear_solver_from_parent:
             self.linear_solver._linearize()
 

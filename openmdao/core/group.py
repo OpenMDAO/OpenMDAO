@@ -1797,7 +1797,7 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
-    def _setup_jacobians(self, parent_asm_jacs=()):
+    def _setup_jacobians(self, parent_asm_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1806,8 +1806,8 @@ class Group(System):
 
         Parameters
         ----------
-        parent_asm_jacs : list of <AssembledJacobian>
-            The global jacobian to populate for this system.
+        parent_asm_jac : AssembledJacobian or None
+            The assembled jacobian from a parent group to populate for this system.
         """
         J = self._jacobian
 
@@ -1895,7 +1895,7 @@ class Group(System):
         else:
             self._jacobian = None
 
-        super(Group, self)._setup_jacobians(parent_asm_jacs)
+        super(Group, self)._setup_jacobians(parent_asm_jac)
 
     def compute_sys_graph(self, comps_only=False):
         """

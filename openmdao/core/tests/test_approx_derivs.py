@@ -561,7 +561,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # Basic sellar test.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = Group(assembled_jac_type='dense')
         sub = model.add_subsystem('sub', Group(), promotes=['*'])
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
@@ -578,7 +578,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov(assembled_jac='dense')
+        sub.linear_solver = ScipyKrylov(assemble_jac=True)
 
         model.approx_totals(method='fd', step=1e-5)
 
@@ -617,7 +617,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov(assembled_jac='csc')
+        sub.linear_solver = ScipyKrylov(assemble_jac=True)
 
         model.approx_totals(method='fd', step=1e-5)
 

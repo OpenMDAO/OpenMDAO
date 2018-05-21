@@ -50,7 +50,9 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         for jac in [None, 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
             prob.model.nonlinear_solver = NewtonSolver()
-            prob.model.linear_solver = DirectSolver(assembled_jac=jac)
+            if jac in ('csc', 'dense'):
+                prob.model.options['assembled_jac_type'] = jac
+            prob.model.linear_solver = DirectSolver(assemble_jac=jac in ('csc','dense'))
             prob.set_solver_print(level=0)
 
             prob.setup(check=False)

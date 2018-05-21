@@ -160,7 +160,7 @@ class ParameterizedInstance(object):
         self.linear_solver_options = {'maxiter': 200,
                                       'atol': 1e-10,
                                       'rtol': 1e-10,
-                                      'assembled_jac': None,
+                                      'assemble_jac': False,
                                       }
 
     def setup(self, check=False):
@@ -192,9 +192,11 @@ class ParameterizedInstance(object):
             jacobian_type = args.get('jacobian_type', 'dense')
 
             if jacobian_type == 'dense':
-                self.linear_solver_options['assembled_jac'] = 'dense'
+                self.linear_solver_options['assemble_jac'] = True
+                prob.model.options['assembled_jac_type'] = 'dense'
             elif jacobian_type == 'sparse-csc':
-                self.linear_solver_options['assembled_jac'] = 'csc'
+                self.linear_solver_options['assemble_jac'] = True
+                prob.model.options['assembled_jac_type'] = 'csc'
             elif jacobian_type != 'matvec':
                 raise RuntimeError("Invalid assembled_jac: '%s'." % jacobian_type)
 
