@@ -63,6 +63,7 @@ class ParaboloidTricky(ExplicitComponent):
         partials['f_xy', 'x'] = 2.0*x*sc*sc - 6.0*sc + y*sc*sc
         partials['f_xy', 'y'] = 2.0*y*sc*sc + 8.0*sc + x*sc*sc
 
+
 class MyCompGoodPartials(ExplicitComponent):
     def setup(self):
         self.add_input('x1', 3.0)
@@ -80,6 +81,7 @@ class MyCompGoodPartials(ExplicitComponent):
         J['y', 'x1'] = np.array([3.0])
         J['y', 'x2'] = np.array([4.0])
 
+
 class MyCompBadPartials(ExplicitComponent):
     def setup(self):
         self.add_input('y1', 3.0)
@@ -96,6 +98,7 @@ class MyCompBadPartials(ExplicitComponent):
         J = partials
         J['z', 'y1'] = np.array([33.0])
         J['z', 'y2'] = np.array([40.0])
+
 
 class MyComp(ExplicitComponent):
     def setup(self):
@@ -1198,6 +1201,48 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"),1)
 
+    def test_glob_includes_excludes(self):
+
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('c1c', Group())
+        sub.add_subsystem('d1', ExecComp('y=2*x'))
+        sub.add_subsystem('e1', ExecComp('y=2*x'))
+
+        sub2 = model.add_subsystem('sss', Group())
+        sub3 = sub2.add_subsystem('sss2', Group())
+        sub2.add_subsystem('d1', ExecComp('y=2*x'))
+        sub3.add_subsystem('e1', ExecComp('y=2*x'))
+
+        model.add_subsystem('abc1cab', ExecComp('y=2*x'))
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None, includes='*c*c*')
+        self.assertEqual(len(data), 3)
+        self.assertTrue('c1c.d1' in data)
+        self.assertTrue('c1c.e1' in data)
+        self.assertTrue('abc1cab' in data)
+
+        data = prob.check_partials(out_stream=None, includes=['*d1', '*e1'])
+        self.assertEqual(len(data), 4)
+        self.assertTrue('c1c.d1' in data)
+        self.assertTrue('c1c.e1' in data)
+        self.assertTrue('sss.d1' in data)
+        self.assertTrue('sss.sss2.e1' in data)
+
+        data = prob.check_partials(out_stream=None, includes=['abc1cab'])
+        self.assertEqual(len(data), 1)
+        self.assertTrue('abc1cab' in data)
+
+        data = prob.check_partials(out_stream=None, includes='*c*c*', excludes=['*e*'])
+        self.assertEqual(len(data), 2)
+        self.assertTrue('c1c.d1' in data)
+        self.assertTrue('abc1cab' in data)
+
+
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
@@ -1570,6 +1615,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(compact_print=True,show_only_incorrect=True)
         prob.check_partials(compact_print=False,show_only_incorrect=True)
+
 
 class TestProblemCheckTotals(unittest.TestCase):
 
