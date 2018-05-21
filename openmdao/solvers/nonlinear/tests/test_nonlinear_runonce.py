@@ -22,30 +22,40 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
         prob = Problem()
-        prob.model = ConvergeDivergeGroups()
-        prob.model.linear_solver = ScipyKrylov()
+        model = prob.model = ConvergeDivergeGroups()
+
+        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = NonlinearRunOnce()
+
+        model.g1.nonlinear_solver = NonlinearRunOnce()
+        model.g1.g2.nonlinear_solver = NonlinearRunOnce()
+        model.g3.nonlinear_solver = NonlinearRunOnce()
+
         prob.set_solver_print(level=0)
-
-        prob.model.nonlinear_solver = NonlinearRunOnce()
-        g1 = prob.model.g1
-        g2 = g1.g2
-        g3 = prob.model.g3
-        g1.nonlinear_solver = NonlinearRunOnce()
-        g2.nonlinear_solver = NonlinearRunOnce()
-        g3.nonlinear_solver = NonlinearRunOnce()
-
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         # Make sure value is fine.
         assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
 
+    def test_undeclared_options(self):
+        # Test that using options that should not exist in class cause an error
+        solver = NonlinearRunOnce()
+
+        msg = "\"Key '%s' cannot be set because it has not been declared.\""
+
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+            with self.assertRaises(KeyError) as context:
+                solver.options[option] = 1
+
+            self.assertEqual(str(context.exception), msg % option)
+
     def test_feature_solver(self):
         from openmdao.api import Problem, Group, NonlinearRunOnce, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
@@ -71,7 +81,7 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
     @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 0.5))
         model.add_subsystem('p2', IndepVarComp('x', 3.0))
@@ -89,10 +99,11 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
         prob.driver = AEDriver()
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         handled = prob.run_driver()
         self.assertTrue(handled)
+
 
 if __name__ == "__main__":
     unittest.main()

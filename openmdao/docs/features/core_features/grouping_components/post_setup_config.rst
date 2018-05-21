@@ -20,8 +20,8 @@ you have called :code:`run_model` or :code:`run_driver`. These allowed actions i
 
 Here, we instantiate a hierarchy of Groups, and then change the solver to one that can solve this problem.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_post_setup_solver_configure
-    :no-split:
+    :layout: code, output
 
 .. tags:: Group, System

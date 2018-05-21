@@ -13,8 +13,9 @@ ways such as in subsystem Newton solves.)
 Here we calculate the total derivatives of the Sellar system objective with respect to the design
 variable 'z'.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_direct_solver.TestDirectSolverFeature.test_specify_solver
+    :layout: interleave
 
 
 DirectSolver Options

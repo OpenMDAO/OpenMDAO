@@ -60,7 +60,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_constraint('cl', equals=.5)
         prob.model.add_constraint('thickness', lower=.5, upper=5., vectorize_derivs=True)
 
-        prob.setup(vector_class=PETScVector, mode='rev')
+        prob.setup(mode='rev')
 
         # this will hang if the bug is present.
         J = prob.compute_totals(of=['cd','cl','thickness'],

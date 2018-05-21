@@ -257,6 +257,31 @@ class TestSystem(unittest.TestCase):
 
         self.assertTrue(isinstance(solver, DummySolver))
 
+    def test_deprecated_metadata(self):
+        from openmdao.api import Problem, IndepVarComp
+        from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
+
+        prob = Problem()
+        prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
+        prob.model.add_subsystem('double', VectorDoublingComp())
+
+        with warnings.catch_warnings(record=True) as w:
+            prob.model.double.metadata['size'] = 3
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "The 'metadata' attribute provides backwards compatibility "
+                         "with earlier version of OpenMDAO; use 'options' instead.")
+
+        prob.model.connect('inputs.x', 'double.x')
+        prob.setup()
+
+        prob['inputs.x'] = [1., 2., 3.]
+
+        prob.run_model()
+        assert_rel_error(self, prob['double.y'], [2., 4., 6.])
+
 
 if __name__ == "__main__":
     unittest.main()

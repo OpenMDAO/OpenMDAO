@@ -67,6 +67,17 @@ The implementation of each method will be illustrated using a simple implicit co
   .. embed-code::
       openmdao.core.tests.test_impl_comp.QuadraticJacVec.apply_linear
 
+- :code:`apply_multi_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)` :
+
+  [Optional] If the user wants to implement partial derivatives in a matrix-free way, this method performs the matrix-matrix product.
+  If mode is 'fwd', this method computes :math:`d\_{residuals} = J \cdot [ d\_{inputs} \quad d\_{outputs} ]^T` where d_outputs and
+  d_residuals are both matrices. If mode is 'rev', this method similarly computes :math:`[ d\_{inputs} \quad d\_{outputs} ]^T = J^T \cdot d\_{residuals}`.
+
+  This method is only used when "vectorize_derivs" is set to True on a design variable or response.
+
+  .. embed-code::
+      openmdao.core.tests.test_matmat.QuadraticCompVectorized.apply_multi_linear
+
 - :code:`solve_linear(d_outputs, d_residuals, mode)` :
 
   [Optional] Solves a linear system where the matrix is :math:`d\_{residuals} / d\_{outputs}` or its transpose. If mode is 'fwd', the right-hand side vector is :math:`d\_{residuals}` and the solution vector is :math:`d\_{outputs}`. If mode is 'rev', the right-hand side vector is :math:`d\_{outputs}` and the solution vector is :math:`d\_{residuals}`.

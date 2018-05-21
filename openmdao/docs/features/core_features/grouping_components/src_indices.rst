@@ -17,17 +17,23 @@ Usage
 1. Connect an independent array variable to two different components where
 each component gets part of the array.
 
-.. embed-test:: openmdao.core.tests.test_group.TestGroup.test_promote_src_indices
+.. embed-code::
+    openmdao.core.tests.test_group.TestGroup.test_promote_src_indices
+    :layout: interleave
 
 2. A distributed component that promotes its input and receives certain
 entries of the source array based on its rank.  Note that negative indices are
 supported.
 
-.. embed-test:: openmdao.core.tests.test_distribcomp.TestGroupMPI.test_promote_distrib
+.. embed-code::
+    openmdao.core.tests.test_distribcomp.TestGroupMPI.test_promote_distrib
+    :layout: interleave
 
 3. The source array is shape (4,3) and the input array is shape (2,2)
 
-.. embed-test:: openmdao.core.tests.test_group.TestGroup.test_promote_src_indices_nonflat
+.. embed-code::
+    openmdao.core.tests.test_group.TestGroup.test_promote_src_indices_nonflat
+    :layout: interleave
 
 4. If the source array is shape (4,3), the input is scalar, and we want to
 connect it to the (3, 1) entry of the source, then the :code:`add_input`

@@ -3,27 +3,42 @@ from __future__ import print_function
 import os
 import sys
 import re
+import time
 import argparse
+import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
 from six import string_types
 from six.moves import cStringIO
 from numpy import ndarray
+try:
+    import objgraph
+except ImportError:
+    objgraph = None
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, \
                                          func_group, _collect_methods, _Options, _setup_func_group,\
                                          _get_methods
+from openmdao.devtools.memory import mem_usage
+from openmdao.utils.mpi import MPI
+
 
 _trace_calls = None  # pointer to function that implements the trace
 _registered = False  # prevents multiple atexit registrations
+_printer = None
 
 MAXLINE = 80
 tab = '    '
+time0 = None
 
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
-def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self']), file=sys.stdout):
+def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
     """
     Print trace info, indenting based on call depth.
     """
@@ -46,14 +61,39 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self']), fil
                 if '\n' in s:
                     # change indent
                     s = s.replace("\n", "\n%s" % (' '*leneq))
-            print(s, file=file)
+            _printer(s)
+
+
+def _get_printer(stream, rank=-1):
+    """
+    Return a custom print function that outputs to the given stream and on the given rank.
+    """
+    if MPI and rank >= MPI.COMM_WORLD.size:
+        if MPI.COMM_WORLD.rank == 0:
+            print("Specified rank (%d) is outside of the valid range (0-%d)." %
+                  (rank, MPI.COMM_WORLD.size - 1))
+        exit()
+
+    # rank < 0 means output on all ranks
+    if not MPI or rank < 0 or MPI.COMM_WORLD.rank == rank:
+        def prt(*args, **kwargs):
+            print(*args, file=stream, **kwargs)
+    else:
+        def prt(*args, **kwargs):
+            pass
+    return prt
 
 
 def _trace_call(frame, arg, stack, context):
     """
     This is called after we have matched based on glob pattern and isinstance check.
     """
-    qual_cache, method_counts, class_counts, verbose = context
+    global time0
+    if time0 is None:
+        time0 = time.time()
+
+    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks, stream = context
+
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -64,19 +104,36 @@ def _trace_call(frame, arg, stack, context):
         pname = ""
 
     cname = self.__class__.__name__
-    class_counts[cname].add(id(self))
-    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+    my_id = id(self)
+    if my_id in id2count:
+        id_count = id2count[my_id]
+    else:
+        class_counts[cname] += 1
+        id2count[my_id] = id_count = class_counts[cname]
+
+    sname = "%s#%d%s" % (self.__class__.__name__, id_count, pname)
 
     fullname = '.'.join((sname, funcname))
     method_counts[fullname] += 1
 
     indent = tab * (len(stack)-1)
     if verbose:
-        print("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _printer("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
         _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     else:
-        print("%s%s" % (indent, fullname))
-    sys.stdout.flush()
+        _printer("%s%s" % (indent, fullname))
+
+    if memory is not None:
+        memory.append(mem_usage())
+
+    if leaks is not None:
+        stats = objgraph.typestats()
+        stats['frame'] += 1
+        stats['cell'] += 1
+        stats['list'] += 1
+        leaks.append(stats)
+
+    stream.flush()
 
 
 def _trace_return(frame, arg, stack, context):
@@ -85,7 +142,9 @@ def _trace_return(frame, arg, stack, context):
 
     This only happens if show_return is True when setup() is called.
     """
-    qual_cache, method_counts, class_counts, _ = context
+    global time0
+
+    qual_cache, method_counts, class_counts, id2count, verbose, memory, leaks, stream = context
     funcname = find_qualified_name(frame.f_code.co_filename,
                                    frame.f_code.co_firstlineno, qual_cache)
 
@@ -95,47 +154,100 @@ def _trace_return(frame, arg, stack, context):
     except AttributeError:
         pname = ""
 
-    cname = self.__class__.__name__
-    class_counts[cname].add(id(self))
-    sname = "%s#%d%s" % (self.__class__.__name__, len(class_counts[cname]), pname)
+    sname = "%s#%d%s" % (self.__class__.__name__, id2count[id(self)], pname)
 
-    indent = tab * (len(stack)-1)
-    print("%s<-- %s" % (indent, '.'.join((sname, funcname))))
-    if arg is not None:
-        s = "%s     %s" % (indent, arg)
-        if ' object at ' in s:
-            s = addr_regex.sub('', s)
-        print(s)
+    indent = tab * len(stack)
+    if memory is not None:
+        current_mem = mem_usage()
+        last_mem = memory.pop()
+        if current_mem != last_mem:
+            delta = current_mem - last_mem
+            _printer("%s<-- %s (time: %8.5f) (total: %6.3f MB) (diff: %+.0f KB)" %
+                     (indent, '.'.join((sname, funcname)), time.time() - time0, current_mem,
+                     delta * 1024.))
 
-    sys.stdout.flush()
+            # add this delta to all callers so when they calculate their own delta, this
+            # delta won't be included
+            for i in range(len(memory) - 1, -1, -1):
+                memory[i] += delta
+        else:
+            _printer("%s<-- %s (time: %8.5f) (total: %6.3f MB)" %
+                     (indent, '.'.join((sname, funcname)), time.time() - time0, current_mem))
+    else:
+        _printer("%s<-- %s" % (indent, '.'.join((sname, funcname))))
+
+    if verbose:
+        if arg is not None:
+            s = "%s     %s" % (indent, arg)
+            if ' object at ' in s:
+                s = addr_regex.sub('', s)
+            _printer(s)
+
+    if leaks is not None:
+        last_objs = leaks.pop()
+        for name, _, delta_objs in objgraph.growth(peak_stats=last_objs):
+            _printer("%s   %s %+d" % (indent, name, delta_objs))
+
+    stream.flush()
 
 
 def _setup(options):
     if not func_group:
         _setup_func_group()
 
-    global _registered, _trace_calls
+    global _registered, _trace_calls, _printer
 
-    verbose=options.verbose
+    verbose = options.verbose
+    memory = options.memory
+    leaks = options.leaks
+
     if not _registered:
         methods = _get_methods(options, default='openmdao')
 
         call_stack = []
         qual_cache = {}
         method_counts = defaultdict(int)
-        class_counts = defaultdict(set)
-        if verbose:
+        class_counts = defaultdict(lambda: -1)
+        id2count = {}
+        if verbose or memory or leaks:
             do_ret = _trace_return
         else:
             do_ret = None
+
+        if memory:
+            if psutil is None:
+                raise RuntimeError("Memory tracing requires the 'psutil' package.  "
+                                   "Install it using 'pip install psutil'.")
+            memory = []
+        else:
+            memory = None
+
+        if leaks:
+            if objgraph is None:
+                raise RuntimeError("Leak detection requires the 'objgraph' package. "
+                                   "Install it using 'pip install objgraph'.")
+            leaks = []
+        else:
+            leaks = None
+
+        if options.outfile == 'stdout':
+            stream = sys.stdout
+        elif options.outfile == 'stderr':
+            stream = sys.stderr
+        else:
+            stream = open(options.outfile, 'w')
+
+        _printer = _get_printer(stream, options.rank)
+
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
-                                                         class_counts, verbose))
+                                                         class_counts, id2count, verbose, memory,
+                                                         leaks, stream))
 
 
-def setup(methods=None, verbose=None):
+def setup(methods=None, verbose=None, memory=None, leaks=False, rank=-1, outfile='stdout'):
     """
     Setup call tracing.
 
@@ -145,8 +257,17 @@ def setup(methods=None, verbose=None):
         Methods to be traced, based on glob patterns and isinstance checks.
     verbose : bool
         If True, show function locals and return values.
+    memory : bool
+        If True, show functions that increase memory usage.
+    leaks : bool
+        If True, show objects that are created within a function and not garbage collected.
+    rank : int
+        MPI rank where output is desired.  The default, -1 means output from all ranks.
+    outfile : file-like or str
+        Output file.
     """
-    _setup(_Options(methods=methods, verbose=verbose))
+    _setup(_Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks, rank=rank,
+                    outfile=outfile))
 
 
 def start():
@@ -169,7 +290,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None, verbose=False):
+def tracing(methods=None, verbose=False, memory=False, leaks=False):
     """
     Turn on call tracing within a certain context.
 
@@ -180,8 +301,12 @@ def tracing(methods=None, verbose=False):
         is a string, use that string to lookup a 'canned' method list by name.
     verbose : bool
         If True, show function locals and return values.
+    memory : bool
+        If True, show functions that increase memory usage.
+    leaks : bool
+        If True, show objects that are created within a function and not garbage collected.
     """
-    setup(methods=methods, verbose=verbose)
+    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
     start()
     yield
     stop()
@@ -197,9 +322,13 @@ class tracedfunc(object):
         Methods to be traced, based on glob patterns and isinstance checks.
     verbose : bool
         If True, show function locals and return values.
+    memory : bool
+        If True, show functions that increase memory usage.
+    leaks : bool
+        If True, show objects that are created within a function and not garbage collected.
     """
-    def __init__(self, methods=None, verbose=False):
-        self.options = _Options(methods=methods, verbose=verbose)
+    def __init__(self, methods=None, verbose=False, memory=False, leaks=False):
+        self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
         self._call_setup = True
 
     def __call__(self, func):
@@ -214,6 +343,9 @@ class tracedfunc(object):
 
 
 def _itrace_setup_parser(parser):
+    """
+    Set up the command line options for the 'openmdao trace' command line tool.
+    """
     if not func_group:
         _setup_func_group()
 
@@ -224,6 +356,14 @@ def _itrace_setup_parser(parser):
                               ' Options are: %s' % sorted(func_group.keys()))
     parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
                         help="Show function locals and return values.")
+    parser.add_argument('-m', '--memory', action='store_true', dest='memory',
+                        help="Show memory usage.")
+    parser.add_argument('-l', '--leaks', action='store_true', dest='leaks',
+                        help="Show objects that are not garbage collected after each function call.")
+    parser.add_argument('-r', '--rank', action='store', dest='rank', type=int,
+                        default=-1, help='MPI rank where output is desired.  Default is all ranks.')
+    parser.add_argument('-o', '--outfile', action='store', dest='outfile',
+                        default='stdout', help='Output file.  Defaults to stdout.')
 
 
 def _itrace_exec(options):

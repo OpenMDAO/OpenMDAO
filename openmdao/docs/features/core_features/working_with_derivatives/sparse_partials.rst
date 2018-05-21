@@ -19,15 +19,18 @@ entries in the (0, 0), (1, 1), (1, 2), and (1,3) positions, one would use
 need to pass the sparsity pattern again. Instead, you simply give the values for the entries in the
 same order as given in :code:`declare_partials`.
 
-.. embed-test::
+.. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_sparse_jacobian
+    :layout: interleave
 
 2. If only some of your Jacobian entries change across iterations, or if you wish to avoid creating intermediate arrays, you may update the entries in-place.
 
-.. embed-test::
+.. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_sparse_jacobian_in_place
+    :layout: interleave
 
 3. If your partial derivative is constant and sparse, or if you simply wish to provide an initial value for the derivative, you can pass in the values using the :code:`val` argument. If you are using the AIJ format, :code:`val` should receive the nonzero entries in the same order as given for :code:`rows` and :code:`cols`. Alternatively, you may provide a Scipy sparse matrix, from which the sparsity pattern is deduced.
 
-.. embed-test::
+.. embed-code::
     openmdao.jacobians.tests.test_jacobian_features.TestJacobianForDocs.test_sparse_jacobian_const
+    :layout: interleave

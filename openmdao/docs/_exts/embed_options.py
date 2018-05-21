@@ -6,10 +6,8 @@ from docutils import nodes
 from docutils.statemachine import ViewList
 
 import sphinx
-
-from sphinx.util.compat import Directive
+from docutils.parsers.rst import Directive
 from sphinx.util.nodes import nested_parse_with_titles
-
 from openmdao.utils.options_dictionary import OptionsDictionary, _undefined
 
 
@@ -44,79 +42,16 @@ class EmbedOptionsDirective(Directive):
         if not isinstance(options, OptionsDictionary):
             raise TypeError("Object '%s' is not an OptionsDictionary." % attribute_name)
 
-        outputs = []
-        for option_name, option_data in sorted(iteritems(options._dict)):
-            name = option_name
-            default = option_data['value'] if option_data['value'] is not _undefined \
-                else '**Required**'
-            values = option_data['values']
-            types = option_data['types']
-            desc = option_data['desc']
-
-            if types is None:
-                types = "N/A"
-
-            elif types is not None:
-                if not isinstance(types, (tuple, list)):
-                    types = (types,)
-
-                types = [type_.__name__ for type_ in types]
-
-            if values is None:
-                values = "N/A"
-
-            elif values is not None:
-                if not isinstance(values, (tuple, list)):
-                    values = (values,)
-
-                values = [value for value in values]
-
-            outputs.append([name, default, values, types, desc])
-
         lines = ViewList()
 
-        col_heads = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
-
-        max_sizes = {}
-        for j, col in enumerate(col_heads):
-            max_sizes[j] = len(col)
-
-        for output in outputs:
-            for j, item in enumerate(output):
-                length = len(str(item))
-                if max_sizes[j] < length:
-                    max_sizes[j] = length
-
-        header = ""
-        titles = ""
-        for key, val in iteritems(max_sizes):
-            header += '=' * val + ' '
-
-        for j, head in enumerate(col_heads):
-            titles += "%s " % head
-            size = max_sizes[j]
-            space = size - len(head)
-            if space > 0:
-                titles += space*' '
-
-        lines.append(header, "options table", 1)
-        lines.append(titles, "options table", 2)
-        lines.append(header, "options table", 3)
-
-        n = 3
-        for output in outputs:
-            line = ""
-            for j, item in enumerate(output):
-                line += "%s " % str(item)
-                size = max_sizes[j]
-                space = size - len(str(item))
-                if space > 0:
-                    line += space*' '
-
+        n = 0
+        for line in options.__rst__():
             lines.append(line, "options table", n)
             n += 1
 
-        lines.append(header, "options table", n)
+        lines.append("", "options table", n+1)  # Blank line required after table.
+        lines.append("Note: Options can be passed as keyword arguments at initialization.",
+                     "options table", n+2)
 
         # Create a node.
         node = nodes.section()

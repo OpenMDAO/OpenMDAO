@@ -31,5 +31,6 @@ So if your residual is a function of one or more of the component outputs, make 
 Check That Your Derivatives Are Correct!
 ****************************************
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.tests.test_quad_implicit.TestQuadImplicit.test_check_partials_for_docs
+    :layout: interleave

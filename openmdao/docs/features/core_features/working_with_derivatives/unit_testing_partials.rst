@@ -18,5 +18,6 @@ In your unit test, after calling :code:`check_partials` on a :code:`Component`, 
 Usage
 -----
 
-.. embed-test::
-    openmdao.utils.tests.test_assert_utils.TestAssertUtils.test_assert_check_partials_no_exception_expected
+.. embed-code::
+    openmdao.utils.tests.test_assert_utils.TestAssertUtils.test_feature_assert_check_partials_exception_expected
+    :layout: interleave

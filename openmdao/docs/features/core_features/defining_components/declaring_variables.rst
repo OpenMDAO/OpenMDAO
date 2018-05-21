@@ -16,6 +16,10 @@ An example is given below.
 .. embed-code::
     openmdao.test_suite.components.expl_comp_simple.TestExplCompSimple
 
+.. note::
+
+    Variable names have few restrictions, but the following characters are not allowed in a variable name: '.', '*', '?', '!', '[', ']'.
+
 Method Signatures
 -----------------
 
@@ -33,45 +37,51 @@ Usage
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithDefault
 
-  .. embed-test::
+  .. embed-code::
       openmdao.core.tests.test_add_var.TestAddVar.test_val
+      :layout: interleave
 
 2. Declaring with only the `shape` argument.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithShape
 
-  .. embed-test::
+  .. embed-code::
       openmdao.core.tests.test_add_var.TestAddVar.test_shape
+      :layout: interleave
 
 3. Declaring with only the `indices` argument.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithIndices
 
-  .. embed-test::
+  .. embed-code::
       openmdao.core.tests.test_add_var.TestAddVar.test_indices
+      :layout: interleave
 
 4. Declaring an array variable with a scalar default value.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddArrayWithScalar
 
-  .. embed-test::
+  .. embed-code::
       openmdao.core.tests.test_add_var.TestAddVar.test_scalar_array
+      :layout: interleave
 
 5. Declaring with an array val and indices (their shapes must match).
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithArrayIndices
 
-  .. embed-test::
+  .. embed-code::
       openmdao.core.tests.test_add_var.TestAddVar.test_array_indices
+      :layout: interleave
 
 6. Declaring an output with bounds, using `upper` and/or `lower` arguments.
 
   .. embed-code::
       openmdao.core.tests.test_add_var.CompAddWithBounds
 
-  .. embed-test::
+  .. embed-code::
       openmdao.core.tests.test_add_var.TestAddVar.test_bounds
+      :layout: interleave

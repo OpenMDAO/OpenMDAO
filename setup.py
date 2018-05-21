@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='openmdao',
-    version='2.2.0',
+    version='2.2.1',
     description="OpenMDAO v2 framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
@@ -27,7 +27,7 @@ setup(
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.2.0',
+    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.2.1',
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
@@ -79,7 +79,8 @@ setup(
         'numpydoc',
         'scipy',
         'sqlitedict',
-        'pycodestyle', 'pydocstyle',
+        'pycodestyle==2.3.1',
+        'pydocstyle==2.0.0',
         'testflo',
         'parameterized',
         'pyparsing',
@@ -89,7 +90,7 @@ setup(
         'mock',
         'requests_mock',
         'tornado',
-        'pyDOE'
+        'pyDOE2'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""

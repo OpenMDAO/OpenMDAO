@@ -44,8 +44,9 @@ In summary, the recipe for solving Kepler's equation is as follows:
 - Add a linear and nonlinear solver to the Group, since the default solvers do not iterate.
 - Setup the problem, set values for the inputs, and run the model.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_keplers_equation.TestKeplersEquation.test_result
+    :layout: interleave
 
 ~~~~~~~
 Summary

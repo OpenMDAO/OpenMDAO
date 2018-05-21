@@ -10,8 +10,9 @@ connections and implicit states in the system or subsystems. Newton's method req
 so a linear solver can also be specified. By default, NewtonSolver uses the linear solver
 that is slotted in the containing system.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_basic
+    :layout: interleave
 
 Most of the solvers in OpenMDAO operate hierarchically, in that you can use solvers on subgroups
 to subdivide the calculation effort. However, NewtonSolver is an exception. It does not
@@ -37,8 +38,9 @@ NewtonSolver Option Examples
   cut it back from the default, ten, down to two, so that it terminates a few iterations earlier and doesn't
   reach the specified absolute or relative tolerance.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_maxiter
+      :layout: interleave
 
 **atol**
 
@@ -47,8 +49,9 @@ NewtonSolver Option Examples
   components and `evaluate` on explicit components. If this norm value is lower than the absolute
   tolerance `atol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_atol
+      :layout: interleave
 
 **rtol**
 
@@ -57,8 +60,9 @@ NewtonSolver Option Examples
   components and `evaluate` on explicit components. If the ratio of the currently calculated norm to the
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_rtol
+      :layout: interleave
 
 **solve_subsystems**
 
@@ -70,8 +74,9 @@ NewtonSolver Option Examples
   We specify a Newton solver in each Sellar subgroup as well as a top-level Newton solver, which we tell to solve
   its subsystems.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_solve_subsystems_basic
+      :layout: interleave
 
 **max_sub_solves**
 
@@ -82,8 +87,9 @@ NewtonSolver Option Examples
   For example, if you set `max_sub_solves` to zero, then the solvers on subsystems are executed during the initial
   evaluation, but not during any subsequent iteration.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_max_sub_solves
+      :layout: interleave
 
 **err_on_maxiter**
 
@@ -91,8 +97,9 @@ NewtonSolver Option Examples
   will raise an AnalysisError exception. This is mainly important when coupled with a higher-level solver or
   driver (e.g., `pyOptSparseDriver`)that can handle the AnalysisError by adapting the stepsize and retrying.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_err_on_maxiter
+      :layout: interleave
 
   This feature can be set on any iterative nonlinear or linear solver.
 
@@ -103,8 +110,9 @@ We can choose a different linear solver for calculating the Newton step by setti
 linear solver that was specified on the containing system, which by default is LinearBlockGS. In the following example,
 we modify the model to use :ref:`DirectSolver <openmdao.solvers.linear.direct.py>` instead.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.nonlinear.tests.test_newton.TestNewtonFeatures.test_feature_linear_solver
+    :layout: interleave
 
 Specifying a Line Search Algorithm
 ----------------------------------
@@ -125,7 +133,8 @@ everywhere. You can verify that if NewtonSolver is used with no backtracking spe
 violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <openmdao.solvers.linesearch.backtracking.py>`
 as our line search algorithm, and we get a solution on the lower bounds for "z".
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_specification
+    :layout: interleave
 
 .. tags:: Solver, NonlinearSolver

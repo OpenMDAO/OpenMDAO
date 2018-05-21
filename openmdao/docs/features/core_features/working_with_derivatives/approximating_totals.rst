@@ -15,7 +15,7 @@ generate an approximate Jacobian for the entire group during the linearization s
 which inputs and output pairs are needed in this Jacobian. When :code:`solve_linear` is called from any system that contains this system, the approximated Jacobian
 is used for the derivatives in this system.
 
-The derivatives approximated in this matter are total derivatives of outputs of the group with respect to inputs. If any components in the group contain
+The derivatives approximated in this manner are total derivatives of outputs of the group with respect to inputs. If any components in the group contain
 implicit states, then you must have an appropriate solver (such as :code:`NewtonSolver`) inside the group to solve the implicit relationships.
 
 Here is a classic example of where you might use an approximation like finite difference. In this example, we could just
@@ -23,14 +23,16 @@ approximate the partials on components CompOne and CompTwo separately. However, 
 so it would require 25 separate executions under finite difference. If we instead approximate the total derivatives on the
 whole group, we only have one input, so just one extra execution.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic
+    :layout: interleave
 
 The same arguments are used for both partial and total derivative approximation specifications. Here we set the finite difference
 `step` size, the `form` to central differences, and the `step_calc` to relative instead of absolute.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_arguments
+    :layout: interleave
 
 Complex Step
 ------------
@@ -48,5 +50,6 @@ You can also complex step your model or group, though there are some important r
   able to converge. Some solvers such as :code:`NonlinearBlockGS` can handle this. However, the Newton solver must linearize and initiate a
   gradient solve about a complex point. This is not possible to do at present (though we are working on some ideas to make this work.)
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic_cs
+    :layout: interleave

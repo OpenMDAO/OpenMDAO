@@ -18,27 +18,13 @@ system in the hierarchy takes precedence over all lower ones for any modificatio
 Here is a simple example where a lower system sets a solver, but we want to change it to a different one in the top-most
 system.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_system_configure
-    :no-split:
+    :layout: code, output
 
 
 Uses of setup vs. configure
 ---------------------------
 
-**setup**
-
- - Add subsystems
- - Issue connections
- - Assign linear and nonlinear solvers at group level
- - Change solver settings in group
- - Assign Jacobians at group level
- - Set system execution order
-
-**configure**
-
- - Assign linear and nonlinear solvers to subsystems
- - Change solver settings in subsystems
- - Assign Jacobians to subsystems
- - Set execution order in subsystems
+To understand when to use setup and when to use configure, see the :ref:`Theory Manual entry on how the setup stack works.<theory_setup_stack>`.
 

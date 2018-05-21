@@ -12,6 +12,7 @@ from openmdao.api import Problem, ExplicitComponent, NewtonSolver, ScipyKrylov, 
     IndepVarComp, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import SubSellar
+from openmdao.utils.general_utils import printoptions
 
 
 # Note: The following class definitions are used in feature docs
@@ -532,54 +533,66 @@ class ExplCompTestCase(unittest.TestCase):
         #   result in the same format of the output. When running this test from the
         #   top level via testflo, the format comes out different than if the test is
         #   run individually
-        np.set_printoptions(edgeitems=3, infstr='inf',
-                            linewidth = 75, nanstr = 'nan', precision = 8,
-                            suppress = False, threshold = 1000, formatter = None)
-        # logging outputs
-        # out_stream - not hierarchical - extras - print_arrays
-        stream = cStringIO()
-        prob.model.list_outputs(values=True,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=False,
-                                print_arrays=True,
-                                out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('2 Explicit Output'), 1)
-        self.assertEqual(text.count('value:'), 2)
-        self.assertEqual(text.count('resids:'), 2)
-        self.assertEqual(text.count('['), 4)
-        # make sure they are in the correct order
-        self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(37, num_non_empty_lines)
+        opts = {
+            'edgeitems': 3,
+            'infstr': 'inf',
+            'linewidth': 75,
+            'nanstr': 'nan',
+            'precision': 8,
+            'suppress': False,
+            'threshold': 1000,
+        }
 
-        # Hierarchical
-        stream = cStringIO()
-        prob.model.list_outputs(values=True,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=True,
-                                print_arrays=True,
-                                out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('2 Explicit Output'), 1)
-        self.assertEqual(text.count('value:'), 2)
-        self.assertEqual(text.count('resids:'), 2)
-        self.assertEqual(text.count('['), 4)
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('  des_vars'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  mult'), 1)
-        self.assertEqual(text.count('    y'), 1)
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 40)
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            opts['legacy'] = '1.13'
+
+        with printoptions(**opts):
+            # logging outputs
+            # out_stream - not hierarchical - extras - print_arrays
+            stream = cStringIO()
+            prob.model.list_outputs(values=True,
+                                    units=True,
+                                    shape=True,
+                                    bounds=True,
+                                    residuals=True,
+                                    scaling=True,
+                                    hierarchical=False,
+                                    print_arrays=True,
+                                    out_stream=stream)
+            text = stream.getvalue()
+            self.assertEqual(text.count('2 Explicit Output'), 1)
+            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('resids:'), 2)
+            self.assertEqual(text.count('['), 4)
+            # make sure they are in the correct order
+            self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
+            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+            self.assertEqual(37, num_non_empty_lines)
+
+            # Hierarchical
+            stream = cStringIO()
+            prob.model.list_outputs(values=True,
+                                    units=True,
+                                    shape=True,
+                                    bounds=True,
+                                    residuals=True,
+                                    scaling=True,
+                                    hierarchical=True,
+                                    print_arrays=True,
+                                    out_stream=stream)
+            text = stream.getvalue()
+            self.assertEqual(text.count('2 Explicit Output'), 1)
+            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('resids:'), 2)
+            self.assertEqual(text.count('['), 4)
+            self.assertEqual(text.count('top'), 1)
+            self.assertEqual(text.count('  des_vars'), 1)
+            self.assertEqual(text.count('    x'), 1)
+            self.assertEqual(text.count('  mult'), 1)
+            self.assertEqual(text.count('    y'), 1)
+            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+            self.assertEqual(num_non_empty_lines, 40)
 
     def test_for_docs_array_list_vars_options(self):
 
@@ -619,29 +632,29 @@ class ExplCompTestCase(unittest.TestCase):
                                hierarchical=True,
                                print_arrays=True)
 
-        np.set_printoptions(edgeitems=3, infstr='inf',
-                            linewidth = 75, nanstr = 'nan', precision = 8,
-                            suppress = False, threshold = 1000, formatter = None)
+        with printoptions(edgeitems=3, infstr='inf',
+                          linewidth = 75, nanstr = 'nan', precision = 8,
+                          suppress = False, threshold = 1000, formatter = None):
 
-        prob.model.list_outputs(values=True,
-                                implicit=False,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=False,
-                                print_arrays=True)
+            prob.model.list_outputs(values=True,
+                                    implicit=False,
+                                    units=True,
+                                    shape=True,
+                                    bounds=True,
+                                    residuals=True,
+                                    scaling=True,
+                                    hierarchical=False,
+                                    print_arrays=True)
 
-        prob.model.list_outputs(values=True,
-                                implicit=False,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=True,
-                                print_arrays=True)
+            prob.model.list_outputs(values=True,
+                                    implicit=False,
+                                    units=True,
+                                    shape=True,
+                                    bounds=True,
+                                    residuals=True,
+                                    scaling=True,
+                                    hierarchical=True,
+                                    print_arrays=True)
 
 
 if __name__ == '__main__':

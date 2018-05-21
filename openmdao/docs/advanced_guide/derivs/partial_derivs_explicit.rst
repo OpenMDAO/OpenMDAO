@@ -25,7 +25,7 @@ The calls to :code:`declare_partials` tell OpenMDAO which partial derivatives to
 This is always done inside the :code:`setup` method.
 In this example, not all the outputs depend on all the inputs, and you'll see that if you look at the derivative declarations.
 Any partial that is not declared is assumed to be zero.
-You may declare all the partials in just one line as follows (see the :ref:`feature doc on specifying partials <feature_specify_partials>` for more details):
+You may declare all the partials in just one line as follows (see the documentation on :ref:`specifying partials <feature_specify_partials>` for more details):
 
 .. code::
 
@@ -38,7 +38,7 @@ Generally, it is better to be more specific, and declare only the nonzero partia
 .. note::
     There are a few more options to :code:`declare_partials` that are worth taking a look at.
     There is support for when your derivatives are constant, and there is support for specifying derivatives in a sparse AIJ format.
-    The full details can be found in the :ref:`feature doc on specifying partials <feature_specify_partials>`.
+    The full details can be found in the documentation on :ref:`specifying partials <feature_specify_partials>`.
 
 After you declare the nonzero partial derivatives, you need to implement the :code:`compute_partials` method to perform the actual
 derivative computations.
@@ -63,22 +63,21 @@ How Do I Know If My Derivatives Are Correct?
 ********************************************
 
 It is really important, if you are going to provide analytic derivatives, that you make sure they are correct.
-Nothing else will screw up the convergence of your analysis or optimization more quickly than bad derivatives.
+It is hard to overstate the importance of accurate derivatives in the convergence of analysis and optimization problems.
 OpenMDAO provides a helper function to make it easier to verify your partial derivatives.
 Any time you implement analytic derivatives, or change the nonlinear equations of your analysis, you should check your partial derivatives this way.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_betz_limit.TestBetzLimit.test_betz_derivatives
+    :layout: interleave
 
 .. note::
 
     :code:`check_partials` is **really** important when you're coding derivatives.
     It has some options to give you more detailed outputs for debugging and to let you limit which components get tested.
-    You should look over the complete :ref:`check_partials doc <feature_check_partials>` before you start doing heavy development with derivatives.
+    You should look over the complete documentation on :ref:`check_partials <feature_check_partials>` before you start doing heavy development with derivatives.
 
-There is a lot of information there, including checks for both forward and reverse derivatives.
-If you've taken our advice and stuck with the :code:`compute_partials` method, then you can ignore all the reverse stuff.
-For now, just take a look at the *r(fwd-chk)* column, which shows the norm of the relative difference between the analytic derivatives Jacobian and one that was approximated using finite difference.
+There is a lot of information there, but for now, just take a look at the *r(fwd-chk)* column, which shows the norm of the relative difference
+between the analytic derivatives Jacobian and one that was approximated using finite differences.
 Here, all the numbers are really small, and that's what you want to see.
 It's rare, except for linear functions, that the finite difference and analytic derivatives will match exactly, but they should be pretty close.
-

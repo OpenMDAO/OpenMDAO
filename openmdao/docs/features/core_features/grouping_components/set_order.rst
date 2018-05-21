@@ -26,5 +26,6 @@ Usage
 
 Change the execution order of components *C1* and *C3*.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_set_order_feature
+    :layout: interleave

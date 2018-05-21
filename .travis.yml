@@ -4,7 +4,6 @@ branches:
 
 group: deprecated-2017Q4
 
-#sudo: false
 filter_secrets: false
 
 os:
@@ -16,10 +15,12 @@ env:
   global:
     - secure: Rx/uHnF0j1Cp/Ume9lQE5Wu2oM6aA41oFI22+oXmw798vmyeqHAocL6hqva0navjqx9FWLdPHn1LTAjLsHop+tavpMR1Qzu3P/5FEcvr/qDi68osWZq3oCs2WRJLo0BFaG8jQvmMd+RxkczVxWj+D2K+ywgkNb1KABP5Xv6lnTtwfTH0lteCMkFcnTnC4jcan1VGdvLyxewzMbdbuvTNVukAdrVxbwZMJrDyPPf7aEZ+t50C/pkRYSVf/2/YyFq5hgywqZZe2RInO7UeyHWhP+giyQsVkL0nWpA5zcgKjvYKnZbAt95uzTmwabs4e6BpipvbcX2M7aMyqMaz6OD36cDScMeOFn/FIQC3UalkvwEH0yvzI3CDncTjWy4xkxnfort7XKeQbrSqrX0AcDu462ke95JHZsIfL402lgtcW4aLcPUPs2MPrin1ENLBK29Jm+5LIM+22ISWd4anhpjE70SgOhsXrHrzL4n4kfxb4rsm483aeXEszlxWu56QNQ5EYCHpLY+aF9XOkFdAMM/FBRwlxhTySscPOANfd4GiZxSPxDOEHoEHKoy/CPo4jkUlFrqZIe+VnHmNPgGH/eU2nCNMhVeH/zJ5kOx7wns0SdorUSuQIywg07BBJtizzSUtzofd8kYRdVMyH4RTAfoBeGPUeFV45N5i07N6ucagL3s=
   matrix:
-    - PY=2.7 MPI=1
-    - PY=3.6 MPI=1
-    - PY=2.7 MPI=
-    - PY=3.6 MPI=
+    - PY=2.7 NUMPY=1.12
+    - PY=2.7 NUMPY=1.12 PETSc=3.8.1
+    - PY=2.7 NUMPY=1.12 PETSc=3.9.1
+    - PY=3.6 NUMPY=1.12
+    - PY=3.6 NUMPY=1.12 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.14 PETSc=3.9.1
 
 git:
   depth: 99999
@@ -42,34 +43,18 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-#- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"
-- pip install --upgrade pip;
-
-- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
-
-- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
-    brew install openmpi;
-  fi
-
-- wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
+- wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh
 - chmod +x miniconda.sh
+- ./miniconda.sh -b  -p /home/travis/miniconda;
+- export PATH=/home/travis/miniconda/bin:$PATH
 
-- if [ "$OS" = "Linux" ]; then
-    ./miniconda.sh -b  -p /home/travis/miniconda;
+- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    MASTER_BUILD=1;
   fi
-
-- if [ "$OS" = "MacOSX" ]; then
-    ./miniconda.sh -b  -p /Users/travis/miniconda;
-  fi
-
-- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin";
-  else echo "/home/travis/miniconda/bin"; fi)
-- export PATH=$PATHPREFIX:$PATH
-- export OPENMDAO_TEST_DOCS=1
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- if [ "$MASTER_BUILD" ]; then
     openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
     eval "$(ssh-agent -s)";
     chmod 600 /tmp/travis_deploy_rsa;
@@ -77,17 +62,15 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-# keeping numpy pinned at 1.12 because pySNOPT dies with 1.13 because numpy broke callback
-#- conda install --yes nomkl
 - conda install --yes python=$PY
-- conda install --yes numpy==1.12 scipy=0.19.1 matplotlib==2.0.2 nose sphinx mock swig pip
+- conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip
 - pip install --upgrade pip
 
 # install pyoptsparse
 - git clone https://github.com/mdolab/pyoptsparse.git;
 - cd pyoptsparse;
 # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+- if [ "$MASTER_BUILD" ]; then
     cd pyoptsparse/pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
     cd ../../..;
@@ -96,9 +79,9 @@ install:
 - python setup.py install;
 - cd ..;
 
-- if [ "$MPI" ]; then
+- if [ "$PETSc" ]; then
     pip install mpi4py;
-    pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
+    pip install petsc4py==$PETSc;
   fi
 
 - pip install redbaron
@@ -107,31 +90,43 @@ install:
 - pip install git+https://github.com/swryan/coveralls-python@work
 - pip install .  # Not using -e on purpose here, to catch pkging errors
 
+# do this after petsc install to avoid weird petsc install failure
+- conda install --yes matplotlib
+
 script:
 # make docs first
 - cd openmdao/docs;
-- if [ "$MPI" ]; then
+- if [ "$PETSc" ]; then
     make all;
   fi
 
+# display version of installed packages
+- pip list
+
 # run the tests from down here to see if it can work without being at top level
-- testflo -n 1 openmdao  -m "ptest*"
-- testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*
+# only do coverage on the upload machine.
+- if [ "$UPLOAD_DOCS" ]; then
+    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
+  else
+    testflo -n 1 --timeout=120 openmdao;
+  fi
+
 
 after_success:
-- coveralls --rcfile=../../.coveragerc --output=coveralls.json
-- sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json
-- coveralls --upload=coveralls-upd.json
+# again, only run coverage operations on the upload machine after success.
+- if [ "$UPLOAD_DOCS" ]; then
+    coveralls --rcfile=../../.coveragerc --output=coveralls.json;
+    sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    coveralls --upload=coveralls-upd.json;
+  fi
 
 deploy:
   provider: script
   skip_cleanup: true
   script:
   # only deploy docs in a build after a PR or merge is accepted
-  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.6" ]; then
-        python _utils/upload_doc_version.py;
-      fi
+  - if [ "$MASTER_BUILD" ] && [ "$UPLOAD_DOCS" ]; then
+      python _utils/upload_doc_version.py;
     fi
   on:
     branch: master

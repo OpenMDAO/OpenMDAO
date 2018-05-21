@@ -6,14 +6,19 @@ Prof. William A. Crossley.
 
 This basic GA algorithm is compartmentalized into the GeneticAlgorithm class so that it can be
 used in more complicated driver.
+
+The following reference is only for the automatic population sizing:
+Williams E.A., Crossley W.A. (1998) Empirically-Derived Population Size and Mutation Rate
+Guidelines for a Genetic Algorithm with Uniform Crossover. In: Chawdhry P.K., Roy R., Pant R.K.
+(eds) Soft Computing in Engineering Design and Manufacturing. Springer, London.
 """
 import copy
 
 from six import iteritems
-from six.moves import range
+from six.moves import range, zip
 
 import numpy as np
-from pyDOE import lhs
+from pyDOE2 import lhs
 
 from openmdao.core.driver import Driver
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -24,15 +29,6 @@ class SimpleGADriver(Driver):
     """
     Driver for a simple genetic algorithm.
 
-    Options
-    -------
-    options['elitism'] :  bool(True)
-        If True, replace worst performing point with best from previous generation each iteration.
-    options['max_gen'] :  int(300)
-        Number of generations before termination.
-    options['pop_size'] :  int(25)
-        Number of points in the GA.
-
     Attributes
     ----------
     _desvar_idx : dict
@@ -40,13 +36,20 @@ class SimpleGADriver(Driver):
         design variables.
     _ga : <GeneticAlgorithm>
         Main genetic algorithm lies here.
+    _randomstate : np.random.RandomState, int
+         Random state (or seed-number) which controls the seed and random draws.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize the SimpleGADriver driver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
-        super(SimpleGADriver, self).__init__()
+        super(SimpleGADriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['integer_design_vars'] = True
@@ -60,7 +63,16 @@ class SimpleGADriver(Driver):
         self.supports['simultaneous_derivatives'] = False
         self.supports['active_set'] = False
 
-        # User Options
+        self._desvar_idx = {}
+        self._ga = None
+
+        # random state can be set for predictability during testing
+        self._randomstate = None
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
         self.options.declare('bits', default={}, types=(dict),
                              desc='Number of bits of resolution. Default is an empty dict, where '
                              'every unspecified variable is assumed to be integer, and the number '
@@ -71,13 +83,11 @@ class SimpleGADriver(Driver):
                              ' generation each iteration.')
         self.options.declare('max_gen', default=300,
                              desc='Number of generations before termination.')
-        self.options.declare('pop_size', default=25,
-                             desc='Number of points in the GA.')
+        self.options.declare('pop_size', default=0,
+                             desc='Number of points in the GA. Set to 0 and it will be computed '
+                             'as four times the number of bits.')
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
-
-        self._desvar_idx = {}
-        self._ga = None
 
     def _setup_driver(self, problem):
         """
@@ -154,7 +164,13 @@ class SimpleGADriver(Driver):
 
             bits[i:j] = val
 
-        desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound, bits, pop_size, max_gen)
+        # Automatic population size.
+        if pop_size == 0:
+            pop_size = 4 * np.sum(bits)
+
+        desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound,
+                                              bits, pop_size, max_gen,
+                                              self._randomstate)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
@@ -264,7 +280,7 @@ class GeneticAlgorithm():
         self.npop = 0
         self.elite = True
 
-    def execute_ga(self, vlb, vub, bits, pop_size, max_gen):
+    def execute_ga(self, vlb, vub, bits, pop_size, max_gen, random_state):
         """
         Perform the genetic algorithm.
 
@@ -280,6 +296,8 @@ class GeneticAlgorithm():
             Number of points in the population.
         max_gen : int
             Number of generations to run the GA.
+        random_state : np.random.RandomState, int
+             Random state (or seed-number) which controls the seed and random draws.
 
         Returns
         -------
@@ -305,7 +323,8 @@ class GeneticAlgorithm():
 
         # TODO: from an user-supplied intial population
         # new_gen, lchrom = encode(x0, vlb, vub, bits)
-        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center'))
+        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
+                               random_state=random_state))
 
         # Main Loop
         nfit = 0

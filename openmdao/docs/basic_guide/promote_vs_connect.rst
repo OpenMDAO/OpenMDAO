@@ -22,8 +22,9 @@ All three will give the exact same answer, but the way you address the variables
 Variable Promotion
 ******************
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_sellar_mda_promote_connect.TestSellarMDAPromoteConnect.test_sellar_mda_promote
+    :layout: interleave
 
 There are a few important details to note:
 
@@ -50,9 +51,9 @@ Connect Statements
 The exact same model results can be achieved using :code:`connect` statements instead of promotions.
 However, take careful note of how the variables are addressed in those connect and print statements.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_sellar_mda_promote_connect.TestSellarMDAPromoteConnect.test_sellar_mda_connect
-
+    :layout: interleave
 
 
 Variable Promotion and Connect Statements
@@ -61,5 +62,6 @@ Variable Promotion and Connect Statements
 It is also possible to combine promotion and connection in a single model.
 Here, notice that we do not have to add "cycle" in front of anything, because we promoted all the variables up from that group.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_sellar_mda_promote_connect.TestSellarMDAPromoteConnect.test_sellar_mda_promote_connect
+    :layout: interleave

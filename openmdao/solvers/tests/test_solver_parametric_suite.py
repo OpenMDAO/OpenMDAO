@@ -24,8 +24,8 @@ class ImplComp4Test(ImplicitComponent):
         self.add_input('x', np.ones(2))
         self.add_output('y', np.ones(2))
         self.mtx = np.array([
-            [ 3., 4.],
-            [ 2., 3.],
+            [3., 4.],
+            [2., 3.],
         ])
         # Inverse is
         # [ 3.,-4.],
@@ -122,7 +122,6 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         assert_rel_error(self, result[5], prob.model.expected_solution[1], 1e-15)
 
     @parametric_suite(
-        vector_class=['default'],
         assembled_jac=[False, True],
         jacobian_type=['dense'],
         partial_type=['array', 'sparse', 'aij'],
@@ -133,6 +132,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
     )
     def test_subset(self, param_instance):
         param_instance.linear_solver_class = DirectSolver
+        param_instance.linear_solver_options = {}  # defaults not valid for DirectSolver
 
         param_instance.setup()
         problem = param_instance.problem

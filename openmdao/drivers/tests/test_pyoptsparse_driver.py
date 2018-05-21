@@ -3,17 +3,15 @@
 import sys
 import unittest
 
-from six.moves import cStringIO as StringIO
-
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent, \
-    ScipyKrylov, NonlinearBlockGS, LinearBlockGS
+    ScipyKrylov, NonlinearBlockGS, LinearBlockGS, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 
 
 # check that pyoptsparse is installed
@@ -105,11 +103,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
+        prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
         if OPTIMIZER == 'SLSQP':
             prob.driver.opt_settings['ACC'] = 1e-9
-        prob.driver.options['print_results'] = False
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -601,87 +597,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'], 7.16667, 1e-4)
         assert_rel_error(self, prob['y'], -7.833334, 1e-4)
 
-    def test_snopt_fd_solution(self):
-
-        if OPTIMIZER is not 'SNOPT':
-            raise unittest.SkipTest()
-
-        prob = Problem()
-        model = prob.model = Group()
-
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.options['gradient method'] = 'snopt_fd'
-        prob.driver.options['print_results'] = False
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup(check=False)
-
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
-
-        # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
-
-    def test_snopt_fd_is_called(self):
-
-        if OPTIMIZER is not 'SNOPT':
-            raise unittest.SkipTest()
-
-        class ParaboloidApplyLinear(Paraboloid):
-            def apply_linear(params, unknowns, resids):
-                raise Exception("OpenMDAO's finite difference has been called."
-                                " snopt_fd option has failed.")
-
-        prob = Problem()
-        model = prob.model = Group()
-
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-
-        model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
-
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.options['gradient method'] = 'snopt_fd'
-        prob.driver.options['print_results'] = False
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup(check=False)
-
-        failed = prob.run_driver()
-
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
-
-        # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
-
     def test_snopt_fd_option_error(self):
 
         prob = Problem()
@@ -1117,29 +1032,21 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
-    def test_sellar_analysis_error(self):
-        # One discipline of Sellar will something raise analysis error. This is to test that
-        # the iprinting doesn't get out-of-whack.
+    def test_sellar_mdf_linear_con_directsolver(self):
+        # This test makes sure that we call solve_nonlinear first if we have any linear constraints
+        # to cache.
 
-        # Only SNOPT can handle this through the analysis errors.
-        if OPTIMIZER is not 'SNOPT':
-            raise unittest.SkipTest()
+        class SellarDis1withDerivatives(ExplicitComponent):
 
-        class SellarDis1AE(ExplicitComponent):
             def setup(self):
                 self.add_input('z', val=np.zeros(2))
                 self.add_input('x', val=0.)
-                self.add_input('y2', val=1.0)
-                self.add_output('y1', val=1.0)
+                self.add_input('y2', val=0.0)
+                self.add_output('y1', val=0.0)
 
-                self.declare_partials('*', '*')
-
-                self.fail_deriv = [2, 4]
-                self.count_iter = 0
-                self.failed = 0
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-
                 z1 = inputs['z'][0]
                 z2 = inputs['z'][1]
                 x1 = inputs['x']
@@ -1148,32 +1055,25 @@ class TestPyoptSparse(unittest.TestCase):
                 outputs['y1'] = z1**2 + z2 + x1 - 0.2*y2
 
             def compute_partials(self, inputs, partials):
-
-                self.count_iter += 1
-                if self.count_iter in self.fail_deriv:
-                    self.failed += 1
-                    raise AnalysisError('Try again.')
-
                 partials['y1', 'y2'] = -0.2
                 partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
                 partials['y1', 'x'] = 1.0
 
-        class SellarDis2AE(ExplicitComponent):
+
+        class SellarDis2withDerivatives(ExplicitComponent):
+
             def setup(self):
                 self.add_input('z', val=np.zeros(2))
-                self.add_input('y1', val=1.0)
-                self.add_output('y2', val=1.0)
+                self.add_input('y1', val=0.0)
+                self.add_output('y2', val=0.0)
 
-                self.declare_partials('*', '*')
+                self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
                 z1 = inputs['z'][0]
                 z2 = inputs['z'][1]
                 y1 = inputs['y1']
 
-                # Note: this may cause some issues. However, y1 is constrained to be
-                # above 3.16, so lets just let it converge, and the optimizer will
-                # throw it out
                 if y1.real < 0.0:
                     y1 *= -1
 
@@ -1187,38 +1087,37 @@ class TestPyoptSparse(unittest.TestCase):
                 J['y2', 'y1'] = .5*y1**-.5
                 J['y2', 'z'] = np.array([[1.0, 1.0]])
 
-        class SellarMDAAE(Group):
+
+        class MySellarGroup(Group):
+
             def setup(self):
-                indeps = self.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
-                indeps.add_output('x', 1.0)
-                indeps.add_output('z', np.array([5.0, 2.0]))
+                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
-
-                cycle.add_subsystem('d1', SellarDis1AE(),
-                                    promotes_inputs=['x', 'z', 'y2'],
-                                    promotes_outputs=['y1'])
-                cycle.add_subsystem('d2', SellarDis2AE(),
-                                    promotes_inputs=['z', 'y1'],
-                                    promotes_outputs=['y2'])
-
-                self.linear_solver = LinearBlockGS()
-                cycle.linear_solver = ScipyKrylov()
-                cycle.nonlinear_solver = NonlinearBlockGS()
+                self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+                mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+                mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
                 self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                   z=np.array([0.0, 0.0]), x=0.0),
-                                   promotes=['x', 'z', 'y1', 'y2', 'obj'])
+                                                       z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
                 self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
                 self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
+                self.linear_solver = DirectSolver()
+                self.nonlinear_solver = NonlinearBlockGS()
+
+
         prob = Problem()
-        model = prob.model = SellarMDAAE()
+        model = prob.model = MySellarGroup()
 
         prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = 'SNOPT'
-        prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
+        elif OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-3
         prob.driver.options['print_results'] = False
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -1226,32 +1125,21 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
-
-        prob.set_solver_print(level=2)
+        model.add_constraint('x', upper=11.0, linear=True)
 
         prob.setup(check=False, mode='rev')
 
-        stdout = sys.stdout
-        strout = StringIO()
-
-        sys.stdout = strout
-        try:
-            failed = prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 4e-3)
 
-        self.assertEqual(model.cycle.d1.failed, 2)
-
-        # Checking that iprint stack gets routinely cleaned.
-        output = strout.getvalue().split('\n')
-        self.assertEqual(output[-2], ('NL: NLBGS Converged'))
+        # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
+        prob.driver.run()
 
     def test_analysis_error_objfunc(self):
 
@@ -1429,6 +1317,41 @@ class TestPyoptSparse(unittest.TestCase):
 
         # pyopt's failure message differs by platform and is not informative anyway
 
+    def test_debug_print_option_totals(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('Solving variable: con.c' in output)
+
     def test_debug_print_option(self):
 
         prob = Problem()
@@ -1456,15 +1379,13 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup(check=False)
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        failed, output = run_driver(prob)
 
-        output = strout.getvalue().split('\n')
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        output = output.split('\n')
+
         self.assertTrue(output.count("Design Vars") > 1,
                         "Should be more than one design vars header printed")
         self.assertTrue(output.count("Nonlinear constraints") > 1,
@@ -1474,13 +1395,13 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue(output.count("Objectives") > 1,
                         "Should be more than one objective header printed")
 
-        self.assertTrue(len([s for s in output if s.startswith('p1.x')]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'p1.x")]) > 1,
                         "Should be more than one p1.x printed")
-        self.assertTrue(len([s for s in output if s.startswith('p2.y')]) > 1,
+        self.assertTrue(len([s for s in output if "'p2.y'" in s]) > 1,
                         "Should be more than one p2.y printed")
-        self.assertTrue(len([s for s in output if s.startswith('con.c')]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'con.c")]) > 1,
                         "Should be more than one con.c printed")
-        self.assertTrue(len([s for s in output if s.startswith('comp.f_xy')]) > 1,
+        self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
 
 
@@ -1488,13 +1409,9 @@ class TestPyoptSparse(unittest.TestCase):
 class TestPyoptSparseFeature(unittest.TestCase):
 
     def setUp(self):
-        from openmdao.utils.general_utils import set_pyoptsparse_opt
-        OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
 
     def test_basic(self):
         import numpy as np
@@ -1530,8 +1447,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = "SLSQP"
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
 
         prob.driver.options['print_results'] = False
 
@@ -1602,7 +1518,13 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
 
-    @unittest.skipIf(OPTIMIZER in [None, "SLSQP"], "pyoptsparse is not providing SNOPT")
+
+class TestPyoptSparseSnoptFeature(unittest.TestCase):
+    # all of these tests require SNOPT
+
+    def setUp(self):
+        OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=False)
+
     def test_snopt_atol(self):
         import numpy as np
 
@@ -1630,7 +1552,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
         assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
 
-    @unittest.skipIf(OPTIMIZER in [None, "SLSQP"], "pyoptsparse is not providing SNOPT")
     def test_snopt_maxit(self):
         import numpy as np
 
@@ -1658,6 +1579,206 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.run_driver()
 
         assert_rel_error(self, prob['z'][0], 1.9780247, 1e-3)
+
+    def test_snopt_fd_solution(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        prob.driver.options['gradient method'] = 'snopt_fd'
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+
+    def test_snopt_fd_is_called(self):
+
+        class ParaboloidApplyLinear(Paraboloid):
+            def apply_linear(params, unknowns, resids):
+                raise Exception("OpenMDAO's finite difference has been called."
+                                " snopt_fd option has failed.")
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+
+        model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
+
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        prob.driver.options['gradient method'] = 'snopt_fd'
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False)
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
+        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+
+    def test_sellar_analysis_error(self):
+        # One discipline of Sellar will something raise analysis error. This is to test that
+        # the iprinting doesn't get out-of-whack.
+
+        class SellarDis1AE(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', val=np.zeros(2))
+                self.add_input('x', val=0.)
+                self.add_input('y2', val=1.0)
+                self.add_output('y1', val=1.0)
+
+                self.declare_partials('*', '*')
+
+                self.fail_deriv = [2, 4]
+                self.count_iter = 0
+                self.failed = 0
+
+            def compute(self, inputs, outputs):
+
+                z1 = inputs['z'][0]
+                z2 = inputs['z'][1]
+                x1 = inputs['x']
+                y2 = inputs['y2']
+
+                outputs['y1'] = z1**2 + z2 + x1 - 0.2*y2
+
+            def compute_partials(self, inputs, partials):
+
+                self.count_iter += 1
+                if self.count_iter in self.fail_deriv:
+                    self.failed += 1
+                    raise AnalysisError('Try again.')
+
+                partials['y1', 'y2'] = -0.2
+                partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
+                partials['y1', 'x'] = 1.0
+
+        class SellarDis2AE(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', val=np.zeros(2))
+                self.add_input('y1', val=1.0)
+                self.add_output('y2', val=1.0)
+
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                z1 = inputs['z'][0]
+                z2 = inputs['z'][1]
+                y1 = inputs['y1']
+
+                # Note: this may cause some issues. However, y1 is constrained to be
+                # above 3.16, so lets just let it converge, and the optimizer will
+                # throw it out
+                if y1.real < 0.0:
+                    y1 *= -1
+
+                outputs['y2'] = y1**.5 + z1 + z2
+
+            def compute_partials(self, inputs, J):
+                y1 = inputs['y1']
+                if y1.real < 0.0:
+                    y1 *= -1
+
+                J['y2', 'y1'] = .5*y1**-.5
+                J['y2', 'z'] = np.array([[1.0, 1.0]])
+
+        class SellarMDAAE(Group):
+            def setup(self):
+                indeps = self.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+                indeps.add_output('x', 1.0)
+                indeps.add_output('z', np.array([5.0, 2.0]))
+
+                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+
+                cycle.add_subsystem('d1', SellarDis1AE(),
+                                    promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', SellarDis2AE(),
+                                    promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                self.linear_solver = LinearBlockGS()
+                cycle.linear_solver = ScipyKrylov()
+                cycle.nonlinear_solver = NonlinearBlockGS()
+
+                self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                   z=np.array([0.0, 0.0]), x=0.0),
+                                   promotes=['x', 'z', 'y1', 'y2', 'obj'])
+
+                self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+                self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        prob = Problem()
+        model = prob.model = SellarMDAAE()
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SNOPT'
+        prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['print_results'] = False
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=2)
+
+        prob.setup(check=False, mode='rev')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
+        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+
+        self.assertEqual(model.cycle.d1.failed, 2)
+
+        # Checking that iprint stack gets routinely cleaned.
+        output = output.split('\n')
+        self.assertEqual(output[-2], ('NL: NLBGS Converged'))
 
 
 if __name__ == "__main__":

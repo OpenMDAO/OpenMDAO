@@ -1,6 +1,6 @@
 
 [![Build Status](https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master)](https://travis-ci.org/OpenMDAO/OpenMDAO)   [![Build status](https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true
-)](https://ci.appveyor.com/project/OpenMDAO/OpenMDAO/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master)
+)](https://ci.appveyor.com/project/OpenMDAO/blue/branch/master)  [![Coverage Status](https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master)](https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master)
 
 
 
@@ -11,14 +11,14 @@ OpenMDAO Naming/Legacy OpenMDAO
 PLEASE NOTE: Until recently, this repository was named OpenMDAO/blue. If you had cloned that repository, please update
 your repository name and remotes to reflect these changes.
 
-The OpenMDAO 1.7.3 codebase repo has been renamed to OpenMDAO1, and it resides
+The OpenMDAO 1.7.4 codebase repo has been renamed to OpenMDAO1, and it resides
 at https://github.com/OpenMDAO/OpenMDAO1
 
-The OpenMDAO 2.0.x code has taken the name OpenMDAO,
+The OpenMDAO 2.x.y code has taken the name OpenMDAO,
 and it resides at https://github.com/OpenMDAO/OpenMDAO.
 
-Installation of 2.0.x code will now work with `pip install openmdao`.
-Installation of 1.7.3 code will now only work with a version specifier: `pip install openmdao==1.7.3`
+Installation of 2.x.y code will now work with `pip install openmdao`.
+Installation of 1.7.4 code will now only work with a version specifier: `pip install openmdao==1.7.4`
 
 To use the OpenMDAO v0.x legacy version
  (versions 0.13.0 and older) of the OpenMDAO-Framework, go here:
@@ -40,21 +40,20 @@ Important Note:
 
 While the API is MOSTLY stable, we reserve the right to change things as needed.
 
-We will be making very frequent updates to this code. If you’re going to try it,
+We will be making frequent updates to this code. If you’re going to try it,
 make sure you pull these updates often.
 
 
-Features of OpenMDAO 1.7.x Not Yet in 2.x
------------------------------------------
+Features of OpenMDAO 1.7.4 Not Yet in 2.x.y
+-------------------------------------------
 
 Be aware that this is an Alpha.
-Not all the features of 1.7.x exist in 2.x yet.
+Not all the features of 1.7.4 exist in 2.x.y yet.
 
 Here is a list of things that have not yet been developed in 2.x:
 
 * Pass-by-object variables
-* automatic ordering of groups/components based on data connections
-* DOE (Design of Experiment) driver and all other case drivers
+* Automatic ordering of groups/components based on data connections
 * Parallel Finite Difference
 * File variables
 * Active-set constraint calculation disabling
@@ -63,12 +62,16 @@ Here is a list of things that have not yet been developed in 2.x:
 
 Installation Instructions:
 --------------------------
+Option 1: Install from pypi:
 
-Use git to clone the repository:
+`pip install openmdao`
+
+
+Option 2: Use git to clone the repository:
 
 `git clone http://github.com/OpenMDAO/OpenMDAO`
 
-Use pip to install openmdao locally:
+ Then use pip to install openmdao locally:
 
 `cd OpenMDAO`
 
@@ -78,9 +81,11 @@ Use pip to install openmdao locally:
 Documentation Building Instructions:
 ------------------------------------
 
+If you've cloned the repository, change to the docs directory:
+
 `cd openmdao/docs`
 
-`make all`
+`make clean; make all`
 
 This will build the docs into `openmdao/docs/_build/html`.
 

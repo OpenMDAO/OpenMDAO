@@ -16,7 +16,9 @@ To set or get the output variable, you reference it by its promoted name.
 In the regular :ref:`Sellar <openmdao.test_suite.components.sellar.py>` problem, all the variables have been promoted to the top of the model.
 So to get the value of the "y1" output defined in the :ref:`SellarDis1WithDerivatives <openmdao.test_suite.components.sellar.py>` component, you would do the following:
 
-.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_outputs
+.. embed-code::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_outputs
+    :layout: interleave
 
 
 You use the same syntax when working with the independent variables of your problem.
@@ -28,7 +30,8 @@ For example, consider our paraboloid tutorial problem problem which has two inde
 
 These would be defined and set as follows:
 
-.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_indeps
+    :layout: interleave
 
 
 
@@ -37,7 +40,8 @@ So if you built the Sellar problem using connections (see :ref:`SellarDerivative
 instead of promoting everything, then you would access the variables like this:
 
 
-.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_not_promoted_sellar_set_get_outputs
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_not_promoted_sellar_set_get_outputs
+    :layout: interleave
 
 
 Working with Array Variables
@@ -47,9 +51,11 @@ When you have an array variable, for convenience we allow you to set the value w
 In other words, the shape of the list has to match the shape of the actual data.
 
 
-.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_get_array
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_set_get_array
+    :layout: interleave
 
-.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_set_2d_array
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_set_2d_array
+    :layout: interleave
 
 
 
@@ -59,8 +65,9 @@ Residuals
 If you want to look at the residual values associated with any particular output variable, you will reference them using the same naming conventions the outputs.
 Also like outputs, you will be given the residuals in the unscaled dimensional form.
 
-.. embed-test::
+.. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_residuals
+    :layout: interleave
 
 
 Inputs
@@ -76,7 +83,23 @@ you could have an output (source) variable in units of meters, and then two conn
 Hence you need a specific path to reference each of the two different inputs separately to get the value in that input's units.
 
 
-.. embed-test:: openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_inputs
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_promoted_sellar_set_get_inputs
+    :layout: interleave
+
+
+Specifying Units
+----------------
+
+You can also set an input or request the valuable of any variable in a different unit than the one it is declared in, and OpenMDAO will
+peform the conversion for you. This is done with the `Problem` methods `get_val` and `set_val`.
+
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_with_units
+    :layout: interleave
+
+When dealing with arrays, you can set or get specific indices or index ranges by adding the "index" argument to the calls:
+
+.. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_array_with_units
+    :layout: interleave
 
 
 .. tags:: SetGet

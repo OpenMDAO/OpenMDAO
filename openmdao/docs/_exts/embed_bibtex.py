@@ -6,7 +6,8 @@ from six import iteritems
 from docutils import nodes
 
 import sphinx
-from sphinx.util.compat import Directive
+from docutils.parsers.rst import Directive
+
 from sphinx.writers.html import HTMLTranslator
 from sphinx.errors import SphinxError
 

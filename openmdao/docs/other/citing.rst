@@ -9,9 +9,9 @@ OpenMDAO can tell you which citations are appropriate, accounting for what class
 
 Here is a simple example
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
-    :no-split:
+    :layout: code, output
 
 
 With the `openmdao` command

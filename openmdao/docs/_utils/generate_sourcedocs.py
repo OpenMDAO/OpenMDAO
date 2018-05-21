@@ -5,7 +5,7 @@ from openmdao.docs.config_params import IGNORE_LIST
 # of our source docs, as well as writing out each individual rst file.
 
 
-def generate_docs():
+def generate_docs(dir, top, packages):
     """
     generate_docs
     """
@@ -39,7 +39,7 @@ Source Docs
    :maxdepth: 1
 """
 
-    docs_dir = os.path.dirname("..")
+    docs_dir = os.path.dirname(dir)
 
     doc_dir = os.path.join(docs_dir, "_srcdocs")
     if os.path.isdir(doc_dir):
@@ -61,28 +61,9 @@ Source Docs
     # to improve the order that the user sees in the source docs, put
     # the important packages in this list explicitly. Any new ones that
     # get added will show up at the end.
-    packages = [
-        'approximation_schemes',
-        'components',
-        'core',
-        'drivers',
-        'error_checking',
-        'jacobians',
-        'matrices',
-        'proc_allocators',
-        'recorders',
-        'solvers',
-        'solvers.linear',
-        'solvers.linesearch',
-        'solvers.nonlinear',
-        'surrogate_models',
-        'surrogate_models.nn_interpolators',
-        'test_suite.components',
-        'vectors',
-    ]
 
     # everything in openmdao dir that isn't discarded is appended as a source package.
-    for listing in os.listdir(os.path.join(docs_dir, "..")):
+    for listing in os.listdir(os.path.join(top)):
         if os.path.isdir(os.path.join("..", listing)):
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
@@ -102,7 +83,7 @@ Source Docs
         package_name = "openmdao." + package
 
         # the sub_listing is going into each package dir and listing what's in it
-        for sub_listing in sorted(os.listdir(os.path.join("..", package.replace('.','/')))):
+        for sub_listing in sorted(os.listdir(os.path.join(dir, package.replace('.','/')))):
             # don't want to catalog files twice, nor use init files nor test dir
             if (os.path.isdir(sub_listing) and sub_listing != "tests") or \
                (sub_listing.endswith(".py") and not sub_listing.startswith('_')):

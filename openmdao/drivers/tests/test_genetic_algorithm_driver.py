@@ -54,7 +54,9 @@ class TestSimpleGA(unittest.TestCase):
         model.add_objective('obj.f')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'px.x' : 16}
+        prob.driver.options['bits'] = {'px.x': 16}
+
+        prob.driver._randomstate = 11
 
         prob.setup(check=False)
         prob.run_driver()
@@ -82,9 +84,10 @@ class TestSimpleGA(unittest.TestCase):
         model.add_design_var('p1.xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
-        prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC' : 8}
-        prob.driver.options['max_gen'] = 400
+        prob.driver = SimpleGADriver(max_gen=400, pop_size=25)
+        prob.driver.options['bits'] = {'p1.xC': 8}
+
+        prob.driver._randomstate = 1
 
         prob.setup(check=False)
         prob.run_driver()
@@ -138,9 +141,11 @@ class TestSimpleGA(unittest.TestCase):
         model.add_objective('weighted')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'area1' : 6,
-                                       'area2' : 6}
+        prob.driver.options['bits'] = {'area1': 6,
+                                       'area2': 6}
         prob.driver.options['max_gen'] = 400
+
+        prob.driver._randomstate = 1
 
         prob.setup(check=False)
         prob['area3'] = 0.0005
@@ -178,11 +183,14 @@ class MPITestSimpleGA(unittest.TestCase):
         model.add_objective('comp.f')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC' : 8}
+        prob.driver.options['bits'] = {'p1.xC': 8}
         prob.driver.options['max_gen'] = 400
+        prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.driver._randomstate = 1
+
+        prob.setup(check=False)
         prob.run_driver()
 
         # Optimal solution
@@ -215,15 +223,44 @@ class TestFeatureSimpleGA(unittest.TestCase):
         model.add_objective('comp.f')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC' : 8}
+        prob.driver.options['bits'] = {'p1.xC': 8}
 
         prob.setup()
         prob.run_driver()
 
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        print('comp.f', prob['comp.f'])
         print('p2.xI', prob['p2.xI'])
         print('p1.xC', prob['p1.xC'])
+
+    def test_basic_with_assert(self):
+        from openmdao.api import Problem, Group, IndepVarComp, SimpleGADriver
+        from openmdao.test_suite.components.branin import Branin
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p2', IndepVarComp('xI', 0.0))
+        model.add_subsystem('comp', Branin())
+
+        model.connect('p2.xI', 'comp.x0')
+        model.connect('p1.xC', 'comp.x1')
+
+        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
+        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver()
+        prob.driver.options['bits'] = {'p1.xC': 8}
+
+        prob.driver._randomstate = 1
+
+        prob.setup()
+        prob.run_driver()
+
+        # Optimal solution
+        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
 
     def test_option_max_gen(self):
         from openmdao.api import Problem, Group, IndepVarComp, SimpleGADriver
@@ -244,7 +281,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         model.add_objective('comp.f')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC' : 8}
+        prob.driver.options['bits'] = {'p1.xC': 8}
         prob.driver.options['max_gen'] = 5
 
         prob.setup()
@@ -274,7 +311,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         model.add_objective('comp.f')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC' : 8}
+        prob.driver.options['bits'] = {'p1.xC': 8}
         prob.driver.options['pop_size'] = 10
 
         prob.setup()
@@ -284,6 +321,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         print('comp.f', prob['comp.f'])
         print('p2.xI', prob['p2.xI'])
         print('p1.xC', prob['p1.xC'])
+
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 @unittest.skipUnless(MPI, "MPI is required.")
@@ -309,10 +347,10 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_objective('comp.f')
 
         prob.driver = SimpleGADriver()
-        prob.driver.options['bits'] = {'p1.xC' : 8}
+        prob.driver.options['bits'] = {'p1.xC': 8}
         prob.driver.options['run_parallel'] = True
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
         prob.run_driver()
 
         # Optimal solution

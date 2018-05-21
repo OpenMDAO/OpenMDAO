@@ -55,6 +55,19 @@ class NonlinearRunOnce(NonlinearSolver):
 
         return False, 0.0, 0.0
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        # Remove unused options from base options here, so that users
+        #  attempting to set them will get KeyErrors.
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
+
+        # this solver does not iterate
+        self.options.undeclare("maxiter")
+        self.options.undeclare("err_on_maxiter")
+
 
 class NonLinearRunOnce(NonlinearRunOnce):
     """

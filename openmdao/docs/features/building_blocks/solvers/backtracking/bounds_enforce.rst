@@ -9,8 +9,9 @@ The BoundsEnforceLS only backtracks until variables violate their upper and lowe
 Here is a simple example where BoundsEnforceLS is used to backtrack during the Newton solver's iteration on
 a system that contains an implicit component with 3 states that are confined to a small range of values.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_basic
+    :layout: interleave
 
 BoundsEnforceLS Options
 -----------------------
@@ -63,8 +64,9 @@ Here are a few examples of this option:
   it reaches a point where the earliest bound violation occurred. The backtracking continues along the original
   computed gradient.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_vector
+    :layout: interleave
 
 - bound_enforcement: scalar
 
@@ -72,8 +74,9 @@ Here are a few examples of this option:
   are enforced. When this is set to "scaler", then the only indices in the output vector that are rolled back
   are the ones that violate their upper or lower bounds. The backtracking continues along the modified gradient.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_scalar
+    :layout: interleave
 
 - bound_enforcement: wall
 
@@ -82,5 +85,8 @@ Here are a few examples of this option:
   are the ones that violate their upper or lower bounds. The backtracking continues along a modified gradient
   direction that follows the boundary of the violated output bounds.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_boundscheck_wall
+    :layout: interleave
+
+.. tags:: Solver

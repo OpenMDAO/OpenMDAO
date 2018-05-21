@@ -17,8 +17,10 @@ class TestNonlinearCircuit(unittest.TestCase):
         from openmdao.api import IndepVarComp, Problem, Group
 
         class Resistor(ExplicitComponent):
+            """Computes current across a resistor using Ohm's law."""
+
             def initialize(self):
-                self.metadata.declare('R', default=1., desc='Resistance in Ohms')
+                self.options.declare('R', default=1., desc='Resistance in Ohms')
 
             def setup(self):
                 self.add_input('V_in', units='V')
@@ -26,19 +28,20 @@ class TestNonlinearCircuit(unittest.TestCase):
                 self.add_output('I', units='A')
 
                 # partial derivs are constant, so we can assign their values in setup
-                R = self.metadata['R']
+                R = self.options['R']
                 self.declare_partials('I', 'V_in', val=1 / R)
                 self.declare_partials('I', 'V_out', val=-1 / R)
 
             def compute(self, inputs, outputs):
                 deltaV = inputs['V_in'] - inputs['V_out']
-                outputs['I'] = deltaV / self.metadata['R']
-
+                outputs['I'] = deltaV / self.options['R']
 
         class Diode(ExplicitComponent):
+            """Computes current across a diode using the Shockley diode equation."""
+
             def initialize(self):
-                self.metadata.declare('Is', default=1e-15, desc='Saturation current in Amps')
-                self.metadata.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
+                self.options.declare('Is', default=1e-15, desc='Saturation current in Amps')
+                self.options.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
 
             def setup(self):
                 self.add_input('V_in', units='V')
@@ -51,33 +54,35 @@ class TestNonlinearCircuit(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 deltaV = inputs['V_in'] - inputs['V_out']
-                Is = self.metadata['Is']
-                Vt = self.metadata['Vt']
+                Is = self.options['Is']
+                Vt = self.options['Vt']
                 outputs['I'] = Is * np.exp(deltaV / Vt - 1)
 
             def compute_partials(self, inputs, J):
                 deltaV = inputs['V_in'] - inputs['V_out']
-                Is = self.metadata['Is']
-                Vt = self.metadata['Vt']
+                Is = self.options['Is']
+                Vt = self.options['Vt']
                 I = Is*np.exp(deltaV/Vt-1)
 
                 J['I', 'V_in'] = I/Vt
                 J['I', 'V_out'] = -I/Vt
 
         class Node(ImplicitComponent):
+            """Computes voltage residual across a node based on incoming and outgoing current."""
+
             def initialize(self):
-                self.metadata.declare('n_in', default=1, types=int, desc='number of connections with + assumed in')
-                self.metadata.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')
+                self.options.declare('n_in', default=1, types=int, desc='number of connections with + assumed in')
+                self.options.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')
 
             def setup(self):
                 self.add_output('V', val=5., units='V')
 
-                for i in range(self.metadata['n_in']):
+                for i in range(self.options['n_in']):
                     i_name = 'I_in:{}'.format(i)
                     self.add_input(i_name, units='A')
                     self.declare_partials('V', i_name, val=1)
 
-                for i in range(self.metadata['n_out']):
+                for i in range(self.options['n_out']):
                     i_name = 'I_out:{}'.format(i)
                     self.add_input(i_name, units='A')
                     self.declare_partials('V', i_name, val=-1)
@@ -87,9 +92,9 @@ class TestNonlinearCircuit(unittest.TestCase):
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 residuals['V'] = 0.
-                for i_conn in range(self.metadata['n_in']):
+                for i_conn in range(self.options['n_in']):
                     residuals['V'] += inputs['I_in:{}'.format(i_conn)]
-                for i_conn in range(self.metadata['n_out']):
+                for i_conn in range(self.options['n_out']):
                     residuals['V'] -= inputs['I_out:{}'.format(i_conn)]
 
         class Circuit(Group):

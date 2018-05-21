@@ -16,9 +16,6 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 
 from openmdao.utils.mpi import MPI
 
-if MPI:
-    from openmdao.vectors.petsc_vector import PETScVector
-
 
 class DynComp(ExplicitComponent):
     """
@@ -104,11 +101,6 @@ if __name__ == '__main__':
             self.add_constraint("%s.o1" % cname, lower=0.0)
 
 
-    if 'petsc' in sys.argv:
-        vec_class = PETScVector
-    else:
-        vec_class = DefaultVector
-
     p = Problem()
     g = p.model
 
@@ -132,11 +124,11 @@ if __name__ == '__main__':
         #g.add_objective("par.%s.o0" % cname)
         #g.add_constraint("par.%s.o1" % cname, lower=0.0)
 
-    p.setup(vector_class=vec_class)
+    p.setup()
     p.final_setup()
     p.run_model()
     #
-    from openmdao.devtools.debug import max_mem_usage
+    from openmdao.devtools.memory import max_mem_usage
     print("mem:", max_mem_usage())
 
     config_summary(p)

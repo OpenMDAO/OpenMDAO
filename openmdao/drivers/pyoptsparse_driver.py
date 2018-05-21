@@ -9,8 +9,9 @@ additional MPI capability.
 from __future__ import print_function
 from collections import OrderedDict
 import traceback
+import json
 
-from six import iteritems
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -19,7 +20,7 @@ from pyoptsparse import Optimization
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.record_util import create_local_meta
+import openmdao.utils.coloring as coloring_mod
 
 
 # names of optimizers that use gradients
@@ -81,17 +82,6 @@ class pyOptSparseDriver(Driver):
 
         two_sided_constraints
 
-    Options
-    -------
-    options['optimizer'] :  str('SLSQP')
-        Name of optimizers to use
-    options['print_results'] :  bool(True)
-        Print pyOpt results if True
-    options['gradient method'] :  str('openmdao', 'pyopt_fd', 'snopt_fd')
-        Finite difference implementation to use ('snopt_fd' may only be used with SNOPT)
-    options['title'] :  str('Optimization using pyOpt_sparse')
-        Title of this optimization run
-
     Attributes
     ----------
     fail : bool
@@ -123,11 +113,16 @@ class pyOptSparseDriver(Driver):
         Contains all response info.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize pyopt.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
-        super(pyOptSparseDriver, self).__init__()
+        super(pyOptSparseDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -136,21 +131,11 @@ class pyOptSparseDriver(Driver):
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
         self.supports['simultaneous_derivatives'] = True
+        self.supports['total_jac_sparsity'] = True
 
         # What we don't support yet
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
-
-        # User Options
-        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
-                             desc='Name of optimizers to use')
-        self.options.declare('title', default='Optimization using pyOpt_sparse',
-                             desc='Title of this optimization run')
-        self.options.declare('print_results', types=bool, default=True,
-                             desc='Print pyOpt results if True')
-        self.options.declare('gradient method', default='openmdao',
-                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
-                             desc='Finite difference implementation to use')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
@@ -170,6 +155,27 @@ class pyOptSparseDriver(Driver):
         self.fail = False
 
         self.cite = CITATIONS
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
+                             desc='Name of optimizers to use')
+        self.options.declare('title', default='Optimization using pyOpt_sparse',
+                             desc='Title of this optimization run')
+        self.options.declare('print_results', types=bool, default=True,
+                             desc='Print pyOpt results if True')
+        self.options.declare('gradient method', default='openmdao',
+                             values={'openmdao', 'pyopt_fd', 'snopt_fd'},
+                             desc='Finite difference implementation to use')
+        self.options.declare('dynamic_derivs_sparsity', default=False, types=bool,
+                             desc='Compute derivative sparsity dynamically if True')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring or derivatives sparsity')
 
     def _setup_driver(self, problem):
         """
@@ -191,6 +197,8 @@ class pyOptSparseDriver(Driver):
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
 
+        self._setup_tot_jac_sparsity()
+
     def run(self):
         """
         Excute pyOptsparse.
@@ -207,18 +215,27 @@ class pyOptSparseDriver(Driver):
         model = problem.model
         relevant = model._relevant
         self.pyopt_solution = None
+        self._total_jac = None
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
+        optimizer = self.options['optimizer']
 
-        # Metadata Setup
-        self.metadata = create_local_meta(self.options['optimizer'])
+        # Only need initial run if we have linear constraints.
+        con_meta = self._cons
+        if np.any([con['linear'] for con in itervalues(self._cons)]):
+            with RecordingDebugging(optimizer, self.iter_count, self) as rec:
+                # Initial Run
+                model._solve_nonlinear()
+                rec.abs = 0.0
+                rec.rel = 0.0
+            self.iter_count += 1
 
-        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
-            # Initial Run
-            model._solve_nonlinear()
-            rec.abs = 0.0
-            rec.rel = 0.0
-        self.iter_count += 1
+        # compute dynamic simul deriv coloring or just sparsity if option is set
+        if coloring_mod._use_sparsity:
+            if self.options['dynamic_simul_derivs']:
+                coloring_mod.dynamic_simul_coloring(self, do_sparsity=True)
+            elif self.options['dynamic_derivs_sparsity']:
+                coloring_mod.dynamic_sparsity(self)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -241,8 +258,7 @@ class pyOptSparseDriver(Driver):
             self._quantities.append(name)
 
         # Calculate and save derivatives for any linear constraints.
-        con_meta = self._cons
-        lcons = [key for (key, con) in iteritems(con_meta) if con['linear'] is True]
+        lcons = [key for (key, con) in iteritems(con_meta) if con['linear']]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
@@ -257,13 +273,14 @@ class pyOptSparseDriver(Driver):
                         # nonzero during the optimization.
                         mat = coo_matrix(subjac)
                         if mat.row.size > 0:
+                            # convert to 'coo' format here to avoid an emphatic warning
+                            # by pyoptsparse.
                             jacdct[n] = {'coo': [mat.row, mat.col, mat.data], 'shape': mat.shape}
 
         # Add all equality constraints
-        self.active_tols = {}
-        eqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                             if con['equals'] is not None)
-        for name, meta in iteritems(eqcons):
+        for name, meta in iteritems(con_meta):
+            if meta['equals'] is None:
+                continue
             size = meta['size']
             lower = upper = meta['equals']
             if fwd:
@@ -278,16 +295,17 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_jacs:
-                    jac = self._res_jacs[name]
+                    resjac = self._res_jacs[name]
+                    jac = {n: resjac[n] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Add all inequality constraints
-        iqcons = OrderedDict((key, con) for (key, con) in iteritems(con_meta)
-                             if con['equals'] is None)
-        for name, meta in iteritems(iqcons):
+        for name, meta in iteritems(con_meta):
+            if meta['equals'] is not None:
+                continue
             size = meta['size']
 
             # Bounds - double sided is supported
@@ -306,28 +324,26 @@ class pyOptSparseDriver(Driver):
                                      linear=True, wrt=wrt, jac=jac)
             else:
                 if name in self._res_jacs:
-                    jac = self._res_jacs[name]
+                    resjac = self._res_jacs[name]
+                    jac = {n: resjac[n] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
                 self._quantities.append(name)
 
         # Instantiate the requested optimizer
-        optimizer = self.options['optimizer']
         try:
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             opt = getattr(_tmp, optimizer)()
 
         except ImportError:
             msg = "Optimizer %s is not available in this installation." % optimizer
+
             raise ImportError(msg)
 
         # Set optimization options
         for option, value in self.opt_settings.items():
             opt.setOption(option, value)
-
-        self.opt_prob = opt_prob
-        self.opt = opt
 
         # Execute the optimization problem
         if self.options['gradient method'] == 'pyopt_fd':
@@ -507,12 +523,20 @@ class pyOptSparseDriver(Driver):
                 # if we don't convert to 'coo' here, pyoptsparse will do a
                 # conversion of our dense array into a fully dense 'coo', which is bad.
                 # TODO: look into getting rid of all of these conversions!
-                for name, dvdct in iteritems(self._res_jacs):
-                    for dv, coo in iteritems(dvdct):
-                        arr = sens_dict[name][dv]
-                        row, col, data = coo['coo']
-                        coo['coo'][2] = arr[row, col].flatten()
-                        sens_dict[name][dv] = coo
+                new_sens = OrderedDict()
+                res_jacs = self._res_jacs
+                for okey in func_dict:
+                    new_sens[okey] = newdv = OrderedDict()
+                    for ikey in dv_dict:
+                        if okey in res_jacs and ikey in res_jacs[okey]:
+                            arr = sens_dict[okey][ikey]
+                            coo = res_jacs[okey][ikey]
+                            row, col, data = coo['coo']
+                            coo['coo'][2] = arr[row, col].flatten()
+                            newdv[ikey] = coo
+                        else:
+                            newdv[ikey] = sens_dict[okey][ikey]
+                sens_dict = new_sens
 
         except Exception as msg:
             tb = traceback.format_exc()
@@ -539,47 +563,46 @@ class pyOptSparseDriver(Driver):
         """
         return self.options['optimizer']
 
-    def _setup_simul_coloring(self, mode='fwd'):
+    def _get_ordered_nl_responses(self):
         """
-        Set up metadata for simultaneous derivative solution.
+        Return the names of nonlinear responses in the order used by the driver.
 
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
+        Default order is objectives followed by nonlinear constraints.  This is used for
+        simultaneous derivative coloring and sparsity determination.
+
+        Returns
+        -------
+        list of str
+            The nonlinear response names in order.
         """
-        super(pyOptSparseDriver, self)._setup_simul_coloring(mode)
+        order = list(self._objs)
+        order.extend(n for n, meta in iteritems(self._cons) if meta['equals'] is not None
+                     and not ('linear' in meta and meta['linear']))
+        order.extend(n for n, meta in iteritems(self._cons) if meta['equals'] is None
+                     and not ('linear' in meta and meta['linear']))
+        return order
 
-        relevant = self._problem.model._relevant
+    def _setup_tot_jac_sparsity(self):
+        """
+        Set up total jacobian subjac sparsity.
+        """
+        if self._total_jac_sparsity is None:
+            return
 
-        for res, meta in iteritems(self._responses):
-            if 'linear' in meta and meta['linear']:
+        if isinstance(self._total_jac_sparsity, string_types):
+            with open(self._total_jac_sparsity, 'r') as f:
+                self._total_jac_sparsity = json.load(f)
+
+        self._res_jacs = {}
+        for res, resdict in iteritems(self._total_jac_sparsity):
+            if res in self._objs:  # skip objectives
                 continue
-            if 'simul_map' in meta and meta['simul_map']:
-                dv_dict = meta['simul_map']
-                self._res_jacs[res] = {}
-                for dv, col_dict in iteritems(dv_dict):
-                    # don't set the sparsity unless the corresponding desvar coloring is set
-                    if res in relevant[dv] and self._designvars[dv]['simul_deriv_color']:
-                        rows = []
-                        cols = []
-                        for color, (row_idxs, col_idxs) in iteritems(col_dict):
-                            if len(row_idxs) > 0:
-                                rows.append(row_idxs)
-                                cols.append(col_idxs)
+            self._res_jacs[res] = {}
+            for dv, (rows, cols, shape) in iteritems(resdict):
+                rows = np.array(rows, dtype=int)
+                cols = np.array(cols, dtype=int)
 
-                        if len(rows) > 0:
-                            row = np.hstack(rows)
-                            col = np.hstack(cols)
-                        elif res in self._objs:
-                            continue
-                        else:
-                            row = col = np.zeros(0, dtype=int)
-
-                        # print("sparsity for %s, %s: %d of %s" % (res, dv, row.size,
-                        #       (self._responses[res]['size'] * self._designvars[dv]['size'],)))
-
-                        self._res_jacs[res][dv] = {
-                            'coo': [row, col, np.zeros(row.size)],
-                            'shape': [self._responses[res]['size'], self._designvars[dv]['size']]
-                        }
+                self._res_jacs[res][dv] = {
+                    'coo': [rows, cols, np.zeros(rows.size)],
+                    'shape': shape,
+                }

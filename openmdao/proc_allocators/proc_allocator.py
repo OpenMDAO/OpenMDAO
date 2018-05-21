@@ -3,8 +3,6 @@ from __future__ import division
 import numpy as np
 from six.moves import range
 
-from openmdao.utils.options_dictionary import OptionsDictionary
-
 
 class ProcAllocationError(Exception):
     """

@@ -1,8 +1,8 @@
 .. _defining_icomps_tutorial:
 
-****************************************
-Building Models with Implicit Components
-****************************************
+****************************************************
+Building Models with Solvers and Implicit Components
+****************************************************
 
 This tutorial will show you how to define implicit components and build models with them.
 We'll use a nonlinear circuit analysis example problem.
@@ -18,7 +18,8 @@ Our goal is to solve for the steady-state voltages at node 1 and node 2.
    :width: 50%
    :alt: diagram of a simple circuit with two resistors and one diode
 
-In order to find the voltages, we'll employ `Kirchoff's voltage law <https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws>`_, and solve for the voltages needed at each node to drive the net current to 0.
+In order to find the voltages, we'll employ `Kirchoff's current law <https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws>`_,
+and solve for the voltages needed at each node to drive the net current to 0.
 
 This means that the voltages at each node are *state variables* for the analysis.
 In other words, V1 and V2 are defined implicitly by the following residual equation:
@@ -38,7 +39,7 @@ ExplicitComponents - Resistor and Diode
 
 The :code:`Resistor` and :code:`Diode` components will each compute their current, given the voltages on either side.
 These calculations are analytic functions, so we'll inherit from :ref:`ExplicitComponent <comp-type-2-explicitcomp>`.
-These components will each declare some metadata to allow you to pass in the relevant physical constants, and to
+These components will each declare some options to allow you to pass in the relevant physical constants, and to
 allow you to give some reasonable default values.
 
 .. embed-code::
@@ -48,8 +49,8 @@ allow you to give some reasonable default values.
      openmdao.test_suite.test_examples.test_circuit_analysis.Diode
 
 .. note::
-    Since we've provided default values for the metadata, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
-    Check out the :ref:`Features <Features>` section for more details on how to use :ref:`component metadata <component_metadata>`.
+    Since we've provided default values for the options, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
+    Check out the :ref:`Features <Features>` section for more details on how to use :ref:`component options <component_options>`.
 
 
 ImplicitComponent - Node
@@ -105,9 +106,9 @@ The Newton solver's use of that Jacobian information is why we need to declare a
     We recommend you stick with :ref:`DirectSolver <directsolver>` unless you have a good reason to switch.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton
-    :no-split:
+    :layout: interleave
 
 
 Modifying Solver Settings in Your Run Script
@@ -123,9 +124,9 @@ It also converges much more slowly, so although we gave it more than twice the n
 close to a converged answer.
 
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_plain_newton_many_iter
-    :no-split:
+    :layout: interleave
 
 
 .. note::
@@ -151,13 +152,13 @@ but you need to be careful about the :ref:`execution order <feature_set_order>` 
 
 .. note::
 
-    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_amijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
+    For this case, we used the :ref:`ArmijoGoldsteinLS <feature_armijo_goldstein>`, which basically limits step sizes so that the residual always goes down.
     For many problems you might want to use :ref:`BoundsEnforceLS <feature_bounds_enforce>` instead, which only activates the
     line search to enforce upper and lower bounds on the outputs in the model.
 
-.. embed-test::
+.. embed-code::
     openmdao.test_suite.test_examples.test_circuit_analysis.TestCircuit.test_circuit_advanced_newton
-    :no-split:
+    :layout: interleave
 
 
 .. note::

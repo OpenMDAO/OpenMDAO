@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 
 import numpy as np
-from scipy.sparse.linalg import LinearOperator, gmres, bicg, bicgstab, cg, cgs
+from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
@@ -141,8 +141,10 @@ class ScipyKrylov(LinearSolver):
         scope_out, scope_in = system._get_scope()
         system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
 
+        # DO NOT REMOVE: frequently used for debugging
         # print('in', in_vec)
         # print('out', b_vec.get_data())
+
         return b_vec.get_data()
 
     def _monitor(self, res):

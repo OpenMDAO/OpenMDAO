@@ -262,19 +262,6 @@ Check Partial Derivatives on All Components
       data = prob.check_partials()
 
 
-Suppress Output While Checking Partial Derivatives
-==================================================
-
-.. content-container ::
-
-  .. embed-compare::
-      openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_suppress
-      suppress_output
-      suppress_output
-
-      data = prob.check_partials(out_stream=None)
-
-
 Check Partial Derivatives with Complex Step
 ===========================================
 
@@ -369,7 +356,7 @@ Setup a Problem Using the PETScVector
 .. content-container ::
 
   .. embed-compare::
-      openmdao.core.tests.test_problem.TestProblem.test_feature_petsc_setup
+      openmdao.core.tests.test_problem.TestProblem.test_feature_basic_setup
       vector_class
       vector_class
 
@@ -460,6 +447,3 @@ Setting Derivative Computation Mode
     prob.setup()
     prob.run()
     prob.calc_gradient(indep_list=['p1.x', 'p2.y'], unknown_list=['comp.f_xy'])
-
-
-

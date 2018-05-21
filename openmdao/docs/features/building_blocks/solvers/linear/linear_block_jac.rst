@@ -13,8 +13,9 @@ will be utilized to solve the subsystem linear problem.
 
 Here, we calculate the total derivatives across the Sellar system.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_specify_solver
+    :layout: interleave
 
 LinearBlockJac Options
 ----------------------
@@ -33,8 +34,9 @@ LinearBlockJac Option Examples
   cut it back from the default, ten, down to five, so that it terminates a few iterations earlier and doesn't  reach the specified absolute or relative tolerance. Note that due to the delayed transfer of
   information, this takes more iterations to converge than the LinearBlockGS solver.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_maxiter
+      :layout: interleave
 
 **atol**
 
@@ -42,8 +44,9 @@ LinearBlockJac Option Examples
   each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If this norm value is lower than the absolute
   tolerance `atol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_atol
+      :layout: interleave
 
 **rtol**
 
@@ -51,7 +54,9 @@ LinearBlockJac Option Examples
   each iteration, the norm of the linear residuals is calculated by calling `apply_linear`. If the ratio of the currently calculated norm to the
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
-  .. embed-test::
+  .. embed-code::
       openmdao.solvers.linear.tests.test_linear_block_jac.TestBJacSolverFeature.test_feature_rtol
+      :layout: interleave
+
 
 .. tags:: Solver, LinearSolver

@@ -58,6 +58,7 @@ def get_formatted_iteration_coordinate():
         rank = MPI.COMM_WORLD.rank
     else:
         rank = 0
+
     formatted_iteration_coordinate = ':'.join(["rank%d" % rank,
                                                separator.join(iteration_coord_list)])
     return formatted_iteration_coordinate
@@ -142,6 +143,8 @@ class Recording(object):
                 self.recording_requester.record_iteration(abs=self.abs, rel=self.rel)
             else:
                 self.recording_requester.record_iteration()
+
+        self.recording_requester = None
 
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()

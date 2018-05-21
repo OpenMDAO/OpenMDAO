@@ -1,3 +1,4 @@
+.. _feature_pyoptsparse:
 
 *****************
 pyOptSparseDriver
@@ -14,11 +15,9 @@ constraint Jacobians. Most of the sparsity features are only applicable when usi
 
 In this simple example, we use the SLSQP optimizer to minimize the objective of SellarDerivativesGrouped.
 
-.. embed-test::
+.. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_basic
-
-Optimizer Settings
-==================
+    :layout: interleave
 
 pyOptSparseDriver Options
 -------------------------
@@ -28,13 +27,14 @@ pyOptSparseDriver Options
     pyOptSparseDriver
     options
 
+pyOptSparseDriver has a small number of unified options that can be specified as keyword arguments when
+it is instantiated or by using the "options" dictionary. We have already shown how to set the
+`optimizer` option. Next we see how the `print_results` option can be used to turn on or off the echoing
+of the results when the optimization finishes. The default is True, but here, we turn it off.
 
-The optimizers have a small number of unified options that can be controlled using the "options" dictionary. We have already shown how
-to set the optimizer name. Next, the `print_results` option can be used to turn on or off the echoing of the pyOptSparse results when
-the optimization finishes. The default is True, but here, we turn it off.
-
-.. embed-test::
+.. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_settings_print
+    :layout: interleave
 
 
 Every optimizer also has its own specialized settings that allow you to fine-tune the algorithm that it uses. You can access these within
@@ -47,13 +47,15 @@ SLSQP-Specific Settings
 
 Here, we set a convergence tolerance for SLSQP:
 
-.. embed-test::
+.. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_slsqp_atol
+    :layout: interleave
 
 Similarly, we can set an iteration limit. Here, we set it to just a few iterations, and don't quite reach the optimum.
 
-.. embed-test::
+.. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_slsqp_maxit
+    :layout: interleave
 
 
 SNOPT-Specific Settings
@@ -63,20 +65,21 @@ SNOPT has many customizable settings. Here we show two common ones.
 
 Setting the convergence tolerance:
 
-.. embed-test::
-    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_snopt_atol
+.. embed-code::
+    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_atol
+    :layout: interleave
 
 Setting a limit on the number of major iterations. Here, we set it to just a few iterations, and don't quite reach the optimum.
 
-.. embed-test::
-    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseFeature.test_snopt_maxit
+.. embed-code::
+    openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_maxit
+    :layout: interleave
 
 You can learn more about the available options in the SNOPT_Manual_.
 
 
-.. toctree::
-    :maxdepth: 1
-
 .. _mdolab: https://github.com/mdolab/pyoptsparse
 
 .. _SNOPT_Manual: http://www.sbsi-sol-optimize.com/manuals/SNOPT%20Manual.pdf
+
+.. tags:: Driver, Optimizer, Optimization

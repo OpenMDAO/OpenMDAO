@@ -4,6 +4,10 @@
 proj.directory-list = [{'dirloc': loc('../..'),
 	'excludes': [
 	u'openmdao/notes',
+	u'openmdao/devtools/docs_experiment/_build',
+	u'openmdao/devtools/docs_experiment/_srcdocs',
+	u'openmdao/docs/_srcdocs',
+	u'openmdao/docs/_build',
 	],
 	'filter': '*.py;*.rst;*.ini;*.cfg;*.js;*.css',
 	'include_hidden': False,
@@ -11,7 +15,7 @@ proj.directory-list = [{'dirloc': loc('../..'),
 	'watch_for_changes': True}]
 proj.file-type = 'normal'
 testing.auto-test-file-specs = [('glob',
-	'test*.py')]
+	'test_*.py')]
 
 [user attributes]
 guimgr.overall-gui-state = {'windowing-policy': 'combined-window',

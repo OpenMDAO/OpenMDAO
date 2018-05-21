@@ -1,6 +1,8 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
+from six import iteritems
+
 from openmdao.utils.general_utils import warn_deprecation
 
 # unique object to check if default is given
@@ -14,7 +16,7 @@ class OptionsDictionary(object):
     This class is instantiated for:
         1. the options attribute in solvers, drivers, and processor allocators
         2. the supports attribute in drivers
-        3. the metadata attribute in systems
+        3. the options attribute in systems
 
     Attributes
     ----------
@@ -37,6 +39,146 @@ class OptionsDictionary(object):
         self._dict = {}
         self._read_only = read_only
 
+    def __repr__(self):
+        """
+        Return a dictionary representation of the options.
+
+        Returns
+        -------
+        dict
+            The options dictionary.
+        """
+        return self._dict
+
+    def __rst__(self):
+        """
+        Generate reStructuredText view of the options table.
+
+        Returns
+        -------
+        list of str
+            A rendition of the options as an rST table.
+        """
+        outputs = []
+        for option_name, option_data in sorted(iteritems(self._dict)):
+            name = option_name
+            default = option_data['value'] if option_data['value'] is not _undefined \
+                else '**Required**'
+            values = option_data['values']
+            types = option_data['types']
+            desc = option_data['desc']
+
+            # if the default is an object instance, replace with the (unqualified) object type
+            default_str = str(default)
+            idx = default_str.find(' object at ')
+            if idx >= 0 and default_str[0] is '<':
+                parts = default_str[:idx].split('.')
+                default = parts[-1]
+
+            if types is None:
+                types = "N/A"
+
+            elif types is not None:
+                if not isinstance(types, (tuple, list)):
+                    types = (types,)
+
+                types = [type_.__name__ for type_ in types]
+
+            if values is None:
+                values = "N/A"
+
+            elif values is not None:
+                if not isinstance(values, (tuple, list)):
+                    values = (values,)
+
+                values = [value for value in values]
+
+            outputs.append([name, default, values, types, desc])
+
+        lines = []
+
+        col_heads = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
+
+        max_sizes = {}
+        for j, col in enumerate(col_heads):
+            max_sizes[j] = len(col)
+
+        for output in outputs:
+            for j, item in enumerate(output):
+                length = len(str(item))
+                if max_sizes[j] < length:
+                    max_sizes[j] = length
+
+        header = ""
+        titles = ""
+        for key, val in iteritems(max_sizes):
+            header += '=' * val + ' '
+
+        for j, head in enumerate(col_heads):
+            titles += "%s " % head
+            size = max_sizes[j]
+            space = size - len(head)
+            if space > 0:
+                titles += space * ' '
+
+        lines.append(header)
+        lines.append(titles)
+        lines.append(header)
+
+        n = 3
+        for output in outputs:
+            line = ""
+            for j, item in enumerate(output):
+                line += "%s " % str(item)
+                size = max_sizes[j]
+                space = size - len(str(item))
+                if space > 0:
+                    line += space * ' '
+
+            lines.append(line)
+            n += 1
+
+        lines.append(header)
+
+        return lines
+
+    def __str__(self, width=100):
+        """
+        Generate text string representation of the options table.
+
+        Parameters
+        ----------
+        width : int
+            The maximum width of the text.
+
+        Returns
+        -------
+        str
+            A text representation of the options table.
+        """
+        rst = self.__rst__()
+        cols = [len(header) for header in rst[0].split()]
+        desc_col = sum(cols[:-1]) + len(cols) - 1
+        desc_len = width - desc_col
+
+        # if it won't fit in allowed width, just return the rST
+        if desc_len < 10:
+            return '\n'.join(rst)
+
+        text = []
+        for row in rst:
+            if len(row) > width:
+                text.append(row[:width])
+                if not row.startswith('==='):
+                    row = row[width:].rstrip()
+                    while(len(row) > 0):
+                        text.append(' ' * desc_col + row[:desc_len])
+                        row = row[desc_len:]
+            else:
+                text.append(row)
+
+        return '\n'.join(text)
+
     def _assert_valid(self, name, value):
         """
         Check whether the given value is valid, where the key has already been declared.
@@ -48,7 +190,7 @@ class OptionsDictionary(object):
         Parameters
         ----------
         name : str
-            The key for the declared entry.
+            The key for the declared option.
         value : object
             The default or user-set value to check for value, type, lower, and upper.
         """
@@ -63,19 +205,19 @@ class OptionsDictionary(object):
             # If only values is declared
             if values is not None:
                 if value not in values:
-                    raise ValueError("Entry '{}'\'s value is not one of {}".format(name, values))
+                    raise ValueError("Option '{}'\'s value is not one of {}".format(name, values))
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
-                    raise TypeError("Entry '{}' has the wrong type ({})".format(name, types))
+                    raise TypeError("Option '{}' has the wrong type ({})".format(name, types))
 
             if upper is not None:
                 if value > upper:
-                    msg = ("Value of {} exceeds maximum of {} for entry 'x'")
+                    msg = ("Value of {} exceeds maximum of {} for option 'x'")
                     raise ValueError(msg.format(value, upper))
             if lower is not None:
                 if value < lower:
-                    msg = ("Value of {} exceeds minimum of {} for entry 'x'")
+                    msg = ("Value of {} exceeds minimum of {} for option 'x'")
                     raise ValueError(msg.format(value, lower))
 
         # General function test
@@ -148,6 +290,19 @@ class OptionsDictionary(object):
         if default_provided:
             self._assert_valid(name, default)
 
+    def undeclare(self, name):
+        """
+        Remove entry from the OptionsDictionary, for classes that don't use that option.
+
+        Parameters
+        ----------
+        name : str
+            The name of a key, the entry of which will be removed from the internal dictionary.
+
+        """
+        if name in self._dict:
+            del self._dict[name]
+
     def update(self, in_dict):
         """
         Update the internal dictionary with the given one.
@@ -178,7 +333,7 @@ class OptionsDictionary(object):
         Parameters
         ----------
         key : str
-            name of the entry.
+            name of the option.
 
         Returns
         -------
@@ -189,14 +344,14 @@ class OptionsDictionary(object):
 
     def __setitem__(self, name, value):
         """
-        Set an entry in the local dictionary.
+        Set an option in the local dictionary.
 
         Parameters
         ----------
         name : str
-            name of the entry.
+            name of the option.
         value : -
-            value of the entry to be value- and type-checked if declared.
+            value of the option to be value- and type-checked if declared.
         """
         if self._read_only:
             msg = "Tried to set '{}' on a read-only OptionsDictionary."
@@ -213,24 +368,24 @@ class OptionsDictionary(object):
 
     def __getitem__(self, name):
         """
-        Get an entry from the local dict, global dict, or declared default.
+        Get an option from the local dict, global dict, or declared default.
 
         Parameters
         ----------
         name : str
-            name of the entry.
+            name of the option.
 
         Returns
         -------
         value : -
-            value of the entry.
+            value of the option.
         """
-        # If the entry has been set in this system, return the set value
+        # If the option has been set in this system, return the set value
         try:
             meta = self._dict[name]
             if meta['has_been_set']:
                 return meta['value']
             else:
-                raise RuntimeError("Entry '{}' is required but has not been set.".format(name))
+                raise RuntimeError("Option '{}' is required but has not been set.".format(name))
         except KeyError:
-            raise KeyError("Entry '{}' cannot be found".format(name))
+            raise KeyError("Option '{}' cannot be found".format(name))

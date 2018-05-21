@@ -6,7 +6,6 @@ from __future__ import print_function
 from collections import OrderedDict
 import sys
 
-
 from six import itervalues, iteritems, reraise
 from six.moves import range
 
@@ -15,6 +14,7 @@ from scipy.optimize import minimize
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
+import openmdao.utils.coloring as coloring_mod
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -46,23 +46,12 @@ class ScipyOptimizeDriver(Driver):
     Driver wrapper for the scipy.optimize.minimize family of local optimizers.
 
     Inequality constraints are supported by COBYLA and SLSQP,
-    but equality constraints are only supported by COBYLA. None of the other
+    but equality constraints are only supported by SLSQP. None of the other
     optimizers support constraints.
 
     ScipyOptimizeDriver supports the following:
         equality_constraints
         inequality_constraints
-
-    Options
-    -------
-    options['disp'] :  bool(True)
-        Set to False to prevent printing of Scipy convergence messages
-    options['maxiter'] : int(200)
-        Maximum number of iterations.
-    options['optimizer'] : str('SLSQP')
-        Name of optimizer to use
-    options['tol'] :  float(1e-06)
-        Tolerance for termination. For detailed control, use solver-specific options.
 
     Attributes
     ----------
@@ -97,11 +86,16 @@ class ScipyOptimizeDriver(Driver):
         for all except linear constraints.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize the ScipyOptimizeDriver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
         """
-        super(ScipyOptimizeDriver, self).__init__()
+        super(ScipyOptimizeDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -114,17 +108,6 @@ class ScipyOptimizeDriver(Driver):
         self.supports['multiple_objectives'] = False
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
-
-        # User Options
-        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
-                             desc='Name of optimizer to use')
-        self.options.declare('tol', 1.0e-6, lower=0.0,
-                             desc='Tolerance for termination. For detailed '
-                             'control, use solver-specific options.')
-        self.options.declare('maxiter', 200, lower=0,
-                             desc='Maximum number of iterations.')
-        self.options.declare('disp', True,
-                             desc='Set to False to prevent printing of Scipy convergence messages')
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = OrderedDict()
@@ -141,6 +124,25 @@ class ScipyOptimizeDriver(Driver):
         self._exc_info = None
 
         self.cite = CITATIONS
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
+                             desc='Name of optimizer to use')
+        self.options.declare('tol', 1.0e-6, lower=0.0,
+                             desc='Tolerance for termination. For detailed '
+                             'control, use solver-specific options.')
+        self.options.declare('maxiter', 200, lower=0,
+                             desc='Maximum number of iterations.')
+        self.options.declare('disp', True,
+                             desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
+                             desc='Number of compute_totals calls during dynamic computation of '
+                                  'simultaneous derivative coloring')
 
     def _get_name(self):
         """
@@ -200,15 +202,18 @@ class ScipyOptimizeDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
+        problem = self._problem
         opt = self.options['optimizer']
-        model = self._problem.model
+        model = problem.model
         self.iter_count = 0
+        self._total_jac = None
 
         # Initial Run
         model._solve_nonlinear()
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
+        self._dvlist = list(self._designvars)
 
         # maxiter and disp get passsed into scipy with all the other options.
         self.opt_settings['maxiter'] = self.options['maxiter']
@@ -305,8 +310,7 @@ class ScipyOptimizeDriver(Driver):
 
             # precalculate gradients of linear constraints
             if lincons:
-                self._lincongrad_cache = self._compute_totals(of=lincons,
-                                                              wrt=list(self._designvars),
+                self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
                                                               return_format='array')
             else:
                 self._lincongrad_cache = None
@@ -316,6 +320,10 @@ class ScipyOptimizeDriver(Driver):
             jac = self._gradfunc
         else:
             jac = None
+
+        # compute dynamic simul deriv coloring if option is set
+        if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
+            coloring_mod.dynamic_simul_coloring(self)
 
         # optimize
         try:
@@ -472,7 +480,7 @@ class ScipyOptimizeDriver(Driver):
             Gradient of objective with respect to parameter array.
         """
         try:
-            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=list(self._designvars),
+            grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format='array')
             self._grad_cache = grad
 
@@ -562,6 +570,6 @@ class ScipyOptimizer(ScipyOptimizeDriver):
         **kwargs : dict
             Named args.
         """
-        super(ScipyOptimizeDriver, self).__init__(**kwargs)
+        super(ScipyOptimizer, self).__init__(**kwargs)
         warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
                          "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")

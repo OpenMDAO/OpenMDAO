@@ -16,10 +16,11 @@ import re
 import os.path
 from collections import OrderedDict
 from six import iteritems
+from six.moves import zip
 from six.moves.configparser import RawConfigParser as ConfigParser
 
 # pylint: disable=E0611, F0401
-from math import sin, cos, tan, floor, pi
+from math import floor, pi
 
 
 ####################################
@@ -345,8 +346,7 @@ class PhysicalUnit(object):
         if isinstance(other, PhysicalUnit):
             return PhysicalUnit(self._names + other._names,
                                 self._factor * other._factor,
-                                [a + b for (a, b) in zip(self._powers,
-                                                         other._powers)])
+                                [a + b for a, b in zip(self._powers, other._powers)])
         else:
             return PhysicalUnit(self._names + {str(other): 1},
                                 self._factor * other,

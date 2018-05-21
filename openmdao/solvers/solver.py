@@ -2,10 +2,16 @@
 
 from __future__ import division, print_function
 
+from six import iteritems
+from collections import OrderedDict
 import os
+import pprint
+import re
+import sys
 
 import numpy as np
 
+from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
@@ -14,6 +20,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 
 
 class SolverInfo(object):
@@ -121,14 +128,12 @@ class Solver(object):
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
     recording_options : <OptionsDictionary>
         Recording options dictionary.
-    metadata : dict
-        Dictionary holding data about this solver.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
@@ -147,8 +152,8 @@ class Solver(object):
 
         Parameters
         ----------
-        **kwargs : dict
-            options dictionary.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Solver options.
         """
         self._system = None
         self._depth = 0
@@ -156,8 +161,8 @@ class Solver(object):
         self._mode = 'fwd'
         self._iter_count = 0
 
+        # Solver options
         self.options = OptionsDictionary()
-        self.recording_options = OptionsDictionary()
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -168,13 +173,19 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
+
         # Case recording options
+        self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
                                        solver level')
         self.recording_options.declare('record_rel_error', types=bool, default=True,
                                        desc='Set to True to record relative error at the \
                                        solver level')
+        self.recording_options.declare('record_inputs', types=bool, default=True,
+                                       desc='Set to True to record inputs at the solver level')
+        self.recording_options.declare('record_outputs', types=bool, default=True,
+                                       desc='Set to True to record outputs at the solver level')
         self.recording_options.declare('record_solver_residuals', types=bool, default=False,
                                        desc='Set to True to record residuals at the solver level')
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
@@ -183,7 +194,7 @@ class Solver(object):
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                            '(processed post-includes)')
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
@@ -195,7 +206,6 @@ class Solver(object):
         self._declare_options()
         self.options.update(kwargs)
 
-        self.metadata = {}
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
@@ -238,7 +248,7 @@ class Solver(object):
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
-        myoutputs = myresiduals = set()
+        myoutputs = myresiduals = myinputs = set()
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
 
@@ -251,15 +261,25 @@ class Solver(object):
             myresiduals = {n for n in residuals._names
                            if check_path(n, incl, excl)}
 
-        if isinstance(self, NonlinearSolver):
-            outputs = self._system._outputs
-        else:  # it's a LinearSolver
-            outputs = self._system._vectors['output']['linear']
+        if self.recording_options['record_outputs']:
+            if isinstance(self, NonlinearSolver):
+                outputs = self._system._outputs
+            else:  # it's a LinearSolver
+                outputs = self._system._vectors['output']['linear']
 
-        myoutputs = {n for n in outputs._names
-                     if check_path(n, incl, excl)}
+            myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
+
+        if self.recording_options['record_inputs']:
+            if isinstance(self, NonlinearSolver):
+                inputs = self._system._inputs
+            else:
+                inputs = self._system._vectors['input']['linear']
+
+            myinputs = {n for n in inputs._names
+                        if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
+            'in': myinputs,
             'out': myoutputs,
             'res': myresiduals
         }
@@ -488,24 +508,36 @@ class Solver(object):
 
         if isinstance(self, NonlinearSolver):
             outputs = self._system._outputs
+            inputs = self._system._inputs
+            residuals = self._system._residuals
         else:  # it's a LinearSolver
             outputs = self._system._vectors['output']['linear']
+            inputs = self._system._vectors['input']['linear']
+            residuals = self._system._vectors['residual']['linear']
 
-        data['o'] = {}
-        if 'out' in self._filtered_vars_to_record:
-            for out in self._filtered_vars_to_record['out']:
-                if out in outputs._names:
-                    data['o'][out] = outputs._views[out]
+        if self.recording_options['record_outputs']:
+            data['o'] = {}
+            if 'out' in self._filtered_vars_to_record:
+                for out in self._filtered_vars_to_record['out']:
+                    if out in outputs._names:
+                        data['o'][out] = outputs._views[out]
+            else:
+                data['o'] = outputs
         else:
-            data['o'] = outputs
+            data['o'] = None
+
+        if self.recording_options['record_inputs']:
+            data['i'] = {}
+            if 'in' in self._filtered_vars_to_record:
+                for inp in self._filtered_vars_to_record['in']:
+                    if inp in inputs._names:
+                        data['i'][inp] = inputs._views[inp]
+            else:
+                data['i'] = inputs
+        else:
+            data['i'] = None
 
         if self.recording_options['record_solver_residuals']:
-
-            if isinstance(self, NonlinearSolver):
-                residuals = self._system._residuals
-            else:  # it's a LinearSolver
-                residuals = self._system._vectors['residual']['linear']
-
             data['r'] = {}
             if 'res' in self._filtered_vars_to_record:
                 for res in self._filtered_vars_to_record['res']:
@@ -522,7 +554,61 @@ class Solver(object):
 class NonlinearSolver(Solver):
     """
     Base class for nonlinear solvers.
+
+    Attributes
+    ----------
+    _system : <System>
+        Pointer to the owning system.
+    _depth : int
+        How many subsolvers deep this solver is (0 means not a subsolver).
+    _vec_names : [str, ...]
+        List of right-hand-side (RHS) vector names.
+    _mode : str
+        'fwd' or 'rev', applicable to linear solvers only.
+    _iter_count : int
+        Number of iterations for the current invocation of the solver.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
+    _solver_info : <SolverInfo>
+        Object to store some formatting for iprint that is shared across all solvers.
+    _err_cache : dict
+        Dictionary holding input and output vectors at start of iteration, if requested.
+    cite : str
+        Listing of relevant citations that should be referenced when
+        publishing work that uses this class.
+    options : <OptionsDictionary>
+        Options dictionary.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
+    supports : <OptionsDictionary>
+        Options dictionary describing what features are supported by this
+        solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(NonlinearSolver, self).__init__(**kwargs)
+        self._err_cache = OrderedDict()
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('debug_print', types=bool, default=False,
+                             desc='If true, the values of input and output variables at '
+                                  'the start of iteration are printed and written to a file '
+                                  'after a failure to converge.')
 
     def solve(self):
         """
@@ -537,7 +623,30 @@ class NonlinearSolver(Solver):
         float
             relative error.
         """
-        return self._run_iterator()
+        fail, abs_err, rel_err = self._run_iterator()
+
+        if fail and self.options['debug_print']:
+            coord = get_formatted_iteration_coordinate()
+
+            out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+            for vec_type, vec in iteritems(self._err_cache):
+                out_str += '\n'
+                out_str += '# %s %ss\n' % (vec._name, vec._typ)
+                out_str += pprint.pformat(vec._views)
+                out_str += '\n'
+
+            print(out_str)
+
+            filename = coord.replace('._solve_nonlinear', '')
+            filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
+            with open(filename, 'w') as f:
+                f.write(out_str)
+                print("Inputs and outputs at start of iteration have been "
+                      "saved to '%s'." % filename)
+
+            sys.stdout.flush()
+
+        return fail, abs_err, rel_err
 
     def _iter_initialize(self):
         """
@@ -550,6 +659,10 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+
         if self.options['maxiter'] > 0:
             self._run_apply()
             norm = self._iter_get_norm()

@@ -19,6 +19,7 @@ from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.record_util import is_valid_sqlite3_db
+from openmdao.utils.mpi import MPI
 
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index):
@@ -95,7 +96,8 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
             return {}
     elif is_valid_sqlite3_db(problem_or_rootgroup_or_filename):
         import sqlite3
-        con = sqlite3.connect(problem_or_rootgroup_or_filename, detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(problem_or_rootgroup_or_filename,
+                              detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         cur.execute("SELECT model_viewer_data FROM driver_metadata;")
         model_pickle = cur.fetchone()
@@ -112,10 +114,12 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
     data_dict = {}
     component_execution_idx = [0] #list so pass by ref
     component_execution_orders = {}
-    data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders, component_execution_idx)
+    data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders,
+                                       component_execution_idx)
 
     connections_list = []
-    sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items())) # sort to make deterministic for testing
+    # sort to make deterministic for testing
+    sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
     root_group._conn_global_abs_in2out = sorted_abs_input2src
     G = root_group.compute_sys_graph(comps_only=True)
     scc = nx.strongly_connected_components(G)
@@ -196,6 +200,13 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
         If true, allows connections to be drawn on the N2 that do not currently exist
         in the model. Defaults to True.
     """
+    #grab the model viewer data
+    model_viewer_data = 'var modelData = %s' % json.dumps(_get_viewer_data(problem_or_filename))
+
+    # if MPI is active only display one copy of the viewer
+    if MPI and MPI.COMM_WORLD.rank != 0:
+        return
+
     html_begin_tags = """
                       <html>
                       <head>
@@ -253,9 +264,6 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     #grab the index.html
     with open(os.path.join(vis_dir, "index.html"), "r") as f:
         index = f.read()
-
-    #grab the model viewer data
-    model_viewer_data = 'var modelData = %s' % json.dumps(_get_viewer_data(problem_or_filename))
 
     #add the necessary HTML tags if we aren't embedding
     if not embeddable:

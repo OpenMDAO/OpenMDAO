@@ -36,8 +36,9 @@ The function needs to have the following signature:
 Here is a rather contrived example where an identity preconditioner is used by giving the component's "mysolve"
 method to a LinearUserDefined solver.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linear.tests.test_user_defined.TestUserDefinedSolver.test_feature
+    :layout: interleave
 
 LinearUserDefined Options
 -------------------------
@@ -48,4 +49,3 @@ LinearUserDefined Options
     options
 
 .. tags:: Solver, LinearSolver
-

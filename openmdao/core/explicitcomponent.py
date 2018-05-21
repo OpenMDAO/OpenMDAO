@@ -5,12 +5,10 @@ from __future__ import division
 import numpy as np
 from six import itervalues, iteritems
 from six.moves import range
-from itertools import product
 
 from openmdao.core.component import Component
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
 
@@ -34,7 +32,7 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
+            Keyword arguments that will be mapped into the Component options.
         """
         super(ExplicitComponent, self).__init__(**kwargs)
 
@@ -183,7 +181,10 @@ class ExplicitComponent(Component):
                 J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
 
                 if 'method' in meta and meta['method']:
-                    self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
+
+                    # Don't approximate output wrt output.
+                    if abs_key[1] not in self._var_allprocs_abs_names['output']:
+                        self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

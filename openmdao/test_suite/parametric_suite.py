@@ -108,11 +108,10 @@ def parametric_suite(*args, **kwargs):
     """
     Decorator used for testing a range of different options for a particular
     ParametericTestGroup. If args is present, must only be the value '*',
-    indicating running all available groups/parameters. Otherwise, use kwargs to set the options
-    like so:
-        arg=value will specify that option,
-        arg='*' will vary over all default options,
-        arg=iterable will iterate over the given options.
+    indicating running all available groups/parameters. Otherwise, use kwargs to set the options like so:
+    arg=value will specify that option,
+    arg='*' will vary over all default options,
+    arg=iterable will iterate over the given options.
     Arguments that are not specified will have a reasonable default chosen."""
     run_by_default = kwargs.pop('run_by_default', False)
     test_cases = _test_suite(*args, **kwargs)
@@ -143,7 +142,6 @@ class ParameterizedInstance(object):
         Linear solver to be instantiated at the problem level.
     linear_solver_options : dict
         Options to pass into the constructor for `linear_solver_class`.
-
     """
     def __init__(self, group_type, **kwargs):
 
@@ -179,18 +177,21 @@ class ParameterizedInstance(object):
 
         group = MODELS[self._group_type](**args)
 
-        if args['vector_class'] == 'default':
+        local_vec_class = args.get('local_vector_class', 'default')
+        if local_vec_class == 'default':
             vec_class = DefaultVector
-        elif args['vector_class'] == 'petsc':
+        elif local_vec_class == 'petsc':
             vec_class = PETScVector
             if PETScVector is None:
                 raise SkipTest('PETSc not available.')
+        else:
+            raise RuntimeError("Unrecognized local_vector_class '%s'" % local_vec_class)
 
         self.problem = prob = Problem(group)
 
         if args['assembled_jac']:
 
-            jacobian_type = args['jacobian_type']
+            jacobian_type = args.get('jacobian_type', 'dense')
             if jacobian_type == 'dense':
                 prob.model.jacobian = DenseJacobian()
             elif jacobian_type == 'sparse-coo':
@@ -206,7 +207,7 @@ class ParameterizedInstance(object):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(vec_class, check=check)
+        prob.setup(check=check, local_vector_class=vec_class)
 
         fail, rele, abse = prob.run_model()
         if fail:

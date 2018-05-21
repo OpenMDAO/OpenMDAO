@@ -21,20 +21,28 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     # DirectSolver doesn't iterate.
     def test_solve_linear_maxiter(self):
-        pass
+        # Test that using options that should not exist in class cause an error
+        solver = DirectSolver()
+
+        msg = "\"Key '%s' cannot be set because it has not been declared.\""
+
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+            with self.assertRaises(KeyError) as context:
+                solver.options[option] = 1
+
+            self.assertEqual(str(context.exception), msg % option)
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with DirectSolver attached to a subsystem"""
 
         p = Problem()
-        model = p.model = Group()
+        model = p.model
         dv = model.add_subsystem('des_vars', IndepVarComp())
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=DirectSolver))
 
-        p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
 
         p.set_solver_print(level=0)
@@ -104,7 +112,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_raise_error_on_singular(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         comp = IndepVarComp()
         comp.add_output('dXdt:TAS', val=1.0)
@@ -135,13 +143,13 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust_equilibrium_group.dynamics.z'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_raise_error_on_singular_with_densejac(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         comp = IndepVarComp()
         comp.add_output('dXdt:TAS', val=1.0)
@@ -173,13 +181,13 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust_equilibrium_group.dynamics.z'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_raise_no_error_on_singular(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         comp = IndepVarComp()
         comp.add_output('dXdt:TAS', val=1.0)
@@ -232,6 +240,7 @@ class TestDirectSolverFeature(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ from parameterized import parameterized
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DenseJacobian, \
+     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DenseJacobian, CSCJacobian, \
      ParallelGroup
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
@@ -53,6 +53,52 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         # 1 output x 2 inputs
         self.assertEqual(len(model._approx_schemes['fd']._exec_list), 2)
+
+    def test_fd_count(self):
+        # Make sure we aren't doing extra FD steps.
+
+        class ParaboloidA(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+                self.add_output('g_xy', val=0.0)
+
+                # makes extra calls to the model with no actual steps
+                self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=1e-6)
+
+                self.count = 0
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+
+                outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                g_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                outputs['g_xy'] = g_xy *3
+
+                self.count += 1
+
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('px', IndepVarComp('x', val=3.0))
+        model.add_subsystem('py', IndepVarComp('y', val=5.0))
+        model.add_subsystem('parab', ParaboloidA())
+
+        model.connect('px.x', 'parab.x')
+        model.connect('py.y', 'parab.y')
+
+        model.add_design_var('px.x', lower=-50, upper=50)
+        model.add_design_var('py.y', lower=-50, upper=50)
+        model.add_objective('parab.f_xy')
+
+        prob.setup(check=False)
+        prob.run_model()
+        print(prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y']))
+
+        # 1. run_model; 2. step x; 3. step y
+        self.assertEqual(model.parab.count, 3)
 
     def test_paraboloid_subbed(self):
         prob = Problem()
@@ -552,6 +598,46 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
+    def test_newton_with_cscjac_under_full_model_fd(self):
+        # Basic sellar test.
+
+        prob = Problem()
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                               z=np.array([0.0, 0.0]), x=0.0),
+                           promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.linear_solver = ScipyKrylov()
+
+        model.jacobian = CSCJacobian()
+        model.approx_totals(method='fd', step=1e-5)
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
 
 @unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class TestGroupFiniteDifferenceMPI(unittest.TestCase):
@@ -562,7 +648,7 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         prob = Problem()
         prob.model = FanInSubbedIDVC()
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.model.approx_totals()
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -608,7 +694,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class, mode='fwd')
+        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -641,7 +727,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         sub.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class, mode='fwd')
+        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -685,7 +771,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         sub.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class, mode='fwd')
+        prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -732,7 +818,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         model.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class)
+        prob.setup(check=False, local_vector_class=vec_class)
         prob.run_model()
         model.run_linearize()
 
@@ -769,7 +855,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         sub2.approx_totals(method='cs')
 
-        prob.setup(check=False, vector_class=vec_class)
+        prob.setup(check=False, local_vector_class=vec_class)
         prob.run_model()
 
         assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
@@ -786,7 +872,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Check the total derivatives in reverse mode
-        prob.setup(check=False, vector_class=vec_class, mode='rev')
+        prob.setup(check=False, mode='rev', local_vector_class=vec_class)
         prob.run_model()
         J = prob.compute_totals(of=of, wrt=wrt, return_format='dict')
 
@@ -825,7 +911,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # Had to make this step larger so that solver would reconverge adequately.
         model.approx_totals(method='cs', step=1.0e-1)
 
-        prob.setup(check=False, vector_class=vec_class)
+        prob.setup(check=False, local_vector_class=vec_class)
         prob.set_solver_print(level=0)
         prob.run_model()
 

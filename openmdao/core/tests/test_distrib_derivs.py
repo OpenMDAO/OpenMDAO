@@ -139,7 +139,7 @@ class MPITests2(unittest.TestCase):
         prob.model.connect('indep.x', 'comp.invec')
         prob.model.connect('comp.outvec', 'total.x')
 
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         final = points.copy()
@@ -171,13 +171,13 @@ class MPITests2(unittest.TestCase):
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
@@ -213,7 +213,7 @@ class MPITests2(unittest.TestCase):
         root.connect("C1.y", "sub.C3.x")
         root.connect("P.x", "C1.x")
 
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         diag1 = [4.5, 4.5, 3.0]
@@ -229,7 +229,7 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(of=['C2.y', "C3.y"], wrt=['P.x'])
@@ -272,7 +272,7 @@ class MPITests2(unittest.TestCase):
 
         prob.model.suppress_solver_output = True
         sub.suppress_solver_output = True
-        prob.setup(vector_class=PETScVector, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         diag1 = numpy.diag([-6.0, -6.0, -3.0])
@@ -282,7 +282,7 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C4.y', 'P1.x'], diag1, 1e-6)
         assert_rel_error(self, J['C4.y', 'P2.x'], diag2, 1e-6)
 
-        prob.setup(vector_class=PETScVector, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
 
         prob.run_driver()
 
@@ -303,7 +303,9 @@ class DistribStateImplicit(ImplicitComponent):
     of 'states'.
     """
     def setup(self):
-        self.add_input('a', val=10., units='m')
+        self.distributed = True
+
+        self.add_input('a', val=10., units='m', src_indices=[0])
 
         rank = self.comm.rank
 
@@ -371,7 +373,7 @@ class DistribStateImplicit(ImplicitComponent):
             if 'a' in d_i:
                     d_i['a'] -= numpy.sum(d_r['states'])
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITests3(unittest.TestCase):
 
     N_PROCS = 3
@@ -383,17 +385,17 @@ class MPITests3(unittest.TestCase):
         p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
         p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
 
-        expected = numpy.array([[5.]])
+        expected = numpy.array([5.])
 
-        p.setup(vector_class=PETScVector, mode='fwd')
+        p.setup(mode='fwd')
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
-        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+        assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
 
-        p.setup(vector_class=PETScVector, mode='rev')
+        p.setup(mode='rev')
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
-        assert_rel_error(self, jac['out_var']['a'], expected, 1e-6)
+        assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

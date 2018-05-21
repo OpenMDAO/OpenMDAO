@@ -10,7 +10,7 @@ from openmdao.api import ExplicitComponent
 class TestExplCompArray(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare('thickness', default=1.)
+        self.options.declare('thickness', default=1.)
 
     def setup(self):
         self.add_input('lengths', val=np.ones((2, 2)))
@@ -21,7 +21,7 @@ class TestExplCompArray(ExplicitComponent):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
-        thk = self.metadata['thickness']
+        thk = self.options['thickness']
 
         outputs['areas'] = inputs['lengths'] * inputs['widths']
         outputs['total_volume'] = np.sum(outputs['areas']) * thk
@@ -30,7 +30,7 @@ class TestExplCompArray(ExplicitComponent):
 class TestExplCompArrayDense(TestExplCompArray):
 
     def compute_partials(self, inputs, partials):
-        thk = self.metadata['thickness']
+        thk = self.options['thickness']
 
         partials['areas', 'lengths'] = np.diag(inputs['widths'].flatten())
         partials['areas', 'widths'] = np.diag(inputs['lengths'].flatten())
@@ -41,7 +41,7 @@ class TestExplCompArrayDense(TestExplCompArray):
 class TestExplCompArraySpmtx(TestExplCompArray):
 
     def compute_partials(self, inputs, partials):
-        thk = self.metadata['thickness']
+        thk = self.options['thickness']
 
         inds = np.arange(4)
         partials['areas', 'lengths'] = scipy.sparse.csr_matrix(
@@ -57,7 +57,7 @@ class TestExplCompArraySpmtx(TestExplCompArray):
 class TestExplCompArraySparse(TestExplCompArray):
 
     def compute_partials(self, inputs, partials):
-        thk = self.metadata['thickness']
+        thk = self.options['thickness']
 
         inds = np.arange(4)
         partials['areas', 'lengths'] = (inputs['widths'].flatten(), inds, inds)

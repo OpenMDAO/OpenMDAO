@@ -2,7 +2,7 @@
 from __future__ import division
 
 import unittest
-
+from copy import deepcopy
 from six.moves import cStringIO
 import numpy as np
 
@@ -722,6 +722,97 @@ class ListFeatureTestCase(unittest.TestCase):
 
         outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
         print(outputs)
+
+
+class CacheUsingComp(ImplicitComponent):
+    def setup(self):
+        self.cache = {}
+        self.lin_sol_count = 0
+        self.add_input('x', val=np.ones(10))
+        self.add_output('y', val=np.zeros(10))
+
+        self.declare_partials(of='*', wrt='*')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x = inputs['x']
+        y = outputs['y']
+        residuals['y'] = x * y ** 2
+
+    def solve_nonlinear(self, inputs, outputs):
+        x = inputs['x']
+        outputs['y'] = x ** 2 + 1.0
+
+    def linearize(self, inputs, outputs, partials):
+        subjac = np.zeros((inputs['x'].size, inputs['x'].size))
+        for row, val in enumerate(inputs['x']):
+            subjac[row, :] = inputs['x'] * 2.0
+        partials['y', 'x'] = subjac
+        self.lin_sol_count = 0
+
+    def solve_linear(self, d_outputs, d_residuals, mode):
+        #print('                    doutputs', d_outputs['y'])
+        #print('dresids', d_residuals['y'])
+        #if self.lin_sol_count in self.cache:
+        #    print('cache  ', self.cache[self.lin_sol_count])
+
+        fwd = mode == 'fwd'
+
+        if self.lin_sol_count in self.cache:
+            if fwd:
+                assert(np.all(d_outputs['y'] == self.cache[self.lin_sol_count]))
+            else:
+                assert(np.all(d_residuals['y'] == self.cache[self.lin_sol_count]))
+
+        if fwd:
+            d_outputs['y'] = d_residuals['y'] + 2.
+            self.cache[self.lin_sol_count] = d_outputs['y'].copy()
+        else:  # rev
+            d_residuals['y'] = d_outputs['y'] + 2.
+            self.cache[self.lin_sol_count] = d_residuals['y'].copy()
+
+        self.lin_sol_count += 1
+
+
+class CacheLinSolutionTestCase(unittest.TestCase):
+    def test_caching_fwd(self):
+        p = Problem()
+        p.model.add_subsystem('indeps', IndepVarComp('x', val=np.arange(10, dtype=float)))
+        p.model.add_subsystem('C1', CacheUsingComp())
+        p.model.connect('indeps.x', 'C1.x')
+        p.model.add_design_var('indeps.x', cache_linear_solution=True)
+        p.model.add_objective('C1.y')
+        p.setup(mode='fwd')
+        p.run_model()
+
+        for i in range(10):
+            p['indeps.x'] += np.arange(10, dtype=float)
+            # run_model always runs setup_driver which resets the cached total jacobian object,
+            # so save it here and restore after the run_model.  This is a contrived test.  In
+            # real life, we only care about caching linear solutions when we're under run_driver.
+            old_tot_jac = p.driver._total_jac
+            p.run_model()
+            p.driver._total_jac = old_tot_jac
+            J = p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
+
+    def test_caching_rev(self):
+        p = Problem()
+        p.model.add_subsystem('indeps', IndepVarComp('x', val=np.arange(10, dtype=float)))
+        p.model.add_subsystem('C1', CacheUsingComp())
+        p.model.connect('indeps.x', 'C1.x')
+        p.model.add_design_var('indeps.x')
+        p.model.add_objective('C1.y', cache_linear_solution=True)
+        p.setup(mode='rev')
+        p.run_model()
+
+        for i in range(10):
+            p['indeps.x'] += np.arange(10, dtype=float)
+            # run_model always runs setup_driver which resets the cached total jacobian object,
+            # so save it here and restore after the run_model.  This is a contrived test.  In
+            # real life, we only care about caching linear solutions when we're under run_driver.
+            old_tot_jac = p.driver._total_jac
+            p.run_model()
+            p.driver._total_jac = old_tot_jac
+            J = p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
 
 
 if __name__ == '__main__':

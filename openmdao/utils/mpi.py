@@ -48,7 +48,13 @@ def use_proc_files():
     Cause stdout/err from each MPI process to be written to [rank].out.
     """
     if MPI is not None:
-        ofile = open("%d.out" % MPI.COMM_WORLD.rank, 'wb')
+        working_dir = os.environ.get('PROC_FILES_DIR')
+        if not working_dir:
+            ofile = open("%d.out" % MPI.COMM_WORLD.rank, 'wb')
+        else:
+            if not os.path.isdir(working_dir):
+                raise RuntimeError("directory '%s' does not exist." % working_dir)
+            ofile = open(os.path.join(working_dir, "%d.out" % MPI.COMM_WORLD.rank), 'wb')
         _redirect_streams(ofile.fileno())
 
 
@@ -195,5 +201,5 @@ else:
     mpirun_tests = unittest.main
 
 
-if os.environ.get('USE_PROC_FILES'):
+if os.environ.get('USE_PROC_FILES') or os.environ.get('PROC_FILES_DIR'):
     use_proc_files()

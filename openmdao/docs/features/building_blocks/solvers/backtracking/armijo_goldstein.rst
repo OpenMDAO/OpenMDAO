@@ -1,8 +1,8 @@
-.. _feature_amijo_goldstein:
+.. _feature_armijo_goldstein:
 
-****************
-Armijo-Goldstein
-****************
+*****************
+ArmijoGoldsteinLS
+*****************
 
 ArmijoGoldsteinLS checks bounds and backtracks to a point that satisfies them. From there,
 further backtracking is performed, until the termination criteria are satisfied.
@@ -12,11 +12,13 @@ decrease from the initial point by measuring the slope. There is also an iterati
 Here is a simple example where ArmijoGoldsteinLS is used to backtrack during the Newton solver's iteration on
 a system that contains an implicit component with 3 states that are confined to a small range of values.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijogoldsteinls_basic
+    :layout: interleave
 
-Armijo-Goldstein Options
-------------------------
+
+ArmijoGoldsteinLS Options
+-------------------------
 
 .. embed-options::
     openmdao.solvers.linesearch.backtracking
@@ -24,8 +26,8 @@ Armijo-Goldstein Options
     options
 
 
-Armijo-Goldstein Option Examples
---------------------------------
+ArmijoGoldsteinLS Option Examples
+---------------------------------
 
 **bound_enforcement**
 
@@ -63,8 +65,10 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   it reaches a point where the earliest bound violation occurred. The backtracking continues along the original
   computed gradient.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijo_boundscheck_vector
+    :layout: interleave
+
 
 - bound_enforcement: scalar
 
@@ -72,8 +76,9 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   are enforced. When this is set to "scaler", then the only indices in the output vector that are rolled back
   are the ones that violate their upper or lower bounds. The backtracking continues along the modified gradient.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijo_boundscheck_scalar
+    :layout: interleave
 
 - bound_enforcement: wall
 
@@ -82,8 +87,9 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   are the ones that violate their upper or lower bounds. The backtracking continues along a modified gradient
   direction that follows the boundary of the violated output bounds.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_armijo_boundscheck_wall
+    :layout: interleave
 
 **maxiter**
 
@@ -110,8 +116,9 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   When the "print_bound_enforce" option is set to True, the line-search will print the name and values of any variables
   that exceeded their lower or upper bounds and were drawn back during bounds enforcement.
 
-.. embed-test::
+.. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_print_bound_enforce
+    :layout: interleave
 
 - retry_on_analysis_error
 
@@ -119,4 +126,4 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
   the component explicitly raises it, or a subsolver hits its iteration limit with the 'err_on_maxiter' option set to True.
   If you would rather terminate on an AnalysisError, you can set this option to False.
 
-.. tags:: linesearch, backtracking
+.. tags:: Solver, linesearch, backtracking

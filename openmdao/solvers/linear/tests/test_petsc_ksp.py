@@ -10,6 +10,7 @@ import numpy as np
 from openmdao.api import Problem, Group, IndepVarComp, PETScKrylov, LinearBlockGS, DirectSolver, \
      ExecComp, NewtonSolver, NonlinearBlockGS, PetscKSP
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
+from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
 try:
@@ -46,7 +47,7 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -79,7 +80,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'gmres'
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -110,7 +111,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -139,7 +140,7 @@ class TestPETScKrylov(unittest.TestCase):
         precon = group.linear_solver.precon = LinearBlockGS()
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -171,7 +172,7 @@ class TestPETScKrylov(unittest.TestCase):
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = DirectSolver()
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -207,7 +208,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'richardson'
 
         p = Problem(group)
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -240,7 +241,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['precon_side'] = 'left'
         group.linear_solver.options['ksp_type'] = 'richardson'
 
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -294,15 +295,15 @@ class TestPETScKrylov(unittest.TestCase):
         """solve an implicit system with KSP attached anywhere but the root"""
 
         p = Problem()
-        model = p.model = Group()
+        model = p.model
+
         dv = model.add_subsystem('des_vars', IndepVarComp())
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PETScKrylov))
 
-        p.model.linear_solver.options['maxiter'] = 1
-        p.setup(vector_class=PETScVector, check=False)
+        p.setup(check=False)
 
         p.set_solver_print(level=0)
 
@@ -332,6 +333,67 @@ class TestPETScKrylov(unittest.TestCase):
         output = d_residuals._data
         assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
         assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+
+    def test_linear_solution_cache(self):
+        # Test derivatives across a converged Sellar model. When caching
+        # is performed, the second solve takes less iterations than the
+        # first one.
+
+        # Forward mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = PETScKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+                                        return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+                                        return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
+
+        # Reverse mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = PETScKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+                                        return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False,
+                                        return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
