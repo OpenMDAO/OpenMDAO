@@ -101,7 +101,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         raise TypeError('get_model_viewer_data only accepts Problems, Groups or filenames')
 
     data_dict = {}
-    component_execution_idx = [0] #list so pass by ref
+    component_execution_idx = [0]  # list so pass by ref
     component_execution_orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders,
                                        component_execution_idx)
@@ -112,7 +112,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
     root_group._conn_global_abs_in2out = sorted_abs_input2src
     G = root_group.compute_sys_graph(comps_only=True)
     scc = nx.strongly_connected_components(G)
-    scc_list = [s for s in scc if len(s)>1] #list(scc)
+    scc_list = [s for s in scc if len(s) > 1]
     for in_abs, out_abs in iteritems(sorted_abs_input2src):
         if out_abs is None:
             continue
@@ -136,7 +136,6 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
                     if(exe_order < exe_low or exe_order > exe_high):
                         subg.remove_node(n)
 
-
                 src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
                 for tup in subg.edges():
                     edge_str = tup[0] + ' ' + tup[1]
@@ -144,11 +143,11 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
                         edges_list.append(edge_str)
 
         if(len(edges_list) > 0):
-            edges_list.sort() # make deterministic so same .html file will be produced each run
-            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs), ('cycle_arrows', edges_list)]))
+            edges_list.sort()  # make deterministic so same .html file will be produced each run
+            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
+                                                 ('cycle_arrows', edges_list)]))
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
-
 
     data_dict['connections_list'] = connections_list
 
