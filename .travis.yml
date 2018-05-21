@@ -52,7 +52,7 @@ notifications:
 
 before_install:
 
-- if [ -f /home/travis/miniconda/bin/python ]; then
+- if [ -f /home/travis/miniconda/bin/python$PY ]; then
     CACHED_CONDA=1;
     echo "cached miniconda found -- nothing to do";
   else
@@ -76,7 +76,7 @@ before_install:
     rm -rf $HOME/.cache/pip;
   fi
 
-- if [ "CACHED_CONDA" = "0" ]; then
+- if [ "$CACHED_CONDA" = "0" ]; then
     wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
     chmod +x miniconda.sh;
     ./miniconda.sh -b  -p /home/travis/miniconda;
