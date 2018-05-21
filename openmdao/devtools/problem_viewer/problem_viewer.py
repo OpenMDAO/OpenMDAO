@@ -28,17 +28,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
 
-    local_prom_dict = OrderedDict()
-
-    from_prom_name = OrderedDict(system._var_allprocs_prom2abs_list['input'])
-    from_prom_name.update(system._var_allprocs_prom2abs_list['output'])
-    for var_prom_name, var_abs_name_list in iteritems(from_prom_name):
-        for var_abs_name in var_abs_name_list:
-            if "." in var_prom_name:
-                local_prom_dict[var_abs_name] = var_prom_name
-        if(len(local_prom_dict) > 0):
-            tree_dict['promotions'] = OrderedDict(sorted(local_prom_dict.items())) # sort to make deterministic for testing
-
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
         component_execution_orders[system.pathname] = component_execution_index[0]
