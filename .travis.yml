@@ -27,6 +27,7 @@ git:
 
 addons:
   apt:
+    update: true
     sources:
     - ubuntu-toolchain-r-test
     packages:
@@ -113,7 +114,7 @@ install:
     cd pyoptsparse;
   fi
     # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$MASTER_BUILD" && "$CACHED_PYOPTSPARSE" = "0" ]; then
+- if [ "$MASTER_BUILD" ] && [ "$CACHED_PYOPTSPARSE" = "0" ]; then
     cd pyoptsparse/pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
     cd ../../..;
@@ -124,7 +125,7 @@ install:
     cd ..;
   fi
 
-- if [ "$PETSc" && "$CACHED_PIP" = "0" ]; then
+- if [ "$PETSc" ] && [ "$CACHED_PIP" = "0" ]; then
     pip install mpi4py;
     pip install petsc4py==$PETSc;
   fi
