@@ -16,15 +16,15 @@ In many cases this can yield a substantial speed up over the default,
     details on how to best select which type of Jacobian to use.
 
 
-To use an assembled Jacobian, you set the :code:`assembled_jac` option of the linear solver you
-would like to use it. There are two options to choose from, `dense` and `csc`.  For example:
+To use an assembled Jacobian, you set the :code:`assembled_jac` option of the linear solver that
+will own it. There are two options to choose from, `dense` and `csc`.  For example:
 
 .. code-block:: python
 
     model.linear_solver = DirectSolver(assembled_jac='csc')
 
 
-If you are unsure of which one to use, try `csc` first. Most problems, even if they have very dense
+If you are unsure of which one to use, try `csc` first. Most problems, even if they have dense
 sub-Jacobians from each component, are fairly sparse at the model level and the
 :ref:`DirectSolver<directsolver>` will usually be much faster with a sparse factorization.
 

@@ -36,8 +36,7 @@ class LinearBlockGS(BlockLinearSolver):
                     if vec_name in subsys._rel_vec_names:
                         b_vec = system._vectors['residual'][vec_name]
                         b_vec *= -1.0
-                        rhs = self._rhs_vecs[vec_name]
-                        for varset, data in iteritems(rhs):
+                        for varset, data in iteritems(self._rhs_vecs[vec_name]):
                             b_vec._data[varset] += data
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
 
@@ -55,8 +54,7 @@ class LinearBlockGS(BlockLinearSolver):
                         b_vec.set_const(0.0)
                         system._transfer(vec_name, mode, isub)
                         b_vec *= -1.0
-                        rhs = self._rhs_vecs[vec_name]
-                        for varset, data in iteritems(rhs):
+                        for varset, data in iteritems(self._rhs_vecs[vec_name]):
                             b_vec._data[varset] += data
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
                 scope_out, scope_in = system._get_scope(subsys)

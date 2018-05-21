@@ -15,17 +15,6 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
-    def __init__(self, **kwargs):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Options dictionary.
-        """
-        super(LinearRunOnce, self).__init__(**kwargs)
-
     def solve(self, vec_names, mode, rel_systems=None):
         """
         Run the solver.
@@ -50,11 +39,6 @@ class LinearRunOnce(LinearBlockGS):
         self._mode = mode
         self._rel_systems = rel_systems
         system = self._system
-
-        if isinstance(system.jacobian, AssembledJacobian):
-            raise RuntimeError("A block linear solver '%s' is being used with "
-                               "an AssembledJacobian in system '%s'" %
-                               (self.SOLVER, self._system.pathname))
 
         # Pre-processing
         if self._mode == 'fwd':
