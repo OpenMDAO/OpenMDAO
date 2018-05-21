@@ -116,10 +116,11 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, cur, expected_abs2prom, expected_prom2abs)
         con.close()
 
-    def assertDriverMetadataRecorded(self, expected_driver_metadata):
+    def assertDriverMetadataRecorded(self, expected_driver_metadata,
+                                     expect_none_viewer_data=False):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
+        assertDriverMetadataRecorded(self, cur, expected_driver_metadata, expect_none_viewer_data)
         con.close()
 
     def assertSystemMetadataIdsRecorded(self, ids):
@@ -503,18 +504,13 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_driver_without_n2_data(self):
         self.setup_sellar_model()
 
-        self.prob.driver.recording_options['includes'] = ["p1.x"]
-        self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.recording_options['record_n2_data'] = False
         self.prob.driver.add_recorder(self.recorder)
         self.prob.setup(check=False)
-
-        # Conclude setup but don't run model.
         self.prob.final_setup()
-
         self.prob.cleanup()
 
-        self.assertDriverMetadataRecorded(None)
+        self.assertDriverMetadataRecorded(None, True)
 
     def test_driver_doesnt_record_metadata(self):
 
