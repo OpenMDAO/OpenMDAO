@@ -363,9 +363,8 @@ class OptionsDictionary(object):
             raise KeyError(msg.format(name))
 
         self._assert_valid(name, value)
-        meta = self._dict[name]
-        meta['value'] = value
-        meta['has_been_set'] = True
+        self._dict[name]['value'] = value
+        self._dict[name]['has_been_set'] = True
 
     def __getitem__(self, name):
         """

@@ -22,6 +22,8 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
 
+_emptyset = set()
+
 
 class SolverInfo(object):
     """
@@ -211,7 +213,8 @@ class Solver(object):
         self.cite = ""
 
     def _get_assembled_jacs(self):
-        return set()
+        global _emptyset
+        return _emptyset
 
     def add_recorder(self, recorder):
         """
@@ -729,8 +732,9 @@ class LinearSolver(Solver):
         super(LinearSolver, self).__init__(**kwargs)
 
     def _get_assembled_jacs(self):
+        global _emptyset
         if self._assembled_jac is None:
-            return ()
+            return _emptyset
         return set([self._assembled_jac])
 
     def _declare_options(self):

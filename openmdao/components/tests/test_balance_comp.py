@@ -126,9 +126,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -175,9 +173,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -222,9 +218,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -267,9 +261,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -312,9 +304,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -361,9 +351,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -400,9 +388,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -449,9 +435,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -498,9 +482,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -548,9 +530,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
 
@@ -590,9 +570,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
 
@@ -630,9 +608,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.linear_solver = DirectSolver(assembled_jac='dense')
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
 
