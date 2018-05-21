@@ -1201,7 +1201,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"),1)
 
-    def test_glob_includes_excludes(self):
+    def test_includes_excludes(self):
 
         prob = Problem()
         model = prob.model
@@ -1615,6 +1615,34 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(compact_print=True,show_only_incorrect=True)
         prob.check_partials(compact_print=False,show_only_incorrect=True)
+
+    def test_includes_excludes(self):
+        from openmdao.api import Problem, Group, ExecComp
+
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('c1c', Group())
+        sub.add_subsystem('d1', ExecComp('y=2*x'))
+        sub.add_subsystem('e1', ExecComp('y=2*x'))
+
+        sub2 = model.add_subsystem('sss', Group())
+        sub3 = sub2.add_subsystem('sss2', Group())
+        sub2.add_subsystem('d1', ExecComp('y=2*x'))
+        sub3.add_subsystem('e1', ExecComp('y=2*x'))
+
+        model.add_subsystem('abc1cab', ExecComp('y=2*x'))
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials(compact_print=True, includes='*c*c*')
+
+        data = prob.check_partials(compact_print=True, includes=['*d1', '*e1'])
+
+        data = prob.check_partials(compact_print=True, includes=['abc1cab'])
+
+        data = prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
 
 
 class TestProblemCheckTotals(unittest.TestCase):
