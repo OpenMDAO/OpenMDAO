@@ -161,6 +161,9 @@ class Driver(object):
                                             'level')
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the driver level')
+        self.recording_options.declare('record_n2_data', types=bool, default=True,
+                                       desc='Set to True to record metadata required for '
+                                       'N^2 viewing')
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -432,10 +435,10 @@ class Driver(object):
         }
 
         self._rec_mgr.startup(self)
-        if self._rec_mgr._recorders:
-            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-            self._model_viewer_data = _get_viewer_data(problem)
         if self.recording_options['record_metadata']:
+            if self.recording_options['record_n2_data']:
+                from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+                self._model_viewer_data = _get_viewer_data(problem)
             self._rec_mgr.record_metadata(self)
 
     def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):

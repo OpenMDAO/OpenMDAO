@@ -500,6 +500,22 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         self.assertDriverMetadataRecorded(expected_driver_metadata)
 
+    def test_driver_without_n2_data(self):
+        self.setup_sellar_model()
+
+        self.prob.driver.recording_options['includes'] = ["p1.x"]
+        self.prob.driver.recording_options['record_metadata'] = True
+        self.prob.driver.recording_options['record_n2_data'] = False
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        self.prob.final_setup()
+
+        self.prob.cleanup()
+
+        self.assertDriverMetadataRecorded(None)
+
     def test_driver_doesnt_record_metadata(self):
 
         self.setup_sellar_model()
