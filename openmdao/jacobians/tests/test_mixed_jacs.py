@@ -27,7 +27,7 @@ def _baseline(mode):
     p.run_model()
 
     objective = p['double_sellar.g1.y1']
-    jac = p.compute_totals()
+    jac = p.compute_totals(return_format='array')
 
     return objective, jac
 
@@ -62,7 +62,7 @@ def _mixed_case(mode):
     p.run_model()
 
     objective = p['double_sellar.g1.y1']
-    jac = p.compute_totals()
+    jac = p.compute_totals(return_format='array')
 
     return objective, jac
 
@@ -70,21 +70,23 @@ def _mixed_case(mode):
 class MixingJacsTestCase(unittest.TestCase):
     def test_mixed_fwd(self):
         base_objective, base_jac = _baseline('fwd')
+        assert_almost_equal(base_objective, np.array([5.47125755]))
+        assert_almost_equal(base_jac, np.array([[3.3775959, 2.17131165]]))
+
         obj, jac = _mixed_case('fwd')
 
         assert_almost_equal(base_objective, obj, decimal=7)
-
-        for key in jac:
-            assert_almost_equal(base_jac[key], jac[key], decimal=7)
+        assert_almost_equal(base_jac, jac, decimal=7)
 
     def test_mixed_rev(self):
         base_objective, base_jac = _baseline('rev')
+        assert_almost_equal(base_objective, np.array([5.47125755]))
+        assert_almost_equal(base_jac, np.array([[3.3775959, 2.17131165]]))
+
         obj, jac = _mixed_case('rev')
 
         assert_almost_equal(base_objective, obj, decimal=7)
-
-        for key in jac:
-            assert_almost_equal(base_jac[key], jac[key], decimal=7)
+        assert_almost_equal(base_jac, jac, decimal=7)
 
 if __name__ == '__main__':
     unittest.main()
