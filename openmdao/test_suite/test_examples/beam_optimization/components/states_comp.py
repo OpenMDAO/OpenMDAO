@@ -85,11 +85,32 @@ class StatesComp(ImplicitComponent):
         cols = np.empty((ndim, ))
         rows = np.empty((ndim, ))
 
-        for ind in range(num_elements):
-            ind1_ = 2 * ind
-            ind2_ = 2 * ind + 4
+        # First element.
+        data[:16] = inputs['K_local'][0, :, :].flat
+        cols[:16] = np.tile(np.arange(4), 4)
+        rows[:16] = np.repeat(np.arange(4), 4)
 
-            K[ind1_:ind2_, ind1_:ind2_] += inputs['K_local'][ind, :, :]
+        j = 16
+        for ind in range(1, num_elements):
+            ind1 = 2 * ind
+            K = inputs['K_local'][ind, :, :]
+
+            # NW quadrant gets summed.
+            data[j-4:j-2]  = K[0, :2]
+            data[j-2:j] = K[1, :2]
+
+            # NE quadrant
+            data[j:j+4] = K[:2, 2:].flat
+            rows[j:j+4] = np.array([ind1, ind1 + 1, ind1, ind1 + 1])
+            cols[j:j+4] = np.array([ind1 + 2, ind1 + 3, ind1 + 2, ind1 + 3])
+
+            # SE and SW quadrants together
+            data[j+4:j+12] = K[2:, :].flat
+            rows[j+4:j+12] = np.repeat(np.arange(ind1, ind1 + 2), 4)
+            cols[j+4:j+12] = np.tile(np.arange(ind1, ind1 + 4), 2)
+
+            j += 12
+
 
         data[-4:] = 1.0
         rows[-4] = 2 * num_nodes
@@ -101,34 +122,8 @@ class StatesComp(ImplicitComponent):
         cols[-2] = 2 * num_nodes
         cols[-1] = 2 * num_nodes + 1
 
-        return K
-
-        #num_elements = self.options['num_elements']
-        #num_nodes = num_elements + 1
-        #num_entry = num_elements * 16
-        #ndim = num_entry + 4
-
-        #data = np.empty((ndim, ))
-        #cols = np.empty((ndim, ))
-        #rows = np.empty((ndim, ))
-
-        #data[:num_entry] = inputs['K_local'].flat
-        #rows[:num_entry]  = np.tile(np.repeat(np.arange(4), 4), num_elements) + \
-                                    #np.repeat(np.arange(num_elements), 16) * 4
-        #cols[:num_entry]  = np.tile(np.tile(np.arange(4), 4), num_elements) + \
-                            #np.repeat(np.arange(num_elements), 16) * 4
-
-        #data[-4:] = 1.0
-        #rows[-4] = 2 * num_nodes
-        #rows[-3] = 2 * num_nodes + 1
-        #rows[-2] = 0.0
-        #rows[-1] = 1.0
-        #cols[-4] = 0.0
-        #cols[-3] = 1.0
-        #cols[-2] = 2 * num_nodes
-        #cols[-1] = 2 * num_nodes + 1
-
-        #return coo_matrix((data, (rows, cols)), shape=(ndim, ndim)).tocsc()
+        n_K = 2 * num_nodes + 2
+        return coo_matrix((data, (rows, cols)), shape=(n_K, n_K)).tocsc()
 
 
 class MultiStatesComp(ImplicitComponent):
