@@ -116,10 +116,11 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, cur, expected_abs2prom, expected_prom2abs)
         con.close()
 
-    def assertDriverMetadataRecorded(self, expected_driver_metadata):
+    def assertDriverMetadataRecorded(self, expected_driver_metadata,
+                                     expect_none_viewer_data=False):
         con = sqlite3.connect(self.filename)
         cur = con.cursor()
-        assertDriverMetadataRecorded(self, cur, expected_driver_metadata)
+        assertDriverMetadataRecorded(self, cur, expected_driver_metadata, expect_none_viewer_data)
         con.close()
 
     def assertSystemMetadataIdsRecorded(self, ids):
@@ -499,6 +500,17 @@ class TestSqliteRecorder(unittest.TestCase):
             'tree_children_length': 7,
         }
         self.assertDriverMetadataRecorded(expected_driver_metadata)
+
+    def test_driver_without_n2_data(self):
+        self.setup_sellar_model()
+
+        self.prob.driver.recording_options['record_n2_data'] = False
+        self.prob.driver.add_recorder(self.recorder)
+        self.prob.setup(check=False)
+        self.prob.final_setup()
+        self.prob.cleanup()
+
+        self.assertDriverMetadataRecorded(None, True)
 
     def test_driver_doesnt_record_metadata(self):
 
@@ -1669,6 +1681,162 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_feature_driver_metadata(self):
+        from openmdao.api import Problem, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+        prob = Problem(SellarDerivatives())
+        prob.driver = pyOptSparseDriver()
+
+        prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                       upper=np.array([10.0, 10.0]))
+        prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+        prob.model.suppress_solver_output = True
+        prob.driver.options['print_results'] = False
+
+        # make sure we record metadata
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.recording_options['record_metadata'] = True
+        prob.driver.add_recorder(recorder)
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        # access list of connections stored in metadata
+        self.assertEqual(len(cr.driver_metadata['connections_list']), 11)
+
+        # access the model tree stored in metadata
+        self.assertEqual(len(cr.driver_metadata['tree']), 4)
+
+    def test_feature_solver_metadata(self):
+        from openmdao.api import Problem, SqliteRecorder, CaseReader, IndepVarComp, ExecComp,\
+            NonlinearBlockGS, LinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives,\
+            SellarDis2withDerivatives
+        import numpy as np
+
+        prob = Problem()
+
+        model = prob.model
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        # create recorder and add to the nonlinear solver
+        recorder = SqliteRecorder("cases.sql")
+        nonlinear_solver = prob.model.nonlinear_solver
+        nonlinear_solver.add_recorder(recorder)
+
+        # add recorder to the linear solver as well
+        linear_solver = prob.model.linear_solver
+        linear_solver.add_recorder(recorder)
+
+        d1 = prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        d1.nonlinear_solver = NonlinearBlockGS()
+        d1.nonlinear_solver.options['maxiter'] = 5
+        d1.nonlinear_solver.add_recorder(recorder)
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        self.assertEqual(
+            sorted(cr.solver_metadata.keys()),
+            sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
+        )
+        self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
+        self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
+
+    def test_feature_system_metadata(self):
+        from openmdao.api import Problem, SqliteRecorder, CaseReader, IndepVarComp, ExecComp,\
+            NonlinearBlockGS, LinearBlockGS
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives,\
+            SellarDis2withDerivatives
+        import numpy as np
+
+        prob = Problem()
+
+        model = prob.model
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        nonlinear_solver = prob.model.nonlinear_solver
+
+        linear_solver = prob.model.linear_solver
+        d1 = prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        d1.nonlinear_solver = NonlinearBlockGS()
+        d1.nonlinear_solver.options['maxiter'] = 5
+
+        # declare two options
+        d1.options.declare('options value 1', 1)
+        d1.options.declare('options value to ignore', 2)
+
+        # create recorder and attach to d1
+        recorder = SqliteRecorder("cases.sql")
+        d1.add_recorder(recorder)
+
+        # don't record the second option on d1
+        d1.recording_options['options_excludes'] = ['options value to ignore']
+
+        prob.setup(check=False)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        d1_options = cr.system_metadata['d1']['component_options']
+
+        # option 1 is recorded
+        self.assertEqual(d1_options['options value 1'], 1)
+
+        # option 2 is not recorded
+        self.assertFalse('options value to ignore' in d1_options)
 
     def test_feature_system_options(self):
         import numpy as np
