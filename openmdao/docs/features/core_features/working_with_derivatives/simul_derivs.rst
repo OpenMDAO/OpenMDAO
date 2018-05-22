@@ -40,12 +40,12 @@ set the `dynamic_simul_derivs` option on the driver.  For example:
 
 
 If you want to change the number of compute_totals calls that the coloring algorithm uses to
-compute the jacobian sparsity (default is 3), you can set the `dynamic_simul_derivs_repeats` option.
+compute the jacobian sparsity (default is 3), you can set the `dynamic_derivs_repeats` option.
 For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_simul_derivs_repeats'] = 2
+    prob.driver.options['dynamic_derivs_repeats'] = 2
 
 
 Whenever a dynamic coloring is computed, the coloring is written to a file called *coloring.json*

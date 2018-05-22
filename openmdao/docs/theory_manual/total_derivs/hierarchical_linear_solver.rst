@@ -65,7 +65,7 @@ There is a subtle difference though; the Sellar problem is constructed of all ex
 Practically speaking, the presence of a CFD component means that the model is too big to use a :ref:`DirectSolver <directsolver>` at the top level of its hierarchy.
 
 Instead, based on the advice in the :ref:`Theory Manual entry on selecting which kind of linear solver to use<theory_selecting_linear_solver>`,
-the feed-forward structure on the top level indicates that the default ref:`LinearRunOnce<lnrunonce>` solver is a good choice for that level of the model.
+the feed-forward structure on the top level indicates that the default :ref:`LinearRunOnce<lnrunonce>` solver is a good choice for that level of the model.
 
 So now the challenge is to select a good linear solver architecture for the :code:`cycle` group.
 One possible approach is to use the :ref:`LinearBlockGS<linearblockgs>` solver for the :code:`cycle`,

@@ -11,13 +11,14 @@ def _build(solver_class=NewtonSolver, linear_solver_class=ScipyKrylov,
            solver_options=None, linear_solver_options=None, **options):
     suite = ParameterizedInstance('cycle', **options)
     suite.solver_class = solver_class
-    if solver_options:
+    if solver_options is not None:
         suite.solver_options = solver_options
-    if linear_solver_options:
+    if linear_solver_options is not None:
         suite.linear_solver_options = linear_solver_options
     suite.linear_solver_class = linear_solver_class
     suite.setup()
     return suite
+
 
 def _check_results(testcase, test, error_bound):
     problem = test.problem
@@ -74,7 +75,7 @@ class BM(unittest.TestCase):
     def benchmark_comp200_var5_newton_direct_assembled(self):
         suite = _build(
             solver_class=NewtonSolver, linear_solver_class=DirectSolver,
-            linear_solver_options={'maxiter': 0},
+            linear_solver_options={},  # defaults not valid for DirectSolver
             assembled_jac=True,
             jacobian_type='dense',
             connection_type='explicit',
@@ -89,7 +90,7 @@ class BM(unittest.TestCase):
     def benchmark_comp50_var5_newton_direct_assembled_fd(self):
         suite = _build(
             solver_class=NewtonSolver, linear_solver_class=DirectSolver,
-            linear_solver_options={'maxiter': 0},
+            linear_solver_options={},  # defaults not valid for DirectSolver
             assembled_jac=True,
             jacobian_type='dense',
             connection_type='explicit',
@@ -100,6 +101,7 @@ class BM(unittest.TestCase):
         )
         suite.problem.run_driver()
         _check_results(self, suite, error_bound=1e-5)
+
 
 if __name__ == '__main__':
     tname = 'benchmark_comp200_var5_newton_direct_assembled_fd'

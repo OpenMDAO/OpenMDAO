@@ -432,7 +432,7 @@ def _write_coloring(col_lists, rows, sparsity, stream):
 def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
                  setup=False, run_model=False, stream=sys.stdout):
     """
-    Compute simultaneous derivative colorings for the given problem.
+    Compute derivative sparsity for the given problem.
 
     Parameters
     ----------
@@ -445,7 +445,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     tol : float
         Tolerance used to determine if an array entry is nonzero.
     show_jac : bool
-        If True, display a visualiation of the final total jacobian used to compute the coloring.
+        If True, display a visualization of the final total jacobian used to compute the coloring.
     stream : file-like or None
         Stream where output coloring info will be written.
     setup : bool
@@ -595,6 +595,27 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
                      (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
 
+def dynamic_sparsity(driver):
+    """
+    Compute deriv sparsity during runtime.
+
+    Parameters
+    ----------
+    driver : <Driver>
+        The driver performing the optimization.
+    """
+    problem = driver._problem
+    driver._total_jac = None
+    repeats = driver.options['dynamic_derivs_repeats']
+
+    # save the sparsity.json file for later inspection
+    with open("sparsity.json", "w") as f:
+        sparsity = get_sparsity(problem, mode=problem._mode, repeats=repeats, stream=f)
+
+    driver.set_total_jac_sparsity(sparsity)
+    driver._setup_tot_jac_sparsity()
+
+
 def dynamic_simul_coloring(driver, do_sparsity=False):
     """
     Compute simultaneous deriv coloring during runtime.
@@ -608,7 +629,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False):
     """
     problem = driver._problem
     driver._total_jac = None
-    repeats = driver.options['dynamic_simul_derivs_repeats']
+    repeats = driver.options['dynamic_derivs_repeats']
 
     # save the coloring.json file for later inspection
     with open("coloring.json", "w") as f:
