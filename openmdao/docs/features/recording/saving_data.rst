@@ -41,11 +41,11 @@ System Recording Options
     recording_options
 
 To record on a System object, simply add the recorder to the System and set the recording options.
-Note that the 'excludes' option takes precedence over the 'includes' option, as shown in the example 
+Note that the 'excludes' option takes precedence over the 'includes' option, as shown in the example
 below where we exclude `obj_cmp.x` and see that it isn't in the set of recorded inputs.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_system_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_options
     :layout: interleave
 
 Recording on Driver Objects
@@ -64,7 +64,7 @@ The options 'record_objectives', 'record_constraints', 'record_desvars', and 're
 is empty but objectives, constraints, and desvars are still recorded.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_driver_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_options
     :layout: interleave
 
 Recording on Solver Objects
@@ -81,7 +81,7 @@ Recording on Solvers is nearly identical to recording on Systems with the addito
 error. Below is a basic example of adding a recorder to a solver object and recording absolute error.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_solver_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_options
     :layout: interleave
 
 .. note::
