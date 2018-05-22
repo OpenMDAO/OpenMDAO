@@ -53,37 +53,39 @@ notifications:
 
 before_install:
 
-- if [ -f /home/travis/miniconda/bin/python$PY ]; then
-    CACHED_CONDA=1;
+# Check for existence of files to determine if cache exists
+# If the dir doesn't exist, but is slated to be cached later,
+# Travis unhelpfully creates it, which then causes "dir already exists"
+# errors when you go to actually install the thing, so we must non-intuitively
+# delete the file before re-creating it later.
+- if [ -f $HOME/miniconda/bin/python$PY ]; then
     echo "cached miniconda found -- nothing to do";
   else
-    CACHED_CONDA=0;
-    rm -rf /home/travis/miniconda;
+    NOT_CACHED_CONDA=1;
+    rm -rf $HOME/miniconda;
   fi
 
 - if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
-    CACHED_PYOPTSPARSE=1;
     echo "cached pyoptsparse found -- nothing to do";
   else
-    CACHED_PYOPTSPARSE=0;
+    NOT_CACHED_PYOPTSPARSE=1;
     rm -rf $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse;
   fi
 
-- if [ -f /home/travis/.cache/pip ]; then
-    CACHED_PIP=1;
+- if [ -f $HOME/.cache/pip ]; then
     echo "cached pip found -- nothing to do";
   else
-    CACHED_PIP=0;
+    NOT_CACHED_PIP=1;
     rm -rf $HOME/.cache/pip;
   fi
 
-- if [ "$CACHED_CONDA" = "0" ]; then
+- if [ "$NOT_CACHED_CONDA" ]; then
     wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
     chmod +x miniconda.sh;
-    ./miniconda.sh -b  -p /home/travis/miniconda;
+    ./miniconda.sh -b  -p $HOME/miniconda;
   fi
 
-- export PATH=/home/travis/miniconda/bin:$PATH
+- export PATH=$HOME/miniconda/bin:$PATH
 
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     MASTER_BUILD=1;
@@ -99,38 +101,38 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-- if [ "$CACHED_CONDA" = "0" ]; then
+- if [ "$NOT_CACHED_CONDA" ]; then
     conda install --yes python=$PY;
     conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
   fi
 
-- if [ "$CACHED_PIP" = "0" ]; then
+- if [ "$NOT_CACHED_PIP" ]; then
     pip install --upgrade pip;
   fi
 
 # install pyoptsparse
-- if [ "$CACHED_PYOPTSPARSE" = "0" ]; then
+- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
     git clone https://github.com/mdolab/pyoptsparse.git;
     cd pyoptsparse;
   fi
     # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$MASTER_BUILD" ] && [ "$CACHED_PYOPTSPARSE" = "0" ]; then
+- if [ "$MASTER_BUILD" ] && [ "$NOT_CACHED_PYOPTSPARSE" ]; then
     cd pyoptsparse/pySNOPT/source;
     scp -r "$SNOPT_LOCATION" .;
     cd ../../..;
   fi
 # return to building pyoptsparse
-- if [ "$CACHED_PYOPTSPARSE" = "0" ]; then
+- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
     python setup.py install;
     cd ..;
   fi
 
-- if [ "$PETSc" ] && [ "$CACHED_PIP" = "0" ]; then
+- if [ "$PETSc" ] && [ "$NOT_CACHED_PIP" ]; then
     pip install mpi4py;
     pip install petsc4py==$PETSc;
   fi
 
-- if [ "$CACHED_PIP" = "0" ]; then
+- if [ "$NOT_CACHED_PIP" ]; then
     pip install redbaron;
     pip install git+https://github.com/OpenMDAO/testflo.git;
     pip install coverage;
@@ -140,7 +142,7 @@ install:
 - pip install .;  # Not using -e on purpose here, to catch pkging errors
 
 # do this after petsc install to avoid weird petsc install failure
-- if [ "$CACHED_CONDA" = "0" ]; then
+- if [ "$NOT_CACHED_CONDA" ]; then
     conda install --yes matplotlib;
   fi
 script:
@@ -180,4 +182,3 @@ deploy:
     fi
   on:
     branch: master
-
