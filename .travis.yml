@@ -69,6 +69,7 @@ before_install:
     echo "cached pyoptsparse found -- nothing to do";
   else
     NOT_CACHED_PYOPTSPARSE=1;
+    rm -rf $HOME/pyoptsparse
     rm -rf $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse;
   fi
 
@@ -78,14 +79,6 @@ before_install:
     NOT_CACHED_PIP=1;
     rm -rf $HOME/.cache/pip;
   fi
-
-- if [ "$NOT_CACHED_CONDA" ]; then
-    wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
-    chmod +x miniconda.sh;
-    ./miniconda.sh -b  -p $HOME/miniconda;
-  fi
-
-- export PATH=$HOME/miniconda/bin:$PATH
 
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     MASTER_BUILD=1;
@@ -102,16 +95,23 @@ install:
   fi
 
 - if [ "$NOT_CACHED_CONDA" ]; then
+    wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p $HOME/miniconda;
     conda install --yes python=$PY;
     conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
   fi
+- export PATH=$HOME/miniconda/bin:$PATH
+
 
 - if [ "$NOT_CACHED_PIP" ]; then
     pip install --upgrade pip;
+
     if [ "$PETSc" ]; then
       pip install mpi4py;
       pip install petsc4py==$PETSc;
     fi
+
     pip install redbaron;
     pip install git+https://github.com/OpenMDAO/testflo.git;
     pip install coverage;
@@ -121,11 +121,13 @@ install:
 - if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
     git clone https://github.com/mdolab/pyoptsparse.git;
     cd pyoptsparse;
+
     if [ "$MASTER_BUILD" ]; then
       cd pyoptsparse/pySNOPT/source;
       scp -r "$SNOPT_LOCATION" .;
       cd ../../..;
     fi
+
     python setup.py install;
     cd ..;
   fi
