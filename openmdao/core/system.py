@@ -154,8 +154,6 @@ class System(object):
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
-    _owns_assembled_jac : bool
-        If True, we are owners of the AssembledJacobian in our linear solver.
     _owns_approx_jac : bool
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
@@ -326,7 +324,6 @@ class System(object):
 
         self._jacobian = None
         self._approx_schemes = OrderedDict()
-        self._owns_assembled_jac = False
         self._subjacs_info = {}
         self.matrix_free = False
 
@@ -1246,13 +1243,13 @@ class System(object):
         parent_asm_jac : AssembledJacobian or None
             The assembled jacobian from a parent group to populate for this system.
         """
-        asm_jac_solvers = []
+        asm_jac_solvers = set()
         if self.linear_solver is not None:
-            asm_jac_solvers.extend(self.linear_solver._assembled_jac_solver_iter())
+            asm_jac_solvers.update(self.linear_solver._assembled_jac_solver_iter())
 
-        nl_asm_jac_solvers = []
+        nl_asm_jac_solvers = set()
         if self.nonlinear_solver is not None:
-            nl_asm_jac_solvers.extend(self.nonlinear_solver._assembled_jac_solver_iter())
+            nl_asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
 
         my_asm_jac = asm_jac = None
         if asm_jac_solvers:
@@ -1265,18 +1262,11 @@ class System(object):
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
 
-        self._owns_assembled_jac = my_asm_jac is not None
-        self._views_assembled_jac = self._owns_assembled_jac
-
-        if not self._owns_approx_jac and asm_jac is not None:
-            if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
-                # TODO: not sure we need to set this to True unless nonlinear solver's linear solver
-                #       has an assembled jac
-                self._views_assembled_jac = True
-
         if my_asm_jac is not None:
             self._assembled_jac = my_asm_jac
             jacs = [my_asm_jac]
+        elif asm_jac is not None:
+            jacs = [asm_jac]
         elif parent_asm_jac is not None:
             jacs = [parent_asm_jac]
         else:
@@ -1311,7 +1301,7 @@ class System(object):
             asm_jac._keymap = parent_asm_jac._keymap
             asm_jac._view_ranges = parent_asm_jac._view_ranges
 
-        if parent_asm_jac is not None and self._views_assembled_jac:
+        if parent_asm_jac is not None and asm_jac is not None:
             parent_asm_jac._init_view(self)
 
         # allocate internal matrices now that we have all of the subjac metadata

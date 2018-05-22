@@ -1631,9 +1631,9 @@ class Group(System):
         with Recording(name + '._apply_linear', self.iter_count, self):
             if self._owns_approx_jac:
                 jac = self._jacobian
-            elif jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
+            elif jac is None and self._assembled_jac is not None:
                 jac = self._assembled_jac
-            if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
+            if jac is not None:
                 with self.jacobian_context(jac):
                     for vec_name in vec_names:
                         with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
@@ -1726,7 +1726,7 @@ class Group(System):
             sub_do_ln = (self._linear_solver is not None) and \
                         (self._linear_solver._linearize_children())
 
-            if jac is None and (self._owns_assembled_jac or self._views_assembled_jac):
+            if jac is None and self._assembled_jac is not None:
                 jac = self._assembled_jac
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
@@ -1890,7 +1890,6 @@ class Group(System):
 
             approx._init_approximations()
 
-            self._views_assembled_jac = False
             J._initialize()
         else:
             self._jacobian = None

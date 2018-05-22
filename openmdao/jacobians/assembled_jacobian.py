@@ -349,7 +349,7 @@ class AssembledJacobian(Jacobian):
         else:
             ext_mtx = None
 
-        if system._views_assembled_jac:
+        if system.pathname in self._view_ranges:
             ranges = self._view_ranges[system.pathname]
             int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
         else:
