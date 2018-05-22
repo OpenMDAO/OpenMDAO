@@ -1000,6 +1000,30 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         _assert_model_matches_case(case, model)
 
+    def test_system_options_pickle_fail(self):
+        self.setup_sellar_model()
+
+        d1 = self.prob.model.d1
+
+        # declare two options
+        d1.options.declare('options value 1', 1)
+        # Given object which can't be pickled
+        d1.options.declare('options value to fail', (i for i in []))
+
+        # create recorder and attach to d1
+        d1.add_recorder(self.recorder)
+
+        self.prob.setup(check=False)
+        self.prob.run_driver()
+        self.prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        d1_options = cr.system_metadata['d1']['component_options']
+
+        # no options should have been recorded for d1
+        self.assertEqual(len(d1_options._dict), 0)
+
 
 def _assert_model_matches_case(case, system):
     '''
