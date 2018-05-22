@@ -133,7 +133,7 @@ When you have a model with a large number of components, you may want to reduce 
 check so that the output is small and readable. The `check_partials` method has two arguments: "inputs" and
 "outputs" that help you specify a reduced set. Both of these arugments are lists that default to None. If you
 specify "includes", and give it some strings, then only the components whose full pathnames match those strings
-are valid. Wildcards are acceptable. Likewise, if you specify excludes, then components whos pathname matches
+are valid. Wildcards are acceptable. Likewise, if you specify excludes, then components whose pathname matches
 the given patterns will be included. You can use both arguments together.
 
 .. embed-code::
