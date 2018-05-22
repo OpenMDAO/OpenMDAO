@@ -108,43 +108,36 @@ install:
 
 - if [ "$NOT_CACHED_PIP" ]; then
     pip install --upgrade pip;
-  fi
-
-# install pyoptsparse
-- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
-    git clone https://github.com/mdolab/pyoptsparse.git;
-    cd pyoptsparse;
-  fi
-    # get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$MASTER_BUILD" ] && [ "$NOT_CACHED_PYOPTSPARSE" ]; then
-    cd pyoptsparse/pySNOPT/source;
-    scp -r "$SNOPT_LOCATION" .;
-    cd ../../..;
-  fi
-# return to building pyoptsparse
-- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
-    python setup.py install;
-    cd ..;
-  fi
-
-- if [ "$PETSc" ] && [ "$NOT_CACHED_PIP" ]; then
-    pip install mpi4py;
-    pip install petsc4py==$PETSc;
-  fi
-
-- if [ "$NOT_CACHED_PIP" ]; then
+    if [ "$PETSc" ]; then
+      pip install mpi4py;
+      pip install petsc4py==$PETSc;
+    fi
     pip install redbaron;
     pip install git+https://github.com/OpenMDAO/testflo.git;
     pip install coverage;
     pip install git+https://github.com/swryan/coveralls-python@work;
   fi
 
-- pip install .;  # Not using -e on purpose here, to catch pkging errors
+- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
+    git clone https://github.com/mdolab/pyoptsparse.git;
+    cd pyoptsparse;
+    if [ "$MASTER_BUILD" ]; then
+      cd pyoptsparse/pySNOPT/source;
+      scp -r "$SNOPT_LOCATION" .;
+      cd ../../..;
+    fi
+    python setup.py install;
+    cd ..;
+  fi
 
 # do this after petsc install to avoid weird petsc install failure
 - if [ "$NOT_CACHED_CONDA" ]; then
     conda install --yes matplotlib;
   fi
+
+# finally, install OpenMDAO
+- pip install .;  # Not using -e on purpose here, to catch pkging errors
+
 script:
 # make docs first
 - cd openmdao/docs;
@@ -162,7 +155,6 @@ script:
   else
     testflo -n 1 --timeout=120 openmdao;
   fi
-
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
