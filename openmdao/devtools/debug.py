@@ -208,26 +208,15 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_jacs:
-            lnjacs = () if s.linear_solver is None else s.linear_solver._get_assembled_jacs()
-            nljacs = () if s.nonlinear_solver is None else s.nonlinear_solver._get_assembled_jacs()
-            if lnjacs:
-                types = sorted(set(type(j).__name__ for j in lnjacs))
+            if s._assembled_jac is not None:
                 cprint(" LN_jac: ")
-                if len(types) == 1:
-                    cprint(', '.join(types), color=Fore.MAGENTA + Style.BRIGHT)
-                else:
-                    cprint(types[0], color=Fore.MAGENTA + Style.BRIGHT)
-            if nljacs:
-                types = sorted(set(type(j).__name__ for j in nljacs))
-                cprint(" NL_jac: ")
-                if len(types) == 1:
-                    cprint(', '.join(types), color=Fore.MAGENTA + Style.BRIGHT)
-                else:
-                    cprint(types[0], color=Fore.MAGENTA + Style.BRIGHT)
-
-            if s._jacobian is None:
-                cprint("  Jac: ")
-                cprint('None', color=Fore.MAGENTA + Style.BRIGHT)
+                cprint(type(s._assembled_jac).__name__, color=Fore.MAGENTA + Style.BRIGHT)
+            if s.nonlinear_solver is not None:
+                jacsolvers = list(s.nonlinear_solver._assembled_jac_solver_iter())
+                if jacsolvers:
+                    cprint(" NL_jac: ")
+                    cprint(type(jacsolvers[0]._assembled_jac).__name__,
+                           color=Fore.MAGENTA + Style.BRIGHT)
 
         cprint('', end='\n')
 

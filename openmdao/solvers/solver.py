@@ -241,17 +241,6 @@ class Solver(object):
         """
         pass
 
-    def _setup_jacobians(self, parent_jacobian=None):
-        """
-        Set and populate assembled jacobian, if we have one.
-
-        Parameters
-        ----------
-        parent_jacobian : <AssembledJacobian> or None
-            The global jacobian to populate.
-        """
-        pass
-
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.

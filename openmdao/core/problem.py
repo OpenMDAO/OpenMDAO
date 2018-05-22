@@ -5,6 +5,7 @@ from __future__ import division, print_function
 import sys
 
 from collections import OrderedDict, defaultdict, namedtuple
+from fnmatch import fnmatchcase
 from itertools import product
 
 from six import iteritems, iterkeys, itervalues
@@ -601,8 +602,8 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
-    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
-                       abs_err_tol=1e-6, rel_err_tol=1e-6,
+    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
+                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=DEFAULT_FD_OPTIONS['step'],
                        form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
@@ -615,9 +616,12 @@ class Problem(object):
         out_stream : file-like object
             Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
-        comps : None or list_like
-            List of component names to check the partials of (all others will be skipped). Set to
-             None (default) to run all components.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         abs_err_tol : float
@@ -665,16 +669,35 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         all_comps = model.system_iter(typ=Component, include_self=True)
-        if comps is None:
-            comps = [comp for comp in all_comps]
-        else:
-            all_comp_names = {c.pathname for c in all_comps}
-            requested = set(comps)
-            extra = requested.difference(all_comp_names)
-            if extra:
-                msg = 'The following are not valid comp names: {}'.format(sorted(list(extra)))
-                raise ValueError(msg)
-            comps = [model._get_subsystem(c_name) for c_name in comps]
+        includes = [includes] if isinstance(includes, str) else includes
+        excludes = [excludes] if isinstance(excludes, str) else excludes
+
+        comps = []
+        for comp in all_comps:
+            if isinstance(comp, IndepVarComp):
+                continue
+
+            name = comp.pathname
+
+            # Process includes
+            if includes is not None:
+                for pattern in includes:
+                    if fnmatchcase(name, pattern):
+                        break
+                else:
+                    continue
+
+            # Process excludes
+            if excludes is not None:
+                match = False
+                for pattern in excludes:
+                    if fnmatchcase(name, pattern):
+                        match = True
+                        break
+                if match:
+                    continue
+
+            comps.append(comp)
 
         self.set_solver_print(level=0)
 
@@ -701,10 +724,6 @@ class Problem(object):
             for comp in comps:
 
                 comp.run_linearize()
-
-                # Skip IndepVarComps
-                if isinstance(comp, IndepVarComp):
-                    continue
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
@@ -860,10 +879,6 @@ class Problem(object):
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         for comp in comps:
-
-            # Skip IndepVarComps
-            if isinstance(comp, IndepVarComp):
-                continue
 
             c_name = comp.pathname
             all_fd_options[c_name] = {}
@@ -1363,9 +1378,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                          'incorrect Jacobians **\n\n')
 
     for system in system_list:
-        # No need to see derivatives of IndepVarComps
-        if isinstance(system, IndepVarComp):
-            continue
 
         sys_name = system.pathname
         sys_class_name = type(system).__name__
