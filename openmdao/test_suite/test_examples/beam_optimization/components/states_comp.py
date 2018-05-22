@@ -2,7 +2,6 @@ from __future__ import division
 from six.moves import range
 
 import numpy as np
-from scipy.linalg import lu_factor, lu_solve
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
@@ -22,8 +21,6 @@ class StatesComp(ImplicitComponent):
 
         self.add_input('K_local', shape=(num_elements, 4, 4))
         self.add_output('d', shape=size)
-
-        self.K = np.zeros((size, size))
 
         cols = np.arange(16*num_elements)
         rows = np.repeat(np.arange(4), 4)
@@ -46,10 +43,8 @@ class StatesComp(ImplicitComponent):
 
         outputs['d'] = self.lu.solve(force_vector)
 
-    def linearize(self, inputs, outputs, partials):
+    def linearize(self, inputs, outputs, jacobian):
         num_elements = self.options['num_elements']
-        num_nodes = num_elements + 1
-        size = 2 * num_nodes + 2
 
         self.K = self.assemble_CSC_K(inputs)
         self.lu = splu(self.K)
@@ -57,9 +52,9 @@ class StatesComp(ImplicitComponent):
         i_elem = np.tile(np.arange(4), 4)
         i_d = np.tile(i_elem, num_elements) + np.repeat(np.arange(num_elements), 16) * 2
 
-        partials['d', 'K_local'] = outputs['d'][i_d]
+        jacobian['d', 'K_local'] = outputs['d'][i_d]
 
-        partials['d', 'd'] = self.K.toarray()
+        jacobian['d', 'd'] = self.K.toarray()
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         if mode == 'fwd':
@@ -95,7 +90,7 @@ class StatesComp(ImplicitComponent):
             ind1 = 2 * ind
             K = inputs['K_local'][ind, :, :]
 
-            # NW quadrant gets summed.
+            # NW quadrant gets summed with previous connected element.
             data[j-6:j-4] += K[0, :2]
             data[j-2:j] += K[1, :2]
 
@@ -142,8 +137,6 @@ class MultiStatesComp(ImplicitComponent):
         for j in range(num_rhs):
             self.add_output('d_%d' % j, shape=size)
 
-        self.K = np.zeros((size, size))
-
         cols = np.arange(16*num_elements)
         rows = np.repeat(np.arange(4), 4)
         rows = np.tile(rows, num_elements) + np.repeat(np.arange(num_elements), 16) * 2
@@ -173,11 +166,9 @@ class MultiStatesComp(ImplicitComponent):
             force_vector = np.concatenate([self.options['force_vector'][:, j], np.zeros(2)])
             outputs['d_%d' % j] = self.lu.solve(force_vector)
 
-    def linearize(self, inputs, outputs, partials):
+    def linearize(self, inputs, outputs, jacobian):
         num_rhs = self.options['num_rhs']
         num_elements = self.options['num_elements']
-        num_nodes = num_elements + 1
-        size = 2 * num_nodes + 2
 
         self.K = self.assemble_CSC_K(inputs)
         self.lu = splu(self.K)
@@ -187,8 +178,8 @@ class MultiStatesComp(ImplicitComponent):
 
         for j in range(num_rhs):
             disp = 'd_%d' % j
-            partials[disp, 'K_local'] = outputs[disp][i_d]
-            partials[disp, disp] = self.K.toarray()
+            jacobian[disp, 'K_local'] = outputs[disp][i_d]
+            jacobian[disp, disp] = self.K.toarray()
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         num_rhs = self.options['num_rhs']
@@ -229,7 +220,7 @@ class MultiStatesComp(ImplicitComponent):
             ind1 = 2 * ind
             K = inputs['K_local'][ind, :, :]
 
-            # NW quadrant gets summed.
+            # NW quadrant gets summed with previous connected element.
             data[j-6:j-4] += K[0, :2]
             data[j-2:j] += K[1, :2]
 
