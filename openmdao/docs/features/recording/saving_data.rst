@@ -17,6 +17,10 @@ SqliteRecorder exists), and name the output file that you would like to write to
 
     my_recorder = SqliteRecorder("filename")
 
+.. note::
+    Currently, appending to an existing DB file is not supported; the SQLite recorder
+    will automatically write over an existing file if it carries the same name.
+
 
 Setting Recording Options
 +++++++++++++++++++++++++
