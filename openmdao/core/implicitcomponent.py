@@ -133,7 +133,7 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self._jacobian if jac is None else jac
+        J = self.jacobian if jac is None else jac
 
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:
@@ -259,7 +259,7 @@ class ImplicitComponent(Component):
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        J = self._jacobian if jac is None else jac
+        J = self.jacobian if jac is None else jac
 
         with self.jacobian_context(J):
             with self._unscaled_context(outputs=[self._outputs]):

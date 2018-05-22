@@ -774,21 +774,9 @@ class LinearSolver(Solver):
             for varset, data in iteritems(b_vecs[vec_name]._data):
                 rhs[varset] = data.copy()
 
-        assembles = self.options['assemble_jac']
-
-        if assembles:
-            newjac = system.options['assembled_jac_type']
-
-            # set up jacobian
-            if self.supports['assembled_jac']:
-                if newjac == 'dense':
-                    self._assembled_jac = DenseJacobian(system)
-                elif newjac == 'csc':
-                    self._assembled_jac = CSCJacobian(system)
-                # else jacobians will be local to components.
-            elif newjac is not None:
-                raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                                   "jacobians." % (self.SOLVER, self._system.pathname))
+        if self.options['assemble_jac'] and not self.supports['assembled_jac']:
+            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
+                               "jacobians." % (self.SOLVER, self._system.pathname))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

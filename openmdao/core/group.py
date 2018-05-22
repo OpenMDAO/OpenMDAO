@@ -1726,7 +1726,7 @@ class Group(System):
             sub_do_ln = (self._linear_solver is not None) and \
                         (self._linear_solver._linearize_children())
 
-            if jac is None and self._assembled_jac is not None:
+            if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
@@ -1734,14 +1734,14 @@ class Group(System):
                 subsys._linearize(jac, do_nl=sub_do_nl, do_ln=sub_do_ln)
 
             # Update jacobian
-            if self._assembled_jac is not None:
-                with self.jacobian_context(self._assembled_jac):
-                    self._assembled_jac._update()
+            if self._views_assembled_jac:
+                with self.jacobian_context(jac):
+                    jac._update()
 
-        if self._nonlinear_solver is not None and do_nl:
+        if do_nl and self._nonlinear_solver is not None:
             self._nonlinear_solver._linearize()
 
-        if self._linear_solver is not None and do_ln:
+        if do_ln and self._linear_solver is not None:
             self._linear_solver._linearize()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):

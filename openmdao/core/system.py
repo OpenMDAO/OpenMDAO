@@ -1262,10 +1262,17 @@ class System(object):
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
 
+        self._views_assembled_jac = False
         if my_asm_jac is not None:
             self._assembled_jac = my_asm_jac
-            jacs = [my_asm_jac]
-        elif asm_jac is not None:
+            self._views_assembled_jac = True
+        else:
+            if not self._owns_approx_jac and asm_jac is not None:
+                nl = self._nonlinear_solver
+                if nl is not None and nl.supports['gradients']:
+                    self._views_assembled_jac = True
+
+        if asm_jac is not None:
             jacs = [asm_jac]
         elif parent_asm_jac is not None:
             jacs = [parent_asm_jac]

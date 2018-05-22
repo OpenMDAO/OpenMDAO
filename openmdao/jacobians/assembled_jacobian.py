@@ -1,6 +1,7 @@
 """Define the AssembledJacobian class."""
 from __future__ import division, print_function
 
+import sys
 from collections import defaultdict
 
 from six import iteritems

@@ -289,7 +289,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self._jacobian if jac is None else jac
+        J = self.jacobian if jac is None else jac
 
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
@@ -395,7 +395,7 @@ class ExplicitComponent(Component):
         if not self._has_compute_partials and not self._approx_schemes:
             return
 
-        J = self._jacobian if jac is None else jac
+        J = self.jacobian if jac is None else jac
 
         with self.jacobian_context(J):
             with self._unscaled_context(
