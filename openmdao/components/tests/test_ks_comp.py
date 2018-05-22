@@ -57,7 +57,7 @@ class TestKSFunction(unittest.TestCase):
         assert_rel_error(self, prob['ks.KS'][1], 34.0)
         assert_rel_error(self, prob['ks.KS'][2], 51.0)
 
-        partials = prob.check_partials(comps=['ks'], out_stream=None)
+        partials = prob.check_partials(includes=['ks'], out_stream=None)
 
         for (of, wrt) in partials['ks']:
             assert_rel_error(self, partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
