@@ -443,7 +443,7 @@ class TestExecComp(unittest.TestCase):
 
         C1._linearize()
 
-        assert_rel_error(self, C1._jacobian[('y','x')], [[-2.0]], 0.00001)
+        assert_rel_error(self, C1.jacobian[('y','x')], [[-2.0]], 0.00001)
 
     def test_complex_step2(self):
         prob = Problem(Group())
@@ -477,15 +477,15 @@ class TestExecComp(unittest.TestCase):
         # any negative C1.x should give a 2.0 derivative for dy/dx
         C1._inputs['x'] = -1.0e-10
         C1._linearize()
-        assert_rel_error(self, C1._jacobian['y','x'], [[2.0]], 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[2.0]], 0.00001)
 
         C1._inputs['x'] = 3.0
         C1._linearize()
-        assert_rel_error(self, C1._jacobian['y','x'], [[-2.0]], 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
 
         C1._inputs['x'] = 0.0
         C1._linearize()
-        assert_rel_error(self, C1._jacobian['y','x'], [[-2.0]], 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
 
     def test_abs_array_complex_step(self):
         prob = Problem(model=Group())
@@ -501,15 +501,15 @@ class TestExecComp(unittest.TestCase):
         # any negative C1.x should give a 2.0 derivative for dy/dx
         C1._inputs['x'] = np.ones(3)*-1.0e-10
         C1._linearize()
-        assert_rel_error(self, C1._jacobian['y','x'], np.eye(3)*2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], np.eye(3)*2.0, 0.00001)
 
         C1._inputs['x'] = np.ones(3)*3.0
         C1._linearize()
-        assert_rel_error(self, C1._jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
 
         C1._inputs['x'] = np.zeros(3)
         C1._linearize()
-        assert_rel_error(self, C1._jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
 
         C1._inputs['x'] = np.array([1.5, -0.6, 2.4])
         C1._linearize()
@@ -518,7 +518,7 @@ class TestExecComp(unittest.TestCase):
         expect[1,1] = 2.0
         expect[2,2] = -2.0
 
-        assert_rel_error(self, C1._jacobian['y','x'], expect, 0.00001)
+        assert_rel_error(self, C1.jacobian['y','x'], expect, 0.00001)
 
     def test_feature_simple(self):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
