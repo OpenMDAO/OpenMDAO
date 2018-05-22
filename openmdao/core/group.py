@@ -1891,8 +1891,6 @@ class Group(System):
             approx._init_approximations()
 
             J._initialize()
-        else:
-            self._jacobian = None
 
         super(Group, self)._setup_jacobians(parent_asm_jac)
 

@@ -1256,6 +1256,11 @@ class System(object):
             my_asm_jac = asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
             for s in asm_jac_solvers:
                 s._assembled_jac = asm_jac
+            if not self._owns_approx_jac:
+                self._jacobian = None
+        elif not self._owns_approx_jac:
+            self._jacobian = DictionaryJacobian(system=self)
+
         if nl_asm_jac_solvers:
             if asm_jac is None:
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
@@ -1466,8 +1471,9 @@ class System(object):
         Set the Jacobian.
         """
         raise RuntimeError("%s: jacobian is no longer settable from System. Instead, use"
-                           " options['assembled_jac'] = val on the linear solver, where val is "
-                           "one of [None, 'dense', 'csc']." % self.pathname)
+                           " options['assemble_jac'] = True on the linear solver, and set "
+                           "options['assembled_jac_type'] = val on the system, where val is "
+                           "one of ['dense', 'csc']." % self.pathname)
 
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):
@@ -2675,7 +2681,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(self.jacobian, vec_names, ContainsAll(), mode, scope_out, scope_in)
+            self._apply_linear(None, vec_names, ContainsAll(), mode, scope_out, scope_in)
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -2719,7 +2725,7 @@ class System(object):
 
         """
         with self._scaled_context_all():
-            self._linearize(self.jacobian, do_nl, do_ln)
+            self._linearize(self._assembled_jac, do_nl, do_ln)
 
     def _apply_nonlinear(self):
         """

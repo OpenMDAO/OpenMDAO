@@ -993,7 +993,7 @@ class _TotalJacInfo(object):
             vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
-        model._linearize(model.jacobian)
+        model._linearize(model._assembled_jac)
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for key, meta in iteritems(self.idx_iter_dict):
@@ -1091,7 +1091,7 @@ class _TotalJacInfo(object):
         model._setup_jacobians()
 
         # Linearize Model
-        model._linearize(model.jacobian)
+        model._linearize(model._assembled_jac)
 
         approx_jac = model._jacobian._subjacs
 

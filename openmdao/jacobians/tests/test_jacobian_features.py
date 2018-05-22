@@ -190,7 +190,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
-        model._linearize(model.jacobian)
+        model._linearize(model._assembled_jac)
         jac = model.jacobian._int_mtx._matrix
 
         # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
