@@ -700,7 +700,7 @@ class TestScaling(unittest.TestCase):
         model.run_linearize()
 
         with model._scaled_context_all():
-            subjacs = comp.jacobian._subjacs
+            subjacs = comp._jacobian._subjacs
 
             assert_rel_error(self, subjacs['comp.x', 'comp.x'], np.ones((2, 2)))
             assert_rel_error(self, subjacs['comp.x', 'comp.extra'], np.ones((2, 2)))
@@ -758,7 +758,7 @@ class TestScaling(unittest.TestCase):
         model.run_linearize()
 
         with model._scaled_context_all():
-            subjacs = comp.jacobian._subjacs
+            subjacs = comp._jacobian._subjacs
 
             assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
             assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))

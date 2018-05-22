@@ -236,7 +236,7 @@ class System(object):
     _local_vector_class : class
         Class to use for local data vectors.
     _assembled_jac : AssembledJacobian or None
-        AssembledJacobian at this level of the system tree.
+        If not None, this is the AssembledJacobian owned by this system's linear_solver.
     """
 
     def __init__(self, **kwargs):
@@ -1456,14 +1456,9 @@ class System(object):
     @property
     def jacobian(self):
         """
-        Get the Jacobian object assigned to this system (or None if unassigned).
+        Get the Jacobian.
         """
-        if self.linear_solver is not None:
-            asjac = self.linear_solver._assembled_jac
-            if asjac is not None:
-                return asjac
-
-        return self._jacobian
+        return self._assembled_jac if self._assembled_jac is not None else self._jacobian
 
     @jacobian.setter
     def jacobian(self, jacobian):

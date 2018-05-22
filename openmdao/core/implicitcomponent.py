@@ -133,7 +133,8 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self.jacobian if jac is None else jac
+        if jac is None:
+            jac = self.jacobian
 
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:
@@ -143,8 +144,8 @@ class ImplicitComponent(Component):
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
-                with self.jacobian_context(J):
-                    J._apply(d_inputs, d_outputs, d_residuals, mode)
+                with self.jacobian_context(jac):
+                    jac._apply(d_inputs, d_outputs, d_residuals, mode)
 
                 # if we're not matrix free, we can skip the bottom of
                 # this loop because apply_linear does nothing.
@@ -259,15 +260,16 @@ class ImplicitComponent(Component):
         do_ln : boolean
             Flag indicating if the linear solver should be linearized.
         """
-        J = self.jacobian if jac is None else jac
+        if jac is None:
+            jac = self.jacobian
 
-        with self.jacobian_context(J):
+        with self.jacobian_context(jac):
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
                 # override FD'd values.
                 for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=J)
-                self.linearize(self._inputs, self._outputs, J)
+                    approximation.compute_approximations(self, jac=jac)
+                self.linearize(self._inputs, self._outputs, jac)
 
             if self._assembled_jac is not None:
                 self._assembled_jac._update()

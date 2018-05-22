@@ -121,7 +121,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
-        Jfd = sub.jacobian._subjacs
+        Jfd = sub._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
 
@@ -155,7 +155,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
-        Jfd = sub.jacobian._subjacs
+        Jfd = sub._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
 
@@ -191,7 +191,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p1.x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
 
-        Jfd = sub.jacobian._subjacs
+        Jfd = sub._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[6.0]], 1e-6)
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
 
@@ -224,7 +224,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.run_model()
         model.run_linearize()
 
-        Jfd = model.jacobian._subjacs
+        Jfd = model._jacobian._subjacs
         assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], -comp.JJ[0:2, 0:2], 1e-6)
         assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], -comp.JJ[0:2, 2:4], 1e-6)
         assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
@@ -253,7 +253,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         prob.run_model()
         model.run_linearize()
 
-        Jfd = comp.jacobian._subjacs
+        Jfd = comp._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 
@@ -735,7 +735,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
-        Jfd = sub.jacobian._subjacs
+        Jfd = sub._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
 
@@ -779,7 +779,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p1.x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
 
-        Jfd = sub.jacobian._subjacs
+        Jfd = sub._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[6.0]], 1e-6)
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
 
@@ -819,7 +819,7 @@ class TestGroupComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize()
 
-        Jfd = model.jacobian._subjacs
+        Jfd = model._jacobian._subjacs
         assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], -comp.JJ[0:2, 0:2], 1e-6)
         assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], -comp.JJ[0:2, 2:4], 1e-6)
         assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
@@ -1070,7 +1070,7 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.run_model()
         model.run_linearize()
 
-        Jfd = comp.jacobian._subjacs
+        Jfd = comp._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 
@@ -1121,7 +1121,7 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.run_model()
 
         model.run_linearize()
-        Jfd = comp.jacobian._subjacs
+        Jfd = comp._jacobian._subjacs
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.rhs'], -np.eye(2), 1e-6)
         assert_rel_error(self, Jfd['sub.comp.x', 'sub.comp.x'], comp.mtx, 1e-6)
 

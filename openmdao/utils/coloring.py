@@ -191,7 +191,9 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model
 
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
-        jac = system.jacobian
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
         if jac is not None and jac not in seen:
             # replace jacobian set_abs with one that replaces all subjacs with random numbers
             jac._set_abs = _SubjacRandomizer(jac, tol)
@@ -217,7 +219,9 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model
     # now revert the _jacobian _set_abs methods back to their original values
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
-        jac = system.jacobian
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
         if jac is not None and jac not in seen:
             randomizer = jac._set_abs
             jac._set_abs = randomizer._orig_set_abs

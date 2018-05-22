@@ -191,7 +191,7 @@ class TestJacobianFeatures(unittest.TestCase):
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
         model._linearize(model._assembled_jac)
-        jac = model.jacobian._int_mtx._matrix
+        jac = model._assembled_jac._int_mtx._matrix
 
         # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
         # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),

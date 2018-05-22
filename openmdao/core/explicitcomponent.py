@@ -289,7 +289,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self._jacobian if jac is None else jac
+        J = self.jacobian if jac is None else jac
 
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
@@ -395,25 +395,26 @@ class ExplicitComponent(Component):
         if not self._has_compute_partials and not self._approx_schemes:
             return
 
-        J = self.jacobian if jac is None else jac
+        if jac is None:
+            jac = self.jacobian
 
-        with self.jacobian_context(J):
+        with self.jacobian_context(jac):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 # Since the residuals are already negated, this call should come before negate_jac
                 # Additionally, computing the approximation before the call to compute_partials
                 # allows users to override FD'd values.
                 for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=J)
+                    approximation.compute_approximations(self, jac=jac)
 
                 if self._has_compute_partials:
                     # negate constant subjacs (and others that will get overwritten)
                     # back to normal
-                    self._negate_jac(J)
-                    self.compute_partials(self._inputs, J)
+                    self._negate_jac(jac)
+                    self.compute_partials(self._inputs, jac)
 
                     # re-negate the jacobian
-                    self._negate_jac(J)
+                    self._negate_jac(jac)
 
             if self._assembled_jac is not None:
                 self._assembled_jac._update()
