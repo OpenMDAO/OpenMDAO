@@ -204,19 +204,23 @@ def assertMetadataRecorded(test, db_cur, expected_prom2abs, expected_abs2prom):
 
     return
 
-def assertDriverMetadataRecorded(test, db_cur, expected):
+def assertDriverMetadataRecorded(test, db_cur, expected, expect_none_viewer_data=False):
 
     db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
     row = db_cur.fetchone()
 
-    if expected is None:
-        test.assertEqual(None, row)
+    if expected is None and not expect_none_viewer_data:
+        test.assertIsNone(row)
         return
 
     if PY2:
         model_viewer_data = pickle.loads(str(row[0]))
     if PY3:
         model_viewer_data = pickle.loads(row[0])
+
+    if expect_none_viewer_data:
+        test.assertIsNone(model_viewer_data)
+        return
 
     test.assertTrue(isinstance(model_viewer_data, dict))
 
