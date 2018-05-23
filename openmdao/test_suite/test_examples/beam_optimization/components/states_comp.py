@@ -176,10 +176,12 @@ class MultiStatesComp(ImplicitComponent):
         i_elem = np.tile(np.arange(4), 4)
         i_d = np.tile(i_elem, num_elements) + np.repeat(np.arange(num_elements), 16) * 2
 
+        K_dense = self.K.toarray()
+
         for j in range(num_rhs):
             disp = 'd_%d' % j
             jacobian[disp, 'K_local'] = outputs[disp][i_d]
-            jacobian[disp, disp] = self.K.toarray()
+            jacobian[disp, disp] = K_dense
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         num_rhs = self.options['num_rhs']
