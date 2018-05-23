@@ -197,7 +197,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -220,7 +220,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_constraints'] = False
         self.prob.driver.recording_options['includes'] = []
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         self.prob.driver.add_recorder(self.recorder)
 
@@ -245,7 +245,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_constraints'] = False
         self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -270,7 +270,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_constraints'] = True
         self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -300,10 +300,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
-
         prob.driver = pyOptSparseDriver()
-
         prob.driver.add_recorder(self.recorder)
         prob.driver.recording_options['record_desvars'] = True
         prob.driver.recording_options['record_responses'] = True
@@ -318,8 +315,9 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
-        prob.setup(check=False)
+        prob.setup()
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
 
         prob.cleanup()
@@ -344,48 +342,6 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
                                                  expected_inputs),), self.eps)
 
-    def test_feature_simple_driver_recording(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
-            ScipyOptimizeDriver, SqliteRecorder, CaseReader
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.driver = ScipyOptimizeDriver()
-
-        case_recorder_filename = 'cases.sql'
-        recorder = SqliteRecorder(case_recorder_filename)
-
-        prob.driver.add_recorder(recorder)
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
-        prob.driver.recording_options['record_objectives'] = True
-        prob.driver.recording_options['record_constraints'] = True
-
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup(check=False)
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader(case_recorder_filename)
-        case = cr.driver_cases.get_case('rank0:SLSQP|3')
-
-        assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
-        assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
-
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_driver_everything_recorded_by_default(self):
@@ -397,10 +353,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
-
         prob.driver = pyOptSparseDriver()
-
         prob.driver.add_recorder(self.recorder)
 
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -411,8 +364,9 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
-        prob.setup(check=False)
+        prob.setup()
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
 
         prob.cleanup()
@@ -443,7 +397,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['includes'] = ["p1.x"]
         self.prob.driver.recording_options['record_metadata'] = True
         self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         # Conclude setup but don't run model.
         self.prob.final_setup()
@@ -506,7 +460,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.driver.recording_options['record_n2_data'] = False
         self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup(check=False)
+        self.prob.setup()
         self.prob.final_setup()
         self.prob.cleanup()
 
@@ -518,7 +472,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         self.prob.driver.recording_options['record_metadata'] = False
         self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup(check=False)
+        self.prob.setup()
         self.prob.final_setup()
         self.prob.cleanup()
 
@@ -549,7 +503,7 @@ class TestSqliteRecorder(unittest.TestCase):
         obj_cmp.recording_options['record_metadata'] = True
         obj_cmp.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -591,10 +545,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
-
         prob.driver = pyOptSparseDriver()
-
         prob.driver.add_recorder(self.recorder)
         prob.driver.recording_options['record_desvars'] = True
         prob.driver.recording_options['record_responses'] = True
@@ -611,7 +562,9 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
+
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
 
         prob.cleanup()
@@ -651,10 +604,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        model.suppress_solver_output = True
-
         prob.driver = pyOptSparseDriver()
-
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.opt_settings['ACC'] = 1e-9
 
@@ -663,7 +613,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Set up recorder after intitial setup.
         prob.driver.add_recorder(self.recorder)
@@ -674,6 +624,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.recording_options['includes'] = ['*']
         prob.driver.recording_options['excludes'] = ['p2*']
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
 
         prob.cleanup()
@@ -770,7 +721,7 @@ class TestSqliteRecorder(unittest.TestCase):
         solver.recording_options['record_solver_residuals'] = True
         solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -821,7 +772,7 @@ class TestSqliteRecorder(unittest.TestCase):
         ls.options['c'] = 100.0
         ls.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -858,7 +809,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         ls.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -891,7 +842,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nonlinear_solver.recording_options['record_solver_residuals'] = True
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -931,7 +882,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NonlinearBlockJac()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -962,7 +913,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NewtonSolver()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -993,7 +944,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.model.nonlinear_solver = NonlinearRunOnce()
         self.prob.model.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -1032,7 +983,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
 
         # No norms so no expected norms
@@ -1078,7 +1029,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyKrylov', (1,)]
@@ -1124,7 +1075,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PETScKrylov', (3,)]
@@ -1169,7 +1120,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
@@ -1215,7 +1166,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (0,)]
@@ -1260,7 +1211,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
         nonlinear_solver.linear_solver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
@@ -1447,7 +1398,7 @@ class TestSqliteRecorder(unittest.TestCase):
         group.connect('comp1.c', 'comp3.c')
 
         prob = Problem(model=group)
-        prob.setup(check=False)
+        prob.setup()
 
         prob['comp1.a'] = 1.
         prob['comp1.b'] = -4.
@@ -1479,7 +1430,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # component TestExplCompArray, put in a model and run it; its outputs are multi-d-arrays.
         from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
         comp = TestExplCompArray(thickness=1.)
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
@@ -1593,7 +1544,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # if OPTIMIZER == 'SLSQP':
         #     self.prob.driver.opt_settings['ACC'] = 1e-9
 
-        self.prob.setup(check=False)
+        self.prob.setup()
 
         t0, t1 = run_driver(self.prob)
 
@@ -1639,7 +1590,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['includes'] = []
         self.prob.driver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         self.prob.run_driver()
         self.prob.cleanup()
 
@@ -1654,7 +1605,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.driver.recording_options['record_constraints'] = False
         self.prob.driver.recording_options['includes'] = []
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         t0, t1 = run_driver(self.prob)
         self.prob.cleanup()
 
@@ -1682,6 +1633,48 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_feature_simple_driver_recording(self):
+        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
+            ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.driver = ScipyOptimizeDriver()
+
+        case_recorder_filename = 'cases.sql'
+        recorder = SqliteRecorder(case_recorder_filename)
+
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(case_recorder_filename)
+        case = cr.driver_cases.get_case('rank0:SLSQP|3')
+
+        assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
+        assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
+
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_feature_driver_metadata(self):
@@ -1698,7 +1691,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.model.add_objective('obj')
         prob.model.add_constraint('con1', upper=0.0)
         prob.model.add_constraint('con2', upper=0.0)
-        prob.model.suppress_solver_output = True
         prob.driver.options['print_results'] = False
 
         # make sure we record metadata
@@ -1706,7 +1698,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.driver.recording_options['record_metadata'] = True
         prob.driver.add_recorder(recorder)
 
-        prob.setup(check=False)
+        prob.set_solver_print(0)
+
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -1762,7 +1756,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         d1.nonlinear_solver.options['maxiter'] = 5
         d1.nonlinear_solver.add_recorder(recorder)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -1824,7 +1818,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # don't record the second option on d1
         d1.recording_options['options_excludes'] = ['options value to ignore']
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -1889,7 +1883,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
 
         prob.driver = ScipyOptimizeDriver()
         driver = prob.driver
@@ -1903,6 +1896,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_desvars'] = True
+
+        prob.set_solver_print(0)
 
         prob.setup()
         prob.run_driver()
@@ -2023,7 +2018,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
 
         prob.driver = ScipyOptimizeDriver()
         driver = prob.driver
@@ -2037,6 +2031,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_desvars'] = True
+
+        prob.set_solver_print(0)
 
         prob.setup()
         prob.run_driver()
@@ -2070,7 +2066,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
 
         prob.driver = ScipyOptimizeDriver()
         driver = prob.driver
@@ -2088,7 +2083,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.recording_options['record_metadata'] = False
         model.recording_options['options_excludes'] = ['*']
 
-        prob.setup(check=False)
+        prob.set_solver_print(0)
+
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -2109,7 +2106,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
-        model.suppress_solver_output = True
 
         prob.driver = ScipyOptimizeDriver()
         driver = prob.driver
@@ -2123,12 +2119,14 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.recording_options['record_metadata'] = False
         model.recording_options['options_excludes'] = ['*']
 
-        prob.setup(check=False)
+        prob.setup()
 
         cr = CaseReader('cases.sql')
         # Load the last case written
         last_case = cr.system_cases.get_case(-1)
         prob.load_case(last_case)
+
+        prob.set_solver_print(0)
 
         prob.run_driver()
         prob.cleanup()

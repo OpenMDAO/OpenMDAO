@@ -37,12 +37,14 @@ class SellarProblem(Problem):
     def __init__(self, model_class=SellarDerivatives, **kwargs):
         super(SellarProblem, self).__init__(model_class(**kwargs))
 
-        self.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        self.model.add_design_var('x', lower=0.0, upper=10.0)
-        self.model.add_objective('obj')
-        self.model.add_constraint('con1', upper=0.0)
-        self.model.add_constraint('con2', upper=0.0)
+        model = self.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
 
+        self.set_solver_print(0)
 
 class TestSqliteCaseReader(unittest.TestCase):
 
@@ -804,6 +806,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver.add_recorder(self.recorder)
 
+        prob.set_solver_print(0)
+
         prob.setup()
         prob.run_model()
         prob.cleanup()
@@ -846,6 +850,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('c', lower=15.0)
 
         prob.driver.add_recorder(self.recorder)
+
+        prob.set_solver_print(0)
 
         prob.setup()
         prob.run_driver()
