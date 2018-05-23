@@ -14,7 +14,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
@@ -32,6 +32,11 @@ from openmdao.utils.write_outputs import write_outputs
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
 _DEFAULT_OUT_STREAM = object()
 _empty_frozen_set = frozenset()
+
+_asm_jac_types = {
+    'csc': CSCJacobian,
+    'dense': DenseJacobian,
+}
 
 
 class System(object):
@@ -148,10 +153,6 @@ class System(object):
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
         <Jacobian> object to be used in apply_linear.
-    _jacobian_changed : bool
-        If True, the jacobian has changed since the last call to setup.
-    _owns_assembled_jac : bool
-        If True, we are owners of the AssembledJacobian in self._jacobian.
     _owns_approx_jac : bool
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
@@ -199,6 +200,9 @@ class System(object):
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
+    matrix_free : Bool
+        This is set to True if the component overrides the appropriate function with a user-defined
+        matrix vector product with the Jacobian or any of its subsystems do.
     _relevant : dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
@@ -230,6 +234,8 @@ class System(object):
         Class to use for distributed data vectors.
     _local_vector_class : class
         Class to use for local data vectors.
+    _assembled_jac : AssembledJacobian or None
+        If not None, this is the AssembledJacobian owned by this system's linear_solver.
     """
 
     def __init__(self, **kwargs):
@@ -247,6 +253,10 @@ class System(object):
 
         # System options
         self.options = OptionsDictionary()
+
+        self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
+                             desc='Linear solver(s) in this group, if using an assembled '
+                                  'jacobian, will use this type.')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -311,12 +321,10 @@ class System(object):
         self._nonlinear_solver = None
         self._linear_solver = None
 
-        self._jacobian = DictionaryJacobian()
-        self._jacobian._system = self
-        self._jacobian_changed = True
+        self._jacobian = None
         self._approx_schemes = OrderedDict()
-        self._owns_assembled_jac = False
         self._subjacs_info = {}
+        self.matrix_free = False
 
         self._owns_approx_jac = False
         self._owns_approx_jac_meta = {}
@@ -356,6 +364,8 @@ class System(object):
         self._vector_class = None
         self._local_vector_class = None
         self._distributed_vector_class = None
+
+        self._assembled_jac = None
 
     def _declare_options(self):
         """
@@ -776,7 +786,7 @@ class System(object):
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
-        self._setup_jacobians(recurse=recurse)
+        self._setup_jacobians()
 
         self._setup_case_recording(recurse=recurse)
 
@@ -1223,93 +1233,92 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
 
-    def _setup_jacobians(self, jacobian=None, recurse=True):
+    def _setup_jacobians(self, parent_asm_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
         Parameters
         ----------
-        jacobian : <AssembledJacobian> or None
-            The global jacobian to populate for this system.
-        recurse : bool
-            Whether to call this method in subsystems.
+        parent_asm_jac : AssembledJacobian or None
+            The assembled jacobian from a parent group to populate for this system.
         """
-        self._jacobian_changed = False
+        asm_jac_solvers = set()
+        if self.linear_solver is not None:
+            asm_jac_solvers.update(self.linear_solver._assembled_jac_solver_iter())
+
+        nl_asm_jac_solvers = set()
+        if self.nonlinear_solver is not None:
+            nl_asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
+
+        my_asm_jac = asm_jac = None
+        if asm_jac_solvers:
+            my_asm_jac = asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+            for s in asm_jac_solvers:
+                s._assembled_jac = asm_jac
+            if not self._owns_approx_jac:
+                self._jacobian = None
+        elif not self._owns_approx_jac:
+            self._jacobian = DictionaryJacobian(system=self)
+
+        if nl_asm_jac_solvers:
+            if asm_jac is None:
+                asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+            for s in nl_asm_jac_solvers:
+                s._assembled_jac = asm_jac
+
         self._views_assembled_jac = False
+        if my_asm_jac is not None:
+            self._assembled_jac = my_asm_jac
+            self._views_assembled_jac = True
+        else:
+            if not self._owns_approx_jac and asm_jac is not None:
+                nl = self._nonlinear_solver
+                if nl is not None and nl.supports['gradients']:
+                    self._views_assembled_jac = True
 
-        if jacobian is not None:
-            if self._nonlinear_solver is not None and self._nonlinear_solver.supports['gradients']:
-                self._views_assembled_jac = True
+        if asm_jac is not None:
+            jacs = [asm_jac]
+        elif parent_asm_jac is not None:
+            jacs = [parent_asm_jac]
+        else:
+            jacs = []
 
-        if self._owns_assembled_jac:
+        if self._jacobian is not None:
+            jacs.append(self._jacobian)
 
-            # if we have an assembled jac at this level and an assembled jac above us, then
-            # our jacs (and any of our children's assembled jacs) will share their internal
-            # subjac dicts.  Each will maintain its own internal Matrix objects though.
-            if jacobian is not None:
-                jacobian._subjacs.update(self._jacobian._subjacs)
-                jacobian._subjacs_info.update(self._jacobian._subjacs_info)
-                self._jacobian._subjacs = jacobian._subjacs
-                self._jacobian._subjacs_info = jacobian._subjacs_info
-                self._jacobian._keymap = jacobian._keymap
-                self._jacobian._view_ranges = jacobian._view_ranges
+        # note that for a Group, _set_partials_meta does nothing
+        self._set_partials_meta(jacs)
 
-            # At present, we don't support a AssembledJacobian in a group
-            # if any subcomponents are matrix-free.
-            for subsys in self.system_iter():
+        # At present, we don't support a AssembledJacobian in a group
+        # if any subcomponents are matrix-free.
+        if asm_jac is not None:
+            if self.matrix_free:
+                raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
-                try:
-                    if subsys.matrix_free:
-                        msg = "AssembledJacobian not supported if any subcomponent is matrix-free."
-                        raise RuntimeError(msg)
-
-                # Groups don't have `matrix_free`
-                # Note, we could put this attribute on Group, but this would be True for a
-                # default Group, and thus we would need an isinstance on Component, which is the
-                # reason for the try block anyway.
-                except AttributeError:
-                    continue
-
-            jacobian = self._jacobian
-
-        elif jacobian is not None:
-            self._jacobian = jacobian
-
-        self._set_partials_meta()
-
-        if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(jacobian, recurse)
+                subsys._setup_jacobians(asm_jac)
+        else:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_jacobians(parent_asm_jac)
 
-        if self._owns_assembled_jac:
-            self._jacobian._system = self
-            self._jacobian._initialize()
-            out_ranges = self._jacobian._out_ranges
-            in_ranges = self._jacobian._in_ranges
+        # if we have an assembled jac at this level and an assembled jac above us, then
+        # our jac (and any of our children's assembled jacs) will share their internal
+        # subjac dicts.  Each will maintain its own internal Matrix objects though.
+        if parent_asm_jac is not None and asm_jac is not None:
+            parent_asm_jac._subjacs.update(asm_jac._subjacs)
+            parent_asm_jac._subjacs_info.update(asm_jac._subjacs_info)
+            asm_jac._subjacs = parent_asm_jac._subjacs
+            asm_jac._subjacs_info = parent_asm_jac._subjacs_info
+            asm_jac._keymap = parent_asm_jac._keymap
+            asm_jac._view_ranges = parent_asm_jac._view_ranges
 
-            for s in self.system_iter(recurse=True, include_self=True):
-                if s._jacobian is self._jacobian and s._views_assembled_jac:
-                    # set up view range for current subsystem
-                    input_names = s._var_abs_names['input']
-                    if input_names:
-                        min_in_offset = in_ranges[input_names[0]][0]
-                        max_in_offset = in_ranges[input_names[-1]][1]
-                    else:
-                        min_in_offset = sys.maxsize
-                        max_in_offset = 0
+        if parent_asm_jac is not None and asm_jac is not None:
+            parent_asm_jac._init_view(self)
 
-                    output_names = s._var_abs_names['output']
-                    if output_names:
-                        min_res_offset = out_ranges[output_names[0]][0]
-                        max_res_offset = out_ranges[output_names[-1]][1]
-                    else:
-                        min_res_offset = sys.maxsize
-                        max_res_offset = 0
-
-                    self._jacobian._view_ranges[s.pathname] = (
-                        min_res_offset, max_res_offset, min_in_offset, max_in_offset)
-
-                    self._jacobian._init_view(s)
+        # allocate internal matrices now that we have all of the subjac metadata
+        if asm_jac is not None:
+            asm_jac._initialize()
+            asm_jac._init_view(self)
 
     def set_initial_values(self):
         """
@@ -1446,18 +1455,19 @@ class System(object):
     @property
     def jacobian(self):
         """
-        Get the Jacobian object assigned to this system (or None if unassigned).
+        Get the Jacobian.
         """
-        return self._jacobian
+        return self._assembled_jac if self._assembled_jac is not None else self._jacobian
 
     @jacobian.setter
     def jacobian(self, jacobian):
         """
         Set the Jacobian.
         """
-        self._owns_assembled_jac = isinstance(jacobian, AssembledJacobian)
-        self._jacobian = jacobian
-        self._jacobian_changed = True
+        raise RuntimeError("%s: jacobian is no longer settable from System. Instead, use"
+                           " options['assemble_jac'] = True on the linear solver, and set "
+                           "options['assembled_jac_type'] = val on the system, where val is "
+                           "one of ['dense', 'csc']." % self.pathname)
 
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):
@@ -1644,7 +1654,7 @@ class System(object):
                 self._vectors['residual'][vec_name])
 
     @contextmanager
-    def jacobian_context(self):
+    def jacobian_context(self, jac):
         """
         Context manager that yields the Jacobian assigned to this system in this system's context.
 
@@ -1653,13 +1663,10 @@ class System(object):
         <Jacobian>
             The current system's jacobian with its _system set to self.
         """
-        if self._jacobian_changed:
-            raise RuntimeError("%s: jacobian has changed and setup was not "
-                               "called." % self.pathname)
-        oldsys = self._jacobian._system
-        self._jacobian._system = self
-        yield self._jacobian
-        self._jacobian._system = oldsys
+        oldsys = jac._system
+        jac._system = self
+        yield jac
+        jac._system = oldsys
 
     @property
     def nonlinear_solver(self):
@@ -1760,11 +1767,16 @@ class System(object):
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-    def _set_partials_meta(self):
+    def _set_partials_meta(self, jacs):
         """
         Set subjacobian info into our jacobian.
 
         Overridden in <Component>.
+
+        Parameters
+        ----------
+        jacs : list of Jacobian
+            Jacobians needing metadata update.
         """
         pass
 
@@ -2663,7 +2675,7 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(vec_names, ContainsAll(), mode, scope_out, scope_in)
+            self._apply_linear(None, vec_names, ContainsAll(), mode, scope_out, scope_in)
 
     def run_solve_linear(self, vec_names, mode):
         """
@@ -2707,7 +2719,7 @@ class System(object):
 
         """
         with self._scaled_context_all():
-            self._linearize(do_nl, do_ln)
+            self._linearize(self._assembled_jac, do_nl, do_ln)
 
     def _apply_nonlinear(self):
         """
@@ -2744,12 +2756,14 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, vec_names, rel_systems, mode, var_inds=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, var_inds=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         rel_systems : set of str
@@ -2786,12 +2800,14 @@ class System(object):
         """
         pass
 
-    def _linearize(self, do_nl=True, do_ln=True):
+    def _linearize(self, jac, do_nl=True, do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         do_nl : boolean
             Flag indicating if the nonlinear solver should be linearized.
         do_ln : boolean

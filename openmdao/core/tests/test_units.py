@@ -5,7 +5,7 @@ import warnings
 
 from six import iteritems
 
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DirectSolver
 from openmdao.api import ExecComp
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
@@ -29,10 +29,10 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_dense_jac(self):
         """Test that output values and total derivatives are correct."""
-        prob = Problem(model=UnitConvGroup())
+        prob = Problem(model=UnitConvGroup(assembled_jac_type='dense'))
 
-        prob.model.jacobian = DenseJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
+
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -678,7 +678,6 @@ class TestUnitConversion(unittest.TestCase):
 
         ## Make sure we can calculate a good derivative in the presence of pollution
 
-        #sub._jacobian_changed = True
         #sub.linear_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
         #rhs_buf = {None : np.array([3.5, 1.7])}
         #sol_buf = sub.linear_solver.solve(rhs_buf, sub, mode='fwd')[None]

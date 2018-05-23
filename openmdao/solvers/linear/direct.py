@@ -117,6 +117,8 @@ class DirectSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(DirectSolver, self)._declare_options()
+
         self.options.declare('err_on_singular', default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
@@ -133,34 +135,23 @@ class DirectSolver(LinearSolver):
         """
         system = self._system
 
-        if system._owns_assembled_jac or system._views_assembled_jac:
-            mtx = system._jacobian._int_mtx
+        if self._assembled_jac is not None:
+            mtx = self._assembled_jac._int_mtx
+            ranges = self._assembled_jac._view_ranges[system.pathname]
+            matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+
             # Perform dense or sparse lu factorization
             if isinstance(mtx, DenseMatrix):
-                if system._views_assembled_jac:
-                    ranges = system._jacobian._view_ranges[system.pathname]
-                    matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
-                else:
-                    matrix = mtx._matrix
-
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
-
                     if self.options['err_on_singular']:
                         warnings.simplefilter('error', RuntimeWarning)
-
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
-
                     except RuntimeWarning as err:
                         raise RuntimeError(format_singluar_error(err, system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                if system._views_assembled_jac:
-                    ranges = system._jacobian._view_ranges[system.pathname]
-                    matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
-                else:
-                    matrix = mtx._matrix
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
@@ -229,7 +220,8 @@ class DirectSolver(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._rel_systems, 'fwd', scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, 'fwd',
+                             scope_out, scope_in)
 
         # put new value in out_vec
         b_vec.get_data(out_vec)
@@ -284,10 +276,10 @@ class DirectSolver(LinearSolver):
                     trans_splu = 'T'
 
                 # AssembledJacobians are unscaled.
-                if system._owns_assembled_jac or system._views_assembled_jac:
+                if self._assembled_jac is not None:
                     with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                         b_data = b_vec.get_data()
-                        if (isinstance(system._jacobian._int_mtx,
+                        if (isinstance(self._assembled_jac._int_mtx,
                                        (COOMatrix, CSRMatrix, CSCMatrix))):
                             x_data = self._lu.solve(b_data, trans_splu)
                         else:

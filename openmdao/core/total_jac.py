@@ -867,7 +867,6 @@ class _TotalJacInfo(object):
                         deriv_val = np.empty(slc.stop - slc.start)
                     self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
 
-                # print("deriv_val:", output_name, input_name, deriv_val)
                 if fwd:
                     J[slc, i] = deriv_val
                 else:
@@ -912,7 +911,6 @@ class _TotalJacInfo(object):
                     indices = out_meta[output_name][1]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
-                    # print("deriv_val:", i, output_name, input_name, deriv_val)
                     J[row, i] = deriv_val[idx2local[row]]
 
     def matmat_jac_setter(self, inds):
@@ -995,7 +993,7 @@ class _TotalJacInfo(object):
             vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
-        model._linearize()
+        model._linearize(model._assembled_jac)
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for key, meta in iteritems(self.idx_iter_dict):
@@ -1090,10 +1088,10 @@ class _TotalJacInfo(object):
             else:
                 model.approx_totals(method='fd')
 
-        model._setup_jacobians(recurse=False)
+        model._setup_jacobians()
 
         # Linearize Model
-        model._linearize()
+        model._linearize(model._assembled_jac)
 
         approx_jac = model._jacobian._subjacs
 

@@ -98,9 +98,12 @@ def _setup_func_group():
     global func_group
 
     from openmdao.core.system import System
+    from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
     from openmdao.core.driver import Driver
-    from openmdao.solvers.solver import Solver
+    from openmdao.core.total_jac import _TotalJacInfo
+    from openmdao.solvers.solver import Solver, LinearSolver
+    from openmdao.solvers.nonlinear.newton import NewtonSolver
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
@@ -110,10 +113,26 @@ def _setup_func_group():
             ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
         ],
         'openmdao_all': [
-            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver, Problem)),
+            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver,
+                   Problem, _TotalJacInfo)),
         ],
         'setup': [
-            ("*setup*", (System, Solver, Driver, Problem)),
+            ("__init__", (System, Solver, Driver, Problem, Jacobian, DefaultVector, _TotalJacInfo,
+                          Matrix)),
+            ("*setup*", (System, Solver, Driver, Problem, Jacobian, DefaultVector, _TotalJacInfo,
+                         Matrix)),
+            ('_configure', (System,)),
+            ('set_initial_values', (System,)),
+            ('_set_initial_conditions', (Problem,)),
+            ('_build', (Matrix,)),
+            ('_add_submat', (Matrix,)),
+            ('_get_maps', (System,)),
+            ('_set_partials_meta', (System,)),
+            ('_init_relevance', (System,)),
+            ('_get_initial_*', (System,)),
+            ('_initialize_*', (DefaultVector,)),
+            ('_create_*', (DefaultVector,)),
+            ('_extract_data', (DefaultVector,)),
         ],
         'dataflow': [
             ('*compute*', (System,)),
@@ -122,9 +141,24 @@ def _setup_func_group():
             ('*', (DefaultTransfer,)),
         ],
         'linear': [
-            ('*linear*', (System,)),
-            ('*solve*', (Solver,)),
-            ('*compute*', (System,))
+            ('_apply_linear', (System,)),
+            ('_setup_jacobians', (System, Solver)),
+            ('_solve_linear', (System,)),
+            ('apply_linear', (System,)),
+            ('solve_linear', (System,)),
+            ('_set_partials_meta', (System, Jacobian)),
+            ('jacobian_context', (System,)),
+            ('_linearize', (System, Solver)),
+            ('_negate_jac', (ExplicitComponent,)),
+            # include NewtonSolver to provide some context
+            ('solve', (LinearSolver, NewtonSolver)),
+            ('_update', (Jacobian,)),
+            ('_apply', (Jacobian,)),
+            ('_initialize', (Jacobian,)),
+            ('_multiply_subjac', (Jacobian,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('compute_jacvec_product', (System,)),
         ],
         'solver': [
             ('*', (Solver,))

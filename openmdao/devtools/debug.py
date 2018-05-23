@@ -208,12 +208,15 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_jacs:
-            jactype = type(s._jacobian).__name__ if s._jacobian is not None else None
-            if (s._jacobian is not None and s._jacobian not in seenJacs and
-                    jactype != 'DictionaryJacobian'):
-                seenJacs.add(s._jacobian)
-                cprint("  Jac: ")
-                cprint(jactype, color=Fore.MAGENTA + Style.BRIGHT)
+            if s._assembled_jac is not None:
+                cprint(" LN_jac: ")
+                cprint(type(s._assembled_jac).__name__, color=Fore.MAGENTA + Style.BRIGHT)
+            if s.nonlinear_solver is not None:
+                jacsolvers = list(s.nonlinear_solver._assembled_jac_solver_iter())
+                if jacsolvers:
+                    cprint(" NL_jac: ")
+                    cprint(type(jacsolvers[0]._assembled_jac).__name__,
+                           color=Fore.MAGENTA + Style.BRIGHT)
 
         cprint('', end='\n')
 

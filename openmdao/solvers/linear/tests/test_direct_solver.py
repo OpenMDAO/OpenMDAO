@@ -8,7 +8,7 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, ExecComp, \
-     NewtonSolver, BalanceComp, DenseJacobian
+     NewtonSolver, BalanceComp
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -55,7 +55,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
-        g1._linearize()
+        g1._linearize(g1._assembled_jac)
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
@@ -167,8 +167,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver()
-        teg.jacobian = DenseJacobian()
+        teg.linear_solver = DirectSolver(assemble_jac=True)
+        teg.options['assembled_jac_type'] = 'dense'
 
         teg.nonlinear_solver = NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True

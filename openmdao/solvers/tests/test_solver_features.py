@@ -26,8 +26,7 @@ class TestSolverFeatures(unittest.TestCase):
         model.nonlinear_solver = newton = NewtonSolver()
 
         # using a different linear solver for Newton with a looser tolerance
-        newton.linear_solver = ScipyKrylov()
-        newton.linear_solver.options['atol'] = 1e-4
+        newton.linear_solver = ScipyKrylov(atol=1e-4)
 
         # used for analytic derivatives
         model.linear_solver = DirectSolver()
@@ -55,8 +54,7 @@ class TestSolverFeatures(unittest.TestCase):
         g2.linear_solver = DirectSolver()
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.nonlinear_solver.options['rtol'] = 1.0e-5
+        model.nonlinear_solver = NonlinearBlockGS(rtol=1.0e-5)
         model.linear_solver = ScipyKrylov()
         model.linear_solver.precon = LinearBlockGS()
 

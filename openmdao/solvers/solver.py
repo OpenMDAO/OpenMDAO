@@ -14,13 +14,15 @@ import numpy as np
 from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
+
+_emptyset = set()
 
 
 class SolverInfo(object):
@@ -210,6 +212,13 @@ class Solver(object):
 
         self.cite = ""
 
+    def _assembled_jac_solver_iter(self):
+        """
+        Return an empty generator of lin solvers using assembled jacs.
+        """
+        for i in ():
+            yield
+
     def add_recorder(self, recorder):
         """
         Add a recorder to the driver's RecordingManager.
@@ -258,8 +267,7 @@ class Solver(object):
             else:  # it's a LinearSolver
                 residuals = self._system._vectors['residual']['linear']
 
-            myresiduals = {n for n in residuals._names
-                           if check_path(n, incl, excl)}
+            myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_outputs']:
             if isinstance(self, NonlinearSolver):
@@ -275,8 +283,7 @@ class Solver(object):
             else:
                 inputs = self._system._vectors['input']['linear']
 
-            myinputs = {n for n in inputs._names
-                        if check_path(n, incl, excl)}
+            myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
             'in': myinputs,
@@ -699,6 +706,8 @@ class LinearSolver(Solver):
     ----------
     _rel_systems : set of str
         Names of systems relevant to the current solve.
+    _assembled_jac : AssembledJacobian or None
+        If not None, the AssembledJacobian instance used by this solver.
     """
 
     def __init__(self, **kwargs):
@@ -710,8 +719,25 @@ class LinearSolver(Solver):
         **kwargs : dict
             options dictionary.
         """
-        super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
+        self._assembled_jac = None
+        super(LinearSolver, self).__init__(**kwargs)
+
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.options['assemble_jac']:
+            yield self
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('assemble_jac', default=False, types=bool,
+                             desc='Activates use of assembled jacobian by this solver.')
+
+        self.supports.declare('assembled_jac', types=bool, default=True)
 
     def _setup_solvers(self, system, depth):
         """
@@ -733,7 +759,13 @@ class LinearSolver(Solver):
 
         self._rhs_vecs = {}
         for vec_name in self._system._rel_vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            self._rhs_vecs[vec_name] = rhs = {}
+            for varset, data in iteritems(b_vecs[vec_name]._data):
+                rhs[varset] = data.copy()
+
+        if self.options['assemble_jac'] and not self.supports['assembled_jac']:
+            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
+                               "jacobians." % (self.SOLVER, self._system.pathname))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -781,7 +813,9 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name].set_vec(b_vecs[vec_name])
+            rhs = self._rhs_vecs[vec_name]
+            for varset, data in iteritems(b_vecs[vec_name]._data):
+                rhs[varset][:] = data
 
         if self.options['maxiter'] > 1:
             self._run_apply()
@@ -799,7 +833,8 @@ class LinearSolver(Solver):
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems, self._mode,
+                             scope_out, scope_in)
 
         recording_iteration.stack.pop()
 
@@ -821,9 +856,11 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
+            rhs = self._rhs_vecs[vec_name]
             if vec_name in system._rel_vec_names:
                 b_vec = b_vecs[vec_name]
-                b_vec -= self._rhs_vecs[vec_name]
+                for varset, data in iteritems(rhs):
+                    b_vec._data[varset] -= data
                 norm += b_vec.get_norm()**2
 
         return norm ** 0.5
@@ -834,19 +871,9 @@ class BlockLinearSolver(LinearSolver):
     A base class for LinearBlockGS and LinearBlockJac.
     """
 
-    def _iter_initialize(self):
+    def _declare_options(self):
         """
-        Perform any necessary pre-processing operations.
-
-        Returns
-        -------
-        float
-            initial error.
-        float
-            error at the first iteration.
+        Declare options before kwargs are processed in the init method.
         """
-        if isinstance(self._system._jacobian, AssembledJacobian):
-            raise RuntimeError("A block linear solver '%s' is being used with "
-                               "an AssembledJacobian in system '%s'" %
-                               (self.SOLVER, self._system.pathname))
-        return super(BlockLinearSolver, self)._iter_initialize()
+        super(BlockLinearSolver, self)._declare_options()
+        self.supports['assembled_jac'] = False

@@ -30,11 +30,16 @@ class Jacobian(object):
         can assign a jacobian with less rows or columns than the variable sizes.
     """
 
-    def __init__(self):
+    def __init__(self, system=None):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
-        self._system = None
+        self._system = system
         self._subjacs = OrderedDict()
         self._subjacs_info = OrderedDict()
         self._override_checks = False

@@ -33,7 +33,7 @@ _registered = False  # prevents multiple atexit registrations
 _printer = None
 
 MAXLINE = 80
-tab = '    '
+tab = '   '
 time0 = None
 
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
@@ -42,6 +42,7 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
     """
     Print trace info, indenting based on call depth.
     """
+    global _printer
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
@@ -49,7 +50,10 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
                 f = cStringIO()
-                _indented_print(f_locals, d[name], 0, file=f)
+                save = _printer
+                _printer = _get_printer(f)
+                _indented_print(f_locals, d[name], 0)
+                _printer = save
                 s = "  %s%s%s{%s}" % (sindent, name, sep, f.getvalue())
             else:
                 s = "  %s%s%s%s" % (sindent, name, sep, d[name])
@@ -118,7 +122,7 @@ def _trace_call(frame, arg, stack, context):
 
     indent = tab * (len(stack)-1)
     if verbose:
-        _printer("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _printer("%s--> %s (%d)" % (indent, fullname, method_counts[fullname]))
         _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     else:
         _printer("%s%s" % (indent, fullname))
@@ -209,10 +213,7 @@ def _setup(options):
         method_counts = defaultdict(int)
         class_counts = defaultdict(lambda: -1)
         id2count = {}
-        if verbose or memory or leaks:
-            do_ret = _trace_return
-        else:
-            do_ret = None
+        do_ret = _trace_return
 
         if memory:
             if psutil is None:

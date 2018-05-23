@@ -24,7 +24,7 @@ class TestOptionsDict(unittest.TestCase):
                           desc='This description is long and verbose, so it '
                                'takes up multiple lines in the options table.')
 
-        self.assertEqual(self.dict.__repr__(), self.dict._dict)
+        self.assertEqual(repr(self.dict), repr(self.dict._dict))
 
         self.assertEqual(self.dict.__str__(width=83), '\n'.join([
             "========= ============ ================= ===================== ====================",

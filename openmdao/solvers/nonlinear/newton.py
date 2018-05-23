@@ -114,6 +114,14 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.linear_solver is not None:
+            for s in self.linear_solver._assembled_jac_solver_iter():
+                yield s
+
     def _set_solver_print(self, level=2, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
@@ -231,7 +239,7 @@ class NewtonSolver(NonlinearSolver):
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
-        system._linearize()
+        system._linearize(self.linear_solver._assembled_jac)
 
         self.linear_solver.solve(['linear'], 'fwd')
 
