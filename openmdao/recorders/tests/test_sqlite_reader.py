@@ -32,7 +32,7 @@ if OPTIMIZER:
 
 class SellarProblem(Problem):
     """
-    The Sellar problem with configurable model and driver.
+    The Sellar problem with configurable model class.
     """
     def __init__(self, model_class=SellarDerivatives, **kwargs):
         super(SellarProblem, self).__init__(model_class(**kwargs))
@@ -45,30 +45,6 @@ class SellarProblem(Problem):
 
 
 class TestSqliteCaseReader(unittest.TestCase):
-
-    def setup_sellar_model_with_units(self):
-        self.prob = Problem()
-
-        model = self.prob.model = Group()
-        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m', lower=-1000, upper=1000), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                            z=np.array([0.0, 0.0]), x={'value': 0.0, 'units': 'm'},
-                            y1={'units': 'm'}, y2={'units': 'cm'}),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-        self.prob.model.nonlinear_solver = NonlinearBlockGS()
-        self.prob.model.linear_solver = LinearBlockGS()
-
-        self.prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        self.prob.model.add_design_var('x', lower=0.0, upper=10.0)
-        self.prob.model.add_objective('obj')
-        self.prob.model.add_constraint('con1', upper=0.0)
-        self.prob.model.add_constraint('con2', upper=0.0)
 
     def setUp(self):
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
@@ -266,12 +242,36 @@ class TestSqliteCaseReader(unittest.TestCase):
                              .format(i))
 
     def test_reading_metadata(self):
-        self.setup_sellar_model_with_units()
-        self.prob.driver.add_recorder(self.recorder)
+        prob = Problem()
+        model = prob.model
 
-        self.prob.setup()
-        self.prob.run_driver()
-        self.prob.cleanup()
+        # the Sellar problem but with units
+        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m', lower=-1000, upper=1000), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x={'value': 0.0, 'units': 'm'},
+                            y1={'units': 'm'}, y2={'units': 'cm'}),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = LinearBlockGS()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
 
         cr = CaseReader(self.filename)
 
