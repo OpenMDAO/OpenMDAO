@@ -4,6 +4,7 @@ from __future__ import print_function
 import errno
 import os
 import unittest
+import warnings
 from shutil import rmtree
 from tempfile import mkdtemp, mkstemp
 
@@ -1001,28 +1002,35 @@ class TestSqliteCaseReader(unittest.TestCase):
         _assert_model_matches_case(case, model)
 
     def test_system_options_pickle_fail(self):
-        self.setup_sellar_model()
-
-        d1 = self.prob.model.d1
+        # simple paraboloid model
+        model = Group()
+        ivc = IndepVarComp()
+        ivc.add_output('x', 3.0)
+        model.add_subsystem('subs', ivc)
+        subs = model.subs
 
         # declare two options
-        d1.options.declare('options value 1', 1)
+        subs.options.declare('options value 1', 1)
         # Given object which can't be pickled
-        d1.options.declare('options value to fail', (i for i in []))
+        subs.options.declare('options value to fail', (i for i in []))
+        subs.add_recorder(self.recorder)
 
-        # create recorder and attach to d1
-        d1.add_recorder(self.recorder)
+        prob = Problem(model)
+        prob.setup()
 
-        self.prob.setup(check=False)
-        self.prob.run_driver()
-        self.prob.cleanup()
+        with warnings.catch_warnings(record=True) as w:
+            prob.run_model()
 
+        prob.cleanup()
         cr = CaseReader(self.filename)
-
-        d1_options = cr.system_metadata['d1']['component_options']
+        subs_options = cr.system_metadata['subs']['component_options']
 
         # no options should have been recorded for d1
-        self.assertEqual(len(d1_options._dict), 0)
+        self.assertEqual(len(subs_options._dict), 0)
+
+        # make sure we got the warning we expected
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
 
 
 def _assert_model_matches_case(case, system):
