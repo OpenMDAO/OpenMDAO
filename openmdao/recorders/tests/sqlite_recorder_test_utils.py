@@ -104,7 +104,8 @@ def assertSystemIterationDataRecorded(test, expected, tolerance):
                            "iteration_coordinate=:iteration_coordinate",
                            {"iteration_coordinate": iter_coord})
             row_actual = db_cur.fetchone()
-            test.assertTrue(row_actual, 'System iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
+            test.assertTrue(row_actual, 'System iterations table does not contain the requested '
+                                        'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
                 outputs_blob, residuals_blob = row_actual
@@ -155,7 +156,8 @@ def assertSolverIterationDataRecorded(test, expected, tolerance):
             db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
                            {"iteration_coordinate": iter_coord})
             row_actual = db_cur.fetchone()
-            test.assertTrue(row_actual, 'Solver iterations table does not contain the requested iteration coordinate: "{}"'.format(iter_coord))
+            test.assertTrue(row_actual, 'Solver iterations table does not contain the requested '
+                                        'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
                 input_blob, output_blob, residuals_blob = row_actual

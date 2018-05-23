@@ -67,104 +67,48 @@ class TestSqliteRecorder(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
-    def setup_sellar_model(self):
-        self.prob = Problem()
-
-        model = self.prob.model
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                            z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = LinearBlockGS()
-
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-    def setup_sellar_grouped_model(self):
-        self.prob = Problem()
-
-        model = self.prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        mda = model.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.linear_solver = ScipyKrylov()
-        mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                            z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        mda.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyKrylov()
-
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
     def test_only_desvars_recorded(self):
+        prob = SellarProblem()
 
-        self.setup_sellar_model()
+        driver = prob.driver
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['includes'] = []
+        driver.add_recorder(self.recorder)
 
-        self.prob.driver.recording_options['record_desvars'] = True
-        self.prob.driver.recording_options['record_responses'] = False
-        self.prob.driver.recording_options['record_objectives'] = False
-        self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['includes'] = []
-        self.prob.driver.add_recorder(self.recorder)
+        prob.setup()
 
-        self.prob.setup()
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
-
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
 
-        assertDriverIterationDataRecorded(self,
-                                          ((coordinate, (t0, t1), expected_outputs, None),),
-                                          self.eps)
+        assertDriverIterationDataRecorded(self, expected_data, self.eps)
 
     def test_add_recorder_after_setup(self):
+        prob = SellarProblem()
 
-        self.setup_sellar_model()
+        driver = prob.driver
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['includes'] = []
 
-        self.prob.driver.recording_options['record_desvars'] = True
-        self.prob.driver.recording_options['record_responses'] = False
-        self.prob.driver.recording_options['record_objectives'] = False
-        self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['includes'] = []
+        prob.setup()
 
-        self.prob.setup()
+        driver.add_recorder(self.recorder)
 
-        self.prob.driver.add_recorder(self.recorder)
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
-
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
         assertDriverIterationDataRecorded(self,
@@ -172,20 +116,21 @@ class TestSqliteRecorder(unittest.TestCase):
                                           self.eps)
 
     def test_only_objectives_recorded(self):
+        prob = SellarProblem()
 
-        self.setup_sellar_model()
+        driver = prob.driver
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['includes'] = []
+        driver.add_recorder(self.recorder)
 
-        self.prob.driver.recording_options['record_desvars'] = False
-        self.prob.driver.recording_options['record_responses'] = False
-        self.prob.driver.recording_options['record_objectives'] = True
-        self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['includes'] = []
-        self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup()
+        prob.setup()
 
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
 
@@ -198,20 +143,21 @@ class TestSqliteRecorder(unittest.TestCase):
                                           self.eps)
 
     def test_only_constraints_recorded(self):
+        prob = SellarProblem()
 
-        self.setup_sellar_model()
+        driver = prob.driver
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['includes'] = []
+        driver.add_recorder(self.recorder)
 
-        self.prob.driver.recording_options['record_desvars'] = False
-        self.prob.driver.recording_options['record_responses'] = False
-        self.prob.driver.recording_options['record_objectives'] = False
-        self.prob.driver.recording_options['record_constraints'] = True
-        self.prob.driver.recording_options['includes'] = []
-        self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup()
+        prob.setup()
 
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, )]
 
@@ -229,7 +175,6 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_simple_driver_recording(self):
-
         prob = Problem()
         model = prob.model
 
@@ -332,17 +277,19 @@ class TestSqliteRecorder(unittest.TestCase):
                                           self.eps)
 
     def test_driver_records_metadata(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
 
-        self.prob.driver.recording_options['includes'] = ["p1.x"]
-        self.prob.driver.recording_options['record_metadata'] = True
-        self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup()
+        driver = prob.driver
+        driver.recording_options['includes'] = ["p1.x"]
+        driver.recording_options['record_metadata'] = True
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
 
         # Conclude setup but don't run model.
-        self.prob.final_setup()
+        prob.final_setup()
 
-        self.prob.cleanup()
+        prob.cleanup()
 
         prom2abs = {
             'input': {
@@ -396,58 +343,60 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverMetadataRecorded(self, expected_driver_metadata)
 
     def test_driver_without_n2_data(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
 
-        self.prob.driver.recording_options['record_n2_data'] = False
-        self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup()
-        self.prob.final_setup()
-        self.prob.cleanup()
+        prob.driver.recording_options['record_n2_data'] = False
+        prob.driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.final_setup()
+        prob.cleanup()
 
         assertDriverMetadataRecorded(self, None, True)
 
     def test_driver_doesnt_record_metadata(self):
+        prob = SellarProblem()
 
-        self.setup_sellar_model()
+        prob.driver.recording_options['record_metadata'] = False
+        prob.driver.add_recorder(self.recorder)
 
-        self.prob.driver.recording_options['record_metadata'] = False
-        self.prob.driver.add_recorder(self.recorder)
-        self.prob.setup()
-        self.prob.final_setup()
-        self.prob.cleanup()
+        prob.setup()
+        prob.final_setup()
+        prob.cleanup()
 
         assertDriverMetadataRecorded(self, None)
 
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
     @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_system(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
 
-        self.prob.model.recording_options['record_inputs'] = True
-        self.prob.model.recording_options['record_outputs'] = True
-        self.prob.model.recording_options['record_residuals'] = True
-        self.prob.model.recording_options['record_metadata'] = True
-        self.prob.model.add_recorder(self.recorder)
+        model = prob.model
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+        model.recording_options['record_metadata'] = True
+        model.add_recorder(self.recorder)
 
-        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
+        prob.setup()
+
+        d1 = model.d1  # instance of SellarDis1withDerivatives, a Group
         d1.recording_options['record_inputs'] = True
         d1.recording_options['record_outputs'] = True
         d1.recording_options['record_residuals'] = True
         d1.recording_options['record_metadata'] = True
         d1.add_recorder(self.recorder)
 
-        obj_cmp = self.prob.model.obj_cmp  # an ExecComp
+        obj_cmp = model.obj_cmp  # an ExecComp
         obj_cmp.recording_options['record_inputs'] = True
         obj_cmp.recording_options['record_outputs'] = True
         obj_cmp.recording_options['record_residuals'] = True
         obj_cmp.recording_options['record_metadata'] = True
         obj_cmp.add_recorder(self.recorder)
 
-        self.prob.setup()
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
                       'NonlinearBlockGS', (6, ), 'd1._solve_nonlinear', (6, )]
@@ -479,29 +428,28 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_includes(self):
         prob = Problem()
-        model = prob.model
 
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
 
-        prob.driver = pyOptSparseDriver()
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
-        prob.driver.recording_options['record_objectives'] = True
-        prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = ['*']
-        prob.driver.recording_options['excludes'] = ['p2*']
-
-        prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.opt_settings['ACC'] = 1e-9
-
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['includes'] = ['*']
+        driver.recording_options['excludes'] = ['p2*']
+        driver.add_recorder(self.recorder)
 
         prob.setup()
 
@@ -536,34 +484,33 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_includes_post_setup(self):
-
         prob = Problem()
-        model = prob.model
 
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = OPTIMIZER
-        prob.driver.opt_settings['ACC'] = 1e-9
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+
         prob.setup()
 
         # Set up recorder after intitial setup.
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
-        prob.driver.recording_options['record_objectives'] = True
-        prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = ['*']
-        prob.driver.recording_options['excludes'] = ['p2*']
+        driver.add_recorder(self.recorder)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['includes'] = ['*']
+        driver.recording_options['excludes'] = ['p2*']
 
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
@@ -593,40 +540,38 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_record_system_with_hierarchy(self):
-        self.setup_sellar_grouped_model()
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
-        self.prob.driver = pyOptSparseDriver()
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
 
-        self.prob.model.recording_options['record_inputs'] = True
-        self.prob.model.recording_options['record_outputs'] = True
-        self.prob.model.recording_options['record_residuals'] = True
-        self.prob.model.recording_options['record_metadata'] = True
+        model = prob.model
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+        model.recording_options['record_metadata'] = True
+        model.add_recorder(self.recorder)
 
-        self.prob.model.add_recorder(self.recorder)
+        prob.setup(mode='rev')
 
-        pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
+        pz = model.pz  # IndepVarComp which is an ExplicitComponent
         pz.recording_options['record_inputs'] = True
         pz.recording_options['record_outputs'] = True
         pz.recording_options['record_residuals'] = True
         pz.recording_options['record_metadata'] = True
         pz.add_recorder(self.recorder)
 
-        mda = self.prob.model.mda  # Group
-        d1 = mda.d1
+        d1 = model.mda.d1
         d1.recording_options['record_inputs'] = True
         d1.recording_options['record_outputs'] = True
         d1.recording_options['record_residuals'] = True
         d1.recording_options['record_metadata'] = True
         d1.add_recorder(self.recorder)
 
-        self.prob.setup(check=False, mode='rev')
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (0, ), 'NonlinearBlockGS', (4,), 'mda.d1._solve_nonlinear', (4, )]
@@ -653,24 +598,22 @@ class TestSqliteRecorder(unittest.TestCase):
             ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals), ), self.eps)
 
     def test_record_solver(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        solver = self.prob.model._nonlinear_solver
-        solver.recording_options['record_abs_error'] = True
-        solver.recording_options['record_rel_error'] = True
-        solver.recording_options['record_solver_residuals'] = True
-        solver.add_recorder(self.recorder)
+        nl = prob.model.nonlinear_solver
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+        nl.add_recorder(self.recorder)
 
-        self.prob.setup()
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
         expected_abs_error = 1.318802844707e-10
-
         expected_rel_error = 3.62990740e-12
 
         expected_solver_output = {
@@ -698,25 +641,23 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_line_search_armijo_goldstein(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        model = self.prob.model
-        model.nonlinear_solver = NewtonSolver()
+        model = prob.model
         model.linear_solver = ScipyKrylov()
 
-        model._nonlinear_solver.options['solve_subsystems'] = True
-        model._nonlinear_solver.options['max_sub_solves'] = 4
-        ls = model._nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        nl = model.nonlinear_solver = NewtonSolver()
+        nl.options['solve_subsystems'] = True
+        nl.options['max_sub_solves'] = 4
 
-        # This is pretty bogus, but it ensures that we get a few LS iterations.
-        ls.options['c'] = 100.0
+        ls = nl.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['c'] = 100.0  # This is pretty bogus, but it ensures that we get a few LS iterations.
         ls.add_recorder(self.recorder)
 
-        self.prob.setup()
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
         expected_abs_error = 3.49773898733e-9
@@ -738,23 +679,22 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_line_search_bounds_enforce(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        model = self.prob.model
-        model.nonlinear_solver = NewtonSolver()
+        model = prob.model
         model.linear_solver = ScipyKrylov()
 
-        model.nonlinear_solver.options['solve_subsystems'] = True
-        model.nonlinear_solver.options['max_sub_solves'] = 4
-        ls = model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        nl = model.nonlinear_solver = NewtonSolver()
+        nl.options['solve_subsystems'] = True
+        nl.options['max_sub_solves'] = 4
 
+        ls = nl.linesearch = BoundsEnforceLS(bound_enforcement='vector')
         ls.add_recorder(self.recorder)
 
-        self.prob.setup()
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (1,), 'BoundsEnforceLS', (0,)]
         expected_abs_error = 7.02783609310096e-10
@@ -769,26 +709,20 @@ class TestSqliteRecorder(unittest.TestCase):
             "px.x": [1.0]
         }
         expected_solver_residuals = None
-
-        assertSolverIterationDataRecorded(self,
-            ((coordinate, (t0, t1), expected_abs_error,
-             expected_rel_error, expected_solver_output,
-             expected_solver_residuals),), self.eps)
+        expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                                 expected_solver_output, expected_solver_residuals),)
+        assertSolverIterationDataRecorded(self, expected_solver_data, self.eps)
 
     def test_record_solver_nonlinear_block_gs(self):
-        self.setup_sellar_model()
+        prob = SellarProblem(linear_solver=LinearBlockGS, nonlinear_solver=NonlinearBlockGS)
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NonlinearBlockGS()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        nonlinear_solver.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.recording_options['record_solver_residuals'] = True
 
-        nonlinear_solver.recording_options['record_solver_residuals'] = True
+        t0, t1 = run_driver(prob)
 
-        self.prob.setup()
-
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockGS', (6, )]
         expected_abs_error = 1.31880284470753394998e-10
@@ -820,16 +754,14 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_block_jac(self):
-        self.setup_sellar_model()
+        prob = SellarProblem(linear_solver=LinearBlockGS, nonlinear_solver=NonlinearBlockJac)
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NonlinearBlockJac()
-        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.setup()
+        t0, t1 = run_driver(prob)
 
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockJac', (9,)]
 
@@ -852,16 +784,13 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_newton(self):
-        self.setup_sellar_model()
+        prob = SellarProblem(linear_solver=LinearBlockGS, nonlinear_solver=NewtonSolver)
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.setup()
-
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,)]
 
@@ -884,16 +813,17 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_nonlinear_run_once(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NonlinearRunOnce()
-        self.prob.model.nonlinear_solver.add_recorder(self.recorder)
+        model = prob.model
 
-        self.prob.setup()
+        model.nonlinear_solver = NonlinearRunOnce()
+        model.nonlinear_solver.add_recorder(self.recorder)
 
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
-        self.prob.cleanup()
+        prob.cleanup()
 
         # No norms so no expected norms
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NLRunOnce', (0,)]
@@ -916,21 +846,18 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_direct_solver(self):
+        prob = SellarProblem()
+        prob.setup()
 
-        self.setup_sellar_model()
+        nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        # used for analytic derivatives
-        nonlinear_solver.linear_solver = DirectSolver()
+        ln = nl.linear_solver = DirectSolver()  # used for analytic derivatives
+        ln.recording_options['record_abs_error'] = True
+        ln.recording_options['record_rel_error'] = True
+        ln.recording_options['record_solver_residuals'] = True
+        ln.add_recorder(self.recorder)
 
-        nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
-        nonlinear_solver.linear_solver.add_recorder(self.recorder)
-
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
         # No norms so no expected norms
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'DirectSolver', (0,)]
@@ -964,20 +891,18 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_scipy_iterative_solver(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        # used for analytic derivatives
-        nonlinear_solver.linear_solver = ScipyKrylov()
+        nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
-        nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        ln = nl.linear_solver = ScipyKrylov()  # used for analytic derivatives
+        ln.recording_options['record_abs_error'] = True
+        ln.recording_options['record_rel_error'] = True
+        ln.recording_options['record_solver_residuals'] = True
+        ln.add_recorder(self.recorder)
 
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyKrylov', (1,)]
         expected_abs_error = 0.0
@@ -1011,20 +936,18 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
     @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_solver_linear_petsc_ksp(self):
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        # used for analytic derivatives
-        nonlinear_solver.linear_solver = PETScKrylov()
+        nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
-        nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        ln = nl.linear_solver = PETScKrylov()  # used for analytic derivatives
+        ln.recording_options['record_abs_error'] = True
+        ln.recording_options['record_rel_error'] = True
+        ln.recording_options['record_solver_residuals'] = True
+        ln.add_recorder(self.recorder)
 
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PETScKrylov', (3,)]
         expected_abs_error = 0.0
@@ -1055,22 +978,18 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_gs(self):
+        prob = SellarProblem()
+        prob.setup()
 
-        # raise unittest.SkipTest("Linear Solver recording not working yet")
-        self.setup_sellar_model()
+        nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        # used for analytic derivatives
-        nonlinear_solver.linear_solver = LinearBlockGS()
+        ln = nl.linear_solver = LinearBlockGS()  # used for analytic derivatives
+        ln.recording_options['record_abs_error'] = True
+        ln.recording_options['record_rel_error'] = True
+        ln.recording_options['record_solver_residuals'] = True
+        ln.add_recorder(self.recorder)
 
-        nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
-        nonlinear_solver.linear_solver.add_recorder(self.recorder)
-
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
         expected_abs_error = 9.109083208861876e-11
@@ -1102,22 +1021,18 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_linear_run_once(self):
+        prob = SellarProblem()
+        prob.setup()
 
-        # raise unittest.SkipTest("Linear Solver recording not working yet")
-        self.setup_sellar_model()
+        nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        # used for analytic derivatives
-        nonlinear_solver.linear_solver = LinearRunOnce()
+        ln = nl.linear_solver = LinearRunOnce() # used for analytic derivatives
+        ln.recording_options['record_abs_error'] = True
+        ln.recording_options['record_rel_error'] = True
+        ln.recording_options['record_solver_residuals'] = True
+        ln.add_recorder(self.recorder)
 
-        nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
-        nonlinear_solver.linear_solver.add_recorder(self.recorder)
-
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (0,)]
         expected_abs_error = None
@@ -1149,21 +1064,18 @@ class TestSqliteRecorder(unittest.TestCase):
              expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_jac(self):
-        # raise unittest.SkipTest("Linear Solver recording not working yet")
-        self.setup_sellar_model()
+        prob = SellarProblem()
+        prob.setup()
 
-        self.prob.model.nonlinear_solver = NewtonSolver()
-        nonlinear_solver = self.prob.model.nonlinear_solver
-        # used for analytic derivatives
-        nonlinear_solver.linear_solver = LinearBlockJac()
+        nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        nonlinear_solver.linear_solver.recording_options['record_abs_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_rel_error'] = True
-        nonlinear_solver.linear_solver.recording_options['record_solver_residuals'] = True
-        nonlinear_solver.linear_solver.add_recorder(self.recorder)
+        ln = nl.linear_solver = LinearBlockJac() # used for analytic derivatives
+        ln.recording_options['record_abs_error'] = True
+        ln.recording_options['record_rel_error'] = True
+        ln.recording_options['record_solver_residuals'] = True
+        ln.add_recorder(self.recorder)
 
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
+        t0, t1 = run_driver(prob)
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
         expected_abs_error = 9.947388408259769e-11
@@ -1197,81 +1109,93 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_record_driver_system_solver(self):
-        # Test what happens when all three types are recorded:
-        #    Driver, System, and Solver
+        # Test what happens when all three types are recorded: Driver, System, and Solver
 
-        self.setup_sellar_grouped_model()
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        prob.setup(mode='rev')
 
-        self.prob.driver = pyOptSparseDriver()
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-        self.prob.driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
 
+        #
         # Add recorders
+        #
+
         # Driver
-        self.prob.driver.recording_options['includes'] = []
-        self.prob.driver.recording_options['record_metadata'] = True
-        self.prob.driver.recording_options['record_desvars'] = True
-        self.prob.driver.recording_options['record_responses'] = True
-        self.prob.driver.recording_options['record_objectives'] = True
-        self.prob.driver.recording_options['record_constraints'] = True
-        self.prob.driver.add_recorder(self.recorder)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_metadata'] = True
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.add_recorder(self.recorder)
+
         # System
-        pz = self.prob.model.pz  # IndepVarComp which is an ExplicitComponent
+        pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
         pz.recording_options['record_metadata'] = True
         pz.recording_options['record_inputs'] = True
         pz.recording_options['record_outputs'] = True
         pz.recording_options['record_residuals'] = True
         pz.add_recorder(self.recorder)
+
         # Solver
-        mda = self.prob.model.mda
-        mda.nonlinear_solver.recording_options['record_metadata'] = True
-        mda.nonlinear_solver.recording_options['record_abs_error'] = True
-        mda.nonlinear_solver.recording_options['record_rel_error'] = True
-        mda.nonlinear_solver.recording_options['record_solver_residuals'] = True
-        mda.nonlinear_solver.add_recorder(self.recorder)
+        nl = prob.model.mda.nonlinear_solver = NonlinearBlockGS()
+        nl.recording_options['record_metadata'] = True
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+        nl.add_recorder(self.recorder)
 
-        self.prob.setup(check=False, mode='rev')
-        t0, t1 = run_driver(self.prob)
-        self.prob.cleanup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
 
+        #
         # Driver recording test
+        #
         coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
-            "pz.z": self.prob['pz.z'],
-            "px.x": self.prob['px.x']
+            "pz.z": prob['pz.z'],
+            "px.x": prob['px.x']
         }
         expected_objectives = {
-            "obj_cmp.obj": self.prob['obj_cmp.obj']
+            "obj_cmp.obj": prob['obj_cmp.obj']
         }
         expected_constraints = {
-            "con_cmp1.con1": self.prob['con_cmp1.con1'],
-            "con_cmp2.con2": self.prob['con_cmp2.con2']
+            "con_cmp1.con1": prob['con_cmp1.con1'],
+            "con_cmp2.con2": prob['con_cmp2.con2']
         }
 
         expected_outputs = expected_desvars
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
 
-        assertDriverIterationDataRecorded(self,
-            ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
+        expected_driver_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        assertDriverIterationDataRecorded(self, expected_driver_data, self.eps)
 
+        #
         # System recording test
+        #
         coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (1, )]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
         expected_residuals = {"pz.z": [0.0, 0.0], }
-        assertSystemIterationDataRecorded(self,
-            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals), ), self.eps)
 
+        expected_system_data = (
+            (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
+        )
+        assertSystemIterationDataRecorded(self, expected_system_data, self.eps)
+
+        #
         # Solver recording test
+        #
         coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (5, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (5, ), 'NonlinearBlockGS', (3, )]
 
         expected_abs_error = 0.0,
-
         expected_rel_error = 0.0,
 
         expected_solver_output = {
@@ -1284,36 +1208,30 @@ class TestSqliteRecorder(unittest.TestCase):
             "mda.d1.y1": [0.0],
         }
 
-        assertSolverIterationDataRecorded(self,
-            ((coordinate, (t0, t1), expected_abs_error,
-             expected_rel_error, expected_solver_output,
-             expected_solver_residuals),), self.eps)
+        expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                                 expected_solver_output, expected_solver_residuals),)
+        assertSolverIterationDataRecorded(self, expected_solver_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_global_counter(self):
-
         # The case recorder maintains a global counter across all recordings
 
-        self.setup_sellar_grouped_model()
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        prob.setup(mode='rev')
 
-        self.prob.driver = pyOptSparseDriver()
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-2  # to speed the test up
-            self.prob.driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-2  # to speed the test up
+        driver.opt_settings['ACC'] = 1e-9
 
         # Add recorders for Driver, System, Solver
-        self.prob.driver.add_recorder(self.recorder)
+        driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
+        prob.model.mda.nonlinear_solver.add_recorder(self.recorder)
 
-        self.prob.model.add_recorder(self.recorder)
-
-        mda = self.prob.model.mda
-        mda.nonlinear_solver.add_recorder(self.recorder)
-
-        self.prob.setup(check=False, mode='rev')
-        t0, t1 = run_driver(self.prob)
-        self.prob.cleanup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
 
         # get global counter values from driver, system, and solver recording
         con = sqlite3.connect(self.filename)
@@ -1358,9 +1276,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob['comp1.c'] = 3.
 
         comp2 = prob.model.comp2  # ImplicitComponent
-
         comp2.recording_options['record_metadata'] = False
-
         comp2.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
@@ -1422,29 +1338,20 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_record_system_recursively(self):
-        # Test adding recorders to all Systems using the recurse option
-        #    to add_recorder
+        # Test adding recorders to all Systems using the recurse option to add_recorder
 
-        self.setup_sellar_grouped_model()
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
-        self.prob.driver = pyOptSparseDriver()
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-        self.prob.driver.opt_settings['ACC'] = 1e-9
-
-        # self.recorder.options['record_metadata'] = True
-        #
-        # # Add recorder to model and all subsystems
-        # self.recorder.options['record_inputs'] = True
-        # self.recorder.options['record_outputs'] = True
-        # self.recorder.options['record_residuals'] = True
-
-        self.prob.setup(check=False, mode='rev')
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
 
         # Need to do recursive adding of recorders AFTER setup
-        self.prob.model.add_recorder(self.recorder, recurse=True)
+        prob.setup(mode='rev')
+        prob.model.add_recorder(self.recorder, recurse=True)
 
-        t0, t1 = run_driver(self.prob)
-        self.prob.cleanup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
         assertSystemMetadataIdsRecorded(self, [
@@ -1475,50 +1382,44 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_driver_recording_with_system_vars(self):
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
-        self.setup_sellar_grouped_model()
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
 
-        self.prob.driver = pyOptSparseDriver()
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-        if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-9
+        driver.add_recorder(self.recorder)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_inputs'] = False
+        driver.recording_options['includes'] = ['mda.d2.y2',]
 
-        self.prob.driver.add_recorder(self.recorder)
-        self.prob.driver.recording_options['record_desvars'] = True
-        self.prob.driver.recording_options['record_responses'] = True
-        self.prob.driver.recording_options['record_objectives'] = True
-        self.prob.driver.recording_options['record_constraints'] = True
-        self.prob.driver.recording_options['record_inputs'] = False
-        self.prob.driver.recording_options['includes'] = ['mda.d2.y2',]
+        prob.setup()
 
-        # self.prob.driver.options['optimizer'] = OPTIMIZER
-        # if OPTIMIZER == 'SLSQP':
-        #     self.prob.driver.opt_settings['ACC'] = 1e-9
+        t0, t1 = run_driver(prob)
 
-        self.prob.setup()
-
-        t0, t1 = run_driver(self.prob)
-
-        self.prob.cleanup()
+        prob.cleanup()
 
         # Driver recording test
         coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
-            "pz.z": self.prob['pz.z'],
-            "px.x": self.prob['px.x']
+            "pz.z": prob['pz.z'],
+            "px.x": prob['px.x']
         }
         expected_objectives = {
-            "obj_cmp.obj": self.prob['obj_cmp.obj']
+            "obj_cmp.obj": prob['obj_cmp.obj']
         }
 
         expected_constraints = {
-            "con_cmp1.con1": self.prob['con_cmp1.con1'],
-            "con_cmp2.con2": self.prob['con_cmp2.con2']
+            "con_cmp1.con1": prob['con_cmp1.con1'],
+            "con_cmp2.con2": prob['con_cmp2.con2']
         }
 
         expected_sysincludes = {
-            'mda.d2.y2': self.prob['mda.d2.y2']
+            'mda.d2.y2': prob['mda.d2.y2']
         }
 
         expected_outputs = expected_desvars
@@ -1530,35 +1431,37 @@ class TestSqliteRecorder(unittest.TestCase):
             ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 
     def test_recorder_file_already_exists_no_append(self):
+        prob = SellarProblem()
+        driver = prob.driver
 
-        self.setup_sellar_model()
+        driver.recording_options['record_metadata'] = True
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['includes'] = []
+        driver.add_recorder(self.recorder)
 
-        self.prob.driver.recording_options['record_metadata'] = True
-        self.prob.driver.recording_options['record_desvars'] = True
-        self.prob.driver.recording_options['record_responses'] = False
-        self.prob.driver.recording_options['record_objectives'] = False
-        self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['includes'] = []
-        self.prob.driver.add_recorder(self.recorder)
-
-        self.prob.setup()
-        self.prob.run_driver()
-        self.prob.cleanup()
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
 
         # Open up a new instance of the recorder but with the same filename
-        self.setup_sellar_model()
-        recorder = SqliteRecorder(self.filename)
-        self.prob.driver.add_recorder(recorder)
-        self.prob.driver.recording_options['record_metadata'] = True
-        self.prob.driver.recording_options['record_desvars'] = True
-        self.prob.driver.recording_options['record_responses'] = False
-        self.prob.driver.recording_options['record_objectives'] = False
-        self.prob.driver.recording_options['record_constraints'] = False
-        self.prob.driver.recording_options['includes'] = []
+        prob = SellarProblem()
+        driver = prob.driver
 
-        self.prob.setup()
-        t0, t1 = run_driver(self.prob)
-        self.prob.cleanup()
+        recorder = SqliteRecorder(self.filename)
+        driver.add_recorder(recorder)
+        driver.recording_options['record_metadata'] = True
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['includes'] = []
+
+        prob.setup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
 
         # Do a simple test to see if recording second time was OK
         coordinate = [0, 'Driver', (0, )]
