@@ -789,26 +789,14 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(iter_count_before, iter_count_after + 1)
 
     def test_load_solver_cases(self):
-        prob = Problem()
+        prob = SellarProblem()
+        prob.setup()
+
         model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.linear_solver = LinearBlockGS()
         model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = LinearBlockGS()
         model.linear_solver.add_recorder(self.recorder)
 
-        prob.set_solver_print(0)
-
-        prob.setup()
         prob.run_model()
         prob.cleanup()
 
@@ -816,11 +804,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         case = cr.solver_cases.get_case(0)
 
         # Add one to all the inputs just to change the model
-        #   so we can see if loading the case values really changes the model
+        # so we can see if loading the case values really changes the model
         for name in prob.model._inputs:
-            prob.model._inputs[name] += 1.0
+            model._inputs[name] += 1.0
         for name in prob.model._outputs:
-            prob.model._outputs[name] += 1.0
+            model._outputs[name] += 1.0
 
         # Now load in the case we recorded
         prob.load_case(case)
