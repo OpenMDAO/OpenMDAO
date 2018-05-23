@@ -23,6 +23,7 @@ from pyDOE2 import lhs
 from openmdao.core.driver import Driver
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.concurrent import concurrent_eval
+from openmdao.utils.mpi import MPI
 
 
 class SimpleGADriver(Driver):
@@ -31,6 +32,10 @@ class SimpleGADriver(Driver):
 
     Attributes
     ----------
+    _concurrent_pop_size : int
+        Number of points to run concurrently when model is a parallel one.
+    _concurrent_color : int
+        Color of current rank when running a parallel model.
     _desvar_idx : dict
         Keeps track of the indices for each desvar, since GeneticAlgorithm seess an array of
         design variables.
@@ -69,6 +74,10 @@ class SimpleGADriver(Driver):
         # random state can be set for predictability during testing
         self._randomstate = None
 
+        # Support for Parallel models.
+        self._concurrent_pop_size = 0
+        self._concurrent_color = 0
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -88,6 +97,8 @@ class SimpleGADriver(Driver):
                              'as four times the number of bits.')
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
+        self.options.declare('procs_per_model', default=1,
+                             desc='Number of processors to give each model under MPI.')
 
     def _setup_driver(self, problem):
         """
@@ -110,12 +121,55 @@ class SimpleGADriver(Driver):
             msg = 'SimpleGADriver currently does not support constraints.'
             raise RuntimeError(msg)
 
-        if self.options['run_parallel']:
+        model_mpi = None
+        if self._concurrent_pop_size > 0:
+            comm = self._problem.comm
+            model_mpi = (self._concurrent_pop_size, self._concurrent_color)
+        elif self.options['run_parallel']:
             comm = self._problem.comm
         else:
             comm = None
 
-        self._ga = GeneticAlgorithm(self.objective_callback, comm=comm)
+        self._ga = GeneticAlgorithm(self.objective_callback, comm=comm, model_mpi=model_mpi)
+
+    def _setup_comm(self, comm):
+        """
+        Perform any driver-specific setup of communicators for the model.
+
+        Here, we generate the model communicators.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem model.
+        """
+        procs_per_model = self.options['procs_per_model']
+        if MPI and procs_per_model > 1:
+
+            comm_size = comm.size
+            model_size = comm_size // procs_per_model
+            if comm_size != model_size * procs_per_model:
+                raise RuntimeError("The number of processors per model is not evenly divisable by "
+                                   "the specified number of parallel cases.\n Provide a "
+                                   "number of processors that is a multiple of %d, or "
+                                   "specify a number of parallel cases that divides "
+                                   "into %d." % (procs_per_model, comm_size))
+            color = comm.rank % model_size
+            model_comm = comm.Split(color)
+
+            # Everything we need to figure out which case to run.
+            self._concurrent_pop_size = model_size
+            self._concurrent_color = color
+
+            return model_comm
+
+        else:
+            return comm
 
     def run(self):
         """
@@ -256,13 +310,17 @@ class GeneticAlgorithm():
         Elitism flag.
     lchrom : int
         Chromosome length.
+    model_mpi : None or tuple
+        If the model in objfun is also parallel, then this will contain a tuple with the the
+        total number of population points to evaluate concurrently, and the color of the point
+        to evalutate on this rank.
     npop : int
         Population size.
     objfun : function
         Objective function callback.
     """
 
-    def __init__(self, objfun, comm=None):
+    def __init__(self, objfun, comm=None, model_mpi=None):
         """
         Initialize genetic algorithm object.
 
@@ -272,6 +330,10 @@ class GeneticAlgorithm():
             Objective callback function.
         comm : MPI communicator or None
             The MPI communicator that will be used objective evaluation for each generation.
+        model_mpi : None or tuple
+            If the model in objfun is also parallel, then this will contain a tuple with the the
+            total number of population points to evaluate concurrently, and the color of the point
+            to evalutate on this rank.
         """
         self.objfun = objfun
         self.comm = comm
@@ -279,6 +341,7 @@ class GeneticAlgorithm():
         self.lchrom = 0
         self.npop = 0
         self.elite = True
+        self.model_mpi = model_mpi
 
     def execute_ga(self, vlb, vub, bits, pop_size, max_gen, random_state):
         """
@@ -337,11 +400,12 @@ class GeneticAlgorithm():
                 # Parallel
                 cases = [((item, ii), None) for ii, item in enumerate(x_pop)]
 
-                results = concurrent_eval(self.objfun, cases, self.comm, allgather=True)
+                results = concurrent_eval(self.objfun, cases, self.comm, allgather=True,
+                                          model_mpi=self.model_mpi)
 
                 fitness[:] = np.inf
                 for result in results:
-                    returns, traceback = result
+                    returns, traceback, _ = result
 
                     if returns:
                         val, success, ii = returns

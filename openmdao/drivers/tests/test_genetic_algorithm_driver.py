@@ -4,7 +4,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, PETScVector
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, PETScVector, \
+                         ParallelGroup
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
@@ -195,6 +196,96 @@ class MPITestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+
+    def test_two_branin_parallel_model(self):
+        np.random.seed(1)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p2', IndepVarComp('xI', 0.0))
+        par = model.add_subsystem('par', ParallelGroup())
+
+        par.add_subsystem('comp1', Branin())
+        par.add_subsystem('comp2', Branin())
+
+        model.connect('p2.xI', 'par.comp1.x0')
+        model.connect('p1.xC', 'par.comp1.x1')
+        model.connect('p2.xI', 'par.comp2.x0')
+        model.connect('p1.xC', 'par.comp2.x1')
+
+        model.add_subsystem('comp', ExecComp('f = f1 + f2'))
+        model.connect('par.comp1.f', 'comp.f1')
+        model.connect('par.comp2.f', 'comp.f2')
+
+        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
+        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver()
+        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['max_gen'] = 400
+        prob.driver.options['pop_size'] = 25
+        prob.driver.options['run_parallel'] = False
+        prob.driver.options['procs_per_model'] = 2
+
+        prob.driver._randomstate = 1
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Optimal solution
+        assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
+        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class MPITestSimpleGA4Procs(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_two_branin_parallel_model(self):
+        np.random.seed(1)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p2', IndepVarComp('xI', 0.0))
+        par = model.add_subsystem('par', ParallelGroup())
+
+        par.add_subsystem('comp1', Branin())
+        par.add_subsystem('comp2', Branin())
+
+        model.connect('p2.xI', 'par.comp1.x0')
+        model.connect('p1.xC', 'par.comp1.x1')
+        model.connect('p2.xI', 'par.comp2.x0')
+        model.connect('p1.xC', 'par.comp2.x1')
+
+        model.add_subsystem('comp', ExecComp('f = f1 + f2'))
+        model.connect('par.comp1.f', 'comp.f1')
+        model.connect('par.comp2.f', 'comp.f2')
+
+        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
+        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver()
+        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['max_gen'] = 400
+        prob.driver.options['pop_size'] = 25
+        prob.driver.options['run_parallel'] = True
+        prob.driver.options['procs_per_model'] = 2
+
+        prob.driver._randomstate = 1
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Optimal solution
+        assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
 

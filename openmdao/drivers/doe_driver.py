@@ -53,6 +53,8 @@ class DOEDriver(Driver):
 
     Attributes
     ----------
+    _color : int or None
+        In MPI, the cached color is used to determine which cases to run on this proc.
     _name : str
         The name used to identify this driver in recorded cases.
     _recorders : list
@@ -88,6 +90,7 @@ class DOEDriver(Driver):
 
         self._name = ''
         self._recorders = []
+        self._color = None
 
     def _declare_options(self):
         """
@@ -121,7 +124,6 @@ class DOEDriver(Driver):
             self._comm = comm
 
             if parallel == 1:  # True == 1
-                size = 1
                 color = self._color = comm.rank
             else:
                 comm_size = comm.size
