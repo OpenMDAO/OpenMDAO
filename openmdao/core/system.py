@@ -14,7 +14,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
@@ -27,7 +27,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
