@@ -27,6 +27,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterationDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 
+
 class DistributedAdder(ExplicitComponent):
     """
     Distributes the work of adding 10 to every item in the param vector
@@ -120,12 +121,6 @@ class DistributedRecorderTest(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
-    def assertDriverIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertDriverIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
-
     def test_distrib_record_system(self):
         prob = Problem()
         prob.model = Group()
@@ -187,11 +182,11 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs = expected_desvars
             expected_outputs.update(expected_objectives)
 
-            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                     None),), self.eps)
+            assertDriverIterationDataRecorded(self,
+                ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_recording_remote_voi(self):
         prob = Problem()
 
@@ -261,7 +256,8 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_includes)
 
             coordinate = [0, 'SLSQP', (48,)]
-            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs, None),), self.eps)
+            assertDriverIterationDataRecorded(self,
+                ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 
 
 if __name__ == "__main__":

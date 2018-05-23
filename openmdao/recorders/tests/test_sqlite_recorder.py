@@ -1,9 +1,10 @@
 """ Unit test for the SqliteRecorder. """
 import errno
 import os
-import sqlite3
 import unittest
 import numpy as np
+
+import sqlite3
 
 from shutil import rmtree
 from six import PY2, PY3
@@ -17,12 +18,12 @@ from openmdao.api import BoundsEnforceLS, NonlinearBlockGS, ArmijoGoldsteinLS, N
 from openmdao.core.problem import Problem
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-    SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
+    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterationDataRecorded, \
     assertSystemIterationDataRecorded, assertSolverIterationDataRecorded, assertMetadataRecorded, \
-    assertDriverMetadataRecorded
+    assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterationCoordinatesRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -44,94 +45,27 @@ if OPTIMIZER:
 
 
 class TestSqliteRecorder(unittest.TestCase):
-    """
-    Features
-    --------
-    CaseRecorder
-    """
+
     def setUp(self):
-        import os
-        from tempfile import mkdtemp
-        from openmdao.api import SqliteRecorder
-        from openmdao.recorders.recording_iteration_stack import recording_iteration
+        recording_iteration.stack = []  # reset to avoid problems from earlier tests
 
-        recording_iteration.stack = []
-        self.dir = mkdtemp()
-        self.startdir = os.getcwd()
-        self.filename = "sqlite_test"
-        self.eps = 1e-3
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
 
-        os.chdir(self.dir)
-
+        self.filename = os.path.join(self.temp_dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
-        # print(self.filename)  # comment out to make filename printout go away.
 
         self.eps = 1e-3
 
     def tearDown(self):
-        os.chdir(self.startdir)
-
-        # return  # comment out to allow db file to be removed.
+        os.chdir(self.orig_dir)
         try:
-            rmtree(self.dir)
+            rmtree(self.temp_dir)
         except OSError as e:
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
-
-    def assertDriverIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertDriverIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
-
-    def assertSystemIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertSystemIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
-
-    def assertSystemIterationCoordinatesRecorded(self, iteration_coordinates):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        for iteration_coordinate in iteration_coordinates:
-            cur.execute("SELECT * FROM system_iterations WHERE "
-                        "iteration_coordinate=:iteration_coordinate",
-                        {"iteration_coordinate": iteration_coordinate})
-            row_actual = cur.fetchone()
-            self.assertTrue(row_actual,
-                            'System iterations table does not contain the '
-                            'requested iteration coordinate: "{}"'.
-                            format(iteration_coordinate))
-
-    def assertSolverIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertSolverIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
-
-    def assertMetadataRecorded(self, expected_abs2prom, expected_prom2abs):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertMetadataRecorded(self, cur, expected_abs2prom, expected_prom2abs)
-        con.close()
-
-    def assertDriverMetadataRecorded(self, expected_driver_metadata,
-                                     expect_none_viewer_data=False):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertDriverMetadataRecorded(self, cur, expected_driver_metadata, expect_none_viewer_data)
-        con.close()
-
-    def assertSystemMetadataIdsRecorded(self, ids):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        for id in ids:
-            cur.execute("SELECT * FROM system_metadata WHERE id=:id", {"id": id})
-            row_actual = cur.fetchone()
-            self.assertTrue(row_actual,
-                            'System metadata table does not contain the '
-                            'requested id: "{}"'.format(id))
 
     def setup_sellar_model(self):
         self.prob = Problem()
@@ -207,8 +141,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None),), self.eps)
+        assertDriverIterationDataRecorded(self,
+                                          ((coordinate, (t0, t1), expected_outputs, None),),
+                                          self.eps)
 
     def test_add_recorder_after_setup(self):
 
@@ -232,8 +167,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None),), self.eps)
+        assertDriverIterationDataRecorded(self,
+                                          ((coordinate, (t0, t1), expected_outputs, None),),
+                                          self.eps)
 
     def test_only_objectives_recorded(self):
 
@@ -257,8 +193,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_outputs = expected_objectives
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None),), self.eps)
+        assertDriverIterationDataRecorded(self,
+                                          ((coordinate, (t0, t1), expected_outputs, None),),
+                                          self.eps)
 
     def test_only_constraints_recorded(self):
 
@@ -285,8 +222,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_outputs = expected_constraints
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None), ), self.eps)
+        assertDriverIterationDataRecorded(self,
+                                          ((coordinate, (t0, t1), expected_outputs, None),),
+                                          self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -339,8 +277,9 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 expected_inputs),), self.eps)
+        assertDriverIterationDataRecorded(self,
+                                          ((coordinate, (t0, t1), expected_outputs, expected_inputs),),
+                                          self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -388,8 +327,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 expected_inputs),), self.eps)
+        assertDriverIterationDataRecorded(self,
+                                          ((coordinate, (t0, t1), expected_outputs, expected_inputs),),
+                                          self.eps)
 
     def test_driver_records_metadata(self):
         self.setup_sellar_model()
@@ -447,13 +387,13 @@ class TestSqliteRecorder(unittest.TestCase):
             }
         }
 
-        self.assertMetadataRecorded(prom2abs, abs2prom)
+        assertMetadataRecorded(self, prom2abs, abs2prom)
         expected_driver_metadata = {
             'connections_list_length': 11,
             'tree_length': 4,
             'tree_children_length': 7,
         }
-        self.assertDriverMetadataRecorded(expected_driver_metadata)
+        assertDriverMetadataRecorded(self, expected_driver_metadata)
 
     def test_driver_without_n2_data(self):
         self.setup_sellar_model()
@@ -464,7 +404,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.final_setup()
         self.prob.cleanup()
 
-        self.assertDriverMetadataRecorded(None, True)
+        assertDriverMetadataRecorded(self, None, True)
 
     def test_driver_doesnt_record_metadata(self):
 
@@ -476,7 +416,7 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.final_setup()
         self.prob.cleanup()
 
-        self.assertDriverMetadataRecorded(None)
+        assertDriverMetadataRecorded(self, None)
 
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
     @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
@@ -518,8 +458,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_outputs = {"d1.y1": [25.58830237, ], }
         expected_residuals = {"d1.y1": [0.0, ], }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
-                                                 expected_outputs, expected_residuals),), self.eps)
+
+        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
+        assertSystemIterationDataRecorded(self, expected_data, self.eps)
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
                       'NonlinearBlockGS', (6, ), 'obj_cmp._solve_nonlinear', (6, )]
@@ -531,8 +472,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_outputs = {"obj_cmp.obj": [28.58830816, ], }
         expected_residuals = {"obj_cmp.obj": [0.0, ], }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
-                                                 expected_outputs, expected_residuals),), self.eps)
+        assertSystemIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -589,8 +530,8 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 expected_inputs), ), self.eps)
+        assertDriverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_outputs, expected_inputs), ), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -646,9 +587,8 @@ class TestSqliteRecorder(unittest.TestCase):
             "con.y": -7.8333333
         }
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 expected_inputs),),
-                                               self.eps)
+        assertDriverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_outputs, expected_inputs),), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -700,8 +640,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"mda.d1.y1": [25.5883027, ], }
         expected_residuals = {"mda.d1.y1": [0.0, ], }
 
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
-                                                 expected_outputs, expected_residuals),), self.eps)
+        assertSystemIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
 
         coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (1, )]
@@ -709,8 +649,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
         expected_residuals = {"pz.z": [0.0, 0.0], }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
-                                                 expected_residuals), ), self.eps)
+        assertSystemIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals), ), self.eps)
 
     def test_record_solver(self):
         self.setup_sellar_model()
@@ -753,9 +693,9 @@ class TestSqliteRecorder(unittest.TestCase):
             "px.x": [0.0]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error, expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_line_search_armijo_goldstein(self):
         self.setup_sellar_model()
@@ -792,9 +732,10 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_solver_residuals = None
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_line_search_bounds_enforce(self):
         self.setup_sellar_model()
@@ -829,9 +770,10 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_solver_residuals = None
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_block_gs(self):
         self.setup_sellar_model()
@@ -872,9 +814,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [0.]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+            expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_block_jac(self):
         self.setup_sellar_model()
@@ -903,9 +846,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [-11.94151185]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_newton(self):
         self.setup_sellar_model()
@@ -934,9 +878,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [-11.94151185]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_nonlinear_nonlinear_run_once(self):
         self.setup_sellar_model()
@@ -965,9 +910,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [-11.72742947]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_direct_solver(self):
 
@@ -1012,9 +958,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [-0.]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_scipy_iterative_solver(self):
         self.setup_sellar_model()
@@ -1056,9 +1003,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [0.41167877]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
     @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
@@ -1101,9 +1049,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp1.con1': [0.77049654],
             'con_cmp2.con2': [0.41167877]
         }
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_gs(self):
 
@@ -1147,9 +1096,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [0.]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_linear_run_once(self):
 
@@ -1193,9 +1143,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [-4.10568454e-06]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     def test_record_solver_linear_block_jac(self):
         # raise unittest.SkipTest("Linear Solver recording not working yet")
@@ -1238,9 +1189,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2.con2': [1.42027975e-15]
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -1301,8 +1253,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None),), self.eps)
+        assertDriverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 
         # System recording test
         coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
@@ -1311,8 +1263,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
         expected_residuals = {"pz.z": [0.0, 0.0], }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs, expected_outputs,
-                                                 expected_residuals), ), self.eps)
+        assertSystemIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals), ), self.eps)
 
         # Solver recording test
         coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (5, ), 'NLRunOnce', (0, ),
@@ -1332,9 +1284,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "mda.d1.y1": [0.0],
         }
 
-        self.assertSolverIterationDataRecorded(((coordinate, (t0, t1), expected_abs_error,
-                                                 expected_rel_error, expected_solver_output,
-                                                 expected_solver_residuals),), self.eps)
+        assertSolverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_abs_error,
+             expected_rel_error, expected_solver_output,
+             expected_solver_residuals),), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -1423,8 +1376,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         expected_outputs = {"comp2.x": [3.0, ], }
         expected_residuals = {"comp2.x": [0.0, ], }
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
-                                                 expected_outputs, expected_residuals),), self.eps)
+        assertSystemIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
 
     def test_multidimensional_arrays(self):
         # component TestExplCompArray, put in a model and run it; its outputs are multi-d-arrays.
@@ -1463,8 +1416,8 @@ class TestSqliteRecorder(unittest.TestCase):
             'areas': [[0., 0.], [0., 0.]],
         }
 
-        self.assertSystemIterationDataRecorded(((coordinate, (t0, t1), expected_inputs,
-                                                 expected_outputs, expected_residuals),), self.eps)
+        assertSystemIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),), self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -1494,22 +1447,20 @@ class TestSqliteRecorder(unittest.TestCase):
         self.prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
-        self.assertSystemMetadataIdsRecorded(
-            [
-                'root',
-                'px',
-                'pz',
-                'mda',
-                'mda.d1',
-                'mda.d2',
-                'obj_cmp',
-                'con_cmp1',
-                'con_cmp2'
-            ]
-        )
+        assertSystemMetadataIdsRecorded(self, [
+            'root',
+            'px',
+            'pz',
+            'mda',
+            'mda.d1',
+            'mda.d2',
+            'obj_cmp',
+            'con_cmp1',
+            'con_cmp2'
+        ])
 
         # Make sure all the Systems are recorded at least once
-        self.assertSystemIterationCoordinatesRecorded([
+        assertSystemIterationCoordinatesRecorded(self, [
             'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
@@ -1575,8 +1526,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs.update(expected_constraints)
         expected_outputs.update(expected_sysincludes)
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None),), self.eps)
+        assertDriverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 
     def test_recorder_file_already_exists_no_append(self):
 
@@ -1614,8 +1565,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
 
-        self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                 None),), self.eps)
+        assertDriverIterationDataRecorded(self,
+            ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
 
 
 class TestFeatureSqliteRecorder(unittest.TestCase):

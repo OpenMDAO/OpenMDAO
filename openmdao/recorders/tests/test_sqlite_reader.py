@@ -20,7 +20,7 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives
+    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
@@ -29,22 +29,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-
-class SellarProblem(Problem):
-    """
-    The Sellar problem with configurable model class.
-    """
-    def __init__(self, model_class=SellarDerivatives, **kwargs):
-        super(SellarProblem, self).__init__(model_class(**kwargs))
-
-        model = self.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-        self.set_solver_print(0)
 
 class TestSqliteCaseReader(unittest.TestCase):
 

@@ -17,6 +17,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.group import Group
+from openmdao.core.problem import Problem
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -583,3 +584,21 @@ class SellarImplicitDis2(ImplicitComponent):
         J['y2', 'y1'] = -.5*y1**-.5
         J['y2', 'z'] = -np.array([[1.0, 1.0]])
         J['y2', 'y2'] = 1.0
+
+
+class SellarProblem(Problem):
+    """
+    The Sellar problem with configurable model class.
+    """
+    def __init__(self, model_class=SellarDerivatives, **kwargs):
+        super(SellarProblem, self).__init__(model_class(**kwargs))
+
+        model = self.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        # default to non-verbose
+        self.set_solver_print(0)
