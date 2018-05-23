@@ -359,27 +359,6 @@ class TestSqliteCaseReader(unittest.TestCase):
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|{}'
                              .format(i))
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
-    def test_reading_driver_metadata(self):
-        self.setup_sellar_model_with_optimization()
-
-        # make sure we record metadata
-        self.prob.driver.recording_options['record_metadata'] = True
-        self.prob.driver.add_recorder(self.recorder)
-
-        self.prob.setup(check=False)
-        self.prob.run_driver()
-        self.prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        # access list of connections stored in metadata
-        self.assertEqual(len(cr.driver_metadata['connections_list']), 11)
-
-        # access the model tree stored in metadata
-        self.assertEqual(len(cr.driver_metadata['tree']), 4)
-
     def test_reading_metadata(self):
         self.setup_sellar_model_with_units()
         self.prob.driver.add_recorder(self.recorder)
@@ -404,62 +383,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.output2meta['x']['upper'], 1000)
         self.assertEqual(cr.output2meta['y2']['upper'], None)
         self.assertEqual(cr.output2meta['y2']['lower'], None)
-
-    def test_reading_system_metadata(self):
-
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
-
-        self.setup_sellar_grouped_scaled_model()
-
-        self.prob.driver = pyOptSparseDriver()
-        self.prob.driver.options['optimizer'] = OPTIMIZER
-
-        self.prob.model.options.declare("test1", 1)
-        self.prob.model.mda.d1.options.declare("test2", "2")
-
-        self.prob.model.pz.options.declare("test3", True)
-        self.prob.model.pz.recording_options['options_excludes'] = ['*']
-
-        if OPTIMIZER == 'SLSQP':
-            self.prob.driver.opt_settings['ACC'] = 1e-9
-
-        self.prob.model.recording_options['record_inputs'] = True
-        self.prob.model.recording_options['record_outputs'] = True
-        self.prob.model.recording_options['record_residuals'] = True
-        self.prob.model.recording_options['record_metadata'] = True
-
-        self.prob.model.add_recorder(self.recorder)
-
-        pz = self.prob.model.pz # IndepVarComp which is an ExplicitComponent
-        pz.add_recorder(self.recorder)
-
-        mda = self.prob.model.mda  # Group
-        d1 = mda.d1
-        d1.add_recorder(self.recorder)
-
-        self.prob.setup(check=False, mode='rev')
-
-        self.prob.run_driver()
-
-        self.prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        self.assertEqual(
-            sorted(cr.system_metadata.keys()),
-            sorted(['root', 'mda.d1', 'pz'])
-        )
-
-        self.assertEqual(cr.system_metadata['root']['component_options']['test1'], 1)
-        self.assertEqual(cr.system_metadata['mda.d1']['component_options']['test2'], "2")
-        self.assertFalse('test3' in cr.system_metadata['pz']['component_options'])
-
-        assert_rel_error(
-            self, cr.system_metadata['pz']['scaling_factors']['output']['nonlinear']['phys'][0][1], [2.0, 2.0], 1.0e-3)
 
     def test_reading_solver_metadata(self):
         self.setup_sellar_model()
@@ -1076,39 +999,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.load_case(case)
 
         _assert_model_matches_case(case, model)
-
-    def test_reading_system_metadata_basic(self):
-        self.setup_sellar_model()
-
-        nonlinear_solver = self.prob.model.nonlinear_solver
-
-        linear_solver = self.prob.model.linear_solver
-        d1 = self.prob.model.d1  # instance of SellarDis1withDerivatives, a Group
-        d1.nonlinear_solver = NonlinearBlockGS()
-        d1.nonlinear_solver.options['maxiter'] = 5
-
-        # declare two options
-        d1.options.declare('options value 1', 1)
-        d1.options.declare('options value to ignore', 2)
-
-        d1.add_recorder(self.recorder)
-
-        # don't record the second option on d1
-        d1.recording_options['options_excludes'] = ['options value to ignore']
-
-        self.prob.setup(check=False)
-        self.prob.run_driver()
-        self.prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        d1_options = cr.system_metadata['d1']['component_options']
-
-        # option 1 is recorded
-        self.assertEqual(d1_options['options value 1'], 1)
-
-        # option 2 is not recorded
-        self.assertFalse('options value to ignore' in d1_options)
 
 
 def _assert_model_matches_case(case, system):
