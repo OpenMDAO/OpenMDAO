@@ -51,17 +51,17 @@ class TestSqliteCaseReader(unittest.TestCase):
     def setUp(self):
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
 
-        self.original_path = os.getcwd()
-        self.dir = mkdtemp()
-        os.chdir(self.dir)
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
 
-        self.filename = os.path.join(self.dir, "sqlite_test")
+        self.filename = os.path.join(self.temp_dir, "sqlite_test")
         self.recorder = SqliteRecorder(self.filename)
 
     def tearDown(self):
-        os.chdir(self.original_path)
+        os.chdir(self.orig_dir)
         try:
-            rmtree(self.dir)
+            rmtree(self.temp_dir)
         except OSError as e:
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
@@ -155,18 +155,19 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_reading_system_cases(self):
         prob = SellarProblem()
+        model = prob.model
 
-        prob.model.recording_options['record_inputs'] = True
-        prob.model.recording_options['record_outputs'] = True
-        prob.model.recording_options['record_residuals'] = True
-        prob.model.recording_options['record_metadata'] = False
+        model.recording_options['record_inputs'] = True
+        model.recording_options['record_outputs'] = True
+        model.recording_options['record_residuals'] = True
+        model.recording_options['record_metadata'] = False
 
-        prob.model.add_recorder(self.recorder)
+        model.add_recorder(self.recorder)
 
         prob.setup()
 
-        prob.model.d1.add_recorder(self.recorder)  # SellarDis1withDerivatives (an ExplicitComp)
-        prob.model.obj_cmp.add_recorder(self.recorder)  # an ExecComp
+        model.d1.add_recorder(self.recorder)  # SellarDis1withDerivatives (an ExplicitComp)
+        model.obj_cmp.add_recorder(self.recorder)  # an ExecComp
 
         prob.run_driver()
         prob.cleanup()
