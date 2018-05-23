@@ -102,7 +102,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_format_version(self):
         prob = SellarProblem()
         prob.model.add_recorder(self.recorder)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -114,7 +114,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         """ Test that CaseReader returns an SqliteCaseReader. """
         prob = SellarProblem()
         prob.model.add_recorder(self.recorder)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -137,7 +137,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -185,7 +185,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.model.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.model.d1.add_recorder(self.recorder)  # SellarDis1withDerivatives (an ExplicitComp)
         prob.model.obj_cmp.add_recorder(self.recorder)  # an ExecComp
@@ -226,7 +226,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_reading_solver_cases(self):
         prob = SellarProblem()
-        prob.setup(check=False)
+        prob.setup()
 
         solver = prob.model.nonlinear_solver
         solver.add_recorder(self.recorder)
@@ -269,7 +269,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.setup_sellar_model_with_units()
         self.prob.driver.add_recorder(self.recorder)
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         self.prob.run_driver()
         self.prob.cleanup()
 
@@ -292,7 +292,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=LinearBlockGS())
-        prob.setup(check=False)
+        prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
         prob.model.linear_solver.add_recorder(self.recorder)
@@ -329,7 +329,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['includes'] = ['mda.d2.y2',]
         driver.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -364,7 +364,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
 
         model = prob.model
         model.add_recorder(self.recorder)
@@ -429,7 +429,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_recorder(self.recorder)
         model.nonlinear_solver.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -455,7 +455,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.add_recorder(self.recorder)
         prob.model.recording_options['record_residuals'] = True
 
-        prob.setup(check=False)
+        prob.setup()
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
         d1.nonlinear_solver = NonlinearBlockGS(maxiter=5)
@@ -527,7 +527,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.model.add_recorder(self.recorder)
         prob.model.recording_options['record_residuals'] = True
 
-        prob.setup(check=False)
+        prob.setup()
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
         d1.nonlinear_solver = NonlinearBlockGS(maxiter=5)
@@ -578,7 +578,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_get_vars(self):
         prob = SellarProblem()
-        prob.setup(check=False)
+        prob.setup()
 
         prob.model.add_recorder(self.recorder)
         prob.model.recording_options['record_residuals'] = True
@@ -620,7 +620,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.recording_options['record_residuals'] = True
         model.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_driver()
         prob.cleanup()
@@ -654,7 +654,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -663,7 +663,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # try to load it into a completely different model
         prob = SellarProblem()
-        prob.setup(check=False)
+        prob.setup()
 
         error_msg = "Input variable, '[^']+', recorded in the case is not found in the model"
         with assertRaisesRegex(self, KeyError, error_msg):
@@ -671,7 +671,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_subsystem_load_system_cases(self):
         prob = SellarProblem()
-        prob.setup(check=False)
+        prob.setup()
 
         model = prob.model
         model.recording_options['record_inputs'] = True
@@ -722,7 +722,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         case = cr.system_cases.get_case(0)
 
         # Add one to all the inputs just to change the model
-        #   so we can see if loading the case values really changes the model
+        # so we can see if loading the case values really changes the model
         for name in model._inputs:
             model._inputs[name] += 1.0
         for name in model._outputs:
@@ -747,7 +747,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -768,7 +768,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
 
-        prob.setup(check=False)
+        prob.setup()
         prob.load_case(third_case)
         prob.run_driver()
         prob.cleanup()
@@ -847,7 +847,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.driver.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
