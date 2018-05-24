@@ -58,7 +58,7 @@ Running a GA on a Parallel Model in Parallel
 
 If you have a model that does contain distributed components or parallel groups, you can also use
 `TestFeatureSimpleGA` to optimize it. If you have enough processors, you can also simultaneously
-evaluate multiple points in your population by turning on the "paralllel" option and setting the
+evaluate multiple points in your population by turning on the "parallel" option and setting the
 "procs_per_model" to the number of processors that your model requires. Take care that you submit
 your parallel run with enough processors such that the number of processors the model requires
 divides evenly into it, as in this example, where the model requires 2 and we give it 4.
