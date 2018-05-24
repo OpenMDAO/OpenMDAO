@@ -143,7 +143,7 @@ class IndepVarComp(ExplicitComponent):
                   'res_ref': res_ref, 'var_set': var_set}
         self._indep_external.append((name, val, kwargs))
 
-    def _linearize(self, jac=None, do_nl=False, do_ln=False):
+    def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -151,10 +151,8 @@ class IndepVarComp(ExplicitComponent):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass

@@ -447,7 +447,7 @@ class Solver(object):
 
     def _linearize_children(self):
         """
-        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
         Returns
         -------

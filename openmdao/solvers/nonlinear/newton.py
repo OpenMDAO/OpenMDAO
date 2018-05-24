@@ -178,7 +178,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
-        if not self._linear_solver_from_parent:
+        if self.linear_solver is not None:
             self.linear_solver._linearize()
 
         if self.linesearch is not None:
@@ -232,6 +232,7 @@ class NewtonSolver(NonlinearSolver):
         self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count < self.options['max_sub_solves'])
+        do_sub_ln = self.linear_solver is not None and self.linear_solver._linearize_children()
 
         # Disable local fd
         approx_status = system._owns_approx_jac
@@ -239,7 +240,8 @@ class NewtonSolver(NonlinearSolver):
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
-        system._linearize(self.linear_solver._assembled_jac)
+        system._linearize(self.linear_solver._assembled_jac, sub_do_ln=do_sub_ln)
+        self._linearize()
 
         self.linear_solver.solve(['linear'], 'fwd')
 
@@ -252,8 +254,8 @@ class NewtonSolver(NonlinearSolver):
         self._solver_info.pop()
 
         # Hybrid newton support.
-        with Recording('Newton_subsolve', 0, self):
-            if do_subsolve:
+        if do_subsolve:
+            with Recording('Newton_subsolve', 0, self):
                 self._solver_info.append_solver()
 
                 for isub, subsys in enumerate(system._subsystems_allprocs):

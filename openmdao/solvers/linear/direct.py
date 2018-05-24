@@ -129,6 +129,17 @@ class DirectSolver(LinearSolver):
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
 
+    def _linearize_children(self):
+        """
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
+
+        Returns
+        -------
+        boolean
+            Flag for indicating child linerization
+        """
+        return False
+
     def _linearize(self):
         """
         Perform factorization.
@@ -211,12 +222,8 @@ class DirectSolver(LinearSolver):
         vec_name = 'linear'
         system = self._system
 
-        # assign x and b vectors based on mode
-        x_vec = system._vectors['output'][vec_name]
-        b_vec = system._vectors['residual'][vec_name]
-
         # set value of x vector to provided value
-        x_vec.set_data(in_vec)
+        system._vectors['output'][vec_name].set_data(in_vec)
 
         # apply linear
         scope_out, scope_in = system._get_scope()
@@ -224,7 +231,7 @@ class DirectSolver(LinearSolver):
                              scope_out, scope_in)
 
         # put new value in out_vec
-        b_vec.get_data(out_vec)
+        system._vectors['residual'][vec_name].get_data(out_vec)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

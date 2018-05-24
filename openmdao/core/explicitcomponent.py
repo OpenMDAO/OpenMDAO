@@ -379,7 +379,7 @@ class ExplicitComponent(Component):
                                 self._vectors['output'][vec_name])
         return False, 0., 0.
 
-    def _linearize(self, jac=None, do_nl=False, do_ln=False):
+    def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -387,10 +387,8 @@ class ExplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         if not self._has_compute_partials and not self._approx_schemes:
             return

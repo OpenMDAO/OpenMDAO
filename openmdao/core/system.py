@@ -1271,7 +1271,7 @@ class System(object):
             self._assembled_jac = my_asm_jac
             self._views_assembled_jac = True
         else:
-            if not self._owns_approx_jac and asm_jac is not None:
+            if not self._owns_approx_jac:
                 nl = self._nonlinear_solver
                 if nl is not None and nl.supports['gradients']:
                     self._views_assembled_jac = True
@@ -1312,7 +1312,7 @@ class System(object):
             asm_jac._keymap = parent_asm_jac._keymap
             asm_jac._view_ranges = parent_asm_jac._view_ranges
 
-        if parent_asm_jac is not None and asm_jac is not None:
+        if parent_asm_jac is not None and self._views_assembled_jac:
             parent_asm_jac._init_view(self)
 
         # allocate internal matrices now that we have all of the subjac metadata
@@ -2704,7 +2704,7 @@ class System(object):
 
         return result
 
-    def run_linearize(self, do_nl=True, do_ln=True):
+    def run_linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization.
 
@@ -2712,14 +2712,14 @@ class System(object):
 
         Parameters
         ----------
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
-
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
-            self._linearize(self._assembled_jac, do_nl, do_ln)
+            do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
+            self._linearize(self._assembled_jac, sub_do_ln=do_ln)
+            if self._linear_solver is not None:
+                self._linear_solver._linearize()
 
     def _apply_nonlinear(self):
         """
@@ -2800,7 +2800,7 @@ class System(object):
         """
         pass
 
-    def _linearize(self, jac, do_nl=True, do_ln=True):
+    def _linearize(self, jac, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -2808,10 +2808,8 @@ class System(object):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         pass
 

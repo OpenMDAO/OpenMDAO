@@ -247,7 +247,7 @@ class ImplicitComponent(Component):
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
-    def _linearize(self, jac=None, do_nl=True, do_ln=True):
+    def _linearize(self, jac=None, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -255,10 +255,8 @@ class ImplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         if jac is None:
             jac = self.jacobian
@@ -273,12 +271,6 @@ class ImplicitComponent(Component):
 
             if self._assembled_jac is not None:
                 self._assembled_jac._update()
-
-        if self._nonlinear_solver is not None and do_nl:
-            self._nonlinear_solver._linearize()
-
-        if self._linear_solver is not None and do_ln:
-            self._linear_solver._linearize()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

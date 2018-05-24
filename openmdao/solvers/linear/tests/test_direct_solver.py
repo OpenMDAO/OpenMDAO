@@ -56,6 +56,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
         g1._linearize(g1._assembled_jac)
+        g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data

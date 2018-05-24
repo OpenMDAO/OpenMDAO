@@ -1696,7 +1696,7 @@ class Group(System):
 
         return result
 
-    def _linearize(self, jac, do_nl=True, do_ln=True):
+    def _linearize(self, jac, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
@@ -1704,10 +1704,8 @@ class Group(System):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         # Group finite difference
         if self._owns_approx_jac:
@@ -1721,28 +1719,24 @@ class Group(System):
                 jac._update()
 
         else:
-            sub_do_nl = (self._nonlinear_solver is not None) and \
-                        (self._nonlinear_solver._linearize_children())
-            sub_do_ln = (self._linear_solver is not None) and \
-                        (self._linear_solver._linearize_children())
-
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:
-                subsys._linearize(jac, do_nl=sub_do_nl, do_ln=sub_do_ln)
+                do_ln = sub_do_ln and (subsys.linear_solver is not None and
+                                       subsys.linear_solver._linearize_children())
+                subsys._linearize(jac, sub_do_ln=do_ln)
 
             # Update jacobian
-            if self._views_assembled_jac:
+            if self._assembled_jac is not None:
                 with self.jacobian_context(jac):
                     jac._update()
 
-        if do_nl and self._nonlinear_solver is not None:
-            self._nonlinear_solver._linearize()
-
-        if do_ln and self._linear_solver is not None:
-            self._linear_solver._linearize()
+            if sub_do_ln:
+                for subsys in self._subsystems_myproc:
+                    if subsys.linear_solver is not None:
+                        subsys.linear_solver._linearize()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
