@@ -174,6 +174,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
@@ -184,7 +185,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'SLSQP', (3, )]
@@ -224,6 +224,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
         driver.add_recorder(self.recorder)
 
@@ -261,10 +262,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.add_recorder(self.recorder)
 
         prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
+        prob.final_setup()  # Conclude setup but don't run model.
         prob.cleanup()
 
         prom2abs = {
@@ -325,7 +323,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.final_setup()
+        prob.final_setup()  # Conclude setup but don't run model.
         prob.cleanup()
 
         assertDriverMetadataRecorded(self, None, True)
@@ -337,7 +335,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.add_recorder(self.recorder)
 
         prob.setup()
-        prob.final_setup()
+        prob.final_setup()  # Conclude setup but don't run model.
         prob.cleanup()
 
         assertDriverMetadataRecorded(self, None)
@@ -709,8 +707,8 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.model.nonlinear_solver.add_recorder(self.recorder)
         prob.model.nonlinear_solver.recording_options['record_solver_residuals'] = True
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockGS', (6, )]
@@ -747,8 +745,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
 
+        prob.set_solver_print(-1)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NonlinearBlockJac', (9,)]
@@ -778,8 +776,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
 
+        prob.set_solver_print(-1)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,)]
@@ -809,8 +807,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         # No norms so no expected norms
@@ -847,8 +845,8 @@ class TestSqliteRecorder(unittest.TestCase):
         ln.recording_options['record_solver_residuals'] = True
         ln.add_recorder(self.recorder)
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         # No norms so no expected norms
@@ -893,8 +891,8 @@ class TestSqliteRecorder(unittest.TestCase):
         ln.recording_options['record_solver_residuals'] = True
         ln.add_recorder(self.recorder)
 
+        prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyKrylov', (1,)]
@@ -985,8 +983,8 @@ class TestSqliteRecorder(unittest.TestCase):
         ln.recording_options['record_solver_residuals'] = True
         ln.add_recorder(self.recorder)
 
+        prob.set_solver_print(-1)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
@@ -1030,8 +1028,8 @@ class TestSqliteRecorder(unittest.TestCase):
         ln.recording_options['record_solver_residuals'] = True
         ln.add_recorder(self.recorder)
 
+        prob.set_solver_print(-1)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (0,)]
@@ -1075,8 +1073,8 @@ class TestSqliteRecorder(unittest.TestCase):
         ln.recording_options['record_solver_residuals'] = True
         ln.add_recorder(self.recorder)
 
+        prob.set_solver_print(-1)
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
@@ -1261,8 +1259,13 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_implicit_component(self):
         from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 
+        indeps = IndepVarComp()
+        indeps.add_output('a', 1.0)
+        indeps.add_output('b', 1.0)
+        indeps.add_output('c', 1.0)
+
         group = Group()
-        group.add_subsystem('comp1', IndepVarComp([('a', 1.0), ('b', 1.0), ('c', 1.0)]))
+        group.add_subsystem('comp1', indeps)
         group.add_subsystem('comp2', QuadraticLinearize())
         group.add_subsystem('comp3', QuadraticJacVec())
         group.connect('comp1.a', 'comp2.a')
@@ -1961,7 +1964,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model = SellarDerivatives())
+        prob = Problem(model=SellarDerivatives())
         model = prob.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
                                   upper=np.array([10.0, 10.0]))

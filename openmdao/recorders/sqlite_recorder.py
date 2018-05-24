@@ -390,9 +390,12 @@ class SqliteRecorder(BaseRecorder):
             model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
                                              self._pickle_version)
 
-            with self.con:
-                self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
-                                 (driver_class, sqlite3.Binary(model_viewer_data)))
+            try:
+                with self.con:
+                    self.con.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
+                                     (driver_class, sqlite3.Binary(model_viewer_data)))
+            except sqlite3.IntegrityError:
+                print("Metadata has already been recorded for %s." % driver_class)
 
     def record_metadata_system(self, recording_requester):
         """

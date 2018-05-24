@@ -420,9 +420,14 @@ class Problem(object):
                          "with OpenMDAO <= 1.x ; use 'model' instead.")
         self.model = model
 
-    def run_model(self):
+    def run_model(self, case_prefix=None):
         """
         Run the model by calling the root system's solve_nonlinear.
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.
 
         Returns
         -------
@@ -436,13 +441,23 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
+        if case_prefix:
+            recording_iteration.prefix = case_prefix
+        else:
+            recording_iteration.prefix = None
+
         self.final_setup()
         self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
-    def run_driver(self):
+    def run_driver(self, case_prefix=None):
         """
         Run the driver on the model.
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.
 
         Returns
         -------
@@ -451,6 +466,11 @@ class Problem(object):
         """
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
+
+        if case_prefix:
+            recording_iteration.prefix = case_prefix
+        else:
+            recording_iteration.prefix = None
 
         self.final_setup()
         self.model._clear_iprint()

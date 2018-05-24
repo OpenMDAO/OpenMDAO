@@ -118,7 +118,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
-                                       ' for {0}'.format('pz.z'))
+                                               ' for {0}'.format('pz.z'))
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
@@ -583,7 +583,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         constraints = driver_case.get_constraints()
         responses = driver_case.get_responses()
 
-        expected_desvars = { "x": 1., "z": [5., 2.]}
+        expected_desvars = {"x": 1., "z": [5., 2.]}
         expected_objectives = {"obj": 28.58830817, }
         expected_constraints = {"con1": -22.42830237, "con2": -11.94151185}
 
@@ -845,6 +845,40 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.load_case(case)
 
         _assert_model_matches_case(case, model)
+
+    def test_driver_case_prefix(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0)
+
+        prob.driver.add_recorder(self.recorder)
+
+        prob.set_solver_print(0)
+
+        prob.setup()
+        prob.run_driver()
+        prob.run_driver(case_prefix='Run2')
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        print(cr.driver_cases.list_cases())
 
     def test_system_options_pickle_fail(self):
         # simple paraboloid model
