@@ -195,9 +195,9 @@ def concurrent_eval(func, cases, comm, allgather=False, model_mpi=None):
         If True, the results will be allgathered to all procs in the comm.
         Otherwise, results will be gathered to rank 0 only.
     model_mpi : None or tuple
-        If the function in func runs in parallel, then this will contain a tuple with the
-        total number of population points to evaluate concurrently, and the color of the point
-        to evalutate on this rank.
+        If the function in func runs in parallel, then this will be a tuple containing the total
+        number of cases to evaluate concurrently, and the color of the cases to evalutate on this
+        rank.
 
     Returns
     -------

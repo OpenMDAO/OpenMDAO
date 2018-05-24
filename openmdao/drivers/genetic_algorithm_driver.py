@@ -97,7 +97,7 @@ class SimpleGADriver(Driver):
                              'as four times the number of bits.')
         self.options.declare('run_parallel', default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
-        self.options.declare('procs_per_model', default=1,
+        self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
     def _setup_driver(self, problem):
@@ -149,19 +149,19 @@ class SimpleGADriver(Driver):
         procs_per_model = self.options['procs_per_model']
         if MPI and procs_per_model > 1:
 
-            comm_size = comm.size
-            model_size = comm_size // procs_per_model
-            if comm_size != model_size * procs_per_model:
-                raise RuntimeError("The number of processors per model is not evenly divisable by "
-                                   "the specified number of parallel cases.\n Provide a "
+            full_size = comm.size
+            size = full_size // procs_per_model
+            if full_size != size * procs_per_model:
+                raise RuntimeError("The total number of processors is not evenly divisable by the "
+                                   "specified number of processors per model.\n Provide a "
                                    "number of processors that is a multiple of %d, or "
                                    "specify a number of parallel cases that divides "
-                                   "into %d." % (procs_per_model, comm_size))
-            color = comm.rank % model_size
+                                   "into %d." % (procs_per_model, full_size))
+            color = comm.rank % size
             model_comm = comm.Split(color)
 
             # Everything we need to figure out which case to run.
-            self._concurrent_pop_size = model_size
+            self._concurrent_pop_size = size
             self._concurrent_color = color
 
             return model_comm
