@@ -2833,10 +2833,14 @@ class System(object):
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:
-            raise RuntimeError(
-                "Recording of Systems when running parallel code is not supported yet")
-        for s in self.system_iter(include_self=True, recurse=recurse):
-            s._rec_mgr.append(recorder)
+            raise RuntimeError("Recording of Systems when running parallel "
+                               "code is not supported yet")
+
+        self._rec_mgr.append(recorder)
+
+        if recurse:
+            for s in self.system_iter(include_self=False, recurse=recurse):
+                s._rec_mgr.append(recorder)
 
     def record_iteration(self):
         """
