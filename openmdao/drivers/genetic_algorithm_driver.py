@@ -122,12 +122,10 @@ class SimpleGADriver(Driver):
             raise RuntimeError(msg)
 
         model_mpi = None
+        comm = self._problem.comm
         if self._concurrent_pop_size > 0:
-            comm = self._problem.comm
             model_mpi = (self._concurrent_pop_size, self._concurrent_color)
-        elif self.options['run_parallel']:
-            comm = self._problem.comm
-        else:
+        elif not self.options['run_parallel']:
             comm = None
 
         self._ga = GeneticAlgorithm(self.objective_callback, comm=comm, model_mpi=model_mpi)
@@ -168,8 +166,7 @@ class SimpleGADriver(Driver):
 
             return model_comm
 
-        else:
-            return comm
+        return comm
 
     def run(self):
         """
@@ -411,7 +408,7 @@ class GeneticAlgorithm():
 
                 fitness[:] = np.inf
                 for result in results:
-                    returns, traceback, _ = result
+                    returns, traceback = result
 
                     if returns:
                         val, success, ii = returns

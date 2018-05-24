@@ -207,7 +207,6 @@ def concurrent_eval(func, cases, comm, allgather=False, model_mpi=None):
     results = []
 
     if comm is None:
-        rank = 0
         it = cases
     else:
         rank = comm.rank
@@ -229,7 +228,7 @@ def concurrent_eval(func, cases, comm, allgather=False, model_mpi=None):
         else:
             err = None
 
-        results.append((retval, err, rank))
+        results.append((retval, err))
 
     if comm is not None:
         if allgather:

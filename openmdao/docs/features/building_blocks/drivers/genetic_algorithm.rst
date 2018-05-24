@@ -61,7 +61,7 @@ If you have a model that does contain distributed components or parallel groups,
 evaluate multiple points in your population by turning on the "paralllel" option and setting the
 "procs_per_model" to the number of processors that your model requires. Take care that you submit
 your parallel run with enough processors such that the number of processors the model requires
-divide evenly into it, as in this example, where the model requires 2 and we give it 4.
+divides evenly into it, as in this example, where the model requires 2 and we give it 4.
 
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.MPIFeatureTests4.test_option_procs_per_model
