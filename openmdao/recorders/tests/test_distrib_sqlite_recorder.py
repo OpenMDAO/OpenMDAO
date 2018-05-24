@@ -182,8 +182,8 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs = expected_desvars
             expected_outputs.update(expected_objectives)
 
-            assertDriverIterationDataRecorded(self,
-                ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            assertDriverIterationDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -256,8 +256,9 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_includes)
 
             coordinate = [0, 'SLSQP', (48,)]
-            assertDriverIterationDataRecorded(self,
-                ((coordinate, (t0, t1), expected_outputs, None),), self.eps)
+
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            assertDriverIterationDataRecorded(self, expected_data, self.eps)
 
 
 if __name__ == "__main__":
