@@ -269,8 +269,8 @@ class ImplicitComponent(Component):
                     approximation.compute_approximations(self, jac=jac)
                 self.linearize(self._inputs, self._outputs, jac)
 
-            if self._assembled_jac is not None:
-                self._assembled_jac._update()
+            # if self._assembled_jac is not None:
+            #     self._assembled_jac._update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

@@ -414,8 +414,8 @@ class ExplicitComponent(Component):
                     # re-negate the jacobian
                     self._negate_jac(jac)
 
-            if self._assembled_jac is not None:
-                self._assembled_jac._update()
+            # if self._assembled_jac is not None:
+            #     self._assembled_jac._update()
 
     def compute(self, inputs, outputs):
         """

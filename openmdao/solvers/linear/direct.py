@@ -147,6 +147,8 @@ class DirectSolver(LinearSolver):
         system = self._system
 
         if self._assembled_jac is not None:
+            # self._assembled_jac._update()
+
             mtx = self._assembled_jac._int_mtx
             ranges = self._assembled_jac._view_ranges[system.pathname]
             matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
