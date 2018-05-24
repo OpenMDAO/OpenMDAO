@@ -371,6 +371,7 @@ class GeneticAlgorithm():
         int
             Number of successful function evaluations.
         """
+        comm = self.comm
         xopt = copy.deepcopy(vlb)
         fopt = np.inf
         self.lchrom = int(np.sum(bits))
@@ -396,11 +397,16 @@ class GeneticAlgorithm():
             x_pop = self.decode(old_gen, vlb, vub, bits)
 
             # Evaluate points in this generation.
-            if self.comm is not None:
+            if comm is not None:
                 # Parallel
+
+                # Since GA is random, ranks generate different new populations, so just take one
+                # and use it on all.
+                x_pop = comm.bcast(x_pop, root=0)
+
                 cases = [((item, ii), None) for ii, item in enumerate(x_pop)]
 
-                results = concurrent_eval(self.objfun, cases, self.comm, allgather=True,
+                results = concurrent_eval(self.objfun, cases, comm, allgather=True,
                                           model_mpi=self.model_mpi)
 
                 fitness[:] = np.inf
@@ -422,7 +428,6 @@ class GeneticAlgorithm():
                 # Serial
                 for ii in range(self.npop):
                     x = x_pop[ii]
-
                     fitness[ii], success, _ = self.objfun(x, 0)
 
                     if success:
