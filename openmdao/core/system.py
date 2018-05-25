@@ -2929,7 +2929,7 @@ class System(object):
 
     def _reset_iter_counts(self):
         """
-        Recursively reset iteration counter for all solvers.
+        Recursively reset iteration counter for all systems and solvers.
         """
         for s in self.system_iter(include_self=True, recurse=True):
             s.iter_count = 0
