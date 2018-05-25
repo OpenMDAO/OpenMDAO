@@ -29,7 +29,7 @@ def database_cursor(filename):
     con.close()
 
 
-def assertDriverIterationDataRecorded(test, expected, tolerance, prefix=None):
+def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     """
         Expected can be from multiple cases.
     """
@@ -89,7 +89,7 @@ def assertDriverIterationDataRecorded(test, expected, tolerance, prefix=None):
                         assert_rel_error(test, actual[key], expected[key], tolerance)
 
 
-def assertSystemIterationDataRecorded(test, expected, tolerance):
+def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
     """
         Expected can be from multiple cases.
     """
@@ -97,7 +97,7 @@ def assertSystemIterationDataRecorded(test, expected, tolerance):
 
         # iterate through the cases
         for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
-            iter_coord = format_iteration_coordinate(coord)
+            iter_coord = format_iteration_coordinate(coord, prefix=prefix)
 
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM system_iterations WHERE "
@@ -140,7 +140,7 @@ def assertSystemIterationDataRecorded(test, expected, tolerance):
                         assert_rel_error(test, actual[0][key], expected[key], tolerance)
 
 
-def assertSolverIterationDataRecorded(test, expected, tolerance):
+def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
     """
         Expected can be from multiple cases.
     """
@@ -150,7 +150,7 @@ def assertSolverIterationDataRecorded(test, expected, tolerance):
         for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
                 expected_solver_residuals in expected:
 
-            iter_coord = format_iteration_coordinate(coord)
+            iter_coord = format_iteration_coordinate(coord, prefix=prefix)
 
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
@@ -281,7 +281,7 @@ def assertSystemMetadataIdsRecorded(test, ids):
                             'requested id: "{}"'.format(id))
 
 
-def assertSystemIterationCoordinatesRecorded(test, iteration_coordinates):
+def assertSystemIterCoordsRecorded(test, iteration_coordinates):
 
     with database_cursor(test.filename) as cur:
 

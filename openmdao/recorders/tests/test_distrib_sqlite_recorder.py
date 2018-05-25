@@ -24,7 +24,7 @@ if OPTIMIZER:
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
     Group, ParallelGroup, IndepVarComp, SqliteRecorder
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterationDataRecorded
+from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 
 
@@ -183,7 +183,7 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_objectives)
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
-            assertDriverIterationDataRecorded(self, expected_data, self.eps)
+            assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -258,7 +258,7 @@ class DistributedRecorderTest(unittest.TestCase):
             coordinate = [0, 'SLSQP', (48,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
-            assertDriverIterationDataRecorded(self, expected_data, self.eps)
+            assertDriverIterDataRecorded(self, expected_data, self.eps)
 
 
 if __name__ == "__main__":

@@ -442,6 +442,8 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
         if case_prefix:
+            if not isinstance(case_prefix, str):
+                raise TypeError("The 'case_prefix' argument should be a string.")
             recording_iteration.prefix = case_prefix
         else:
             recording_iteration.prefix = None
@@ -468,6 +470,8 @@ class Problem(object):
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
 
         if case_prefix:
+            if not isinstance(case_prefix, str):
+                raise TypeError("The 'case_prefix' argument should be a string.")
             recording_iteration.prefix = case_prefix
         else:
             recording_iteration.prefix = None
