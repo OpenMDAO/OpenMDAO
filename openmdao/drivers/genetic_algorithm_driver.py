@@ -21,7 +21,7 @@ import numpy as np
 from pyDOE2 import lhs
 
 from openmdao.core.driver import Driver
-from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent import concurrent_eval
 from openmdao.utils.mpi import MPI
 
@@ -230,7 +230,7 @@ class SimpleGADriver(Driver):
             val = desvar_new[i:j]
             self.set_design_var(name, val)
 
-        with Recording('SimpleGA', self.iter_count, self) as rec:
+        with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
             model._solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
@@ -266,7 +266,7 @@ class SimpleGADriver(Driver):
             self.set_design_var(name, x[i:j])
 
         # Execute the model
-        with Recording('SimpleGA', self.iter_count, self) as rec:
+        with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
             self.iter_count += 1
             try:
                 model._solve_nonlinear()
