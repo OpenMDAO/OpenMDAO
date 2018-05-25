@@ -304,7 +304,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
                          "The total number of processors is not evenly divisable by the "
                          "specified number of processors per model.\n Provide a number of "
                          "processors that is a multiple of 3, or specify a number "
-                         "of parallel cases that divides into 4.")
+                         "of processors per model that divides into 4.")
 
 
 class TestFeatureSimpleGA(unittest.TestCase):

@@ -155,7 +155,7 @@ class SimpleGADriver(Driver):
                 raise RuntimeError("The total number of processors is not evenly divisable by the "
                                    "specified number of processors per model.\n Provide a "
                                    "number of processors that is a multiple of %d, or "
-                                   "specify a number of parallel cases that divides "
+                                   "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
             color = comm.rank % size
             model_comm = comm.Split(color)
