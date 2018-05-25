@@ -428,7 +428,7 @@ class SqliteRecorder(BaseRecorder):
             # try to pickle the metadata, report if it failed
             try:
                 pickled_metadata = pickle.dumps(user_options, self._pickle_version)
-            except TypeError:
+            except Exception:
                 pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
                 warnings.warn("Trying to record options which cannot be pickled "
                               "on system with name: %s. Use the 'options_excludes' "
