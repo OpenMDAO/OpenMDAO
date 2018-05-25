@@ -185,7 +185,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC': 8}
-        prob.driver.options['max_gen'] = 300
+        prob.driver.options['max_gen'] = 125
         prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
 
@@ -226,7 +226,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC': 8}
-        prob.driver.options['max_gen'] = 300
+        prob.driver.options['max_gen'] = 125
         prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = False
         prob.driver.options['procs_per_model'] = 2
@@ -274,7 +274,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC': 8}
-        prob.driver.options['max_gen'] = 300
+        prob.driver.options['max_gen'] = 125
         prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
@@ -502,7 +502,7 @@ class MPIFeatureTests4(unittest.TestCase):
 
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC': 8}
-        prob.driver.options['max_gen'] = 300
+        prob.driver.options['max_gen'] = 125
         prob.driver.options['pop_size'] = 25
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
