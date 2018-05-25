@@ -420,7 +420,7 @@ class Problem(object):
                          "with OpenMDAO <= 1.x ; use 'model' instead.")
         self.model = model
 
-    def run_model(self, case_prefix=None):
+    def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the model by calling the root system's solve_nonlinear.
 
@@ -428,6 +428,9 @@ class Problem(object):
         ----------
         case_prefix : str or None
             Prefix to prepend to coordinates when recording.
+
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
 
         Returns
         -------
@@ -448,11 +451,15 @@ class Problem(object):
         else:
             recording_iteration.prefix = None
 
+        if self.model.iter_count > 0 and reset_iter_counts:
+            self.driver.iter_count = 0
+            self.model._reset_iter_counts()
+
         self.final_setup()
         self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
-    def run_driver(self, case_prefix=None):
+    def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
 
@@ -460,6 +467,9 @@ class Problem(object):
         ----------
         case_prefix : str or None
             Prefix to prepend to coordinates when recording.
+
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
 
         Returns
         -------
@@ -475,6 +485,10 @@ class Problem(object):
             recording_iteration.prefix = case_prefix
         else:
             recording_iteration.prefix = None
+
+        if self.model.iter_count > 0 and reset_iter_counts:
+            self.driver.iter_count = 0
+            self.model._reset_iter_counts()
 
         self.final_setup()
         self.model._clear_iprint()

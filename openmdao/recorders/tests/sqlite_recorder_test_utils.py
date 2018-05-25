@@ -164,6 +164,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
 
             output_actual = blob_to_array(output_blob)
             residuals_actual = blob_to_array(residuals_blob)
+
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
                                                                  'started and stopped')

@@ -236,8 +236,8 @@ class TestSqliteRecorder(unittest.TestCase):
         run2_t0, run2_t1 = run_driver(prob, case_prefix='Run2')
         prob.cleanup()
 
-        run1_coord = [0, 'SLSQP', (3, )]  # 1st run takes 3 iterations
-        run2_coord = [0, 'SLSQP', (1, )]  # 2nd run takes 1 iteration
+        run1_coord = [0, 'SLSQP', (4, )]  # 1st run, 5 iterations
+        run2_coord = [0, 'SLSQP', (1, )]  # 2nd run, 2 iterations
 
         expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
         expected_objectives = {"comp.f_xy": [-27.0833]}
@@ -387,7 +387,7 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverMetadataRecorded(self, None)
 
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
+    # @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_system(self):
         prob = SellarProblem()
         prob.setup()
@@ -416,38 +416,56 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        #
-        # check data from 'd1'
-        #
-        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
-                      'NonlinearBlockGS', (6, ), 'd1._solve_nonlinear', (6, )]
-        expected_inputs = {
-            "d1.y2": [12.05848815],
-            "d1.z": [5.0, 2.0],
-            "d1.x": [1.0, ],
-        }
-        expected_outputs = {"d1.y1": [25.58830237, ], }
-        expected_residuals = {"d1.y1": [0.0, ], }
+        expected_data = [
+            # data from 'd1'
+            [
+                # coords
+                [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
+                 'NonlinearBlockGS', (6, ), 'd1._solve_nonlinear', (6, )],
+                # timestamps
+                (t0, t1),
+                # inputs
+                {"d1.y2": [12.05848815], "d1.z": [5.0, 2.0], "d1.x": [1.0, ]},
+                # outputs
+                {"d1.y1": [25.58830237]},
+                # residuals
+                {"d1.y1": [0.0]}
+            ],
 
-        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
+            # data from 'obj_cmp'
+            [
+                # coords
+                [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
+                 'NonlinearBlockGS', (6, ), 'obj_cmp._solve_nonlinear', (6, )],
+                # timestamps
+                (t0, t1),
+                # inputs
+                {"obj_cmp.z": [5.0, 2.0],
+                 "obj_cmp.y1": [25.58830236],
+                 "obj_cmp.x": [1.0, ],
+                 "obj_cmp.y2": [12.05857185],
+                },
+                # outputs
+                {"obj_cmp.obj": [28.58830816]},
+                # residuals
+                {"obj_cmp.obj": [0.0]}
+            ],
+        ]
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
-        #
-        # check data from 'obj_cmp'
-        #
-        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
-                      'NonlinearBlockGS', (6, ), 'obj_cmp._solve_nonlinear', (6, )]
-        expected_inputs = {
-            "obj_cmp.z": [5.0, 2.0],
-            "obj_cmp.y1": [25.58830236, ],
-            "obj_cmp.x": [1.0, ],
-            "obj_cmp.y2": [12.05857185, ],
-        }
-        expected_outputs = {"obj_cmp.obj": [28.58830816, ], }
-        expected_residuals = {"obj_cmp.obj": [0.0, ], }
+        # run again with prefix, only changes should be iter count reset and timestamps
+        t0, t1 = run_driver(prob, case_prefix='Run#2')
+        prob.cleanup()
 
-        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
-        assertSystemIterDataRecorded(self, expected_data, self.eps)
+        expected_data[0][0] = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
+                               'NonlinearBlockGS', (0, ), 'd1._solve_nonlinear', (0, )]
+        expected_data[0][1] = (t0, t1)
+
+        expected_data[1][0] = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ),
+                               'NonlinearBlockGS', (0, ), 'obj_cmp._solve_nonlinear', (0, )]
+        expected_data[1][1] = (t0, t1)
+
+        assertSystemIterDataRecorded(self, expected_data, self.eps, prefix='Run#2')
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -613,7 +631,6 @@ class TestSqliteRecorder(unittest.TestCase):
         nl.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
-
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
@@ -644,6 +661,31 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps)
+
+        #
+        # run again with a prefix, iter_counts should be reset
+        #
+        t0, t1 = run_driver(prob, case_prefix='run_again')
+        prob.cleanup()
+
+        coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (0, )]
+
+        expected_abs_error = 2.60769184e-12
+        expected_rel_error = 0.01977317421405673
+
+        expected_solver_residuals = {
+            "con_cmp1.con1": [0.0],
+            "d1.y1": [-2.60769184e-12],
+            "con_cmp2.con2": [0.0],
+            "pz.z": [0.0, 0.0],
+            "obj_cmp.obj": [0.0],
+            "d2.y2": [0.0],
+            "px.x": [0.0]
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+                          expected_solver_output, expected_solver_residuals),)
+        assertSolverIterDataRecorded(self, expected_data, self.eps, prefix='run_again')
 
     def test_record_line_search_armijo_goldstein(self):
         prob = SellarProblem()
@@ -1449,15 +1491,15 @@ class TestSqliteRecorder(unittest.TestCase):
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
             'Run1_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
 
-            'Run2_rank0:root._solve_nonlinear|1',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|con_cmp1._solve_nonlinear|1',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|con_cmp2._solve_nonlinear|1',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|mda._solve_nonlinear|1',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|mda._solve_nonlinear|1|NonlinearBlockGS|0|mda.d1._solve_nonlinear|7',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|mda._solve_nonlinear|1|NonlinearBlockGS|0|mda.d2._solve_nonlinear|7',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|obj_cmp._solve_nonlinear|1',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|px._solve_nonlinear|1',
-            'Run2_rank0:root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
+            'Run2_rank0:root._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
+            'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
         ])
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")

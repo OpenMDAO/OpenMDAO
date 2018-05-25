@@ -2926,3 +2926,17 @@ class System(object):
         Clear out the iprint stack from the solvers.
         """
         self.nonlinear_solver._solver_info.clear()
+
+    def _reset_iter_counts(self):
+        """
+        Recursively reset iteration counter for all solvers.
+        """
+        for s in self.system_iter(include_self=True, recurse=True):
+            s.iter_count = 0
+            if s._linear_solver:
+                s._linear_solver._iter_count = 0
+            if s._nonlinear_solver:
+                nl = s._nonlinear_solver
+                nl._iter_count = 0
+                if hasattr(nl, 'linesearch') and nl.linesearch:
+                    nl.linesearch._iter_count = 0
