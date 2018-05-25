@@ -84,9 +84,12 @@ To illustrate this, we will demonstrate performing a DOE on a model based on the
     :layout: code
 
 In this case, the model itself requires two processors, so in order to run cases
-concurrently we need to allocate at least four processors in total.  With four
-processors we can run two cases at a time, which is done by specifying
-:code:`options['parallel']=2`.
+concurrently we need to allocate at least four processors in total. We can allocate
+as many procs as we have available, however the number of procs must be a multiple
+of the number of procs per model, which is 2 here. Regardless of how many processors
+we allocate, we need to tell the `DOEDriver` that the model needs 2 processors, which
+is done by specifying :code:`options['procs_per_model']=2`. From this, the driver
+figures out how many models it can run in parallel, which in this case is also 2.
 
 The `SqliteRecorder` will record cases on the first two processors, which serve as
 the "root" processors for the parallel cases.

@@ -196,7 +196,7 @@ def concurrent_eval(func, cases, comm, allgather=False, model_mpi=None):
         Otherwise, results will be gathered to rank 0 only.
     model_mpi : None or tuple
         If the function in func runs in parallel, then this will be a tuple containing the total
-        number of cases to evaluate concurrently, and the color of the cases to evalutate on this
+        number of cases to evaluate concurrently, and the color of the cases to evaluate on this
         rank.
 
     Returns

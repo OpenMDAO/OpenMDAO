@@ -309,7 +309,7 @@ class GeneticAlgorithm():
     model_mpi : None or tuple
         If the model in objfun is also parallel, then this will contain a tuple with the the
         total number of population points to evaluate concurrently, and the color of the point
-        to evalutate on this rank.
+        to evaluate on this rank.
     npop : int
         Population size.
     objfun : function
@@ -329,7 +329,7 @@ class GeneticAlgorithm():
         model_mpi : None or tuple
             If the model in objfun is also parallel, then this will contain a tuple with the the
             total number of population points to evaluate concurrently, and the color of the point
-            to evalutate on this rank.
+            to evaluate on this rank.
         """
         self.objfun = objfun
         self.comm = comm
