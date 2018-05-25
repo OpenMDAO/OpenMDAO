@@ -964,8 +964,6 @@ class Component(System):
             J._system = self
 
         for key, meta in iteritems(self._subjacs_info):
-            if not meta['dependent']:
-                continue
             self._check_partials_meta(key, meta)
             for J in jacs:
                 J._set_partials_meta(key, meta)

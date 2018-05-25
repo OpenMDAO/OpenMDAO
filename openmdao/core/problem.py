@@ -837,11 +837,7 @@ class Problem(object):
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                try:
-                                    in_size = comp._var_abs2meta[wrt]['size']
-                                except KeyError:
-                                    in_size = comp._var_abs2meta[wrt]['size']
-
+                                in_size = comp._var_abs2meta[wrt]['size']
                                 out_size = comp._var_abs2meta[of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 

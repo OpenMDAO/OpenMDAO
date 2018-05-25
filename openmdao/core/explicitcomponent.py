@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+from copy import deepcopy
+
 import numpy as np
 from six import itervalues, iteritems
 from six.moves import range
@@ -23,8 +25,6 @@ class ExplicitComponent(Component):
         Dictionary of names mapped to bound methods.
     _has_compute_partials : bool
         If True, the instance overrides compute_partials.
-    _negated_subjacs : set
-        Keeps track of negated subjacs so we don't negate more than once during setup.
     """
 
     def __init__(self, **kwargs):
@@ -40,7 +40,6 @@ class ExplicitComponent(Component):
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
-        self._negated_subjacs = set()
 
     def _configure(self):
         """
@@ -168,18 +167,6 @@ class ExplicitComponent(Component):
                     if abs_key in J._subjacs:
                         J._multiply_subjac(abs_key, -1.)
 
-    def _setup_jacobians(self, parent_asm_jac=None):
-        """
-        Set and populate jacobians down through the system tree.
-
-        Parameters
-        ----------
-        parent_asm_jac : AssembledJacobian or None
-            The assembled jacobian from a parent group to populate for this system.
-        """
-        self._negated_subjacs = set()
-        super(ExplicitComponent, self)._setup_jacobians(parent_asm_jac)
-
     def _set_partials_meta(self, jacs):
         """
         Set subjacobian info into our jacobian.
@@ -190,6 +177,7 @@ class ExplicitComponent(Component):
             Jacobians needing metadata update.
         """
         abs2prom = self._var_abs2prom
+        negated_subjacs = set()
 
         # set context of jacobians once to avoid doing inside of loop
         old_systems = []
@@ -203,16 +191,17 @@ class ExplicitComponent(Component):
                 in_size = self._var_abs2meta[abs_key[1]]['size']
                 meta['value'] = np.zeros((out_size, in_size))
 
-            # if wrt is an input, we need to negate the subjac, but only once, since we don't
-            # copy the subjacobian values in each jacobian (but we do copy the values in the
-            # internal matrices)
+            # if wrt is an input, we need to negate the subjac.
             negate = abs_key[1] in abs2prom['input']
             for J in jacs:
                 if negate:
-                    if abs_key in self._negated_subjacs:
-                        negate = False
+                    # If we have multiple jacs, we need to make a copy after the first one in
+                    # order for our subjac negation to work properly.
+                    if abs_key in negated_subjacs:
+                        meta = meta.copy()  # shallow copy
+                        meta['value'] = deepcopy(meta['value'])
                     else:
-                        self._negated_subjacs.add(abs_key)
+                        negated_subjacs.add(abs_key)
                 J._set_partials_meta(abs_key, meta, negate)
 
             if 'method' in meta and meta['method']:
