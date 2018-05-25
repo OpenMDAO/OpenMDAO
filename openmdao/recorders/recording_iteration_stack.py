@@ -24,52 +24,50 @@ class _RecIteration(object):
         self.stack = []
         self.prefix = None
 
+    def print_recording_iteration_stack(self):
+        """
+        Print the record iteration stack.
+
+        Used for debugging.
+        """
+        print()
+        for name, iter_count in reversed(self.stack):
+            print('^^^', name, iter_count)
+        print(60 * '^')
+
+    def get_formatted_iteration_coordinate(self):
+        """
+        Format the iteration coordinate into human-readable form.
+
+        'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
+
+        Returns
+        -------
+        str :
+            the iteration coordinate formatted in our proprietary way.
+        """
+        separator = '|'
+
+        # prefix
+        if self.prefix:
+            prefix = '%s_' % self.prefix
+        else:
+            prefix = ''
+
+        if MPI:
+            prefix += 'rank%d:' % MPI.COMM_WORLD.rank
+        else:
+            prefix += 'rank0:'
+
+        # iteration hierarchy
+        coord_list = []
+        for name, iter_count in self.stack:
+            coord_list.append('{}{}{}'.format(name, separator, iter_count))
+
+        return prefix + separator.join(coord_list)
+
 
 recording_iteration = _RecIteration()
-
-
-def print_recording_iteration_stack():
-    """
-    Print the record iteration stack.
-
-    Used for debugging.
-    """
-    print()
-    for name, iter_count in reversed(recording_iteration.stack):
-        print('^^^', name, iter_count)
-    print(60 * '^')
-
-
-def get_formatted_iteration_coordinate():
-    """
-    Format the iteration coordinate into human-readable form.
-
-    'rank0:pyoptsparsedriver|6|root._solve_nonlinear|6|mda._solve_nonlinear|6|mda.d1._solve_nonlinear|45'
-
-    Returns
-    -------
-    str :
-        the iteration coordinate formatted in our proprietary way.
-    """
-    separator = '|'
-
-    # prefix
-    if recording_iteration.prefix:
-        prefix = '%s_' % recording_iteration.prefix
-    else:
-        prefix = ''
-
-    if MPI:
-        prefix += 'rank%d:' % MPI.COMM_WORLD.rank
-    else:
-        prefix += 'rank0:'
-
-    # iteration hierarchy
-    coord_list = []
-    for name, iter_count in recording_iteration.stack:
-        coord_list.append('{}{}{}'.format(name, separator, iter_count))
-
-    return prefix + separator.join(coord_list)
 
 
 class Recording(object):

@@ -29,7 +29,7 @@ def database_cursor(filename):
     con.close()
 
 
-def assertDriverIterationDataRecorded(test, expected, tolerance):
+def assertDriverIterationDataRecorded(test, expected, tolerance, prefix=None):
     """
         Expected can be from multiple cases.
     """
@@ -37,7 +37,7 @@ def assertDriverIterationDataRecorded(test, expected, tolerance):
 
         # iterate through the cases
         for coord, (t0, t1), outputs_expected, inputs_expected in expected:
-            iter_coord = format_iteration_coordinate(coord)
+            iter_coord = format_iteration_coordinate(coord, prefix=prefix)
 
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM driver_iterations WHERE "

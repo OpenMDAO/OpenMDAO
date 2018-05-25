@@ -18,8 +18,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.recorders.recording_iteration_stack import recording_iteration, \
-    get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI

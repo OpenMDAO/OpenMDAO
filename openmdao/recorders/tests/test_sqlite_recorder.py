@@ -44,6 +44,25 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
+class ParaboloidProblem(Problem):
+    """
+    Constrained Paraboloid problem.
+    """
+    def __init__(self):
+        super(ParaboloidProblem, self).__init__()
+
+        model = self.model
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+
 class TestSqliteRecorder(unittest.TestCase):
 
     def setUp(self):
@@ -160,18 +179,7 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_simple_driver_recording(self):
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
+        prob = ParaboloidProblem()
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
@@ -209,19 +217,56 @@ class TestSqliteRecorder(unittest.TestCase):
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_simple_driver_recording_with_prefix(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        run1_t0, run1_t1 = run_driver(prob, case_prefix='Run1')
+        run2_t0, run2_t1 = run_driver(prob, case_prefix='Run2')
+        prob.cleanup()
+
+        run1_coord = [0, 'SLSQP', (3, )]  # 1st run takes 3 iterations
+        run2_coord = [0, 'SLSQP', (1, )]  # 2nd run takes 1 iteration
+
+        expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
+        expected_objectives = {"comp.f_xy": [-27.0833]}
+        expected_constraints = {"con.c": [-15.0]}
+
+        expected_outputs = expected_desvars
+        expected_outputs.update(expected_objectives)
+        expected_outputs.update(expected_constraints)
+
+        expected_inputs = {
+            "con.x": 7.1666667,
+            "comp.y": -7.83333333,
+            "comp.x": 7.1666667,
+            "con.y": -7.8333333
+        }
+
+        expected_data = (
+            (run1_coord, (run1_t0, run1_t1), expected_outputs, expected_inputs),
+        )
+        assertDriverIterationDataRecorded(self, expected_data, self.eps, prefix='Run1')
+
+        expected_data = (
+            (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs),
+        )
+        assertDriverIterationDataRecorded(self, expected_data, self.eps, prefix='Run2')
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_driver_everything_recorded_by_default(self):
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
+        prob = ParaboloidProblem()
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
@@ -406,18 +451,7 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_includes(self):
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
+        prob = ParaboloidProblem()
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
@@ -462,18 +496,7 @@ class TestSqliteRecorder(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_includes_post_setup(self):
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
+        prob = ParaboloidProblem()
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
