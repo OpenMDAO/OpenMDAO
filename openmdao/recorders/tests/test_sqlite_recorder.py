@@ -990,7 +990,7 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
+    # @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_solver_linear_petsc_ksp(self):
         prob = SellarProblem()
         prob.setup()

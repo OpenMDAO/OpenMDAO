@@ -100,9 +100,8 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-@unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
-                 "PETSc is required." if PETScVector is None
-                 else "Unreliable on Travis CI.")
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
+# @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedRecorderTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -143,7 +142,6 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-
         size = 100  # how many items in the array
         prob = Problem()
         prob.model = Group()
