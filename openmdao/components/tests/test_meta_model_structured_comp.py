@@ -1049,7 +1049,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         p.setup()
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(AnalysisError) as cm:
             p.run_model()
 
         msg = ("Error interpolating output 'y' in 'MM' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
