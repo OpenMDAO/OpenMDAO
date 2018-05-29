@@ -1687,45 +1687,22 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(len(cr.driver_metadata['tree']), 4)
 
     def test_feature_solver_metadata(self):
-        from openmdao.api import Problem, SqliteRecorder, CaseReader, IndepVarComp, ExecComp,\
-            NonlinearBlockGS, LinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives,\
-            SellarDis2withDerivatives
-        import numpy as np
+        from openmdao.api import Problem, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                            z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = LinearBlockGS()
-
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
 
         # create recorder
         recorder = SqliteRecorder("cases.sql")
 
         # add recorder to the nonlinear solver
-        nonlinear_solver = model.nonlinear_solver
-        nonlinear_solver.add_recorder(recorder)
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver.add_recorder(recorder)
 
         # add recorder to the linear solver as well
-        linear_solver = model.linear_solver
-        linear_solver.add_recorder(recorder)
+        prob.model.linear_solver = LinearBlockGS()
+        prob.model.linear_solver.add_recorder(recorder)
 
         # add recorder to the nonlinear solver for Component 'd1' (SellarDis1withDerivatives)
         d1 = prob.model.d1
@@ -1733,8 +1710,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         d1.nonlinear_solver.options['maxiter'] = 5
         d1.nonlinear_solver.add_recorder(recorder)
 
-        prob.setup()
-        prob.run_driver()
+        prob.run_model()
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
@@ -1748,37 +1724,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
 
     def test_feature_system_metadata(self):
-        from openmdao.api import Problem, SqliteRecorder, CaseReader, IndepVarComp, ExecComp,\
-            NonlinearBlockGS, LinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives,\
-            SellarDis2withDerivatives
-        import numpy as np
+        from openmdao.api import Problem, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                            z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = LinearBlockGS()
-
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-        nonlinear_solver = prob.model.nonlinear_solver
-        linear_solver = prob.model.linear_solver
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
 
         d1 = prob.model.d1  # SellarDis1withDerivatives
         d1.nonlinear_solver = NonlinearBlockGS()
@@ -1795,8 +1745,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # don't record the second option on d1
         d1.recording_options['options_excludes'] = ['options value to ignore']
 
-        prob.setup()
-        prob.run_driver()
+        prob.run_model()
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
