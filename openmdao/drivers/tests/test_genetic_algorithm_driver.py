@@ -457,6 +457,7 @@ class MPIFeatureTests(unittest.TestCase):
 
         prob.driver = SimpleGADriver()
         prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['max_gen'] = 100
         prob.driver.options['run_parallel'] = True
 
         prob.setup(check=False)
