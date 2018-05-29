@@ -118,7 +118,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
-                                               ' for {0}'.format('pz.z'))
+                                       ' for {0}'.format('pz.z'))
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
