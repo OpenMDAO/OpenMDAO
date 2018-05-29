@@ -50,13 +50,13 @@ Running a DOE in Parallel
 -------------------------
 
 In a parallel processing environment, it is possible for `DOEDriver` to run
-cases concurrently. This is done by specifying the `parallel` option as shown
+cases concurrently. This is done by setting the `run_parallel` option to True as shown
 in the following example.
 
 Here we are using the `FullFactorialGenerator` with 3 levels to generate inputs
 for our `Paraboloid` model. With two inputs, :math:`3^2=9` cases have been
 generated. In this case we are running on two processors and have specified
-:code:`options['parallel']=True` to run cases on all available processors.
+:code:`options['run_parallel']=True` to run cases on all available processors.
 The cases have therefore been split with 5 cases run on the first processor
 and 4 cases on the second.
 

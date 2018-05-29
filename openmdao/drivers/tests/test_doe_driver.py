@@ -551,6 +551,7 @@ class TestParallelDOE(unittest.TestCase):
         prob = Problem()
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  3
 
         with self.assertRaises(RuntimeError) as context:
@@ -570,6 +571,7 @@ class TestParallelDOE(unittest.TestCase):
 
         # run cases on all procs
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  1
 
         with self.assertRaises(RuntimeError) as context:
@@ -591,7 +593,8 @@ class TestParallelDOE(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), procs_per_model=True)
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), procs_per_model=True,
+                                run_parallel=True)
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup()
@@ -656,6 +659,7 @@ class TestParallelDOE(unittest.TestCase):
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  doe_parallel
 
         prob.setup(check=False)
@@ -726,6 +730,7 @@ class TestParallelDOE(unittest.TestCase):
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  doe_parallel
 
         prob.setup(check=False)
@@ -896,6 +901,7 @@ class TestParallelDOEFeature(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  1
 
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
@@ -987,6 +993,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.options['run_parallel'] =  True
 
         # run 2 cases at a time, each using 2 of our 4 procs
         doe_parallel = prob.driver.options['procs_per_model'] = 2

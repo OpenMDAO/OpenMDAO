@@ -98,7 +98,8 @@ class DOEDriver(Driver):
         """
         self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
                              desc='The case generator. If default, no cases are generated.')
-
+        self.options.declare('run_parallel', default=False,
+                             desc='Set to True to execute cases in parallel.')
         self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
@@ -116,7 +117,7 @@ class DOEDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
-        if MPI:
+        if MPI and self.options['run_parallel']:
             self._comm = comm
             procs_per_model = self.options['procs_per_model']
 
