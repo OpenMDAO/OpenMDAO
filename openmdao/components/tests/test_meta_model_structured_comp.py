@@ -9,6 +9,7 @@ from copy import deepcopy
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.assert_utils import assert_rel_error
 import numpy as np
 import unittest
@@ -964,7 +965,7 @@ class TestRegularGridMap(unittest.TestCase):
         #   dict so no guarantee on the order except for Python 3.6 !
         msg = "Error interpolating output '[f|g]' in 'comp' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
-        with assertRaisesRegex(self, ValueError, msg):
+        with assertRaisesRegex(self, AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):
@@ -1048,7 +1049,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         p.setup()
 
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(AnalysisError) as cm:
             p.run_model()
 
         msg = ("Error interpolating output 'y' in 'MM' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
