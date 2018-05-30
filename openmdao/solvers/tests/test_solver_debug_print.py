@@ -25,7 +25,7 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.general_utils import printoptions
 
-from nose_parameterized import parameterized
+from parameterized import parameterized
 
 
 nonlinear_solvers = [
