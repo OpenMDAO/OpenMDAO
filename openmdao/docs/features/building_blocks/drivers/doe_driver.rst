@@ -85,8 +85,8 @@ To illustrate this, we will demonstrate performing a DOE on a model based on the
 
 In this case, the model itself requires two processors, so in order to run cases
 concurrently we need to allocate at least four processors in total. We can allocate
-as many procs as we have available, however the number of procs must be a multiple
-of the number of procs per model, which is 2 here. Regardless of how many processors
+as many processors as we have available, however the number of processors must be a multiple
+of the number of processors per model, which is 2 here. Regardless of how many processors
 we allocate, we need to tell the `DOEDriver` that the model needs 2 processors, which
 is done by specifying :code:`options['procs_per_model']=2`. From this, the driver
 figures out how many models it can run in parallel, which in this case is also 2.

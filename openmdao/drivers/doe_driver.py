@@ -265,9 +265,10 @@ class DOEDriver(Driver):
         Set up case recording.
         """
         if MPI:
+            procs_per_model = self.options['procs_per_model']
+
             for recorder in self._recorders:
                 recorder._parallel = True
-                procs_per_model = self.options['procs_per_model']
 
                 # if SqliteRecorder, write cases only on procs up to the number
                 # of parallel DOEs (i.e. on the root procs for the cases)

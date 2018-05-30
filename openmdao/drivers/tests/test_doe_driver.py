@@ -593,7 +593,7 @@ class TestParallelDOE(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), procs_per_model=True,
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), procs_per_model=1,
                                 run_parallel=True)
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
