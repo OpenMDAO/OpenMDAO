@@ -547,7 +547,7 @@ class TestParallelDOE(unittest.TestCase):
         except OSError:
             pass
 
-    def test_indivisable_error(self):
+    def test_indivisible_error(self):
         prob = Problem()
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
@@ -558,7 +558,7 @@ class TestParallelDOE(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "The total number of processors is not evenly divisable by the "
+                         "The total number of processors is not evenly divisible by the "
                          "specified number of processors per model.\n Provide a number of "
                          "processors that is a multiple of 3, or specify a number "
                          "of processors per model that divides into 4.")

@@ -288,7 +288,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
-    def test_indivisable_error(self):
+    def test_indivisible_error(self):
         prob = Problem()
         model = prob.model = Group()
         par = model.add_subsystem('par', ParallelGroup())
@@ -301,7 +301,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "The total number of processors is not evenly divisable by the "
+                         "The total number of processors is not evenly divisible by the "
                          "specified number of processors per model.\n Provide a number of "
                          "processors that is a multiple of 3, or specify a number "
                          "of processors per model that divides into 4.")

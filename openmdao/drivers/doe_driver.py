@@ -124,7 +124,7 @@ class DOEDriver(Driver):
             full_size = comm.size
             size = full_size // procs_per_model
             if full_size != size * procs_per_model:
-                raise RuntimeError("The total number of processors is not evenly divisable by the "
+                raise RuntimeError("The total number of processors is not evenly divisible by the "
                                    "specified number of processors per model.\n Provide a "
                                    "number of processors that is a multiple of %d, or "
                                    "specify a number of processors per model that divides "
