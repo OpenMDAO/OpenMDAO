@@ -415,7 +415,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials()
 
         for comp_name, comp in iteritems(data):
             for partial_name, partial in iteritems(comp):

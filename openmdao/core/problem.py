@@ -789,8 +789,9 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
+                                # TODO - Hey I sorted it out!
                                 # TODO - Sort out the minus sign difference.
-                                perturb = 1.0 if not explicit else -1.0
+                                perturb = 1.0
 
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
@@ -968,7 +969,7 @@ class Problem(object):
                 # Since all partials for outputs for explicit comps are declared, assume anything
                 # missing is an input deriv.
                 if explicit and abs_key[1] in comp._var_abs_names['input']:
-                    partials_data[c_name][rel_key][jac_key] = -partial
+                    partials_data[c_name][rel_key][jac_key] = partial
                 else:
                     partials_data[c_name][rel_key][jac_key] = partial
 

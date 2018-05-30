@@ -89,7 +89,7 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
-            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=-1.)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
