@@ -611,7 +611,7 @@ class TestDOEDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "expecting a list:\n{'desvar': 1.0}")
+                         "expecting a list of name/value pairs:\n{'desvar': 1.0}")
 
         # data contains a list of list, but one has the wrong length
         cases = [
