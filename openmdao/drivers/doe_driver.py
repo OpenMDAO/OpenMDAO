@@ -57,6 +57,8 @@ class DOEDriver(Driver):
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
+    _comm : MPI.Comm or None
+        MPI communicator object.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -88,6 +90,7 @@ class DOEDriver(Driver):
 
         self._name = ''
         self._recorders = []
+        self._comm = None
 
     def _declare_options(self):
         """

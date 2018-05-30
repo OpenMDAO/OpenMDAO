@@ -7,8 +7,153 @@ import numpy as np
 from six import iteritems
 from six.moves import range
 
+import json
+
 from openmdao.drivers.doe_driver import DOEGenerator
 import pyDOE2
+
+
+class UniformGenerator(DOEGenerator):
+    """
+    DOE case generator implementing the Uniform method.
+
+    Attributes
+    ----------
+    _num_samples : int
+        The number of samples in the DOE.
+    _seed : int or None
+        Random seed.
+    """
+
+    def __init__(self, num_samples=1, seed=None):
+        """
+        Initialize the UniformGenerator.
+
+        Parameters
+        ----------
+        num_samples : int, optional
+            The number of samples to run. Defaults to 1.
+
+        seed : int or None, optional
+            Seed for randon number generator.
+        """
+        super(UniformGenerator, self).__init__()
+
+        self._num_samples = num_samples
+        self._seed = seed
+
+    def __call__(self, design_vars):
+        """
+        Generate case.
+
+        Parameters
+        ----------
+        design_vars : dict
+            Dictionary of design variables for which to generate values.
+
+        Yields
+        ------
+        list
+            list of name, value tuples for the design variables.
+        """
+        if self._seed is not None:
+            np.random.seed(self._seed)
+
+        for i in range(self._num_samples):
+            sample = []
+
+            for (name, meta) in iteritems(design_vars):
+                values = []
+
+                for k in range(meta['size']):
+                    lower = meta['lower']
+                    if isinstance(lower, np.ndarray):
+                        lower = lower[k]
+
+                    upper = meta['upper']
+                    if isinstance(upper, np.ndarray):
+                        upper = upper[k]
+
+                    values.append(np.random.uniform(lower, upper))
+
+                sample.append((name, np.array(values)))
+
+            yield sample
+
+
+class JSONFileGenerator(DOEGenerator):
+    """
+    DOE case generator that reads cases from a JSON file.
+
+    Attributes
+    ----------
+    _num_samples : int
+        The number of samples in the DOE.
+
+    _filename : satr
+        The name of the JSON file from which cases are to be read.
+
+    _data : list
+        List of list of name, value tuples for the design variables.
+    """
+
+    def __init__(self, filename):
+        """
+        Initialize the JSONFileGenerator generator.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the JSON file from which cases are to be read.
+        """
+        super(JSONFileGenerator, self).__init__()
+
+        with open(filename, 'r') as f:
+            json_data = f.read()
+            data = self._data = json.loads(json_data)
+
+        if not isinstance(data, list):
+            raise RuntimeError("The file '%s' is not a valid DOE case file." % filename)
+
+        self._filename = filename
+        self._num_samples = len(data)
+
+    def __call__(self, design_vars):
+        """
+        Generate case.
+
+        Parameters
+        ----------
+        design_vars : dict
+            Dictionary of design variables for which to generate values.
+
+        Yields
+        ------
+        list
+            list of name, value tuples for the design variables.
+        """
+        error_msg = "Invalid DOE case found in file '%s':\n%s"
+
+        for case in self._data:
+            if not isinstance(case, list):
+                raise RuntimeError(error_msg % (self._filename, str(case)))
+
+            invalid_desvars = []
+            for tup in case:
+                if not isinstance(tup, list) or len(tup) != 2:
+                    raise RuntimeError(error_msg % (self._filename, str(case)))
+
+                if tup[0] not in design_vars:
+                    invalid_desvars.append(tup[0])
+
+            if invalid_desvars:
+                if len(invalid_desvars) > 1:
+                    info = "%s are not valid design variables." % invalid_desvars
+                else:
+                    info = "'%s' is not a valid design variable." % invalid_desvars[0]
+                raise RuntimeError(error_msg % (self._filename, info))
+
+            yield case
 
 
 class UniformGenerator(DOEGenerator):
