@@ -748,8 +748,8 @@ class Problem(object):
 
                 with comp._unscaled_context():
                     subjacs = comp._jacobian._subjacs
-                    if explicit:
-                        comp._negate_jac()
+                    #if explicit:
+                    #    comp._negate_jac()
 
                     of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -881,8 +881,8 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-                    if explicit:
-                        comp._negate_jac()
+                    #if explicit:
+                    #    comp._negate_jac()
 
         model._inputs.set_vec(input_cache)
         model._outputs.set_vec(output_cache)
