@@ -1846,7 +1846,7 @@ class Group(System):
                     if key[0] == key[1]:
                         size = self._var_allprocs_abs2meta[key[0]]['size']
                         meta['rows'] = meta['cols'] = np.arange(size)
-                        meta['value'] = np.ones(size)
+                        meta['value'] = -np.ones(size)
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.
