@@ -19,7 +19,7 @@ from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, \
 
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGenerator, \
-    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, JSONFileGenerator
+    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, JSONGenerator
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
@@ -529,7 +529,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
-    def test_json_file(self):
+    def test_json(self):
         prob = Problem()
         model = prob.model
 
@@ -543,20 +543,16 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        # write DOE case data to a JSON file
+        # save DOE case data to a JSON string
         cases = []
         case_gen = FullFactorialGenerator(levels=3)
         for case in case_gen(model.get_design_vars(recurse=True)):
             cases.append([(var, list(val)) for (var, val) in case])
 
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
+        json_data = json.dumps(cases)
 
-        # create DOEDriver using cases from JSON file
-        generator = JSONFileGenerator('cases.json')
-        self.assertEqual(generator._num_samples, 9)
-
-        prob.driver = DOEDriver(generator)
+        # create DOEDriver using JSON data
+        prob.driver = DOEDriver(generator=JSONGenerator(json_data))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.run_driver()
@@ -586,7 +582,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['y'], expected[n]['y'])
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
 
-    def test_json_file_errors(self):
+    def test_json_errors(self):
         prob = Problem()
         model = prob.model
 
@@ -600,30 +596,24 @@ class TestDOEDriver(unittest.TestCase):
 
         prob.setup()
 
-        # JSON file does not contain list
+        # data does not contain a list
         cases ={'desvar': 1.0}
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
 
         with self.assertRaises(RuntimeError) as err:
-            prob.driver = DOEDriver(generator=JSONFileGenerator('cases.json'))
+            prob.driver = DOEDriver(generator=JSONGenerator(cases))
         self.assertEqual(str(err.exception),
-                         "The file 'cases.json' is not a valid DOE case file.")
+                         "JSONGenerator was not provided valid DOE case data.")
 
-        # JSON file contains a list of non-list
+        # data contains a list of non-list
         cases = [{'desvar': 1.0}]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
-
-        prob.driver = DOEDriver(generator=JSONFileGenerator('cases.json'))
+        prob.driver = DOEDriver(generator=JSONGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
-        self.assertEqual(str(err.exception),
-                         "Invalid DOE case found in file 'cases.json':\n"
-                         "{'desvar': 1.0}")
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "expecting a list:\n{'desvar': 1.0}")
 
-        # JSON file contains a list of list, but one has the wrong length
+        # data contains a list of list, but one has the wrong length
         cases = [
             [['p1.x', 0.], ['p2.y', 0.]],
             [['p1.x', 1.], ['p2.y', 1., 'foo']]
@@ -631,15 +621,15 @@ class TestDOEDriver(unittest.TestCase):
         with open('cases.json', 'w') as f:
             f.write(json.dumps(cases))
 
-        prob.driver = DOEDriver(generator=JSONFileGenerator('cases.json'))
+            prob.driver = DOEDriver(generator=JSONGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
-        self.assertEqual(str(err.exception),
-                         "Invalid DOE case found in file 'cases.json':\n"
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "expecting a list of name/value pairs:\n"
                          "[['p1.x', 1.0], ['p2.y', 1.0, 'foo']]")
 
-        # JSON file contains a list of list, but one has an invalid design var
+        # data contains a list of list, but one case has an invalid design var
         cases = [
             [['p1.x', 0.], ['p2.y', 0.]],
             [['p1.x', 1.], ['p2.z', 1.]]
@@ -647,15 +637,15 @@ class TestDOEDriver(unittest.TestCase):
         with open('cases.json', 'w') as f:
             f.write(json.dumps(cases))
 
-        prob.driver = DOEDriver(generator=JSONFileGenerator('cases.json'))
+            prob.driver = DOEDriver(generator=JSONGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
-        self.assertEqual(str(err.exception),
-                         "Invalid DOE case found in file 'cases.json':\n"
-                         "'p2.z' is not a valid design variable.")
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "'p2.z' is not a valid design variable:\n"
+                         "[['p1.x', 1.0], ['p2.z', 1.0]]")
 
-        # JSON file contains a list of list, but one has an multiple invalid design vars
+        # data contains a list of list, but one case has multiple invalid design vars
         cases = [
             [['p1.x', 0.], ['p2.y', 0.]],
             [['p1.y', 1.], ['p2.z', 1.]]
@@ -663,13 +653,13 @@ class TestDOEDriver(unittest.TestCase):
         with open('cases.json', 'w') as f:
             f.write(json.dumps(cases))
 
-        prob.driver = DOEDriver(generator=JSONFileGenerator('cases.json'))
+            prob.driver = DOEDriver(generator=JSONGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
-        self.assertEqual(str(err.exception),
-                         "Invalid DOE case found in file 'cases.json':\n"
-                         "['p1.y', 'p2.z'] are not valid design variables.")
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "['p1.y', 'p2.z'] are not valid design variables:\n"
+                         "[['p1.y', 1.0], ['p2.z', 1.0]]")
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
