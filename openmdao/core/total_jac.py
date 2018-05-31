@@ -1226,7 +1226,7 @@ class _TotalJacInfo(object):
         """
         Print out the derivatives when debug_print is True.
         """
-        if self.mode  == 'fwd':
+        if self.mode == 'fwd':
             outputs = self.input_list
             inputs = self.output_list
         else:
@@ -1245,7 +1245,7 @@ class _TotalJacInfo(object):
             out_meta = self.out_meta
             J = self.J
 
-            if self.mode  == 'fwd':
+            if self.mode == 'fwd':
                 in_meta, out_meta = out_meta, in_meta
 
             for i, of in enumerate(outputs):
