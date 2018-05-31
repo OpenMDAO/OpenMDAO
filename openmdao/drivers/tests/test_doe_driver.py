@@ -190,9 +190,8 @@ class TestDOEDriver(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as err:
             prob.driver = DOEDriver(generator=ListGenerator(cases))
-        self.assertEqual(str(err.exception),
-                         "ListGenerator was not provided valid DOE case data, "
-                         "expected a list of name/value pairs but got a dict.")
+        self.assertEqual(str(err.exception), "Invalid DOE case data, "
+                         "expected a list but got a dict.")
 
         # data contains a list of non-list
         cases = [{'desvar': 1.0}]

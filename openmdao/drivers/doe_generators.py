@@ -47,7 +47,7 @@ class ListGenerator(DOEGenerator):
     Attributes
     ----------
     _data : list
-        List of list of name, value tuples for the design variables.
+        List of collections of name, value pairs for the design variables.
     """
 
     def __init__(self, data=[]):
@@ -56,15 +56,14 @@ class ListGenerator(DOEGenerator):
 
         Parameters
         ----------
-        data : list of collections of name, value tuples for the design variables
-               or string encoded JSON version of that data.
+        data : list
+            list of collections of name, value pairs for the design variables
         """
         super(ListGenerator, self).__init__()
 
         if not isinstance(data, list):
-            raise RuntimeError("%s was not provided valid DOE case data, expected "
-                               "a list of name/value pairs but got a %s." %
-                               (self.__class__.__name__, type(data).__name__))
+            raise RuntimeError("Invalid DOE case data, expected a list but got a %s." %
+                               type(data).__name__)
 
         self._data = data
 
@@ -158,7 +157,6 @@ class CSVGenerator(DOEGenerator):
         # check that column headers match design vars
         with open(self._filename, 'r') as f:
             names = f.readline().strip().split(',')
-            print(names)
             invalid_desvars = []
             for name in names:
                 if name not in design_vars:
@@ -177,7 +175,6 @@ class CSVGenerator(DOEGenerator):
             for row in reader:
                 case = [(name, np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
                         for name in row]
-                print('yielding case:', case)
                 yield case
 
 
