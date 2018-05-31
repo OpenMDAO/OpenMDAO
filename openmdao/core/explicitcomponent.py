@@ -306,32 +306,29 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name in self._rel_vec_names:
+                    d_outputs = self._vectors['output'][vec_name]
+                    d_residuals = self._vectors['residual'][vec_name]
+
                     if mode == 'fwd':
                         if self._has_resid_scaling:
-                            d_outputs = self._vectors['output'][vec_name]
-                            d_residuals = self._vectors['residual'][vec_name]
-
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_outputs.set_vec(d_residuals)
                                 d_outputs *= -1.0
                         else:
-                            self._vectors['output'][vec_name].set_vec(
-                                self._vectors['residual'][vec_name])
-                            self._vectors['output'][vec_name] *= -1.0
+                            d_outputs.set_vec(d_residuals)
+                            d_outputs *= -1.0
+
                     else:  # rev
                         if self._has_resid_scaling:
-                            d_outputs = self._vectors['output'][vec_name]
-                            d_residuals = self._vectors['residual'][vec_name]
-
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_residuals.set_vec(d_outputs)
                                 d_residuals *= -1.0
                         else:
-                            self._vectors['residual'][vec_name].set_vec(
-                                self._vectors['output'][vec_name])
-                            self._vectors['residual'][vec_name] *= -1.0
+                            d_residuals.set_vec(d_outputs)
+                            d_residuals *= -1.0
+
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):
