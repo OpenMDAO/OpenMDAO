@@ -50,13 +50,13 @@ Running a DOE in Parallel
 -------------------------
 
 In a parallel processing environment, it is possible for `DOEDriver` to run
-cases concurrently. This is done by specifying the `parallel` option as shown
+cases concurrently. This is done by setting the `run_parallel` option to True as shown
 in the following example.
 
 Here we are using the `FullFactorialGenerator` with 3 levels to generate inputs
 for our `Paraboloid` model. With two inputs, :math:`3^2=9` cases have been
 generated. In this case we are running on two processors and have specified
-:code:`options['parallel']=True` to run cases on all available processors.
+:code:`options['run_parallel']=True` to run cases on all available processors.
 The cases have therefore been split with 5 cases run on the first processor
 and 4 cases on the second.
 
@@ -84,9 +84,12 @@ To illustrate this, we will demonstrate performing a DOE on a model based on the
     :layout: code
 
 In this case, the model itself requires two processors, so in order to run cases
-concurrently we need to allocate at least four processors in total.  With four
-processors we can run two cases at a time, which is done by specifying
-:code:`options['parallel']=2`.
+concurrently we need to allocate at least four processors in total. We can allocate
+as many processors as we have available, however the number of processors must be a multiple
+of the number of processors per model, which is 2 here. Regardless of how many processors
+we allocate, we need to tell the `DOEDriver` that the model needs 2 processors, which
+is done by specifying :code:`options['procs_per_model']=2`. From this, the driver
+figures out how many models it can run in parallel, which in this case is also 2.
 
 The `SqliteRecorder` will record cases on the first two processors, which serve as
 the "root" processors for the parallel cases.
