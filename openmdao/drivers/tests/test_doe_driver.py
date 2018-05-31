@@ -19,7 +19,7 @@ from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, \
 
 from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGenerator, \
-    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, JSONGenerator
+    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, ListGenerator
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
@@ -117,6 +117,137 @@ class TestDOEDriver(unittest.TestCase):
         cases = CaseReader("cases.sql").driver_cases
 
         self.assertEqual(cases.num_cases, 0)
+
+    def test_list(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        # create a list of DOE cases
+        cases = []
+        case_gen = FullFactorialGenerator(levels=3)
+        for case in case_gen(model.get_design_vars(recurse=True)):
+            cases.append([(var, list(val)) for (var, val) in case])
+
+        # create DOEDriver using provided list of cases
+        prob.driver = DOEDriver(cases)
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
+            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+
+            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
+            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
+            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
+
+            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
+            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        }
+
+        cases = CaseReader("cases.sql").driver_cases
+
+        self.assertEqual(cases.num_cases, 9)
+
+        for n in range(cases.num_cases):
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['x'], expected[n]['x'])
+            self.assertEqual(outputs['y'], expected[n]['y'])
+            self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
+
+    def test_list_errors(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        # data does not contain a list
+        cases ={'desvar': 1.0}
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.driver = DOEDriver(generator=ListGenerator(cases))
+        self.assertEqual(str(err.exception),
+                         "ListGenerator was not provided valid DOE case data, "
+                         "expected a list of name/value pairs but got a dict.")
+
+        # data contains a list of non-list
+        cases = [{'desvar': 1.0}]
+        prob.driver = DOEDriver(generator=ListGenerator(cases))
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "expecting a list of name/value pairs:\n{'desvar': 1.0}")
+
+        # data contains a list of list, but one has the wrong length
+        cases = [
+            [['p1.x', 0.], ['p2.y', 0.]],
+            [['p1.x', 1.], ['p2.y', 1., 'foo']]
+        ]
+        with open('cases.json', 'w') as f:
+            f.write(json.dumps(cases))
+
+            prob.driver = DOEDriver(generator=ListGenerator(cases))
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "expecting a list of name/value pairs:\n"
+                         "[['p1.x', 1.0], ['p2.y', 1.0, 'foo']]")
+
+        # data contains a list of list, but one case has an invalid design var
+        cases = [
+            [['p1.x', 0.], ['p2.y', 0.]],
+            [['p1.x', 1.], ['p2.z', 1.]]
+        ]
+        with open('cases.json', 'w') as f:
+            f.write(json.dumps(cases))
+
+            prob.driver = DOEDriver(generator=ListGenerator(cases))
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "'p2.z' is not a valid design variable:\n"
+                         "[['p1.x', 1.0], ['p2.z', 1.0]]")
+
+        # data contains a list of list, but one case has multiple invalid design vars
+        cases = [
+            [['p1.x', 0.], ['p2.y', 0.]],
+            [['p1.y', 1.], ['p2.z', 1.]]
+        ]
+        with open('cases.json', 'w') as f:
+            f.write(json.dumps(cases))
+
+            prob.driver = DOEDriver(generator=ListGenerator(cases))
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception), "Invalid DOE case found, "
+                         "['p1.y', 'p2.z'] are not valid design variables:\n"
+                         "[['p1.y', 1.0], ['p2.z', 1.0]]")
 
     def test_uniform(self):
         prob = Problem()
@@ -528,138 +659,6 @@ class TestDOEDriver(unittest.TestCase):
 
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
-
-    def test_json(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        # save DOE case data to a JSON string
-        cases = []
-        case_gen = FullFactorialGenerator(levels=3)
-        for case in case_gen(model.get_design_vars(recurse=True)):
-            cases.append([(var, list(val)) for (var, val) in case])
-
-        json_data = json.dumps(cases)
-
-        # create DOEDriver using JSON data
-        prob.driver = DOEDriver(generator=JSONGenerator(json_data))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
-
-        prob.run_driver()
-        prob.cleanup()
-
-        expected = {
-            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
-            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
-            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
-            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        }
-
-        cases = CaseReader("cases.sql").driver_cases
-
-        self.assertEqual(cases.num_cases, 9)
-
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
-            self.assertEqual(outputs['x'], expected[n]['x'])
-            self.assertEqual(outputs['y'], expected[n]['y'])
-            self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
-
-    def test_json_errors(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        # data does not contain a list
-        cases ={'desvar': 1.0}
-
-        with self.assertRaises(RuntimeError) as err:
-            prob.driver = DOEDriver(generator=JSONGenerator(cases))
-        self.assertEqual(str(err.exception),
-                         "JSONGenerator was not provided valid DOE case data.")
-
-        # data contains a list of non-list
-        cases = [{'desvar': 1.0}]
-        prob.driver = DOEDriver(generator=JSONGenerator(cases))
-
-        with self.assertRaises(RuntimeError) as err:
-            prob.run_driver()
-        self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "expecting a list of name/value pairs:\n{'desvar': 1.0}")
-
-        # data contains a list of list, but one has the wrong length
-        cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.x', 1.], ['p2.y', 1., 'foo']]
-        ]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
-
-            prob.driver = DOEDriver(generator=JSONGenerator(cases))
-
-        with self.assertRaises(RuntimeError) as err:
-            prob.run_driver()
-        self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "expecting a list of name/value pairs:\n"
-                         "[['p1.x', 1.0], ['p2.y', 1.0, 'foo']]")
-
-        # data contains a list of list, but one case has an invalid design var
-        cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.x', 1.], ['p2.z', 1.]]
-        ]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
-
-            prob.driver = DOEDriver(generator=JSONGenerator(cases))
-
-        with self.assertRaises(RuntimeError) as err:
-            prob.run_driver()
-        self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "'p2.z' is not a valid design variable:\n"
-                         "[['p1.x', 1.0], ['p2.z', 1.0]]")
-
-        # data contains a list of list, but one case has multiple invalid design vars
-        cases = [
-            [['p1.x', 0.], ['p2.y', 0.]],
-            [['p1.y', 1.], ['p2.z', 1.]]
-        ]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
-
-            prob.driver = DOEDriver(generator=JSONGenerator(cases))
-
-        with self.assertRaises(RuntimeError) as err:
-            prob.run_driver()
-        self.assertEqual(str(err.exception), "Invalid DOE case found, "
-                         "['p1.y', 'p2.z'] are not valid design variables:\n"
-                         "[['p1.y', 1.0], ['p2.z', 1.0]]")
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

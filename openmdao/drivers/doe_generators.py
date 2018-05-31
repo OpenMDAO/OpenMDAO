@@ -7,15 +7,49 @@ import numpy as np
 from six import iteritems
 from six.moves import range
 
-import json
-
-from openmdao.drivers.doe_driver import DOEGenerator
 import pyDOE2
 
 
-class JSONGenerator(DOEGenerator):
+class DOEGenerator(object):
     """
-    DOE case generator that reads cases from JSON data.
+    Base class for a callable object that generates cases for a DOEDriver.
+
+    Attributes
+    ----------
+    _num_samples : int
+        The number of samples generated (available after generator has been called).
+    """
+
+    def __init__(self):
+        """
+        Initialize the DOEGenerator.
+        """
+        self._num_samples = 0
+
+    def __call__(self, design_vars):
+        """
+        Generate case.
+
+        Parameters
+        ----------
+        design_vars : dict
+            Dictionary of design variables for which to generate values.
+
+        Returns
+        -------
+        list
+            list of name, value tuples for the design variables.
+        """
+        return []
+
+
+class ListGenerator(DOEGenerator):
+    """
+    DOE case generator that reads cases from a provided list of DOE case data.
+
+    This DOE case generator will accept an existing data set in the form of
+    a list of DOE cases, each of which consists of a collection of name/value
+    pairs specifying values for design variables.
 
     Attributes
     ----------
@@ -25,32 +59,24 @@ class JSONGenerator(DOEGenerator):
         List of list of name, value tuples for the design variables.
     """
 
-    def __init__(self, data):
+    def __init__(self, data=[]):
         """
-        Initialize the JSONGenerator.
+        Initialize the ListGenerator.
 
         Parameters
         ----------
-        data : list of list of name, value tuples for the design variables
+        data : list of collections of name, value tuples for the design variables
                or string encoded JSON version of that data.
         """
-        super(JSONGenerator, self).__init__()
+        super(ListGenerator, self).__init__()
 
-        if isinstance(data, list):
-            self._data = data
-        elif isinstance(data, str):
-            try:
-                self._data = json.loads(data)
-            except err:
-                self._data = None
-        else:
-            self._data = None
+        if not isinstance(data, list):
+            raise RuntimeError("%s was not provided valid DOE case data, expected "
+                               "a list of name/value pairs but got a %s." %
+                               (self.__class__.__name__, type(data).__name__))
 
-        if not isinstance(self._data, list):
-            raise RuntimeError("%s was not provided valid DOE case data." %
-                               self.__class__.__name__)
-
-        self._num_samples = len(self._data)
+        self._data = data
+        self._num_samples = len(data)
 
     def __call__(self, design_vars):
         """
@@ -73,7 +99,7 @@ class JSONGenerator(DOEGenerator):
 
             invalid_desvars = []
             for tup in case:
-                if not isinstance(tup, list) or len(tup) != 2:
+                if type(tup) not in (tuple, list, set) or len(tup) != 2:
                     msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
                     raise RuntimeError(msg % str(case))
 

@@ -8,43 +8,11 @@ import inspect
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 
 from openmdao.utils.mpi import MPI
 
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
-
-
-class DOEGenerator(object):
-    """
-    Base class for a callable object that generates cases for a DOEDriver.
-
-    Attributes
-    ----------
-    _num_samples : int
-        The number of samples generated (available after generator has been called).
-    """
-
-    def __init__(self):
-        """
-        Initialize the DOEGenerator.
-        """
-        self._num_samples = 0
-
-    def __call__(self, design_vars):
-        """
-        Generate case.
-
-        Parameters
-        ----------
-        design_vars : dict
-            Dictionary of design variables for which to generate values.
-
-        Returns
-        -------
-        list
-            list of name, value tuples for the design variables.
-        """
-        return []
 
 
 class DOEDriver(Driver):
@@ -67,13 +35,17 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        generator : DOEGenerator or None
-            The case generator.
+        generator : DOEGenerator, list or None
+            The case generator or a list of DOE cases.
 
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        if generator and not isinstance(generator, DOEGenerator):
+        # if given a list, create a ListGenerator
+        if isinstance(generator, list):
+            generator = ListGenerator(generator)
+
+        elif generator and not isinstance(generator, DOEGenerator):
             if inspect.isclass(generator):
                 raise TypeError("DOEDriver requires an instance of DOEGenerator, "
                                 "but a class object was found: %s"
