@@ -131,9 +131,9 @@ class ComplexStep(ApproximationScheme):
             if form == 'reverse':
                 delta *= -1.0
             fact = 1.0 / delta
-            if deriv_type == 'total':
+            #if deriv_type == 'total':
                 # Sign difference between output and resids
-                fact = -fact
+                #fact = -fact
 
             if wrt in system._owns_approx_wrt_idx:
                 in_idx = system._owns_approx_wrt_idx[wrt]

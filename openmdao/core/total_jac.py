@@ -1280,7 +1280,7 @@ def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
             tot = tot[:, wrt_idx[prom_in]]
         return tot
     else:
-        return -jac
+        return jac
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):
