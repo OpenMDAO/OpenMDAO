@@ -1849,7 +1849,7 @@ class Group(System):
 
                         # All group approximations are treated as explicit components, so we have
                         # a -1 on the diagonal.
-                        meta['value'] = -np.ones(size)
+                        meta['value'] = np.full(size, -1.0)
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.
