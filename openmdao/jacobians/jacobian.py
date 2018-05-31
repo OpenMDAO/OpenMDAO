@@ -233,7 +233,7 @@ class Jacobian(object):
         """
         pass
 
-    def _set_partials_meta(self, abs_key, meta, negate=False):
+    def _set_partials_meta(self, abs_key, meta):
         """
         Store subjacobian metadata.
 
@@ -243,8 +243,6 @@ class Jacobian(object):
             Absolute name pair of sub-Jacobian.
         meta : dict
             Metadata dictionary for the subjacobian.
-        negate : bool
-            If True negate the given value, if any.
         """
         shape = self._abs_key2shape(abs_key)
         self._subjacs_info[abs_key] = (meta, shape)
@@ -252,5 +250,3 @@ class Jacobian(object):
         val = meta['value']
         if val is not None:
             self._set_abs(abs_key, val)
-            if negate:
-                self._multiply_subjac(abs_key, -1.0)

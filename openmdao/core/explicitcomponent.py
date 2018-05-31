@@ -178,7 +178,7 @@ class ExplicitComponent(Component):
                     in_size = self._var_abs2meta[abs_key[1]]['size']
                     meta['value'] = np.zeros((out_size, in_size))
 
-                J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
+                J._set_partials_meta(abs_key, meta)
 
                 if 'method' in meta and meta['method']:
 
@@ -197,7 +197,8 @@ class ExplicitComponent(Component):
         residuals = self._residuals
         with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals.set_data(-outputs.get_data())
+                residuals.set_vec(outputs)
+                residuals *= -1.0
 
                 self.compute(self._inputs, outputs)
 
@@ -270,7 +271,7 @@ class ExplicitComponent(Component):
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
-                        #d_residuals *= -1.0
+
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
                                 self.compute_multi_jacvec_product(self._inputs, d_inputs,
@@ -287,7 +288,6 @@ class ExplicitComponent(Component):
                                 d_residuals._icol = None
                         else:
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
-                        #d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -321,12 +321,12 @@ class ExplicitComponent(Component):
 
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
-                                #d_outputs.set_vec(d_residuals)
-                                d_outputs.set_data(-d_residuals.get_data(d_outputs))
+                                d_outputs.set_vec(d_residuals)
+                                d_outputs *= -1.0
                         else:
-                            #self._vectors['output'][vec_name].set_vec(
-                            #    self._vectors['residual'][vec_name])
-                            self._vectors['output'][vec_name].set_data(-self._vectors['residual'][vec_name].get_data())
+                            self._vectors['output'][vec_name].set_vec(
+                                self._vectors['residual'][vec_name])
+                            self._vectors['output'][vec_name] *= -1.0
                     else:  # rev
                         if self._has_resid_scaling:
                             d_outputs = self._vectors['output'][vec_name]
@@ -334,12 +334,12 @@ class ExplicitComponent(Component):
 
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
-                                #d_residuals.set_vec(d_outputs)
-                                d_residuals.set_data(-d_outputs.get_data())
+                                d_residuals.set_vec(d_outputs)
+                                d_residuals *= -1.0
                         else:
-                            #self._vectors['residual'][vec_name].set_vec(
-                            #    self._vectors['output'][vec_name])
-                            self._vectors['residual'][vec_name].set_data(-self._vectors['output'][vec_name].get_data())
+                            self._vectors['residual'][vec_name].set_vec(
+                                self._vectors['output'][vec_name])
+                            self._vectors['residual'][vec_name] *= -1.0
         return False, 0., 0.
 
     def _linearize(self, do_nl=False, do_ln=False):
@@ -359,20 +359,13 @@ class ExplicitComponent(Component):
         with self.jacobian_context() as J:
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
-                # Since the residuals are already negated, this call should come before negate_jac
-                # Additionally, computing the approximation before the call to compute_partials
-                # allows users to override FD'd values.
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
                 for approximation in itervalues(self._approx_schemes):
                     approximation.compute_approximations(self, jac=J)
 
                 if self._has_compute_partials:
-                    # negate constant subjacs (and others that will get overwritten)
-                    # back to normal
-                    #self._negate_jac()
                     self.compute_partials(self._inputs, J)
-
-                    # re-negate the jacobian
-                    #self._negate_jac()
 
             if self._owns_assembled_jac or self._views_assembled_jac:
                 J._update()

@@ -385,10 +385,10 @@ class TestJacobianFeatures(unittest.TestCase):
         assert_rel_error(self, totals, expected_totals, 1e-6)
 
         expected_subjacs = {
-            ('units.flow:T', 'units.T'): [[-1.]],
+            ('units.flow:T', 'units.T'): [[1.]],
             ('units.flow:P', 'units.T'): [[0.]],
             ('units.flow:T', 'units.P'): [[0.]],
-            ('units.flow:P', 'units.P'): [[-1.]],
+            ('units.flow:P', 'units.P'): [[1.]],
         }
 
         jac = units._jacobian._subjacs

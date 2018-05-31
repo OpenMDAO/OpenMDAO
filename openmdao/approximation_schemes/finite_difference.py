@@ -236,13 +236,6 @@ class FiniteDifference(ApproximationScheme):
                     result_array *= coeff
                     result.iadd_data(result_array)
 
-                #if deriv_type == 'total':
-                    # Sign difference between output and resids. This arises from the definitions
-                    # in the unified derivatives equations.
-                    # For ExplicitComponent: resid = output(n-1) - output(n)
-                    # so dresid/d* = - doutput/d*
-                    #result *= -1.0
-
                 for of, subjac in outputs:
 
                     if of in system._owns_approx_of_idx:

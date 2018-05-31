@@ -163,7 +163,7 @@ class TestDotProductCompNonVectorized(unittest.TestCase):
         np.testing.assert_almost_equal(c_i.ravel(), expected)
 
     def test_partials(self):
-        cpd = self.p.check_partials(method='cs')
+        cpd = self.p.check_partials(out_stream=None, method='cs')
 
         for comp in cpd:
             for (var, wrt) in cpd[comp]:

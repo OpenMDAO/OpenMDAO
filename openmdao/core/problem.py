@@ -748,8 +748,6 @@ class Problem(object):
 
                 with comp._unscaled_context():
                     subjacs = comp._jacobian._subjacs
-                    #if explicit:
-                    #    comp._negate_jac()
 
                     of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -789,13 +787,9 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
-                                # TODO - Hey I sorted it out!
-                                # TODO - Sort out the minus sign difference.
-                                perturb = 1.0
-
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
-                                flat_view[idx] = perturb
+                                flat_view[idx] = 1.0
 
                                 # Matrix Vector Product
                                 comp._apply_linear(['linear'], _contains_all, mode)
@@ -881,9 +875,6 @@ class Problem(object):
                                     deriv_value = deriv_value.todense()
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
-
-                    #if explicit:
-                    #    comp._negate_jac()
 
         model._inputs.set_vec(input_cache)
         model._outputs.set_vec(output_cache)
