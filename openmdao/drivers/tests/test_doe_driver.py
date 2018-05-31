@@ -10,7 +10,7 @@ import unittest
 import os
 import shutil
 import tempfile
-import json
+import csv
 
 import numpy as np
 
@@ -18,14 +18,15 @@ from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, \
     SqliteRecorder, CaseReader, PETScVector
 
 from openmdao.drivers.doe_driver import DOEDriver
-from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGenerator, \
-    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, ListGenerator
+from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, \
+    UniformGenerator, FullFactorialGenerator, PlackettBurmanGenerator, \
+    BoxBehnkenGenerator, LatinHypercubeGenerator
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import run_driver
+from openmdao.utils.general_utils import run_driver, printoptions
 
 from openmdao.utils.mpi import MPI
 
@@ -185,7 +186,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.setup()
 
         # data does not contain a list
-        cases ={'desvar': 1.0}
+        cases = {'desvar': 1.0}
 
         with self.assertRaises(RuntimeError) as err:
             prob.driver = DOEDriver(generator=ListGenerator(cases))
@@ -207,10 +208,8 @@ class TestDOEDriver(unittest.TestCase):
             [['p1.x', 0.], ['p2.y', 0.]],
             [['p1.x', 1.], ['p2.y', 1., 'foo']]
         ]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
 
-            prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = DOEDriver(generator=ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
@@ -223,10 +222,8 @@ class TestDOEDriver(unittest.TestCase):
             [['p1.x', 0.], ['p2.y', 0.]],
             [['p1.x', 1.], ['p2.z', 1.]]
         ]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
 
-            prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = DOEDriver(generator=ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
@@ -239,16 +236,226 @@ class TestDOEDriver(unittest.TestCase):
             [['p1.x', 0.], ['p2.y', 0.]],
             [['p1.y', 1.], ['p2.z', 1.]]
         ]
-        with open('cases.json', 'w') as f:
-            f.write(json.dumps(cases))
 
-            prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = DOEDriver(generator=ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case found, "
                          "['p1.y', 'p2.z'] are not valid design variables:\n"
                          "[['p1.y', 1.0], ['p2.z', 1.0]]")
+
+    def test_csv(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        # create a list of DOE cases
+        cases = []
+        case_gen = FullFactorialGenerator(levels=3)
+        for case in case_gen(model.get_design_vars(recurse=True)):
+            cases.append([(var, val) for (var, val) in case])
+
+        # generate CSV file with cases
+        header = [var for (var, val) in cases[0]]
+        with open('cases.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for case in cases:
+                writer.writerow([val for (var, val) in case])
+
+        # create DOEDriver using generated CSV file
+        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
+            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+
+            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
+            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
+            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
+
+            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
+            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        }
+
+        cases = CaseReader("cases.sql").driver_cases
+
+        self.assertEqual(cases.num_cases, 9)
+
+        for n in range(cases.num_cases):
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['x'], expected[n]['x'])
+            self.assertEqual(outputs['y'], expected[n]['y'])
+            self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
+
+    def test_csv_array(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', [0., 1.]))
+        model.add_subsystem('p2', IndepVarComp('y', [0., 1.]))
+        model.add_subsystem('comp1', Paraboloid())
+        model.add_subsystem('comp2', Paraboloid())
+
+        model.connect('p1.x', 'comp1.x', src_indices=[0])
+        model.connect('p2.y', 'comp1.y', src_indices=[0])
+
+        model.connect('p1.x', 'comp2.x', src_indices=[1])
+        model.connect('p2.y', 'comp2.y', src_indices=[1])
+
+        model.add_design_var('p1.x', lower=0.0, upper=1.0)
+        model.add_design_var('p2.y', lower=0.0, upper=1.0)
+
+        prob.setup()
+
+        # create a list of DOE cases
+        cases = []
+        case_gen = FullFactorialGenerator(levels=2)
+        for case in case_gen(model.get_design_vars(recurse=True)):
+            cases.append([(var, val) for (var, val) in case])
+
+        # generate CSV file with cases
+        header = [var for (var, val) in cases[0]]
+        with open('cases.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for case in cases:
+                writer.writerow([val for (var, val) in case])
+
+        # create DOEDriver using generated CSV file
+        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 0.])},
+            1: {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 0.])},
+            2: {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 0.])},
+            3: {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 0.])},
+            4: {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 1.])},
+            5: {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 1.])},
+            6: {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 1.])},
+            7: {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
+            8: {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 0.])},
+            9: {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 0.])},
+            10: {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 0.])},
+            11: {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 0.])},
+            12: {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 1.])},
+            13: {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 1.])},
+            14: {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 1.])},
+            15: {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
+        }
+
+        cases = CaseReader("cases.sql").driver_cases
+
+        self.assertEqual(cases.num_cases, 16)
+
+        for n in range(cases.num_cases):
+            outputs = cases.get_case(n).outputs
+            self.assertEqual(outputs['p1.x'][0], expected[n]['p1.x'][0])
+            self.assertEqual(outputs['p2.y'][0], expected[n]['p2.y'][0])
+            self.assertEqual(outputs['p1.x'][1], expected[n]['p1.x'][1])
+            self.assertEqual(outputs['p2.y'][1], expected[n]['p2.y'][1])
+
+    def test_csv_errors(self):
+        # test invalid file name
+        with self.assertRaises(RuntimeError) as err:
+            CSVGenerator(1.23)
+        self.assertEqual(str(err.exception),
+                         "'1.23' is not a valid file name.")
+
+        # test file not found
+        with self.assertRaises(RuntimeError) as err:
+            CSVGenerator('nocases.csv')
+        self.assertEqual(str(err.exception),
+                         "File not found: nocases.csv")
+
+        # create problem and a list of DOE cases
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        cases = []
+        case_gen = FullFactorialGenerator(levels=2)
+        for case in case_gen(model.get_design_vars(recurse=True)):
+            cases.append([(var, val) for (var, val) in case])
+
+        # test CSV file with an invalid design var
+        header = [var for (var, val) in cases[0]]
+        header[-1] = 'foobar'
+        with open('cases.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for case in cases:
+                writer.writerow([val for (var, val) in case])
+
+        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception), "Invalid DOE case file, "
+                         "'foobar' is not a valid design variable.")
+
+        # test CSV file with invalid design vars
+        header = [var+'_bad' for (var, val) in cases[0]]
+        with open('cases.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for case in cases:
+                writer.writerow([val for (var, val) in case])
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.run_driver()
+        self.assertEqual(str(err.exception), "Invalid DOE case file, "
+                         "%s are not valid design variables." %
+                         str([var for var in header]))
+
+        # test CSV file with invalid values
+        header = [var for (var, val) in cases[0]]
+        with open('cases.csv', 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            for case in cases:
+                writer.writerow([np.ones((2,2))*val for (var, val) in case])
+
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            opts = {'legacy': '1.13'}
+        else:
+            opts = {}
+
+        with printoptions(**opts):
+            with self.assertRaises(ValueError) as err:
+                prob.run_driver()
+            self.assertEqual(str(err.exception),
+                             "Error assigning p1.x = [ 0.  0.  0.  0.]: "
+                             "could not broadcast input array from shape (4) into shape (1)")
 
     def test_uniform(self):
         prob = Problem()

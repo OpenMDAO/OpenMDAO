@@ -7,6 +7,10 @@ import numpy as np
 from six import iteritems
 from six.moves import range
 
+import os.path
+import csv
+import re
+
 import pyDOE2
 
 
@@ -34,7 +38,7 @@ class DOEGenerator(object):
 
 class ListGenerator(DOEGenerator):
     """
-    DOE case generator that reads cases from a provided list of DOE case data.
+    DOE case generator that reads cases from a provided list of DOE cases.
 
     This DOE case generator will accept an existing data set in the form of
     a list of DOE cases, each of which consists of a collection of name/value
@@ -101,6 +105,80 @@ class ListGenerator(DOEGenerator):
                     raise RuntimeError(msg % (str(invalid_desvars[0]), str(case)))
 
             yield case
+
+
+class CSVGenerator(DOEGenerator):
+    """
+    DOE case generator that reads cases from a CSV file.
+
+    This DOE case generator will accept an existing data set in the form of
+    a CSV file containing DOE cases. The CSV file should have one column per
+    design variable and the header row should have the names of the design
+    variables.
+
+    Attributes
+    ----------
+    _filename : str
+           the name of the file from which to read cases
+    """
+
+    def __init__(self, filename):
+        """
+        Initialize the CSVGenerator.
+
+        Parameters
+        ----------
+        filename : str
+               the name of the file from which to read cases
+        """
+        super(CSVGenerator, self).__init__()
+
+        if not isinstance(filename, str):
+            raise RuntimeError("'%s' is not a valid file name." % str(filename))
+
+        if not os.path.isfile(filename):
+            raise RuntimeError("File not found: %s" % filename)
+
+        self._filename = filename
+
+    def __call__(self, design_vars):
+        """
+        Generate case.
+
+        Parameters
+        ----------
+        design_vars : dict
+            Dictionary of design variables for which to generate values.
+
+        Yields
+        ------
+        list
+            list of name, value tuples for the design variables.
+        """
+        # check that column headers match design vars
+        with open(self._filename, 'r') as f:
+            names = f.readline().strip().split(',')
+            print(names)
+            invalid_desvars = []
+            for name in names:
+                if name not in design_vars:
+                    invalid_desvars.append(name)
+            if invalid_desvars:
+                if len(invalid_desvars) > 1:
+                    msg = "Invalid DOE case file, %s are not valid design variables."
+                    raise RuntimeError(msg % str(invalid_desvars))
+                else:
+                    msg = "Invalid DOE case file, '%s' is not a valid design variable."
+                    raise RuntimeError(msg % str(invalid_desvars[0]))
+
+        # read cases from file, parse values into numpy arrays
+        with open(self._filename, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                case = [(name, np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
+                        for name in row]
+                print('yielding case:', case)
+                yield case
 
 
 class UniformGenerator(DOEGenerator):

@@ -21,14 +21,14 @@ class DOEDriver(Driver):
 
     Attributes
     ----------
-    _color : int or None
-        In MPI, the cached color is used to determine which cases to run on this proc.
     _name : str
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
     _comm : MPI.Comm or None
         MPI communicator object.
+    _color : int or None
+        In MPI, the cached color is used to determine which cases to run on this proc.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -180,7 +180,14 @@ class DOEDriver(Driver):
         metadata = {}
 
         for dv_name, dv_val in case:
-            self.set_design_var(dv_name, dv_val)
+            try:
+                msg = None
+                self.set_design_var(dv_name, dv_val)
+            except ValueError as err:
+                msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
+            finally:
+                if msg:
+                    raise(ValueError(msg))
 
         with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
