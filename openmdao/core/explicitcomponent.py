@@ -155,17 +155,6 @@ class ExplicitComponent(Component):
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
                                                          var_set=var_set)
 
-    def _negate_jac(self):
-        """
-        Negate this component's part of the jacobian.
-        """
-        if self._jacobian._subjacs:
-            for res_name in self._var_abs_names['output']:
-                for in_name in self._var_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
-
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
