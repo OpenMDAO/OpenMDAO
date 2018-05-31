@@ -1226,8 +1226,13 @@ class _TotalJacInfo(object):
         """
         Print out the derivatives when debug_print is True.
         """
-        inputs = self.input_list
-        outputs = self.output_list
+        if self.mode  == 'fwd':
+            outputs = self.input_list
+            inputs = self.output_list
+        else:
+            inputs = self.input_list
+            outputs = self.output_list
+
         if self.return_format == 'dict':
             J = self.J_dict
             for of in inputs:
@@ -1239,6 +1244,9 @@ class _TotalJacInfo(object):
             in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
             out_meta = self.out_meta
             J = self.J
+
+            if self.mode  == 'fwd':
+                in_meta, out_meta = out_meta, in_meta
 
             for i, of in enumerate(outputs):
                 out_slice = out_meta[of][0]
