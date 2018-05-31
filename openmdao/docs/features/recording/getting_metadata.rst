@@ -15,7 +15,7 @@ The Driver records model viewer data in 'connections_list' and 'tree' within its
 is primaily used for the N^2 viewer.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_reading_driver_metadata
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_metadata
     :layout: interleave
 
 *Solver Metadata*
@@ -26,7 +26,7 @@ one solver's metadata may be recorded, each solver's metadata must be accessed t
 its absolute name within :code:`solver_metadata`, as shown in the example below.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_reading_solver_metadata
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_metadata
     :layout: interleave
 
 *System Metadata*
@@ -42,7 +42,7 @@ pickled and recorded. If there are options that cannot be pickled or you simply 
 to record, they can be excluded using the 'options_excludes' recording option on the system.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_reading_system_metadata_basic
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_metadata
     :layout: interleave
 
 .. note::

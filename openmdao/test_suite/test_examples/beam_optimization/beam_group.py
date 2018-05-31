@@ -5,7 +5,6 @@ from openmdao.api import Group, IndepVarComp
 
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
-from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import StatesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import DisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import ComplianceComp
@@ -42,9 +41,6 @@ class BeamGroup(Group):
         comp = LocalStiffnessMatrixComp(num_elements=num_elements, E=E, L=L)
         self.add_subsystem('local_stiffness_matrix_comp', comp)
 
-        comp = GlobalStiffnessMatrixComp(num_elements=num_elements)
-        self.add_subsystem('global_stiffness_matrix_comp', comp)
-
         comp = StatesComp(num_elements=num_elements, force_vector=force_vector)
         self.add_subsystem('states_comp', comp)
 
@@ -61,10 +57,7 @@ class BeamGroup(Group):
         self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
         self.connect(
             'local_stiffness_matrix_comp.K_local',
-            'global_stiffness_matrix_comp.K_local')
-        self.connect(
-            'global_stiffness_matrix_comp.K',
-            'states_comp.K')
+            'states_comp.K_local')
         self.connect(
             'states_comp.d',
             'displacements_comp.d')

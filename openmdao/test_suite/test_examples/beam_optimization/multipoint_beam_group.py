@@ -13,7 +13,6 @@ from openmdao.components.bsplines_comp import BsplinesComp
 
 from openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp import MultiComplianceComp
 from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
-from openmdao.test_suite.test_examples.beam_optimization.components.global_stiffness_matrix_comp import GlobalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
 from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp
@@ -113,9 +112,6 @@ class MultipointBeamGroup(Group):
                 f = - np.sin(x)
                 force_vector[0:-1:2, i] = f
 
-            comp = GlobalStiffnessMatrixComp(num_elements=num_elements)
-            sub.add_subsystem('global_stiffness_matrix_comp', comp)
-
             comp = MultiStatesComp(num_elements=num_elements, force_vector=force_vector, num_rhs=num_rhs)
             sub.add_subsystem('states_comp', comp)
 
@@ -128,11 +124,7 @@ class MultipointBeamGroup(Group):
 
             self.connect(
                 'local_stiffness_matrix_comp.K_local',
-                'parallel.%s.global_stiffness_matrix_comp.K_local' % name)
-
-            sub.connect(
-                'global_stiffness_matrix_comp.K',
-                'states_comp.K')
+                'parallel.%s.states_comp.K_local' % name)
 
             for k in range(num_rhs):
                 sub.connect(

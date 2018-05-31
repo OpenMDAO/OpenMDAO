@@ -17,6 +17,7 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.core.analysis_error import AnalysisError
 
 
 class OutOfBoundsError(Exception):
@@ -758,7 +759,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                     "was out of bounds ('{}', '{}') with " \
                     "value '{}'".format(out_name, self.pathname, varname_causing_error,
                                         err.lower, err.upper, err.value)
-                raise_from(ValueError(errmsg), None)
+                raise_from(AnalysisError(errmsg), None)
             except ValueError as err:
                 raise ValueError("Error interpolating output '%s' in %s:\n%s" %
                                  (out_name, self.pathname, str(err)))

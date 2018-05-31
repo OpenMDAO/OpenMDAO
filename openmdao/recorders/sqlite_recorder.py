@@ -6,6 +6,7 @@ import io
 import os
 import sqlite3
 
+import warnings
 import numpy as np
 from six import iteritems
 from six.moves import cPickle as pickle
@@ -423,7 +424,18 @@ class SqliteRecorder(BaseRecorder):
                 if check_path(key, [], excludes, True):
                     user_options._dict[key] = recording_requester.options._dict[key]
             user_options._read_only = recording_requester.options._read_only
-            pickled_metadata = pickle.dumps(user_options, self._pickle_version)
+
+            # try to pickle the metadata, report if it failed
+            try:
+                pickled_metadata = pickle.dumps(user_options, self._pickle_version)
+            except Exception:
+                pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
+                warnings.warn("Trying to record options which cannot be pickled "
+                              "on system with name: %s. Use the 'options_excludes' "
+                              "recording option on system objects to avoid attempting "
+                              "to record options which cannot be pickled. Skipping "
+                              "recording options for this system." % recording_requester.name,
+                              RuntimeWarning)
 
             path = recording_requester.pathname
             if not path:
