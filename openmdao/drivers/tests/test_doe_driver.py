@@ -136,6 +136,7 @@ class TestDOEDriver(unittest.TestCase):
         cases = []
         case_gen = FullFactorialGenerator(levels=3)
         for case in case_gen(model.get_design_vars(recurse=True)):
+            # converting ndarray to list enables JSON serialization
             cases.append([(var, list(val)) for (var, val) in case])
 
         # create DOEDriver using provided list of cases

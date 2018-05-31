@@ -291,24 +291,25 @@ class DOEDriver(Driver):
 
         model = self._problem.model
 
-        sys_vars = {}
-        in_vars = {}
-        outputs = model._outputs
-        inputs = model._inputs
-        views = outputs._views
-        views_in = inputs._views
-        sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
-        if self.recording_options['record_inputs']:
-            in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
+        names = model._outputs._names
+        views = model._outputs._views
+        sys_vars = {name: views[name] for name in names if name in filt['sys']}
 
-        outs = des_vars
-        outs.update(res_vars)
-        outs.update(obj_vars)
-        outs.update(con_vars)
-        outs.update(sys_vars)
+        out_vars = des_vars
+        out_vars.update(res_vars)
+        out_vars.update(obj_vars)
+        out_vars.update(con_vars)
+        out_vars.update(sys_vars)
+
+        if self.recording_options['record_inputs']:
+            names = model._inputs._names
+            views = model._inputs._views
+            in_vars = {name: views[name] for name in names if name in filt['in']}
+        else:
+            in_vars = {}
 
         data = {
-            'out': outs,
+            'out': out_vars,
             'in': in_vars
         }
 

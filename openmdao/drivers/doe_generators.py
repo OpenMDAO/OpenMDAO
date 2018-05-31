@@ -13,18 +13,7 @@ import pyDOE2
 class DOEGenerator(object):
     """
     Base class for a callable object that generates cases for a DOEDriver.
-
-    Attributes
-    ----------
-    _num_samples : int
-        The number of samples generated (available after generator has been called).
     """
-
-    def __init__(self):
-        """
-        Initialize the DOEGenerator.
-        """
-        self._num_samples = 0
 
     def __call__(self, design_vars):
         """
@@ -53,8 +42,6 @@ class ListGenerator(DOEGenerator):
 
     Attributes
     ----------
-    _num_samples : int
-        The number of samples in the DOE.
     _data : list
         List of list of name, value tuples for the design variables.
     """
@@ -76,7 +63,6 @@ class ListGenerator(DOEGenerator):
                                (self.__class__.__name__, type(data).__name__))
 
         self._data = data
-        self._num_samples = len(data)
 
     def __call__(self, design_vars):
         """
@@ -194,8 +180,6 @@ class _pyDOE_Generator(DOEGenerator):
     _levels : int
         The number of evenly spaced levels between each design variable
         lower and upper bound.
-    _num_samples : int
-        The number of samples in the DOE.
     """
 
     def __init__(self, levels=2):
@@ -228,8 +212,6 @@ class _pyDOE_Generator(DOEGenerator):
         size = sum([meta['size'] for name, meta in iteritems(design_vars)])
 
         doe = self._generate_design(size)
-
-        self._num_samples = len(doe)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
@@ -403,8 +385,6 @@ class LatinHypercubeGenerator(DOEGenerator):
         The number of iterations to use for maximin and correlations algorithms.
     _seed : int or None
         Random seed.
-    _num_samples : int
-        The number of samples in the DOE.
     """
 
     _supported_criterion = [
@@ -475,8 +455,6 @@ class LatinHypercubeGenerator(DOEGenerator):
                          criterion=self._criterion,
                          iterations=self._iterations,
                          random_state=self._seed)
-
-        self._num_samples = len(doe)
 
         # yield desvar values for doe samples
         for row in doe:
