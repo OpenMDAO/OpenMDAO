@@ -679,20 +679,21 @@ class TestParallelDOE(unittest.TestCase):
         except OSError:
             pass
 
-    def test_indivisable_error(self):
+    def test_indivisible_error(self):
         prob = Problem()
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.options['parallel'] =  3
+        prob.driver.options['run_parallel'] =  True
+        prob.driver.options['procs_per_model'] =  3
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "The number of processors is not evenly divisable by the "
-                         "specified number of parallel cases.\n Provide a number of "
+                         "The total number of processors is not evenly divisible by the "
+                         "specified number of processors per model.\n Provide a number of "
                          "processors that is a multiple of 3, or specify a number "
-                         "of parallel cases that divides into 4.")
+                         "of processors per model that divides into 4.")
 
     def test_minprocs_error(self):
         prob = Problem(FanInGrouped())
@@ -702,7 +703,8 @@ class TestParallelDOE(unittest.TestCase):
 
         # run cases on all procs
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.options['parallel'] =  True
+        prob.driver.options['run_parallel'] =  True
+        prob.driver.options['procs_per_model'] =  1
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
@@ -723,7 +725,8 @@ class TestParallelDOE(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), parallel=True)
+        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), procs_per_model=1,
+                                run_parallel=True)
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.setup()
@@ -788,7 +791,8 @@ class TestParallelDOE(unittest.TestCase):
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
-        prob.driver.options['parallel'] =  doe_parallel
+        prob.driver.options['run_parallel'] =  True
+        prob.driver.options['procs_per_model'] =  doe_parallel
 
         prob.setup()
 
@@ -846,7 +850,7 @@ class TestParallelDOE(unittest.TestCase):
 
     def test_fan_in_grouped_serial(self):
         # run cases on all procs (parallel model will run on single proc)
-        doe_parallel = True
+        doe_parallel = 1
 
         prob = Problem(FanInGrouped())
         model = prob.model
@@ -858,7 +862,8 @@ class TestParallelDOE(unittest.TestCase):
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
-        prob.driver.options['parallel'] =  doe_parallel
+        prob.driver.options['run_parallel'] =  True
+        prob.driver.options['procs_per_model'] =  doe_parallel
 
         prob.setup()
 
@@ -1028,7 +1033,8 @@ class TestParallelDOEFeature(unittest.TestCase):
         model.add_objective('f_xy')
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.options['parallel'] =  True
+        prob.driver.options['run_parallel'] =  True
+        prob.driver.options['procs_per_model'] =  1
 
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
 
@@ -1119,9 +1125,10 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
         prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
         prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.options['run_parallel'] =  True
 
         # run 2 cases at a time, each using 2 of our 4 procs
-        doe_parallel = prob.driver.options['parallel'] = 2
+        doe_parallel = prob.driver.options['procs_per_model'] = 2
 
         prob.setup()
         prob.run_driver()

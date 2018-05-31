@@ -21,6 +21,8 @@ class DOEDriver(Driver):
 
     Attributes
     ----------
+    _color : int or None
+        In MPI, the cached color is used to determine which cases to run on this proc.
     _name : str
         The name used to identify this driver in recorded cases.
     _recorders : list
@@ -63,6 +65,7 @@ class DOEDriver(Driver):
         self._name = ''
         self._recorders = []
         self._comm = None
+        self._color = None
 
     def _declare_options(self):
         """
@@ -70,12 +73,10 @@ class DOEDriver(Driver):
         """
         self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
                              desc='The case generator. If default, no cases are generated.')
-
-        self.options.declare('parallel', default=False, types=(bool, int), lower=0,
-                             desc='True or number of cases to run in parallel. '
-                                  'If True, cases will be run on all available processors. '
-                                  'If an integer, each case will get COMM.size/<number> '
-                                  'processors and <number> of cases will be run in parallel')
+        self.options.declare('run_parallel', default=False,
+                             desc='Set to True to execute cases in parallel.')
+        self.options.declare('procs_per_model', default=1, lower=1,
+                             desc='Number of processors to give each model under MPI.')
 
     def _setup_comm(self, comm):
         """
@@ -91,23 +92,19 @@ class DOEDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
-        parallel = self.options['parallel']
-        if MPI and parallel:
+        if MPI and self.options['run_parallel']:
             self._comm = comm
+            procs_per_model = self.options['procs_per_model']
 
-            if parallel == 1:  # True == 1
-                size = 1
-                color = self._color = comm.rank
-            else:
-                comm_size = comm.size
-                size = comm_size // parallel
-                if comm_size != size * parallel:
-                    raise RuntimeError("The number of processors is not evenly divisable by "
-                                       "the specified number of parallel cases.\n Provide a "
-                                       "number of processors that is a multiple of %d, or "
-                                       "specify a number of parallel cases that divides "
-                                       "into %d." % (parallel, comm_size))
-                color = self._color = comm.rank % size
+            full_size = comm.size
+            size = full_size // procs_per_model
+            if full_size != size * procs_per_model:
+                raise RuntimeError("The total number of processors is not evenly divisible by the "
+                                   "specified number of processors per model.\n Provide a "
+                                   "number of processors that is a multiple of %d, or "
+                                   "specify a number of processors per model that divides "
+                                   "into %d." % (procs_per_model, full_size))
+            color = self._color = comm.rank % size
 
             model_comm = comm.Split(color)
         else:
@@ -215,7 +212,7 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._comm.size // self.options['parallel']
+        size = self._comm.size // self.options['procs_per_model']
         color = self._color
 
         generator = self.options['generator']
@@ -242,18 +239,23 @@ class DOEDriver(Driver):
         """
         Set up case recording.
         """
-        parallel = self.options['parallel']
-        if MPI and parallel:
+        if MPI:
+            procs_per_model = self.options['procs_per_model']
+
             for recorder in self._recorders:
                 recorder._parallel = True
 
                 # if SqliteRecorder, write cases only on procs up to the number
                 # of parallel DOEs (i.e. on the root procs for the cases)
                 if isinstance(recorder, SqliteRecorder):
-                    if parallel is True or self._comm.rank < parallel:
+                    if procs_per_model == 1:
                         recorder._record_on_proc = True
                     else:
-                        recorder._record_on_proc = False
+                        size = self._comm.size // procs_per_model
+                        if self._comm.rank < size:
+                            recorder._record_on_proc = True
+                        else:
+                            recorder._record_on_proc = False
 
         super(DOEDriver, self)._setup_recording()
 
