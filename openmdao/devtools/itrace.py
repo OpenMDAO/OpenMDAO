@@ -245,7 +245,8 @@ def _setup(options):
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, id2count, verbose, memory,
-                                                         leaks, stream))
+                                                         leaks, stream),
+                                                filters=options.filters)
 
 
 def setup(methods=None, verbose=None, memory=None, leaks=False, rank=-1, outfile='stdout'):
@@ -291,7 +292,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None, verbose=False, memory=False, leaks=False):
+def tracing(methods=None, verbose=False, memory=False, leaks=False, filters=None):
     """
     Turn on call tracing within a certain context.
 
@@ -306,8 +307,11 @@ def tracing(methods=None, verbose=False, memory=False, leaks=False):
         If True, show functions that increase memory usage.
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
+    filters : list of str or None
+        If not None, evaluate as an expression in the frame of matching trace functions. If
+        True, include the function in the trace.  Up to one expression per class.
     """
-    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
+    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks, filters=filters)
     start()
     yield
     stop()
@@ -327,9 +331,13 @@ class tracedfunc(object):
         If True, show functions that increase memory usage.
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
+    filters : list of str or None
+        If not None, evaluate as an expression in the frame of matching trace functions. If
+        True, include the function in the trace.  Up to one expresson per class.
     """
-    def __init__(self, methods=None, verbose=False, memory=False, leaks=False):
-        self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
+    def __init__(self, methods=None, verbose=False, memory=False, leaks=False, filters=None):
+        self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks,
+                                filters=filters)
         self._call_setup = True
 
     def __call__(self, func):
@@ -365,6 +373,11 @@ def _itrace_setup_parser(parser):
                         default=-1, help='MPI rank where output is desired.  Default is all ranks.')
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         default='stdout', help='Output file.  Defaults to stdout.')
+    parser.add_argument('-f', '--filter', action='append', dest='filters',
+                        default=[],
+                        help='An expression.  If it evaluates to True for any matching trace '
+                             'function, that function will be displayed in the trace. One '
+                             'expression can be added for each class.')
 
 
 def _itrace_exec(options):
