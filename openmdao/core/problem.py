@@ -957,12 +957,7 @@ class Problem(object):
 
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                # Since all partials for outputs for explicit comps are declared, assume anything
-                # missing is an input deriv.
-                if explicit and abs_key[1] in comp._var_abs_names['input']:
-                    partials_data[c_name][rel_key][jac_key] = partial
-                else:
-                    partials_data[c_name][rel_key][jac_key] = partial
+                partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
