@@ -11,6 +11,7 @@ import os
 import shutil
 import tempfile
 import csv
+import json
 
 import numpy as np
 
@@ -1130,6 +1131,53 @@ class TestDOEDriverFeature(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriverFeature-')
         os.chdir(self.tempdir)
 
+        self.expected_csv = '\n'.join([
+            "p1.x, p2.y",
+            "0.0,  0.0",
+            "0.5,  0.0",
+            "1.0,  0.0",
+            "0.0,  0.5",
+            "0.5,  0.5",
+            "1.0,  0.5",
+            "0.0,  1.0",
+            "0.5,  1.0",
+            "1.0,  1.0",
+        ])
+
+        with open('cases.csv', 'w') as f:
+            f.write(self.expected_csv)
+
+        expected = {
+            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            1: {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
+            2: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+
+            3: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
+            4: {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
+            5: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
+
+            6: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            7: {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
+            8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        }
+
+        values = []
+        cases = []
+
+        for idx in range(len(expected)):
+            case = expected[idx]
+            values.append((case['x'], case['y'], case['f_xy']))
+            # converting ndarray to list enables JSON serialization
+            cases.append((('p1.x', list(case['x'])), ('p2.y', list(case['y']))))
+
+        self.expected_text = "\n".join([
+            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values
+        ])
+
+        self.expected_json = json.dumps(cases).replace(']]],', ']]],\n')
+        with open('cases.json', 'w') as f:
+            f.write(self.expected_json)
+
     def tearDown(self):
         os.chdir(self.startdir)
         try:
@@ -1172,6 +1220,98 @@ class TestDOEDriverFeature(unittest.TestCase):
 
         print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
+    def test_csv(self):
+        from openmdao.api import Problem, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        from openmdao.api import DOEDriver, CSVGenerator, SqliteRecorder, CaseReader
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        # this file contains design variable inputs in CSV format
+        with open('cases.csv', 'r') as f:
+            self.assertEqual(f.read(), self.expected_csv)
+
+        # run problem with DOEDriver using the CSV file
+        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cases = CaseReader("cases.sql").driver_cases
+
+        values = []
+        for n in range(cases.num_cases):
+            outputs = cases.get_case(n).outputs
+            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
+
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
+            self.expected_text)
+
+    def test_list(self):
+        from openmdao.api import Problem, IndepVarComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        from openmdao.api import DOEDriver, ListGenerator, SqliteRecorder, CaseReader
+
+        import json
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        # load design variable inputs from JSON file and decode into list
+        with open('cases.json', 'r') as f:
+            json_data = f.read()
+
+        self.assertEqual(json_data, self.expected_json)
+
+        case_list = json.loads(json_data)
+
+        self.assertEqual(case_list, json.loads(json_data))
+
+        # create DOEDriver using provided list of cases
+        prob.driver = DOEDriver(case_list)
+
+        # a ListGenerator was created
+        self.assertEqual(type(prob.driver.options['generator']), ListGenerator)
+
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cases = CaseReader("cases.sql").driver_cases
+
+        values = []
+        for n in range(cases.num_cases):
+            outputs = cases.get_case(n).outputs
+            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
+
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
+            self.expected_text)
+
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestParallelDOEFeature(unittest.TestCase):
@@ -1202,7 +1342,7 @@ class TestParallelDOEFeature(unittest.TestCase):
                 case = expected[idx]
                 values.append((case['x'], case['y'], case['f_xy']))
 
-        self.expect_text = "\n"+"\n".join([
+        self.expect_text = "\n".join([
             "x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values
         ])
 
@@ -1263,7 +1403,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             outputs = cases.get_case(n).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
             self.expect_text)
 
 
@@ -1296,9 +1436,9 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 case = expected[idx]
                 values.append((case['iv.x1'], case['iv.x2'], case['c3.y']))
 
-        self.expect_text = "\n"+"\n".join(list([
+        self.expect_text = "\n".join([
             "iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values
-        ]))
+        ])
 
         # run in temp dir
         self.startdir = os.getcwd()
@@ -1353,7 +1493,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 outputs = cases.get_case(n).outputs
                 values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
 
-            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
+            self.assertEqual("\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
                 self.expect_text)
 
 

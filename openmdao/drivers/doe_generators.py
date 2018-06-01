@@ -156,7 +156,7 @@ class CSVGenerator(DOEGenerator):
         """
         # check that column headers match design vars
         with open(self._filename, 'r') as f:
-            names = f.readline().strip().split(',')
+            names = re.sub(' ', '', f.readline()).strip().split(',')
             invalid_desvars = []
             for name in names:
                 if name not in design_vars:
@@ -173,7 +173,7 @@ class CSVGenerator(DOEGenerator):
         with open(self._filename, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                case = [(name, np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
+                case = [(name.strip(), np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
                         for name in row]
                 yield case
 
