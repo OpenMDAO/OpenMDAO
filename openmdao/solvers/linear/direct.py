@@ -19,7 +19,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
-def format_singluar_error(err, system, mtx):
+def format_singular_error(err, system, mtx):
     """
     Format a coherent error message when the matrix is singular.
 
@@ -68,7 +68,7 @@ def format_singluar_error(err, system, mtx):
     return msg.format(system.pathname, loc_txt, varname)
 
 
-def format_singluar_csc_error(system, matrix):
+def format_singular_csc_error(system, matrix):
     """
     Format a coherent error message when the CSC matrix is singular.
 
@@ -192,7 +192,7 @@ class DirectSolver(LinearSolver):
                         self._lup = scipy.linalg.lu_factor(matrix)
 
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singluar_error(err, system, matrix))
+                        raise RuntimeError(format_singular_error(err, system, matrix))
 
                     # NaN in matrix.
                     except ValueError as err:
@@ -208,7 +208,7 @@ class DirectSolver(LinearSolver):
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singluar_csc_error(system, matrix))
+                        raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
                         reraise(*sys.exc_info())
 
@@ -247,7 +247,7 @@ class DirectSolver(LinearSolver):
                     self._lup = scipy.linalg.lu_factor(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singluar_error(err, system, mtx))
+                    raise RuntimeError(format_singular_error(err, system, mtx))
 
                 # NaN in matrix.
                 except ValueError as err:

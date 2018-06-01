@@ -23,7 +23,6 @@ class NanComp(ExplicitComponent):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
-        """ Doesn't do much. """
         outputs['y'] = 3.0*inputs['x']
 
     def compute_partials(self, inputs, partials):
@@ -41,7 +40,6 @@ class NanComp2(ExplicitComponent):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
-        """ Doesn't do much. """
         outputs['y'] = 3.0*inputs['x']
         outputs['y2'] = 2.0*inputs['x']
 

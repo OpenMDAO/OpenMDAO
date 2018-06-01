@@ -784,7 +784,6 @@ class TestUnitConversion(unittest.TestCase):
                 #self.dx2count = 0
 
             #def solve_nonlinear(self, inputs, outputs, resids):
-                #""" Doesn't do much. """
                 #x1 = inputs['x1']
                 #x2 = inputs['x2']
                 #outputs['y'] = 1.01*(x1 + x2)
