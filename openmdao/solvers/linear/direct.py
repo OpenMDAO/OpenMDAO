@@ -58,9 +58,10 @@ def format_singluar_error(err, system, mtx):
     n = 0
     varname = "Unknown"
     for name in system._var_allprocs_abs_names['output']:
-        n += len(system._outputs._views_flat[name])
+        relname = system._var_abs2prom['output'][name]
+        n += len(system._outputs[relname])
         if loc <= n:
-            varname = name
+            varname = relname
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -134,9 +135,10 @@ def format_nan_error(system, matrix):
     for row in rows:
         n = 0
         for name in all_vars:
-            n += len(system._outputs._views_flat[name])
+            relname = system._var_abs2prom['output'][name]
+            n += len(system._outputs[relname])
             if row <= n:
-                varname.append("'%s'" % name)
+                varname.append("'%s'" % relname)
                 break
 
     msg = "NaN entries found in '{}' for rows associated with states/residuals [{}]."
@@ -194,7 +196,7 @@ class DirectSolver(LinearSolver):
 
                     # NaN in matrix.
                     except ValueError as err:
-                        raise RuntimeError(format_nan_error(system, mtx))
+                        raise RuntimeError(format_nan_error(system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 if system._views_assembled_jac:
@@ -250,7 +252,6 @@ class DirectSolver(LinearSolver):
                 # NaN in matrix.
                 except ValueError as err:
                     raise RuntimeError(format_nan_error(system, mtx))
-
 
     def _mat_vec(self, in_vec, out_vec):
         """
