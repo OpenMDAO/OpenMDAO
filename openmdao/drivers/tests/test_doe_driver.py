@@ -1342,7 +1342,7 @@ class TestParallelDOEFeature(unittest.TestCase):
                 case = expected[idx]
                 values.append((case['x'], case['y'], case['f_xy']))
 
-        self.expect_text = "\n".join([
+        self.expect_text = "\n"+"\n".join([
             "x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values
         ])
 
@@ -1403,7 +1403,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             outputs = cases.get_case(n).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
+        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
             self.expect_text)
 
 
@@ -1436,7 +1436,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 case = expected[idx]
                 values.append((case['iv.x1'], case['iv.x2'], case['c3.y']))
 
-        self.expect_text = "\n".join([
+        self.expect_text = "\n"+"\n".join([
             "iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values
         ])
 
@@ -1493,7 +1493,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 outputs = cases.get_case(n).outputs
                 values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
 
-            self.assertEqual("\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
+            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
                 self.expect_text)
 
 
