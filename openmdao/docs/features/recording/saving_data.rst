@@ -25,14 +25,13 @@ SqliteRecorder exists), and name the output file that you would like to write to
 Setting Recording Options
 +++++++++++++++++++++++++
 
-There are many recorder options that can be set. This affects the amount of information retained by the recorders.
+There are many recording options that can be set. This affects the amount of information retained by the recorders.
 These options are associated with the System, Driver or Solver that is being recorded.
 
-A basic example of how to set an option:
 
-.. code-block:: console
+The following examples use the :ref:`Sellar <sellar>` model and demonstrate setting the recording options on
+each of these types.
 
-    prob.driver.recording_options['record_desvars'] = True
 
 Recording on System Objects
 ---------------------------
@@ -90,3 +89,16 @@ error. Below is a basic example of adding a recorder to a solver object and reco
 
 .. note::
     A recorder can be attached to more than one object. Also, more than one recorder can be attached to an object.
+
+
+Specifying a Case Prefix
+------------------------
+
+It is possible to record data from multiple executions by specifying a prefix that will be used to differentiate the
+cases.  This prefix can be specified when calling `run_model` or `run_driver` and will be prepended to the case ID
+in the recorded case data:
+
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_record_with_prefix
+    :layout: interleave

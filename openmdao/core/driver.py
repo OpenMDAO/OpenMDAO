@@ -17,7 +17,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.mpi import MPI
-from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 
@@ -413,9 +413,8 @@ class Driver(object):
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
             if not model.is_active():
-                raise RuntimeError(
-                    "RecordingManager.startup should never be called when "
-                    "running in parallel on an inactive System")
+                raise RuntimeError("RecordingManager.startup should never be called when "
+                                   "running in parallel on an inactive System")
             rrank = problem.comm.rank
             rowned = model._owning_rank
             mydesvars = [n for n in mydesvars if rrank == rowned[n]]
@@ -990,7 +989,7 @@ class Driver(object):
 
         if not MPI or MPI.COMM_WORLD.rank == 0:
             header = 'Driver debug print for iter coord: {}'.format(
-                get_formatted_iteration_coordinate())
+                recording_iteration.get_formatted_iteration_coordinate())
             print(header)
             print(len(header) * '-')
 

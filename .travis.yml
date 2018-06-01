@@ -141,15 +141,15 @@ install:
 # finally, install OpenMDAO
 - pip install .;  # Not using -e on purpose here, to catch pkging errors
 
+# display summary of installed packages and their versions
+- pip list
+
 script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
     make all;
   fi
-
-# display version of installed packages
-- pip list
 
 # run the tests from down here to see if it can work without being at top level
 # only do coverage on the upload machine.

@@ -18,8 +18,7 @@ from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobi
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.recorders.recording_iteration_stack import recording_iteration, \
-    get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI
@@ -2833,10 +2832,14 @@ class System(object):
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:
-            raise RuntimeError(
-                "Recording of Systems when running parallel code is not supported yet")
-        for s in self.system_iter(include_self=True, recurse=recurse):
-            s._rec_mgr.append(recorder)
+            raise RuntimeError("Recording of Systems when running parallel "
+                               "code is not supported yet")
+
+        self._rec_mgr.append(recorder)
+
+        if recurse:
+            for s in self.system_iter(include_self=False, recurse=recurse):
+                s._rec_mgr.append(recorder)
 
     def record_iteration(self):
         """
@@ -2923,3 +2926,17 @@ class System(object):
         Clear out the iprint stack from the solvers.
         """
         self.nonlinear_solver._solver_info.clear()
+
+    def _reset_iter_counts(self):
+        """
+        Recursively reset iteration counter for all systems and solvers.
+        """
+        for s in self.system_iter(include_self=True, recurse=True):
+            s.iter_count = 0
+            if s._linear_solver:
+                s._linear_solver._iter_count = 0
+            if s._nonlinear_solver:
+                nl = s._nonlinear_solver
+                nl._iter_count = 0
+                if hasattr(nl, 'linesearch') and nl.linesearch:
+                    nl.linesearch._iter_count = 0
