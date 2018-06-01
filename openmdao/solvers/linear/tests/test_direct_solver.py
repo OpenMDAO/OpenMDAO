@@ -8,11 +8,48 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, ExecComp, \
-     NewtonSolver, BalanceComp, DenseJacobian
+     NewtonSolver, BalanceComp, DenseJacobian, ExplicitComponent, CSCJacobian
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
+
+
+class NanComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('x', 1.0)
+        self.add_output('y', 1.0)
+
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        """ Doesn't do much. """
+        outputs['y'] = 3.0*inputs['x']
+
+    def compute_partials(self, inputs, partials):
+        """Intentionally incorrect derivative."""
+        J = partials
+        J['y', 'x'] = np.NaN
+
+
+class NanComp2(ExplicitComponent):
+    def setup(self):
+        self.add_input('x', 1.0)
+        self.add_output('y', 1.0)
+        self.add_output('y2', 1.0)
+
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        """ Doesn't do much. """
+        outputs['y'] = 3.0*inputs['x']
+        outputs['y2'] = 2.0*inputs['x']
+
+    def compute_partials(self, inputs, partials):
+        """Intentionally incorrect derivative."""
+        J = partials
+        J['y', 'x'] = np.NaN
+        J['y2', 'x'] = 2.0
 
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
@@ -217,6 +254,73 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         teg.linear_solver.options['err_on_singular'] = False
         prob.run_model()
+
+    def test_raise_error_on_nan(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0))
+        model.add_subsystem('c1', ExecComp('y = 4.0*x'))
+        sub = model.add_subsystem('sub', Group())
+        sub.add_subsystem('c2', NanComp())
+        model.add_subsystem('c3', ExecComp('y = 4.0*x'))
+        model.add_subsystem('c4', NanComp2())
+        model.add_subsystem('c5', ExecComp('y = 3.0*x'))
+        model.add_subsystem('c6', ExecComp('y = 2.0*x'))
+
+        model.connect('p.x', 'c1.x')
+        model.connect('c1.y', 'sub.c2.x')
+        model.connect('sub.c2.y', 'c3.x')
+        model.connect('c3.y', 'c4.x')
+        model.connect('c4.y', 'c5.x')
+        model.connect('c4.y2', 'c6.x')
+
+        model.linear_solver = DirectSolver()
+
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
+
+        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c1.y', 'c3.y']."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_raise_error_on_nan_sparse(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0))
+        model.add_subsystem('c1', ExecComp('y = 4.0*x'))
+        sub = model.add_subsystem('sub', Group())
+        sub.add_subsystem('c2', NanComp())
+        model.add_subsystem('c3', ExecComp('y = 4.0*x'))
+        model.add_subsystem('c4', NanComp2())
+        model.add_subsystem('c5', ExecComp('y = 3.0*x'))
+        model.add_subsystem('c6', ExecComp('y = 2.0*x'))
+
+        model.connect('p.x', 'c1.x')
+        model.connect('c1.y', 'sub.c2.x')
+        model.connect('sub.c2.y', 'c3.x')
+        model.connect('c3.y', 'c4.x')
+        model.connect('c4.y', 'c5.x')
+        model.connect('c4.y2', 'c6.x')
+
+        model.linear_solver = DirectSolver()
+        model.jacobian = CSCJacobian()
+
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
+
+        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c1.y', 'c3.y']."
+
+        self.assertEqual(expected_msg, str(cm.exception))
 
 
 class TestDirectSolverFeature(unittest.TestCase):

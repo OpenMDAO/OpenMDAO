@@ -86,7 +86,10 @@ def format_singluar_csc_error(system, matrix):
     dense = matrix.toarray()
     zero_rows = np.where(~dense.any(axis=1))[0]
     zero_cols = np.where(~dense.any(axis=0))[0]
-    if zero_cols.size <= zero_rows.size:
+    if np.any(np.isnan(dense)):
+        # There is a nan in the matrix.
+        return(format_nan_error(system, dense))
+    elif zero_cols.size <= zero_rows.size:
         loc_txt = "row"
         loc = zero_rows[0]
     else:
@@ -104,6 +107,40 @@ def format_singluar_csc_error(system, matrix):
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
     return msg.format(system.pathname, loc_txt, varname)
+
+
+def format_nan_error(system, matrix):
+    """
+    Format a coherent error message when the matrix contains NaN.
+
+    Parameters
+    ----------
+    system : <System>
+        System containing the Directsolver.
+    matrix : ndarray
+        Matrix of interest.
+
+    Returns
+    -------
+    str
+        New error string.
+    """
+    rows = set(np.where(np.isnan(matrix))[0])
+
+    # Because of how we built the matrix, a NaN in a comp cause the whole row to be NaN, so we
+    # need to associate each index with a variable.
+    varname = []
+    all_vars = system._var_allprocs_abs_names['output']
+    for row in rows:
+        n = 0
+        for name in all_vars:
+            n += len(system._outputs._views_flat[name])
+            if row <= n:
+                varname.append("'%s'" % name)
+                break
+
+    msg = "NaN entries found in '{}' for rows associated with states/residuals [{}]."
+    return msg.format(system.pathname, ', '.join(varname))
 
 
 class DirectSolver(LinearSolver):
@@ -155,6 +192,10 @@ class DirectSolver(LinearSolver):
                     except RuntimeWarning as err:
                         raise RuntimeError(format_singluar_error(err, system, matrix))
 
+                    # NaN in matrix.
+                    except ValueError as err:
+                        raise RuntimeError(format_nan_error(system, mtx))
+
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 if system._views_assembled_jac:
                     ranges = system._jacobian._view_ranges[system.pathname]
@@ -205,6 +246,11 @@ class DirectSolver(LinearSolver):
 
                 except RuntimeWarning as err:
                     raise RuntimeError(format_singluar_error(err, system, mtx))
+
+                # NaN in matrix.
+                except ValueError as err:
+                    raise RuntimeError(format_nan_error(system, mtx))
+
 
     def _mat_vec(self, in_vec, out_vec):
         """
