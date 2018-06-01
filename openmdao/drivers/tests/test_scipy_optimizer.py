@@ -974,6 +974,37 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue('Solving variable: comp.f_xy' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False, mode='fwd')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('Solving variable: p1.x' in output)
+        self.assertTrue('Solving variable: p2.y' in output)
+
     def test_debug_print_option(self):
 
         prob = Problem()

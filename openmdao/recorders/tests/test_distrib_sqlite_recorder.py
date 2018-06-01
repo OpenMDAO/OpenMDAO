@@ -24,8 +24,9 @@ if OPTIMIZER:
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
     Group, ParallelGroup, IndepVarComp, SqliteRecorder
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterationDataRecorded
+from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
+
 
 class DistributedAdder(ExplicitComponent):
     """
@@ -99,9 +100,8 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-@unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
-                 "PETSc is required." if PETScVector is None
-                 else "Unreliable on Travis CI.")
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
+# @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedRecorderTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -119,12 +119,6 @@ class DistributedRecorderTest(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
-
-    def assertDriverIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        assertDriverIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
 
     def test_distrib_record_system(self):
         prob = Problem()
@@ -148,7 +142,6 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-
         size = 100  # how many items in the array
         prob = Problem()
         prob.model = Group()
@@ -187,11 +180,11 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs = expected_desvars
             expected_outputs.update(expected_objectives)
 
-            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs,
-                                                     None),), self.eps)
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_recording_remote_voi(self):
         prob = Problem()
 
@@ -261,7 +254,9 @@ class DistributedRecorderTest(unittest.TestCase):
             expected_outputs.update(expected_includes)
 
             coordinate = [0, 'SLSQP', (48,)]
-            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_outputs, None),), self.eps)
+
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            assertDriverIterDataRecorded(self, expected_data, self.eps)
 
 
 if __name__ == "__main__":

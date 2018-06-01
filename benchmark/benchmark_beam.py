@@ -7,7 +7,6 @@ from openmdao.api import Problem
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
 
-@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamNP1(unittest.TestCase):
 
     N_PROCS = 1
@@ -32,7 +31,6 @@ class BenchBeamNP1(unittest.TestCase):
         prob.run_model()
 
 
-@unittest.skip("for debugging, not for routine benchmarking")
 class BenchBeamNP2(unittest.TestCase):
 
     N_PROCS = 2

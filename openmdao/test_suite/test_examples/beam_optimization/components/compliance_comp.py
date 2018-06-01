@@ -21,7 +21,7 @@ class ComplianceComp(ExplicitComponent):
         self.add_output('compliance')
 
         self.declare_partials('compliance', 'displacements',
-            val=force_vector.reshape((1, 2 * num_nodes)))
+                              val=force_vector.reshape((1, 2 * num_nodes)))
 
     def compute(self, inputs, outputs):
         force_vector = self.options['force_vector']
@@ -47,7 +47,7 @@ class MultiComplianceComp(ExplicitComponent):
             force_vector = self.options['force_vector'][:, j]
 
             self.declare_partials('compliance_%d' % j, 'displacements_%d' % j,
-                val=force_vector.reshape((1, 2 * num_nodes)))
+                                  val=force_vector.reshape((1, 2 * num_nodes)))
 
     def compute(self, inputs, outputs):
         num_rhs = self.options['num_rhs']
