@@ -13,13 +13,15 @@ import re
 
 import pyDOE2
 
+from openmdao.utils.name_maps import prom_name2abs_name
+
 
 class DOEGenerator(object):
     """
     Base class for a callable object that generates cases for a DOEDriver.
     """
 
-    def __call__(self, design_vars):
+    def __call__(self, design_vars, model=None):
         """
         Generate case.
 
@@ -27,6 +29,9 @@ class DOEGenerator(object):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables (used by some subclasses).
 
         Returns
         -------
@@ -67,7 +72,7 @@ class ListGenerator(DOEGenerator):
 
         self._data = data
 
-    def __call__(self, design_vars):
+    def __call__(self, design_vars, model=None):
         """
         Generate case.
 
@@ -75,6 +80,9 @@ class ListGenerator(DOEGenerator):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables.
 
         Yields
         ------
@@ -86,15 +94,23 @@ class ListGenerator(DOEGenerator):
                 msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
                 raise RuntimeError(msg % str(case))
 
-            invalid_desvars = []
+            name_map = {}
+
             for tup in case:
                 if type(tup) not in (tuple, list, set) or len(tup) != 2:
                     msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
                     raise RuntimeError(msg % str(case))
 
-                if tup[0] not in design_vars:
-                    invalid_desvars.append(tup[0])
+                name = tup[0]
+                if name in design_vars:
+                    name_map[name] = name
+                elif model:
+                    abs_name = prom_name2abs_name(model, name, 'output')
+                    if abs_name in design_vars:
+                        name_map[name] = abs_name
 
+            # any names not found in name_map are invalid design vars
+            invalid_desvars = [name for name, val in case if name_map.get(name) is None]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
                     msg = "Invalid DOE case found, %s are not valid design variables:\n%s"
@@ -103,7 +119,7 @@ class ListGenerator(DOEGenerator):
                     msg = "Invalid DOE case found, '%s' is not a valid design variable:\n%s"
                     raise RuntimeError(msg % (str(invalid_desvars[0]), str(case)))
 
-            yield case
+            yield [(name_map[name], val) for name, val in case]
 
 
 class CSVGenerator(DOEGenerator):
@@ -140,7 +156,7 @@ class CSVGenerator(DOEGenerator):
 
         self._filename = filename
 
-    def __call__(self, design_vars):
+    def __call__(self, design_vars, model=None):
         """
         Generate case.
 
@@ -149,18 +165,29 @@ class CSVGenerator(DOEGenerator):
         design_vars : dict
             Dictionary of design variables for which to generate values.
 
+        model : Group
+            The model containing the design variables.
+
         Yields
         ------
         list
             list of name, value tuples for the design variables.
         """
-        # check that column headers match design vars
+        name_map = {}
+
         with open(self._filename, 'r') as f:
+            # map header names to absolute names if necessary
             names = re.sub(' ', '', f.readline()).strip().split(',')
-            invalid_desvars = []
             for name in names:
-                if name not in design_vars:
-                    invalid_desvars.append(name)
+                if name in design_vars:
+                    name_map[name] = name
+                elif model:
+                    abs_name = prom_name2abs_name(model, name, 'output')
+                    if abs_name in design_vars:
+                        name_map[name] = abs_name
+
+            # any names not found in name_map are invalid design vars
+            invalid_desvars = [name for name in names if name_map.get(name) is None]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
                     msg = "Invalid DOE case file, %s are not valid design variables."
@@ -173,7 +200,8 @@ class CSVGenerator(DOEGenerator):
         with open(self._filename, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                case = [(name.strip(), np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
+                case = [(name_map[name.strip()],
+                         np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
                         for name in row]
                 yield case
 
@@ -207,7 +235,7 @@ class UniformGenerator(DOEGenerator):
         self._num_samples = num_samples
         self._seed = seed
 
-    def __call__(self, design_vars):
+    def __call__(self, design_vars, model=None):
         """
         Generate case.
 
@@ -215,6 +243,9 @@ class UniformGenerator(DOEGenerator):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables (not used).
 
         Yields
         ------
@@ -270,7 +301,7 @@ class _pyDOE_Generator(DOEGenerator):
         super(_pyDOE_Generator, self).__init__()
         self._levels = levels
 
-    def __call__(self, design_vars):
+    def __call__(self, design_vars, model=None):
         """
         Generate case.
 
@@ -278,6 +309,9 @@ class _pyDOE_Generator(DOEGenerator):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables (not used).
 
         Yields
         ------
@@ -503,7 +537,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         self._iterations = iterations
         self._seed = seed
 
-    def __call__(self, design_vars):
+    def __call__(self, design_vars, model=None):
         """
         Generate case.
 
@@ -511,6 +545,9 @@ class LatinHypercubeGenerator(DOEGenerator):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables (not used).
 
         Yields
         ------

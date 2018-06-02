@@ -162,7 +162,7 @@ class DOEDriver(Driver):
         else:
             case_gen = self.options['generator']
 
-        for case in case_gen(self._designvars):
+        for case in case_gen(self._designvars, self._problem.model):
             self._run_case(case)
             self.iter_count += 1
 
@@ -205,7 +205,7 @@ class DOEDriver(Driver):
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
-    def _parallel_generator(self, design_vars):
+    def _parallel_generator(self, design_vars, model=None):
         """
         Generate case for this processor when running under MPI.
 
@@ -213,6 +213,9 @@ class DOEDriver(Driver):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables (used by some generators).
 
         Yields
         ------
@@ -223,7 +226,7 @@ class DOEDriver(Driver):
         color = self._color
 
         generator = self.options['generator']
-        for i, case in enumerate(generator(design_vars)):
+        for i, case in enumerate(generator(design_vars, model)):
             if i % size == color:
                 yield case
 

@@ -135,11 +135,8 @@ class TestDOEDriver(unittest.TestCase):
         prob.setup()
 
         # create a list of DOE cases
-        cases = []
         case_gen = FullFactorialGenerator(levels=3)
-        for case in case_gen(model.get_design_vars(recurse=True)):
-            # converting ndarray to list enables JSON serialization
-            cases.append([(var, list(val)) for (var, val) in case])
+        cases = list(case_gen(model.get_design_vars(recurse=True)))
 
         # create DOEDriver using provided list of cases
         prob.driver = DOEDriver(cases)
@@ -1132,7 +1129,7 @@ class TestDOEDriverFeature(unittest.TestCase):
         os.chdir(self.tempdir)
 
         self.expected_csv = '\n'.join([
-            "p1.x, p2.y",
+            " x ,   y",
             "0.0,  0.0",
             "0.5,  0.0",
             "1.0,  0.0",
@@ -1168,7 +1165,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             case = expected[idx]
             values.append((case['x'], case['y'], case['f_xy']))
             # converting ndarray to list enables JSON serialization
-            cases.append((('p1.x', list(case['x'])), ('p2.y', list(case['y']))))
+            cases.append((('x', list(case['x'])), ('y', list(case['y']))))
 
         self.expected_text = "\n".join([
             "x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values
