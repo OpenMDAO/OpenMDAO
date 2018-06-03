@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# usage: extcode_paraboloid.py input_filename output_filename
+# usage: extcode_resistor.py input_filename output_filename
 #
 # Evaluates the equation
 #              I = ( V_in - V_out ) / R
