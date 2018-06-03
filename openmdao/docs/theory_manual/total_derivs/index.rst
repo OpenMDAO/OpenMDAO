@@ -50,10 +50,11 @@ or by solving a linear system in the reverse (adjoint) form:
 
     \left[\frac{\partial \mathcal{R}}{\partial o}\right]^T \left[\frac{do}{dp}\right]^T = \left[ I \right].
 
-Where :math:`o` and :math:`p` denote arbitrary variables within the model, :math:`\mathcal{R}` denotes the residual associated with any :math:`o`, and
-:math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is the Jacobian matrix of all the partial derivatives.
+Where :math:`o` and :math:`p` denote vectors of all the variables within the model (i.e. every output of every component), :math:`\mathcal{R}` denotes the vector of residual functions,
+:math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is the Jacobian matrix of all the partial derivatives,
+and :math:`\left[\frac{do}{dp}\right]` is the matrix of total derivatives of :math:`o` with respect to :math:`p` .
 
-:math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is known, we all the components provide their respective partial derivatives,
+:math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is known because all the components provide their respective partial derivatives,
 so OpenMDAO solves the UDE linear system (either in the forward or the reverse form) to compute :math:`\left[\frac{do}{dp}\right]`.
 For each linear solve, one column from the identity matrix is chosen for the right hand side and the solutions provides one piece of :math:`\left[\frac{do}{dp}\right]`.
 In forward form, one linear solve is performed per design variable and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dp}\right]`.

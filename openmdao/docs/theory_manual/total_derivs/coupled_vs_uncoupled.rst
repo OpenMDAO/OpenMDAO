@@ -13,7 +13,7 @@ Uncoupled Models
 ----------------
 
 If you have a completely uncoupled model, then the partial-derivative Jacobian matrix will have a lower-triangular structure.
-The resulting linear system can be solved using a block-forward or backward-substitution algorithm.
+The resulting linear system can be solved using a block-forward or block-backward substitution algorithm.
 Alternatively you could view the solution algorithm as a single iteration of a block Gauss-Seidel algorithm.
 In OpenMDAO, the single-pass block Gauss-Seidel algorithm is implemented via the :ref:`LinearRunOnce<lnrunonce>` solver.
 This is the default solver used by OpenMDAO on all :ref:`Groups<feature_grouping_components>`.
