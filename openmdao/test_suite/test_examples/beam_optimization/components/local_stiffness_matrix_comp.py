@@ -20,9 +20,9 @@ class LocalStiffnessMatrixComp(ExplicitComponent):
 
         L0 = L / num_elements
         coeffs = np.empty((4, 4))
-        coeffs[0, :] = [12 , 6 * L0, -12, 6 * L0]
+        coeffs[0, :] = [12, 6 * L0, -12, 6 * L0]
         coeffs[1, :] = [6 * L0, 4 * L0 ** 2, -6 * L0, 2 * L0 ** 2]
-        coeffs[2, :] = [-12 , -6 * L0, 12, -6 * L0]
+        coeffs[2, :] = [-12, -6 * L0, 12, -6 * L0]
         coeffs[3, :] = [6 * L0, 2 * L0 ** 2, -6 * L0, 4 * L0 ** 2]
         coeffs *= E / L0 ** 3
 
