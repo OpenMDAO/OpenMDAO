@@ -445,7 +445,8 @@ class TestJacobianForDocs(unittest.TestCase):
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         problem = Problem(model=model)
-        model.suppress_solver_output = True
+        problem.set_solver_print(0)
+
         model.linear_solver = DirectSolver()
         model.jacobian = DenseJacobian()
         model.add_subsystem('simple', SimpleCompConst(),
