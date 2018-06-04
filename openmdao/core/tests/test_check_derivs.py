@@ -1,6 +1,7 @@
 """ Testing for Problem.check_partials and check_totals."""
 
 import unittest
+import sys
 from six import iteritems
 from six.moves import cStringIO
 
@@ -640,7 +641,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
         prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
-        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        comp = prob.model.add_subsystem('comp', ParaboloidMatVec())
 
         prob.model.connect('p1.x', 'comp.x')
         prob.model.connect('p2.y', 'comp.y')
@@ -652,12 +653,27 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        with self.assertRaises(RuntimeError) as context:
+        stdout = sys.stdout
+        strout = cStringIO()
+        sys.stdout = strout
+        try:
             data = prob.check_partials(out_stream=None)
+        finally:
+            sys.stdout = stdout
 
-        msg = 'In order to check partials with complex step, you need to set ' + \
-            '"force_alloc_complex" to True during setup.'
-        self.assertEqual(str(context.exception), msg)
+        output = strout.getvalue()
+
+        msg = "The following components requested complex step, but force_alloc_complex " + \
+            "has not been set to True, so finite difference was used:"
+        self.assertTrue(msg in output)
+
+        msg = "['comp']"
+        self.assertTrue(msg in output)
+
+        # Derivative still calculated, but with fd instead.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_method_on_comp(self):
         prob = Problem()
