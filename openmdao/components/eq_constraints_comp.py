@@ -107,6 +107,9 @@ class EqualityConstraintsComp(ExplicitComponent):
             if options['use_mult']:
                 self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
 
+            if options['add_constraint']:
+                self.add_constraint(name, equals=0.)
+
     def compute(self, inputs, outputs):
         """
         Calculate the output for each equality constraint.
@@ -198,7 +201,8 @@ class EqualityConstraintsComp(ExplicitComponent):
                 outputs[name] = options['guess_func'](inputs, residuals)
 
     def add_eq_output(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                      guess_func=None, use_mult=False, mult_name=None, mult_val=1.0, **kwargs):
+                      guess_func=None, use_mult=False, mult_name=None, mult_val=1.0,
+                      add_constraint=False, **kwargs):
         """
         Add a new output variable and associated equation to be balanced.
 
@@ -249,4 +253,5 @@ class EqualityConstraintsComp(ExplicitComponent):
                                    'guess_func': guess_func,
                                    'use_mult': use_mult,
                                    'mult_name': mult_name,
-                                   'mult_val': mult_val}
+                                   'mult_val': mult_val,
+                                   'add_constraint': add_constraint}

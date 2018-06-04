@@ -49,7 +49,6 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.connect('g.y', 'equal.rhs:x')
 
         model.add_design_var('indep.x', lower=0., upper=5.)
-        model.add_constraint('equal.x', equals=0.)  # TODO: auto-add constraint
         model.add_objective('f.y')
 
         if pyOptSparseDriver:
@@ -59,14 +58,25 @@ class TestEqualityConstraintsComp(unittest.TestCase):
 
         # prob.driver.options['debug_print'] = ['desvars', 'nl_cons', 'objs', 'totals']
 
+        # make sure constraint is not added by default
+        prob.setup(mode='fwd')
+        self.assertFalse('equal.x' in model.get_constraints())
+
+        model.add_constraint('equal.x', equals=0.)
         prob.setup(mode='fwd')
 
         print('\nOPT:')
         failed = prob.run_driver()
-        print('success?', not failed)
+
         print('x:', prob['indep.x'], 'y:', prob['f.y'], prob['g.y'], 'eq_con:', prob['equal.x'])
 
-        self.assertFalse(failed, 'Optimization failed.')
+        if pyOptSparseDriver:
+            info = prob.driver.pyopt_solution.optInform
+            self.assertFalse(failed, "Optimization failed, info = " +
+                                     str(info['value'])+": "+info['text'])
+        else:
+            self.assertFalse(failed, "Optimization failed, result =\n" +
+                                     str(prob.driver.result))
 
         assert_almost_equal(prob['equal.x'], 0.0)
         assert_almost_equal(prob['indep.x'], 3.6609049)
@@ -84,7 +94,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         indep.add_output('x', val=0.)
 
         equal = EqualityConstraintsComp()
-        equal.add_eq_output('x')
+        equal.add_eq_output('x', add_constraint=True)
 
         model.add_subsystem('indep', indep)
         model.add_subsystem('f', ExecComp('y=1.5*x+5.', x=0.))
@@ -98,7 +108,6 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.connect('g.y', 'equal.rhs:x')
 
         model.add_design_var('indep.x', lower=-5., upper=0.)
-        model.add_constraint('equal.x', equals=0.)  # TODO: auto-add constraint
         model.add_objective('f.y')
 
         if pyOptSparseDriver:
@@ -111,16 +120,33 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         else:
             prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
 
-        # prob.driver.options['debug_print'] = ['desvars', 'nl_cons', 'objs', 'totals']
-
         prob.setup(mode='fwd')
+
+        # make sure constraint is added as requested
+        self.assertTrue('equal.x' in model.get_constraints())
+
+        prob.run_model()
+
+        cpd = prob.check_partials()
+
+        for (of, wrt) in cpd['equal']:
+            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        # prob.driver.options['debug_print'] = ['desvars', 'nl_cons', 'objs', 'totals']
 
         print('\nOPT:')
         failed = prob.run_driver()
-        print('success?', not failed)
+
         print('x:', prob['indep.x'], 'y:', prob['f.y'], prob['g.y'], 'eq_con:', prob['equal.x'])
 
-        self.assertFalse(failed, 'Optimization failed.')
+        if pyOptSparseDriver:
+            info = prob.driver.pyopt_solution.optInform
+            self.assertFalse(failed, "Optimization failed, info = " +
+                                     str(info['value'])+": "+info['text'])
+        else:
+            self.assertFalse(failed, "Optimization failed, result =\n" +
+                                     str(prob.driver.result))
+
 
         assert_almost_equal(prob['equal.x'], 0.0)
         # assert_almost_equal(prob['indep.x'], 3.6609049)
