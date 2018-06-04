@@ -1233,7 +1233,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
 
-    def _setup_jacobians(self, parent_asm_jac=None):
+    def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1265,19 +1265,25 @@ class System(object):
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
+            if self.nonlinear_solver.supports['gradients']:
+                gradient_nl_jac = asm_jac
+            
 
         self._views_assembled_jac = False
         if my_asm_jac is not None:
             self._assembled_jac = my_asm_jac
             self._views_assembled_jac = True
-        else:
-            if not self._owns_approx_jac:
-                nl = self._nonlinear_solver
-                if nl is not None and nl.supports['gradients']:
-                    self._views_assembled_jac = True
+        elif not self._owns_approx_jac:
+            nl = self._nonlinear_solver
+            if nl is not None and nl.supports['gradients']:
+                self._views_assembled_jac = True
+            elif gradient_nl_jac is not None:
+                self._views_assembled_jac = True
 
         if asm_jac is not None:
             jacs = [asm_jac]
+        elif gradient_nl_jac is not None:
+            jacs = [gradient_nl_jac]
         elif parent_asm_jac is not None:
             jacs = [parent_asm_jac]
         else:
@@ -1296,24 +1302,31 @@ class System(object):
                 raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(asm_jac)
+                subsys._setup_jacobians(asm_jac, gradient_nl_jac)
         else:
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(parent_asm_jac)
+                subsys._setup_jacobians(parent_asm_jac, gradient_nl_jac)
+
+        par_jacs = set([j for j in (parent_asm_jac, gradient_nl_jac) if j is not None])
 
         # if we have an assembled jac at this level and an assembled jac above us, then
         # our jac (and any of our children's assembled jacs) will share their internal
         # subjac dicts.  Each will maintain its own internal Matrix objects though.
-        if parent_asm_jac is not None and asm_jac is not None:
-            parent_asm_jac._subjacs.update(asm_jac._subjacs)
-            parent_asm_jac._subjacs_info.update(asm_jac._subjacs_info)
-            asm_jac._subjacs = parent_asm_jac._subjacs
-            asm_jac._subjacs_info = parent_asm_jac._subjacs_info
-            asm_jac._keymap = parent_asm_jac._keymap
-            asm_jac._view_ranges = parent_asm_jac._view_ranges
-
-        if parent_asm_jac is not None and self._views_assembled_jac:
-            parent_asm_jac._init_view(self)
+        if par_jacs:
+            for par_jac in par_jacs:
+                if asm_jac is not None and par_jac is not asm_jac:
+                    if self.pathname.startswith('TOC'):
+                        print(asm_jac._system.pathname, type(asm_jac).__name__, id(asm_jac), "-->", 
+                              par_jac._system.pathname, type(par_jac).__name__, id(par_jac))
+                    par_jac._subjacs.update(asm_jac._subjacs)
+                    par_jac._subjacs_info.update(asm_jac._subjacs_info)
+                    asm_jac._subjacs = par_jac._subjacs
+                    asm_jac._subjacs_info = par_jac._subjacs_info
+                    asm_jac._keymap = par_jac._keymap
+                    asm_jac._view_ranges = par_jac._view_ranges
+    
+                if self._views_assembled_jac:
+                    par_jac._init_view(self)
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:

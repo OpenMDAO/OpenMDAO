@@ -106,6 +106,7 @@ def _setup_func_group():
     from openmdao.core.total_jac import _TotalJacInfo
     from openmdao.solvers.solver import Solver, LinearSolver
     from openmdao.solvers.nonlinear.newton import NewtonSolver
+    from openmdao.solvers.linear.direct import DirectSolver
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
@@ -167,13 +168,14 @@ def _setup_func_group():
             ('compute_jacvec_product', (System,)),
         ],
         'jac': [
-            ('_linearize', (System, Solver)),
+            ('_linearize', (System, DirectSolver)),
             ('_setup_jacobians', (System,)),
             ('compute_totals', (_TotalJacInfo, Problem, Driver)),
             ('compute_totals_approx', (_TotalJacInfo,)),
             ('_apply_linear', (System,)),
             ('solve', (LinearSolver, NewtonSolver)),
             ('_update', (Jacobian,)),
+            ('_initialize', (Jacobian,)),
         ],
         'solver': [
             ('*', (Solver,))

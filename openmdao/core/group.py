@@ -1793,7 +1793,7 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
-    def _setup_jacobians(self, parent_asm_jac=None):
+    def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1888,7 +1888,7 @@ class Group(System):
 
             J._initialize()
 
-        super(Group, self)._setup_jacobians(parent_asm_jac)
+        super(Group, self)._setup_jacobians(parent_asm_jac, gradient_nl_jac)
 
     def compute_sys_graph(self, comps_only=False):
         """

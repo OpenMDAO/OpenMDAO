@@ -38,7 +38,7 @@ time0 = None
 
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
-def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
+def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self', '__class__'])):
     """
     Print trace info, indenting based on call depth.
     """
@@ -57,8 +57,8 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
                 s = "  %s%s%s{%s}" % (sindent, name, sep, f.getvalue())
             else:
                 s = "  %s%s%s%s" % (sindent, name, sep, d[name])
-            if ' object at ' in s:
-                s = addr_regex.sub('', s)
+            # if ' object at ' in s:
+            #     s = addr_regex.sub('', s)
             linelen = len(s)
             leneq = len(s.split(sep, 1)[0])
             if linelen > MAXLINE:
@@ -183,8 +183,8 @@ def _trace_return(frame, arg, stack, context):
     if verbose:
         if arg is not None:
             s = "%s     %s" % (indent, arg)
-            if ' object at ' in s:
-                s = addr_regex.sub('', s)
+            # if ' object at ' in s:
+            #     s = addr_regex.sub('', s)
             _printer(s)
 
     if leaks is not None:
