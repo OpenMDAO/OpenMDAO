@@ -27,6 +27,7 @@ git:
 
 addons:
   apt:
+    update: true
     sources:
     - ubuntu-toolchain-r-test
     packages:
@@ -38,15 +39,46 @@ addons:
     ssh_known_hosts:
     - web543.webfaction.com
 
+cache:
+  apt: true
+  directories:
+    - $HOME/.cache/pip
+    - $HOME/pyoptsparse
+    - $HOME/miniconda
+    - $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse
+
 notifications:
   slack:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-- wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh
-- chmod +x miniconda.sh
-- ./miniconda.sh -b  -p /home/travis/miniconda;
-- export PATH=/home/travis/miniconda/bin:$PATH
+
+# Check for existence of files to determine if cache exists
+# If the dir doesn't exist, but is slated to be cached later,
+# Travis unhelpfully creates it, which then causes "dir already exists"
+# errors when you go to actually install the thing, so we must non-intuitively
+# delete the file before re-creating it later.
+- if [ -f $HOME/miniconda/bin/python$PY ]; then
+    echo "cached miniconda found -- nothing to do";
+  else
+    NOT_CACHED_CONDA=1;
+    rm -rf $HOME/miniconda;
+  fi
+
+- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
+    echo "cached pyoptsparse found -- nothing to do";
+  else
+    NOT_CACHED_PYOPTSPARSE=1;
+    rm -rf $HOME/pyoptsparse
+    rm -rf $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse;
+  fi
+
+- if [ -f $HOME/.cache/pip ]; then
+    echo "cached pip found -- nothing to do";
+  else
+    NOT_CACHED_PIP=1;
+    rm -rf $HOME/.cache/pip;
+  fi
 
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     MASTER_BUILD=1;
@@ -62,36 +94,55 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-- conda install --yes python=$PY
-- conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip
-- pip install --upgrade pip
-
-# install pyoptsparse
-- git clone https://github.com/mdolab/pyoptsparse.git;
-- cd pyoptsparse;
-# get SNOPT source, securely, if SNOPT_LOCATION is set.
-- if [ "$MASTER_BUILD" ]; then
-    cd pyoptsparse/pySNOPT/source;
-    scp -r "$SNOPT_LOCATION" .;
-    cd ../../..;
-  fi
-# return to building pyoptsparse
-- python setup.py install;
-- cd ..;
-
-- if [ "$PETSc" ]; then
-    pip install mpi4py;
-    pip install petsc4py==$PETSc;
+- if [ "$NOT_CACHED_CONDA" ]; then
+    wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p $HOME/miniconda;
+    export PATH=$HOME/miniconda/bin:$PATH;
+    conda install --yes python=$PY;
+    conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+  else
+    export PATH=$HOME/miniconda/bin:$PATH;
   fi
 
-- pip install redbaron
-- pip install git+https://github.com/OpenMDAO/testflo.git
-- pip install coverage
-- pip install git+https://github.com/swryan/coveralls-python@work
-- pip install .  # Not using -e on purpose here, to catch pkging errors
+- if [ "$NOT_CACHED_PIP" ]; then
+    pip install --upgrade pip;
+
+    if [ "$PETSc" ]; then
+      pip install mpi4py;
+      pip install petsc4py==$PETSc;
+    fi
+
+    pip install redbaron;
+    pip install git+https://github.com/OpenMDAO/testflo.git;
+    pip install coverage;
+    pip install git+https://github.com/swryan/coveralls-python@work;
+  fi
+
+- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
+    git clone https://github.com/mdolab/pyoptsparse.git;
+    cd pyoptsparse;
+
+    if [ "$MASTER_BUILD" ]; then
+      cd pyoptsparse/pySNOPT/source;
+      scp -r "$SNOPT_LOCATION" .;
+      cd ../../..;
+    fi
+
+    python setup.py install;
+    cd ..;
+  fi
 
 # do this after petsc install to avoid weird petsc install failure
-- conda install --yes matplotlib
+- if [ "$NOT_CACHED_CONDA" ]; then
+    conda install --yes matplotlib;
+  fi
+
+# finally, install OpenMDAO
+- pip install .;  # Not using -e on purpose here, to catch pkging errors
+
+# display summary of installed packages and their versions
+- pip list
 
 script:
 # make docs first
@@ -100,9 +151,6 @@ script:
     make all;
   fi
 
-# display version of installed packages
-- pip list
-
 # run the tests from down here to see if it can work without being at top level
 # only do coverage on the upload machine.
 - if [ "$UPLOAD_DOCS" ]; then
@@ -110,7 +158,6 @@ script:
   else
     testflo -n 1 --timeout=120 openmdao;
   fi
-
 
 after_success:
 # again, only run coverage operations on the upload machine after success.

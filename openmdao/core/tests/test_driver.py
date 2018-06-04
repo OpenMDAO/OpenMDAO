@@ -236,7 +236,7 @@ class TestDriver(unittest.TestCase):
         strout = StringIO()
         sys.stdout = strout
         try:
-            prob.run_driver()
+            prob.run_driver(reset_iter_counts=False)
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')

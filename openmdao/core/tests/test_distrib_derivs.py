@@ -270,9 +270,8 @@ class MPITests2(unittest.TestCase):
         root.linear_solver = LinearBlockGS()
         sub.linear_solver = LinearBlockGS()
 
-        prob.model.suppress_solver_output = True
-        sub.suppress_solver_output = True
-        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(0)
+        prob.setup(mode='fwd')
         prob.run_driver()
 
         diag1 = numpy.diag([-6.0, -6.0, -3.0])
