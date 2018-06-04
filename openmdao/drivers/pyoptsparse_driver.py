@@ -30,26 +30,9 @@ grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
 
-
-def _check_imports():
-    """
-    Dynamically remove optimizers we don't have.
-
-    Returns
-    -------
-    list of str
-        List of valid optimizer strings.
-    """
-    optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-               'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
-
-    for optimizer in optlist[:]:
-        try:
-            __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
-        except ImportError:
-            optlist.remove(optimizer)
-
-    return optlist
+# All optimizers in pyoptsparse
+optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
+           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
 
 
 CITATIONS = """
@@ -160,7 +143,7 @@ class pyOptSparseDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
+        self.options.declare('optimizer', default='SLSQP', values=optlist,
                              desc='Name of optimizers to use')
         self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
