@@ -8,43 +8,11 @@ import inspect
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 
 from openmdao.utils.mpi import MPI
 
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
-
-
-class DOEGenerator(object):
-    """
-    Base class for a callable object that generates cases for a DOEDriver.
-
-    Attributes
-    ----------
-    _num_samples : int
-        The number of samples generated (available after generator has been called).
-    """
-
-    def __init__(self):
-        """
-        Initialize the DOEGenerator.
-        """
-        self._num_samples = 0
-
-    def __call__(self, design_vars):
-        """
-        Generate case.
-
-        Parameters
-        ----------
-        design_vars : dict
-            Dictionary of design variables for which to generate values.
-
-        Returns
-        -------
-        list
-            list of name, value tuples for the design variables.
-        """
-        return []
 
 
 class DOEDriver(Driver):
@@ -53,12 +21,14 @@ class DOEDriver(Driver):
 
     Attributes
     ----------
-    _color : int or None
-        In MPI, the cached color is used to determine which cases to run on this proc.
     _name : str
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
+    _comm : MPI.Comm or None
+        MPI communicator object.
+    _color : int or None
+        In MPI, the cached color is used to determine which cases to run on this proc.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -67,13 +37,17 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        generator : DOEGenerator or None
-            The case generator.
+        generator : DOEGenerator, list or None
+            The case generator or a list of DOE cases.
 
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        if generator and not isinstance(generator, DOEGenerator):
+        # if given a list, create a ListGenerator
+        if isinstance(generator, list):
+            generator = ListGenerator(generator)
+
+        elif generator and not isinstance(generator, DOEGenerator):
             if inspect.isclass(generator):
                 raise TypeError("DOEDriver requires an instance of DOEGenerator, "
                                 "but a class object was found: %s"
@@ -90,6 +64,7 @@ class DOEDriver(Driver):
 
         self._name = ''
         self._recorders = []
+        self._comm = None
         self._color = None
 
     def _declare_options(self):
@@ -187,7 +162,7 @@ class DOEDriver(Driver):
         else:
             case_gen = self.options['generator']
 
-        for case in case_gen(self._designvars):
+        for case in case_gen(self._designvars, self._problem.model):
             self._run_case(case)
             self.iter_count += 1
 
@@ -205,7 +180,14 @@ class DOEDriver(Driver):
         metadata = {}
 
         for dv_name, dv_val in case:
-            self.set_design_var(dv_name, dv_val)
+            try:
+                msg = None
+                self.set_design_var(dv_name, dv_val)
+            except ValueError as err:
+                msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
+            finally:
+                if msg:
+                    raise(ValueError(msg))
 
         with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
@@ -223,7 +205,7 @@ class DOEDriver(Driver):
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
-    def _parallel_generator(self, design_vars):
+    def _parallel_generator(self, design_vars, model=None):
         """
         Generate case for this processor when running under MPI.
 
@@ -231,6 +213,9 @@ class DOEDriver(Driver):
         ----------
         design_vars : dict
             Dictionary of design variables for which to generate values.
+
+        model : Group
+            The model containing the design variables (used by some generators).
 
         Yields
         ------
@@ -241,7 +226,7 @@ class DOEDriver(Driver):
         color = self._color
 
         generator = self.options['generator']
-        for i, case in enumerate(generator(design_vars)):
+        for i, case in enumerate(generator(design_vars, model)):
             if i % size == color:
                 yield case
 
@@ -318,24 +303,25 @@ class DOEDriver(Driver):
 
         model = self._problem.model
 
-        sys_vars = {}
-        in_vars = {}
-        outputs = model._outputs
-        inputs = model._inputs
-        views = outputs._views
-        views_in = inputs._views
-        sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
-        if self.recording_options['record_inputs']:
-            in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
+        names = model._outputs._names
+        views = model._outputs._views
+        sys_vars = {name: views[name] for name in names if name in filt['sys']}
 
-        outs = des_vars
-        outs.update(res_vars)
-        outs.update(obj_vars)
-        outs.update(con_vars)
-        outs.update(sys_vars)
+        out_vars = des_vars
+        out_vars.update(res_vars)
+        out_vars.update(obj_vars)
+        out_vars.update(con_vars)
+        out_vars.update(sys_vars)
+
+        if self.recording_options['record_inputs']:
+            names = model._inputs._names
+            views = model._inputs._views
+            in_vars = {name: views[name] for name in names if name in filt['in']}
+        else:
+            in_vars = {}
 
         data = {
-            'out': outs,
+            'out': out_vars,
             'in': in_vars
         }
 
