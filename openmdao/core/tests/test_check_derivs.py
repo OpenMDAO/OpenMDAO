@@ -1,9 +1,10 @@
 """ Testing for Problem.check_partials and check_totals."""
 
-import unittest
-import sys
 from six import iteritems
 from six.moves import cStringIO
+import sys
+import unittest
+import warnings
 
 import numpy as np
 
@@ -649,22 +650,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        stdout = sys.stdout
-        strout = cStringIO()
-        sys.stdout = strout
-        try:
+        with warnings.catch_warnings(record=True) as w:
             data = prob.check_partials(out_stream=None)
-        finally:
-            sys.stdout = stdout
 
-        output = strout.getvalue()
+        self.assertEqual(len(w), 1)
 
         msg = "The following components requested complex step, but force_alloc_complex " + \
-            "has not been set to True, so finite difference was used:"
-        self.assertTrue(msg in output)
+            "has not been set to True, so finite difference was used: ['comp']"
 
-        msg = "['comp']"
-        self.assertTrue(msg in output)
+        self.assertEqual(str(w[0].message), msg)
 
         # Derivative still calculated, but with fd instead.
         x_error = data['comp']['f_xy', 'x']['rel error']

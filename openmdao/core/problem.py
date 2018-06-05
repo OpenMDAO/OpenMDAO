@@ -7,6 +7,7 @@ import sys
 from collections import OrderedDict, defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
+import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -1019,9 +1020,9 @@ class Problem(object):
 
         if len(comps_could_not_cs) > 0:
             msg = "The following components requested complex step, but force_alloc_complex " + \
-                "has not been set to True, so finite difference was used:"
-            print(msg)
-            print(list(comps_could_not_cs))
+                "has not been set to True, so finite difference was used: "
+            msg += str(list(comps_could_not_cs))
+            warnings.warn(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
