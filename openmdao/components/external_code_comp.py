@@ -263,7 +263,6 @@ class ExternalCodeComp(ExplicitComponent):
 
         self.return_code = 0
 
-
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -365,7 +364,6 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         self.stderr = "external_code_comp_error.out"
 
         self.return_code = 0
-
 
     def _declare_options(self):
         """
