@@ -15,8 +15,8 @@ operating system. But it treats the `Component` as an `ImplicitComponent` rather
 ExternalCodeImplicitComp Example
 --------------------------------
 
-The only difference between `ExternalCodeImplicitComp` and `ExternalCodeComp` is that for the former, a `compute`
-method must be defined, while for the latter, a `apply_nonlinear` method must be defined.
+The only difference between `ExternalCodeImplicitComp` and `ExternalCodeComp` is that for the former, a `apply_nonlinear`
+method must be defined, while for the latter, a `compute` method must be defined.
 
 To show the difference, we will use an example. We will modify the code given in
 :ref:`the circuit tutorial <defining_icomps_tutorial>`. We will replace one of the nodes and one of the resistors

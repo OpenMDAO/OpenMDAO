@@ -92,7 +92,7 @@ class ExternalCodeDelegate(object):
 
         # Check for missing input files. This just generates a warning during
         # setup, since these files may be generated later during execution.
-        missing = self._check_for_files(self._comp.options['external_input_files'])
+        missing = self._check_for_files(comp.options['external_input_files'])
         if missing:
             logger.warning("The following input files are missing at setup "
                            "time: %s" % missing)
@@ -261,10 +261,8 @@ class ExternalCodeComp(ExplicitComponent):
         self.stdout = None
         self.stderr = "external_code_comp_error.out"
 
-        self.DEV_NULL = DEV_NULL
-        self.STDOUT = STDOUT
-
         self.return_code = 0
+
 
     def _declare_options(self):
         """
@@ -366,10 +364,8 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         self.stdout = None
         self.stderr = "external_code_comp_error.out"
 
-        self.DEV_NULL = DEV_NULL
-        self.STDOUT = STDOUT
-
         self.return_code = 0
+
 
     def _declare_options(self):
         """

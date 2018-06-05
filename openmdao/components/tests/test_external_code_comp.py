@@ -635,7 +635,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                     for i_conn in range(n_out):
                         input_file.write('{}\n'.format(inputs['I_out:{}'.format(i_conn)][0] ))
 
-                # the parent compute function actually runs the external code
+                # the parent apply_nonlinear function actually runs the external code
                 super(NodeExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
 
                 # parse the output file from the external code and set the value of I
