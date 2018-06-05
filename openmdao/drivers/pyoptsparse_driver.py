@@ -5,14 +5,14 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
-
 from __future__ import print_function
+
 from collections import OrderedDict
 import json
 import sys
 import traceback
 
-from six import iteritems, itervalues, string_types, PY3
+from six import iteritems, itervalues, string_types, reraise
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -324,11 +324,7 @@ class pyOptSparseDriver(Driver):
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
-            etype, value, traceback = sys.exc_info()
-            if PY3:
-                raise ImportError(msg).with_traceback(traceback)
-            else:
-                raise ImportError, msg, traceback
+            reraise(ImportError, ImportError(msg), sys.exc_info()[2])
 
         # Set optimization options
         for option, value in self.opt_settings.items():
