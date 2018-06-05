@@ -80,8 +80,8 @@ except ImportError:
 from openmdao.drivers.scipy_optimizer import ScipyOptimizer, ScipyOptimizeDriver
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 from openmdao.drivers.doe_driver import DOEDriver
-from openmdao.drivers.doe_generators import UniformGenerator, FullFactorialGenerator, \
-    PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator
+from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, UniformGenerator, \
+    FullFactorialGenerator, PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
