@@ -11,7 +11,7 @@ Using OpenMDAO's total derivatives features can significantly improve the effici
 
 .. note::
 
-    total derivatives are also useful for other applications such as gradient enhanced surrogate modeling and dimensionality reduction for active subspaces
+    Total derivatives are also useful for other applications such as gradient enhanced surrogate modeling and dimensionality reduction for active subspaces.
 
 
 The goal of this document is to help you understand how the underlying algorithms work, and when they are appropriate to apply to your model.
@@ -38,27 +38,41 @@ In order to perform those computations the model moves data through many differe
 many intermediate variables.
 Internally, OpenMDAO doesn't distinguish between objective/constraint variables, design variables, or intermediate variables;
 they are all just variables, following the mathematical formulation prescribed by the `MAUD architecture`_, developed by Hwang and Martins.
-Using that formulation, it is possible to compute the total derivative any variable with respect to any other variable by solving a linear system of equations, called the `Unified Derivative Equations`_ (UDE).
+Using that formulation, it is possible to compute the total derivative of any explicit variable with respect to any other explicit variable by solving a linear system of equations, called the `Unified Derivative Equations`_ (UDE).
 
 .. math::
 
-    \left[\frac{\partial \mathcal{R}}{\partial o}\right] \left[\frac{do}{dp}\right] = \left[ I \right],
+    \left[\frac{\partial \mathcal{R}}{\partial o}\right] \left[\frac{do}{dr}\right] = \left[ I \right],
 
 or by solving a linear system in the reverse (adjoint) form:
 
 .. math::
 
-    \left[\frac{\partial \mathcal{R}}{\partial o}\right]^T \left[\frac{do}{dp}\right]^T = \left[ I \right].
+    \left[\frac{\partial \mathcal{R}}{\partial o}\right]^T \left[\frac{do}{dr}\right]^T = \left[ I \right].
 
-Where :math:`o` and :math:`p` denote vectors of all the variables within the model (i.e. every output of every component), :math:`\mathcal{R}` denotes the vector of residual functions,
+Where :math:`o` denotes the vector of all the variables within the model (i.e. every output of every component), :math:`\mathcal{R}` denotes the vector of residual functions, :math:`r` is the vector of residual values,
 :math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is the Jacobian matrix of all the partial derivatives,
-and :math:`\left[\frac{do}{dp}\right]` is the matrix of total derivatives of :math:`o` with respect to :math:`p` .
+and :math:`\left[\frac{do}{dr}\right]` is the matrix of total derivatives of :math:`o` with respect to :math:`r` .
 
-:math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is known because all the components provide their respective partial derivatives,
-so OpenMDAO solves the UDE linear system (either in the forward or the reverse form) to compute :math:`\left[\frac{do}{dp}\right]`.
-For each linear solve, one column from the identity matrix is chosen for the right hand side and the solutions provides one piece of :math:`\left[\frac{do}{dp}\right]`.
-In forward form, one linear solve is performed per design variable and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dp}\right]`.
-In reverse form, one linear solve is performed per objective/constraint and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dp}\right]^T` (or one row of :math:`\left[\frac{do}{dp}\right]`).
+It might not seem like derivatives with respect to residual values are inherently useful, however we can define the residual of explicit functions carefully in order to make use of the UDE to compute meaningful total derivatives.
+If you have an explicit function, :math:`f = F(o)`, then you can define an equivalent implicit function as
+
+.. math::
+
+    r_f = f - F(o) = 0
+
+Then it follows that
+
+.. math::
+
+    \left[\frac{do}{dr_f}\right] = \left[\frac{do}{df}\right]
+
+Thus, since :math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is known because all the components provide their respective partial derivatives,
+we can solve the UDE linear system to compute the total derivatives we need for optimization.
+A one column from the identity matrix is chosen for the right hand side and the solutions provides one piece of :math:`\left[\frac{do}{dr}\right]`.
+
+In forward form, one linear solve is performed per design variable and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dr}\right]`.
+In reverse form, one linear solve is performed per objective/constraint and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dr}\right]^T` (or one row of :math:`\left[\frac{do}{dr}\right]`).
 Selecting between forward and reverse linear solver modes is just a matter of counting how many design variables and constraints you have, and picking whichever form yields the fewest linear solves.
 
 

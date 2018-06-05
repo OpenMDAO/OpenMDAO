@@ -20,6 +20,7 @@ New Features:
     - Automatic calculation of total Jacobian sparsity for optimizers that support it (lower compute cost when using SNOPT).
     - Automatic simultaneous coloring algorithm for separable problems to speed up serial derivatives calculations.
     - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers
+    - check_partials now allows you to use `includes` and `excludes` to limit which components get checked.
 
 - New Components in the standard library:
     - CrossProductComp
@@ -52,6 +53,7 @@ Backwards-Compatible API Changes:
 - User no longer needs to specify PETSCvector for parallel cases (the framework figures it out now).
 
 - check_totals and check_partials no longer support the `supress_output` argument. Use `out_stream=None` instead.
+- `comps` argument in check_partials was replaced with `includes` and `excludes` arguments.
 
 Backwards-Incompatible API changes:
 -----------------------------------

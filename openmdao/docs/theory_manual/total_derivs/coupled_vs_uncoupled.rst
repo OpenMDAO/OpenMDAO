@@ -67,7 +67,7 @@ However, there are a few rules of thumb that can be used to guide most cases:
     If :math:`n` < 2000 try this solver first.
     #. iterative solvers are more difficult to use because they do not always succeed in finding a good solution to the linear problem.
     Often times they require preconditioners in order to be effective.
-    However, with adequate preconditioning iterative solvers can dramatically out perform direct solvers for even moderate sized problems.
+    However, with adequate preconditioning iterative solvers can dramatically outperform direct solvers for even moderate sized problems.
     The trade off you make is computational speed for complexity in getting the solver to work.
     Iterative solvers can also offer significant memory savings, since there isn't a need to allocate one large matrix for all the partials.
 
