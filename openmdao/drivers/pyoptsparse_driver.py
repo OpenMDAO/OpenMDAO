@@ -8,10 +8,11 @@ additional MPI capability.
 
 from __future__ import print_function
 from collections import OrderedDict
-import traceback
 import json
+import sys
+import traceback
 
-from six import iteritems, itervalues, string_types
+from six import iteritems, itervalues, string_types, PY3
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -319,10 +320,15 @@ class pyOptSparseDriver(Driver):
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             opt = getattr(_tmp, optimizer)()
 
-        except ImportError:
+        except Exception as err:
+            # Change whatever pyopt gives us to an ImportError, give it a readable message,
+            # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
-
-            raise ImportError(msg)
+            etype, value, traceback = sys.exc_info()
+            if PY3:
+                raise ImportError(msg).with_traceback(traceback)
+            else:
+                raise ImportError, msg, traceback
 
         # Set optimization options
         for option, value in self.opt_settings.items():

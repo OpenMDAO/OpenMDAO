@@ -13,8 +13,6 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 
-from pyoptsparse.pyOpt_error import Error
-
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -1461,9 +1459,11 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['optimizer'] = 'IPOPT'
         prob.setup(check=False)
 
-        # Test that we get exception. This exception is whatever pyopt wants it to be.
-        with self.assertRaises(Error) as raises_cm:
+        # Test that we get exception.
+        with self.assertRaises(ImportError) as raises_cm:
             prob.run_driver()
+
+        self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
