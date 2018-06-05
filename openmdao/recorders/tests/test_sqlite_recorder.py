@@ -674,7 +674,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
-            "d1.y1": [-2.60769184e-12],
+            "d1.y1": [2.60769184e-12],
             "con_cmp2.con2": [0.0],
             "pz.z": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
