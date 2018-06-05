@@ -125,7 +125,7 @@ def _trace_call(frame, arg, stack, context):
         _printer("%s--> %s (%d)" % (indent, fullname, method_counts[fullname]))
         _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     else:
-        _printer("%s%s" % (indent, fullname))
+        _printer("%s-->%s" % (indent, fullname))
 
     if memory is not None:
         memory.append(mem_usage())
