@@ -545,7 +545,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         from openmdao.test_suite.test_examples.test_circuit_analysis import Diode, Node, Resistor
         from openmdao.components.external_code_comp import ExternalCodeComp, \
             ExternalCodeImplicitComp
-        from openmdao.utils.logger_utils import TestLogger
 
         class ResistorExternalCodeComp(ExternalCodeComp):
 
@@ -557,8 +556,8 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 self.add_input('V_out', units='V')
                 self.add_output('I', units='A')
 
-                self.declare_partials('I', 'V_in', method='fd')
-                self.declare_partials('I', 'V_out', method='fd')
+                self.declare_partials(of='I', wrt='V_in', method='fd')
+                self.declare_partials(of='I', wrt='V_out', method='fd')
 
                 self.input_file = 'resistor_input.dat'
                 self.output_file = 'resistor_output.dat'
@@ -611,7 +610,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
                 # note: we don't declare any partials wrt `V` here,
                 #      because the residual doesn't directly depend on it
-                self.declare_partials('V', 'I*', method='fd')
+                self.declare_partials(of='V', wrt='I*', method='fd')
 
                 self.input_file = 'node_input.dat'
                 self.output_file = 'node_output.dat'
@@ -678,8 +677,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         model.connect('source.I', 'circuit.I_in')
         model.connect('ground.V', 'circuit.Vg')
 
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
+        p.setup(check=True)
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.

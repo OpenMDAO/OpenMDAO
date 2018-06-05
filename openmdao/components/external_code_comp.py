@@ -37,21 +37,6 @@ class ExternalCodeDelegate(object):
         """
         self._comp = comp
 
-    def init_comp(self):
-        """
-        Initialize the external code component this delegate is associated with.
-        """
-        comp = self._comp
-
-        comp.stdin = DEV_NULL
-        comp.stdout = None
-        comp.stderr = "external_code_comp_error.out"
-
-        comp.DEV_NULL = DEV_NULL
-        comp.STDOUT = STDOUT
-
-        comp.return_code = 0
-
     def declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -271,7 +256,15 @@ class ExternalCodeComp(ExplicitComponent):
         """
         self._external_code_runner = ExternalCodeDelegate(self)
         super(ExternalCodeComp, self).__init__(**kwargs)
-        self._external_code_runner.init_comp()
+
+        self.stdin = DEV_NULL
+        self.stdout = None
+        self.stderr = "external_code_comp_error.out"
+
+        self.DEV_NULL = DEV_NULL
+        self.STDOUT = STDOUT
+
+        self.return_code = 0
 
     def _declare_options(self):
         """
@@ -368,7 +361,15 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         """
         self._external_code_runner = ExternalCodeDelegate(self)
         super(ExternalCodeImplicitComp, self).__init__(**kwargs)
-        self._external_code_runner.init_comp()
+
+        self.stdin = DEV_NULL
+        self.stdout = None
+        self.stderr = "external_code_comp_error.out"
+
+        self.DEV_NULL = DEV_NULL
+        self.STDOUT = STDOUT
+
+        self.return_code = 0
 
     def _declare_options(self):
         """
