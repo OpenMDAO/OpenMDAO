@@ -12,7 +12,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 
 class EqualityConstraintsComp(ExplicitComponent):
     """
-    A simple equation balance for solving implicit equations.
+    A component that computes the difference between two inputs to test for equality.
 
     Attributes
     ----------
@@ -21,9 +21,9 @@ class EqualityConstraintsComp(ExplicitComponent):
         so everything can be saved until setup is called.
     """
 
-    def __init__(self, name=None, eq_units=None, lhs_name=None,
-                 rhs_name=None, rhs_val=0.0, guess_func=None,
-                 use_mult=False, mult_name=None, mult_val=1.0, **kwargs):
+    def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
+                 use_mult=False, mult_name=None, mult_val=1.0, add_constraint=False,
+                 **kwargs):
         r"""
         Initialize an EqualityConstraintsComp, optionally add an output constraint to the model.
 
@@ -32,21 +32,16 @@ class EqualityConstraintsComp(ExplicitComponent):
         name : str
             The name of the output variable to be created.
         eq_units : str or None
-            Units for the left-hand-side and right-hand-side of the equation to be balanced.
+            Units for the left-hand-side and right-hand-side of the difference equation.
         lhs_name : str or None
-            Optional name for the LHS variable associated with the implicit output variable.  If
+            Optional name for the LHS variable associated with the difference equation.  If
             None, the default will be used:  'lhs:{name}'.
         rhs_name : str or None
-            Optional name for the RHS variable associated with the implicit output variable.  If
+            Optional name for the RHS variable associated with the difference equation.  If
             None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
             Default value for the RHS of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
-        guess_func : callable or None
-            A callable function in the form f(inputs, resids) that returns an initial "guess" value
-            of the output variable based on the inputs to the EqualityConstraintsComp.  Note that
-            you may have to add additional inputs to the EqualityConstraintsComp in order to
-            evaluate this function.
         use_mult : bool
             Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
             by mult_name with the default value given by mult_val.  Default is False.
@@ -56,14 +51,16 @@ class EqualityConstraintsComp(ExplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val option in kwargs.
+        add_constraint : bool
+            Specifies whether to add an equality constraint.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
         """
         super(EqualityConstraintsComp, self).__init__()
         self._output_vars = {}
         if name is not None:
-            self.add_eq_constraint(name, eq_units, lhs_name, rhs_name, rhs_val, guess_func,
-                                   use_mult, mult_name, mult_val, **kwargs)
+            self.add_eq_constraint(name, eq_units, lhs_name, rhs_name, rhs_val,
+                                   use_mult, mult_name, mult_val, add_constraint, **kwargs)
 
     def setup(self):
         """
@@ -183,31 +180,14 @@ class EqualityConstraintsComp(ExplicitComponent):
             # Partials of output wrt lhs
             partials[name, lhs_name] = mult * self._scale_factor
 
-    def guess_nonlinear(self, inputs, outputs, residuals):
-        """
-        Provide an "guess" for each output based on the values of the inputs and resids.
-
-        Parameters
-        ----------
-        inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
-        """
-        for name, options in iteritems(self._output_vars):
-            if options['guess_func'] is not None:
-                outputs[name] = options['guess_func'](inputs, residuals)
-
     def add_eq_output(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                      guess_func=None, use_mult=False, mult_name=None, mult_val=1.0,
-                      add_constraint=False, **kwargs):
+                      use_mult=False, mult_name=None, mult_val=1.0, add_constraint=False,
+                      **kwargs):
         """
-        Add a new output variable and associated equation to be balanced.
+        Add a new output variable and associated difference equation.
 
         This will create new inputs `lhs:name`, `rhs:name`, and `mult:name` that will
-        define the left and right sides of the equation to be balanced, and a
+        define the left and right sides of the difference equation, and a
         multiplier for the left-hand-side.
 
         Parameters
@@ -215,21 +195,16 @@ class EqualityConstraintsComp(ExplicitComponent):
         name : str
             The name of the output variable to be created.
         eq_units : str or None
-            Units for the left-hand-side and right-hand-side of the equation to be balanced.
+            Units for the left-hand-side and right-hand-side of the difference equation.
         lhs_name : str or None
-            Optional name for the LHS variable associated with the implicit output variable.  If
+            Optional name for the LHS variable associated with the difference equation.  If
             None, the default will be used:  'lhs:{name}'.
         rhs_name : str or None
-            Optional name for the RHS variable associated with the implicit output variable.  If
+            Optional name for the RHS variable associated with the difference equation.  If
             None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
             Default value for the RHS.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
-        guess_func : callable or None
-            A callable function in the form f(inputs, resids) that returns an initial "guess" value
-            of the output variable based on the inputs to the EqualityConstraintsComp.  Note that
-            you may have to add additional inputs to the EqualityConstraintsComp in order to
-            evaluate this function.
         use_mult : bool
             Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
             by mult_name with the default value given by mult_val.  Default is False.
@@ -239,18 +214,16 @@ class EqualityConstraintsComp(ExplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val option in kwargs.
+        add_constraint : bool
+            Specifies whether to add an equality constraint.
         **kwargs : dict
-            Additional arguments to be passed for the creation of the implicit output variable.
+            Additional arguments to be passed for the creation of the difference equation.
         """
-        if guess_func is not None and not callable(guess_func):
-            raise ValueError("Argument 'guess_func' must be a callable if specified")
-
         self._output_vars[name] = {'kwargs': kwargs,
                                    'eq_units': eq_units,
                                    'lhs_name': lhs_name,
                                    'rhs_name': rhs_name,
                                    'rhs_val': rhs_val,
-                                   'guess_func': guess_func,
                                    'use_mult': use_mult,
                                    'mult_name': mult_name,
                                    'mult_val': mult_val,

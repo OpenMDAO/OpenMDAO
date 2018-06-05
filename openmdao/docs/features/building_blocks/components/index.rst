@@ -8,6 +8,7 @@ Components
 
     exec_comp.rst
     balance_comp.rst
+    eq_constraints_comp.rst
     external_code_comp.rst
     linearsystem_comp.rst
     metamodelstructured_comp.rst
