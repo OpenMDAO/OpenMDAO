@@ -833,9 +833,15 @@ class Component(System):
                 if val is None:
                     val = np.zeros_like(rows, dtype=float)
 
+                shape = (rows.size, cols.size)
+            else:
+                shape = None
+
         pattern_matches = self._find_partial_matches(of, wrt)
 
         multiple_items = False
+
+        abs2meta = self._var_abs2meta
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -865,6 +871,11 @@ class Component(System):
                 meta['cols'] = cols
                 meta['value'] = deepcopy(val) if make_copies else val
                 meta['dependent'] = dependent
+                if shape is None:
+                    meta['shape'] = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+                else:
+                    meta['shape'] = shape
+
                 self._check_partials_meta(abs_key, meta)
                 self._subjacs_info[abs_key] = meta
 
@@ -964,7 +975,6 @@ class Component(System):
             J._system = self
 
         for key, meta in iteritems(self._subjacs_info):
-            self._check_partials_meta(key, meta)
             for J in jacs:
                 J._set_partials_meta(key, meta)
 

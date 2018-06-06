@@ -185,11 +185,11 @@ class ExplicitComponent(Component):
             old_systems.append(J._system)
             J._system = self
 
+        abs2meta = self._var_abs2meta
         for abs_key, meta in iteritems(self._subjacs_info):
+
             if meta['value'] is None:
-                out_size = self._var_abs2meta[abs_key[0]]['size']
-                in_size = self._var_abs2meta[abs_key[1]]['size']
-                meta['value'] = np.zeros((out_size, in_size))
+                meta['value'] = np.zeros(meta['shape'])
 
             # if wrt is an input, we need to negate the subjac.
             negate = abs_key[1] in abs2prom['input']
