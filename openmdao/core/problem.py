@@ -7,6 +7,7 @@ import sys
 from collections import OrderedDict, defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
+import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -922,6 +923,7 @@ class Problem(object):
         jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
+        comps_could_not_cs = set()
         for comp in comps:
 
             c_name = comp.pathname
@@ -950,15 +952,15 @@ class Problem(object):
                     if local_method:
                         method = local_method
 
+                # We can't use CS if we havent' allocated a complex vector, so we fall back on fd.
+                if method == 'cs' and not alloc_complex:
+                    comps_could_not_cs.add(c_name)
+                    method = 'fd'
+
                 fd_options = {'order': None,
                               'method': method}
 
                 if method == 'cs':
-                    if not alloc_complex:
-                        msg = 'In order to check partials with complex step, you need to set ' + \
-                            '"force_alloc_complex" to True during setup.'
-                        raise RuntimeError(msg)
-
                     defaults = DEFAULT_CS_OPTIONS
 
                     fd_options['form'] = None
@@ -1002,6 +1004,12 @@ class Problem(object):
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
+
+        if len(comps_could_not_cs) > 0:
+            msg = "The following components requested complex step, but force_alloc_complex " + \
+                "has not been set to True, so finite difference was used: "
+            msg += str(list(comps_could_not_cs))
+            warnings.warn(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
