@@ -1,6 +1,7 @@
 """Define the DenseMatrix class."""
 from __future__ import division, print_function
 import numpy as np
+from numpy import ndarray
 from six import iteritems
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map
@@ -82,15 +83,15 @@ class DenseMatrix(Matrix):
             the sub-jacobian, the same format with which it was declared.
         """
         irows, icols, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type):
+        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
-        if isinstance(jac, np.ndarray):
-            self._matrix[irows, icols] = jac
-        elif isinstance(jac, list):
+        if jac_type is list:
             self._matrix[irows, icols] = jac[0]
+        elif isinstance(jac, np.ndarray):
+            self._matrix[irows, icols] = jac
         else:  # sparse
             self._matrix[irows, icols] = jac.data
 
@@ -109,7 +110,7 @@ class DenseMatrix(Matrix):
             the sub-jacobian, the same format with which it was declared.
         """
         irows, icols, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type):
+        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,

@@ -8,6 +8,7 @@ from itertools import product
 from six import string_types, iteritems, itervalues
 
 import numpy as np
+from numpy import ndarray
 from scipy.sparse import issparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
@@ -358,13 +359,13 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if any([True for character in forbidden_chars if character in name]):
             raise NameError("'%s' is not a valid input name." % name)
-        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % type(shape))
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                    np.ndarray, Iterable)):
+                                                                    ndarray, Iterable)):
             raise TypeError('The src_indices argument should be an int, list, '
                             'tuple, ndarray or Iterable')
         if units is not None and not isinstance(units, str):
@@ -482,16 +483,16 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if any([True for character in forbidden_chars if character in name]):
             raise NameError("'%s' is not a valid output name." % name)
-        if not np.isscalar(val) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+        if not np.isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
-        if not np.isscalar(ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+        if not np.isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The ref argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
-        if not np.isscalar(ref0) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+        if not np.isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The ref0 argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
-        if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, np.ndarray, Iterable)):
+        if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The res_ref argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
@@ -833,13 +834,7 @@ class Component(System):
                 if val is None:
                     val = np.zeros_like(rows, dtype=float)
 
-                shape = (rows.size, cols.size)
-            else:
-                shape = None
-
         pattern_matches = self._find_partial_matches(of, wrt)
-
-        multiple_items = False
 
         abs2meta = self._var_abs2meta
 
@@ -850,11 +845,6 @@ class Component(System):
                 raise ValueError('No matches were found for of="{}"'.format(of_pattern))
             if not wrt_matches:
                 raise ValueError('No matches were found for wrt="{}"'.format(wrt_pattern))
-
-            make_copies = multiple_items or len(of_matches) > 1 or len(wrt_matches) > 1
-            # Setting this to true means that future loop iterations (i.e. if there are multiple
-            # items in either of or wrt) will make copies.
-            multiple_items = True
 
             for rel_key in product(of_matches, wrt_matches):
                 abs_key = rel_key2abs_key(self, rel_key)
@@ -869,12 +859,19 @@ class Component(System):
                     meta = SUBJAC_META_DEFAULTS.copy()
                 meta['rows'] = rows
                 meta['cols'] = cols
-                meta['value'] = deepcopy(val) if make_copies else val
                 meta['dependent'] = dependent
-                if shape is None:
-                    meta['shape'] = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+                meta['shape'] = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+
+                if val is None:
+                    # we can only get here if rows is None  (we're not sparse list format)
+                    meta['value'] = np.zeros(meta['shape'])
+                elif isinstance(val, ndarray):
+                    meta['value'] = val.copy()
                 else:
-                    meta['shape'] = shape
+                    meta['value'] = val
+                    
+                if rows is not None and val.size != rows.size and val.size == 1:
+                    meta['value'] = np.full(rows.size, val[0])
 
                 self._check_partials_meta(abs_key, meta)
                 self._subjacs_info[abs_key] = meta
@@ -969,22 +966,22 @@ class Component(System):
         jacs : list of Jacobian
             Jacobians needing metadata update.
         """
-        old_systems = []
-        for J in jacs:
-            old_systems.append(J._system)
-            J._system = self
+        #old_systems = []
+        #for J in jacs:
+            #old_systems.append(J._system)
+            #J._system = self
 
         for key, meta in iteritems(self._subjacs_info):
-            for J in jacs:
-                J._set_partials_meta(key, meta)
+            # for J in jacs:
+            # self._jacobian._set_partials_meta(key, meta)
 
             if 'method' in meta:
                 method = meta['method']
                 if method:
                     self._approx_schemes[method].add_approximation(key, meta)
 
-        for i, J in enumerate(jacs):
-            J._system = old_systems[i]
+        #for i, J in enumerate(jacs):
+            #J._system = old_systems[i]
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

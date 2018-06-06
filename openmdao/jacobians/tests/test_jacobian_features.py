@@ -390,9 +390,9 @@ class TestJacobianFeatures(unittest.TestCase):
             ('units.flow:P', 'units.P'): [[-1.]],
         }
 
-        jac = units._jacobian._subjacs
+        jac = units._subjacs_info
         for deriv, val in iteritems(expected_subjacs):
-            assert_rel_error(self, jac[deriv], val, 1e-6)
+            assert_rel_error(self, jac[deriv]['value'], val, 1e-6)
 
     def test_reference(self):
         class TmpComp(ExplicitComponent):

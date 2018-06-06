@@ -1095,7 +1095,7 @@ class _TotalJacInfo(object):
         model._linearize(model._assembled_jac, sub_do_ln=model.linear_solver._linearize_children())
         model.linear_solver._linearize()
 
-        approx_jac = model._jacobian._subjacs
+        approx_jac = model._jacobian._subjacs_info
 
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
@@ -1104,7 +1104,7 @@ class _TotalJacInfo(object):
             totals = OrderedDict()
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name],
+                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name]['value'],
                                                             prom_out, prom_in, of_idx, wrt_idx)
 
         elif return_format == 'dict':
@@ -1112,7 +1112,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 totals[prom_out] = tot = OrderedDict()
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name],
+                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name]['value'],
                                                prom_out, prom_in, of_idx, wrt_idx)
 
         elif return_format == 'array':
@@ -1120,7 +1120,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
+                    tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name]['value'],
                                                   prom_out, prom_in, of_idx, wrt_idx)
         else:
             msg = "Unsupported return format '%s." % return_format

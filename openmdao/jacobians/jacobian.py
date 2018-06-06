@@ -20,8 +20,6 @@ class Jacobian(object):
     ----------
     _system : <System>
         Pointer to the system that is currently operating on this Jacobian.
-    _subjacs : dict
-        Dictionary of the user-supplied sub-Jacobians keyed by absolute names.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _override_checks : bool
@@ -40,8 +38,7 @@ class Jacobian(object):
             Parent system to this jacobian.
         """
         self._system = system
-        self._subjacs = OrderedDict()
-        self._subjacs_info = OrderedDict()
+        self._subjacs_info = None
         self._override_checks = False
 
     def _abs_key2shape(self, abs_key):
@@ -74,16 +71,12 @@ class Jacobian(object):
         val : float
             value to multiply by.
         """
-        jac = self._subjacs[abs_key]
+        jac = self._subjacs_info[abs_key]['value']
 
-        if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] *= val
-        elif isinstance(jac, sparse_types):
-            self._subjacs[abs_key].data *= val  # DOK not supported
-        elif len(jac) == 3:
-            self._subjacs[abs_key][0] *= val
+        if isinstance(jac, sparse_types):
+            jac.data *= val  # DOK not supported
         else:
-            self._subjacs[abs_key] *= val
+            jac *= val
 
     def __contains__(self, key):
         """
@@ -99,7 +92,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        return key2abs_key(self._system, key) in self._subjacs
+        return key2abs_key(self._system, key) in self._subjacs_info
 
     def __getitem__(self, key):
         """
@@ -115,13 +108,18 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        abs_key = key2abs_key(self._system, key)
-        if abs_key in self._subjacs:
-            subjac = self._subjacs[abs_key]
-            if isinstance(subjac, list):
-                # Sparse AIJ format
-                return subjac[0]
-            return subjac
+        if key not in self._subjacs_info:
+            abs_key = key2abs_key(self._system, key)
+        else:
+            abs_key = key
+
+        if abs_key in self._subjacs_info:
+            # subjac = self._subjacs_info[abs_key]
+            # if isinstance(subjac, list):
+            #     # Sparse AIJ format
+            #     return subjac[0]
+            # return subjac
+            return self._subjacs_info[abs_key]['value']
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
@@ -161,6 +159,8 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
+        subjacs_info = self._subjacs_info[abs_key]
+
         if not issparse(subjac):
             # np.promote_types will choose the smallest dtype that can contain both arguments
             subjac = np.atleast_1d(subjac)
@@ -170,14 +170,10 @@ class Jacobian(object):
             # Bail here so that we allow top level jacobians to be of reduced size when indices are
             # specified on driver vars.
             if self._override_checks:
-                self._subjacs[abs_key] = subjac
+                subjacs_info['value'] = subjac
                 return
 
-            if abs_key in self._subjacs_info:
-                subjac_info = self._subjacs_info[abs_key][0]
-                rows = subjac_info['rows']
-            else:
-                rows = None
+            rows = subjacs_info['rows']
 
             if rows is None:
                 # Dense subjac
@@ -187,11 +183,6 @@ class Jacobian(object):
                     subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
                 else:
                     subjac = subjac.reshape(shape)
-
-                if abs_key in self._subjacs and self._subjacs[abs_key].shape == shape:
-                    np.copyto(self._subjacs[abs_key], subjac)
-                else:
-                    self._subjacs[abs_key] = subjac.copy()
             else:
                 # Sparse subjac
                 if subjac.shape == (1,):
@@ -202,20 +193,17 @@ class Jacobian(object):
                                      "the wrong shape (%s), expected (%s)." %
                                      (abs_key, subjac.shape, rows.shape))
 
-                if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
-                    np.copyto(self._subjacs[abs_key][0], subjac)
-                else:
-                    self._subjacs[abs_key] = [subjac.copy(), rows, subjac_info['cols']]
+            np.copyto(subjacs_info['value'], subjac)
         else:
-            self._subjacs[abs_key] = subjac
+            subjacs_info['value'] = subjac
 
-    def _initialize(self):
+    def _initialize(self, subjacs_info):
         """
         Allocate the global matrices.
         """
-        pass
+        self._subjacs_info = subjacs_info
 
-    def _update(self):
+    def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
         """

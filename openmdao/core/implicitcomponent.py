@@ -259,7 +259,7 @@ class ImplicitComponent(Component):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if jac is None:
-            jac = self.jacobian
+            jac = self._assembled_jac if self._assembled_jac else self._jacobian
 
         with self.jacobian_context(jac):
             with self._unscaled_context(outputs=[self._outputs]):
@@ -269,8 +269,8 @@ class ImplicitComponent(Component):
                     approximation.compute_approximations(self, jac=jac)
                 self.linearize(self._inputs, self._outputs, jac)
 
-            if self._assembled_jac is not None:
-                self._assembled_jac._update()
+        if self._assembled_jac is not None:
+            self._assembled_jac._update(self)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

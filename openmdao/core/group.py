@@ -1709,14 +1709,13 @@ class Group(System):
         """
         # Group finite difference
         if self._owns_approx_jac:
-            if jac is None:
-                jac = self._jacobian
+            jac = self._jacobian
             with self.jacobian_context(jac):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
                         approximation.compute_approximations(self, jac=jac, deriv_type='total')
 
-                jac._update()
+            jac._update(self)
 
         else:
             if self._assembled_jac is not None:
@@ -1732,8 +1731,7 @@ class Group(System):
 
             # Update jacobian
             if self._assembled_jac is not None:
-                with self.jacobian_context(jac):
-                    jac._update()
+                self._assembled_jac._update(self)
 
             if sub_do_ln:
                 for subsys in self._subsystems_myproc:
@@ -1816,6 +1814,7 @@ class Group(System):
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
             pro2abs = self._var_allprocs_prom2abs_list
+            abs2meta = self._var_allprocs_abs2meta
 
             if self._owns_approx_of:
                 of = self._owns_approx_of
@@ -1866,7 +1865,7 @@ class Group(System):
                     self._subjacs_info[key] = meta
 
                     # Create Jacobian stub for every key pair
-                    J._set_partials_meta(key, meta)
+                    # J._set_partials_meta(key, meta)
 
                     # Create approximations, but only for the ones we need.
                     if meta['dependent']:
@@ -1884,9 +1883,14 @@ class Group(System):
 
                         approx.add_approximation(key, meta)
 
+                    if meta['value'] is None:
+                        shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
+                        meta['shape'] = shape
+                        meta['value'] = np.zeros(shape)
+
             approx._init_approximations()
 
-            J._initialize()
+            J._initialize(self._subjacs_info)
 
         super(Group, self)._setup_jacobians(parent_asm_jac, gradient_nl_jac)
 

@@ -51,7 +51,7 @@ class DictionaryJacobian(Jacobian):
         entry = (system.pathname, vec_name)
 
         if entry not in self._iter_keys:
-            subjacs = self._subjacs
+            subjacs = self._subjacs_info
             keys = []
             for res_name in system._var_relevant_names[vec_name]['output']:
                 for type_ in ('output', 'input'):
@@ -94,11 +94,15 @@ class DictionaryJacobian(Jacobian):
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
+            subjacs_info = self._subjacs_info
             for abs_key in self._iter_abs_keys(d_residuals._name):
-                subjac = self._subjacs[abs_key]
+                subjac_info = subjacs_info[abs_key]
+                subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
-                    if isinstance(subjac, list):
+                    rows = subjac_info['rows']
+                    if rows is not None:  # sparse list format
+                        cols = subjac_info['cols']
                         if other_name in d_out_names:
                             # skip the matvec mult completely for identity subjacs
                             if res_name is other_name and isinstance(system, ExplicitComponent):
@@ -109,36 +113,36 @@ class DictionaryJacobian(Jacobian):
                             elif fwd:
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(rflat[res_name][:, i], subjac[1],
-                                                  oflat[other_name][:, i][subjac[2]] * subjac[0])
+                                        np_add_at(rflat[res_name][:, i], rows,
+                                                  oflat[other_name][:, i][cols] * subjac)
                                 else:
-                                    np_add_at(rflat[res_name], subjac[1],
-                                              oflat[other_name][subjac[2]] * subjac[0])
+                                    np_add_at(rflat[res_name], rows,
+                                              oflat[other_name][cols] * subjac)
                             else:  # rev
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(oflat[other_name][:, i], subjac[2],
-                                                  rflat[res_name][:, i][subjac[1]] * subjac[0])
+                                        np_add_at(oflat[other_name][:, i], cols,
+                                                  rflat[res_name][:, i][rows] * subjac)
                                 else:
-                                    np_add_at(oflat[other_name], subjac[2],
-                                              rflat[res_name][subjac[1]] * subjac[0])
+                                    np_add_at(oflat[other_name], cols,
+                                              rflat[res_name][rows] * subjac)
                         elif other_name in d_inp_names:
                             if fwd:
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(rflat[res_name][:, i], subjac[1],
-                                                  iflat[other_name][:, i][subjac[2]] * subjac[0])
+                                        np_add_at(rflat[res_name][:, i], rows,
+                                                  iflat[other_name][:, i][cols] * subjac)
                                 else:
-                                    np_add_at(rflat[res_name], subjac[1],
-                                              iflat[other_name][subjac[2]] * subjac[0])
+                                    np_add_at(rflat[res_name], rows,
+                                              iflat[other_name][cols] * subjac)
                             else:  # rev
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(iflat[other_name][:, i], subjac[2],
-                                                  rflat[res_name][:, i][subjac[1]] * subjac[0])
+                                        np_add_at(iflat[other_name][:, i], cols,
+                                                  rflat[res_name][:, i][rows] * subjac)
                                 else:
-                                    np_add_at(iflat[other_name], subjac[2],
-                                              rflat[res_name][subjac[1]] * subjac[0])
+                                    np_add_at(iflat[other_name], cols,
+                                              rflat[res_name][rows] * subjac)
                     else:  # ndarray or sparse
                         if other_name in d_out_names:
                             if fwd:

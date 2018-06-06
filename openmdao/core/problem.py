@@ -733,7 +733,6 @@ class Problem(object):
                 # TODO: Check deprecated deriv_options.
 
                 with comp._unscaled_context():
-                    subjacs = comp._jacobian._subjacs
                     if explicit:
                         comp._negate_jac(comp._jacobian)
 
@@ -818,19 +817,23 @@ class Problem(object):
 
                     # These components already have a Jacobian with calculated derivatives.
                     else:
+                        subjacs = comp._jacobian._subjacs_info
 
                         for rel_key in product(of_list, wrt_list):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
 
                             # No need to calculate partials; they are already stored
-                            deriv_value = subjacs.get(abs_key)
+                            try:
+                                deriv_value = subjacs[abs_key]['value']
+                            except KeyError:
+                                deriv_value = None
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
                             # undeclared partials, which is the default behavior now.
                             try:
-                                if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
+                                if subjacs[abs_key]['dependent'] is False:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
                                 indep_key[c_name].add(rel_key)
@@ -1044,10 +1047,9 @@ class Problem(object):
                                        driver_scaling=driver_scaling)
             Jfd = total_info.compute_totals_approx(initialize=True)
 
-            # reset the _owns_approx_jac flag and the top level _jacobian attribute after
-            # approximation is complete.
+            # reset the _owns_approx_jac flag after approximation is complete.
             if not approx:
-                model._jacobian = None
+                # model._jacobian = None
                 model._owns_approx_jac = False
 
         # Assemble and Return all metrics.

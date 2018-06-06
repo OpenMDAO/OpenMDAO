@@ -86,7 +86,7 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
-            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=np.ones(meta['size']))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
@@ -160,11 +160,11 @@ class ExplicitComponent(Component):
         J : Jacobian
             The jacobian to be negated.
         """
-        if J._subjacs:
+        if J._subjacs_info:
             for res_name in self._var_abs_names['output']:
                 for in_name in self._var_abs_names['input']:
                     abs_key = (res_name, in_name)
-                    if abs_key in J._subjacs:
+                    if abs_key in J._subjacs_info:
                         J._multiply_subjac(abs_key, -1.)
 
     def _set_partials_meta(self, jacs):
@@ -179,11 +179,11 @@ class ExplicitComponent(Component):
         abs2prom = self._var_abs2prom
         negated_subjacs = set()
 
-        # set context of jacobians once to avoid doing inside of loop
-        old_systems = []
-        for J in jacs:
-            old_systems.append(J._system)
-            J._system = self
+        # # set context of jacobians once to avoid doing inside of loop
+        # old_systems = []
+        # for J in jacs:
+        #     old_systems.append(J._system)
+        #     J._system = self
 
         abs2meta = self._var_abs2meta
         for abs_key, meta in iteritems(self._subjacs_info):
@@ -193,25 +193,27 @@ class ExplicitComponent(Component):
 
             # if wrt is an input, we need to negate the subjac.
             negate = abs_key[1] in abs2prom['input']
-            for J in jacs:
-                if negate:
-                    # If we have multiple jacs, we need to make a copy after the first one in
-                    # order for our subjac negation to work properly.
-                    if abs_key in negated_subjacs:
-                        meta = meta.copy()  # shallow copy
-                        meta['value'] = deepcopy(meta['value'])
-                    else:
-                        negated_subjacs.add(abs_key)
-                J._set_partials_meta(abs_key, meta, negate)
+            #for J in jacs:
+                #if negate:
+                    ## If we have multiple jacs, we need to make a copy after the first one in
+                    ## order for our subjac negation to work properly.
+                    #if abs_key in negated_subjacs:
+                        #meta = meta.copy()  # shallow copy
+                        #meta['value'] = deepcopy(meta['value'])
+                    #else:
+                        #negated_subjacs.add(abs_key)
+            if negate:
+                self._jacobian._multiply_subjac(abs_key, -1.0)
+            # self._jacobian._set_partials_meta(abs_key, meta, negate)
 
             if 'method' in meta and meta['method']:
                 # Don't approximate output wrt output.
                 if abs_key[1] not in self._var_allprocs_abs_names['output']:
                     self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
 
-        # reset context of jacobians
-        for i, J in enumerate(jacs):
-            J._system = old_systems[i]
+        ## reset context of jacobians
+        #for i, J in enumerate(jacs):
+            #J._system = old_systems[i]
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
@@ -278,7 +280,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self.jacobian if jac is None else jac
+        J = self._jacobian if jac is None else jac
 
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
@@ -383,7 +385,7 @@ class ExplicitComponent(Component):
             return
 
         if jac is None:
-            jac = self.jacobian
+            jac = self._jacobian
 
         with self.jacobian_context(jac):
             with self._unscaled_context(
@@ -403,8 +405,8 @@ class ExplicitComponent(Component):
                     # re-negate the jacobian
                     self._negate_jac(jac)
 
-            # if self._assembled_jac is not None:
-            #     self._assembled_jac._update()
+            if self._assembled_jac is not None:
+                self._assembled_jac._update(self)
 
     def compute(self, inputs, outputs):
         """

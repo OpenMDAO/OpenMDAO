@@ -105,10 +105,11 @@ class AssembledJacobian(Jacobian):
             in_ranges[name] = (start, end)
             start = end
 
-    def _initialize(self):
+    def _initialize(self, subjacs_info):
         """
         Allocate the global matrices.
         """
+        self._subjacs_info = subjacs_info
         system = self._system
 
         # var_indices are the *global* indices for variables on this proc
@@ -132,7 +133,7 @@ class AssembledJacobian(Jacobian):
         abs_key2shape = self._abs_key2shape
 
         # create the matrix subjacs
-        for abs_key, (info, shape) in iteritems(self._subjacs_info):
+        for abs_key, info in iteritems(self._subjacs_info):
             res_abs_name, wrt_abs_name = abs_key
             # because self._subjacs_info is shared among all 'related' assembled jacs,
             # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
@@ -142,7 +143,7 @@ class AssembledJacobian(Jacobian):
 
             if wrt_abs_name in abs2prom_out:
                 out_offset, _ = out_ranges[wrt_abs_name]
-                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
+                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, info['shape'])
                 keymap[abs_key] = abs_key
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
@@ -165,7 +166,9 @@ class AssembledJacobian(Jacobian):
                     abs_key2 = (res_abs_name, out_abs_name)
                     keymap[abs_key] = abs_key2
 
-                    if src_indices is not None:
+                    if src_indices is None:
+                        shape = info['shape']
+                    else:
                         shape = abs_key2shape(abs_key2)
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
@@ -173,7 +176,7 @@ class AssembledJacobian(Jacobian):
 
                 elif not is_top:  # input is connected to something outside current system
                     ext_mtx._add_submat(abs_key, info, res_offset,
-                                        in_ranges[wrt_abs_name][0], None, shape)
+                                        in_ranges[wrt_abs_name][0], None, info['shape'])
 
         iproc = system.comm.rank
         out_size = np.sum(out_sizes[iproc, :])
@@ -243,9 +246,9 @@ class AssembledJacobian(Jacobian):
                         if abs_key not in subjacs_info:
                             continue
 
-                        info, shape = subjacs_info[abs_key]
+                        info = subjacs_info[abs_key]
                         ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
-                                            in_offset[in_abs_name] - ranges[2], None, shape)
+                                            in_offset[in_abs_name] - ranges[2], None, info['shape'])
 
         if ext_mtx._submats:
             sizes = system._var_sizes
@@ -264,7 +267,7 @@ class AssembledJacobian(Jacobian):
             keymap = self._keymap
             int_mtx = self._int_mtx
             ext_mtx = self._ext_mtx[system.pathname]
-            subjacs = self._subjacs
+            subjacs = system._subjacs_info
             seen = set()
             global_conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
@@ -308,25 +311,24 @@ class AssembledJacobian(Jacobian):
 
         return subjac_iters
 
-    def _update(self):
+    def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
         """
-        system = self._system
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
-        subjacs = self._subjacs
+        subjacs = system._subjacs_info
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
         for key1, key2, do_add in iters:
             if do_add:
-                int_mtx._update_add_submat(key2, subjacs[key2])
+                int_mtx._update_add_submat(key2, subjacs[key2]['value'])
             else:
-                int_mtx._update_submat(key2, subjacs[key2])
+                int_mtx._update_submat(key2, subjacs[key2]['value'])
 
         for key in iters_in_ext:
-            ext_mtx._update_submat(key, subjacs[key])
+            ext_mtx._update_submat(key, subjacs[key]['value'])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """

@@ -1227,11 +1227,13 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._subjacs_info = OrderedDict()
+        # FIXME: I don't think this has to be an OrderedDict
+        self._subjacs_info = info = OrderedDict()
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
+                info.update(subsys._subjacs_info)
 
     def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
         """
@@ -1257,8 +1259,6 @@ class System(object):
                 s._assembled_jac = asm_jac
             if not self._owns_approx_jac:
                 self._jacobian = None
-        elif not self._owns_approx_jac:
-            self._jacobian = DictionaryJacobian(system=self)
 
         if nl_asm_jac_solvers:
             if asm_jac is None:
@@ -1267,7 +1267,6 @@ class System(object):
                 s._assembled_jac = asm_jac
             if self.nonlinear_solver.supports['gradients']:
                 gradient_nl_jac = asm_jac
-            
 
         self._views_assembled_jac = False
         if my_asm_jac is not None:
@@ -1292,6 +1291,10 @@ class System(object):
         if self._jacobian is not None:
             jacs.append(self._jacobian)
 
+        if not self._owns_approx_jac:
+            self._jacobian = DictionaryJacobian(system=self)
+            self._jacobian._initialize(self._subjacs_info)
+
         # note that for a Group, _set_partials_meta does nothing
         self._set_partials_meta(jacs)
 
@@ -1307,30 +1310,30 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_jacobians(parent_asm_jac, gradient_nl_jac)
 
-        par_jacs = set([j for j in (parent_asm_jac, gradient_nl_jac) if j is not None])
-
-        # if we have an assembled jac at this level and an assembled jac above us, then
-        # our jac (and any of our children's assembled jacs) will share their internal
-        # subjac dicts.  Each will maintain its own internal Matrix objects though.
-        if par_jacs:
-            for par_jac in par_jacs:
-                if asm_jac is not None and par_jac is not asm_jac:
-                    if self.pathname.startswith('TOC'):
-                        print(asm_jac._system.pathname, type(asm_jac).__name__, id(asm_jac), "-->", 
-                              par_jac._system.pathname, type(par_jac).__name__, id(par_jac))
-                    par_jac._subjacs.update(asm_jac._subjacs)
-                    par_jac._subjacs_info.update(asm_jac._subjacs_info)
-                    asm_jac._subjacs = par_jac._subjacs
-                    asm_jac._subjacs_info = par_jac._subjacs_info
-                    asm_jac._keymap = par_jac._keymap
-                    asm_jac._view_ranges = par_jac._view_ranges
-    
-                if self._views_assembled_jac:
-                    par_jac._init_view(self)
+        # par_jacs = set([j for j in (parent_asm_jac, gradient_nl_jac) if j is not None])
+        #
+        # # if we have an assembled jac at this level and an assembled jac above us, then
+        # # our jac (and any of our children's assembled jacs) will share their internal
+        # # subjac dicts.  Each will maintain its own internal Matrix objects though.
+        # if par_jacs:
+        #     for par_jac in par_jacs:
+        #         if asm_jac is not None and par_jac is not asm_jac:
+        #             if self.pathname.startswith('TOC'):
+        #                 print(asm_jac._system.pathname, type(asm_jac).__name__, id(asm_jac), "-->",
+        #                       par_jac._system.pathname, type(par_jac).__name__, id(par_jac))
+        #             par_jac._subjacs.update(asm_jac._subjacs)
+        #             par_jac._subjacs_info.update(asm_jac._subjacs_info)
+        #             asm_jac._subjacs = par_jac._subjacs
+        #             asm_jac._subjacs_info = par_jac._subjacs_info
+        #             asm_jac._keymap = par_jac._keymap
+        #             asm_jac._view_ranges = par_jac._view_ranges
+        #
+        #         if self._views_assembled_jac:
+        #             par_jac._init_view(self)
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
-            asm_jac._initialize()
+            asm_jac._initialize(self._subjacs_info)
             asm_jac._init_view(self)
 
     def set_initial_values(self):
