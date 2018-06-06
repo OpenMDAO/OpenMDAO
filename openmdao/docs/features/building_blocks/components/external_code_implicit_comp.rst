@@ -12,6 +12,12 @@ operating system. But it treats the `Component` as an `ImplicitComponent` rather
 
 `ExternalCodeImplicitComp` has the same options as `ExternalCodeComp`.
 
+    .. embed-options::
+        openmdao.components.external_code_comp
+        ExternalCodeImplicitComp
+        options
+
+
 ExternalCodeImplicitComp Example
 --------------------------------
 
