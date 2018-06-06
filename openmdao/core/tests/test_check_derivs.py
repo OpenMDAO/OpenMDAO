@@ -1,8 +1,10 @@
 """ Testing for Problem.check_partials and check_totals."""
 
-import unittest
 from six import iteritems
 from six.moves import cStringIO
+import sys
+import unittest
+import warnings
 
 import numpy as np
 
@@ -63,6 +65,7 @@ class ParaboloidTricky(ExplicitComponent):
         partials['f_xy', 'x'] = 2.0*x*sc*sc - 6.0*sc + y*sc*sc
         partials['f_xy', 'y'] = 2.0*y*sc*sc + 8.0*sc + x*sc*sc
 
+
 class MyCompGoodPartials(ExplicitComponent):
     def setup(self):
         self.add_input('x1', 3.0)
@@ -71,7 +74,6 @@ class MyCompGoodPartials(ExplicitComponent):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
-        """ Doesn't do much. """
         outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
 
     def compute_partials(self, inputs, partials):
@@ -79,6 +81,7 @@ class MyCompGoodPartials(ExplicitComponent):
         J = partials
         J['y', 'x1'] = np.array([3.0])
         J['y', 'x2'] = np.array([4.0])
+
 
 class MyCompBadPartials(ExplicitComponent):
     def setup(self):
@@ -88,7 +91,6 @@ class MyCompBadPartials(ExplicitComponent):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
-        """ Doesn't do much. """
         outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
 
     def compute_partials(self, inputs, partials):
@@ -96,6 +98,7 @@ class MyCompBadPartials(ExplicitComponent):
         J = partials
         J['z', 'y1'] = np.array([33.0])
         J['z', 'y2'] = np.array([40.0])
+
 
 class MyComp(ExplicitComponent):
     def setup(self):
@@ -107,7 +110,6 @@ class MyComp(ExplicitComponent):
         self.declare_partials(of='*', wrt='*')
 
     def compute(self, inputs, outputs):
-        """ Doesn't do much. """
         outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
     def compute_partials(self, inputs, partials):
@@ -205,7 +207,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -637,7 +638,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
         prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
-        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        comp = prob.model.add_subsystem('comp', ParaboloidMatVec())
 
         prob.model.connect('p1.x', 'comp.x')
         prob.model.connect('p2.y', 'comp.y')
@@ -649,12 +650,20 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        with self.assertRaises(RuntimeError) as context:
+        with warnings.catch_warnings(record=True) as w:
             data = prob.check_partials(out_stream=None)
 
-        msg = 'In order to check partials with complex step, you need to set ' + \
-            '"force_alloc_complex" to True during setup.'
-        self.assertEqual(str(context.exception), msg)
+        self.assertEqual(len(w), 1)
+
+        msg = "The following components requested complex step, but force_alloc_complex " + \
+            "has not been set to True, so finite difference was used: ['comp']"
+
+        self.assertEqual(str(w[0].message), msg)
+
+        # Derivative still calculated, but with fd instead.
+        x_error = data['comp']['f_xy', 'x']['rel error']
+        self.assertLess(x_error.forward, 1e-5)
+        self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_method_on_comp(self):
         prob = Problem()
@@ -890,7 +899,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -907,7 +915,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['really_long_variable_name_y'] = 3.0*inputs['really_long_variable_name_x1'] + 4.0*inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -1031,7 +1038,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['z'] = 3.0 * inputs['x1'] + -4444.0 * inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -1198,6 +1204,48 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"),1)
 
+    def test_includes_excludes(self):
+
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('c1c', Group())
+        sub.add_subsystem('d1', ExecComp('y=2*x'))
+        sub.add_subsystem('e1', ExecComp('y=2*x'))
+
+        sub2 = model.add_subsystem('sss', Group())
+        sub3 = sub2.add_subsystem('sss2', Group())
+        sub2.add_subsystem('d1', ExecComp('y=2*x'))
+        sub3.add_subsystem('e1', ExecComp('y=2*x'))
+
+        model.add_subsystem('abc1cab', ExecComp('y=2*x'))
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None, includes='*c*c*')
+        self.assertEqual(len(data), 3)
+        self.assertTrue('c1c.d1' in data)
+        self.assertTrue('c1c.e1' in data)
+        self.assertTrue('abc1cab' in data)
+
+        data = prob.check_partials(out_stream=None, includes=['*d1', '*e1'])
+        self.assertEqual(len(data), 4)
+        self.assertTrue('c1c.d1' in data)
+        self.assertTrue('c1c.e1' in data)
+        self.assertTrue('sss.d1' in data)
+        self.assertTrue('sss.sss2.e1' in data)
+
+        data = prob.check_partials(out_stream=None, includes=['abc1cab'])
+        self.assertEqual(len(data), 1)
+        self.assertTrue('abc1cab' in data)
+
+        data = prob.check_partials(out_stream=None, includes='*c*c*', excludes=['*e*'])
+        self.assertEqual(len(data), 2)
+        self.assertTrue('c1c.d1' in data)
+        self.assertTrue('abc1cab' in data)
+
+
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
@@ -1215,7 +1263,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -1266,7 +1313,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -1527,7 +1573,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
 
             def compute_partials(self, inputs, partials):
@@ -1544,7 +1589,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
-                """ Doesn't do much. """
                 outputs['z'] = 3.0 * inputs['y1'] + 4.0 * inputs['y2']
 
             def compute_partials(self, inputs, partials):
@@ -1570,6 +1614,35 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(compact_print=True,show_only_incorrect=True)
         prob.check_partials(compact_print=False,show_only_incorrect=True)
+
+    def test_includes_excludes(self):
+        from openmdao.api import Problem, Group, ExecComp
+
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('c1c', Group())
+        sub.add_subsystem('d1', ExecComp('y=2*x'))
+        sub.add_subsystem('e1', ExecComp('y=2*x'))
+
+        sub2 = model.add_subsystem('sss', Group())
+        sub3 = sub2.add_subsystem('sss2', Group())
+        sub2.add_subsystem('d1', ExecComp('y=2*x'))
+        sub3.add_subsystem('e1', ExecComp('y=2*x'))
+
+        model.add_subsystem('abc1cab', ExecComp('y=2*x'))
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials(compact_print=True, includes='*c*c*')
+
+        data = prob.check_partials(compact_print=True, includes=['*d1', '*e1'])
+
+        data = prob.check_partials(compact_print=True, includes=['abc1cab'])
+
+        data = prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
+
 
 class TestProblemCheckTotals(unittest.TestCase):
 

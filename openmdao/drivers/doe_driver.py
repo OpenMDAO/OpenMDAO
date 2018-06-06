@@ -8,43 +8,11 @@ import inspect
 
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 
 from openmdao.utils.mpi import MPI
 
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
-
-
-class DOEGenerator(object):
-    """
-    Base class for a callable object that generates cases for a DOEDriver.
-
-    Attributes
-    ----------
-    _num_samples : int
-        The number of samples generated (available after generator has been called).
-    """
-
-    def __init__(self):
-        """
-        Initialize the DOEGenerator.
-        """
-        self._num_samples = 0
-
-    def __call__(self, design_vars):
-        """
-        Generate case.
-
-        Parameters
-        ----------
-        design_vars : dict
-            Dictionary of design variables for which to generate values.
-
-        Returns
-        -------
-        list
-            list of name, value tuples for the design variables.
-        """
-        return []
 
 
 class DOEDriver(Driver):
@@ -57,6 +25,10 @@ class DOEDriver(Driver):
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
+    _comm : MPI.Comm or None
+        MPI communicator object.
+    _color : int or None
+        In MPI, the cached color is used to determine which cases to run on this proc.
     """
 
     def __init__(self, generator=None, **kwargs):
@@ -65,13 +37,17 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        generator : DOEGenerator or None
-            The case generator.
+        generator : DOEGenerator, list or None
+            The case generator or a list of DOE cases.
 
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        if generator and not isinstance(generator, DOEGenerator):
+        # if given a list, create a ListGenerator
+        if isinstance(generator, list):
+            generator = ListGenerator(generator)
+
+        elif generator and not isinstance(generator, DOEGenerator):
             if inspect.isclass(generator):
                 raise TypeError("DOEDriver requires an instance of DOEGenerator, "
                                 "but a class object was found: %s"
@@ -88,6 +64,8 @@ class DOEDriver(Driver):
 
         self._name = ''
         self._recorders = []
+        self._comm = None
+        self._color = None
 
     def _declare_options(self):
         """
@@ -95,12 +73,10 @@ class DOEDriver(Driver):
         """
         self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
                              desc='The case generator. If default, no cases are generated.')
-
-        self.options.declare('parallel', default=False, types=(bool, int), lower=0,
-                             desc='True or number of cases to run in parallel. '
-                                  'If True, cases will be run on all available processors. '
-                                  'If an integer, each case will get COMM.size/<number> '
-                                  'processors and <number> of cases will be run in parallel')
+        self.options.declare('run_parallel', default=False,
+                             desc='Set to True to execute cases in parallel.')
+        self.options.declare('procs_per_model', default=1, lower=1,
+                             desc='Number of processors to give each model under MPI.')
 
     def _setup_comm(self, comm):
         """
@@ -116,23 +92,19 @@ class DOEDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
-        parallel = self.options['parallel']
-        if MPI and parallel:
+        if MPI and self.options['run_parallel']:
             self._comm = comm
+            procs_per_model = self.options['procs_per_model']
 
-            if parallel == 1:  # True == 1
-                size = 1
-                color = self._color = comm.rank
-            else:
-                comm_size = comm.size
-                size = comm_size // parallel
-                if comm_size != size * parallel:
-                    raise RuntimeError("The number of processors is not evenly divisable by "
-                                       "the specified number of parallel cases.\n Provide a "
-                                       "number of processors that is a multiple of %d, or "
-                                       "specify a number of parallel cases that divides "
-                                       "into %d." % (parallel, comm_size))
-                color = self._color = comm.rank % size
+            full_size = comm.size
+            size = full_size // procs_per_model
+            if full_size != size * procs_per_model:
+                raise RuntimeError("The total number of processors is not evenly divisible by the "
+                                   "specified number of processors per model.\n Provide a "
+                                   "number of processors that is a multiple of %d, or "
+                                   "specify a number of processors per model that divides "
+                                   "into %d." % (procs_per_model, full_size))
+            color = self._color = comm.rank % size
 
             model_comm = comm.Split(color)
         else:
@@ -190,7 +162,7 @@ class DOEDriver(Driver):
         else:
             case_gen = self.options['generator']
 
-        for case in case_gen(self._designvars):
+        for case in case_gen(self._designvars, self._problem.model):
             self._run_case(case)
             self.iter_count += 1
 
@@ -208,7 +180,14 @@ class DOEDriver(Driver):
         metadata = {}
 
         for dv_name, dv_val in case:
-            self.set_design_var(dv_name, dv_val)
+            try:
+                msg = None
+                self.set_design_var(dv_name, dv_val)
+            except ValueError as err:
+                msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
+            finally:
+                if msg:
+                    raise(ValueError(msg))
 
         with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
@@ -226,7 +205,7 @@ class DOEDriver(Driver):
             # save reference to metadata for use in record_iteration
             self._metadata = metadata
 
-    def _parallel_generator(self, design_vars):
+    def _parallel_generator(self, design_vars, model=None):
         """
         Generate case for this processor when running under MPI.
 
@@ -235,16 +214,19 @@ class DOEDriver(Driver):
         design_vars : dict
             Dictionary of design variables for which to generate values.
 
+        model : Group
+            The model containing the design variables (used by some generators).
+
         Yields
         ------
         list
             list of name, value tuples for the design variables.
         """
-        size = self._comm.size // self.options['parallel']
+        size = self._comm.size // self.options['procs_per_model']
         color = self._color
 
         generator = self.options['generator']
-        for i, case in enumerate(generator(design_vars)):
+        for i, case in enumerate(generator(design_vars, model)):
             if i % size == color:
                 yield case
 
@@ -267,18 +249,23 @@ class DOEDriver(Driver):
         """
         Set up case recording.
         """
-        parallel = self.options['parallel']
-        if MPI and parallel:
+        if MPI:
+            procs_per_model = self.options['procs_per_model']
+
             for recorder in self._recorders:
                 recorder._parallel = True
 
                 # if SqliteRecorder, write cases only on procs up to the number
                 # of parallel DOEs (i.e. on the root procs for the cases)
                 if isinstance(recorder, SqliteRecorder):
-                    if parallel is True or self._comm.rank < parallel:
+                    if procs_per_model == 1:
                         recorder._record_on_proc = True
                     else:
-                        recorder._record_on_proc = False
+                        size = self._comm.size // procs_per_model
+                        if self._comm.rank < size:
+                            recorder._record_on_proc = True
+                        else:
+                            recorder._record_on_proc = False
 
         super(DOEDriver, self)._setup_recording()
 
@@ -316,24 +303,25 @@ class DOEDriver(Driver):
 
         model = self._problem.model
 
-        sys_vars = {}
-        in_vars = {}
-        outputs = model._outputs
-        inputs = model._inputs
-        views = outputs._views
-        views_in = inputs._views
-        sys_vars = {name: views[name] for name in outputs._names if name in filt['sys']}
-        if self.recording_options['record_inputs']:
-            in_vars = {name: views_in[name] for name in inputs._names if name in filt['in']}
+        names = model._outputs._names
+        views = model._outputs._views
+        sys_vars = {name: views[name] for name in names if name in filt['sys']}
 
-        outs = des_vars
-        outs.update(res_vars)
-        outs.update(obj_vars)
-        outs.update(con_vars)
-        outs.update(sys_vars)
+        out_vars = des_vars
+        out_vars.update(res_vars)
+        out_vars.update(obj_vars)
+        out_vars.update(con_vars)
+        out_vars.update(sys_vars)
+
+        if self.recording_options['record_inputs']:
+            names = model._inputs._names
+            views = model._inputs._views
+            in_vars = {name: views[name] for name in names if name in filt['in']}
+        else:
+            in_vars = {}
 
         data = {
-            'out': outs,
+            'out': out_vars,
             'in': in_vars
         }
 

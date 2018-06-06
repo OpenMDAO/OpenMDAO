@@ -5,7 +5,9 @@ from __future__ import division, print_function
 import sys
 
 from collections import OrderedDict, defaultdict, namedtuple
+from fnmatch import fnmatchcase
 from itertools import product
+import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -419,9 +421,17 @@ class Problem(object):
                          "with OpenMDAO <= 1.x ; use 'model' instead.")
         self.model = model
 
-    def run_model(self):
+    def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the model by calling the root system's solve_nonlinear.
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.
+
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
 
         Returns
         -------
@@ -435,13 +445,32 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
+        if case_prefix:
+            if not isinstance(case_prefix, str):
+                raise TypeError("The 'case_prefix' argument should be a string.")
+            recording_iteration.prefix = case_prefix
+        else:
+            recording_iteration.prefix = None
+
+        if self.model.iter_count > 0 and reset_iter_counts:
+            self.driver.iter_count = 0
+            self.model._reset_iter_counts()
+
         self.final_setup()
         self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
-    def run_driver(self):
+    def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.
+
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
 
         Returns
         -------
@@ -450,6 +479,17 @@ class Problem(object):
         """
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
+
+        if case_prefix:
+            if not isinstance(case_prefix, str):
+                raise TypeError("The 'case_prefix' argument should be a string.")
+            recording_iteration.prefix = case_prefix
+        else:
+            recording_iteration.prefix = None
+
+        if self.model.iter_count > 0 and reset_iter_counts:
+            self.driver.iter_count = 0
+            self.model._reset_iter_counts()
 
         self.final_setup()
         self.model._clear_iprint()
@@ -615,8 +655,8 @@ class Problem(object):
                 return False
         return True
 
-    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, comps=None, compact_print=False,
-                       abs_err_tol=1e-6, rel_err_tol=1e-6,
+    def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
+                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=DEFAULT_FD_OPTIONS['step'],
                        form=DEFAULT_FD_OPTIONS['form'],
                        step_calc=DEFAULT_FD_OPTIONS['step_calc'],
@@ -629,9 +669,12 @@ class Problem(object):
         out_stream : file-like object
             Where to send human readable output. By default it goes to stdout.
             Set to None to suppress.
-        comps : None or list_like
-            List of component names to check the partials of (all others will be skipped). Set to
-             None (default) to run all components.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         abs_err_tol : float
@@ -679,16 +722,35 @@ class Problem(object):
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         all_comps = model.system_iter(typ=Component, include_self=True)
-        if comps is None:
-            comps = [comp for comp in all_comps]
-        else:
-            all_comp_names = {c.pathname for c in all_comps}
-            requested = set(comps)
-            extra = requested.difference(all_comp_names)
-            if extra:
-                msg = 'The following are not valid comp names: {}'.format(sorted(list(extra)))
-                raise ValueError(msg)
-            comps = [model._get_subsystem(c_name) for c_name in comps]
+        includes = [includes] if isinstance(includes, str) else includes
+        excludes = [excludes] if isinstance(excludes, str) else excludes
+
+        comps = []
+        for comp in all_comps:
+            if isinstance(comp, IndepVarComp):
+                continue
+
+            name = comp.pathname
+
+            # Process includes
+            if includes is not None:
+                for pattern in includes:
+                    if fnmatchcase(name, pattern):
+                        break
+                else:
+                    continue
+
+            # Process excludes
+            if excludes is not None:
+                match = False
+                for pattern in excludes:
+                    if fnmatchcase(name, pattern):
+                        match = True
+                        break
+                if match:
+                    continue
+
+            comps.append(comp)
 
         self.set_solver_print(level=0)
 
@@ -715,10 +777,6 @@ class Problem(object):
             for comp in comps:
 
                 comp.run_linearize()
-
-                # Skip IndepVarComps
-                if isinstance(comp, IndepVarComp):
-                    continue
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
@@ -873,11 +931,8 @@ class Problem(object):
         jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
+        comps_could_not_cs = set()
         for comp in comps:
-
-            # Skip IndepVarComps
-            if isinstance(comp, IndepVarComp):
-                continue
 
             c_name = comp.pathname
             all_fd_options[c_name] = {}
@@ -905,15 +960,15 @@ class Problem(object):
                     if local_method:
                         method = local_method
 
+                # We can't use CS if we havent' allocated a complex vector, so we fall back on fd.
+                if method == 'cs' and not alloc_complex:
+                    comps_could_not_cs.add(c_name)
+                    method = 'fd'
+
                 fd_options = {'order': None,
                               'method': method}
 
                 if method == 'cs':
-                    if not alloc_complex:
-                        msg = 'In order to check partials with complex step, you need to set ' + \
-                            '"force_alloc_complex" to True during setup.'
-                        raise RuntimeError(msg)
-
                     defaults = DEFAULT_CS_OPTIONS
 
                     fd_options['form'] = None
@@ -962,6 +1017,12 @@ class Problem(object):
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
+
+        if len(comps_could_not_cs) > 0:
+            msg = "The following components requested complex step, but force_alloc_complex " + \
+                "has not been set to True, so finite difference was used: "
+            msg += str(list(comps_could_not_cs))
+            warnings.warn(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
@@ -1370,9 +1431,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                          'incorrect Jacobians **\n\n')
 
     for system in system_list:
-        # No need to see derivatives of IndepVarComps
-        if isinstance(system, IndepVarComp):
-            continue
 
         sys_name = system.pathname
         sys_class_name = type(system).__name__

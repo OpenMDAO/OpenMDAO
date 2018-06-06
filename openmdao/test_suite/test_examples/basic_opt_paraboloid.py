@@ -60,7 +60,7 @@ class BasicOptParaboloid(unittest.TestCase):
 
         prob.model.add_subsystem('parab', Paraboloid())
 
-        # define the component whos output will be constrained
+        # define the component whose output will be constrained
         prob.model.add_subsystem('const', ExecComp('g = x + y'))
 
         prob.model.connect('indeps.x', ['parab.x', 'const.x'])
