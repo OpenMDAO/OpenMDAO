@@ -132,7 +132,7 @@ as a list:
     :layout: interleave
 
 
-.. note::
+.. warning::
     When using pre-generated cases via `CSVGenerator` or `ListGenerator`, there is no
     enforcement of the declared bounds on a design variable as with the algorithmic
     generators.
