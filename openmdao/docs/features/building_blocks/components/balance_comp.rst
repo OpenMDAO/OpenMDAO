@@ -34,7 +34,7 @@ The multiplier is optional and will default to 1.0 if not connected. The
 left-hand side should always be defined and should be dependent upon the value
 of the implicit state variable.
 
-The BalanceComp supports vectorized implicit states, simply provide a default
+The BalanceComp supports vectorized implicit states. Simply provide a default
 value or shape when adding the balance that reflects the correct shape.
 
 BalanceComp accepts the following other arguments (which are all passed

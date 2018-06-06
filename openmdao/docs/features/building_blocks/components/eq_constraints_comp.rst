@@ -9,8 +9,8 @@ EqualityConstraintsComp
 `EqualityConstraintsComp` is a specialized component that provides a simple way to implement
 equality constraints.
 
-`EqualityConstraintsComp` allows you to add one or more outputs that compute the difference
-between a pair of input values for the purposes of driving the two inputs to equality.
+You can add one or more outputs to an `EqualityConstraintsComp` that compute
+the difference between a pair of input values for the purposes of driving the two inputs to equality.
 
 The following inputs and outputs are associated with each output variable.
 
@@ -27,11 +27,11 @@ The right-hand side is optional and will default to zero if not connected.
 The multiplier is optional and will default to 1.0 if not connected. The
 left-hand side should always be defined.
 
-The `EqualityConstraintsComp` supports vectorized outputs, simply provide a default
+The `EqualityConstraintsComp` supports vectorized outputs. Simply provide a default
 value or shape when adding the difference equation that reflects the correct shape.
 
 `EqualityConstraintsComp` accepts the following other arguments (which are all passed
-to ``add_eq_output equation`` during initialization):
+to ``add_eq_output`` during initialization):
 
 =============== ======================== ===================================================================================
 Name            Type                     Description
@@ -50,7 +50,7 @@ kwargs          dict or named arguments  Additional arguments to be passed for t
 Simple Example
 --------------
 
-The following simple example uses an EqualityConstraintsComp to find the intersection of two parabolas.
+The following simple example uses an `EqualityConstraintsComp` to find the intersection of two parabolas.
 The equations for the two parabolas are:
 
 .. math::

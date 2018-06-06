@@ -6,10 +6,15 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver
-from openmdao.components.eq_constraints_comp import EqualityConstraintsComp
-from openmdao.utils.general_utils import printoptions
 
+from openmdao.components.eq_constraints_comp import EqualityConstraintsComp
+
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+    SellarDis2withDerivatives
+
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
+from openmdao.utils.assert_utils import assert_rel_error
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -17,10 +22,92 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-pyOptSparseDriver = None
+# pyOptSparseDriver = None
 
 
 class TestEqualityConstraintsComp(unittest.TestCase):
+
+    def test_sellar_idf(self):
+        """
+        Individual Design Feasible (IDF) architecture for the Sellar problem.
+
+        In IDF, the direct coupling between the disciplines is removed, and the
+        input coupling variables are added to the optimizer’s design variables.
+        The algorithm calls for two new equality constraints that enforce the
+        coupling between the disciplines. This ensures that the solution is a
+        feasible coupling, though it is achieved through the optimizer instead
+        of using a solver.
+
+        Optimal Design at x=0, z=[1.9776, 0]
+        Optimal Objective = 3.18339
+        """
+        prob = Problem()
+        model = prob.model
+
+        # construct the Sellar model with `y1` and `y2` as independent variables
+        indep = IndepVarComp()
+        indep.add_output('x', 5.0)
+        indep.add_output('y1', 5.0)
+        indep.add_output('y2', 5.0)
+        indep.add_output('z', np.array([5.0, 2.0]))
+
+        model.add_subsystem('indep', indep)
+        model.add_subsystem('d1', SellarDis1withDerivatives())
+        model.add_subsystem('d2', SellarDis2withDerivatives())
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                            z=np.array([0.0, 0.0]), x=0.0))
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'))
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'))
+
+        model.connect('indep.x', ['d1.x', 'obj_cmp.x'])
+        model.connect('indep.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
+        model.connect('indep.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
+        model.connect('indep.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
+
+        # rather than create a cycle by connecting d1.y1 to d2.y1 and d2.y2 to d1.y2
+        # we will constrain y1 and y2 to be equal for the two disciplines
+        equal = EqualityConstraintsComp()
+        model.add_subsystem('equal', equal)
+
+        equal.add_eq_output('y1', add_constraint=True)
+        equal.add_eq_output('y2', add_constraint=True)
+
+        model.connect('indep.y1', 'equal.lhs:y1')
+        model.connect('d1.y1', 'equal.rhs:y1')
+
+        model.connect('indep.y2', 'equal.lhs:y2')
+        model.connect('d2.y2', 'equal.rhs:y2')
+
+        # the driver will effectively solve the cycle via the equality constraints
+        model.add_design_var('indep.x', lower=0.0, upper=10.0)
+        model.add_design_var('indep.y1', lower=0.0, upper=10.0)
+        model.add_design_var('indep.y2', lower=0.0, upper=10.0)
+        model.add_design_var('indep.z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_objective('obj_cmp.obj')
+        model.add_constraint('con_cmp1.con1', upper=0.0)
+        model.add_constraint('con_cmp2.con2', upper=0.0)
+
+        prob.driver = pyOptSparseDriver(optimizer='SNOPT', print_results=True)
+        # prob.driver.opt_settings['Major optimality tolerance'] = 1e-9
+        # prob.driver.opt_settings['Verify level'] = 3
+        # prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-11, disp=True)
+
+        prob.setup(check=True)
+        prob.run_driver()
+
+        print('minimum found at x =', prob['indep.x'], 'z =', prob['indep.z'])
+        assert_rel_error(self, prob['indep.x'], 0., 1e-5)
+        assert_rel_error(self, prob['indep.z'], [1.977639, 0.], 1e-5)
+
+        print('minumum objective =', prob['obj_cmp.obj'])
+        assert_rel_error(self, prob['obj_cmp.obj'][0], 3.18339395045, 1e-5)
+
+        print('y1 =', prob['indep.y1'], prob['d1.y1'], prob['equal.y1'])  # expect 3.16
+        print('y2 =', prob['indep.y2'], prob['d2.y2'], prob['equal.y2'])  # expect 3.75
+        assert_almost_equal(prob['equal.y1'], 0.0)
+        assert_almost_equal(prob['equal.y2'], 0.0)
 
     def test_two_parabolas(self):
         """
