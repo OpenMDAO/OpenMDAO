@@ -168,6 +168,7 @@ class ExplicitComponent(Component):
                     in_size = self._var_abs2meta[abs_key[1]]['size']
                     meta['value'] = np.zeros((out_size, in_size))
 
+                # We used to have to negate the partials on the diagonal here.
                 J._set_partials_meta(abs_key, meta)
 
                 if 'method' in meta and meta['method']:
@@ -264,6 +265,8 @@ class ExplicitComponent(Component):
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
 
+                        # We used to negate the residual here, and then re-negate after the hook.
+
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
                                 self.compute_multi_jacvec_product(self._inputs, d_inputs,
@@ -314,20 +317,22 @@ class ExplicitComponent(Component):
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_outputs.set_vec(d_residuals)
-                                d_outputs *= -1.0
                         else:
                             d_outputs.set_vec(d_residuals)
-                            d_outputs *= -1.0
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_outputs *= -1.0
 
                     else:  # rev
                         if self._has_resid_scaling:
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_residuals.set_vec(d_outputs)
-                                d_residuals *= -1.0
                         else:
                             d_residuals.set_vec(d_outputs)
-                            d_residuals *= -1.0
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_residuals *= -1.0
 
         return False, 0., 0.
 
@@ -354,6 +359,9 @@ class ExplicitComponent(Component):
                     approximation.compute_approximations(self, jac=J)
 
                 if self._has_compute_partials:
+
+                    # We used to negate the jacobian here, and then re-negate after the hook.
+
                     self.compute_partials(self._inputs, J)
 
             if self._owns_assembled_jac or self._views_assembled_jac:
