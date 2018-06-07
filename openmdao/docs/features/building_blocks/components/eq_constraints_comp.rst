@@ -47,8 +47,8 @@ add_constraint  bool                     Specifies whether to add an equality co
 kwargs          dict or named arguments  Additional arguments to be passed for the creation of the output variable.
 =============== ======================== ===================================================================================
 
-Example
--------
+Example: Sellar IDF
+-------------------
 
 The following example shows an Individual Design Feasible (IDF) architecture for the
 :ref:`Sellar <sellar>` problem that demonstrates the use of an `EqualityConstraintsComp`.
@@ -57,8 +57,8 @@ In IDF, the direct coupling between the disciplines is removed and the coupling 
 are added to the optimizer’s design variables. The algorithm calls for two new equality
 constraints that enforce the coupling between the disciplines. This ensures that the
 solution is a feasible coupling, though it is achieved through the optimizer instead of
-using a solver.  The two new equality constraints are implemented in this example via the
-`EqualityConstraintsComp`.
+using a solver.  The two new equality constraints are implemented in this example with
+an `EqualityConstraintsComp`.
 
 .. embed-code::
     openmdao.components.tests.test_eq_constraints_comp.SellarIDF

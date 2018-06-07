@@ -90,7 +90,11 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         assert_rel_error(self, prob['obj_cmp.obj'], 3.18339395045, 1e-5)
 
         assert_almost_equal(prob['dv.y1'], 3.16)
+        assert_almost_equal(prob['d1.y1'], 3.16)
+
         assert_almost_equal(prob['dv.y2'], 3.755277)
+        assert_almost_equal(prob['d2.y2'], 3.755277)
+
         assert_almost_equal(prob['equal.y1'], 0.0)
         assert_almost_equal(prob['equal.y2'], 0.0)
 
@@ -101,6 +105,10 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         prob.run_driver()
 
         assert_rel_error(self, prob['dv.x'], 0., 1e-5)
+
+        assert_rel_error(self, [prob['dv.y1'], prob['d1.y1']], [[3.16], [3.16]], 1e-5)
+        assert_rel_error(self, [prob['dv.y2'], prob['d2.y2']], [[3.7552778], [3.7552778]], 1e-5)
+
         assert_rel_error(self, prob['dv.z'], [1.977639, 0.], 1e-5)
 
         assert_rel_error(self, prob['obj_cmp.obj'], 3.18339395045, 1e-5)
