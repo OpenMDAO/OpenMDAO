@@ -970,7 +970,7 @@ class Component(System):
 
             if 'method' in meta:
                 method = meta['method']
-                if method:
+                if method is not None and method in self._approx_schemes:
                     self._approx_schemes[method].add_approximation(key, meta)
 
         for approx in itervalues(self._approx_schemes):

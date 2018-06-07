@@ -1849,12 +1849,12 @@ class Group(System):
                         meta = self._subjacs_info[key]
                     else:
                         meta = SUBJAC_META_DEFAULTS.copy()
+                        if key[0] == key[1]:
+                            size = self._var_allprocs_abs2meta[key[0]]['size']
+                            meta['rows'] = meta['cols'] = np.arange(size)
+                            meta['value'] = np.ones(size)
 
                     meta['method'] = method
-                    if key[0] == key[1]:
-                        size = self._var_allprocs_abs2meta[key[0]]['size']
-                        meta['rows'] = meta['cols'] = np.arange(size)
-                        meta['value'] = np.ones(size)
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.
@@ -1862,7 +1862,6 @@ class Group(System):
                     meta['dependent'] = True
 
                     meta.update(self._owns_approx_jac_meta)
-                    self._subjacs_info[key] = meta
 
                     # Create Jacobian stub for every key pair
                     # J._set_partials_meta(key, meta)
@@ -1887,6 +1886,8 @@ class Group(System):
                         shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
                         meta['shape'] = shape
                         meta['value'] = np.zeros(shape)
+
+                    self._subjacs_info[key] = meta
 
             approx._init_approximations()
 

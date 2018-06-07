@@ -188,10 +188,12 @@ class ExplicitComponent(Component):
             if negate:
                 self._jacobian._multiply_subjac(abs_key, -1.0)
 
-            if 'method' in meta and meta['method']:
+            if 'method' in meta:
+                method = meta['method']
                 # Don't approximate output wrt output.
-                if abs_key[1] not in self._var_allprocs_abs_names['output']:
-                    self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
+                if (method is not None and method in self._approx_schemes and abs_key[1]
+                        not in self._var_allprocs_abs_names['output']):
+                    self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

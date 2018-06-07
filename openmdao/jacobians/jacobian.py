@@ -225,25 +225,3 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         pass
-
-    def _set_partials_meta(self, abs_key, meta, negate=False):
-        """
-        Store subjacobian metadata.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        meta : dict
-            Metadata dictionary for the subjacobian.
-        negate : bool
-            If True negate the given value, if any.
-        """
-        shape = self._abs_key2shape(abs_key)
-        self._subjacs_info[abs_key] = (meta, shape)
-
-        val = meta['value']
-        if val is not None:
-            self._set_abs(abs_key, val)
-            if negate:
-                self._multiply_subjac(abs_key, -1.0)
