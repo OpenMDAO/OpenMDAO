@@ -386,9 +386,6 @@ class ExplicitComponent(Component):
                     # re-negate the jacobian
                     self._negate_jac(jac)
 
-            if self._assembled_jac is not None:
-                self._assembled_jac._update(self)
-
     def compute(self, inputs, outputs):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.

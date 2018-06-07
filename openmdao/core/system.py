@@ -1235,31 +1235,24 @@ class System(object):
         if self.nonlinear_solver is not None:
             nl_asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
 
-        my_asm_jac = asm_jac = None
+        asm_jac = None
         if asm_jac_solvers:
-            my_asm_jac = asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+            asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+            self._assembled_jac = asm_jac
+            self._views_assembled_jac = True
             for s in asm_jac_solvers:
                 s._assembled_jac = asm_jac
-
-        gradient_nl_jac = None
 
         if nl_asm_jac_solvers:
             if asm_jac is None:
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
-            if self.nonlinear_solver.supports['gradients']:
-                gradient_nl_jac = asm_jac
 
         self._views_assembled_jac = False
-        if my_asm_jac is not None:
-            self._assembled_jac = my_asm_jac
-            self._views_assembled_jac = True
-        elif not self._owns_approx_jac:
+        if not self._owns_approx_jac:
             nl = self._nonlinear_solver
             if nl is not None and nl.supports['gradients']:
-                self._views_assembled_jac = True
-            elif gradient_nl_jac is not None:
                 self._views_assembled_jac = True
 
         # note that for a Group, _set_partials_meta does nothing
