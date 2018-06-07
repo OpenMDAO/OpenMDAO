@@ -787,8 +787,6 @@ class Problem(object):
 
                 with comp._unscaled_context():
                     subjacs = comp._jacobian._subjacs
-                    if explicit:
-                        comp._negate_jac()
 
                     of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -828,12 +826,9 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
-                                # TODO - Sort out the minus sign difference.
-                                perturb = 1.0 if not explicit else -1.0
-
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
-                                flat_view[idx] = perturb
+                                flat_view[idx] = 1.0
 
                                 # Matrix Vector Product
                                 comp._apply_linear(['linear'], _contains_all, mode)
@@ -920,9 +915,6 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-                    if explicit:
-                        comp._negate_jac()
-
         model._inputs.set_vec(input_cache)
         model._outputs.set_vec(output_cache)
         model.run_apply_nonlinear()
@@ -1005,12 +997,7 @@ class Problem(object):
 
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                # Since all partials for outputs for explicit comps are declared, assume anything
-                # missing is an input deriv.
-                if explicit and abs_key[1] in comp._var_abs_names['input']:
-                    partials_data[c_name][rel_key][jac_key] = -partial
-                else:
-                    partials_data[c_name][rel_key][jac_key] = partial
+                partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}

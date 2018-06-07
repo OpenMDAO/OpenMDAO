@@ -372,13 +372,13 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = model.p1._residuals.get_data()[0]
+        res1 = -model.p1._residuals.get_data()[0]
         out1 = model.p1._outputs.get_data()[0]
         out2 = model.p2._outputs.get_data()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
         with model._scaled_context_all():
-            res1 = model.p1._residuals.get_data()[0]
+            res1 = -model.p1._residuals.get_data()[0]
             out1 = model.p1._outputs.get_data()[0]
             out2 = model.p2._outputs.get_data()[0]
 
@@ -387,7 +387,7 @@ class TestScaling(unittest.TestCase):
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
 
         # Scale the outputs only.
         # Residual scaling uses output scaling by default.
@@ -410,20 +410,20 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = model.p1._residuals.get_data()[0]
+        res1 = -model.p1._residuals.get_data()[0]
         out1 = model.p1._outputs.get_data()[0]
         out2 = model.p2._outputs.get_data()[0]
 
         self.assertEqual(res1, (out1 - 2.0*(out2 + 1.0)))
         with model._scaled_context_all():
-            res1a = model.p1._residuals.get_data()[0]
+            res1a = -model.p1._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1)/(ref))
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
 
         # Scale the residual
 
@@ -444,20 +444,20 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = model.p1._residuals.get_data()[0]
+        res1 = -model.p1._residuals.get_data()[0]
         out1 = model.p1._outputs.get_data()[0]
         out2 = model.p2._outputs.get_data()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = model.p1._residuals.get_data()[0]
+            res1a = -model.p1._residuals.get_data()[0]
 
             self.assertEqual(res1a, res1/res_ref)
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
 
         # Simultaneously scale the residual and output with different values
 
@@ -480,20 +480,20 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = model.p1._residuals.get_data()[0]
+        res1 = -model.p1._residuals.get_data()[0]
         out1 = model.p1._outputs.get_data()[0]
         out2 = model.p2._outputs.get_data()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = model.p1._residuals.get_data()[0]
+            res1a = -model.p1._residuals.get_data()[0]
 
             self.assertEqual(res1a, (res1)/(res_ref))
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian._subjacs
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[-2.0]])
+        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
 
     def test_scale_array_with_float(self):
 

@@ -58,28 +58,6 @@ class Jacobian(object):
         abs2meta = self._system._var_allprocs_abs2meta
         return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
-    def _multiply_subjac(self, abs_key, val):
-        """
-        Multiply this sub-Jacobian by val.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        val : float
-            value to multiply by.
-        """
-        jac = self._subjacs[abs_key]
-
-        if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] *= val
-        elif isinstance(jac, sparse_types):
-            self._subjacs[abs_key].data *= val  # DOK not supported
-        elif len(jac) == 3:
-            self._subjacs[abs_key][0] *= val
-        else:
-            self._subjacs[abs_key] *= val
-
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.
@@ -233,7 +211,7 @@ class Jacobian(object):
         """
         pass
 
-    def _set_partials_meta(self, abs_key, meta, negate=False):
+    def _set_partials_meta(self, abs_key, meta):
         """
         Store subjacobian metadata.
 
@@ -243,8 +221,6 @@ class Jacobian(object):
             Absolute name pair of sub-Jacobian.
         meta : dict
             Metadata dictionary for the subjacobian.
-        negate : bool
-            If True negate the given value, if any.
         """
         shape = self._abs_key2shape(abs_key)
         self._subjacs_info[abs_key] = (meta, shape)
@@ -252,5 +228,3 @@ class Jacobian(object):
         val = meta['value']
         if val is not None:
             self._set_abs(abs_key, val)
-            if negate:
-                self._multiply_subjac(abs_key, -1.0)
