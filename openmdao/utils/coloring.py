@@ -68,7 +68,7 @@ class _SubjacRandomizer(object):
         tol = self._tol
 
         if key in jac._subjacs_info:
-            info, shape = jac._subjacs_info[key]
+            info = jac._subjacs_info[key]
             rows = info['rows']
         else:
             rows = None

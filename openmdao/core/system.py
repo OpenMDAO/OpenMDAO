@@ -1240,8 +1240,6 @@ class System(object):
             my_asm_jac = asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
             for s in asm_jac_solvers:
                 s._assembled_jac = asm_jac
-            if not self._owns_approx_jac:
-                self._jacobian = None
 
         gradient_nl_jac = None
 

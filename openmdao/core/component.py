@@ -8,7 +8,7 @@ from itertools import product
 from six import string_types, iteritems, itervalues
 
 import numpy as np
-from numpy import ndarray
+from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
@@ -361,7 +361,7 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if any([True for character in forbidden_chars if character in name]):
             raise NameError("'%s' is not a valid input name." % name)
-        if not np.isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+        if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("The shape argument should be an int, tuple, or list but "
@@ -485,16 +485,16 @@ class Component(System):
             raise TypeError('The name argument should be a string')
         if any([True for character in forbidden_chars if character in name]):
             raise NameError("'%s' is not a valid output name." % name)
-        if not np.isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+        if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
-        if not np.isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+        if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The ref argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
-        if not np.isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+        if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The ref0 argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
-        if not np.isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
+        if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The res_ref argument should be a float, list, tuple, ndarray or Iterable'
             raise TypeError(msg)
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
@@ -532,21 +532,21 @@ class Component(System):
 
         # All refs: check the shape if necessary
         for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
-            if not np.isscalar(item):
-                if np.atleast_1d(item).shape != metadata['shape']:
+            if not isscalar(item):
+                if atleast_1d(item).shape != metadata['shape']:
                     raise ValueError('The %s argument has the wrong shape' % item_name)
 
-        if np.isscalar(ref):
+        if isscalar(ref):
             self._has_output_scaling |= ref != 1.0
         else:
             self._has_output_scaling |= np.any(ref != 1.0)
 
-        if np.isscalar(ref0):
+        if isscalar(ref0):
             self._has_output_scaling |= ref0 != 0.0
         else:
             self._has_output_scaling |= np.any(ref0)
 
-        if np.isscalar(res_ref):
+        if isscalar(res_ref):
             self._has_resid_scaling |= res_ref != 1.0
         else:
             self._has_resid_scaling |= np.any(res_ref != 1.0)
@@ -813,14 +813,15 @@ class Component(System):
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
         """
-        if dependent:
-            if val is not None and not issparse(val):
-                val = np.atleast_1d(val)
-                # np.promote_types  will choose the smallest dtype that can contain both arguments
-                safe_dtype = np.promote_types(val.dtype, float)
-                val = val.astype(safe_dtype, copy=False)
+        is_scalar = isscalar(val)
 
-            if rows is not None:
+        if dependent:
+            if rows is None:
+                if val is not None and not is_scalar and not issparse(val):
+                    val = atleast_2d(val)
+                    val = val.astype(promote_types(val.dtype, float), copy=False)
+                rows_max = cols_max = 0
+            else:  # sparse list format
                 rows = np.array(rows, dtype=INT_DTYPE, copy=False)
                 cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
@@ -828,17 +829,40 @@ class Component(System):
                     raise ValueError('rows and cols must have the same shape,'
                                      ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
 
-                if val is not None and val.shape != (1,) and rows.shape != val.shape:
-                    raise ValueError('If rows and cols are specified, val must be a scalar or '
-                                     'have the same shape, val: {}, '
-                                     'rows/cols: {}'.format(val.shape, rows.shape))
+                if is_scalar:
+                    val = np.full(rows.size, val, dtype=float)
+                elif val is not None:
+                    # np.promote_types will choose the smallest dtype that can contain
+                    # both arguments
+                    val = atleast_1d(val)
+                    safe_dtype = promote_types(val.dtype, float)
+                    val = val.astype(safe_dtype, copy=False)
 
-                if val is None:
+                    if rows.shape != val.shape:
+                        raise ValueError('If rows and cols are specified, val must be a scalar or '
+                                         'have the same shape, val: {}, '
+                                         'rows/cols: {}'.format(val.shape, rows.shape))
+                else:
                     val = np.zeros_like(rows, dtype=float)
 
-        pattern_matches = self._find_partial_matches(of, wrt)
+                if rows.size > 0:
+                    if rows.min() < 0:
+                        # of, wrt = abs_key2rel_key(self, abs_key)
+                        msg = '{}: d({})/d({}): row indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
+                    if cols.min() < 0:
+                        # of, wrt = abs_key2rel_key(self, abs_key)
+                        msg = '{}: d({})/d({}): col indices must be non-negative'
+                        raise ValueError(msg.format(self.pathname, of, wrt))
+                    rows_max = rows.max()
+                    cols_max = cols.max()
+                else:
+                    rows_max = cols_max = 0
 
+        pattern_matches = self._find_partial_matches(of, wrt)
         abs2meta = self._var_abs2meta
+
+        is_array = isinstance(val, ndarray)
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -859,23 +883,33 @@ class Component(System):
                     meta = self._subjacs_info[abs_key]
                 else:
                     meta = SUBJAC_META_DEFAULTS.copy()
+
                 meta['rows'] = rows
                 meta['cols'] = cols
                 meta['dependent'] = dependent
-                meta['shape'] = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+                meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)
-                    meta['value'] = np.zeros(meta['shape'])
-                elif isinstance(val, ndarray):
-                    meta['value'] = val.copy()
+                    meta['value'] = np.zeros(shape)
+                elif is_array:
+                    if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
+                        meta['value'] = val = val.copy().reshape(shape)
+                    else:
+                        meta['value'] = val.copy()
+                elif is_scalar:
+                    meta['value'] = np.full(shape, val, dtype=float)
                 else:
                     meta['value'] = val
 
-                if rows is not None and val.size != rows.size and val.size == 1:
-                    meta['value'] = np.full(rows.size, val[0])
+                if rows_max >= shape[0] or cols_max >= shape[1]:
+                    of, wrt = abs_key2rel_key(self, abs_key)
+                    msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
+                    raise ValueError(msg.format(self.pathname, of, wrt, shape[0], shape[1],
+                                                rows_max + 1, cols_max + 1))
 
-                self._check_partials_meta(abs_key, meta)
+                self._check_partials_meta(abs_key, meta['value'],
+                                          shape if rows is None else (rows.shape[0], 1))
                 self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
@@ -908,7 +942,7 @@ class Component(System):
         wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
-    def _check_partials_meta(self, abs_key, meta):
+    def _check_partials_meta(self, abs_key, val, shape):
         """
         Check a given partial derivative and metadata for the correct shapes.
 
@@ -916,48 +950,27 @@ class Component(System):
         ----------
         abs_key : tuple(str, str)
             The of/wrt pair (given absolute names) defining the partial derivative.
-        meta : dict
-            Metadata dictionary from declare_partials.
+        val : ndarray
+            Subjac value.
+        shape : tuple
+            Expected shape of val.
         """
-        if meta['dependent']:
-            out_size = np.prod(self._var_abs2meta[abs_key[0]]['shape'])
-            in_size = self._var_abs2meta[abs_key[1]]['size']
+        out_size, in_size = shape
 
-            if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
-                return
+        if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
+            return
 
-            rows = meta['rows']
-            cols = meta['cols']
-            if not (rows is None or rows.size == 0):
-                if rows.min() < 0:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    msg = '{}: d({})/d({}): row indices must be non-negative'
-                    raise ValueError(msg.format(self.pathname, of, wrt))
-                if cols.min() < 0:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    msg = '{}: d({})/d({}): col indices must be non-negative'
-                    raise ValueError(msg.format(self.pathname, of, wrt))
-                if rows.max() >= out_size or cols.max() >= in_size:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
-                    raise ValueError(msg.format(
-                        self.pathname, of, wrt,
-                        out_size, in_size,
-                        rows.max() + 1, cols.max() + 1))
-            elif meta['value'] is not None:
-                val = meta['value']
-                val_shape = val.shape
-                if len(val_shape) == 1:
-                    val_out, val_in = val_shape[0], 1
-                else:
-                    val_out, val_in = val.shape
-                if val_out > out_size or val_in > in_size:
-                    of, wrt = abs_key2rel_key(self, abs_key)
-                    msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
-                    raise ValueError(msg.format(
-                        self.pathname, of, wrt,
-                        out_size, in_size,
-                        val_out, val_in))
+        if val is not None:
+            val_shape = val.shape
+            if len(val_shape) == 1:
+                val_out, val_in = val_shape[0], 1
+            else:
+                val_out, val_in = val.shape
+            if val_out > out_size or val_in > in_size:
+                of, wrt = abs_key2rel_key(self, abs_key)
+                msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
+                raise ValueError(msg.format(self.pathname, of, wrt, out_size, in_size,
+                                            val_out, val_in))
 
     def _set_partials_meta(self):
         """
