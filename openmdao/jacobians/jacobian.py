@@ -197,15 +197,20 @@ class Jacobian(object):
         else:
             subjacs_info['value'] = subjac
 
-    def _initialize(self, subjacs_info):
+    def _initialize(self):
         """
         Allocate the global matrices.
         """
-        self._subjacs_info = subjacs_info
+        pass
 
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
         """
         pass
 

@@ -18,16 +18,18 @@ class DictionaryJacobian(Jacobian):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, system, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
+        system : System
+            Parent system to this jacobian.
         **kwargs : dict
             options dictionary.
         """
-        super(DictionaryJacobian, self).__init__(**kwargs)
+        super(DictionaryJacobian, self).__init__(system, **kwargs)
 
         self._iter_keys = {}
 

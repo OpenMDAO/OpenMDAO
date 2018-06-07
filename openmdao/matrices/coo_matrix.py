@@ -187,9 +187,7 @@ class COOMatrix(Matrix):
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
-        if jac_type is list:  # list format  [data, rows, cols]
-            self._matrix.data[idxs] = jac[0]
-        elif isinstance(jac, ndarray):
+        if isinstance(jac, ndarray):
             self._matrix.data[idxs] = jac.flat
         else:  # sparse
             self._matrix.data[idxs] = jac.data
@@ -214,9 +212,7 @@ class COOMatrix(Matrix):
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
-        if jac_type is list:  # list format  [data, rows, cols]
-            val = jac[0]
-        elif isinstance(jac, ndarray):
+        if isinstance(jac, ndarray):
             val = jac.flatten()
         else:  # sparse
             val = jac.data

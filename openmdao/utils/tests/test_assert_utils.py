@@ -172,7 +172,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.model = SellarNoDerivativesCS()
 
         prob.setup(check=False)
-        prob.model.cycle._jacobian = DictionaryJacobian()
+        prob.model.cycle._jacobian = DictionaryJacobian(prob.model.cycle)
 
         try:
             assert_no_dict_jacobians(prob.model, include_self=True, recurse=True)

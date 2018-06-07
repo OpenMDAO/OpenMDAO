@@ -1808,7 +1808,7 @@ class Group(System):
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
 
-    def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
+    def _setup_jacobians(self, parent_asm_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1905,7 +1905,7 @@ class Group(System):
 
             approx._init_approximations()
 
-        super(Group, self)._setup_jacobians(parent_asm_jac, gradient_nl_jac)
+        super(Group, self)._setup_jacobians(parent_asm_jac)
 
     def compute_sys_graph(self, comps_only=False):
         """

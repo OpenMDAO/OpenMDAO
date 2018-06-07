@@ -1218,7 +1218,7 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_solvers(recurse=recurse)
 
-    def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
+    def _setup_jacobians(self, parent_asm_jac=None):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1242,6 +1242,8 @@ class System(object):
                 s._assembled_jac = asm_jac
             if not self._owns_approx_jac:
                 self._jacobian = None
+
+        gradient_nl_jac = None
 
         if nl_asm_jac_solvers:
             if asm_jac is None:
@@ -1272,14 +1274,14 @@ class System(object):
                 raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(asm_jac, gradient_nl_jac)
+                subsys._setup_jacobians(asm_jac)
         else:
             for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(parent_asm_jac, gradient_nl_jac)
+                subsys._setup_jacobians(parent_asm_jac)
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
-            asm_jac._initialize(self._subjacs_info)
+            asm_jac._initialize()
             asm_jac._init_view(self)
 
     def set_initial_values(self):

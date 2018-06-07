@@ -856,7 +856,8 @@ class Problem(object):
                                     # expand to the correct size array value for zipping
                                     if deriv_value.size == 1:
                                         deriv_value *= np.ones(rows.size)
-                                    for i, j, val in zip(rows, subjacs[abs_key]['cols'], deriv_value):
+                                    for i, j, val in zip(rows, subjacs[abs_key]['cols'],
+                                                         deriv_value):
                                         tmp_value[i, j] += val
                                     deriv_value = tmp_value
 

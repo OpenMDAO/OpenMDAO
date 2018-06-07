@@ -52,7 +52,7 @@ class AssembledJacobian(Jacobian):
         Row ranges for outputs.
     """
 
-    def __init__(self, matrix_class, system=None):
+    def __init__(self, matrix_class, system):
         """
         Initialize all attributes.
 
@@ -104,11 +104,10 @@ class AssembledJacobian(Jacobian):
             in_ranges[name] = (start, end)
             start = end
 
-    def _initialize(self, subjacs_info):
+    def _initialize(self):
         """
         Allocate the global matrices.
         """
-        self._subjacs_info = subjacs_info
         system = self._system
 
         # var_indices are the *global* indices for variables on this proc
@@ -313,6 +312,11 @@ class AssembledJacobian(Jacobian):
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
         """
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
@@ -399,7 +403,7 @@ class DenseJacobian(AssembledJacobian):
     Assemble dense global <Jacobian>.
     """
 
-    def __init__(self, system=None):
+    def __init__(self, system):
         """
         Initialize all attributes.
 
@@ -416,7 +420,7 @@ class COOJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Coordinate list format.
     """
 
-    def __init__(self, system=None):
+    def __init__(self, system):
         """
         Initialize all attributes.
 
@@ -433,7 +437,7 @@ class CSRJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Row Storage format.
     """
 
-    def __init__(self, system=None):
+    def __init__(self, system):
         """
         Initialize all attributes.
 
@@ -450,7 +454,7 @@ class CSCJacobian(AssembledJacobian):
     Assemble sparse global <Jacobian> in Compressed Col Storage format.
     """
 
-    def __init__(self, system=None):
+    def __init__(self, system):
         """
         Initialize all attributes.
 

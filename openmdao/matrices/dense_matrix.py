@@ -88,9 +88,7 @@ class DenseMatrix(Matrix):
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
-        if jac_type is list:
-            self._matrix[irows, icols] = jac[0]
-        elif isinstance(jac, np.ndarray):
+        if isinstance(jac, np.ndarray):
             self._matrix[irows, icols] = jac
         else:  # sparse
             self._matrix[irows, icols] = jac.data
@@ -115,10 +113,9 @@ class DenseMatrix(Matrix):
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
+
         if isinstance(jac, np.ndarray):
             val = jac
-        elif isinstance(jac, list):
-            val = jac[0]
         else:  # sparse
             val = jac.data
 
