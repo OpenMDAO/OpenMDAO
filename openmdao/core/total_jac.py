@@ -1104,7 +1104,7 @@ class _TotalJacInfo(object):
             totals = OrderedDict()
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name]['value'],
+                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name],
                                                             prom_out, prom_in, of_idx, wrt_idx)
 
         elif return_format == 'dict':
@@ -1112,7 +1112,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 totals[prom_out] = tot = OrderedDict()
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name]['value'],
+                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name],
                                                prom_out, prom_in, of_idx, wrt_idx)
 
         elif return_format == 'array':
@@ -1120,7 +1120,7 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name]['value'],
+                    tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                   prom_out, prom_in, of_idx, wrt_idx)
         else:
             msg = "Unsupported return format '%s." % return_format
@@ -1249,14 +1249,14 @@ class _TotalJacInfo(object):
         sys.stdout.flush()
 
 
-def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
+def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
     """
     Return proper subjacobian based on input/output names and indices.
 
     Parameters
     ----------
-    jac : list or ndarray
-        Partial subjacobian coming from approx_jac.
+    jac_meta : dict
+        Partial subjacobian metadata coming from approx_jac.
     prom_out : str
         Promoted output name.
     prom_in : str
@@ -1271,16 +1271,16 @@ def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
     ndarray
         The desired subjacobian.
     """
-    if isinstance(jac, list):
+    if jac_meta['rows'] is not None:  # sparse list format
         # This is a design variable that was declared as an obj/con.
-        tot = np.eye(len(jac[0]))
+        tot = np.eye(len(jac_meta['value']))
         if prom_out in of_idx:
             tot = tot[of_idx[prom_out], :]
         if prom_in in wrt_idx:
             tot = tot[:, wrt_idx[prom_in]]
         return tot
     else:
-        return -jac
+        return -jac_meta['value']
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

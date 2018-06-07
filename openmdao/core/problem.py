@@ -668,12 +668,11 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        all_comps = model.system_iter(typ=Component, include_self=True)
         includes = [includes] if isinstance(includes, str) else includes
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        for comp in all_comps:
+        for comp in model.system_iter(typ=Component, include_self=True):
             if isinstance(comp, IndepVarComp):
                 continue
 
@@ -826,8 +825,9 @@ class Problem(object):
                             # No need to calculate partials; they are already stored
                             try:
                                 deriv_value = subjacs[abs_key]['value']
+                                rows = subjacs[abs_key]['rows']
                             except KeyError:
-                                deriv_value = None
+                                deriv_value = rows = None
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
@@ -845,19 +845,18 @@ class Problem(object):
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
-                                if isinstance(deriv_value, list):
+                                if rows is not None:
                                     try:
                                         in_size = comp._var_abs2meta[wrt]['size']
                                     except KeyError:
                                         in_size = comp._var_abs2meta[wrt]['size']
                                     out_size = comp._var_abs2meta[of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
-                                    jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
                                     # expand to the correct size array value for zipping
-                                    if jac_val.size == 1:
-                                        jac_val = jac_val * np.ones(jac_i.size)
-                                    for i, j, val in zip(jac_i, jac_j, jac_val):
+                                    if deriv_value.size == 1:
+                                        deriv_value *= np.ones(rows.size)
+                                    for i, j, val in zip(rows, subjacs[abs_key]['cols'], deriv_value):
                                         tmp_value[i, j] += val
                                     deriv_value = tmp_value
 
@@ -1041,6 +1040,8 @@ class Problem(object):
                 'step_calc': step_calc,
             }
             approx = model._owns_approx_jac
+            old_jac = model._jacobian
+
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method is 'fd' else None)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
@@ -1049,7 +1050,7 @@ class Problem(object):
 
             # reset the _owns_approx_jac flag after approximation is complete.
             if not approx:
-                # model._jacobian = None
+                model._jacobian = old_jac
                 model._owns_approx_jac = False
 
         # Assemble and Return all metrics.
