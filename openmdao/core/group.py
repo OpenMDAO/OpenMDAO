@@ -1714,9 +1714,6 @@ class Group(System):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
                         approximation.compute_approximations(self, jac=jac, deriv_type='total')
-
-            jac._update(self)
-
         else:
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
@@ -1726,8 +1723,6 @@ class Group(System):
                 do_ln = sub_do_ln and (subsys.linear_solver is not None and
                                        subsys.linear_solver._linearize_children())
                 subsys._linearize(jac, sub_do_ln=do_ln)
-                # if do_ln:  # sub_do_ln and subsys.linear_solver is not None:
-                #     subsys._linear_solver._linearize()
 
             # Update jacobian
             if self._assembled_jac is not None:

@@ -240,9 +240,11 @@ class NewtonSolver(NonlinearSolver):
 
         system._vectors['residual']['linear'].set_vec(system._residuals)
         system._vectors['residual']['linear'] *= -1.0
-        system._linearize(self.linear_solver._assembled_jac, sub_do_ln=do_sub_ln)
-        if (self.linear_solver is not system._linear_solver and
-                self.linear_solver._assembled_jac is not None):
+        my_asm_jac = self.linear_solver._assembled_jac
+
+        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+        if (my_asm_jac is not None and system._linear_solver is not None
+                and system.linear_solver._assembled_jac is not my_asm_jac):
             self.linear_solver._assembled_jac._update(system)
         self._linearize()
 
