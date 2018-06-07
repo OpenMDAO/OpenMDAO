@@ -1791,6 +1791,23 @@ class Group(System):
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
 
+    def _setup_partials(self, recurse=True):
+        """
+        Call setup_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        # FIXME: I don't think this has to be an OrderedDict
+        self._subjacs_info = info = OrderedDict()
+
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_partials(recurse)
+                info.update(subsys._subjacs_info)
+
     def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
         """
         Set and populate jacobians down through the system tree.
@@ -1803,13 +1820,10 @@ class Group(System):
         parent_asm_jac : AssembledJacobian or None
             The assembled jacobian from a parent group to populate for this system.
         """
-        J = self._jacobian
-
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
-            if J is None:
-                self._jacobian = J = DictionaryJacobian(system=self)
+            self._jacobian = J = DictionaryJacobian(system=self)
 
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
@@ -1890,8 +1904,6 @@ class Group(System):
                     self._subjacs_info[key] = meta
 
             approx._init_approximations()
-
-            J._initialize(self._subjacs_info)
 
         super(Group, self)._setup_jacobians(parent_asm_jac, gradient_nl_jac)
 

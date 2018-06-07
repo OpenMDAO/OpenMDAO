@@ -1218,23 +1218,6 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_solvers(recurse=recurse)
 
-    def _setup_partials(self, recurse=True):
-        """
-        Call setup_partials in components.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        # FIXME: I don't think this has to be an OrderedDict
-        self._subjacs_info = info = OrderedDict()
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_partials(recurse)
-                info.update(subsys._subjacs_info)
-
     def _setup_jacobians(self, parent_asm_jac=None, gradient_nl_jac=None):
         """
         Set and populate jacobians down through the system tree.
@@ -1278,10 +1261,6 @@ class System(object):
                 self._views_assembled_jac = True
             elif gradient_nl_jac is not None:
                 self._views_assembled_jac = True
-
-        if not self._owns_approx_jac:
-            self._jacobian = DictionaryJacobian(system=self)
-            self._jacobian._initialize(self._subjacs_info)
 
         # note that for a Group, _set_partials_meta does nothing
         self._set_partials_meta()

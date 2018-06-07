@@ -28,7 +28,7 @@ class Jacobian(object):
         can assign a jacobian with less rows or columns than the variable sizes.
     """
 
-    def __init__(self, system=None):
+    def __init__(self, system):
         """
         Initialize all attributes.
 
@@ -38,7 +38,7 @@ class Jacobian(object):
             Parent system to this jacobian.
         """
         self._system = system
-        self._subjacs_info = None
+        self._subjacs_info = system._subjacs_info
         self._override_checks = False
 
     def _abs_key2shape(self, abs_key):
