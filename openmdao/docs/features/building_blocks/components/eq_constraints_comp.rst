@@ -47,32 +47,25 @@ add_constraint  bool                     Specifies whether to add an equality co
 kwargs          dict or named arguments  Additional arguments to be passed for the creation of the output variable.
 =============== ======================== ===================================================================================
 
-Simple Example
---------------
+Example
+-------
 
-The following simple example uses an `EqualityConstraintsComp` to find the intersection of two parabolas.
-The equations for the two parabolas are:
+The following example shows an Individual Design Feasible (IDF) architecture for the
+:ref:`Sellar <sellar>` problem that demonstrates the use of an `EqualityConstraintsComp`.
 
-.. math::
-
-    f(x) = 1.5^2 - 9x + 11.5
-
-.. math::
-    g(x) = -0.2^2 - 0.4x + 2.8
-
-and they look like this:
+In IDF, the direct coupling between the disciplines is removed and the coupling variables
+are added to the optimizer’s design variables. The algorithm calls for two new equality
+constraints that enforce the coupling between the disciplines. This ensures that the
+solution is a feasible coupling, though it is achieved through the optimizer instead of
+using a solver.  The two new equality constraints are implemented in this example via the
+`EqualityConstraintsComp`.
 
 .. embed-code::
-    openmdao.components.tests.test_eq_constraints_comp.TestEqualityConstraintsComp.plot_feature_two_parabolas
-    :layout: plot
-    :scale: 90
-    :align: center
-
-Here we use the `EqualityConstraintsComp` to constrain the :code:`y` values to be equal while we optimize for the
-minimum value:
+    openmdao.components.tests.test_eq_constraints_comp.SellarIDF
+    :layout: code
 
 .. embed-code::
-    openmdao.components.tests.test_eq_constraints_comp.TestEqualityConstraintsComp.test_feature_two_parabolas
+    openmdao.components.tests.test_eq_constraints_comp.TestEqualityConstraintsComp.test_feature_sellar_idf
     :layout: interleave
 
 .. tags:: EqualityConstraintsComp, Component
