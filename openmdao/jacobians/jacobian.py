@@ -108,17 +108,8 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        if key not in self._subjacs_info:
-            abs_key = key2abs_key(self._system, key)
-        else:
-            abs_key = key
-
+        abs_key = key2abs_key(self._system, key)
         if abs_key in self._subjacs_info:
-            # subjac = self._subjacs_info[abs_key]
-            # if isinstance(subjac, list):
-            #     # Sparse AIJ format
-            #     return subjac[0]
-            # return subjac
             return self._subjacs_info[abs_key]['value']
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'

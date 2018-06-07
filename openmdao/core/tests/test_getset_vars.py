@@ -103,16 +103,13 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        c = ExecComp('y=2*x')
-
         g = Group(assembled_jac_type='dense')
-        g.add_subsystem('c', c)
         g.linear_solver = DirectSolver(assemble_jac=True)
+        c = g.add_subsystem('c', ExecComp('y=2*x'))
 
-        model = Group()
+        p = Problem()
+        model = p.model
         model.add_subsystem('g', g)
-
-        p = Problem(model)
         p.setup(check=False)
 
         # -------------------------------------------------------------------
@@ -126,7 +123,7 @@ class TestGetSetVariables(unittest.TestCase):
         p._initial_condition_cache = {}
 
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            self.assertEqual(p['x'], 5.0)
+            x = p['x']
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
@@ -135,7 +132,7 @@ class TestGetSetVariables(unittest.TestCase):
         p._initial_condition_cache = {}
 
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            self.assertEqual(p['y'], 5.0)
+            y = p['y']
 
         msg = 'Variable name "{}" not found.'
         inputs, outputs, residuals = g.get_nonlinear_vectors()
@@ -144,21 +141,21 @@ class TestGetSetVariables(unittest.TestCase):
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             inputs['x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            self.assertEqual(inputs['x'], 5.0)
+            x = inputs['x']
         with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
             inputs['g.c.x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-            self.assertEqual(inputs['g.c.x'], 5.0)
+            gcx = inputs['g.c.x']
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             outputs['y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            self.assertEqual(outputs['y'], 5.0)
+            y = outputs['y']
         with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
             outputs['g.c.y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-            self.assertEqual(outputs['g.c.y'], 5.0)
+            out = outputs['g.c.y']
 
         msg = 'Variable name pair \("{}", "{}"\) not found.'
         jac = g.linear_solver._assembled_jac
@@ -167,21 +164,23 @@ class TestGetSetVariables(unittest.TestCase):
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
             jac['y', 'x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-            self.assertEqual(jac['y', 'x'], 5.0)
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-            jac['g.c.y', 'g.c.x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-            self.assertEqual(jac['g.c.y', 'g.c.x'], 5.0)
+            dydx = jac['y', 'x']
+        # allow absolute keys now
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+            #jac['g.c.y', 'g.c.x'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+            #deriv = jac['g.c.y', 'g.c.x']
 
         # d(output)/d(output)
         with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
             jac['y', 'y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-            self.assertEqual(jac['y', 'y'], 5.0)
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-            jac['g.c.y', 'g.c.y'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-            self.assertEqual(jac['g.c.y', 'g.c.y'], 5.0)
+            dydy = jac['y', 'y']
+        # allow absoute keys now
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+            #jac['g.c.y', 'g.c.y'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+            #deriv = jac['g.c.y', 'g.c.y']
 
     def test_with_promotion_errors(self):
         """
@@ -245,16 +244,17 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(jac['y', 'x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
 
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-            jac['g.c2.y', 'g.c2.x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-            self.assertEqual(jac['g.c2.y', 'g.c2.x'], 5.0)
+        # absolute keys now allowed
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+            #jac['g.c2.y', 'g.c2.x'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+            #deriv = jac['g.c2.y', 'g.c2.x']
 
         # d(outputs)/d(outputs)
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-            jac['g.c2.y', 'g.c2.y'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-            self.assertEqual(jac['g.c2.y', 'g.c2.y'], 5.0)
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+            #jac['g.c2.y', 'g.c2.y'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+            #deriv = jac['g.c2.y', 'g.c2.y']
 
 
     def test_nested_promotion_errors(self):
