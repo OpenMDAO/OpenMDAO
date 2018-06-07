@@ -869,7 +869,7 @@ class Component(System):
                     meta['value'] = val.copy()
                 else:
                     meta['value'] = val
-                    
+
                 if rows is not None and val.size != rows.size and val.size == 1:
                     meta['value'] = np.full(rows.size, val[0])
 
@@ -957,7 +957,7 @@ class Component(System):
                         out_size, in_size,
                         val_out, val_in))
 
-    def _set_partials_meta(self, jacs):
+    def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
 
@@ -966,22 +966,12 @@ class Component(System):
         jacs : list of Jacobian
             Jacobians needing metadata update.
         """
-        #old_systems = []
-        #for J in jacs:
-            #old_systems.append(J._system)
-            #J._system = self
-
         for key, meta in iteritems(self._subjacs_info):
-            # for J in jacs:
-            # self._jacobian._set_partials_meta(key, meta)
 
             if 'method' in meta:
                 method = meta['method']
                 if method:
                     self._approx_schemes[method].add_approximation(key, meta)
-
-        #for i, J in enumerate(jacs):
-            #J._system = old_systems[i]
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()

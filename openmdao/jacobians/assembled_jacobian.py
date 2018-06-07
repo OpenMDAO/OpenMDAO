@@ -19,7 +19,6 @@ SUBJAC_META_DEFAULTS = {
     'rows': None,
     'cols': None,
     'value': None,
-    'approx': None,
     'dependent': False,
 }
 

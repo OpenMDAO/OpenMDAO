@@ -167,7 +167,7 @@ class ExplicitComponent(Component):
                     if abs_key in J._subjacs_info:
                         J._multiply_subjac(abs_key, -1.)
 
-    def _set_partials_meta(self, jacs):
+    def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
 
@@ -177,14 +177,6 @@ class ExplicitComponent(Component):
             Jacobians needing metadata update.
         """
         abs2prom = self._var_abs2prom
-        negated_subjacs = set()
-
-        # # set context of jacobians once to avoid doing inside of loop
-        # old_systems = []
-        # for J in jacs:
-        #     old_systems.append(J._system)
-        #     J._system = self
-
         abs2meta = self._var_abs2meta
         for abs_key, meta in iteritems(self._subjacs_info):
 
@@ -193,27 +185,13 @@ class ExplicitComponent(Component):
 
             # if wrt is an input, we need to negate the subjac.
             negate = abs_key[1] in abs2prom['input']
-            #for J in jacs:
-                #if negate:
-                    ## If we have multiple jacs, we need to make a copy after the first one in
-                    ## order for our subjac negation to work properly.
-                    #if abs_key in negated_subjacs:
-                        #meta = meta.copy()  # shallow copy
-                        #meta['value'] = deepcopy(meta['value'])
-                    #else:
-                        #negated_subjacs.add(abs_key)
             if negate:
                 self._jacobian._multiply_subjac(abs_key, -1.0)
-            # self._jacobian._set_partials_meta(abs_key, meta, negate)
 
             if 'method' in meta and meta['method']:
                 # Don't approximate output wrt output.
                 if abs_key[1] not in self._var_allprocs_abs_names['output']:
                     self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
-
-        ## reset context of jacobians
-        #for i, J in enumerate(jacs):
-            #J._system = old_systems[i]
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
