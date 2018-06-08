@@ -182,20 +182,34 @@ class DirectSolver(LinearSolver):
                                    " in system '%s'." % (type(mtx), system.pathname))
 
         else:
+            bvec = system._vectors['residual']['linear']
+            xvec = system._vectors['output']['linear']
+
             # First make a backup of the vectors
-            b_data = system._vectors['residual']['linear'].get_data()
-            x_data = system._vectors['output']['linear'].get_data()
+            b_data = bvec.get_data()
+            x_data = xvec.get_data()
 
             # Assemble the Jacobian by running the identity matrix through apply_linear
             nmtx = x_data.size
             eye = np.eye(nmtx)
             mtx = np.empty((nmtx, nmtx))
+            scope_out, scope_in = system._get_scope()
+            vnames = ['linear']
+
             for i in range(nmtx):
-                self._mat_vec(eye[:, i], mtx[:, i])
+                # set value of x vector to provided value
+                xvec.set_data(eye[:, i])
+
+                # apply linear
+                system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
+                                     scope_out, scope_in)
+
+                # put new value in out_vec
+                bvec.get_data(mtx[:, i])
 
             # Restore the backed-up vectors
-            system._vectors['residual']['linear'].set_data(b_data)
-            system._vectors['output']['linear'].set_data(x_data)
+            bvec.set_data(b_data)
+            xvec.set_data(x_data)
 
             # During LU decomposition, detect singularities and warn user.
             with warnings.catch_warnings():
@@ -208,31 +222,6 @@ class DirectSolver(LinearSolver):
 
                 except RuntimeWarning as err:
                     raise RuntimeError(format_singluar_error(err, system, mtx))
-
-    def _mat_vec(self, in_vec, out_vec):
-        """
-        Compute matrix-vector product.
-
-        Parameters
-        ----------
-        in_vec : ndarray
-            the incoming array (combines all varsets).
-        out_vec : ndarray
-            where the outgoing array after the product (combines all varsets) will be stored
-        """
-        vec_name = 'linear'
-        system = self._system
-
-        # set value of x vector to provided value
-        system._vectors['output'][vec_name].set_data(in_vec)
-
-        # apply linear
-        scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, 'fwd',
-                             scope_out, scope_in)
-
-        # put new value in out_vec
-        system._vectors['residual'][vec_name].get_data(out_vec)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
