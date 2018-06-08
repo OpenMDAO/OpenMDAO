@@ -65,7 +65,7 @@ an `EqualityConstraintsComp`.
     :layout: code
 
 .. embed-code::
-    openmdao.components.tests.test_eq_constraints_comp.TestEqualityConstraintsComp.test_feature_sellar_idf
+    openmdao.components.tests.test_eq_constraints_comp.TestFeatureEqualityConstraintsComp.test_feature_sellar_idf
     :layout: interleave
 
 .. tags:: EqualityConstraintsComp, Component
