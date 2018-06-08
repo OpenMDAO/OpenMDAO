@@ -22,6 +22,8 @@ SUBJAC_META_DEFAULTS = {
     'dependent': False,
 }
 
+_empty_dict = {}
+
 
 class AssembledJacobian(Jacobian):
     """
@@ -260,6 +262,8 @@ class AssembledJacobian(Jacobian):
         self._ext_mtx[system.pathname] = ext_mtx
 
     def _get_subjac_iters(self, system):
+        global _empty_dict
+
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
             keymap = self._keymap
@@ -267,7 +271,10 @@ class AssembledJacobian(Jacobian):
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
             seen = set()
-            global_conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
+            if isinstance(system, Component):
+                global_conns = _empty_dict
+            else:
+                global_conns = system._conn_global_abs_in2out
             output_names = system._var_abs_names['output']
             input_names = system._var_abs_names['input']
 
