@@ -138,7 +138,7 @@ class DirectSolver(LinearSolver):
         boolean
             Flag for indicating child linearization.
         """
-        return False
+        return self._assembled_jac is None
 
     def _linearize(self):
         """
