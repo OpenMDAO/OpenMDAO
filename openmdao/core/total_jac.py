@@ -1245,6 +1245,7 @@ class _TotalJacInfo(object):
 
         print('', flush=True)
 
+
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
     """
     Return proper subjacobian based on input/output names and indices.
