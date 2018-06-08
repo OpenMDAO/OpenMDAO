@@ -243,9 +243,8 @@ class NewtonSolver(NonlinearSolver):
         my_asm_jac = self.linear_solver._assembled_jac
 
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if (my_asm_jac is not None and system._linear_solver is not None
-                and system.linear_solver._assembled_jac is not my_asm_jac):
-            self.linear_solver._assembled_jac._update(system)
+        if (my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac):
+            my_asm_jac._update(system)
         self._linearize()
 
         self.linear_solver.solve(['linear'], 'fwd')

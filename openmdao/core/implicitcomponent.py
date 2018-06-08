@@ -258,18 +258,17 @@ class ImplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if jac is None:
-            jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
+        J = jac if jac is not None else self._jacobian
 
-        with self.jacobian_context(jac):
+        with self.jacobian_context(J):
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
                 # override FD'd values.
                 for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=jac)
-                self.linearize(self._inputs, self._outputs, jac)
+                    approximation.compute_approximations(self, jac=J)
+                self.linearize(self._inputs, self._outputs, J)
 
-        if self._assembled_jac is not None:
+        if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
