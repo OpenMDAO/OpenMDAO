@@ -122,8 +122,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         Jfd = sub._jacobian
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
@@ -156,8 +156,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         Jfd = sub._jacobian
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
@@ -192,8 +192,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
 
         Jfd = sub._jacobian
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[6.0]], 1e-6)
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
@@ -225,10 +225,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.run_linearize()
 
         Jfd = model._jacobian
-        assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], -comp.JJ[0:2, 0:2], 1e-6)
-        assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], -comp.JJ[0:2, 2:4], 1e-6)
-        assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
-        assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], -comp.JJ[2:4, 2:4], 1e-6)
+        assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
+        assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
+        assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
+        assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], comp.JJ[2:4, 2:4], 1e-6)
 
     def test_implicit_component_fd(self):
         # Somehow this wasn't tested in the original fd tests (which are mostly feature tests.)
@@ -736,8 +736,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         Jfd = sub._jacobian
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[6.0]], 1e-6)
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[-8.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.x'], [[-6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 2)
@@ -780,8 +780,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, derivs['sub.comp.f_xy', 'p2.y'], [[8.0]], 1e-6)
 
         Jfd = sub._jacobian
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[6.0]], 1e-6)
-        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[-8.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
+        assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 6)
@@ -820,10 +820,10 @@ class TestGroupComplexStep(unittest.TestCase):
         model.run_linearize()
 
         Jfd = model._jacobian
-        assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], -comp.JJ[0:2, 0:2], 1e-6)
-        assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], -comp.JJ[0:2, 2:4], 1e-6)
-        assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], -comp.JJ[2:4, 0:2], 1e-6)
-        assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], -comp.JJ[2:4, 2:4], 1e-6)
+        assert_rel_error(self, Jfd['comp.y1', 'p1.x1'], comp.JJ[0:2, 0:2], 1e-6)
+        assert_rel_error(self, Jfd['comp.y1', 'p2.x2'], comp.JJ[0:2, 2:4], 1e-6)
+        assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
+        assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], comp.JJ[2:4, 2:4], 1e-6)
 
     @parameterized.expand(itertools.product(
         [DefaultVector, PETScVector],

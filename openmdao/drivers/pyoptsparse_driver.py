@@ -5,13 +5,14 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
-
 from __future__ import print_function
-from collections import OrderedDict
-import traceback
-import json
 
-from six import iteritems, itervalues, string_types
+from collections import OrderedDict
+import json
+import sys
+import traceback
+
+from six import iteritems, itervalues, string_types, reraise
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -30,26 +31,9 @@ grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
 
-
-def _check_imports():
-    """
-    Dynamically remove optimizers we don't have.
-
-    Returns
-    -------
-    list of str
-        List of valid optimizer strings.
-    """
-    optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-               'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
-
-    for optimizer in optlist[:]:
-        try:
-            __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
-        except ImportError:
-            optlist.remove(optimizer)
-
-    return optlist
+# All optimizers in pyoptsparse
+optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
+           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
 
 
 CITATIONS = """
@@ -160,7 +144,7 @@ class pyOptSparseDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('optimizer', default='SLSQP', values=_check_imports(),
+        self.options.declare('optimizer', default='SLSQP', values=optlist,
                              desc='Name of optimizers to use')
         self.options.declare('title', default='Optimization using pyOpt_sparse',
                              desc='Title of this optimization run')
@@ -336,10 +320,11 @@ class pyOptSparseDriver(Driver):
             _tmp = __import__('pyoptsparse', globals(), locals(), [optimizer], 0)
             opt = getattr(_tmp, optimizer)()
 
-        except ImportError:
+        except Exception as err:
+            # Change whatever pyopt gives us to an ImportError, give it a readable message,
+            # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
-
-            raise ImportError(msg)
+            reraise(ImportError, ImportError(msg), sys.exc_info()[2])
 
         # Set optimization options
         for option, value in self.opt_settings.items():

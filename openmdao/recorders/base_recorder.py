@@ -6,7 +6,7 @@ from six import StringIO
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
-from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.mpi import MPI
 
 
@@ -159,7 +159,7 @@ class BaseRecorder(object):
 
         self._counter += 1
 
-        self._iteration_coordinate = get_formatted_iteration_coordinate()
+        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
 
         if isinstance(recording_requester, Driver):
             self.record_iteration_driver(recording_requester, data, metadata)

@@ -19,7 +19,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
-def format_singluar_error(err, system, mtx):
+def format_singular_error(err, system, mtx):
     """
     Format a coherent error message when the matrix is singular.
 
@@ -58,16 +58,17 @@ def format_singluar_error(err, system, mtx):
     n = 0
     varname = "Unknown"
     for name in system._var_allprocs_abs_names['output']:
-        n += len(system._outputs._views_flat[name])
+        relname = system._var_abs2prom['output'][name]
+        n += len(system._outputs[relname])
         if loc <= n:
-            varname = name
+            varname = relname
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
     return msg.format(system.pathname, loc_txt, varname)
 
 
-def format_singluar_csc_error(system, matrix):
+def format_singular_csc_error(system, matrix):
     """
     Format a coherent error message when the CSC matrix is singular.
 
@@ -86,7 +87,10 @@ def format_singluar_csc_error(system, matrix):
     dense = matrix.toarray()
     zero_rows = np.where(~dense.any(axis=1))[0]
     zero_cols = np.where(~dense.any(axis=0))[0]
-    if zero_cols.size <= zero_rows.size:
+    if np.any(np.isnan(dense)):
+        # There is a nan in the matrix.
+        return(format_nan_error(system, dense))
+    elif zero_cols.size <= zero_rows.size:
         loc_txt = "row"
         loc = zero_rows[0]
     else:
@@ -104,6 +108,41 @@ def format_singluar_csc_error(system, matrix):
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
     return msg.format(system.pathname, loc_txt, varname)
+
+
+def format_nan_error(system, matrix):
+    """
+    Format a coherent error message when the matrix contains NaN.
+
+    Parameters
+    ----------
+    system : <System>
+        System containing the Directsolver.
+    matrix : ndarray
+        Matrix of interest.
+
+    Returns
+    -------
+    str
+        New error string.
+    """
+    rows = set(np.where(np.isnan(matrix))[0])
+
+    # Because of how we built the matrix, a NaN in a comp cause the whole row to be NaN, so we
+    # need to associate each index with a variable.
+    varname = []
+    all_vars = system._var_allprocs_abs_names['output']
+    for row in rows:
+        n = 0
+        for name in all_vars:
+            relname = system._var_abs2prom['output'][name]
+            n += len(system._outputs[relname])
+            if row <= n:
+                varname.append("'%s'" % relname)
+                break
+
+    msg = "NaN entries found in '{}' for rows associated with states/residuals [{}]."
+    return msg.format(system.pathname, ', '.join(varname))
 
 
 class DirectSolver(LinearSolver):
@@ -161,14 +200,18 @@ class DirectSolver(LinearSolver):
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
                     except RuntimeWarning as err:
-                        raise RuntimeError(format_singluar_error(err, system, matrix))
+                        raise RuntimeError(format_singular_error(err, system, matrix))
+
+                    # NaN in matrix.
+                    except ValueError as err:
+                        raise RuntimeError(format_nan_error(system, matrix))
 
             elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singluar_csc_error(system, matrix))
+                        raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
                         reraise(*sys.exc_info())
 
@@ -221,7 +264,11 @@ class DirectSolver(LinearSolver):
                     self._lup = scipy.linalg.lu_factor(mtx)
 
                 except RuntimeWarning as err:
-                    raise RuntimeError(format_singluar_error(err, system, mtx))
+                    raise RuntimeError(format_singular_error(err, system, mtx))
+
+                # NaN in matrix.
+                except ValueError as err:
+                    raise RuntimeError(format_nan_error(system, mtx))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

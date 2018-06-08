@@ -20,7 +20,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.recorders.recording_iteration_stack import get_formatted_iteration_coordinate
+from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 _emptyset = set()
 
@@ -633,7 +633,7 @@ class NonlinearSolver(Solver):
         fail, abs_err, rel_err = self._run_iterator()
 
         if fail and self.options['debug_print']:
-            coord = get_formatted_iteration_coordinate()
+            coord = recording_iteration.get_formatted_iteration_coordinate()
 
             out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
             for vec_type, vec in iteritems(self._err_cache):

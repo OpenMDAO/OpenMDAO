@@ -13,7 +13,6 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 
-
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -1352,6 +1351,39 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue('Solving variable: comp.f_xy' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False, mode='fwd')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                             str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('Solving variable: p1.x' in output)
+        self.assertTrue('Solving variable: p2.y' in output)
+
     def test_debug_print_option(self):
 
         prob = Problem()
@@ -1403,6 +1435,35 @@ class TestPyoptSparse(unittest.TestCase):
                         "Should be more than one con.c printed")
         self.assertTrue(len([s for s in output if s.startswith("{'comp.f_xy")]) > 1,
                         "Should be more than one comp.f_xy printed")
+
+    def test_show_exception_bad_opt(self):
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.driver = pyOptSparseDriver()
+
+        # We generally don't hae a working IPOPT install.
+        prob.driver.options['optimizer'] = 'IPOPT'
+        prob.setup(check=False)
+
+        # Test that we get exception.
+        with self.assertRaises(ImportError) as raises_cm:
+            prob.run_driver()
+
+        self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")

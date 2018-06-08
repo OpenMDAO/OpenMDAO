@@ -43,11 +43,28 @@ bits for all variables encoded.
     openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_option_pop_size
     :layout: interleave
 
+Running a GA in Parallel
+------------------------
+
 If you have a model that doesn't contain any distributed components or parallel groups, then the model
 evaluations for a new generation can be performed in parallel by turning on the "parallel" option:
 
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.MPIFeatureTests.test_option_parallel
+    :layout: interleave
+
+Running a GA on a Parallel Model in Parallel
+--------------------------------------------
+
+If you have a model that does contain distributed components or parallel groups, you can also use
+`SimpleGADriver` to optimize it. If you have enough processors, you can also simultaneously
+evaluate multiple points in your population by turning on the "parallel" option and setting the
+"procs_per_model" to the number of processors that your model requires. Take care that you submit
+your parallel run with enough processors such that the number of processors the model requires
+divides evenly into it, as in this example, where the model requires 2 and we give it 4.
+
+.. embed-code::
+    openmdao.drivers.tests.test_genetic_algorithm_driver.MPIFeatureTests4.test_option_procs_per_model
     :layout: interleave
 
 .. tags:: Driver, Optimizer, Optimization

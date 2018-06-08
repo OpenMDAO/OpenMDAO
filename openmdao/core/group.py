@@ -1861,7 +1861,9 @@ class Group(System):
                         if key[0] == key[1]:
                             size = self._var_allprocs_abs2meta[key[0]]['size']
                             meta['rows'] = meta['cols'] = np.arange(size)
-                            meta['value'] = np.ones(size)
+                            # All group approximations are treated as explicit components, so we
+                            # have a -1 on the diagonal.
+                            meta['value'] = np.full(size, -1.0)
 
                     meta['method'] = method
 

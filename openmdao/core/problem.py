@@ -7,6 +7,7 @@ import sys
 from collections import OrderedDict, defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
+import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -420,9 +421,17 @@ class Problem(object):
                          "with OpenMDAO <= 1.x ; use 'model' instead.")
         self.model = model
 
-    def run_model(self):
+    def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the model by calling the root system's solve_nonlinear.
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.
+
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
 
         Returns
         -------
@@ -436,13 +445,32 @@ class Problem(object):
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
 
+        if case_prefix:
+            if not isinstance(case_prefix, str):
+                raise TypeError("The 'case_prefix' argument should be a string.")
+            recording_iteration.prefix = case_prefix
+        else:
+            recording_iteration.prefix = None
+
+        if self.model.iter_count > 0 and reset_iter_counts:
+            self.driver.iter_count = 0
+            self.model._reset_iter_counts()
+
         self.final_setup()
         self.model._clear_iprint()
         return self.model.run_solve_nonlinear()
 
-    def run_driver(self):
+    def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
         Run the driver on the model.
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.
+
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
 
         Returns
         -------
@@ -451,6 +479,17 @@ class Problem(object):
         """
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_driver`.")
+
+        if case_prefix:
+            if not isinstance(case_prefix, str):
+                raise TypeError("The 'case_prefix' argument should be a string.")
+            recording_iteration.prefix = case_prefix
+        else:
+            recording_iteration.prefix = None
+
+        if self.model.iter_count > 0 and reset_iter_counts:
+            self.driver.iter_count = 0
+            self.model._reset_iter_counts()
 
         self.final_setup()
         self.model._clear_iprint()
@@ -732,8 +771,6 @@ class Problem(object):
                 # TODO: Check deprecated deriv_options.
 
                 with comp._unscaled_context():
-                    if explicit:
-                        comp._negate_jac(comp._jacobian)
 
                     of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -773,12 +810,9 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
-                                # TODO - Sort out the minus sign difference.
-                                perturb = 1.0 if not explicit else -1.0
-
                                 # Dictionary access returns a scaler for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
-                                flat_view[idx] = perturb
+                                flat_view[idx] = 1.0
 
                                 # Matrix Vector Product
                                 comp._apply_linear(None, ['linear'], _contains_all, mode)
@@ -866,9 +900,6 @@ class Problem(object):
 
                             partials_data[c_name][rel_key][jac_key] = deriv_value.copy()
 
-                    if explicit:
-                        comp._negate_jac(comp._jacobian)
-
         model._inputs.set_vec(input_cache)
         model._outputs.set_vec(output_cache)
         model.run_apply_nonlinear()
@@ -877,6 +908,7 @@ class Problem(object):
         jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
+        comps_could_not_cs = set()
         for comp in comps:
 
             c_name = comp.pathname
@@ -905,15 +937,15 @@ class Problem(object):
                     if local_method:
                         method = local_method
 
+                # We can't use CS if we havent' allocated a complex vector, so we fall back on fd.
+                if method == 'cs' and not alloc_complex:
+                    comps_could_not_cs.add(c_name)
+                    method = 'fd'
+
                 fd_options = {'order': None,
                               'method': method}
 
                 if method == 'cs':
-                    if not alloc_complex:
-                        msg = 'In order to check partials with complex step, you need to set ' + \
-                            '"force_alloc_complex" to True during setup.'
-                        raise RuntimeError(msg)
-
                     defaults = DEFAULT_CS_OPTIONS
 
                     fd_options['form'] = None
@@ -950,18 +982,19 @@ class Problem(object):
 
             for rel_key, partial in iteritems(approx_jac):
                 abs_key = rel_key2abs_key(comp, rel_key)
-                # Since all partials for outputs for explicit comps are declared, assume anything
-                # missing is an input deriv.
-                if explicit and abs_key[1] in comp._var_abs_names['input']:
-                    partials_data[c_name][rel_key][jac_key] = -partial
-                else:
-                    partials_data[c_name][rel_key][jac_key] = partial
+                partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
+
+        if len(comps_could_not_cs) > 0:
+            msg = "The following components requested complex step, but force_alloc_complex " + \
+                "has not been set to True, so finite difference was used: "
+            msg += str(list(comps_could_not_cs))
+            warnings.warn(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,

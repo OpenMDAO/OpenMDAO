@@ -60,24 +60,6 @@ class Jacobian(object):
         abs2meta = self._system._var_allprocs_abs2meta
         return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
-    def _multiply_subjac(self, abs_key, val):
-        """
-        Multiply this sub-Jacobian by val.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        val : float
-            value to multiply by.
-        """
-        jac = self._subjacs_info[abs_key]['value']
-
-        if isinstance(jac, sparse_types):
-            jac.data *= val  # DOK not supported
-        else:
-            jac *= val
-
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.

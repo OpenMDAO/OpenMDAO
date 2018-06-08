@@ -86,8 +86,9 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
+            # ExplicitComponent jacobians have -1 on the diagonal.
             self._declare_partials(out_name, out_name, rows=arange, cols=arange,
-                                   val=np.ones(meta['size']))
+                                   val=np.full(meta['size'], -1.))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
@@ -152,22 +153,6 @@ class ExplicitComponent(Component):
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
                                                          var_set=var_set)
 
-    def _negate_jac(self, J):
-        """
-        Negate this component's part of the jacobian.
-
-        Parameters
-        ----------
-        J : Jacobian
-            The jacobian to be negated.
-        """
-        if J._subjacs_info:
-            for res_name in self._var_abs_names['output']:
-                for in_name in self._var_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in J._subjacs_info:
-                        J._multiply_subjac(abs_key, -1.)
-
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
@@ -184,10 +169,10 @@ class ExplicitComponent(Component):
             if meta['value'] is None:
                 meta['value'] = np.zeros(meta['shape'])
 
-            # if wrt is an input, we need to negate the subjac.
-            negate = abs_key[1] in abs2prom['input']
-            if negate:
-                self._jacobian._multiply_subjac(abs_key, -1.0)
+            # # if wrt is an input, we need to negate the subjac.
+            # negate = abs_key[1] in abs2prom['input']
+            # if negate:
+            #     self._jacobian._multiply_subjac(abs_key, -1.0)
 
             if 'method' in meta:
                 method = meta['method']
@@ -208,6 +193,10 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
                 residuals.set_vec(outputs)
+
+                # Sign of the residual is minus the sign of the output vector.
+                residuals *= -1.0
+
                 self.compute(self._inputs, outputs)
 
                 # Restore any complex views if under complex step.
@@ -215,8 +204,8 @@ class ExplicitComponent(Component):
                     outputs._remove_complex_views()
                     residuals._remove_complex_views()
 
-                residuals -= outputs
-                outputs += residuals
+                residuals += outputs
+                outputs -= residuals
 
     def _solve_nonlinear(self):
         """
@@ -283,7 +272,9 @@ class ExplicitComponent(Component):
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
-                        d_residuals *= -1.0
+
+                        # We used to negate the residual here, and then re-negate after the hook.
+
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
                                 self.compute_multi_jacvec_product(self._inputs, d_inputs,
@@ -300,7 +291,6 @@ class ExplicitComponent(Component):
                                 d_residuals._icol = None
                         else:
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
-                        d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -327,28 +317,31 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name in self._rel_vec_names:
+                    d_outputs = self._vectors['output'][vec_name]
+                    d_residuals = self._vectors['residual'][vec_name]
+
                     if mode == 'fwd':
                         if self._has_resid_scaling:
-                            d_outputs = self._vectors['output'][vec_name]
-                            d_residuals = self._vectors['residual'][vec_name]
-
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_outputs.set_vec(d_residuals)
                         else:
-                            self._vectors['output'][vec_name].set_vec(
-                                self._vectors['residual'][vec_name])
+                            d_outputs.set_vec(d_residuals)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_outputs *= -1.0
+
                     else:  # rev
                         if self._has_resid_scaling:
-                            d_outputs = self._vectors['output'][vec_name]
-                            d_residuals = self._vectors['residual'][vec_name]
-
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_residuals.set_vec(d_outputs)
                         else:
-                            self._vectors['residual'][vec_name].set_vec(
-                                self._vectors['output'][vec_name])
+                            d_residuals.set_vec(d_outputs)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_residuals *= -1.0
+
         return False, 0., 0.
 
     def _linearize(self, jac=None, sub_do_ln=False):
@@ -371,20 +364,14 @@ class ExplicitComponent(Component):
         with self.jacobian_context(jac):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
-                # Since the residuals are already negated, this call should come before negate_jac
-                # Additionally, computing the approximation before the call to compute_partials
-                # allows users to override FD'd values.
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
                 for approximation in itervalues(self._approx_schemes):
                     approximation.compute_approximations(self, jac=jac)
 
                 if self._has_compute_partials:
-                    # negate constant subjacs (and others that will get overwritten)
-                    # back to normal
-                    self._negate_jac(jac)
+                    # We used to negate the jacobian here, and then re-negate after the hook.
                     self.compute_partials(self._inputs, jac)
-
-                    # re-negate the jacobian
-                    self._negate_jac(jac)
 
     def compute(self, inputs, outputs):
         """
