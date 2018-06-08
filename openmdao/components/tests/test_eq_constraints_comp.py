@@ -66,7 +66,8 @@ class SellarIDF(Group):
         self.connect('dv.y2', 'equal.lhs:y2')
         self.connect('d2.y2', 'equal.rhs:y2')
 
-        # the driver will effectively solve the cycle via the equality constraints
+        # the driver will effectively solve the cycle
+        # by satisfying the equality constraints
         self.add_design_var('dv.x', lower=0., upper=5.)
         self.add_design_var('dv.y1', lower=0., upper=5.)
         self.add_design_var('dv.y2', lower=0., upper=5.)
@@ -80,7 +81,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
 
     def test_sellar_idf(self):
         prob = Problem(SellarIDF())
-        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', disp=True)
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
         prob.setup()
 
         # check derivatives
@@ -114,7 +115,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         assert_almost_equal(prob['equal.y2'], 0.0)
 
     def test_feature_sellar_idf(self):
-        prob = Problem(SellarIDF())
+        prob = Problem(model=SellarIDF())
         prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', disp=True)
         prob.setup()
         prob.run_driver()
@@ -136,7 +137,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.add_subsystem('indep', IndepVarComp('x', val=0.))
         model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
         model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', val=1.0, add_constraint=True))
+        model.add_subsystem('equal', EqualityConstraintsComp('y', val=11.))
 
         model.connect('indep.x', 'f.x')
         model.connect('indep.x', 'g.x')
@@ -149,7 +150,47 @@ class TestEqualityConstraintsComp(unittest.TestCase):
 
         prob.setup(mode='fwd')
 
-        # check that constraint has been added as requested
+        # verify that the output variable has been initialized
+        self.assertEqual(prob['equal.y'], 11.)
+
+        # verify that the constraint has not been added
+        self.assertFalse('equal.y' in model.get_constraints())
+
+        # manually add the constraint
+        model.add_constraint('equal.y', equals=0.)
+        prob.setup(mode='fwd')
+
+        prob.driver = ScipyOptimizeDriver(disp=False)
+
+        prob.run_driver()
+
+        assert_almost_equal(prob['equal.y'], 0.)
+        assert_almost_equal(prob['indep.x'], 10.)
+        assert_almost_equal(prob['f.y'], 27.)
+        assert_almost_equal(prob['g.y'], 27.)
+
+    def test_create_on_init_add_constraint(self):
+        prob = Problem()
+        model = prob.model
+
+        # find intersection of two non-parallel lines
+        model.add_subsystem('indep', IndepVarComp('x', val=0.))
+        model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
+        model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
+        model.add_subsystem('equal', EqualityConstraintsComp('y', add_constraint=True))
+
+        model.connect('indep.x', 'f.x')
+        model.connect('indep.x', 'g.x')
+
+        model.connect('f.y', 'equal.lhs:y')
+        model.connect('g.y', 'equal.rhs:y')
+
+        model.add_design_var('indep.x', lower=0., upper=20.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd')
+
+        # verify that the constraint has been added as requested
         self.assertTrue('equal.y' in model.get_constraints())
 
         prob.driver = ScipyOptimizeDriver(disp=False)
@@ -170,15 +211,86 @@ class TestEqualityConstraintsComp(unittest.TestCase):
     def test_vectorized_with_default_mult(self):
         pass
 
-    def test_rhs_val(self):
-        """ Test solution with a default RHS value and no connected RHS variable. """
-        pass
-
     def test_scalar_with_mult(self):
-        pass
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('x', val=1.))
+        model.add_subsystem('multx', IndepVarComp('m', val=2.))
+        model.add_subsystem('f', ExecComp('y=x**2', x=1.))
+        model.add_subsystem('equal', EqualityConstraintsComp('y', use_mult=True))
+
+        model.connect('indep.x', 'f.x')
+
+        model.connect('indep.x', 'equal.lhs:y')
+        model.connect('multx.m', 'equal.mult:y')
+        model.connect('f.y', 'equal.rhs:y')
+
+        model.add_design_var('indep.x', lower=0., upper=10.)
+        model.add_constraint('equal.y', equals=0.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd')
+        prob.driver = ScipyOptimizeDriver(disp=False)
+        prob.run_driver()
+
+        print('x:', prob['indep.x'], 'y:', prob['f.y'], 'equal.y:', prob['equal.y'])
+        assert_rel_error(self, prob['equal.y'], 0., 1e-6)
+        assert_rel_error(self, prob['indep.x'], 2., 1e-6)
+        assert_rel_error(self, prob['f.y'], 4., 1e-6)
+
+    def test_rhs_val(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', IndepVarComp('x', val=1.))
+        model.add_subsystem('f', ExecComp('y=x**2', x=1.))
+        model.add_subsystem('equal', EqualityConstraintsComp('y', rhs_val=4.))
+
+        model.connect('indep.x', 'f.x')
+        model.connect('f.y', 'equal.lhs:y')
+
+        model.add_design_var('indep.x', lower=0., upper=10.)
+        model.add_constraint('equal.y', equals=0.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd')
+        prob.driver = ScipyOptimizeDriver(disp=False)
+        prob.run_driver()
+
+        assert_rel_error(self, prob['equal.y'], 0., 1e-6)
+        assert_rel_error(self, prob['indep.x'], 2., 1e-6)
+        assert_rel_error(self, prob['f.y'], 4., 1e-6)
 
     def test_renamed_vars(self):
-        pass
+        prob = Problem()
+        model = prob.model
+
+        equal = EqualityConstraintsComp('y', lhs_name='fx_y', rhs_name='gx_y',
+                                        add_constraint=True)
+
+        model.add_subsystem('indep', IndepVarComp('x', val=0.))
+        model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
+        model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
+        model.add_subsystem('equal', equal)
+
+        model.connect('indep.x', 'f.x')
+        model.connect('indep.x', 'g.x')
+
+        model.connect('f.y', 'equal.fx_y')
+        model.connect('g.y', 'equal.gx_y')
+
+        model.add_design_var('indep.x', lower=0., upper=20.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd')
+        prob.driver = ScipyOptimizeDriver(disp=False)
+        prob.run_driver()
+
+        assert_almost_equal(prob['equal.y'], 0.)
+        assert_almost_equal(prob['indep.x'], 10.)
+        assert_almost_equal(prob['f.y'], 27.)
+        assert_almost_equal(prob['g.y'], 27.)
 
 
 if __name__ == '__main__':  # pragma: no cover
