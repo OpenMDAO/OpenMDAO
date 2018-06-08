@@ -129,7 +129,37 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         assert_rel_error(self, prob['obj_cmp.obj'], 3.18339395045, 1e-5)
 
     def test_create_on_init(self):
-        pass
+        prob = Problem()
+        model = prob.model
+
+        # find intersection of two non-parallel lines
+        model.add_subsystem('indep', IndepVarComp('x', val=0.))
+        model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
+        model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
+        model.add_subsystem('equal', EqualityConstraintsComp('y', val=1.0, add_constraint=True))
+
+        model.connect('indep.x', 'f.x')
+        model.connect('indep.x', 'g.x')
+
+        model.connect('f.y', 'equal.lhs:y')
+        model.connect('g.y', 'equal.rhs:y')
+
+        model.add_design_var('indep.x', lower=0., upper=20.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd')
+
+        # check that constraint has been added as requested
+        self.assertTrue('equal.y' in model.get_constraints())
+
+        prob.driver = ScipyOptimizeDriver(disp=False)
+
+        prob.run_driver()
+
+        assert_almost_equal(prob['equal.y'], 0.)
+        assert_almost_equal(prob['indep.x'], 10.)
+        assert_almost_equal(prob['f.y'], 27.)
+        assert_almost_equal(prob['g.y'], 27.)
 
     def test_vectorized(self):
         pass

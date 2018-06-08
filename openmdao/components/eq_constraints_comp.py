@@ -17,7 +17,7 @@ class EqualityConstraintsComp(ExplicitComponent):
     Attributes
     ----------
     _output_vars : dict
-        Cache the data provided during `add_eq_constraint`
+        Cache the data provided during `add_eq_output`
         so everything can be saved until setup is called.
     """
 
@@ -59,8 +59,8 @@ class EqualityConstraintsComp(ExplicitComponent):
         super(EqualityConstraintsComp, self).__init__()
         self._output_vars = {}
         if name is not None:
-            self.add_eq_constraint(name, eq_units, lhs_name, rhs_name, rhs_val,
-                                   use_mult, mult_name, mult_val, add_constraint, **kwargs)
+            self.add_eq_output(name, eq_units, lhs_name, rhs_name, rhs_val,
+                               use_mult, mult_name, mult_val, add_constraint, **kwargs)
 
     def setup(self):
         """
