@@ -1013,11 +1013,10 @@ class _TotalJacInfo(object):
                 if debug_print:
                     if par_deriv and key in par_deriv:
                         varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
-                        print('Solving color:', key, varlist)
+                        print('Solving color:', key, varlist, flush=True)
                     else:
-                        print('Solving variable:', key)
+                        print('Solving variable:', key, flush=True)
 
-                    sys.stdout.flush()
                     t0 = time.time()
 
                 # restore old linear solution if cache_linear_solution was set by the user for
@@ -1030,8 +1029,7 @@ class _TotalJacInfo(object):
                     model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
 
                 if debug_print:
-                    print('Elapsed Time:', time.time() - t0, '\n')
-                    sys.stdout.flush()
+                    print('Elapsed Time:', time.time() - t0, '\n', flush=True)
 
                 jac_setter(inds)
 

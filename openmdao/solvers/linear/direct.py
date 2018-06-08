@@ -136,7 +136,7 @@ class DirectSolver(LinearSolver):
         Returns
         -------
         boolean
-            Flag for indicating child linerization
+            Flag for indicating child linearization.
         """
         return False
 
@@ -189,13 +189,13 @@ class DirectSolver(LinearSolver):
             b_data = bvec.get_data()
             x_data = xvec.get_data()
 
-            # Assemble the Jacobian by running the identity matrix through apply_linear
             nmtx = x_data.size
             eye = np.eye(nmtx)
             mtx = np.empty((nmtx, nmtx))
             scope_out, scope_in = system._get_scope()
             vnames = ['linear']
 
+            # Assemble the Jacobian by running the identity matrix through apply_linear
             for i in range(nmtx):
                 # set value of x vector to provided value
                 xvec.set_data(eye[:, i])
