@@ -105,9 +105,9 @@ class DictionaryJacobian(Jacobian):
                             # skip the matvec mult completely for identity subjacs
                             if res_name is other_name and isinstance(system, ExplicitComponent):
                                 if fwd:
-                                    re += op
+                                    re -= op
                                 else:
-                                    op += re
+                                    op -= re
                             elif fwd:
                                 if ncol > 1:
                                     for i in range(ncol):

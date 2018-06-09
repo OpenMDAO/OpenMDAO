@@ -508,6 +508,194 @@ class TestDeprecatedExternalCode(unittest.TestCase):
         self.prob.setup(check=True)
         self.prob.run_model()
 
+class TestExternalCodeImplicitCompFeature(unittest.TestCase):
+
+    def setUp(self):
+        import os
+        import shutil
+        import tempfile
+
+        # get the directory where the needed support files are located
+        import openmdao.components.tests.test_external_code_comp as extcode_test
+        DIRECTORY = os.path.dirname((os.path.abspath(extcode_test.__file__)))
+
+        # change to temp dir
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_extcode-')
+        os.chdir(self.tempdir)
+
+        # copy required files to temp dir
+        files = ['extcode_resistor.py', 'extcode_node.py']
+        for filename in files:
+            shutil.copy(os.path.join(DIRECTORY, filename),
+                        os.path.join(self.tempdir, filename))
+
+    def tearDown(self):
+        # destroy the evidence
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
+
+    def test_circuit_plain_newton_using_extcode(self):
+        # Use external code for the resistor and node.
+        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Diode, Node, Resistor
+        from openmdao.components.external_code_comp import ExternalCodeComp, \
+            ExternalCodeImplicitComp
+
+        class ResistorExternalCodeComp(ExternalCodeComp):
+
+            def initialize(self):
+                self.options.declare('R', default=1., desc='Resistance in Ohms')
+
+            def setup(self):
+                self.add_input('V_in', units='V')
+                self.add_input('V_out', units='V')
+                self.add_output('I', units='A')
+
+                self.declare_partials(of='I', wrt='V_in', method='fd')
+                self.declare_partials(of='I', wrt='V_out', method='fd')
+
+                self.input_file = 'resistor_input.dat'
+                self.output_file = 'resistor_output.dat'
+
+                # providing these is optional; the component will verify that any input
+                # files exist before execution and that the output files exist after.
+                self.options['external_input_files'] = [self.input_file, ]
+                self.options['external_output_files'] = [self.output_file, ]
+
+                self.options['command'] = [
+                    'python', 'extcode_resistor.py', self.input_file, self.output_file
+                ]
+
+            def compute(self, inputs, outputs):
+                V_in = inputs['V_in']
+                V_out = inputs['V_out']
+                R = self.options['R']
+
+                # generate the input file for the paraboloid external code
+                with open(self.input_file, 'w') as input_file:
+                    input_file.write('%.16f\n%.16f\n%.16f\n' % (V_in, V_out, R))
+
+                # the parent compute function actually runs the external code
+                super(ResistorExternalCodeComp, self).compute(inputs, outputs)
+
+                # parse the output file from the external code and set the value of I
+                with open(self.output_file, 'r') as output_file:
+                    I = float(output_file.read())
+
+                outputs['I'] = I
+
+        class NodeExternalCodeComp(ExternalCodeImplicitComp):
+
+            def initialize(self):
+                self.options.declare('n_in', default=1, types=int,
+                                     desc='number of connections with + assumed in')
+                self.options.declare('n_out', default=1, types=int,
+                                     desc='number of current connections + assumed out')
+
+            def setup(self):
+                self.add_output('V', val=5., units='V')
+
+                for i in range(self.options['n_in']):
+                    i_name = 'I_in:{}'.format(i)
+                    self.add_input(i_name, units='A')
+
+                for i in range(self.options['n_out']):
+                    i_name = 'I_out:{}'.format(i)
+                    self.add_input(i_name, units='A')
+
+                # note: we don't declare any partials wrt `V` here,
+                #      because the residual doesn't directly depend on it
+                self.declare_partials(of='V', wrt='I*', method='fd')
+
+                self.input_file = 'node_input.dat'
+                self.output_file = 'node_output.dat'
+
+                # providing these is optional; the component will verify that any input
+                # files exist before execution and that the output files exist after.
+                self.options['external_input_files'] = [self.input_file, ]
+                self.options['external_output_files'] = [self.output_file, ]
+
+                self.options['command'] = [
+                    'python', 'extcode_node.py', self.input_file, self.output_file
+                ]
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                with open(self.input_file, 'w') as input_file:
+                    n_in = self.options['n_in']
+                    input_file.write('{}\n'.format(n_in))
+                    for i_conn in range(n_in):
+                        input_file.write('{}\n'.format(inputs['I_in:{}'.format(i_conn)][0] ))
+                    n_out = self.options['n_out']
+                    input_file.write('{}\n'.format(n_out))
+                    for i_conn in range(n_out):
+                        input_file.write('{}\n'.format(inputs['I_out:{}'.format(i_conn)][0] ))
+
+                # the parent apply_nonlinear function actually runs the external code
+                super(NodeExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
+
+                # parse the output file from the external code and set the value of I
+                with open(self.output_file, 'r') as output_file:
+                    resid_V = float(output_file.read())
+
+                residuals['V'] = resid_V
+
+        class Circuit(Group):
+
+            def setup(self):
+                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
+                self.add_subsystem('n2', NodeExternalCodeComp())  # leaving defaults
+
+                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
+                self.add_subsystem('R2', ResistorExternalCodeComp(R=10000.))
+                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
+
+                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
+                self.connect('R1.I', 'n1.I_out:0')
+                self.connect('R2.I', 'n1.I_out:1')
+
+                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
+                self.connect('R2.I', 'n2.I_in:0')
+                self.connect('D1.I', 'n2.I_out:0')
+
+                self.nonlinear_solver = NewtonSolver()
+                self.nonlinear_solver.options['iprint'] = 2
+                self.nonlinear_solver.options['maxiter'] = 20
+                self.linear_solver = DirectSolver()
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        p.setup(check=True)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+
+        # sanity check: should sum to .1 Amps
+        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+
+
+
 
 if __name__ == "__main__":
     unittest.main()

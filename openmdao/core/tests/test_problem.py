@@ -9,7 +9,7 @@ import numpy as np
 
 from openmdao.core.group import get_relevant_vars
 from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
-     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
+    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -80,7 +80,7 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, totals[('comp.f_xy','p1.x')][0][0], -4.0)
         assert_rel_error(self, totals[('comp.f_xy','p2.y')][0][0], 3.0)
 
-        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format= 'dict')
+        totals = prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'], return_format='dict')
         assert_rel_error(self, totals['comp.f_xy']['p1.x'][0][0], -4.0)
         assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
@@ -596,7 +596,7 @@ class TestProblem(unittest.TestCase):
                                                          yy={'units': 'degC'}),
                                         promotes=['xx', 'yy'])
         comp = prob.model.add_subsystem('acomp', ExecComp('y=x-25.', x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                         y={'units': 'degC'}))
+                                                          y={'units': 'degC'}))
         comp = prob.model.add_subsystem('aprom', ExecComp('ayy=axx-25.', axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
                                                           ayy={'units': 'degC'}),
                                         promotes=['axx', 'ayy'])
@@ -745,7 +745,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
         comp = prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
-                                                         y={'shape' : (2, ), 'units': 'm'}))
+                                                         y={'shape': (2, ), 'units': 'm'}))
 
         prob.setup()
         prob.run_model()
@@ -896,6 +896,29 @@ class TestProblem(unittest.TestCase):
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting RuntimeError')
+
+    def test_run_with_invalid_prefix(self):
+        # Test error message when running with invalid prefix.
+
+        msg = "The 'case_prefix' argument should be a string."
+
+        prob = Problem()
+
+        try:
+            prob.setup()
+            prob.run_model(case_prefix=1234)
+        except TypeError as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Expecting TypeError')
+
+        try:
+            prob.setup()
+            prob.run_driver(case_prefix=12.34)
+        except TypeError as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail('Expecting TypeError')
 
     def test_root_deprecated(self):
         # testing the root property
@@ -1293,30 +1316,32 @@ class TestProblem(unittest.TestCase):
         sys.stdout = strout
         try:
             prob.list_problem_vars(
-                                   desvar_opts=['lower', 'upper', 'ref', 'ref0',
-                                                'indices', 'adder', 'scaler',
-                                                'parallel_deriv_color',
-                                                'vectorize_derivs', 'simul_deriv_color',
-                                                'cache_linear_solution'],
-                                   cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
-                                              'indices', 'adder', 'scaler', 'linear',
-                                              'parallel_deriv_color',
-                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
-                                              'cache_linear_solution'],
-                                   objs_opts=['ref', 'ref0',
-                                              'indices', 'adder', 'scaler',
-                                              'parallel_deriv_color',
-                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
-                                              'cache_linear_solution'],
-                                   )
+                desvar_opts=['lower', 'upper', 'ref', 'ref0',
+                             'indices', 'adder', 'scaler',
+                             'parallel_deriv_color',
+                             'vectorize_derivs', 'simul_deriv_color',
+                             'cache_linear_solution'],
+                cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
+                           'indices', 'adder', 'scaler', 'linear',
+                           'parallel_deriv_color',
+                           'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                           'cache_linear_solution'],
+                objs_opts=['ref', 'ref0',
+                           'indices', 'adder', 'scaler',
+                           'parallel_deriv_color',
+                           'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                           'cache_linear_solution'],
+            )
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[3],'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
-                         'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
-                         'vectorize_derivs\s+simul_deriv_color\s+cache_linear_solution')
-        assertRegex(self, output[5],'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
-                         'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
+        assertRegex(self, output[3],
+                    '^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
+                    'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
+                    'vectorize_derivs\s+simul_deriv_color\s+cache_linear_solution')
+        assertRegex(self, output[5],
+                    '^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                    'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
 
         # With all the optional columns and print_arrays
         stdout = sys.stdout
@@ -1385,6 +1410,7 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs', 'simul_deriv_color', 'simul_map',
                                           'cache_linear_solution'],
                                )
+
 
 if __name__ == "__main__":
     unittest.main()

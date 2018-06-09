@@ -385,10 +385,10 @@ class TestJacobianFeatures(unittest.TestCase):
         assert_rel_error(self, totals, expected_totals, 1e-6)
 
         expected_subjacs = {
-            ('units.flow:T', 'units.T'): [[-1.]],
+            ('units.flow:T', 'units.T'): [[1.]],
             ('units.flow:P', 'units.T'): [[0.]],
             ('units.flow:T', 'units.P'): [[0.]],
-            ('units.flow:P', 'units.P'): [[-1.]],
+            ('units.flow:P', 'units.P'): [[1.]],
         }
 
         jac = units._jacobian._subjacs
@@ -445,7 +445,8 @@ class TestJacobianForDocs(unittest.TestCase):
         model.add_subsystem('input_comp', comp, promotes=['x', 'y1', 'y2', 'y3', 'z'])
 
         problem = Problem(model=model)
-        model.suppress_solver_output = True
+        problem.set_solver_print(0)
+
         model.linear_solver = DirectSolver()
         model.jacobian = DenseJacobian()
         model.add_subsystem('simple', SimpleCompConst(),

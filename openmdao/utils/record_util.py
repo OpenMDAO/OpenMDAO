@@ -33,7 +33,7 @@ def create_local_meta(name):
     return local_meta
 
 
-def format_iteration_coordinate(coord):
+def format_iteration_coordinate(coord, prefix=None):
     """
     Format the iteration coordinate to a human-readable string.
 
@@ -41,6 +41,9 @@ def format_iteration_coordinate(coord):
     ----------
     coord : list
         List containing the iteration coordinate.
+
+    prefix : str or None
+        Prefix to prepend to iteration coordinates.
 
     Returns
     -------
@@ -58,7 +61,12 @@ def format_iteration_coordinate(coord):
         coord_str = iteration_number_separator.join(iter_str)
         iteration_coordinate.append(coord_str)
 
-    return ':'.join(["rank%d" % coord[0], separator.join(iteration_coordinate)])
+    if prefix:
+        prefix = "%s_rank%d" % (prefix, coord[0])
+    else:
+        prefix = "rank%d" % (coord[0])
+
+    return ':'.join([prefix, separator.join(iteration_coordinate)])
 
 
 def is_valid_sqlite3_db(filename):

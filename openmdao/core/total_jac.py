@@ -679,7 +679,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[idx]
         if loc_idx != -1:
-            self.input_vec[vecname]._views_flat[input_name][loc_idx] = 1.0
+            self.input_vec[vecname]._views_flat[input_name][loc_idx] = -1.0
 
         if cache_lin_sol:
             return rel_systems, (vecname,), idx
@@ -778,7 +778,7 @@ class _TotalJacInfo(object):
         for col, i in enumerate(inds):
             loc_idx = in_loc_idxs[i]
             if loc_idx != -1:
-                dinputs._views_flat[input_name][loc_idx, col] = 1.0
+                dinputs._views_flat[input_name][loc_idx, col] = -1.0
 
         if cache_lin_sol:
             return rel_systems, (vec_name,), inds[0]
@@ -825,9 +825,9 @@ class _TotalJacInfo(object):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
                     if ncol > 1:
-                        dinputs._views_flat[input_name][loc_idx, col] = 1.0
+                        dinputs._views_flat[input_name][loc_idx, col] = -1.0
                     else:
-                        dinputs._views_flat[input_name][loc_idx] = 1.0
+                        dinputs._views_flat[input_name][loc_idx] = -1.0
 
         if cache:
             return all_rel_systems, vec_names, inds[0][0]
@@ -1226,8 +1226,13 @@ class _TotalJacInfo(object):
         """
         Print out the derivatives when debug_print is True.
         """
-        inputs = self.input_list
-        outputs = self.output_list
+        if self.mode == 'fwd':
+            outputs = self.input_list
+            inputs = self.output_list
+        else:
+            inputs = self.input_list
+            outputs = self.output_list
+
         if self.return_format == 'dict':
             J = self.J_dict
             for of in inputs:
@@ -1239,6 +1244,9 @@ class _TotalJacInfo(object):
             in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
             out_meta = self.out_meta
             J = self.J
+
+            if self.mode == 'fwd':
+                in_meta, out_meta = out_meta, in_meta
 
             for i, of in enumerate(outputs):
                 out_slice = out_meta[of][0]
@@ -1280,7 +1288,7 @@ def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
             tot = tot[:, wrt_idx[prom_in]]
         return tot
     else:
-        return -jac
+        return jac
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

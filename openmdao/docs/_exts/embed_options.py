@@ -49,9 +49,11 @@ class EmbedOptionsDirective(Directive):
             lines.append(line, "options table", n)
             n += 1
 
-        lines.append("", "options table", n+1)  # Blank line required after table.
-        lines.append("Note: Options can be passed as keyword arguments at initialization.",
-                     "options table", n+2)
+        # Note applicable to System, Solver and Driver 'options', but not to 'recording_options'
+        if attribute_name != 'recording_options':
+            lines.append("", "options table", n+1)  # Blank line required after table.
+            lines.append("Note: Options can be passed as keyword arguments at initialization.",
+                         "options table", n+2)
 
         # Create a node.
         node = nodes.section()
