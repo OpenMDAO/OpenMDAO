@@ -830,6 +830,7 @@ class Component(System):
 
                 if is_scalar:
                     val = np.full(rows.size, val, dtype=float)
+                    is_scalar = False
                 elif val is not None:
                     # np.promote_types will choose the smallest dtype that can contain
                     # both arguments

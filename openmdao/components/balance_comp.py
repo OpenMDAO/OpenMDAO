@@ -156,10 +156,8 @@ class BalanceComp(ImplicitComponent):
             self._dscale_drhs = np.ones(n)
 
             ar = np.arange(n)
-            self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar,
-                                  val=np.ones(n))
-            self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar,
-                                  val=np.ones(n))
+            self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
+            self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
 
             if options['use_mult']:
                 self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
