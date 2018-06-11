@@ -8,7 +8,7 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, ExecComp, \
-     NewtonSolver, BalanceComp, DenseJacobian, ExplicitComponent, CSCJacobian
+     NewtonSolver, BalanceComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -90,7 +90,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         d_residuals.set_const(1.0)
         d_outputs.set_const(0.0)
-        g1._linearize()
+        g1._linearize(g1._assembled_jac)
+        g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
@@ -202,8 +203,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver()
-        teg.jacobian = DenseJacobian()
+        teg.linear_solver = DirectSolver(assemble_jac=True)
+        teg.options['assembled_jac_type'] = 'dense'
 
         teg.nonlinear_solver = NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True
@@ -240,8 +241,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver()
-        teg.jacobian = CSCJacobian()
+        teg.linear_solver = DirectSolver(assemble_jac=True)
 
         teg.nonlinear_solver = NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True
@@ -345,8 +345,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c4.y', 'c5.x')
         model.connect('c4.y2', 'c6.x')
 
-        model.linear_solver = DirectSolver()
-        model.jacobian = CSCJacobian()
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.setup()
         prob.run_model()
@@ -360,7 +359,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_raise_error_on_nan_dense(self):
 
-        prob = Problem()
+        prob = Problem(model=Group(assembled_jac_type='dense'))
         model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', 2.0))
@@ -379,8 +378,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c4.y', 'c5.x')
         model.connect('c4.y2', 'c6.x')
 
-        model.linear_solver = DirectSolver()
-        model.jacobian = DenseJacobian()
+        model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.setup()
         prob.run_model()

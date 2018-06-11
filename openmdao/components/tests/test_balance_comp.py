@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
-    NewtonSolver, DirectSolver, DenseJacobian
+    NewtonSolver, DirectSolver
 from openmdao.api import BalanceComp
 from openmdao.utils.general_utils import printoptions
 
@@ -104,7 +104,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -124,13 +124,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -151,7 +147,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -175,13 +171,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -206,7 +198,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp('x', val=np.ones(n), use_mult=True, mult_val=2.0)
 
@@ -224,13 +216,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -251,7 +239,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -271,13 +259,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -298,7 +282,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -318,13 +302,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -345,7 +325,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -369,13 +349,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -397,7 +373,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp('x', rhs_val=4.0)
 
@@ -410,13 +386,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -437,7 +409,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -461,13 +433,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -488,7 +456,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 1
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -512,13 +480,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.XSQ')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -538,9 +502,9 @@ class TestBalanceComp(unittest.TestCase):
     def test_feature_scalar(self):
         from numpy.testing import assert_almost_equal
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
-            DirectSolver, DenseJacobian, BalanceComp
+            DirectSolver, BalanceComp
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -564,13 +528,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
 
@@ -586,9 +546,9 @@ class TestBalanceComp(unittest.TestCase):
     def test_feature_scalar_with_default_mult(self):
         from numpy.testing import assert_almost_equal
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
-            DirectSolver, DenseJacobian, BalanceComp
+            DirectSolver, BalanceComp
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         bal = BalanceComp()
 
@@ -608,13 +568,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
 
@@ -631,12 +587,11 @@ class TestBalanceComp(unittest.TestCase):
         import numpy as np
         from numpy.testing import assert_almost_equal
 
-        from openmdao.api import Problem, Group, ExecComp, NewtonSolver, DirectSolver, \
-            DenseJacobian, BalanceComp
+        from openmdao.api import Problem, Group, ExecComp, NewtonSolver, DirectSolver, BalanceComp
 
         n = 100
 
-        prob = Problem(model=Group())
+        prob = Problem(model=Group(assembled_jac_type='dense'))
 
         exec_comp = ExecComp('y=b*x+c',
                              b={'value': np.random.uniform(0.01,100, size=n)},
@@ -651,13 +606,9 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
-
-        prob.model.jacobian = DenseJacobian()
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
 

@@ -90,13 +90,13 @@ class COOMatrix(Matrix):
                 ind2 = counter
                 locations[loc] = (ind1, ind2, key)
 
-            pre_metadata[key] = (ind1, ind2, dense)
+            pre_metadata[key] = (ind1, ind2, dense, rows)
 
         data = np.zeros(counter)
         rows = np.empty(counter, dtype=int)
         cols = np.empty(counter, dtype=int)
 
-        for key, (ind1, ind2, dense) in iteritems(pre_metadata):
+        for key, (ind1, ind2, dense, jrows) in iteritems(pre_metadata):
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
@@ -122,14 +122,13 @@ class COOMatrix(Matrix):
                 subcols += icol
 
             else:  # sparse
-                if isinstance(val, sparse_types):
+                if jrows is None:
                     jac_type = type(val)
                     jac = val.tocoo()
                     jrows = jac.row
                     jcols = jac.col
                 else:
                     jac_type = list
-                    jrows = info['rows']
                     jcols = info['cols']
 
                 if src_indices is None:
@@ -183,17 +182,15 @@ class COOMatrix(Matrix):
             the sub-jacobian, the same format with which it was declared.
         """
         idxs, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type):
+        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
             self._matrix.data[idxs] = jac.flat
-        elif isinstance(jac, sparse_types):
+        else:  # sparse
             self._matrix.data[idxs] = jac.data
-        else:  # list format  [data, rows, cols]
-            self._matrix.data[idxs] = jac[0]
 
         if factor is not None:
             self._matrix.data[idxs] *= factor
@@ -210,17 +207,15 @@ class COOMatrix(Matrix):
             the sub-jacobian, the same format with which it was declared.
         """
         idxs, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type):
+        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
             val = jac.flatten()
-        elif isinstance(jac, sparse_types):
+        else:  # sparse
             val = jac.data
-        else:  # list format  [data, rows, cols]
-            val = jac[0]
 
         if factor is not None:
             self._matrix.data[idxs] += val * factor
@@ -323,7 +318,7 @@ class COOMatrix(Matrix):
             mask = np.ones(self._matrix.data.size, dtype=np.bool)
             for key, val in iteritems(self._key_ranges):
                 if key[1] in input_names:
-                    ind1, ind2, _ = val
+                    ind1, ind2, _, _ = val
                     mask[ind1:ind2] = False
 
             return mask

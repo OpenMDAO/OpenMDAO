@@ -161,14 +161,12 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
         If a subsystem of group is found to be using approximated partials.
 
     """
-    groups_with_dict_jacobians = []
-    msg = 'The following groups use dictionary jacobians:\n'
+    parts = ['The following groups use dictionary jacobians:\n']
     for s in system.system_iter(include_self=include_self, recurse=recurse, typ=Group):
-        if isinstance(s.jacobian, DictionaryJacobian):
-            groups_with_dict_jacobians.append(s.pathname)
-    msg = msg + '\n'.join(['    ' + s for s in groups_with_dict_jacobians])
-    if groups_with_dict_jacobians:
-        raise AssertionError(msg)
+        if isinstance(s._jacobian, DictionaryJacobian):
+            parts.append('    ' + s.pathname)
+    if len(parts) > 1:
+        raise AssertionError('\n'.join(parts))
 
 
 def assert_rel_error(test_case, actual, desired, tolerance=1e-15):

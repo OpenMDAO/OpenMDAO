@@ -46,7 +46,7 @@ In other words, there will be non-zero entries both above and below the diagonal
     :align: center
     :width: 50%
 
-    The linear solver for a coupled system must be solved using either a direct factorization or an iterative linear solver.
+    The linear system of a coupled model must be solved using either a direct factorization or an iterative linear solver.
 
 Consequently, these linear systems **cannot** be solved with the :ref:`LinearRunOnce<lnrunonce>`.
 There are two basic categories of linear solver that can be used in this situation:

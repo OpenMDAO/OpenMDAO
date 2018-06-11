@@ -78,8 +78,7 @@ class ExplicitCycleComp(ExplicitComponent):
 
     def initialize(self):
         self.options.declare('jacobian_type', default='matvec',
-                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr',
-                                      'sparse-csc'],
+                              values=['matvec', 'dense', 'sparse-csc'],
                               desc='method of assembling derivatives')
         self.options.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
