@@ -169,7 +169,7 @@ def _get_full_disjoint_rows(J, start, end):
         return {}, {}
 
     disjoints = defaultdict(set)
-    cols = [None] * J.shape[1]  # will contain list of nonzero cols for each row
+    cols = [None] * J.shape[0]  # will contain list of nonzero cols for each row
     for r1, r2 in combinations(range(start, end + 1), 2):  # loop over row pairs
         # 'and' two rows together. If we get all False, then rows have disjoint column sets
         if not np.any(J[r1, :] & J[r2, :]):
@@ -312,60 +312,6 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model
     boolJ[fullJ > good_tol] = True
 
     return boolJ
-
-
-def _find_global_disjoint_cols(prob, J):
-    """
-    Find sets of disjoint columns in the total jac and their corresponding rows.
-
-    Parameters
-    ----------
-    prob : Problem
-        The Problem being analyzed.
-    J : ndarray
-        Boolean total jacobian (True for nonzero values).
-
-    Returns
-    -------
-    tuple
-        Tuple of the form (disjoint_col_sets, rows_per_col)
-    """
-    full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
-
-    uncolored = [i for i, r in enumerate(rows) if r is None]
-
-    print("%d uncolored columns" % len(uncolored))
-    for color, cols in enumerate(full_disjoint):
-        print("%d columns in color %d" % (len(cols), color + 1))
-
-    return full_disjoint, rows
-
-
-def _find_global_disjoint_rows(prob, J):
-    """
-    Find sets of disjoint rows in the total jac and their corresponding cols.
-
-    Parameters
-    ----------
-    prob : Problem
-        The Problem being analyzed.
-    J : ndarray
-        Boolean total jacobian (True for nonzero values).
-
-    Returns
-    -------
-    tuple
-        Tuple of the form (disjoint_row_sets, cols_per_col)
-    """
-    full_disjoint, cols = _get_full_disjoint_rows(J, 0, J.shape[1] - 1)
-
-    uncolored = [i for i, r in enumerate(cols) if r is None]
-
-    print("%d uncolored rows" % len(uncolored))
-    for color, rows in enumerate(full_disjoint):
-        print("%d rows in color %d" % (len(rows), color + 1))
-
-    return full_disjoint, rows
 
 
 def _sparsity_from_jac(J, of, wrt, driver):
@@ -613,23 +559,35 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
                       run_model=run_model)
 
     if mode == 'fwd':
-        full_disjoint, rows = _find_global_disjoint_cols(problem, J)
+        full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
         uncolored_cols = [i for i, r in enumerate(rows) if r is None]
+
+        print("%d uncolored columns" % len(uncolored_cols))
+        for color, cols in enumerate(full_disjoint):
+            print("%d columns in color %d" % (len(cols), color + 1))
 
         # the first col_list entry corresponds to all uncolored columns (columns that are not disjoint
         # wrt any other columns).  The other entries are groups of columns that do not share any
         # nonzero row entries in common.
         col_lists = [uncolored_cols]
         col_lists.extend(full_disjoint)
+        lists = col_lists
+        other = rows
     elif mode == 'rev':
-        full_disjoint, cols = _find_global_disjoint_rows(problem, J)
+        full_disjoint, cols = _get_full_disjoint_rows(J, 0, J.shape[0] - 1)
         uncolored_rows = [i for i, r in enumerate(cols) if r is None]
+
+        print("%d uncolored rows" % len(uncolored_rows))
+        for color, rows in enumerate(full_disjoint):
+            print("%d rows in color %d" % (len(rows), color + 1))
 
         # the first row_list entry corresponds to all uncolored rows (rows that are not disjoint
         # wrt any other rows).  The other entries are groups of rows that do not share any
         # nonzero column entries in common.
         row_lists = [uncolored_rows]
         row_lists.extend(full_disjoint)
+        lists = row_lists
+        other = cols
     else:
         raise RuntimeError("get_simul_meta: invalid mode: '%s'" % mode)
 
@@ -662,7 +620,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
             s.write("\n\n")
             array_viz(J, problem, of, wrt, s)
 
-    return col_lists, rows, sparsity
+    return lists, other, sparsity
 
 
 def simul_coloring_summary(problem, color_info, stream=sys.stdout):
@@ -698,7 +656,7 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
         for obj in objs:
             tot_size += objs[obj]['size']
         for con in nl_cons:
-            tot_size += cons[con]['size']
+            tot_size += con['size']
 
     if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
