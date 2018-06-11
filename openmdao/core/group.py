@@ -1812,7 +1812,7 @@ class Group(System):
         Parameters
         ----------
         recurse : bool
-            If True, setup jacobians i descendants.
+            If True, setup jacobians in all descendants.
         """
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)

@@ -1223,7 +1223,7 @@ class System(object):
         Parameters
         ----------
         recurse : bool
-            If True, setup jacobians i descendants.
+            If True, setup jacobians in all descendants.
         """
         asm_jac_solvers = set()
         if self._linear_solver is not None:
