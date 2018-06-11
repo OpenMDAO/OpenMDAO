@@ -108,7 +108,7 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton_assembled(self):
 
-        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, CSCJacobian
+        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
 
         from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
 
@@ -133,12 +133,11 @@ class TestCircuit(unittest.TestCase):
                 self.nonlinear_solver = NewtonSolver()
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
-                self.linear_solver = DirectSolver()
-
-                ##############################
-                # Assemble at the group level
-                ##############################
-                self.jacobian = CSCJacobian()
+                ##################################################################
+                # Assemble at the group level. Default assembled jac type is 'csc'
+                ##################################################################
+                self.options['assembled_jac_type'] = 'csc'
+                self.linear_solver = DirectSolver(assemble_jac=True)
 
         p = Problem()
         model = p.model

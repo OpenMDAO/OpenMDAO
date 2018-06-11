@@ -64,7 +64,7 @@ class TestNumpyVec(unittest.TestCase):
 
     def setUp(self):
         group = GroupG()
-        self.p = Problem(group).setup(DefaultVector, check=False)
+        self.p = Problem(group).setup(check=False)
         self.p.final_setup()
 
     def test_prom_names(self):

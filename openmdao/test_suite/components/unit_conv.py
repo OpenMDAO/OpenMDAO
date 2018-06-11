@@ -168,8 +168,8 @@ class UnitConvGroup(Group):
     units degF, degC, and degK respectively. Good for testing unit
     conversion."""
 
-    def __init__(self):
-        super(UnitConvGroup, self).__init__()
+    def __init__(self, **kwargs):
+        super(UnitConvGroup, self).__init__(**kwargs)
 
         self.add_subsystem('px1', IndepVarComp('x1', 100.0))
         self.add_subsystem('src', SrcComp())
