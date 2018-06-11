@@ -13,12 +13,18 @@ New Features:
 - OpenMDAO command line utility now works under MPI.
 - `list_problem_vars()` method on problem will report all design vars, objectives, and constraints.
 - ExternalCodeComp has new option, `allowed_return_codes` to specify valid return codes.
+- User can provide a CSV file to the DOEDriver to run an arbitrary set of cases.
+- Components that request complex-step for partial derivative checks will now fall back to finite-difference if `force_alloc_complex=False`
+- You can now pass a case_prefix argument to run_model or run_driver to name the cases for case recording
+- SimpleGA driver can support models that need more than 1 proc
+- New CSV DOE generator for DOEDriver
+- Beam example problem now runs 20x faster
 
 - New Analytic Derivatives Features
     - Major re-write of the Feature documentation on the Core Feature, "Working with Analytic Derivatives."
-    - User can now assign AssembledJacobians. (Big speedup for a lot of lower-order or serial problems).
-    - Automatic calculation of total Jacobian sparsity for optimizers that support it (lower compute cost when using SNOPT).
-    - Automatic simultaneous coloring algorithm for separable problems to speed up serial derivatives calculations.
+    - User can now set AssembledJacobians for linear solvers. (Big speedup for a lot of lower-order or serial problems).
+    - Automatic calculation of total Jacobian sparsity for fwd derivatives for optimizers that support it (lower compute cost when using SNOPT).
+    - Automatic simultaneous coloring algorithm for separable problems to speed up derivatives calculations.
     - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers
     - check_partials now allows you to use `includes` and `excludes` to limit which components get checked.
 
@@ -54,6 +60,8 @@ Backwards-Compatible API Changes:
 
 - check_totals and check_partials no longer support the `supress_output` argument. Use `out_stream=None` instead.
 - `comps` argument in check_partials was replaced with `includes` and `excludes` arguments.
+
+- Option that controls the parallel behavior for DOEdriver was changed 'procs_per_model' from 'parallel'
 
 Backwards-Incompatible API changes:
 -----------------------------------
