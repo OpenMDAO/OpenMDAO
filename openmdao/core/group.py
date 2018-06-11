@@ -1802,17 +1802,12 @@ class Group(System):
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
 
-    def _setup_jacobians(self, parent_asm_jac=None):
+    def _setup_jacobians(self):
         """
         Set and populate jacobians down through the system tree.
 
         In <Group>, we only need to prepare for Group finite difference. However, to be efficient,
         we need to find the minimum set of inputs and outputs to approximate.
-
-        Parameters
-        ----------
-        parent_asm_jac : AssembledJacobian or None
-            The assembled jacobian from a parent group to populate for this system.
         """
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
@@ -1901,7 +1896,7 @@ class Group(System):
 
             approx._init_approximations()
 
-        super(Group, self)._setup_jacobians(parent_asm_jac)
+        super(Group, self)._setup_jacobians()
 
     def compute_sys_graph(self, comps_only=False):
         """

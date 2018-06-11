@@ -1217,14 +1217,9 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_solvers(recurse=recurse)
 
-    def _setup_jacobians(self, parent_asm_jac=None):
+    def _setup_jacobians(self):
         """
         Set and populate jacobians down through the system tree.
-
-        Parameters
-        ----------
-        parent_asm_jac : AssembledJacobian or None
-            The assembled jacobian from a parent group to populate for this system.
         """
         asm_jac_solvers = set()
         if self._linear_solver is not None:
@@ -1238,7 +1233,6 @@ class System(object):
         if asm_jac_solvers:
             asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
             self._assembled_jac = asm_jac
-            self._views_assembled_jac = True
             for s in asm_jac_solvers:
                 s._assembled_jac = asm_jac
 
@@ -1247,12 +1241,6 @@ class System(object):
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
-
-        self._views_assembled_jac = False
-        if not self._owns_approx_jac:
-            nl = self._nonlinear_solver
-            if nl is not None and nl.supports['gradients']:
-                self._views_assembled_jac = True
 
         # note that for a Group, _set_partials_meta does nothing
         self._set_partials_meta()
@@ -1263,11 +1251,8 @@ class System(object):
             if self.matrix_free:
                 raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
-            for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(asm_jac)
-        else:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians(parent_asm_jac)
+        for subsys in self._subsystems_myproc:
+            subsys._setup_jacobians()
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
