@@ -6,6 +6,8 @@ import shutil
 import tempfile
 import unittest
 
+from scipy.optimize import fsolve
+
 from openmdao.api import Problem, Group, ExternalCodeComp, AnalysisError
 from openmdao.components.external_code_comp import STDOUT
 
@@ -13,6 +15,28 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
+# These next three functions are used by test_simple_external_code_implicit_comp_with_solver
+def area_ratio_explicit(Mach):
+    """isentropic relationship between area ratio and Mach number"""
+    gamma = 1.4
+    gamma_p_1 = gamma + 1
+    gamma_m_1 = gamma - 1
+    exponent = gamma_p_1 / (2 * gamma_m_1)
+    return (gamma_p_1 / 2.) ** -exponent * (
+            (1 + gamma_m_1 / 2. * Mach ** 2) ** exponent) / Mach
+
+def mach_residual(Mach, area_ratio_target):
+    return area_ratio_target - area_ratio_explicit(Mach)
+
+def mach_solve(area_ratio, super_sonic=False):
+    if super_sonic:
+        initial_guess = 4
+    else:
+        initial_guess = .1
+
+    mach = fsolve(func=mach_residual, x0=initial_guess, args=(area_ratio,))[0]
+
+    return mach
 
 class TestExternalCodeComp(unittest.TestCase):
 
@@ -525,7 +549,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         os.chdir(self.tempdir)
 
         # copy required files to temp dir
-        files = ['extcode_resistor.py', 'extcode_node.py']
+        files = ['extcode_resistor.py', 'extcode_node.py', 'extcode_mach.py']
         for filename in files:
             shutil.copy(os.path.join(DIRECTORY, filename),
                         os.path.join(self.tempdir, filename))
@@ -538,6 +562,177 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         except OSError:
             pass
 
+    # def test_simple_external_code_implicit_comp(self):
+    #     from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
+    #     from openmdao.test_suite.test_examples.test_circuit_analysis import Diode, Node, Resistor
+    #     from openmdao.components.external_code_comp import ExternalCodeComp, \
+    #         ExternalCodeImplicitComp
+    #     from scipy.optimize import fsolve
+    #
+    #     gamma = 1.4
+    #
+    #     class MachExternalCodeComp(ExternalCodeImplicitComp):
+    #
+    #         def initialize(self):
+    #             pass
+    #
+    #         def setup(self):
+    #             self.add_input('area_ratio', val=5., units=None)
+    #             self.add_output('mach', val=5., units=None)
+    #             self.declare_partials(of='mach', wrt='area_ratio', method='fd')
+    #
+    #             self.input_file = 'mach_input.dat'
+    #             self.output_file = 'mach_output.dat'
+    #             self.residual_file = 'mach_residual.dat'
+    #
+    #             # providing these is optional; the component will verify that any input
+    #             # files exist before execution and that the output files exist after.
+    #             self.options['external_input_files'] = [self.input_file, ]
+    #             self.options['external_output_files'] = [self.output_file, self.residual_file]
+    #
+    #             self.options['command'] = [
+    #                 'python', 'extcode_mach.py', self.input_file, self.output_file,
+    #                 self.residual_file
+    #             ]
+    #
+    #         def apply_nonlinear(self, inputs, outputs, residuals):
+    #             with open(self.input_file, 'w') as input_file:
+    #                 input_file.write('{}\n'.format(inputs['area_ratio'][0]))
+    #
+    #             # the parent apply_nonlinear function actually runs the external code
+    #             super(MachExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
+    #
+    #             # parse the output file from the external code and set the value of area_ratio
+    #             with open(self.output_file, 'r') as output_file:
+    #                 area_ratio = float(output_file.read())
+    #
+    #             residuals['mach'] = area_ratio
+    #
+    #         def solve_nonlinear(self, inputs, outputs):
+    #             with open(self.input_file, 'w') as input_file:
+    #                 input_file.write('{}\n'.format(inputs['area_ratio'][0]))
+    #
+    #             # the parent apply_nonlinear function actually runs the external code
+    #             super(MachExternalCodeComp, self).solve_nonlinear(inputs, outputs)
+    #
+    #             # parse the output file from the external code and set the value of area_ratio
+    #             with open(self.output_file, 'r') as output_file:
+    #                 area_ratio = float(output_file.read())
+    #
+    #             outputs['mach'] = area_ratio
+    #
+    #     def area_ratio_explicit(Mach):
+    #         """isentropic relationship between area ratio and Mach number"""
+    #         gamma_p_1 = gamma + 1
+    #         gamma_m_1 = gamma - 1
+    #         exponent = gamma_p_1 / (2 * gamma_m_1)
+    #         return (gamma_p_1 / 2.) ** -exponent * (
+    #                 (1 + gamma_m_1 / 2. * Mach ** 2) ** exponent) / Mach
+    #
+    #     def mach_residual(Mach, area_ratio_target):
+    #         return area_ratio_target - area_ratio_explicit(Mach)
+    #
+    #     def mach_solve(area_ratio, super_sonic=False):
+    #         if super_sonic:
+    #             initial_guess = 4
+    #         else:
+    #             initial_guess = .1
+    #
+    #         mach = fsolve(func=mach_residual, x0=initial_guess, args=(area_ratio,))[0]
+    #
+    #         return mach
+    #
+    #     p = Problem()
+    #     mach = 0.5
+    #     #  super_sonic=False ????????????????
+    #     comp = MachExternalCodeComp()
+    #     p.model.add_subsystem('comp', comp, promotes=['*'])
+    #     p.setup()
+    #
+    #     area_ratio = area_ratio_explicit(mach)
+    #
+    #     p['area_ratio'] = area_ratio
+    #     p.run_model()
+    #
+    #     assert_rel_error(self, p['mach'], mach, 1e-8)
+
+    def test_simple_external_code_implicit_comp_with_solver(self):
+        from openmdao.api import Group, NewtonSolver, Problem, IndepVarComp, ScipyKrylov
+        from openmdao.components.external_code_comp import ExternalCodeImplicitComp
+
+        class MachExternalCodeComp(ExternalCodeImplicitComp):
+
+            def initialize(self):
+                self.options.declare('super_sonic', types=bool)
+
+            def setup(self):
+                self.add_input('area_ratio', val=1.0, units=None)
+                self.add_output('mach', val=1., units=None)
+                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
+
+                self.input_file = 'mach_input.dat'
+                self.output_file = 'mach_output.dat'
+
+                # providing these are optional; the component will verify that any input
+                # files exist before execution and that the output files exist after.
+                self.options['external_input_files'] = [self.input_file, ]
+                self.options['external_output_files'] = [self.output_file,]
+
+                self.options['command'] = [
+                    'python', 'extcode_mach.py', self.input_file, self.output_file,
+                ]
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                with open(self.input_file, 'w') as input_file:
+                    input_file.write('residuals\n')
+                    input_file.write('{}\n'.format(inputs['area_ratio'][0]))
+                    input_file.write('{}\n'.format(outputs['mach'][0]))
+
+                # the parent apply_nonlinear function actually runs the external code
+                super(MachExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
+
+                # parse the output file from the external code and set the value of mach
+                with open(self.output_file, 'r') as output_file:
+                    mach = float(output_file.read())
+
+                residuals['mach'] = mach
+
+            def solve_nonlinear(self, inputs, outputs):
+                with open(self.input_file, 'w') as input_file:
+                    input_file.write('outputs\n')
+                    input_file.write('{}\n'.format(inputs['area_ratio'][0]))
+                    input_file.write('{}\n'.format(self.options['super_sonic']))
+                # the parent apply_nonlinear function actually runs the external code
+                super(MachExternalCodeComp, self).solve_nonlinear(inputs, outputs)
+
+                # parse the output file from the external code and set the value of mach
+                with open(self.output_file, 'r') as output_file:
+                    mach = float(output_file.read())
+
+                outputs['mach'] = mach
+
+        group = Group()
+        group.add_subsystem('ar', IndepVarComp('area_ratio', 0.5))
+        mach_comp = group.add_subsystem('comp', MachExternalCodeComp(), promotes=['*'])
+        prob = Problem(model=group)
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['solve_subsystems'] = True
+        group.linear_solver = ScipyKrylov()
+        prob.setup(check=False)
+
+        area_ratio = 1.3
+        super_sonic = False
+        prob['area_ratio'] = area_ratio
+        mach_comp.options['super_sonic'] = super_sonic
+        prob.run_model()
+        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
+
+        area_ratio = 1.3
+        super_sonic = True
+        prob['area_ratio'] = area_ratio
+        mach_comp.options['super_sonic'] = super_sonic
+        prob.run_model()
+        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
     def test_circuit_plain_newton_using_extcode(self):
         # Use external code for the resistor and node.
