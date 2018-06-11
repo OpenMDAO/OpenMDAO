@@ -571,16 +571,16 @@ class SparsityTestCase(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # unittest.main()
-    import sys
-    from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
-    mode = 'rev'
-    p = run_opt(pyOptSparseDriver, mode, None, optimizer='SLSQP', print_results=False)
-    Problem._post_setup_func = None  # avoid recursive loop
-    color_info = get_simul_meta(p,
-                                mode=mode,
-                                repeats=3,
-                                show_jac=True,
-                                include_sparsity=True,
-                                setup=True, run_model=True)
-    simul_coloring_summary(p, color_info, stream=sys.stdout)
+    unittest.main()
+    # import sys
+    # from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
+    # mode = 'rev'
+    # p = run_opt(pyOptSparseDriver, mode, None, optimizer='SLSQP', print_results=False)
+    # Problem._post_setup_func = None  # avoid recursive loop
+    # color_info = get_simul_meta(p,
+    #                             mode=mode,
+    #                             repeats=3,
+    #                             show_jac=True,
+    #                             include_sparsity=True,
+    #                             setup=True, run_model=True)
+    # simul_coloring_summary(p, color_info, stream=sys.stdout)
