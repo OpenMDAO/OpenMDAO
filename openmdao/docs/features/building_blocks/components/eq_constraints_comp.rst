@@ -45,8 +45,9 @@ as the ``add_eq_output`` method:
    :noindex:
 
 Note that the `kwargs` arguments can include any of the keyword arguments normally available
-when creatiing of an output variable using the
+when creating an output variable with the
 :meth:`add_output <openmdao.core.component.Component.add_output>` method of a `Component`.
+
 
 Example: Sellar IDF
 -------------------

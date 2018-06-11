@@ -38,7 +38,7 @@ Sparse Assembled Jacobian
 In the majority of cases, if an assembled Jacobian is appropriate for your model then you want to use the :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>`.
 The :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>` only allocates memory for the non-zero partial derivatives.
 How does OpenMDAO know which partials are non-zero?
-The authors of the components in your model declared them using either a :ref:`dense<feature_specify_partials>` or :ref:`sparse<feature_sparse_partials>` form of :code:`delcare_partials`.
+The authors of the components in your model declared them using either a :ref:`dense<feature_specify_partials>` or :ref:`sparse<feature_sparse_partials>` form of :code:`declare_partials`.
 
 Even if all of your components declared their partial derivatives as dense (or if they are all scalar variables and specifying sparsity doesn't have meaning), at the group level there is still a sparsity pattern to be taken advantage of.
 This sparsity arises from the way components are connected to one another, because unless there is a connection present, there is no need to allocate space associated with that portion of the Jacobian.
