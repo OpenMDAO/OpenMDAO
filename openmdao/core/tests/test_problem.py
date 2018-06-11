@@ -1319,17 +1319,17 @@ class TestProblem(unittest.TestCase):
                 desvar_opts=['lower', 'upper', 'ref', 'ref0',
                              'indices', 'adder', 'scaler',
                              'parallel_deriv_color',
-                             'vectorize_derivs', 'simul_deriv_color',
+                             'vectorize_derivs',
                              'cache_linear_solution'],
                 cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
                            'indices', 'adder', 'scaler', 'linear',
                            'parallel_deriv_color',
-                           'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                           'vectorize_derivs',
                            'cache_linear_solution'],
                 objs_opts=['ref', 'ref0',
                            'indices', 'adder', 'scaler',
                            'parallel_deriv_color',
-                           'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                           'vectorize_derivs',
                            'cache_linear_solution'],
             )
         finally:
@@ -1338,7 +1338,7 @@ class TestProblem(unittest.TestCase):
         assertRegex(self, output[3],
                     '^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
                     'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
-                    'vectorize_derivs\s+simul_deriv_color\s+cache_linear_solution')
+                    'vectorize_derivs\s+cache_linear_solution')
         assertRegex(self, output[5],
                     '^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
                     'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
@@ -1352,17 +1352,17 @@ class TestProblem(unittest.TestCase):
                                    desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                                 'indices', 'adder', 'scaler',
                                                 'parallel_deriv_color',
-                                                'vectorize_derivs', 'simul_deriv_color',
+                                                'vectorize_derivs',
                                                 'cache_linear_solution'],
                                    cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
                                               'indices', 'adder', 'scaler', 'linear',
                                               'parallel_deriv_color',
-                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'vectorize_derivs',
                                               'cache_linear_solution'],
                                    objs_opts=['ref', 'ref0',
                                               'indices', 'adder', 'scaler',
                                               'parallel_deriv_color',
-                                              'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                              'vectorize_derivs',
                                               'cache_linear_solution'],
                                    )
         finally:
@@ -1407,7 +1407,7 @@ class TestProblem(unittest.TestCase):
                                objs_opts=['ref', 'ref0',
                                           'indices', 'adder', 'scaler',
                                           'parallel_deriv_color',
-                                          'vectorize_derivs', 'simul_deriv_color', 'simul_map',
+                                          'vectorize_derivs',
                                           'cache_linear_solution'],
                                )
 
