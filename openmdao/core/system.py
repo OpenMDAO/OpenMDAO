@@ -13,7 +13,6 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
