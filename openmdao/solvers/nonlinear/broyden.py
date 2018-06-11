@@ -7,6 +7,7 @@ from __future__ import print_function
 
 import numpy as np
 
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -93,108 +94,94 @@ class BroydenSolver(NonlinearSolver):
         float
             Initial absolute error in the user-specified residuals.
         """
-        return super(BroydenSolver, self)._iter_initialize()
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+
+        system = self._system
+
+        # Execute guess_nonlinear if specified.
+        system._guess_nonlinear()
+
+        # Cache initial states.
+        self.xm = self.get_states()
+
+        with Recording('Broyden', 0, self):
+
+            self._solver_info.append_solver()
+
+            # should call the subsystems solve before computing the first residual
+            for isub, subsys in enumerate(system._subsystems_myproc):
+                system._transfer('nonlinear', 'fwd', isub)
+                subsys._solve_nonlinear()
+                system._check_reconf_update()
+
+            self._solver_info.pop()
+
+        self._run_apply()
+        norm = self._iter_get_norm()
+
+        norm0 = norm if norm != 0.0 else 1.0
+        return norm0, norm
+
+    def _iter_get_norm(self):
+        """
+        Return the norm of only the residuals requested in options.
+
+        Returns
+        -------
+        float
+            norm.
+        """
+        fxm = self.get_residuals()
+        return np.sum(fxm**2) ** 0.5
 
     def _iter_execute(self):
         """
         Perform the operations in the iteration loop.
         """
-        pass
+        system = self._system
+        Gm = self._update_jacobian()
+        fxm = self.fxm
 
-    def _compute_jacobian(self):
-        """
-        Compute the Jacobian for the state/residual equations specified in the options.
-        """
-        # Use Broyden Update.
-        if not self._recompute_jacobian:
-            dfxm = self.delta_fxm
-            Gm = self.Gm
-            Gm += (self.delta_xm - Gm * dfxm) * dfxm.T / np.linalg.norm(dfxm)**2
-            return
+        delta_xm = -Gm.dot(fxm)
+        xm = self.xm + delta_xm.T
 
-        # Solve for total derivatives of user-requested residuals wrt states.
-        if self.options['compute_initial_jacobian']:
-            # TODO: this
-            pass
+        # Update the new states in the model.
+        self.set_states(xm)
 
-        # Reset Jacobian to identiy scaled by alpha.
-        else:
-            self.Gm = -self.alpha * np.identity(self.n)
+        # Run the model.
+        with Recording('Broyden', 0, self):
+            self._solver_info.append_solver()
 
-    def get_states(self):
-        """
-        Return a vector containing the values of the states specified in options.
+            for isub, subsys in enumerate(system._subsystems_allprocs):
+                system._transfer('nonlinear', 'fwd', isub)
 
-        This is used to get the initial state guesses.
+                if subsys in system._subsystems_myproc:
+                    subsys._solve_nonlinear()
 
-        Returns
-        -------
-        ndarray
-            Array containing values of states.
-        """
-        states = self.options['state_vars']
-        xm = self.xm
-        outputs = self.system._outputs
-        i = 0
-        for name in states:
-            val = outputs[name]
-            n_size = len(val)
-            xm[i:i + n_size] = val
-            i += n_size
+            self._solver_info.pop()
 
-        return xm
+        self._run_apply()
 
-    def set_states(self):
-        """
-        Return a vector containing the values of the states specified in options.
+        fxm1 = fxm.copy()
+        fxm = self.get_residuals()
+        delta_fxm = fxm1 - fxm
 
-        This is used to get the initial state guesses.
+        # Determine whether to update Jacobian.
+        self._recompute_jacobian = False
 
-        Returns
-        -------
-        ndarray
-            Array containing values of states.
-        """
-        states = self.options['state_vars']
-        xm = self.xm
-        outputs = self.system._outputs
-        i = 0
-        for name in states:
-            val = outputs[name]
-            n_size = len(val)
-            xm[i:i + n_size] = val
-            i += n_size
+        # Cache for next jacobian update.
+        self.delta_xm = delta_xm
+        self.delta_fxm = delta_fxm
+        self.fxm = fxm
 
-    def get_residuals(self):
-        """
-        Return a vector containing the values of the residuals specified in options.
-
-        Returns
-        -------
-        ndarray
-            Array containing values of residuals.
-        """
-        states = self.options['state_vars']
-        fm = self.fm
-        residuals = self.system._residuals
-        i = 0
-        for name in states:
-            val = residuals[name]
-            n_size = len(val)
-            fm[i:i + n_size] = val
-            i += n_size
-
-        return fm
-
-"""
+    """
         xm = self.xin.T
         Fxm = numpy.matrix(self.F).T
         Gm = -self.alpha*numpy.matrix(numpy.identity(len(self.xin)))
 
         for n in range(self.itmax):
-
-            if self._stop:
-                self.raise_exception('Stop requested', RunStopped)
 
             deltaxm = -Gm*Fxm
             xm = xm + deltaxm.T
@@ -226,4 +213,93 @@ class BroydenSolver(NonlinearSolver):
 
             Fxm = Fxm1.copy()
             Gm = Gm + (deltaxm-Gm*deltaFxm)*deltaFxm.T/norm(deltaFxm)**2
-"""
+    """
+
+    def _update_jacobian(self):
+        """
+        Update the Jacobian for a new Broyden iteration.
+
+        Returns
+        -------
+        ndarray
+            Updated Jacobian.
+        """
+        # Use Broyden Update.
+        if not self._recompute_jacobian:
+            dfxm = self.delta_fxm
+            Gm = self.Gm
+            Gm += (self.delta_xm - Gm * dfxm) * dfxm.T / np.linalg.norm(dfxm)**2
+
+        # Solve for total derivatives of user-requested residuals wrt states.
+        elif self.options['compute_initial_jacobian']:
+            # TODO: do this
+            pass
+
+        # Reset Jacobian to identiy scaled by alpha.
+        else:
+            Gm = -self.options['alpha'] * np.identity(self.n)
+
+        return Gm
+
+    def get_states(self):
+        """
+        Return a vector containing the values of the states specified in options.
+
+        This is used to get the initial state guesses.
+
+        Returns
+        -------
+        ndarray
+            Array containing values of states.
+        """
+        states = self.options['state_vars']
+        xm = self.xm
+        outputs = self._system._outputs
+        i = 0
+        for name in states:
+            val = outputs[name]
+            n_size = len(val)
+            xm[i:i + n_size] = val
+            i += n_size
+
+        return xm
+
+    def set_states(self, new_val):
+        """
+        Set new values for states specified in options.
+
+        Parameters
+        ----------
+        new_val : ndarray
+            New values for states.
+        """
+        states = self.options['state_vars']
+        outputs = self._system._outputs
+        i = 0
+        for name in states:
+            val = outputs[name]
+            n_size = len(val)
+            outputs[name] = new_val[i:i + n_size]
+            i += n_size
+
+    def get_residuals(self):
+        """
+        Return a vector containing the values of the residuals specified in options.
+
+        Returns
+        -------
+        ndarray
+            Array containing values of residuals.
+        """
+        states = self.options['state_vars']
+        fxm = self.fxm
+        residuals = self._system._residuals
+        i = 0
+        for name in states:
+            val = residuals[name]
+            n_size = len(val)
+            fxm[i:i + n_size] = val
+            i += n_size
+
+        return fxm
+

@@ -23,6 +23,7 @@ class TestBryoden(unittest.TestCase):
         prob.set_solver_print(level=0)
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
 
+        prob.set_solver_print(level=2, depth=1e99, type_='all')
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
