@@ -1795,8 +1795,7 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        # FIXME: I don't think this has to be an OrderedDict
-        self._subjacs_info = info = OrderedDict()
+        self._subjacs_info = info = {}
 
         if recurse:
             for subsys in self._subsystems_myproc:

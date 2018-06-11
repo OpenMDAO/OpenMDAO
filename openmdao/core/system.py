@@ -174,7 +174,7 @@ class System(object):
         they may optionally specify an "indices" argument. This argument must also be communicated
         to the approximations when they are set up so that 1) the Jacobian is the correct size, and
         2) we don't perform any extra unnecessary calculations.
-    _subjacs_info : OrderedDict of dict
+    _subjacs_info : dict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
     _design_vars : dict of dict

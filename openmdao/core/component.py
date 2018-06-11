@@ -299,8 +299,7 @@ class Component(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        # FIXME: I don't think this has to be an OrderedDict
-        self._subjacs_info = OrderedDict()
+        self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
         for of, wrt, dependent, rows, cols, val in self._declared_partials:
