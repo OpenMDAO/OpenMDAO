@@ -649,7 +649,8 @@ class NonlinearSolver(Solver):
             with open(filename, 'w') as f:
                 f.write(out_str)
                 print("Inputs and outputs at start of iteration have been "
-                      "saved to '%s'." % filename, flush=True)
+                      "saved to '%s'." % filename)
+                sys.stdout.flush()
 
         return fail, abs_err, rel_err
 

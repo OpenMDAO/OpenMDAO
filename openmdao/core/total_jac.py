@@ -1013,9 +1013,11 @@ class _TotalJacInfo(object):
                 if debug_print:
                     if par_deriv and key in par_deriv:
                         varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
-                        print('Solving color:', key, varlist, flush=True)
+                        print('Solving color:', key, varlist)
                     else:
-                        print('Solving variable:', key, flush=True)
+                        print('Solving variable:', key)
+
+                    sys.stdout.flush()
 
                     t0 = time.time()
 
@@ -1029,7 +1031,8 @@ class _TotalJacInfo(object):
                     model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
 
                 if debug_print:
-                    print('Elapsed Time:', time.time() - t0, '\n', flush=True)
+                    print('Elapsed Time:', time.time() - t0, '\n')
+                    sys.stdout.flush()
 
                 jac_setter(inds)
 
@@ -1251,7 +1254,8 @@ class _TotalJacInfo(object):
                 for j, wrt in enumerate(inputs):
                     pprint.pprint({(of, wrt): J[out_slice, in_meta[wrt][0]]})
 
-        print('', flush=True)
+        print('')
+        sys.stdout.flush()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
