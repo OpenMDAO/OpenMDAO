@@ -484,6 +484,179 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
 
+class SimulColoringRevScipyTestCase(unittest.TestCase):
+
+    def test_simul_coloring(self):
+
+        # first, run w/o coloring
+        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
+
+        color_info = [[
+           [1, 4, 5, 6, 7, 8, 9, 10],   # uncolored rows
+           [3, 17],   # color 1
+           [0, 11, 13, 14, 15, 16],   # color 2
+           [2, 12, 18, 19, 20, 21]   # color 3
+        ],
+        [
+           [20],   # row 0
+           None,   # row 1
+           [1, 11, 20],   # row 2
+           [2, 12, 20],   # row 3
+           None,   # row 4
+           None,   # row 5
+           None,   # row 6
+           None,   # row 7
+           None,   # row 8
+           None,   # row 9
+           None,   # row 10
+           [0],   # row 11
+           [0, 10],   # row 12
+           [2, 12],   # row 13
+           [4, 14],   # row 14
+           [6, 16],   # row 15
+           [8, 18],   # row 16
+           [0, 1, 10, 11],   # row 17
+           [2, 3, 12, 13],   # row 18
+           [4, 5, 14, 15],   # row 19
+           [6, 7, 16, 17],   # row 20
+           [8, 9, 18, 19]   # row 21
+        ], None]
+
+        p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 11 solves per driver iter  (11 vs 22)
+        # - initial solve for linear constraints takes 22 in both cases (only done once)
+        # - (total_solves - 22) / (solves_per_iter) should be equal between the two cases
+        self.assertEqual((p.model.linear_solver._solve_count - 22) / 22,
+                         (p_color.model.linear_solver._solve_count - 22) / 11)
+
+    def test_dynamic_simul_coloring(self):
+
+        # first, run w/o coloring
+        p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
+                         (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
+
+    def test_simul_coloring_example(self):
+
+        from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
+        import numpy as np
+
+        # note: size must be an even number
+        SIZE = 10
+        p = Problem()
+
+        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+
+        # the following were randomly generated using np.random.random(10)*2-1 to randomly
+        # disperse them within a unit circle centered at the origin.
+        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        indeps.add_output('r', .7)
+
+        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+
+        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r',
+                                                g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+
+        thetas = np.linspace(0, np.pi/4, SIZE)
+        p.model.add_subsystem('theta_con', ExecComp('g=arctan(y/x) - theta',
+                                                    g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE),
+                                                    theta=thetas))
+        p.model.add_subsystem('delta_theta_con', ExecComp('g = arctan(y/x)[::2]-arctan(y/x)[1::2]',
+                                                          g=np.ones(SIZE//2), x=np.ones(SIZE),
+                                                          y=np.ones(SIZE)))
+
+        thetas = np.linspace(0, np.pi/4, SIZE)
+
+        p.model.add_subsystem('l_conx', ExecComp('g=x-1', g=np.ones(SIZE), x=np.ones(SIZE)))
+
+        p.model.connect('r', ('circle.r', 'r_con.r'))
+        p.model.connect('x', ['r_con.x', 'theta_con.x', 'delta_theta_con.x'])
+
+        p.model.connect('x', 'l_conx.x')
+
+        p.model.connect('y', ['r_con.y', 'theta_con.y', 'delta_theta_con.y'])
+
+        p.driver = ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['disp'] = False
+
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
+
+        # nonlinear constraints
+        p.model.add_constraint('r_con.g', equals=0)
+
+        IND = np.arange(SIZE, dtype=int)
+        ODD_IND = IND[0::2]  # all odd indices
+        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=ODD_IND)
+        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+
+        # this constrains x[0] to be 1 (see definition of l_conx)
+        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+
+        # linear constraint
+        p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
+
+        p.model.add_objective('circle.area', ref=-1)
+
+        # setup coloring
+        color_info = ([
+           [20],   # uncolored column list
+           [0, 2, 4, 6, 8],   # color 1
+           [1, 3, 5, 7, 9],   # color 2
+           [10, 12, 14, 16, 18],   # color 3
+           [11, 13, 15, 17, 19],   # color 4
+        ],
+        [
+           [1, 11, 16, 21],   # column 0
+           [2, 16],   # column 1
+           [3, 12, 17],   # column 2
+           [4, 17],   # column 3
+           [5, 13, 18],   # column 4
+           [6, 18],   # column 5
+           [7, 14, 19],   # column 6
+           [8, 19],   # column 7
+           [9, 15, 20],   # column 8
+           [10, 20],   # column 9
+           [1, 11, 16],   # column 10
+           [2, 16],   # column 11
+           [3, 12, 17],   # column 12
+           [4, 17],   # column 13
+           [5, 13, 18],   # column 14
+           [6, 18],   # column 15
+           [7, 14, 19],   # column 16
+           [8, 19],   # column 17
+           [9, 15, 20],   # column 18
+           [10, 20],   # column 19
+           None,   # column 20
+        ], None)
+
+        p.driver.set_simul_deriv_color(color_info)
+
+        p.setup(mode='fwd')
+        p.run_driver()
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+
+
 class SparsityTestCase(unittest.TestCase):
 
     def setUp(self):
