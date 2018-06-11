@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, DenseJacobian
+from openmdao.api import Group, IndepVarComp, Problem
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -456,64 +456,6 @@ class LinearSolverTests(object):
                 assert_rel_error(self, J[key], val, .00001)
 
             prob.setup(check=False, mode='rev')
-            prob.run_model()
-
-            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
-                assert_rel_error(self, J[key], val, .00001)
-
-        def test_sellar_state_connection_densejac(self):
-            # Test derivatives across a converged Sellar model.
-
-            prob = Problem()
-            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(), nl_atol=1e-12)
-
-            prob.set_solver_print(level=0)
-
-            prob.setup(check=False, mode='fwd')
-
-            prob.model.sub.d1.jacobian = DenseJacobian()
-            prob.model.sub.d2.jacobian = DenseJacobian()
-            prob.model.sub.state_eq_group.state_eq.jacobian = DenseJacobian()
-            prob.model.obj_cmp.jacobian = DenseJacobian()
-            prob.model.con_cmp1.jacobian = DenseJacobian()
-            prob.model.con_cmp2.jacobian = DenseJacobian()
-
-            prob.run_model()
-
-            # Just make sure we are at the right answer
-            assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-            assert_rel_error(self, prob['d2.y2'], 12.05848819, .00001)
-
-            wrt = ['x', 'z']
-            of = ['obj', 'con1', 'con2']
-
-            Jbase = {}
-            Jbase['con1', 'x'] = [[-0.98061433]]
-            Jbase['con1', 'z'] = np.array([[-9.61002285, -0.78449158]])
-            Jbase['con2', 'x'] = [[0.09692762]]
-            Jbase['con2', 'z'] = np.array([[1.94989079, 1.0775421]])
-            Jbase['obj', 'x'] = [[2.98061392]]
-            Jbase['obj', 'z'] = np.array([[9.61001155, 1.78448534]])
-
-            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-            for key, val in iteritems(Jbase):
-                assert_rel_error(self, J[key], val, .00001)
-
-            prob = Problem()
-            prob.model = SellarStateConnection(linear_solver=self.linear_solver_class(), nl_atol=1e-12)
-
-            prob.set_solver_print(level=0)
-
-            prob.setup(check=False, mode='rev')
-
-            prob.model.sub.d1.jacobian = DenseJacobian()
-            prob.model.sub.d2.jacobian = DenseJacobian()
-            prob.model.sub.state_eq_group.state_eq.jacobian = DenseJacobian()
-            prob.model.obj_cmp.jacobian = DenseJacobian()
-            prob.model.con_cmp1.jacobian = DenseJacobian()
-            prob.model.con_cmp2.jacobian = DenseJacobian()
-
             prob.run_model()
 
             J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
