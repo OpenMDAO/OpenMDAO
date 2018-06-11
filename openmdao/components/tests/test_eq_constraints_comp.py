@@ -375,7 +375,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
 
         n = 100
 
-        # find where 2*x == x^2, vectorized
+        # find where x^2 == 4, vectorized
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(n)))
         model.add_subsystem('f', ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
         model.add_subsystem('equal', EqualityConstraintsComp('y', val=np.ones(n),
