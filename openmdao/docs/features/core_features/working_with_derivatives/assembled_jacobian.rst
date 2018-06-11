@@ -17,7 +17,7 @@ In many cases this can yield a substantial speed up over the default,
 
 
 To use an assembled Jacobian, you set the :code:`assemble_jac` option of the linear solver that
-will own it to True.  The type of the assembled jacobian will be determined by the value of
+will use it to True.  The type of the assembled jacobian will be determined by the value of
 :code:`options['assembled_jac_type']` in the solver's containing system.
 There are two options of 'assembled_jac_type' to choose from, `dense` and `csc`.  For example:
 

@@ -975,11 +975,6 @@ class Component(System):
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
-
-        Parameters
-        ----------
-        jacs : list of Jacobian
-            Jacobians needing metadata update.
         """
         for key, meta in iteritems(self._subjacs_info):
 

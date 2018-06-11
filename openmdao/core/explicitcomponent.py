@@ -154,11 +154,6 @@ class ExplicitComponent(Component):
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
-
-        Parameters
-        ----------
-        jacs : list of Jacobian
-            Jacobians needing metadata update.
         """
         abs2prom = self._var_abs2prom
         abs2meta = self._var_abs2meta

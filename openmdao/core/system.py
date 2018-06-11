@@ -1253,7 +1253,8 @@ class System(object):
         # if any subcomponents are matrix-free.
         if asm_jac is not None:
             if self.matrix_free:
-                raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
+                raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+                                   "subcomponent." % self.pathname)
 
         if recurse:
             for subsys in self._subsystems_myproc:
