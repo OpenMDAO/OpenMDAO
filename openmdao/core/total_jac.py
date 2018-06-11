@@ -1087,7 +1087,7 @@ class _TotalJacInfo(object):
             else:
                 model.approx_totals(method='fd')
 
-        model._setup_jacobians()
+        model._setup_jacobians(recurse=False)
 
         # Linearize Model
         model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())

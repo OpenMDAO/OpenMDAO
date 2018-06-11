@@ -784,7 +784,7 @@ class System(object):
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
         self._setup_partials(recurse=recurse)
-        self._setup_jacobians()
+        self._setup_jacobians(recurse=recurse)
 
         self._setup_case_recording(recurse=recurse)
 
@@ -1216,9 +1216,14 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_solvers(recurse=recurse)
 
-    def _setup_jacobians(self):
+    def _setup_jacobians(self, recurse=True):
         """
         Set and populate jacobians down through the system tree.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, setup jacobians i descendants.
         """
         asm_jac_solvers = set()
         if self._linear_solver is not None:
@@ -1250,8 +1255,9 @@ class System(object):
             if self.matrix_free:
                 raise RuntimeError("AssembledJacobian not supported for matrix-free subcomponent.")
 
-        for subsys in self._subsystems_myproc:
-            subsys._setup_jacobians()
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_jacobians()
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
