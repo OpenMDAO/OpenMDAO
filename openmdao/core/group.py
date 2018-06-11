@@ -1868,9 +1868,6 @@ class Group(System):
 
                     meta.update(self._owns_approx_jac_meta)
 
-                    # Create Jacobian stub for every key pair
-                    # J._set_partials_meta(key, meta)
-
                     # Create approximations, but only for the ones we need.
                     if meta['dependent']:
 
