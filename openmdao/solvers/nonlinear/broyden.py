@@ -5,6 +5,8 @@ Based on implementation in Scipy via OpenMDAO 0.8x
 """
 from __future__ import print_function
 
+import numpy as np
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -27,6 +29,7 @@ class BroydenSolver(NonlinearSolver):
         super(BroydenSolver, self).__init__(**kwargs)
 
         self.n = 0
+        self._recompute_jacobian = True
 
     def _declare_options(self):
         """
@@ -55,6 +58,7 @@ class BroydenSolver(NonlinearSolver):
             Depth of the current system (already incremented).
         """
         super(BroydenSolver, self)._setup_solvers(system, depth)
+        self._recompute_jacobian = True
 
         states = self.options['state_vars']
         prom = system._var_allprocs_prom2abs_list['output']
@@ -72,6 +76,11 @@ class BroydenSolver(NonlinearSolver):
             n += len(outputs[name])
 
         self.n = n
+        self.Gm = np.empty((n, n))
+        self.xm = np.empty((n, ))
+        self.fxm = np.empty((n, ))
+        self.delta_xm = None
+        self.delta_fxm = None
 
     def _iter_initialize(self):
         """
@@ -92,6 +101,90 @@ class BroydenSolver(NonlinearSolver):
         """
         pass
 
+    def _compute_jacobian(self):
+        """
+        Compute the Jacobian for the state/residual equations specified in the options.
+        """
+        # Use Broyden Update.
+        if not self._recompute_jacobian:
+            dfxm = self.delta_fxm
+            Gm = self.Gm
+            Gm += (self.delta_xm - Gm * dfxm) * dfxm.T / np.linalg.norm(dfxm)**2
+            return
+
+        # Solve for total derivatives of user-requested residuals wrt states.
+        if self.options['compute_initial_jacobian']:
+            # TODO: this
+            pass
+
+        # Reset Jacobian to identiy scaled by alpha.
+        else:
+            self.Gm = -self.alpha * np.identity(self.n)
+
+    def get_states(self):
+        """
+        Return a vector containing the values of the states specified in options.
+
+        This is used to get the initial state guesses.
+
+        Returns
+        -------
+        ndarray
+            Array containing values of states.
+        """
+        states = self.options['state_vars']
+        xm = self.xm
+        outputs = self.system._outputs
+        i = 0
+        for name in states:
+            val = outputs[name]
+            n_size = len(val)
+            xm[i:i + n_size] = val
+            i += n_size
+
+        return xm
+
+    def set_states(self):
+        """
+        Return a vector containing the values of the states specified in options.
+
+        This is used to get the initial state guesses.
+
+        Returns
+        -------
+        ndarray
+            Array containing values of states.
+        """
+        states = self.options['state_vars']
+        xm = self.xm
+        outputs = self.system._outputs
+        i = 0
+        for name in states:
+            val = outputs[name]
+            n_size = len(val)
+            xm[i:i + n_size] = val
+            i += n_size
+
+    def get_residuals(self):
+        """
+        Return a vector containing the values of the residuals specified in options.
+
+        Returns
+        -------
+        ndarray
+            Array containing values of residuals.
+        """
+        states = self.options['state_vars']
+        fm = self.fm
+        residuals = self.system._residuals
+        i = 0
+        for name in states:
+            val = residuals[name]
+            n_size = len(val)
+            fm[i:i + n_size] = val
+            i += n_size
+
+        return fm
 
 """
         xm = self.xin.T
