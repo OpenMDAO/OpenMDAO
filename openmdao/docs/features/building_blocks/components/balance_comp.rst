@@ -37,22 +37,18 @@ of the implicit state variable.
 The BalanceComp supports vectorized implicit states. Simply provide a default
 value or shape when adding the balance that reflects the correct shape.
 
-BalanceComp accepts the following other arguments (which are all passed
-to ``add_balance`` during initialization):
+You can provide the arguments to create a balance when instantiating a `BalanceComp`
+or you can use the ``add_balance`` method to create one or more state variables after
+instantiation.  The constructor accepts all the same arguments as the ``add_balance``
+method:
 
-=========== ======================== ===================================================================================
-Name        Type                     Description
-=========== ======================== ===================================================================================
-eq_units    str or None              Units associated with left-hand and right-hand side. (mult is treated as unitless).
-lhs_name    str or None              Optional name associated with the left-hand side of the balance.
-rhs_name    str or None              Optional name associated with the right-hand side of the balance.
-rhs_val     int, float, or np.array  Default value for the right-hand side.
-guess_func  callable or None         Callable function that returns an initial “guess” value of the state variable.
-use_mult    bool                     Specifies whether the left-hand side multiplier is to be used.
-mult_name   str or None              Optional name associated with the left-hand side multiplier variable.
-mult_val    int, float, or np.array  Default value for the left-hand side multiplier.
-kwargs      dict or named arguments  Additional arguments to be passed for the creation of the implicit state variable.
-=========== ======================== ===================================================================================
+.. automethod:: openmdao.components.balance_comp.BalanceComp.add_balance
+   :noindex:
+
+Note that the `kwargs` arguments can include any of the keyword arguments normally available
+when creatiing of an output variable using the
+:meth:`add_output <openmdao.core.component.Component.add_output>` method of a `Component`.
+
 
 Example:  Scalar Root Finding
 -----------------------------

@@ -9,8 +9,14 @@ EqualityConstraintsComp
 `EqualityConstraintsComp` is a specialized component that provides a simple way to implement
 equality constraints.
 
-You can add one or more outputs to an `EqualityConstraintsComp` that compute
-the difference between a pair of input values for the purposes of driving the two inputs to equality.
+You can add one or more outputs to an `EqualityConstraintsComp` that compute the difference
+between a pair of input values for the purposes of driving the two inputs to equality. It
+computes the output value as:
+
+.. math::
+
+  name_{output} = name_{mult} \times name_{lhs} - name_{rhs}
+
 
 The following inputs and outputs are associated with each output variable.
 
@@ -28,24 +34,19 @@ The multiplier is optional and will default to 1.0 if not connected. The
 left-hand side should always be defined.
 
 The `EqualityConstraintsComp` supports vectorized outputs. Simply provide a default
-value or shape when adding the difference equation that reflects the correct shape.
+value or shape when adding the output that reflects the correct shape.
 
-`EqualityConstraintsComp` accepts the following other arguments (which are all passed
-to ``add_eq_output`` during initialization):
+You can provide the arguments to create an output variable when instantiating an
+`EqualityConstraintsComp` or you can use the ``add_eq_output`` method to create one
+or more outputs after instantiation.  The constructor accepts all the same arguments
+as the ``add_eq_output`` method:
 
-=============== ======================== ===================================================================================
-Name            Type                     Description
-=============== ======================== ===================================================================================
-eq_units        str or None              Units associated with left-hand and right-hand side. (mult is treated as unitless).
-lhs_name        str or None              Optional name associated with the left-hand side of the difference equation.
-rhs_name        str or None              Optional name associated with the right-hand side of the difference equation.
-rhs_val         int, float, or np.array  Default value for the right-hand side.
-use_mult        bool                     Specifies whether the left-hand side multiplier is to be used.
-mult_name       str or None              Optional name associated with the left-hand side multiplier variable.
-mult_val        int, float, or np.array  Default value for the left-hand side multiplier.
-add_constraint  bool                     Specifies whether to add an equality constraint.
-kwargs          dict or named arguments  Additional arguments to be passed for the creation of the output variable.
-=============== ======================== ===================================================================================
+.. automethod:: openmdao.components.eq_constraints_comp.EqualityConstraintsComp.add_eq_output
+   :noindex:
+
+Note that the `kwargs` arguments can include any of the keyword arguments normally available
+when creatiing of an output variable using the
+:meth:`add_output <openmdao.core.component.Component.add_output>` method of a `Component`.
 
 Example: Sellar IDF
 -------------------

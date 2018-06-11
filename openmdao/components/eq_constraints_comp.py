@@ -27,6 +27,21 @@ class EqualityConstraintsComp(ExplicitComponent):
         r"""
         Initialize an EqualityConstraintsComp, optionally add an output constraint to the model.
 
+        The EqualityConstraintsComp is a bit like IndepVarComp in that it allows for the
+        creation of one or more output variables and computes the values for those variables
+        based on the following equation:
+
+        .. math::
+
+          name_{output} = name_{mult} \times name_{lhs} - name_{rhs}
+
+        Where :math:`name_{lhs}` represents the left-hand-side of the equality,
+        :math:`name_{rhs}` represents the right-hand-side, and :math:`name_{mult}`
+        is an optional multiplier on the left hand side. If use_mult is True then
+        the default value of the multiplier is 1.
+
+        New output variables are created by calling `add_eq_output`.
+
         Parameters
         ----------
         name : str
@@ -40,21 +55,23 @@ class EqualityConstraintsComp(ExplicitComponent):
             Optional name for the RHS variable associated with the difference equation.  If
             None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
-            Default value for the RHS of the given state.  Must be compatible
-            with the shape (optionally) given by the val option in kwargs.
+            Default value for the RHS of the given output.  Must be compatible
+            with the shape (optionally) given by the val or shape option in kwargs.
         use_mult : bool
-            Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
-            by mult_name with the default value given by mult_val.  Default is False.
+            Specifies whether the LHS multiplier is to be used.  If True, then an additional
+            input `mult_name` is created, with the default value given by `mult_val`, that
+            multiplies lhs.  Default is False.
         mult_name : str or None
-            Optional name for the LHS multiplier variable associated with the implicit state
+            Optional name for the LHS multiplier variable associated with the output
             variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
-            Default value for the LHS multiplier of the given state.  Must be compatible
-            with the shape (optionally) given by the val option in kwargs.
+            Default value for the LHS multiplier of the given output.  Must be compatible
+            with the shape (optionally) given by the val or shape option in kwargs.
         add_constraint : bool
             Specifies whether to add an equality constraint.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
+            (see `add_output` method).
         """
         super(EqualityConstraintsComp, self).__init__()
         self._output_vars = {}
@@ -204,20 +221,22 @@ class EqualityConstraintsComp(ExplicitComponent):
             None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
             Default value for the RHS.  Must be compatible with the shape (optionally)
-            given by the val option in kwargs.
+            given by the val or shape option in kwargs.
         use_mult : bool
-            Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
-            by mult_name with the default value given by mult_val.  Default is False.
+            Specifies whether the LHS multiplier is to be used.  If True, then an additional
+            input `mult_name` is created, with the default value given by `mult_val`, that
+            multiplies lhs.  Default is False.
         mult_name : str or None
-            Optional name for the LHS multiplier variable associated with the implicit state
+            Optional name for the LHS multiplier variable associated with the output
             variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
-            given by the val option in kwargs.
+            given by the val or shape option in kwargs.
         add_constraint : bool
             Specifies whether to add an equality constraint.
         **kwargs : dict
-            Additional arguments to be passed for the creation of the difference equation.
+            Additional arguments to be passed for the creation of the output variable.
+            (see `add_output` method).
         """
         self._output_vars[name] = {'kwargs': kwargs,
                                    'eq_units': eq_units,

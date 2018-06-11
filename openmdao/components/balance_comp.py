@@ -97,22 +97,24 @@ class BalanceComp(ImplicitComponent):
             None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
             Default value for the RHS of the given state.  Must be compatible
-            with the shape (optionally) given by the val option in kwargs.
+            with the shape (optionally) given by the val or shape option in kwargs.
         guess_func : callable or None
             A callable function in the form f(inputs, resids) that returns an initial "guess" value
             of the state variable based on the inputs to the BalanceComp.  Note you may have to
             add additional inputs to the BalanceComp in order to evaluate this function.
         use_mult : bool
-            Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
-            by mult_name with the default value given by mult_val.  Default is False.
+            Specifies whether the LHS multiplier is to be used.  If True, then an additional
+            input `mult_name` is created, with the default value given by `mult_val`, that
+            multiplies lhs.  Default is False.
         mult_name : str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
-            with the shape (optionally) given by the val option in kwargs.
+            with the shape (optionally) given by the val or shape option in kwargs.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
+            (see `add_output` method).
         """
         super(BalanceComp, self).__init__()
         self._state_vars = {}
@@ -280,22 +282,24 @@ class BalanceComp(ImplicitComponent):
             None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
             Default value for the RHS.  Must be compatible with the shape (optionally)
-            given by the val option in kwargs.
+            given by the val or shape option in kwargs.
         guess_func : callable or None
             A callable function in the form f(inputs, resids) that returns an initial "guess" value
             of the state variable based on the inputs to the BalanceComp.  Note you may have to
             add additional inputs to the BalanceComp in order to evaluate this function.
         use_mult : bool
-            Specifies whether the LHS multiplier is to be used.  If True, adds the input specified
-            by mult_name with the default value given by mult_val.  Default is False.
+            Specifies whether the LHS multiplier is to be used.  If True, then an additional
+            input `mult_name` is created, with the default value given by `mult_val`, that
+            multiplies lhs.  Default is False.
         mult_name : str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
-            given by the val option in kwargs.
+            given by the val or shape option in kwargs.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
+            (see `add_output` method).
         """
         if guess_func is not None and not callable(guess_func):
             raise ValueError("Argument 'guess_func' must be a callable if specified")
