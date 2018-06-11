@@ -369,6 +369,40 @@ class TestEqualityConstraintsComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
+    def test_vectorized_rhs_val(self):
+        prob = Problem()
+        model = prob.model
+
+        n = 100
+
+        # find where 2*x == x^2, vectorized
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(n)))
+        model.add_subsystem('f', ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('equal', EqualityConstraintsComp('y', val=np.ones(n),
+                            rhs_val=np.ones(n)*4., use_mult=True, mult_val=2.))
+        model.add_subsystem('obj_cmp', ExecComp('obj=sum(y)', y=np.zeros(n)))
+
+        model.connect('indep.x', 'f.x')
+
+        model.connect('indep.x', 'equal.lhs:y')
+        model.connect('f.y', 'obj_cmp.y')
+
+        model.add_design_var('indep.x', lower=np.zeros(n), upper=np.ones(n)*10.)
+        model.add_constraint('equal.y', equals=0.)
+        model.add_objective('obj_cmp.obj')
+
+        prob.setup(mode='fwd')
+        prob.driver = ScipyOptimizeDriver(disp=False)
+        prob.run_driver()
+
+        assert_rel_error(self, prob['equal.y'], np.zeros(n), 1e-6)
+        assert_rel_error(self, prob['indep.x'], np.ones(n)*2., 1e-6)
+        assert_rel_error(self, prob['f.y'], np.ones(n)*4., 1e-6)
+
+        cpd = prob.check_partials(out_stream=None)
+        for (of, wrt) in cpd['equal']:
+            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
     def test_renamed_vars(self):
         prob = Problem()
         model = prob.model
