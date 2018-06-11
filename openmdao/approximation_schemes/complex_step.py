@@ -103,7 +103,7 @@ class ComplexStep(ApproximationScheme):
             being approximated.
         """
         if jac is None:
-            jac = system.jacobian
+            jac = system._jacobian
 
         if deriv_type == 'total':
             current_vec = system._outputs

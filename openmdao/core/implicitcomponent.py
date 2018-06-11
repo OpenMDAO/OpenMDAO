@@ -134,7 +134,7 @@ class ImplicitComponent(Component):
             If None, all are in the scope.
         """
         if jac is None:
-            jac = self.jacobian
+            jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
 
         for vec_name in vec_names:
             if vec_name not in self._rel_vec_names:

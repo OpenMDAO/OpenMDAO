@@ -2,8 +2,6 @@
 
 from __future__ import division
 
-from copy import deepcopy
-
 import numpy as np
 from six import itervalues, iteritems
 from six.moves import range

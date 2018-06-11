@@ -1396,23 +1396,6 @@ class System(object):
                          "with earlier version of OpenMDAO; use 'options' instead.")
         return self.options
 
-    @property
-    def jacobian(self):
-        """
-        Get the Jacobian.
-        """
-        return self._assembled_jac if self._assembled_jac is not None else self._jacobian
-
-    @jacobian.setter
-    def jacobian(self, jacobian):
-        """
-        Set the Jacobian.
-        """
-        raise RuntimeError("%s: jacobian is no longer settable from System. Instead, use"
-                           " options['assemble_jac'] = True on the linear solver, and set "
-                           "options['assembled_jac_type'] = val on the system, where val is "
-                           "one of ['dense', 'csc']." % self.pathname)
-
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):
         """
