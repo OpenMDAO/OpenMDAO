@@ -164,21 +164,17 @@ class ExplicitComponent(Component):
         """
         abs2prom = self._var_abs2prom
         abs2meta = self._var_abs2meta
+
         for abs_key, meta in iteritems(self._subjacs_info):
 
             if meta['value'] is None:
                 meta['value'] = np.zeros(meta['shape'])
 
-            # # if wrt is an input, we need to negate the subjac.
-            # negate = abs_key[1] in abs2prom['input']
-            # if negate:
-            #     self._jacobian._multiply_subjac(abs_key, -1.0)
-
             if 'method' in meta:
                 method = meta['method']
-                # Don't approximate output wrt output.
+                # Don't approximate output wrt output.``
                 if (method is not None and method in self._approx_schemes and abs_key[1]
-                        not in self._var_allprocs_abs_names['output']):
+                        not in self._outputs._views_flat):
                     self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
@@ -358,20 +354,15 @@ class ExplicitComponent(Component):
         if not self._has_compute_partials and not self._approx_schemes:
             return
 
-        if jac is None:
-            jac = self._jacobian
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            # Computing the approximation before the call to compute_partials allows users to
+            # override FD'd values.
+            for approximation in itervalues(self._approx_schemes):
+                approximation.compute_approximations(self, jac=self._jacobian)
 
-        with self.jacobian_context(jac):
-            with self._unscaled_context(
-                    outputs=[self._outputs], residuals=[self._residuals]):
-                # Computing the approximation before the call to compute_partials allows users to
-                # override FD'd values.
-                for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=jac)
-
-                if self._has_compute_partials:
-                    # We used to negate the jacobian here, and then re-negate after the hook.
-                    self.compute_partials(self._inputs, jac)
+            if self._has_compute_partials:
+                # We used to negate the jacobian here, and then re-negate after the hook.
+                self.compute_partials(self._inputs, self._jacobian)
 
     def compute(self, inputs, outputs):
         """

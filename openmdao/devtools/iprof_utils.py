@@ -156,13 +156,11 @@ def _setup_func_group():
             ('_set_partials_meta', (System, Jacobian)),
             ('jacobian_context', (System,)),
             ('_linearize', (System, Solver)),
-            ('_negate_jac', (ExplicitComponent,)),
             # include NewtonSolver to provide some context
             ('solve', (LinearSolver, NewtonSolver)),
             ('_update', (Jacobian,)),
             ('_apply', (Jacobian,)),
             ('_initialize', (Jacobian,)),
-            ('_multiply_subjac', (Jacobian,)),
             ('compute_totals', (_TotalJacInfo, Problem, Driver)),
             ('compute_totals_approx', (_TotalJacInfo,)),
             ('compute_jacvec_product', (System,)),

@@ -1227,8 +1227,8 @@ class System(object):
             The assembled jacobian from a parent group to populate for this system.
         """
         asm_jac_solvers = set()
-        if self.linear_solver is not None:
-            asm_jac_solvers.update(self.linear_solver._assembled_jac_solver_iter())
+        if self._linear_solver is not None:
+            asm_jac_solvers.update(self._linear_solver._assembled_jac_solver_iter())
 
         nl_asm_jac_solvers = set()
         if self.nonlinear_solver is not None:
@@ -1703,8 +1703,8 @@ class System(object):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        if self.linear_solver is not None and type_ != 'NL':
-            self.linear_solver._set_solver_print(level=level, type_=type_)
+        if self._linear_solver is not None and type_ != 'NL':
+            self._linear_solver._set_solver_print(level=level, type_=type_)
         if self.nonlinear_solver is not None and type_ != 'LN':
             self.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
@@ -1716,8 +1716,8 @@ class System(object):
 
             subsys._set_solver_print(level=level, depth=depth - current_depth, type_=type_)
 
-            if subsys.linear_solver is not None and type_ != 'NL':
-                subsys.linear_solver._set_solver_print(level=level, type_=type_)
+            if subsys._linear_solver is not None and type_ != 'NL':
+                subsys._linear_solver._set_solver_print(level=level, type_=type_)
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
