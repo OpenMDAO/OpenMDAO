@@ -1,7 +1,7 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
-from six import iteritems
+from six import iteritems, string_types
 
 from openmdao.utils.general_utils import warn_deprecation
 
@@ -205,24 +205,32 @@ class OptionsDictionary(object):
             # If only values is declared
             if values is not None:
                 if value not in values:
-                    raise ValueError("Option '{}'\'s value is not one of {}".format(name, values))
+                    if isinstance(value, string_types):
+                        value = "'{}'".format(value)
+                    raise ValueError("Value {} of option '{}' "
+                                     "is not one of {}".format(value, name, values))
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
-                    raise TypeError("Option '{}' has the wrong type ({})".format(name, types))
+                    if isinstance(value, string_types):
+                        value = "'{}'".format(value)
+                    raise TypeError("Value {} of option '{}' "
+                                    "has the wrong type ({}).".format(value, name, types))
 
             if upper is not None:
                 if value > upper:
-                    msg = ("Value of {} exceeds maximum of {} for option 'x'")
-                    raise ValueError(msg.format(value, upper))
+                    raise ValueError("Value {} of option '{}' "
+                                     "exceeds maximum allowed value of {}.".format(value, name,
+                                                                                   upper))
             if lower is not None:
                 if value < lower:
-                    msg = ("Value of {} exceeds minimum of {} for option 'x'")
-                    raise ValueError(msg.format(value, lower))
+                    raise ValueError("Value {} of option '{}' "
+                                     "exceeds minimum allowed value of {}.".format(value, name,
+                                                                                   upper))
 
         # General function test
         if is_valid is not None and not is_valid(value):
-            raise ValueError("Function is_valid returns False for {}.".format(name))
+            raise ValueError("Function is_valid({}) returns False for {}.".format(value, name))
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
                 upper=None, lower=None, is_valid=None, allow_none=False):
@@ -264,9 +272,11 @@ class OptionsDictionary(object):
             types = type_
 
         if values is not None and not isinstance(values, (set, list, tuple)):
-            raise TypeError("'values' must be of type None, list, or tuple - not %s." % values)
+            raise TypeError("In declaration of option '%s', the 'values' arg must be of type None,"
+                            " list, or tuple - not %s." % (name, values))
         if types is not None and not isinstance(types, (type, set, list, tuple)):
-            raise TypeError("'types' must be None, a type or a tuple  - not %s." % types)
+            raise TypeError("In declaration of option '%s', the 'types' arg must be None, a type "
+                            "or a tuple - not %s." % (name, types))
 
         if types is not None and values is not None:
             raise RuntimeError("'types' and 'values' were both specified for option '%s'." %

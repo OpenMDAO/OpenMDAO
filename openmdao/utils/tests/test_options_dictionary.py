@@ -72,7 +72,7 @@ class TestOptionsDict(unittest.TestCase):
             self.dict['test'] = ''
 
         class_or_type = 'class' if PY3 else 'type'
-        expected_msg = "Option 'test' has the wrong type (<{} 'int'>)".format(class_or_type)
+        expected_msg = "Value '' of option 'test' has the wrong type (<class 'int'>)."
         self.assertEqual(expected_msg, str(context.exception))
 
         # make sure bools work
@@ -111,7 +111,7 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['even_test'] = 3
 
-        expected_msg = "Function is_valid returns False for {}.".format('even_test')
+        expected_msg = "Function is_valid(3) returns False for even_test."
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_isvalid_deprecated_type(self):
@@ -128,7 +128,7 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['even_test'] = 3
 
-        expected_msg = "Function is_valid returns False for {}.".format('even_test')
+        expected_msg = "Function is_valid(3) returns False for even_test."
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_unnamed_args(self):
@@ -192,7 +192,7 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['test'] = object()
 
-        expected_msg = ("Option 'test''s value is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
+        expected_msg = ("Value <object object at 0x[0-9A-Fa-f]+> of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
                         " <object object at 0x[0-9A-Fa-f]+>\]")
         assertRegex(self, str(context.exception), expected_msg)
 
@@ -212,13 +212,13 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = 3.0
 
-        expected_msg = ("Value of 3.0 exceeds maximum of 2.0 for option 'x'")
+        expected_msg = "Value 3.0 of option 'x' exceeds maximum allowed value of 2.0"
         assertRegex(self, str(context.exception), expected_msg)
 
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = -3.0
 
-        expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for option 'x'")
+        expected_msg = "Value -3.0 of option 'x' exceeds minimum allowed value of 2.0"
         assertRegex(self, str(context.exception), expected_msg)
 
     def test_undeclare(self):
