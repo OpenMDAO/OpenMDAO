@@ -32,6 +32,7 @@ New Features:
     - CrossProductComp
     - DotProductComp
     - MatrixVectorProductComp
+    - ExternalCodeImplicitComp
 
 - Updates to existing Components in standard library:
     - LinearSystemComp has been vectorized.
