@@ -48,11 +48,11 @@ class EQConstraintComp(ExplicitComponent):
         eq_units : str or None
             Units for the left-hand-side and right-hand-side of the difference equation.
         lhs_name : str or None
-            Optional name for the LHS variable associated with the difference equation.  If
-            None, the default will be used:  'lhs:{name}'.
+            Optional name for the LHS variable associated with the difference equation.
+            If None, the default will be used:  'lhs:{name}'.
         rhs_name : str or None
-            Optional name for the RHS variable associated with the difference equation.  If
-            None, the default will be used:  'rhs:{name}'.
+            Optional name for the RHS variable associated with the difference equation.
+            If None, the default will be used:  'rhs:{name}'.
         rhs_val : int, float, or np.array
             Default value for the RHS of the given output.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
