@@ -219,6 +219,53 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n")
         self.assertTrue("The following inputs are not connected:" in warnings[1])
 
+    def test_warn_no_recorders(self):
+
+        # No recorder set
+        p = Problem(model=Group())
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(warnings[0], "The Problem has no recorder of any kind attached")
+
+        # Driver recorder set
+        from openmdao.api import SqliteRecorder
+        p = Problem(model=Group())
+        p.driver.add_recorder(SqliteRecorder("temp.sql"))
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+        # System recorder set
+        p = Problem(model=Group())
+        p.model.add_recorder(SqliteRecorder("temp.sql"))
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+        # Non Linear Solver recorder set
+        p = Problem(model=Group())
+        p.model.nonlinear_solver.add_recorder(SqliteRecorder("temp.sql"))
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+        # Linear Solver recorder set
+        p = Problem(model=Group())
+        p.model.linear_solver.add_recorder(SqliteRecorder("temp.sql"))
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
