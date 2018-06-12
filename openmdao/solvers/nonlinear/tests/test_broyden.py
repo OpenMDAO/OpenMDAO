@@ -27,7 +27,7 @@ class TestBryoden(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
 
 if __name__ == "__main__":

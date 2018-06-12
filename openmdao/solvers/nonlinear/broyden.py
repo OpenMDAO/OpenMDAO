@@ -103,7 +103,7 @@ class BroydenSolver(NonlinearSolver):
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
 
-        # Cache initial states.
+        # Start with initial states.
         self.xm = self.get_states()
 
         with Recording('Broyden', 0, self):
@@ -145,7 +145,7 @@ class BroydenSolver(NonlinearSolver):
         fxm = self.fxm
 
         delta_xm = -Gm.dot(fxm)
-        xm = self.xm + delta_xm.T
+        xm = self.xm + delta_xm
 
         # Update the new states in the model.
         self.set_states(xm)
@@ -171,50 +171,11 @@ class BroydenSolver(NonlinearSolver):
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
 
-        # Cache for next jacobian update.
+        # Cache for next iteration.
         self.delta_xm = delta_xm
         self.delta_fxm = delta_fxm
         self.fxm = fxm
         self.xm = xm
-
-    """
-        xm = self.xin.T
-        Fxm = numpy.matrix(self.F).T
-        Gm = -self.alpha*numpy.matrix(numpy.identity(len(self.xin)))
-
-        for n in range(self.itmax):
-
-            deltaxm = -Gm*Fxm
-            xm = xm + deltaxm.T
-
-            # update the new independents in the model
-            self.set_parameters(numpy.asarray(xm).flat)
-
-            # run the model
-            self.run_iteration()
-
-            # get dependents
-            self.F[:] = self.eval_eq_constraints()
-
-            # successful termination if independents are below tolerance
-            #print "iter", n, norm(self.F)
-            if norm(self.F) < self.tol:
-                return
-
-            Fxm1 = numpy.matrix(self.F).T
-            deltaFxm = Fxm1 - Fxm
-
-            if norm(deltaFxm) == 0:
-                msg = "Broyden iteration has stopped converging. Change in " \
-                      "input has produced no change in output. This could " \
-                      "indicate a problem with your component connections. " \
-                      "It could also mean that this solver method is " \
-                      "inadequate for your problem."
-                raise RuntimeError(msg)
-
-            Fxm = Fxm1.copy()
-            Gm = Gm + (deltaxm-Gm*deltaFxm)*deltaFxm.T/norm(deltaFxm)**2
-    """
 
     def _update_jacobian(self):
         """
@@ -236,7 +197,7 @@ class BroydenSolver(NonlinearSolver):
             # TODO: do this
             pass
 
-        # Reset Jacobian to identiy scaled by alpha.
+        # Set Jacobian to identiy scaled by alpha.
         else:
             Gm = -self.options['alpha'] * np.identity(self.n)
 
