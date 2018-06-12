@@ -8,7 +8,7 @@ If you know additional information about the structure of partial derivatives in
 (for example, if an output does not depend on a particular input), you can use the :code:`declare_partials()`
 method to inform the framework. This will allow the framework to be more efficient in terms of
 memory and computation (especially if using a sparse :code:`AssembledJacobian`). This information
-should be delcared in the `setup` method of your component.
+should be declared in the `setup` method of your component.
 
 .. automethod:: openmdao.core.component.Component.declare_partials
     :noindex:

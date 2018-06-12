@@ -52,7 +52,7 @@ The :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>` only allocates 
 non-zero partial derivatives.
 How does OpenMDAO know which partials are non-zero?
 The authors of the components in your model declared them using either a
-:ref:`dense<feature_specify_partials>` or :ref:`sparse<feature_sparse_partials>` form of :code:`delcare_partials`.
+:ref:`dense<feature_specify_partials>` or :ref:`sparse<feature_sparse_partials>` form of :code:`declare_partials`.
 
 Even if all of your components declared their partial derivatives as dense (or if they are all
 scalar variables and specifying sparsity doesn't have meaning), at the group level there is still a

@@ -42,6 +42,7 @@ clean:
 	rm -rf tags
 	rm -rf tmp
 	rm -rf make_sourcedocs
+	rm -rf doc_plot_*.png
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"
