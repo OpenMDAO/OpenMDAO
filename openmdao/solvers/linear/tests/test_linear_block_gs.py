@@ -8,7 +8,7 @@ import numpy as np
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.api import LinearBlockGS, Problem, Group, ImplicitComponent, IndepVarComp, \
-    DirectSolver, NewtonSolver, ScipyKrylov, DenseJacobian, ExecComp, NonlinearBlockGS
+    DirectSolver, NewtonSolver, ScipyKrylov, ExecComp, NonlinearBlockGS
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
@@ -35,30 +35,20 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_globaljac_err(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = Group(assembled_jac_type='dense')
         model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                             promotes=['length'])
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = self.linear_solver_class()
-        prob.set_solver_print(level=0)
-
-        prob.model.jacobian = DenseJacobian()
-        prob.setup(check=False, mode='fwd')
-
-        prob['width'] = 2.0
-        prob.run_model()
-
-        of = ['area']
-        wrt = ['length']
+        model.linear_solver = self.linear_solver_class(assemble_jac=True)
+        prob.setup(check=False)
 
         with self.assertRaises(RuntimeError) as context:
-            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+            prob.run_model()
 
         self.assertEqual(str(context.exception),
-                         "A block linear solver 'LN: LNBGS' is being used with"
-                         " an AssembledJacobian in system ''")
+                         "Linear solver 'LN: LNBGS' in system '' doesn't support assembled jacobians.")
 
     def test_simple_implicit(self):
         # This verifies that we can perform lgs around an implicit comp and get the right answer
@@ -125,25 +115,6 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         # Newton is kinda slow on this for some reason, this is how far it gets with directsolver too.
         self.assertLess(res, 2.0e-2)
-
-    def test_error_under_assembled_jac(self):
-        prob = Problem()
-        model = prob.model
-        model.add_subsystem('p', IndepVarComp('a', 5.0))
-        comp = model.add_subsystem('comp', SimpleImp())
-        model.connect('p.a', 'comp.a')
-
-        comp.linear_solver = self.linear_solver_class()
-        comp.jacobian = DenseJacobian()
-
-        prob.setup(check=False, mode='fwd')
-
-        with self.assertRaises(RuntimeError) as context:
-            prob.compute_totals(of=['comp.x'], wrt=['p.a'])
-
-        self.assertEqual(str(context.exception),
-                         "A block linear solver 'LN: LNBGS' is being used with"
-                         " an AssembledJacobian in system 'comp'")
 
     def test_full_desvar_with_index_obj_relevance_bug(self):
         prob = Problem()

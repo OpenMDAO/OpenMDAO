@@ -14,6 +14,7 @@ from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.bsplines_comp import BsplinesComp
 from openmdao.components.cross_product_comp import CrossProductComp
 from openmdao.components.dot_product_comp import DotProductComp
+from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.external_code_comp import ExternalCode
 from openmdao.components.external_code_comp import ExternalCodeComp
@@ -67,10 +68,6 @@ except ImportError:
 # Developer Tools
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
-
-# Derivative Specification
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, \
-    DenseJacobian, COOJacobian, CSRJacobian, CSCJacobian
 
 # Drivers
 try:

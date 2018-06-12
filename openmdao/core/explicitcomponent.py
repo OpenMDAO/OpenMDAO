@@ -56,11 +56,6 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
-        # TODO : Uncomment these out to set default to DenseJacobian, once we have resolved further
-        # issues.
-        # self._jacobian = DenseJacobian()
-        # self._owns_assembled_jac = True
-
     def _setup_partials(self, recurse=True):
         """
         Call setup_partials in components.
@@ -89,7 +84,9 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
-            self._declare_partials(out_name, out_name, rows=arange, cols=arange, val=1.)
+            # ExplicitComponent jacobians have -1 on the diagonal.
+            self._declare_partials(out_name, out_name, rows=arange, cols=arange,
+                                   val=np.full(meta['size'], -1.))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
@@ -154,37 +151,24 @@ class ExplicitComponent(Component):
                                                          ref=ref, ref0=ref0, res_ref=res_ref,
                                                          var_set=var_set)
 
-    def _negate_jac(self):
-        """
-        Negate this component's part of the jacobian.
-        """
-        if self._jacobian._subjacs:
-            for res_name in self._var_abs_names['output']:
-                for in_name in self._var_abs_names['input']:
-                    abs_key = (res_name, in_name)
-                    if abs_key in self._jacobian._subjacs:
-                        self._jacobian._multiply_subjac(abs_key, -1.)
-
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
         """
         abs2prom = self._var_abs2prom
+        abs2meta = self._var_abs2meta
 
-        with self.jacobian_context() as J:
-            for abs_key, meta in iteritems(self._subjacs_info):
-                if meta['value'] is None:
-                    out_size = self._var_abs2meta[abs_key[0]]['size']
-                    in_size = self._var_abs2meta[abs_key[1]]['size']
-                    meta['value'] = np.zeros((out_size, in_size))
+        for abs_key, meta in iteritems(self._subjacs_info):
 
-                J._set_partials_meta(abs_key, meta, abs_key[1] in abs2prom['input'])
+            if meta['value'] is None:
+                meta['value'] = np.zeros(meta['shape'])
 
-                if 'method' in meta and meta['method']:
-
-                    # Don't approximate output wrt output.
-                    if abs_key[1] not in self._var_allprocs_abs_names['output']:
-                        self._approx_schemes[meta['method']].add_approximation(abs_key, meta)
+            if 'method' in meta:
+                method = meta['method']
+                # Don't approximate output wrt output.``
+                if (method is not None and method in self._approx_schemes and abs_key[1]
+                        not in self._outputs._views_flat):
+                    self._approx_schemes[method].add_approximation(abs_key, meta)
 
         for approx in itervalues(self._approx_schemes):
             approx._init_approximations()
@@ -198,6 +182,10 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
                 residuals.set_vec(outputs)
+
+                # Sign of the residual is minus the sign of the output vector.
+                residuals *= -1.0
+
                 self.compute(self._inputs, outputs)
 
                 # Restore any complex views if under complex step.
@@ -205,8 +193,8 @@ class ExplicitComponent(Component):
                     outputs._remove_complex_views()
                     residuals._remove_complex_views()
 
-                residuals -= outputs
-                outputs += residuals
+                residuals += outputs
+                outputs -= residuals
 
     def _solve_nonlinear(self):
         """
@@ -230,12 +218,14 @@ class ExplicitComponent(Component):
                 failed = self.compute(self._inputs, self._outputs)
         return bool(failed), 0., 0.
 
-    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use jac.
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         rel_systems : set of str
@@ -249,6 +239,8 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        J = self._jacobian if jac is None else jac
+
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name not in self._rel_vec_names:
@@ -258,7 +250,7 @@ class ExplicitComponent(Component):
                     d_inputs, d_outputs, d_residuals = vecs
 
                     # Jacobian and vectors are all scaled, unitless
-                    with self.jacobian_context() as J:
+                    with self.jacobian_context(J):
                         J._apply(d_inputs, d_outputs, d_residuals, mode)
 
                     # if we're not matrix free, we can skip the bottom of
@@ -269,7 +261,9 @@ class ExplicitComponent(Component):
                     # Jacobian and vectors are all unscaled, dimensional
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
-                        d_residuals *= -1.0
+
+                        # We used to negate the residual here, and then re-negate after the hook.
+
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
                                 self.compute_multi_jacvec_product(self._inputs, d_inputs,
@@ -286,7 +280,6 @@ class ExplicitComponent(Component):
                                 d_residuals._icol = None
                         else:
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
-                        d_residuals *= -1.0
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -313,64 +306,56 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._solve_linear', self.iter_count, self):
             for vec_name in vec_names:
                 if vec_name in self._rel_vec_names:
+                    d_outputs = self._vectors['output'][vec_name]
+                    d_residuals = self._vectors['residual'][vec_name]
+
                     if mode == 'fwd':
                         if self._has_resid_scaling:
-                            d_outputs = self._vectors['output'][vec_name]
-                            d_residuals = self._vectors['residual'][vec_name]
-
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_outputs.set_vec(d_residuals)
                         else:
-                            self._vectors['output'][vec_name].set_vec(
-                                self._vectors['residual'][vec_name])
+                            d_outputs.set_vec(d_residuals)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_outputs *= -1.0
+
                     else:  # rev
                         if self._has_resid_scaling:
-                            d_outputs = self._vectors['output'][vec_name]
-                            d_residuals = self._vectors['residual'][vec_name]
-
                             with self._unscaled_context(outputs=[d_outputs],
                                                         residuals=[d_residuals]):
                                 d_residuals.set_vec(d_outputs)
                         else:
-                            self._vectors['residual'][vec_name].set_vec(
-                                self._vectors['output'][vec_name])
+                            d_residuals.set_vec(d_outputs)
+
+                        # ExplicitComponent jacobian defined with -1 on diagonal.
+                        d_residuals *= -1.0
+
         return False, 0., 0.
 
-    def _linearize(self, do_nl=False, do_ln=False):
+    def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         if not self._has_compute_partials and not self._approx_schemes:
             return
 
-        with self.jacobian_context() as J:
-            with self._unscaled_context(
-                    outputs=[self._outputs], residuals=[self._residuals]):
-                # Since the residuals are already negated, this call should come before negate_jac
-                # Additionally, computing the approximation before the call to compute_partials
-                # allows users to override FD'd values.
-                for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=J)
+        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            # Computing the approximation before the call to compute_partials allows users to
+            # override FD'd values.
+            for approximation in itervalues(self._approx_schemes):
+                approximation.compute_approximations(self, jac=self._jacobian)
 
-                if self._has_compute_partials:
-                    # negate constant subjacs (and others that will get overwritten)
-                    # back to normal
-                    self._negate_jac()
-                    self.compute_partials(self._inputs, J)
-
-                    # re-negate the jacobian
-                    self._negate_jac()
-
-            if self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            if self._has_compute_partials:
+                # We used to negate the jacobian here, and then re-negate after the hook.
+                self.compute_partials(self._inputs, self._jacobian)
 
     def compute(self, inputs, outputs):
         """

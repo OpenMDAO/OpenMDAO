@@ -1,4 +1,6 @@
 """Define the LinearRunOnce class."""
+from six import iteritems
+
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian
@@ -12,17 +14,6 @@ class LinearRunOnce(LinearBlockGS):
     """
 
     SOLVER = 'LN: RUNONCE'
-
-    def __init__(self, **kwargs):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Options dictionary.
-        """
-        super(LinearRunOnce, self).__init__(**kwargs)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -49,11 +40,6 @@ class LinearRunOnce(LinearBlockGS):
         self._rel_systems = rel_systems
         system = self._system
 
-        if isinstance(system._jacobian, AssembledJacobian):
-            raise RuntimeError("A block linear solver '%s' is being used with "
-                               "an AssembledJacobian in system '%s'" %
-                               (self.SOLVER, self._system.pathname))
-
         # Pre-processing
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
@@ -62,7 +48,9 @@ class LinearRunOnce(LinearBlockGS):
 
         for vec_name in self._vec_names:
             if vec_name in system._rel_vec_names:
-                self._rhs_vecs[vec_name].set_vec(b_vecs[vec_name])
+                rhs = self._rhs_vecs[vec_name]
+                for varset, data in iteritems(b_vecs[vec_name]._data):
+                    rhs[varset][:] = data
 
         with Recording('LinearRunOnce', 0, self) as rec:
             # Single iteration of GS
@@ -77,6 +65,8 @@ class LinearRunOnce(LinearBlockGS):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(LinearRunOnce, self)._declare_options()
+
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
         self.options.undeclare("atol")
