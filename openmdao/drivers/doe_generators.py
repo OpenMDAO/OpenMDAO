@@ -202,7 +202,7 @@ class CSVGenerator(DOEGenerator):
             for row in reader:
                 case = [(name_map[name.strip()],
                          np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
-                        for name in row]
+                        for name in reader.fieldnames]
                 yield case
 
 

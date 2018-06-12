@@ -113,7 +113,7 @@ class ExternalCodeDelegate(object):
         """
         return [path for path in files if not os.path.exists(path)]
 
-    def run_component(self):
+    def run_component(self, command=None):
         """
         Run this component.
 
@@ -121,16 +121,17 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        inputs : Vector
-            Unscaled, dimensional input variables read via inputs[key].
-        outputs : Vector
-            Unscaled, dimensional output variables read via outputs[key].
+        command : List
+            Optional command. Otherwise use the command in self.options['command'].
         """
         comp = self._comp
 
+        if not command:
+            command = comp.options['command']
+
         comp.return_code = -12345678
 
-        if not comp.options['command']:
+        if not command:
             raise ValueError('Empty command list')
 
         if comp.options['fail_hard']:
@@ -145,7 +146,7 @@ class ExternalCodeDelegate(object):
             if missing:
                 raise err_class("The following input files are missing: %s"
                                 % sorted(missing))
-            return_code, error_msg = self._execute_local()
+            return_code, error_msg = self._execute_local(command)
 
             if return_code is None:
                 raise AnalysisError('Timed out after %s sec.' %
@@ -174,9 +175,14 @@ class ExternalCodeDelegate(object):
         finally:
             comp.return_code = -999999 if return_code is None else return_code
 
-    def _execute_local(self):
+    def _execute_local(self, command):
         """
         Run the command.
+
+        Parameters
+        ----------
+        command : List
+            List containing OS command string.
 
         Returns
         -------
@@ -188,10 +194,10 @@ class ExternalCodeDelegate(object):
         # Check to make sure command exists
         comp = self._comp
 
-        if isinstance(comp.options['command'], str):
-            program_to_execute = comp.options['command']
+        if isinstance(command, str):
+            program_to_execute = command
         else:
-            program_to_execute = comp.options['command'][0]
+            program_to_execute = command[0]
 
         # Suppress message from find_executable function, we'll handle it
         numpy.distutils.log.set_verbosity(-1)
@@ -201,7 +207,7 @@ class ExternalCodeDelegate(object):
             msg = "The command to be executed, '%s', cannot be found" % program_to_execute
             raise ValueError(msg)
 
-        command_for_shell_proc = comp.options['command']
+        command_for_shell_proc = command
         if sys.platform == 'win32':
             command_for_shell_proc = ['cmd.exe', '/c'] + command_for_shell_proc
 
@@ -374,6 +380,13 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         """
         self._external_code_runner.declare_options()
 
+        # ImplicitComponent has two separate commands to run.
+        self.options.declare('command_apply', [],
+                             desc='command to be executed for apply_nonlinear')
+        self.options.declare('command_solve', [],
+                             desc='command to be executed for solve_nonlinear')
+        self.options.undeclare('command')
+
     def check_config(self, logger):
         """
         Perform optional error checks.
@@ -400,4 +413,21 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        self._external_code_runner.run_component()
+        command = self.options['command_apply']
+        if command:
+            self._external_code_runner.run_component(command=command)
+
+    def solve_nonlinear(self, inputs, outputs):
+        """
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        command = self.options['command_solve']
+        if command:
+            self._external_code_runner.run_component(command=command)
