@@ -21,9 +21,9 @@ operating system. But it treats the `Component` as an `ImplicitComponent` rather
 ExternalCodeImplicitComp Example
 ---------------------------------------
 
-Here is a simple example of the use of a `ExternalCodeImplicitComp` Component. The external code is a Python script
-that evaluates the output and residual for the implicit relationship between the area ratio and mach number in an
-isentropic flow.
+Here is a simple example of the use of an `ExternalCodeImplicitComp` Component. The external code in the example
+is a Python script that evaluates the output and residual for the implicit relationship between the area ratio and
+mach number in an isentropic flow.
 
 .. embed-code::
     openmdao.components.tests.extcode_mach
@@ -31,7 +31,7 @@ isentropic flow.
 The following model makes use of this external code.
 
 .. embed-code::
-    openmdao.components.tests.test_external_code_comp.TestExternalCodeImplicitCompFeature.test_simple_external_code_implicit_comp_with_solver
+    openmdao.components.tests.test_external_code_comp.TestExternalCodeImplicitCompFeature.test_simple_external_code_implicit_comp
     :layout: interleave
 
 
