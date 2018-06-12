@@ -48,11 +48,11 @@ if __name__ == '__main__':
             super_sonic = (input_file.readline().strip() == "True")
 
     if output_or_resids == 'outputs':
-        mach_output = mach_solve(area_ratio,super_sonic=super_sonic)
+        mach_output = mach_solve(area_ratio, super_sonic=super_sonic)
         with open(output_filename, 'w') as output_file:
             output_file.write('%.16f\n' % mach_output)
 
-    if output_or_resids == 'residuals':
+    elif output_or_resids == 'residuals':
         mach_resid = mach_residual(mach, area_ratio)
         with open(output_filename, 'w') as output_file:
             output_file.write('%.16f\n' % mach_resid)

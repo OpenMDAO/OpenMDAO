@@ -584,7 +584,10 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 self.options['external_input_files'] = [self.input_file, ]
                 self.options['external_output_files'] = [self.output_file,]
 
-                self.options['command'] = [
+                self.options['command_apply'] = [
+                    'python', 'extcode_mach.py', self.input_file, self.output_file,
+                ]
+                self.options['command_solve'] = [
                     'python', 'extcode_mach.py', self.input_file, self.output_file,
                 ]
 
