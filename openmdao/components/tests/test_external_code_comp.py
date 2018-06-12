@@ -644,6 +644,9 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
                 residuals['V'] = resid_V
 
+            def solve_nonlinear(self, inputs, outputs):
+                print('hey')
+
         class Circuit(Group):
 
             def setup(self):
@@ -665,6 +668,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 self.nonlinear_solver = NewtonSolver()
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
+                self.nonlinear_solver.options['solve_subsystems'] = True
                 self.linear_solver = DirectSolver()
 
         p = Problem()

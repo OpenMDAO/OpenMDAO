@@ -166,7 +166,7 @@ class BroydenSolver(NonlinearSolver):
 
         fxm1 = fxm.copy()
         fxm = self.get_residuals()
-        delta_fxm = fxm1 - fxm
+        delta_fxm = fxm - fxm1
 
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
@@ -175,6 +175,7 @@ class BroydenSolver(NonlinearSolver):
         self.delta_xm = delta_xm
         self.delta_fxm = delta_fxm
         self.fxm = fxm
+        self.xm = xm
 
     """
         xm = self.xin.T
