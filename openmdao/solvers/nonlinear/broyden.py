@@ -1,12 +1,13 @@
 """
 Define the BroydenSolver class.
 
-Based on implementation in Scipy via OpenMDAO 0.8x
+Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS.
 """
 from __future__ import print_function
 
 import numpy as np
 
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 
@@ -31,6 +32,11 @@ class BroydenSolver(NonlinearSolver):
 
         self.n = 0
         self._recompute_jacobian = True
+        self.Gm = None
+        self.xm = None
+        self.fxm = None
+        self.delta_xm = None
+        self.delta_fxm = None
 
     def _declare_options(self):
         """
@@ -168,6 +174,15 @@ class BroydenSolver(NonlinearSolver):
         fxm = self.get_residuals()
         delta_fxm = fxm - fxm1
 
+        # Note: This is the old OpenMDAO Classic code. We will do something smarter from NPSS.
+        #if np.linalg.norm(delta_fxm) == 0:
+            #msg = "Broyden iteration has stopped converging. Change in " \
+                  #"input has produced no change in output. This could " \
+                  #"indicate a problem with your component connections. " \
+                  #"It could also mean that this solver method is " \
+                  #"inadequate for your problem."
+            #raise AnalysisError(msg)
+
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
 
@@ -176,6 +191,7 @@ class BroydenSolver(NonlinearSolver):
         self.delta_fxm = delta_fxm
         self.fxm = fxm
         self.xm = xm
+        self.Gm = Gm
 
     def _update_jacobian(self):
         """
@@ -190,14 +206,15 @@ class BroydenSolver(NonlinearSolver):
         if not self._recompute_jacobian:
             dfxm = self.delta_fxm
             Gm = self.Gm
-            Gm += (self.delta_xm - Gm * dfxm) * dfxm.T / np.linalg.norm(dfxm)**2
+            fact = 1.0 / np.linalg.norm(dfxm)**2
+            Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * fact)
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_initial_jacobian']:
             # TODO: do this
             pass
 
-        # Set Jacobian to identiy scaled by alpha.
+        # Set Jacobian to identity scaled by alpha.
         else:
             Gm = -self.options['alpha'] * np.identity(self.n)
 
@@ -264,4 +281,3 @@ class BroydenSolver(NonlinearSolver):
             i += n_size
 
         return fxm
-
