@@ -69,10 +69,6 @@ except ImportError:
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 
-# Derivative Specification
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, \
-    DenseJacobian, COOJacobian, CSRJacobian, CSCJacobian
-
 # Drivers
 try:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver

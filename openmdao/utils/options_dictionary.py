@@ -48,7 +48,7 @@ class OptionsDictionary(object):
         dict
             The options dictionary.
         """
-        return self._dict
+        return self._dict.__repr__()
 
     def __rst__(self):
         """

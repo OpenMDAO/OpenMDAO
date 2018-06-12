@@ -199,6 +199,8 @@ class PETScKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(PETScKrylov, self)._declare_options()
+
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
@@ -211,6 +213,16 @@ class PETScKrylov(LinearSolver):
 
         # changing the default maxiter from the base class
         self.options['maxiter'] = 100
+
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.options['assemble_jac']:
+            yield self
+        if self.precon is not None:
+            for s in self.precon._assembled_jac_solver_iter():
+                yield s
 
     def _setup_solvers(self, system, depth):
         """
@@ -285,7 +297,8 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
+                             scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         b_vec.get_data(result.array)

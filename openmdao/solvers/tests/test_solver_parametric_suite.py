@@ -10,8 +10,6 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, COOJacobian, \
-                                                  CSRJacobian, CSCJacobian
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
@@ -49,31 +47,15 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         Test the direct solver on a component.
         """
-        for jac in ['dict', 'coo', 'csr', 'csc', 'dense']:
+        for jac in [None, 'csc', 'dense']:
             prob = Problem(model=ImplComp4Test())
             prob.model.nonlinear_solver = NewtonSolver()
-            prob.model.linear_solver = DirectSolver()
+            if jac in ('csc', 'dense'):
+                prob.model.options['assembled_jac_type'] = jac
+            prob.model.linear_solver = DirectSolver(assemble_jac=jac in ('csc','dense'))
             prob.set_solver_print(level=0)
 
-            if jac == 'dict':
-                pass
-            elif jac == 'csr':
-                prob.model.jacobian = CSRJacobian()
-            elif jac == 'csc':
-                prob.model.jacobian = CSCJacobian()
-            elif jac == 'coo':
-                prob.model.jacobian = COOJacobian()
-            elif jac == 'dense':
-                prob.model.jacobian = DenseJacobian()
-
             prob.setup(check=False)
-
-            if jac == 'coo':
-                with self.assertRaises(Exception) as context:
-                    prob.run_model()
-                self.assertEqual(str(context.exception),
-                                 "Direct solver is not compatible with matrix type COOMatrix in system ''.")
-                continue
 
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])

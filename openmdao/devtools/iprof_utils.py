@@ -4,7 +4,7 @@ import os
 import sys
 import ast
 
-from inspect import getmembers
+from inspect import getmembers, iscode
 from fnmatch import fnmatchcase
 from collections import defaultdict
 from six import string_types
@@ -93,27 +93,53 @@ def find_qualified_name(filename, line, cache, full=True):
 # glob patterns for each class.
 func_group = {}
 
+base_classes = {}
+
 
 def _setup_func_group():
-    global func_group
+    global func_group, base_classes
 
     from openmdao.core.system import System
+    from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
     from openmdao.core.driver import Driver
-    from openmdao.solvers.solver import Solver
+    from openmdao.core.total_jac import _TotalJacInfo
+    from openmdao.solvers.solver import Solver, LinearSolver
+    from openmdao.solvers.nonlinear.newton import NewtonSolver
+    from openmdao.solvers.linear.direct import DirectSolver
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+
+    for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
+                   NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer]:
+        base_classes[class_.__name__] = class_
 
     func_group.update({
         'openmdao': [
             ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
         ],
         'openmdao_all': [
-            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver, Problem)),
+            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver,
+                   Problem, _TotalJacInfo)),
         ],
         'setup': [
-            ("*setup*", (System, Solver, Driver, Problem)),
+            ("__init__", (System, Solver, Driver, Problem, Jacobian, DefaultVector, _TotalJacInfo,
+                          Matrix)),
+            ("*setup*", (System, Solver, Driver, Problem, Jacobian, DefaultVector, _TotalJacInfo,
+                         Matrix)),
+            ('_configure', (System,)),
+            ('set_initial_values', (System,)),
+            ('_set_initial_conditions', (Problem,)),
+            ('_build', (Matrix,)),
+            ('_add_submat', (Matrix,)),
+            ('_get_maps', (System,)),
+            ('_set_partials_meta', (System,)),
+            ('_init_relevance', (System,)),
+            ('_get_initial_*', (System,)),
+            ('_initialize_*', (DefaultVector,)),
+            ('_create_*', (DefaultVector,)),
+            ('_extract_data', (DefaultVector,)),
         ],
         'dataflow': [
             ('*compute*', (System,)),
@@ -122,9 +148,32 @@ def _setup_func_group():
             ('*', (DefaultTransfer,)),
         ],
         'linear': [
-            ('*linear*', (System,)),
-            ('*solve*', (Solver,)),
-            ('*compute*', (System,))
+            ('_apply_linear', (System,)),
+            ('_setup_jacobians', (System, Solver)),
+            ('_solve_linear', (System,)),
+            ('apply_linear', (System,)),
+            ('solve_linear', (System,)),
+            ('_set_partials_meta', (System, Jacobian)),
+            ('jacobian_context', (System,)),
+            ('_linearize', (System, Solver)),
+            # include NewtonSolver to provide some context
+            ('solve', (LinearSolver, NewtonSolver)),
+            ('_update', (Jacobian,)),
+            ('_apply', (Jacobian,)),
+            ('_initialize', (Jacobian,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('compute_jacvec_product', (System,)),
+        ],
+        'jac': [
+            ('_linearize', (System, DirectSolver)),
+            ('_setup_jacobians', (System,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('_apply_linear', (System,)),
+            ('solve', (LinearSolver, NewtonSolver)),
+            ('_update', (Jacobian,)),
+            ('_initialize', (Jacobian,)),
         ],
         'solver': [
             ('*', (Solver,))
@@ -190,24 +239,39 @@ def _collect_methods(method_patterns):
     return matches
 
 
-def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=None):
+def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=None, filters=None):
     """
     The wrapped function returned from here handles identification of matching calls when called
     as a setprofile callback.
     """
+    if filters:
+        newfilts = []
+        for s in filters:
+            class_name, filt = s.split(' ', 1)
+            class_ = base_classes[class_name]
+            newfilts.append((class_, compile(filt, mode='eval', filename=filt)))
+        filters = newfilts
+
     def _wrapped(frame, event, arg):
         if event == 'call':
             if 'self' in frame.f_locals and frame.f_code.co_name in matches and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
-                stack.append(id(frame))
-                if do_call is not None:
-                   return do_call(frame, arg, stack, context)
+                pred = True
+                if filters:
+                    inst = frame.f_locals['self']
+                    for class_, filt in filters:
+                        if isinstance(inst, class_):
+                            pred = eval(filt, globals(), frame.f_locals)
+                            break
+                if pred:
+                    stack.append(id(frame))
+                    if do_call is not None:
+                       return do_call(frame, arg, stack, context)
         elif event == 'return' and stack:
             if id(frame) == stack[-1]:
                 stack.pop()
                 if do_ret is not None:
                     do_ret(frame, arg, stack, context)
-                #stack.pop()
 
     return _wrapped
 

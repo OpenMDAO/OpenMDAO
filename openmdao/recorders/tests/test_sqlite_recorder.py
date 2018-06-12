@@ -649,7 +649,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
-            "d1.y1": [1.318802844707534e-10],
+            "d1.y1": [-1.318802844707534e-10],
             "con_cmp2.con2": [0.0],
             "pz.z": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
@@ -674,7 +674,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
-            "d1.y1": [-2.60769184e-12],
+            "d1.y1": [2.60769184e-12],
             "con_cmp2.con2": [0.0],
             "pz.z": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
@@ -791,9 +791,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [-0.],
-            'pz.z': [-0., -0.],
-            'd1.y1': [1.31880284e-10],
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [-1.31880284e-10],
             'd2.y2': [0.],
             'obj_cmp.obj': [0.],
             'con_cmp1.con1': [0.],
@@ -932,10 +932,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             'px.x': [0.],
-            'pz.z': [-0., -0.],
+            'pz.z': [0., 0.],
             'd1.y1': [0.0],
-            'd2.y2': [-0.00229801],
-            'obj_cmp.obj': [5.75455956e-06],
+            'd2.y2': [0.00229801],
+            'obj_cmp.obj': [-5.75455956e-06],
             'con_cmp1.con1': [-0.],
             'con_cmp2.con2': [-0.]
         }
@@ -969,10 +969,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'px.x': [0.],
             'pz.z': [0., 0.],
             'd1.y1': [0.0],
-            'd2.y2': [-0.41168147],
-            'obj_cmp.obj': [-0.48667678],
-            'con_cmp1.con1': [0.770496],
-            'con_cmp2.con2': [-2.70578793e-06]
+            'd2.y2': [0.41168147],
+            'obj_cmp.obj': [0.48667678],
+            'con_cmp1.con1': [-0.770496],
+            'con_cmp2.con2': [2.70578793e-06]
         }
 
         expected_solver_residuals = {
@@ -1015,11 +1015,11 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_output = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [5.41157587e-07],
-            'd2.y2': [-0.41168147],
-            'obj_cmp.obj': [-0.48667678],
-            'con_cmp1.con1': [0.770496],
-            'con_cmp2.con2': [-2.70578793e-06]
+            'd1.y1': [-5.41157587e-07],
+            'd2.y2': [0.41168147],
+            'obj_cmp.obj': [0.48667678],
+            'con_cmp1.con1': [-0.770496],
+            'con_cmp2.con2': [2.70578793e-06]
         }
 
         expected_solver_residuals = {
@@ -1070,9 +1070,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_residuals = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [9.10908321e-11],
+            'd1.y1': [-9.10908321e-11],
             'd2.y2': [0.],
-            'obj_cmp.obj': [-2.03287907e-20],
+            'obj_cmp.obj': [2.03287907e-20],
             'con_cmp1.con1': [0.],
             'con_cmp2.con2': [0.]
         }
@@ -1113,13 +1113,13 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [-0.],
+            'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [-4.15366975e-05],
-            'd2.y2': [4.10564051e-06],
-            'obj_cmp.obj': [-4.15366737e-05],
-            'con_cmp1.con1': [-4.15366975e-05],
-            'con_cmp2.con2': [-4.10568454e-06]
+            'd1.y1': [4.15366975e-05],
+            'd2.y2': [-4.10564051e-06],
+            'obj_cmp.obj': [4.15366737e-05],
+            'con_cmp1.con1': [4.15366975e-05],
+            'con_cmp2.con2': [4.10568454e-06]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -1158,13 +1158,13 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [-0.],
+            'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [-2.84055951e-16],
-            'd2.y2': [6.93561782e-12],
-            'obj_cmp.obj': [7.01674811e-11],
-            'con_cmp1.con1': [-7.01674811e-11],
-            'con_cmp2.con2': [1.42027975e-15]
+            'd1.y1': [2.84055951e-16],
+            'd2.y2': [-6.93561782e-12],
+            'obj_cmp.obj': [-7.01674811e-11],
+            'con_cmp1.con1': [7.01674811e-11],
+            'con_cmp2.con2': [-1.42027975e-15]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,

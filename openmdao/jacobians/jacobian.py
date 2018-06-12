@@ -20,8 +20,6 @@ class Jacobian(object):
     ----------
     _system : <System>
         Pointer to the system that is currently operating on this Jacobian.
-    _subjacs : dict
-        Dictionary of the user-supplied sub-Jacobians keyed by absolute names.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _override_checks : bool
@@ -30,13 +28,17 @@ class Jacobian(object):
         can assign a jacobian with less rows or columns than the variable sizes.
     """
 
-    def __init__(self):
+    def __init__(self, system):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
         """
-        self._system = None
-        self._subjacs = OrderedDict()
-        self._subjacs_info = OrderedDict()
+        self._system = system
+        self._subjacs_info = system._subjacs_info
         self._override_checks = False
 
     def _abs_key2shape(self, abs_key):
@@ -58,28 +60,6 @@ class Jacobian(object):
         abs2meta = self._system._var_allprocs_abs2meta
         return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
-    def _multiply_subjac(self, abs_key, val):
-        """
-        Multiply this sub-Jacobian by val.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        val : float
-            value to multiply by.
-        """
-        jac = self._subjacs[abs_key]
-
-        if isinstance(jac, np.ndarray):
-            self._subjacs[abs_key] *= val
-        elif isinstance(jac, sparse_types):
-            self._subjacs[abs_key].data *= val  # DOK not supported
-        elif len(jac) == 3:
-            self._subjacs[abs_key][0] *= val
-        else:
-            self._subjacs[abs_key] *= val
-
     def __contains__(self, key):
         """
         Return whether there is a subjac for the given promoted or relative name pair.
@@ -94,7 +74,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        return key2abs_key(self._system, key) in self._subjacs
+        return key2abs_key(self._system, key) in self._subjacs_info
 
     def __getitem__(self, key):
         """
@@ -111,12 +91,8 @@ class Jacobian(object):
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
         abs_key = key2abs_key(self._system, key)
-        if abs_key in self._subjacs:
-            subjac = self._subjacs[abs_key]
-            if isinstance(subjac, list):
-                # Sparse AIJ format
-                return subjac[0]
-            return subjac
+        if abs_key in self._subjacs_info:
+            return self._subjacs_info[abs_key]['value']
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
@@ -156,6 +132,8 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
+        subjacs_info = self._subjacs_info[abs_key]
+
         if not issparse(subjac):
             # np.promote_types will choose the smallest dtype that can contain both arguments
             subjac = np.atleast_1d(subjac)
@@ -165,14 +143,10 @@ class Jacobian(object):
             # Bail here so that we allow top level jacobians to be of reduced size when indices are
             # specified on driver vars.
             if self._override_checks:
-                self._subjacs[abs_key] = subjac
+                subjacs_info['value'] = subjac
                 return
 
-            if abs_key in self._subjacs_info:
-                subjac_info = self._subjacs_info[abs_key][0]
-                rows = subjac_info['rows']
-            else:
-                rows = None
+            rows = subjacs_info['rows']
 
             if rows is None:
                 # Dense subjac
@@ -182,11 +156,6 @@ class Jacobian(object):
                     subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
                 else:
                     subjac = subjac.reshape(shape)
-
-                if abs_key in self._subjacs and self._subjacs[abs_key].shape == shape:
-                    np.copyto(self._subjacs[abs_key], subjac)
-                else:
-                    self._subjacs[abs_key] = subjac.copy()
             else:
                 # Sparse subjac
                 if subjac.shape == (1,):
@@ -197,12 +166,9 @@ class Jacobian(object):
                                      "the wrong shape (%s), expected (%s)." %
                                      (abs_key, subjac.shape, rows.shape))
 
-                if abs_key in self._subjacs and subjac.shape == self._subjacs[abs_key][0].shape:
-                    np.copyto(self._subjacs[abs_key][0], subjac)
-                else:
-                    self._subjacs[abs_key] = [subjac.copy(), rows, subjac_info['cols']]
+            np.copyto(subjacs_info['value'], subjac)
         else:
-            self._subjacs[abs_key] = subjac
+            subjacs_info['value'] = subjac
 
     def _initialize(self):
         """
@@ -210,9 +176,14 @@ class Jacobian(object):
         """
         pass
 
-    def _update(self):
+    def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
         """
         pass
 
@@ -232,25 +203,3 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         pass
-
-    def _set_partials_meta(self, abs_key, meta, negate=False):
-        """
-        Store subjacobian metadata.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        meta : dict
-            Metadata dictionary for the subjacobian.
-        negate : bool
-            If True negate the given value, if any.
-        """
-        shape = self._abs_key2shape(abs_key)
-        self._subjacs_info[abs_key] = (meta, shape)
-
-        val = meta['value']
-        if val is not None:
-            self._set_abs(abs_key, val)
-            if negate:
-                self._multiply_subjac(abs_key, -1.0)
