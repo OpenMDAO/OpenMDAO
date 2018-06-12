@@ -207,30 +207,32 @@ class OptionsDictionary(object):
                 if value not in values:
                     if isinstance(value, string_types):
                         value = "'{}'".format(value)
-                    raise ValueError("Value {} of option '{}' "
-                                     "is not one of {}".format(value, name, values))
+                    raise ValueError("Value ({}) of option '{}' "
+                                     "is not one of {}.".format(value, name, values))
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
+                    vtype = type(value)
                     if isinstance(value, string_types):
                         value = "'{}'".format(value)
-                    raise TypeError("Value {} of option '{}' "
-                                    "has the wrong type ({}).".format(value, name, types))
+                    raise TypeError("Value ({}) of option '{}' has type of ({}), but "
+                                    "expected type ({}).".format(value, name, vtype, types))
 
             if upper is not None:
                 if value > upper:
-                    raise ValueError("Value {} of option '{}' "
+                    raise ValueError("Value ({}) of option '{}' "
                                      "exceeds maximum allowed value of {}.".format(value, name,
                                                                                    upper))
             if lower is not None:
                 if value < lower:
-                    raise ValueError("Value {} of option '{}' "
+                    raise ValueError("Value ({}) of option '{}' "
                                      "exceeds minimum allowed value of {}.".format(value, name,
                                                                                    upper))
 
         # General function test
         if is_valid is not None and not is_valid(value):
-            raise ValueError("Function is_valid({}) returns False for {}.".format(value, name))
+            raise ValueError("Function is_valid({}) returns False for option '{}'.".format(value,
+                                                                                           name))
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
                 upper=None, lower=None, is_valid=None, allow_none=False):
