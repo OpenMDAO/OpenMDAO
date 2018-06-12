@@ -33,7 +33,7 @@ New Features:
     - DotProductComp
     - MatrixVectorProductComp
     - ExternalCodeImplicitComp
-    - EQConstraintsComp
+    - EQConstraintComp
 
 - Updates to existing Components in standard library:
     - LinearSystemComp has been vectorized.
