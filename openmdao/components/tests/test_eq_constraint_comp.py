@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
-    EqualityConstraintsComp, ScipyOptimizeDriver
+    EQConstraintComp, ScipyOptimizeDriver
 
 from openmdao.test_suite.components.sellar import \
     SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -42,7 +42,7 @@ class SellarIDF(Group):
         # rather than create a cycle by connecting d1.y1 to d2.y1 and d2.y2 to d1.y2
         # we will constrain y1 and y2 to be equal for the two disciplines
 
-        equal = EqualityConstraintsComp()
+        equal = EQConstraintComp()
         self.add_subsystem('equal', equal)
 
         equal.add_eq_output('y1', add_constraint=True)
@@ -66,7 +66,7 @@ class SellarIDF(Group):
         self.add_constraint('con_cmp2.con2', upper=0.)
 
 
-class TestEqualityConstraintsComp(unittest.TestCase):
+class TestEQConstraintComp(unittest.TestCase):
 
     def test_sellar_idf(self):
         prob = Problem(SellarIDF())
@@ -111,7 +111,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.add_subsystem('indep', IndepVarComp('x', val=0.))
         model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
         model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', val=11.))
+        model.add_subsystem('equal', EQConstraintComp('y', val=11.))
 
         model.connect('indep.x', 'f.x')
         model.connect('indep.x', 'g.x')
@@ -158,7 +158,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.add_subsystem('indep', IndepVarComp('x', val=0.))
         model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
         model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', add_constraint=True))
+        model.add_subsystem('equal', EQConstraintComp('y', add_constraint=True))
 
         model.connect('indep.x', 'f.x')
         model.connect('indep.x', 'g.x')
@@ -200,7 +200,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(n)))
         model.add_subsystem('f', ExecComp('y=3*x-3', x=np.ones(n), y=np.ones(n)))
         model.add_subsystem('g', ExecComp('y=2.3*x+4', x=np.ones(n), y=np.ones(n)))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', val=np.ones(n), add_constraint=True))
+        model.add_subsystem('equal', EQConstraintComp('y', val=np.ones(n), add_constraint=True))
         model.add_subsystem('obj_cmp', ExecComp('obj=sum(y)', y=np.zeros(n)))
 
         model.connect('indep.x', 'f.x')
@@ -238,7 +238,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.add_subsystem('indep', IndepVarComp('x', val=1.))
         model.add_subsystem('multx', IndepVarComp('m', val=2.))
         model.add_subsystem('f', ExecComp('y=x**2', x=1.))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', use_mult=True))
+        model.add_subsystem('equal', EQConstraintComp('y', use_mult=True))
 
         model.connect('indep.x', 'f.x')
 
@@ -274,7 +274,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(n)))
         model.add_subsystem('multx', IndepVarComp('m', val=np.ones(n)*2.))
         model.add_subsystem('f', ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', val=np.ones(n),
+        model.add_subsystem('equal', EQConstraintComp('y', val=np.ones(n),
                             use_mult=True, add_constraint=True))
         model.add_subsystem('obj_cmp', ExecComp('obj=sum(y)', y=np.zeros(n)))
 
@@ -311,7 +311,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         # find where 2*x == x^2, vectorized
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(n)))
         model.add_subsystem('f', ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', val=np.ones(n),
+        model.add_subsystem('equal', EQConstraintComp('y', val=np.ones(n),
                             use_mult=True, mult_val=2., add_constraint=True))
         model.add_subsystem('obj_cmp', ExecComp('obj=sum(y)', y=np.zeros(n)))
 
@@ -345,7 +345,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         # find where x^2 == 4
         model.add_subsystem('indep', IndepVarComp('x', val=1.))
         model.add_subsystem('f', ExecComp('y=x**2', x=1.))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', rhs_val=4.))
+        model.add_subsystem('equal', EQConstraintComp('y', rhs_val=4.))
 
         model.connect('indep.x', 'f.x')
         model.connect('f.y', 'equal.lhs:y')
@@ -378,7 +378,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         # find where x^2 == 4, vectorized
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(n)))
         model.add_subsystem('f', ExecComp('y=x**2', x=np.ones(n), y=np.ones(n)))
-        model.add_subsystem('equal', EqualityConstraintsComp('y', val=np.ones(n),
+        model.add_subsystem('equal', EQConstraintComp('y', val=np.ones(n),
                             rhs_val=np.ones(n)*4., use_mult=True, mult_val=2.))
         model.add_subsystem('obj_cmp', ExecComp('obj=sum(y)', y=np.zeros(n)))
 
@@ -408,7 +408,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         model = prob.model
 
         # find intersection of two non-parallel lines, fx_y and gx_y
-        equal = EqualityConstraintsComp('y', lhs_name='fx_y', rhs_name='gx_y',
+        equal = EQConstraintComp('y', lhs_name='fx_y', rhs_name='gx_y',
                                         add_constraint=True)
 
         model.add_subsystem('indep', IndepVarComp('x', val=0.))
@@ -442,7 +442,7 @@ class TestEqualityConstraintsComp(unittest.TestCase):
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
 
-class TestFeatureEqualityConstraintsComp(unittest.TestCase):
+class TestFeatureEQConstraintComp(unittest.TestCase):
 
     def test_feature_sellar_idf(self):
         prob = Problem(model=SellarIDF())

@@ -1,4 +1,4 @@
-"""Define the EqualityConstraintsComp class."""
+"""Define the EQConstraintComp class."""
 
 from __future__ import print_function, division, absolute_import
 
@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
-class EqualityConstraintsComp(ExplicitComponent):
+class EQConstraintComp(ExplicitComponent):
     """
     A component that computes the difference between two inputs to test for equality.
 
@@ -25,11 +25,10 @@ class EqualityConstraintsComp(ExplicitComponent):
                  use_mult=False, mult_name=None, mult_val=1.0, add_constraint=False,
                  **kwargs):
         r"""
-        Initialize an EqualityConstraintsComp, optionally add an output constraint to the model.
+        Initialize an EQConstraintComp, optionally add an output constraint to the model.
 
-        The EqualityConstraintsComp is a bit like IndepVarComp in that it allows for the
-        creation of one or more output variables and computes the values for those variables
-        based on the following equation:
+        The EQConstraintComp allows for the creation of one or more output variables and
+        computes the values for those variables based on the following equation:
 
         .. math::
 
@@ -73,7 +72,7 @@ class EqualityConstraintsComp(ExplicitComponent):
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
         """
-        super(EqualityConstraintsComp, self).__init__()
+        super(EQConstraintComp, self).__init__()
         self._output_vars = {}
         if name is not None:
             self.add_eq_output(name, eq_units, lhs_name, rhs_name, rhs_val,
@@ -201,7 +200,7 @@ class EqualityConstraintsComp(ExplicitComponent):
                       use_mult=False, mult_name=None, mult_val=1.0, add_constraint=False,
                       **kwargs):
         """
-        Add a new output variable and associated difference equation.
+        Add a new output variable computed via the difference equation.
 
         This will create new inputs `lhs:name`, `rhs:name`, and `mult:name` that will
         define the left and right sides of the difference equation, and a

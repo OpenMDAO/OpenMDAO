@@ -14,7 +14,7 @@ from openmdao.components.balance_comp import BalanceComp
 from openmdao.components.bsplines_comp import BsplinesComp
 from openmdao.components.cross_product_comp import CrossProductComp
 from openmdao.components.dot_product_comp import DotProductComp
-from openmdao.components.eq_constraints_comp import EqualityConstraintsComp
+from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.external_code_comp import ExternalCode
 from openmdao.components.external_code_comp import ExternalCodeComp

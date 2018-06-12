@@ -27,9 +27,8 @@ class BalanceComp(ImplicitComponent):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
-        The BalanceComp is a bit like IndepVarComp in that it allows for the
-        creation of one or more implicit state variables, and computes the residuals
-        for those variables based on the following equation.
+        The BalanceComp allows for the creation of one or more implicit state variables,
+        and computes the residuals for those variables based on the following equation.
 
         .. math::
 

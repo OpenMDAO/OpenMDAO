@@ -8,7 +8,7 @@ Components
 
     exec_comp.rst
     balance_comp.rst
-    eq_constraints_comp.rst
+    eq_constraint_comp.rst
     external_code_comp.rst
     external_code_implicit_comp.rst
     linearsystem_comp.rst
