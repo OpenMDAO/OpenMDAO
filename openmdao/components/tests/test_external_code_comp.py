@@ -6,6 +6,8 @@ import shutil
 import tempfile
 import unittest
 
+from scipy.optimize import fsolve
+
 from openmdao.api import Problem, Group, ExternalCodeComp, AnalysisError
 from openmdao.components.external_code_comp import STDOUT
 
@@ -13,6 +15,28 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
+# These next three functions are used by test_simple_external_code_implicit_comp_with_solver
+def area_ratio_explicit(Mach):
+    """isentropic relationship between area ratio and Mach number"""
+    gamma = 1.4
+    gamma_p_1 = gamma + 1
+    gamma_m_1 = gamma - 1
+    exponent = gamma_p_1 / (2 * gamma_m_1)
+    return (gamma_p_1 / 2.) ** -exponent * (
+            (1 + gamma_m_1 / 2. * Mach ** 2) ** exponent) / Mach
+
+def mach_residual(Mach, area_ratio_target):
+    return area_ratio_target - area_ratio_explicit(Mach)
+
+def mach_solve(area_ratio, super_sonic=False):
+    if super_sonic:
+        initial_guess = 4
+    else:
+        initial_guess = .1
+
+    mach = fsolve(func=mach_residual, x0=initial_guess, args=(area_ratio,))[0]
+
+    return mach
 
 class TestExternalCodeComp(unittest.TestCase):
 
@@ -525,7 +549,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         os.chdir(self.tempdir)
 
         # copy required files to temp dir
-        files = ['extcode_resistor.py', 'extcode_node.py']
+        files = ['extcode_resistor.py', 'extcode_node.py', 'extcode_mach.py']
         for filename in files:
             shutil.copy(os.path.join(DIRECTORY, filename),
                         os.path.join(self.tempdir, filename))
@@ -538,161 +562,85 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         except OSError:
             pass
 
-
-    def test_circuit_plain_newton_using_extcode(self):
-        # Use external code for the resistor and node.
-        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Diode, Node, Resistor
-        from openmdao.components.external_code_comp import ExternalCodeComp, \
+    def test_simple_external_code_implicit_comp(self):
+        from openmdao.api import Group, NewtonSolver, Problem, IndepVarComp, DirectSolver, \
             ExternalCodeImplicitComp
 
-        class ResistorExternalCodeComp(ExternalCodeComp):
+        class MachExternalCodeComp(ExternalCodeImplicitComp):
 
             def initialize(self):
-                self.options.declare('R', default=1., desc='Resistance in Ohms')
+                self.options.declare('super_sonic', types=bool)
 
             def setup(self):
-                self.add_input('V_in', units='V')
-                self.add_input('V_out', units='V')
-                self.add_output('I', units='A')
+                self.add_input('area_ratio', val=1.0, units=None)
+                self.add_output('mach', val=1., units=None)
+                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
 
-                self.declare_partials(of='I', wrt='V_in', method='fd')
-                self.declare_partials(of='I', wrt='V_out', method='fd')
+                self.input_file = 'mach_input.dat'
+                self.output_file = 'mach_output.dat'
 
-                self.input_file = 'resistor_input.dat'
-                self.output_file = 'resistor_output.dat'
-
-                # providing these is optional; the component will verify that any input
+                # providing these are optional; the component will verify that any input
                 # files exist before execution and that the output files exist after.
                 self.options['external_input_files'] = [self.input_file, ]
-                self.options['external_output_files'] = [self.output_file, ]
+                self.options['external_output_files'] = [self.output_file,]
 
                 self.options['command'] = [
-                    'python', 'extcode_resistor.py', self.input_file, self.output_file
-                ]
-
-            def compute(self, inputs, outputs):
-                V_in = inputs['V_in']
-                V_out = inputs['V_out']
-                R = self.options['R']
-
-                # generate the input file for the paraboloid external code
-                with open(self.input_file, 'w') as input_file:
-                    input_file.write('%.16f\n%.16f\n%.16f\n' % (V_in, V_out, R))
-
-                # the parent compute function actually runs the external code
-                super(ResistorExternalCodeComp, self).compute(inputs, outputs)
-
-                # parse the output file from the external code and set the value of I
-                with open(self.output_file, 'r') as output_file:
-                    I = float(output_file.read())
-
-                outputs['I'] = I
-
-        class NodeExternalCodeComp(ExternalCodeImplicitComp):
-
-            def initialize(self):
-                self.options.declare('n_in', default=1, types=int,
-                                     desc='number of connections with + assumed in')
-                self.options.declare('n_out', default=1, types=int,
-                                     desc='number of current connections + assumed out')
-
-            def setup(self):
-                self.add_output('V', val=5., units='V')
-
-                for i in range(self.options['n_in']):
-                    i_name = 'I_in:{}'.format(i)
-                    self.add_input(i_name, units='A')
-
-                for i in range(self.options['n_out']):
-                    i_name = 'I_out:{}'.format(i)
-                    self.add_input(i_name, units='A')
-
-                # note: we don't declare any partials wrt `V` here,
-                #      because the residual doesn't directly depend on it
-                self.declare_partials(of='V', wrt='I*', method='fd')
-
-                self.input_file = 'node_input.dat'
-                self.output_file = 'node_output.dat'
-
-                # providing these is optional; the component will verify that any input
-                # files exist before execution and that the output files exist after.
-                self.options['external_input_files'] = [self.input_file, ]
-                self.options['external_output_files'] = [self.output_file, ]
-
-                self.options['command'] = [
-                    'python', 'extcode_node.py', self.input_file, self.output_file
+                    'python', 'extcode_mach.py', self.input_file, self.output_file,
                 ]
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 with open(self.input_file, 'w') as input_file:
-                    n_in = self.options['n_in']
-                    input_file.write('{}\n'.format(n_in))
-                    for i_conn in range(n_in):
-                        input_file.write('{}\n'.format(inputs['I_in:{}'.format(i_conn)][0] ))
-                    n_out = self.options['n_out']
-                    input_file.write('{}\n'.format(n_out))
-                    for i_conn in range(n_out):
-                        input_file.write('{}\n'.format(inputs['I_out:{}'.format(i_conn)][0] ))
+                    input_file.write('residuals\n')
+                    input_file.write('{}\n'.format(inputs['area_ratio'][0]))
+                    input_file.write('{}\n'.format(outputs['mach'][0]))
 
                 # the parent apply_nonlinear function actually runs the external code
-                super(NodeExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super(MachExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
 
-                # parse the output file from the external code and set the value of I
+                # parse the output file from the external code and set the value of mach
                 with open(self.output_file, 'r') as output_file:
-                    resid_V = float(output_file.read())
+                    mach = float(output_file.read())
+                residuals['mach'] = mach
 
-                residuals['V'] = resid_V
+            def solve_nonlinear(self, inputs, outputs):
+                with open(self.input_file, 'w') as input_file:
+                    input_file.write('outputs\n')
+                    input_file.write('{}\n'.format(inputs['area_ratio'][0]))
+                    input_file.write('{}\n'.format(self.options['super_sonic']))
+                # the parent apply_nonlinear function actually runs the external code
+                super(MachExternalCodeComp, self).solve_nonlinear(inputs, outputs)
 
-        class Circuit(Group):
+                # parse the output file from the external code and set the value of mach
+                with open(self.output_file, 'r') as output_file:
+                    mach = float(output_file.read())
+                outputs['mach'] = mach
 
-            def setup(self):
-                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
-                self.add_subsystem('n2', NodeExternalCodeComp())  # leaving defaults
+        group = Group()
+        group.add_subsystem('ar', IndepVarComp('area_ratio', 0.5))
+        mach_comp = group.add_subsystem('comp', MachExternalCodeComp(), promotes=['*'])
+        prob = Problem(model=group)
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['solve_subsystems'] = True
+        group.nonlinear_solver.options['iprint'] = 0
+        group.nonlinear_solver.options['maxiter'] = 20
+        group.linear_solver = DirectSolver()
 
-                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
-                self.add_subsystem('R2', ResistorExternalCodeComp(R=10000.))
-                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
+        prob.setup(check=False)
 
-                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
-                self.connect('R1.I', 'n1.I_out:0')
-                self.connect('R2.I', 'n1.I_out:1')
+        area_ratio = 1.3
+        super_sonic = False
+        prob['area_ratio'] = area_ratio
+        mach_comp.options['super_sonic'] = super_sonic
+        prob.run_model()
+        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
-                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
-                self.connect('R2.I', 'n2.I_in:0')
-                self.connect('D1.I', 'n2.I_out:0')
+        area_ratio = 1.3
+        super_sonic = True
+        prob['area_ratio'] = area_ratio
+        mach_comp.options['super_sonic'] = super_sonic
+        prob.run_model()
+        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
 
-                self.nonlinear_solver = NewtonSolver()
-                self.nonlinear_solver.options['iprint'] = 2
-                self.nonlinear_solver.options['maxiter'] = 20
-                self.linear_solver = DirectSolver()
-
-        p = Problem()
-        model = p.model
-
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
-
-        p.setup(check=True)
-
-        # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
-
-        p.run_model()
-
-        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
-
-        # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
 
 

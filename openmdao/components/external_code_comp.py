@@ -401,3 +401,16 @@ class ExternalCodeImplicitComp(ImplicitComponent):
             unscaled, dimensional residuals written to via residuals[key]
         """
         self._external_code_runner.run_component()
+
+    def solve_nonlinear(self, inputs, outputs):
+        """
+        Compute outputs given inputs. The model is assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        self._external_code_runner.run_component()

@@ -12,29 +12,28 @@ operating system. But it treats the `Component` as an `ImplicitComponent` rather
 
 `ExternalCodeImplicitComp` has the same options as `ExternalCodeComp`.
 
+    .. embed-options::
+        openmdao.components.external_code_comp
+        ExternalCodeImplicitComp
+        options
+
+
 ExternalCodeImplicitComp Example
---------------------------------
+---------------------------------------
 
-The only difference between `ExternalCodeImplicitComp` and `ExternalCodeComp` is that for the former, an `apply_nonlinear`
-method must be defined, while for the latter, a `compute` method must be defined.
-
-To show the difference, we will use an example. We will modify the code given in
-:ref:`the circuit tutorial <defining_icomps_tutorial>`. We will replace one of the nodes and one of the resistors
-in the model with external codes.
-
-In this example, our external codes will be simple Python scripts. Here they are:
+Here is a simple example of the use of an `ExternalCodeImplicitComp` Component. The external code in the example
+is a Python script that evaluates the output and residual for the implicit relationship between the area ratio and
+mach number in an isentropic flow.
 
 .. embed-code::
-    openmdao.components.tests.extcode_resistor
+    openmdao.components.tests.extcode_mach
+
+The following model makes use of this external code.
 
 .. embed-code::
-    openmdao.components.tests.extcode_node
-
-Here is the modified circuit example using these external codes.
-
-.. embed-code::
-    openmdao.components.tests.test_external_code_comp.TestExternalCodeImplicitCompFeature.test_circuit_plain_newton_using_extcode
+    openmdao.components.tests.test_external_code_comp.TestExternalCodeImplicitCompFeature.test_simple_external_code_implicit_comp
     :layout: interleave
+
 
 
 .. tags:: ExternalCodeImplicitComp, ExternalCodeComp, FileWrapping, Component
