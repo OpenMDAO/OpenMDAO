@@ -72,7 +72,7 @@ class TestOptionsDict(unittest.TestCase):
             self.dict['test'] = ''
 
         class_or_type = 'class' if PY3 else 'type'
-        expected_msg = "Value ('') of option 'test' has type of (<class 'str'>), but expected type (<class 'int'>)."
+        expected_msg = "Value ('') of option 'test' has type of (<{} 'str'>), but expected type (<{} 'int'>).".format(class_or_type, class_or_type)
         self.assertEqual(expected_msg, str(context.exception))
 
         # make sure bools work
