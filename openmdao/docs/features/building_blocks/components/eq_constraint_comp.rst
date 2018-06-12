@@ -60,8 +60,8 @@ The following example shows an Individual Design Feasible (IDF) architecture for
 
 In IDF, the direct coupling between the disciplines is removed and the coupling variables
 are added to the optimizer’s design variables. The algorithm calls for two new equality
-constraints that enforce the coupling between the disciplines. This ensures that the
-solution is a feasible coupling, though it is achieved through the optimizer instead of
+constraints that enforce the coupling between the disciplines. TThis ensures that the final
+optimized solution is feasible, though it is achieved through the optimizer instead of
 using a solver.  The two new equality constraints are implemented in this example with
 an `EQConstraintComp`.
 
