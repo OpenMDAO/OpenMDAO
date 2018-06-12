@@ -89,7 +89,7 @@ class SimpleGADriver(Driver):
         self.options.declare('elitism', default=True,
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
-        self.options.declare('max_gen', default=300,
+        self.options.declare('max_gen', default=100,
                              desc='Number of generations before termination.')
         self.options.declare('pop_size', default=0,
                              desc='Number of points in the GA. Set to 0 and it will be computed '

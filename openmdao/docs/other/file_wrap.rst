@@ -65,7 +65,7 @@ the external code is run.) The code will generally look like this:
 
 ::
 
-    from openmdao.util.file_wrap import InputFileGenerator
+    from openmdao.utils.file_wrap import InputFileGenerator
 
     parser = InputFileGenerator()
     parser.set_template_file('mytemplate.txt')
@@ -199,7 +199,7 @@ characters that is some number of lines and some number of fields away from an
 
 ::
 
-    from openmdao.util.file_wrap import FileParser
+    from openmdao.utils.file_wrap import FileParser
 
     parser = FileParser()
     parser.set_file('output.txt')

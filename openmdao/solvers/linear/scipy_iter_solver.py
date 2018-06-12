@@ -44,10 +44,22 @@ class ScipyKrylov(LinearSolver):
         # initialize preconditioner to None
         self.precon = None
 
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.options['assemble_jac']:
+            yield self
+        if self.precon is not None:
+            for s in self.precon._assembled_jac_solver_iter():
+                yield s
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(ScipyKrylov, self)._declare_options()
+
         self.options.declare('solver', default='gmres', values=tuple(_SOLVER_TYPES.keys()),
                              desc='function handle for actual solver')
 
@@ -139,7 +151,8 @@ class ScipyKrylov(LinearSolver):
 
         x_vec.set_data(in_vec)
         scope_out, scope_in = system._get_scope()
-        system._apply_linear([vec_name], self._rel_systems, self._mode, scope_out, scope_in)
+        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
+                             scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_vec)

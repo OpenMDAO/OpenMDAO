@@ -33,15 +33,16 @@ _registered = False  # prevents multiple atexit registrations
 _printer = None
 
 MAXLINE = 80
-tab = '    '
+tab = '   '
 time0 = None
 
 addr_regex = re.compile(" at 0x[0-9a-fA-F]+")
 
-def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
+def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self', '__class__'])):
     """
     Print trace info, indenting based on call depth.
     """
+    global _printer
     sindent = tab * indent
     sep = '=' if d is f_locals else ':'
 
@@ -49,12 +50,15 @@ def _indented_print(f_locals, d, indent, excludes=set(['__init__', 'self'])):
         if name not in excludes:
             if isinstance(d[name], (dict, OrderedDict)):
                 f = cStringIO()
-                _indented_print(f_locals, d[name], 0, file=f)
+                save = _printer
+                _printer = _get_printer(f)
+                _indented_print(f_locals, d[name], 0)
+                _printer = save
                 s = "  %s%s%s{%s}" % (sindent, name, sep, f.getvalue())
             else:
                 s = "  %s%s%s%s" % (sindent, name, sep, d[name])
-            if ' object at ' in s:
-                s = addr_regex.sub('', s)
+            # if ' object at ' in s:
+            #     s = addr_regex.sub('', s)
             linelen = len(s)
             leneq = len(s.split(sep, 1)[0])
             if linelen > MAXLINE:
@@ -118,10 +122,10 @@ def _trace_call(frame, arg, stack, context):
 
     indent = tab * (len(stack)-1)
     if verbose:
-        _printer("%s%s (%d)" % (indent, fullname, method_counts[fullname]))
+        _printer("%s--> %s (%d)" % (indent, fullname, method_counts[fullname]))
         _indented_print(frame.f_locals, frame.f_locals, len(stack)-1)
     else:
-        _printer("%s%s" % (indent, fullname))
+        _printer("%s-->%s" % (indent, fullname))
 
     if memory is not None:
         memory.append(mem_usage())
@@ -179,8 +183,8 @@ def _trace_return(frame, arg, stack, context):
     if verbose:
         if arg is not None:
             s = "%s     %s" % (indent, arg)
-            if ' object at ' in s:
-                s = addr_regex.sub('', s)
+            # if ' object at ' in s:
+            #     s = addr_regex.sub('', s)
             _printer(s)
 
     if leaks is not None:
@@ -209,10 +213,7 @@ def _setup(options):
         method_counts = defaultdict(int)
         class_counts = defaultdict(lambda: -1)
         id2count = {}
-        if verbose or memory or leaks:
-            do_ret = _trace_return
-        else:
-            do_ret = None
+        do_ret = _trace_return
 
         if memory:
             if psutil is None:
@@ -244,7 +245,8 @@ def _setup(options):
                                                 do_ret=do_ret,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, id2count, verbose, memory,
-                                                         leaks, stream))
+                                                         leaks, stream),
+                                                filters=options.filters)
 
 
 def setup(methods=None, verbose=None, memory=None, leaks=False, rank=-1, outfile='stdout'):
@@ -290,7 +292,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None, verbose=False, memory=False, leaks=False):
+def tracing(methods=None, verbose=False, memory=False, leaks=False, filters=None):
     """
     Turn on call tracing within a certain context.
 
@@ -305,8 +307,11 @@ def tracing(methods=None, verbose=False, memory=False, leaks=False):
         If True, show functions that increase memory usage.
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
+    filters : list of str or None
+        If not None, evaluate as an expression in the frame of matching trace functions. If
+        True, include the function in the trace.  Up to one expression per class.
     """
-    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
+    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks, filters=filters)
     start()
     yield
     stop()
@@ -326,9 +331,13 @@ class tracedfunc(object):
         If True, show functions that increase memory usage.
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
+    filters : list of str or None
+        If not None, evaluate as an expression in the frame of matching trace functions. If
+        True, include the function in the trace.  Up to one expresson per class.
     """
-    def __init__(self, methods=None, verbose=False, memory=False, leaks=False):
-        self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks)
+    def __init__(self, methods=None, verbose=False, memory=False, leaks=False, filters=None):
+        self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks,
+                                filters=filters)
         self._call_setup = True
 
     def __call__(self, func):
@@ -364,6 +373,11 @@ def _itrace_setup_parser(parser):
                         default=-1, help='MPI rank where output is desired.  Default is all ranks.')
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         default='stdout', help='Output file.  Defaults to stdout.')
+    parser.add_argument('-f', '--filter', action='append', dest='filters',
+                        default=[],
+                        help='An expression.  If it evaluates to True for any matching trace '
+                             'function, that function will be displayed in the trace. One '
+                             'expression can be added for each class.')
 
 
 def _itrace_exec(options):

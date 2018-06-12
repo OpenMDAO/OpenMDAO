@@ -649,7 +649,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
-            "d1.y1": [1.318802844707534e-10],
+            "d1.y1": [-1.318802844707534e-10],
             "con_cmp2.con2": [0.0],
             "pz.z": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
@@ -674,7 +674,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
-            "d1.y1": [-2.60769184e-12],
+            "d1.y1": [2.60769184e-12],
             "con_cmp2.con2": [0.0],
             "pz.z": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
@@ -791,9 +791,9 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [-0.],
-            'pz.z': [-0., -0.],
-            'd1.y1': [1.31880284e-10],
+            'px.x': [0.],
+            'pz.z': [0., 0.],
+            'd1.y1': [-1.31880284e-10],
             'd2.y2': [0.],
             'obj_cmp.obj': [0.],
             'con_cmp1.con1': [0.],
@@ -932,10 +932,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_solver_residuals = {
             'px.x': [0.],
-            'pz.z': [-0., -0.],
+            'pz.z': [0., 0.],
             'd1.y1': [0.0],
-            'd2.y2': [-0.00229801],
-            'obj_cmp.obj': [5.75455956e-06],
+            'd2.y2': [0.00229801],
+            'obj_cmp.obj': [-5.75455956e-06],
             'con_cmp1.con1': [-0.],
             'con_cmp2.con2': [-0.]
         }
@@ -969,10 +969,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'px.x': [0.],
             'pz.z': [0., 0.],
             'd1.y1': [0.0],
-            'd2.y2': [-0.41168147],
-            'obj_cmp.obj': [-0.48667678],
-            'con_cmp1.con1': [0.770496],
-            'con_cmp2.con2': [-2.70578793e-06]
+            'd2.y2': [0.41168147],
+            'obj_cmp.obj': [0.48667678],
+            'con_cmp1.con1': [-0.770496],
+            'con_cmp2.con2': [2.70578793e-06]
         }
 
         expected_solver_residuals = {
@@ -1015,11 +1015,11 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_output = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [5.41157587e-07],
-            'd2.y2': [-0.41168147],
-            'obj_cmp.obj': [-0.48667678],
-            'con_cmp1.con1': [0.770496],
-            'con_cmp2.con2': [-2.70578793e-06]
+            'd1.y1': [-5.41157587e-07],
+            'd2.y2': [0.41168147],
+            'obj_cmp.obj': [0.48667678],
+            'con_cmp1.con1': [-0.770496],
+            'con_cmp2.con2': [2.70578793e-06]
         }
 
         expected_solver_residuals = {
@@ -1070,9 +1070,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_residuals = {
             'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [9.10908321e-11],
+            'd1.y1': [-9.10908321e-11],
             'd2.y2': [0.],
-            'obj_cmp.obj': [-2.03287907e-20],
+            'obj_cmp.obj': [2.03287907e-20],
             'con_cmp1.con1': [0.],
             'con_cmp2.con2': [0.]
         }
@@ -1113,13 +1113,13 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [-0.],
+            'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [-4.15366975e-05],
-            'd2.y2': [4.10564051e-06],
-            'obj_cmp.obj': [-4.15366737e-05],
-            'con_cmp1.con1': [-4.15366975e-05],
-            'con_cmp2.con2': [-4.10568454e-06]
+            'd1.y1': [4.15366975e-05],
+            'd2.y2': [-4.10564051e-06],
+            'obj_cmp.obj': [4.15366737e-05],
+            'con_cmp1.con1': [4.15366975e-05],
+            'con_cmp2.con2': [4.10568454e-06]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -1158,13 +1158,13 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            'px.x': [-0.],
+            'px.x': [0.],
             'pz.z': [0., 0.],
-            'd1.y1': [-2.84055951e-16],
-            'd2.y2': [6.93561782e-12],
-            'obj_cmp.obj': [7.01674811e-11],
-            'con_cmp1.con1': [-7.01674811e-11],
-            'con_cmp2.con2': [1.42027975e-15]
+            'd1.y1': [2.84055951e-16],
+            'd2.y2': [-6.93561782e-12],
+            'obj_cmp.obj': [-7.01674811e-11],
+            'con_cmp1.con1': [7.01674811e-11],
+            'con_cmp2.con2': [-1.42027975e-15]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -1649,12 +1649,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
         assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_feature_driver_metadata(self):
-        from openmdao.api import Problem, SqliteRecorder, CaseReader
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
-        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
         prob = Problem(SellarDerivatives())
 
@@ -1665,8 +1662,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.model.add_constraint('con1', upper=0.0)
         prob.model.add_constraint('con2', upper=0.0)
 
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['print_results'] = False
+        prob.driver = ScipyOptimizeDriver()
 
         # make sure we record metadata
         prob.driver.recording_options['record_metadata'] = True
@@ -1681,10 +1677,24 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # access list of connections stored in metadata
-        self.assertEqual(len(cr.driver_metadata['connections_list']), 11)
+        connections = cr.driver_metadata['connections_list']
+        self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
+                         '\n'.join(["d1.y1\tcon_cmp1.y1",
+                                    "d2.y2\tcon_cmp2.y2",
+                                    "px.x\td1.x",
+                                    "d2.y2\td1.y2",
+                                    "pz.z\td1.z",
+                                    "d1.y1\td2.y1",
+                                    "pz.z\td2.z",
+                                    "px.x\tobj_cmp.x",
+                                    "d1.y1\tobj_cmp.y1",
+                                    "d2.y2\tobj_cmp.y2",
+                                    "pz.z\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
-        self.assertEqual(len(cr.driver_metadata['tree']), 4)
+        self.assertEqual(list(cr.driver_metadata['tree'].keys()),
+                         ['name', 'type', 'subsystem_type', 'children'])
+
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1715,10 +1725,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
 
-        self.assertEqual(
-            sorted(cr.solver_metadata.keys()),
-            sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
-        )
+        self.assertEqual(sorted(cr.solver_metadata.keys()), [
+            'd1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS'
+        ])
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
         self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
@@ -1794,19 +1803,14 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        prob.driver = ScipyOptimizeDriver()
-
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
-
-        recorder = SqliteRecorder("cases.sql")
-        driver.add_recorder(recorder)
+        driver = prob.driver = ScipyOptimizeDriver()
         driver.recording_options['includes'] = []
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_desvars'] = True
+
+        recorder = SqliteRecorder("cases.sql")
+        driver.add_recorder(recorder)
 
         prob.setup()
         prob.run_driver()

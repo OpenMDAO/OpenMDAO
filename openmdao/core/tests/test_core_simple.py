@@ -39,7 +39,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG()
         group.add_subsystems()
-        self.p = Problem(group).setup(DefaultVector)
+        self.p = Problem(group).setup()
         self.p.set_solver_print(level=0)
         self.p.final_setup()
 

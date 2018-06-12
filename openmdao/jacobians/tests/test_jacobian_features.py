@@ -9,7 +9,7 @@ from six import iteritems
 from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
-                         COOJacobian, ScipyKrylov, DirectSolver, DenseJacobian
+                         ScipyKrylov, DirectSolver
 
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -94,6 +94,7 @@ class SimpleCompConst(ExplicitComponent):
 
         self.declare_partials('f', 'x', val=1.)
         self.declare_partials('f', 'z', val=np.ones((1, 4)))
+        # y[13] is a glob pattern for ['y1', 'y3']
         self.declare_partials('g', 'y[13]', val=[[1, 0], [1, 0], [0, 1], [0, 1]])
         self.declare_partials('g', 'y2', val=[1., 1., 1., 1.], cols=[0, 0, 1, 1], rows=[0, 2, 1, 3])
         self.declare_partials('g', 'x', val=sp.sparse.coo_matrix(((1., 1.), ((0, 3), (0, 0)))))
@@ -177,8 +178,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         self.problem = Problem(model=model)
         self.problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov()
-        model.jacobian = COOJacobian()
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
 
     def test_dependence(self):
         problem = self.problem
@@ -190,8 +190,8 @@ class TestJacobianFeatures(unittest.TestCase):
 
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
-        model._linearize()
-        jac = model._jacobian._int_mtx._matrix
+        model._linearize(model._assembled_jac)
+        jac = model._assembled_jac._int_mtx._matrix
 
         # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
         # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),
@@ -266,8 +266,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         problem = Problem(model=model)
         problem.set_solver_print(level=0)
-        model.linear_solver = ScipyKrylov()
-        model.jacobian = COOJacobian()
+        model.linear_solver = ScipyKrylov(assemble_jac=True)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
@@ -385,15 +384,15 @@ class TestJacobianFeatures(unittest.TestCase):
         assert_rel_error(self, totals, expected_totals, 1e-6)
 
         expected_subjacs = {
-            ('units.flow:T', 'units.T'): [[-1.]],
+            ('units.flow:T', 'units.T'): [[1.]],
             ('units.flow:P', 'units.T'): [[0.]],
             ('units.flow:T', 'units.P'): [[0.]],
-            ('units.flow:P', 'units.P'): [[-1.]],
+            ('units.flow:P', 'units.P'): [[1.]],
         }
 
-        jac = units._jacobian._subjacs
+        jac = units._subjacs_info
         for deriv, val in iteritems(expected_subjacs):
-            assert_rel_error(self, jac[deriv], val, 1e-6)
+            assert_rel_error(self, jac[deriv]['value'], val, 1e-6)
 
     def test_reference(self):
         class TmpComp(ExplicitComponent):
@@ -434,10 +433,10 @@ class TestJacobianForDocs(unittest.TestCase):
     def test_const_jacobian(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, DenseJacobian
+        from openmdao.api import Problem, Group, IndepVarComp, DirectSolver
         from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
 
-        model = Group()
+        model = Group(assembled_jac_type='dense')
         comp = IndepVarComp()
         for name, val in (('x', 1.), ('y1', np.ones(2)), ('y2', np.ones(2)),
                           ('y3', np.ones(2)), ('z', np.ones((2, 2)))):
@@ -447,8 +446,7 @@ class TestJacobianForDocs(unittest.TestCase):
         problem = Problem(model=model)
         problem.set_solver_print(0)
 
-        model.linear_solver = DirectSolver()
-        model.jacobian = DenseJacobian()
+        model.linear_solver = DirectSolver(assemble_jac=True)
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(check=False)
@@ -461,11 +459,11 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_rel_error(self, totals['f', 'y1'], np.zeros((1, 2)))
         assert_rel_error(self, totals['f', 'y2'], np.zeros((1, 2)))
         assert_rel_error(self, totals['f', 'y3'], np.zeros((1, 2)))
-        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
         assert_rel_error(self, totals['g', 'z'], np.zeros((4, 4)))
         assert_rel_error(self, totals['g', 'y1'], [[1, 0], [1, 0], [0, 1], [0, 1]])
         assert_rel_error(self, totals['g', 'y2'], [[1, 0], [0, 1], [1, 0], [0, 1]])
         assert_rel_error(self, totals['g', 'y3'], [[1, 0], [1, 0], [0, 1], [0, 1]])
+        assert_rel_error(self, totals['g', 'x'], [[1], [0], [0], [1]])
 
     def test_sparse_jacobian_in_place(self):
         import numpy as np

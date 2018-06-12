@@ -70,7 +70,7 @@ class LinearSystemComp(ImplicitComponent):
         # Set up the derivatives.
         row_col = np.arange(full_size, dtype="int")
 
-        self.declare_partials('x', 'b', val=-np.ones(full_size), rows=row_col, cols=row_col)
+        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
 
         rows = np.repeat(np.arange(full_size), size)
 
