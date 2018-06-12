@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='openmdao',
-    version='2.2.1',
+    version='2.3.0',
     description="OpenMDAO v2 framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
@@ -27,7 +27,7 @@ setup(
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.2.1',
+    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.3.0',
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
