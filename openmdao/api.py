@@ -17,6 +17,7 @@ from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.external_code_comp import ExternalCode
 from openmdao.components.external_code_comp import ExternalCodeComp
+from openmdao.components.external_code_comp import ExternalCodeImplicitComp
 from openmdao.components.ks_comp import KSComp
 from openmdao.components.ks_comp import KSComponent
 from openmdao.components.linear_system_comp import LinearSystemComp

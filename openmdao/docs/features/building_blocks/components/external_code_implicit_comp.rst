@@ -18,7 +18,7 @@ operating system. But it treats the `Component` as an `ImplicitComponent` rather
         options
 
 
-Simple ExternalCodeImplicitComp Example
+ExternalCodeImplicitComp Example
 ---------------------------------------
 
 Here is a simple example of the use of a `ExternalCodeImplicitComp` Component. The external code is a Python script
@@ -34,29 +34,6 @@ The following model makes use of this external code.
     openmdao.components.tests.test_external_code_comp.TestExternalCodeImplicitCompFeature.test_simple_external_code_implicit_comp_with_solver
     :layout: interleave
 
-
-
-Example with both ExternalCodeComp and ExternalCodeImplicitComp
----------------------------------------------------------------
-
-Here is another example where there are external codes for both an `ImplicitComponent` and `ExplicitComponent`.
-We will modify the code given in
-:ref:`the circuit tutorial <defining_icomps_tutorial>`. We will replace one of the nodes and one of the resistors
-in the model with external codes.
-
-In this example, our external codes will be simple Python scripts. Here they are:
-
-.. embed-code::
-    openmdao.components.tests.extcode_resistor
-
-.. embed-code::
-    openmdao.components.tests.extcode_node
-
-Here is the modified circuit example using these external codes.
-
-.. embed-code::
-    openmdao.components.tests.test_external_code_comp.TestExternalCodeImplicitCompFeature.test_circuit_plain_newton_using_extcode
-    :layout: interleave
 
 
 .. tags:: ExternalCodeImplicitComp, ExternalCodeComp, FileWrapping, Component
