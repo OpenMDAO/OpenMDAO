@@ -644,8 +644,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
                 residuals['V'] = resid_V
 
-            def solve_nonlinear(self, inputs, outputs):
-                print('hey')
 
         class Circuit(Group):
 
