@@ -6,26 +6,34 @@ June 12, 2018
 New Features:
 --------------
 - Drivers have new `debug_print` option that writes design vars, objective, and constraints to stdout for each iteration.
-- Added DOEDriver for serial and parallel cases to the standard library.
+
+- Added a DOEDriver for serial and parallel cases to the standard library.
+    (For people who had adopted DOEDriver early, via github, the following things have changed since initial implementation:)
+    - The option that controls the parallel behavior for DOEDriver was changed to `procs_per_model` from `parallel`.
+    - User can provide a CSV file to the DOEDriver to run an arbitrary set of cases.
+
 - Solvers have new `debug_print` option that will report the initial condition of the solver if it fails to converge.
-- SimpleGAdriver will now compute a population size based on 4*sum(bits) + 1 if pop_size=0
-- New problem methods `<problem>.get_val()` and `<problem>.set_val()` allow the user to specify a unit, and we'll convert to the correct unit (or throw an error if the unit is not compatible).
+
+- SimpleGADriver changes:
+    - Will now compute a population size based on 4*sum(bits) + 1 if pop_size=0
+    - Can support models that need more than 1 proc
+
+- Problem changes:
+    - New Problem methods `<problem>.get_val()` and `<problem>.set_val()` allow the user to specify a unit, and we'll convert to the correct unit (or throw an error if the unit is not compatible).
+    - `list_problem_vars()` method will report all design vars, objectives, and constraints.
+
 - OpenMDAO command line utility now works under MPI.
-- `list_problem_vars()` method on problem will report all design vars, objectives, and constraints.
 - ExternalCodeComp has new option, `allowed_return_codes` to specify valid return codes.
-- User can provide a CSV file to the DOEDriver to run an arbitrary set of cases.
-- Components that request complex-step for partial derivative checks will now fall back to finite-difference if `force_alloc_complex=False`
-- You can now pass a case_prefix argument to run_model or run_driver to name the cases for case recording
-- SimpleGA driver can support models that need more than 1 proc
-- New CSV DOE generator for DOEDriver
-- Beam example problem now runs 20x faster
+- Components that request complex-step for partial derivative checks will now fall back to finite-difference if `force_alloc_complex=False`.
+- You can now pass a case_prefix argument to run_model or run_driver to name the cases for case recording.
+- Beam example problem now runs 20x faster.
 
 - New Analytic Derivatives Features
     - Major re-write of the Feature documentation on the Core Feature, "Working with Analytic Derivatives."
     - User can now set AssembledJacobians for linear solvers. (Big speedup for a lot of lower-order or serial problems).
     - Automatic calculation of total Jacobian sparsity for fwd derivatives for optimizers that support it (lower compute cost when using SNOPT).
     - Automatic simultaneous coloring algorithm for separable problems to speed up derivatives calculations.
-    - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers
+    - Option for caching of linear solution vectors to speed up linear solves when using iterative solvers.
     - check_partials now allows you to use `includes` and `excludes` to limit which components get checked.
 
 - New Components in the standard library:
@@ -49,7 +57,7 @@ New Features:
 
 Backwards-Compatible API Changes:
 -----------------------------------
-- Changed all instances of `metadata` to `options`. `<system>.metadata` has now been deprecated
+- Changed all instances of `metadata` to `options`. `<system>.metadata` has now been deprecated.
 
 - Class name changes to Components, so all end in "Comp" (old class names have been deprecated):
     - MetaModelStructured -> MetaModelStructuredComp
@@ -63,7 +71,6 @@ Backwards-Compatible API Changes:
 - check_totals and check_partials no longer support the `supress_output` argument. Use `out_stream=None` instead.
 - `comps` argument in check_partials was replaced with `includes` and `excludes` arguments.
 
-- Option that controls the parallel behavior for DOEdriver was changed 'procs_per_model' from 'parallel'
 
 Backwards-Incompatible API changes:
 -----------------------------------
@@ -76,7 +83,7 @@ Bug Fixes:
 - Fixed bug in component-level FD that caused it to call the model too many times.
 - Added proper error check for situation when user creates a variable name containing illegal characters.
 - Better error msg when adding objectives or constraints with variables that don't exist under MPI execution.
-- Vectorization for MetaModelUnStructuredComp was super-duper broken. Its fixed now.
+- Vectorization for MetaModelUnStructuredComp was super-duper broken. It's fixed now.
 
 
 

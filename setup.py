@@ -10,7 +10,7 @@ setup(
     while still solving them in a tightly coupled manner with efficient parallel numerical methods.
     """,
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Natural Language :: English',
