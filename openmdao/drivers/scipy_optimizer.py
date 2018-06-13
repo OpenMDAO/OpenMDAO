@@ -183,15 +183,15 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower != - sys.float_info.max \
                         or isinstance(upper, np.ndarray) or upper != sys.float_info.max:
-                    dict = OrderedDict()
-                    dict['lower'] = lower
-                    dict['upper'] = upper
-                    dict['equals'] = None
-                    dict['indices'] = None
-                    dict['adder'] = None
-                    dict['scaler'] = None
-                    dict['size'] = meta['size']
-                    self._cons[name] = dict
+                    d = OrderedDict()
+                    d['lower'] = lower
+                    d['upper'] = upper
+                    d['equals'] = None
+                    d['indices'] = None
+                    d['adder'] = None
+                    d['scaler'] = None
+                    d['size'] = meta['size']
+                    self._cons[name] = d
 
     def run(self):
         """
@@ -216,7 +216,7 @@ class ScipyOptimizeDriver(Driver):
         self._dvlist = list(self._designvars)
 
         # maxiter and disp get passsed into scipy with all the other options.
-        self.opt_settings['maxiter'] = self.options['maxiter']
+        self.opt_settings['maxiter'] = 2 # self.options['maxiter']
         self.opt_settings['disp'] = self.options['disp']
 
         # Size Problem
@@ -312,6 +312,13 @@ class ScipyOptimizeDriver(Driver):
             if lincons:
                 self._lincongrad_cache = self._compute_totals(of=lincons, wrt=self._dvlist,
                                                               return_format='array')
+                print("linear gradient")
+                for row, _ in enumerate(self._lincongrad_cache):
+                    print('')
+                    for col, _ in enumerate(self._lincongrad_cache[row]):
+                        print(self._lincongrad_cache[row, col], ',', end='')
+                print("\n** end linear grad")
+
             else:
                 self._lincongrad_cache = None
 
@@ -483,6 +490,12 @@ class ScipyOptimizeDriver(Driver):
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format='array')
             self._grad_cache = grad
+            print("** new grad cache")
+            for row, _ in enumerate(grad):
+                print('')
+                for col, _ in enumerate(grad[row]):
+                    print(grad[row, col], ',', end='')
+            print("\n** end new grad")
 
         except Exception as msg:
             self._exc_info = sys.exc_info()
@@ -545,6 +558,7 @@ class ScipyOptimizeDriver(Driver):
         if dbl or (lower == -sys.float_info.max):
             return -grad[grad_idx, :]
         else:
+            print(name, idx, grad_idx, grad[grad_idx, :])
             return grad[grad_idx, :]
 
     def _reraise(self):

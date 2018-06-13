@@ -519,17 +519,32 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
            [8, 9, 18, 19]   # row 21
         ], None]
 
-        p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
-        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
+        import sys
+        old = sys.stdout
+        with open('color_foo', 'w') as f:
+            sys.stdout = f
+            p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
+        #p_color = run_opt(pyOptSparseDriver, 'rev', color_info, optimizer='SNOPT')#, disp=False)
+        #p_color.run_model()
+        #Jcolor = p_color.compute_totals()
+        #print("----------------------")
+        with open('nocolor_foo', 'w') as f:
+            sys.stdout = f
+            p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
+        sys.stdout = old
+
+        #p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT')#, disp=False)
+        #p.run_model()
+        #J = p.compute_totals()
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # - coloring saves 11 solves per driver iter  (11 vs 22)
-        # - initial solve for linear constraints takes 22 in both cases (only done once)
-        # - (total_solves - 22) / (solves_per_iter) should be equal between the two cases
-        self.assertEqual((p.model.linear_solver._solve_count - 22) / 22,
-                         (p_color.model.linear_solver._solve_count - 22) / 11)
+        # - initial solve for linear constraints takes 1 in both cases (only done once)
+        # - (total_solves - 1) / (solves_per_iter) should be equal between the two cases
+        self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
+                         (p_color.model.linear_solver._solve_count - 1) / 11)
 
     def test_dynamic_simul_coloring(self):
 
