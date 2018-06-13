@@ -18,16 +18,18 @@ class DictionaryJacobian(Jacobian):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, system, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
+        system : System
+            Parent system to this jacobian.
         **kwargs : dict
             options dictionary.
         """
-        super(DictionaryJacobian, self).__init__(**kwargs)
+        super(DictionaryJacobian, self).__init__(system, **kwargs)
 
         self._iter_keys = {}
 
@@ -51,7 +53,7 @@ class DictionaryJacobian(Jacobian):
         entry = (system.pathname, vec_name)
 
         if entry not in self._iter_keys:
-            subjacs = self._subjacs
+            subjacs = self._subjacs_info
             keys = []
             for res_name in system._var_relevant_names[vec_name]['output']:
                 for type_ in ('output', 'input'):
@@ -87,71 +89,70 @@ class DictionaryJacobian(Jacobian):
         d_res_names = d_residuals._names
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
-        res_flat_views = d_residuals._views_flat
-        out_flat_views = d_outputs._views_flat
-        inp_flat_views = d_inputs._views_flat
+        rflat = d_residuals._views_flat
+        oflat = d_outputs._views_flat
+        iflat = d_inputs._views_flat
         np_add_at = np.add.at
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
+            subjacs_info = self._subjacs_info
             for abs_key in self._iter_abs_keys(d_residuals._name):
-                subjac = self._subjacs[abs_key]
+                subjac_info = subjacs_info[abs_key]
+                subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
-                    if isinstance(subjac, list):
+                    rows = subjac_info['rows']
+                    if rows is not None:  # sparse list format
+                        cols = subjac_info['cols']
                         if other_name in d_out_names:
-                            re = res_flat_views[res_name]
-                            op = out_flat_views[other_name]
                             # skip the matvec mult completely for identity subjacs
                             if res_name is other_name and isinstance(system, ExplicitComponent):
                                 if fwd:
-                                    re -= op
+                                    rflat[res_name] -= oflat[other_name]
                                 else:
-                                    op -= re
+                                    oflat[other_name] -= rflat[res_name]
                             elif fwd:
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(re[:, i], subjac[1],
-                                                  op[:, i][subjac[2]] * subjac[0])
+                                        np_add_at(rflat[res_name][:, i], rows,
+                                                  oflat[other_name][:, i][cols] * subjac)
                                 else:
-                                    np_add_at(re, subjac[1], op[subjac[2]] * subjac[0])
+                                    np_add_at(rflat[res_name], rows,
+                                              oflat[other_name][cols] * subjac)
                             else:  # rev
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(op[:, i], subjac[2],
-                                                  re[:, i][subjac[1]] * subjac[0])
+                                        np_add_at(oflat[other_name][:, i], cols,
+                                                  rflat[res_name][:, i][rows] * subjac)
                                 else:
-                                    np_add_at(op, subjac[2], re[subjac[1]] * subjac[0])
+                                    np_add_at(oflat[other_name], cols,
+                                              rflat[res_name][rows] * subjac)
                         elif other_name in d_inp_names:
-                            re = res_flat_views[res_name]
-                            ip = inp_flat_views[other_name]
                             if fwd:
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(re[:, i], subjac[1],
-                                                  ip[:, i][subjac[2]] * subjac[0])
+                                        np_add_at(rflat[res_name][:, i], rows,
+                                                  iflat[other_name][:, i][cols] * subjac)
                                 else:
-                                    np_add_at(re, subjac[1], ip[subjac[2]] * subjac[0])
+                                    np_add_at(rflat[res_name], rows,
+                                              iflat[other_name][cols] * subjac)
                             else:  # rev
                                 if ncol > 1:
                                     for i in range(ncol):
-                                        np_add_at(ip[:, i], subjac[2],
-                                                  re[:, i][subjac[1]] * subjac[0])
+                                        np_add_at(iflat[other_name][:, i], cols,
+                                                  rflat[res_name][:, i][rows] * subjac)
                                 else:
-                                    np_add_at(ip, subjac[2], re[subjac[1]] * subjac[0])
+                                    np_add_at(iflat[other_name], cols,
+                                              rflat[res_name][rows] * subjac)
                     else:  # ndarray or sparse
                         if other_name in d_out_names:
-                            re = res_flat_views[res_name]
-                            op = out_flat_views[other_name]
                             if fwd:
-                                re += subjac.dot(op)
+                                rflat[res_name] += subjac.dot(oflat[other_name])
                             else:  # rev
-                                op += subjac.T.dot(re)
-
+                                oflat[other_name] += subjac.T.dot(rflat[res_name])
                         elif other_name in d_inp_names:
-                            re = res_flat_views[res_name]
-                            ip = inp_flat_views[other_name]
                             if fwd:
-                                re += subjac.dot(ip)
+                                rflat[res_name] += subjac.dot(iflat[other_name])
                             else:  # rev
-                                ip += subjac.T.dot(re)
+                                iflat[other_name] += subjac.T.dot(rflat[res_name])

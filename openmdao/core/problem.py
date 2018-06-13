@@ -641,20 +641,6 @@ class Problem(object):
         if Problem._post_setup_func is not None:
             Problem._post_setup_func(self)
 
-    def _all_components_provide_jacobians(self):
-        """
-        Are all components providing jacobians.
-
-        Returns
-        -------
-        boolean
-            True if all Components use jacobian-free linear operators; False otherwise.
-        """
-        for comp in self.model.system_iter(typ=Component, include_self=True):
-            if comp.matrix_free:
-                return False
-        return True
-
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=DEFAULT_FD_OPTIONS['step'],
@@ -721,12 +707,11 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        all_comps = model.system_iter(typ=Component, include_self=True)
         includes = [includes] if isinstance(includes, str) else includes
         excludes = [excludes] if isinstance(excludes, str) else excludes
 
         comps = []
-        for comp in all_comps:
+        for comp in model.system_iter(typ=Component, include_self=True):
             if isinstance(comp, IndepVarComp):
                 continue
 
@@ -786,7 +771,6 @@ class Problem(object):
                 # TODO: Check deprecated deriv_options.
 
                 with comp._unscaled_context():
-                    subjacs = comp._jacobian._subjacs
 
                     of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
                     wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
@@ -831,7 +815,7 @@ class Problem(object):
                                 flat_view[idx] = 1.0
 
                                 # Matrix Vector Product
-                                comp._apply_linear(['linear'], _contains_all, mode)
+                                comp._apply_linear(None, ['linear'], _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -866,47 +850,48 @@ class Problem(object):
 
                     # These components already have a Jacobian with calculated derivatives.
                     else:
+                        subjacs = comp._jacobian._subjacs_info
 
                         for rel_key in product(of_list, wrt_list):
                             abs_key = rel_key2abs_key(comp, rel_key)
                             of, wrt = abs_key
 
                             # No need to calculate partials; they are already stored
-                            deriv_value = subjacs.get(abs_key)
+                            try:
+                                deriv_value = subjacs[abs_key]['value']
+                                rows = subjacs[abs_key]['rows']
+                            except KeyError:
+                                deriv_value = rows = None
 
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is non zero. Note: subjacs_info is empty for
                             # undeclared partials, which is the default behavior now.
                             try:
-                                if comp._jacobian._subjacs_info[abs_key][0]['dependent'] is False:
+                                if subjacs[abs_key]['dependent'] is False:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
                                 indep_key[c_name].add(rel_key)
 
                             if deriv_value is None:
                                 # Missing derivatives are assumed 0.
-                                try:
-                                    in_size = comp._var_abs2meta[wrt]['size']
-                                except KeyError:
-                                    in_size = comp._var_abs2meta[wrt]['size']
-
+                                in_size = comp._var_abs2meta[wrt]['size']
                                 out_size = comp._var_abs2meta[of]['size']
                                 deriv_value = np.zeros((out_size, in_size))
 
                             if force_dense:
-                                if isinstance(deriv_value, list):
+                                if rows is not None:
                                     try:
                                         in_size = comp._var_abs2meta[wrt]['size']
                                     except KeyError:
                                         in_size = comp._var_abs2meta[wrt]['size']
                                     out_size = comp._var_abs2meta[of]['size']
                                     tmp_value = np.zeros((out_size, in_size))
-                                    jac_val, jac_i, jac_j = deriv_value
                                     # if a scalar value is provided (in declare_partials),
                                     # expand to the correct size array value for zipping
-                                    if jac_val.size == 1:
-                                        jac_val = jac_val * np.ones(jac_i.size)
-                                    for i, j, val in zip(jac_i, jac_j, jac_val):
+                                    if deriv_value.size == 1:
+                                        deriv_value *= np.ones(rows.size)
+                                    for i, j, val in zip(rows, subjacs[abs_key]['cols'],
+                                                         deriv_value):
                                         tmp_value[i, j] += val
                                     deriv_value = tmp_value
 
@@ -1013,7 +998,7 @@ class Problem(object):
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
-                                  all_comps_provide_jacs=self._all_components_provide_jacobians(),
+                                  all_comps_provide_jacs=not self.model.matrix_free,
                                   show_only_incorrect=show_only_incorrect)
 
         return partials_data
@@ -1088,11 +1073,19 @@ class Problem(object):
                 'form': form,
                 'step_calc': step_calc,
             }
+            approx = model._owns_approx_jac
+            old_jac = model._jacobian
+
             model.approx_totals(method=method, step=step, form=form,
                                 step_calc=step_calc if method is 'fd' else None)
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                        driver_scaling=driver_scaling)
             Jfd = total_info.compute_totals_approx(initialize=True)
+
+            # reset the _owns_approx_jac flag after approximation is complete.
+            if not approx:
+                model._jacobian = old_jac
+                model._owns_approx_jac = False
 
         # Assemble and Return all metrics.
         data = {}

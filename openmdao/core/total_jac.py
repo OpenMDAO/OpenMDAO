@@ -872,7 +872,6 @@ class _TotalJacInfo(object):
                         deriv_val = np.empty(slc.stop - slc.start)
                     self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
 
-                # print("deriv_val:", output_name, input_name, deriv_val)
                 if fwd:
                     J[slc, i] = deriv_val
                 else:
@@ -1006,7 +1005,8 @@ class _TotalJacInfo(object):
             vec_dresid[vec_name].set_const(0.0)
 
         # Linearize Model
-        model._linearize()
+        model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
+        model._linear_solver._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for key, meta in iteritems(self.idx_iter_dict):
@@ -1030,6 +1030,7 @@ class _TotalJacInfo(object):
                         print('Solving variable:', key)
 
                     sys.stdout.flush()
+
                     t0 = time.time()
 
                 # restore old linear solution if cache_linear_solution was set by the user for
@@ -1104,9 +1105,10 @@ class _TotalJacInfo(object):
         model._setup_jacobians(recurse=False)
 
         # Linearize Model
-        model._linearize()
+        model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
+        model._linear_solver._linearize()
 
-        approx_jac = model._jacobian._subjacs
+        approx_jac = model._jacobian._subjacs_info
 
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
@@ -1268,14 +1270,14 @@ class _TotalJacInfo(object):
         sys.stdout.flush()
 
 
-def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
+def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
     """
     Return proper subjacobian based on input/output names and indices.
 
     Parameters
     ----------
-    jac : list or ndarray
-        Partial subjacobian coming from approx_jac.
+    jac_meta : dict
+        Partial subjacobian metadata coming from approx_jac.
     prom_out : str
         Promoted output name.
     prom_in : str
@@ -1290,16 +1292,16 @@ def _get_subjac(jac, prom_out, prom_in, of_idx, wrt_idx):
     ndarray
         The desired subjacobian.
     """
-    if isinstance(jac, list):
+    if jac_meta['rows'] is not None:  # sparse list format
         # This is a design variable that was declared as an obj/con.
-        tot = np.eye(len(jac[0]))
+        tot = np.eye(len(jac_meta['value']))
         if prom_out in of_idx:
             tot = tot[of_idx[prom_out], :]
         if prom_in in wrt_idx:
             tot = tot[:, wrt_idx[prom_in]]
         return tot
     else:
-        return jac
+        return jac_meta['value']
 
 
 def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):

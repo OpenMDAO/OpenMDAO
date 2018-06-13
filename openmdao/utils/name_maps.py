@@ -191,7 +191,7 @@ def prom_key2abs_key(system, prom_key):
 
 def key2abs_key(system, key):
     """
-    Map the given promoted or relative name pair to the absolute name pair.
+    Map the given absolute, promoted or relative name pair to the absolute name pair.
 
     The first name is an output, and the second name can be an output or an input.
     If the second name is non-unique, a KeyError is thrown.
@@ -208,6 +208,9 @@ def key2abs_key(system, key):
     (str, str) or None
         Absolute name pair of sub-Jacobian if unique abs_key found or None otherwise.
     """
+    if key in system._subjacs_info:
+        return key
+
     abs2meta = system._var_abs2meta
 
     abs_key = prom_key2abs_key(system, key)

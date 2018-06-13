@@ -10,7 +10,7 @@ import math
 
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, DenseJacobian, DirectSolver,\
+from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
 

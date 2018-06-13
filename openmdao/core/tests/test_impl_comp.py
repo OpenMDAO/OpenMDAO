@@ -209,10 +209,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = cStringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
-        self.assertEqual(states, [
-            ('comp2.x', {'value': [3.], 'resids': [0.]}),
-            ('comp3.x', {'value': [3.], 'resids': [0.]}),
-        ])
+        self.assertTrue(('comp2.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
+        self.assertTrue(('comp3.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
         text = stream.getvalue()
         self.assertEqual(1, text.count('comp2.x'))
         self.assertEqual(1, text.count('comp3.x'))
