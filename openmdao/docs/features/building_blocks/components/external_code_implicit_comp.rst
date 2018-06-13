@@ -12,10 +12,10 @@ operating system. But it treats the `Component` as an `ImplicitComponent` rather
 
 `ExternalCodeImplicitComp` has most of the same options as `ExternalCodeComp`, but there is one major difference.
 
-    .. embed-options::
-        openmdao.components.external_code_comp
-        ExternalCodeImplicitComp
-        options
+.. embed-options::
+    openmdao.components.external_code_comp
+    ExternalCodeImplicitComp
+    options
 
 When using an `ExternalCodeImplicitComp`, you have the option to define two external programs rather than one. The
 first of these is "command_apply", which is the command that you want to run to evaluate the residuals. You should
@@ -25,7 +25,7 @@ solve itself, and if you want it to do so (for example, while using a Newton sol
 on in a higher-level `Group`.)
 
 ExternalCodeImplicitComp Example
----------------------------------------
+--------------------------------
 
 Here is a simple example of the use of an `ExternalCodeImplicitComp` Component. The external code in the example
 is a Python script that evaluates the output and residual for the implicit relationship between the area ratio and
