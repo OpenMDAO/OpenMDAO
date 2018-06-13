@@ -15,8 +15,8 @@ New Features:
 - Solvers have new `debug_print` option that will report the initial condition of the solver if it fails to converge.
 
 - SimpleGADriver changes:
-    - Will now compute a population size based on 4*sum(bits) + 1 if pop_size=0
-    - Can support models that need more than 1 proc
+    - Will now compute a population size based on 4*sum(bits) + 1 if pop_size=0.
+    - Can support models that need more than one processor.
 
 - Problem changes:
     - New Problem methods `<problem>.get_val()` and `<problem>.set_val()` allow the user to specify a unit, and we'll convert to the correct unit (or throw an error if the unit is not compatible).
@@ -56,7 +56,7 @@ New Features:
 
 
 Backwards-Compatible API Changes:
------------------------------------
+---------------------------------
 - Changed all instances of `metadata` to `options`. `<system>.metadata` has now been deprecated.
 
 - Class name changes to Components, so all end in "Comp" (old class names have been deprecated):
@@ -69,11 +69,11 @@ Backwards-Compatible API Changes:
 - User no longer needs to specify PETSCvector for parallel cases (the framework figures it out now).
 
 - check_totals and check_partials no longer support the `supress_output` argument. Use `out_stream=None` instead.
-- `comps` argument in check_partials was replaced with `includes` and `excludes` arguments.
 
 
-Backwards-Incompatible API changes:
+Backwards-Incompatible API Changes:
 -----------------------------------
+- `comps` argument in check_partials was replaced with `includes` and `excludes` arguments.
 - Re-design of the CaseReader API. Unification of all cases, and simpler iteration over case hierarchies.
 - `partial_type` argument for LinearSystemComponent has been removed
 - `maxiter` option from BoundsEnforceLS has been removed
