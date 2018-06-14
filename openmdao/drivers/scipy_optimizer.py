@@ -545,7 +545,6 @@ class ScipyOptimizeDriver(Driver):
         if dbl or (lower == -sys.float_info.max):
             return -grad[grad_idx, :]
         else:
-            # print(name, idx, grad_idx, grad[grad_idx, :])
             return grad[grad_idx, :]
 
     def _reraise(self):
