@@ -181,8 +181,6 @@ class _TotalJacInfo(object):
             else:
                 self.out_meta, out_size = self.wrt_meta, self.wrt_size
 
-            # self.out_meta, out_size = self._get_tuple_map(self.output_list, output_meta, abs2meta)
-
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name, self.idx2local = self._create_idx_maps(self.output_list, output_meta,
                                                                       out_size)
@@ -256,7 +254,7 @@ class _TotalJacInfo(object):
                 if val['indices'] is not None
             }
 
-    def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, in_meta, out_meta, return_format):
+    def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
         """
         Create a dict or flat-dict jacobian that maps to views in the given 2D array jacobian.
 
@@ -284,9 +282,6 @@ class _TotalJacInfo(object):
         OrderedDict
             Dict form of the total jacobian that contains views of the ndarray jacobian.
         """
-        of_meta = self.of_meta
-        wrt_meta = self.wrt_meta
-
         J_dict = OrderedDict()
         if return_format == 'dict':
             for i, out in enumerate(of):
