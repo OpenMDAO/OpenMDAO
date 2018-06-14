@@ -837,7 +837,7 @@ class _TotalJacInfo(object):
     #
     # Jacobian setter functions
     #
-    def single_jac_setter(self, i):
+    def single_jac_setter(self, i, mode):
         """
         Set the appropriate part of the total jacobian for a single input index.
 
@@ -845,11 +845,13 @@ class _TotalJacInfo(object):
         ----------
         i : int
             Total jacobian row or column index.
+        mode : str
+            Direction of derivative solution.
         """
         input_name, vecname, _, _ = self.in_idx_map[i]
         out_views = self.output_vec[vecname]._views_flat
         relevant = self.relevant
-        fwd = self.mode == 'fwd'
+        fwd = mode == 'fwd'
         J = self.J
         nproc = self.comm.size
 
@@ -872,7 +874,7 @@ class _TotalJacInfo(object):
                 else:
                     J[i, slc] = deriv_val
 
-    def par_deriv_jac_setter(self, inds):
+    def par_deriv_jac_setter(self, inds, mode):
         """
         Set the appropriate part of the total jacobian for multiple input indices.
 
@@ -880,11 +882,13 @@ class _TotalJacInfo(object):
         ----------
         inds : tuple of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
         """
         for i in inds:
-            self.single_jac_setter(i)
+            self.single_jac_setter(i, mode)
 
-    def simul_coloring_jac_setter(self, inds):
+    def simul_coloring_jac_setter(self, inds, mode):
         """
         Set the appropriate part of the total jacobian for simul coloring input indices.
 
@@ -892,13 +896,18 @@ class _TotalJacInfo(object):
         ----------
         inds : list of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
         """
         row_col_map = self.simul_coloring[1]
         out_meta = self.out_meta
         idx2local = self.idx2local
         idx2name = self.idx2name
         outvecs = self.output_vec
-        fwd = self.mode == 'fwd'
+        fwd = mode == 'fwd'
+        if self.mode == 'fwd' and not fwd:
+            raise RuntimeError("Bidirectional derivative solving attempted but rev mode was not "
+                               "set up.")
         J = self.J
 
         for i in inds:
@@ -918,7 +927,7 @@ class _TotalJacInfo(object):
                     else:
                         J[i, row_or_col] = deriv_val[idx2local[row_or_col]]
 
-    def matmat_jac_setter(self, inds):
+    def matmat_jac_setter(self, inds, mode):
         """
         Set the appropriate part of the total jacobian for matrix matrix input indices.
 
@@ -926,6 +935,8 @@ class _TotalJacInfo(object):
         ----------
         inds : ndarray of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution. (ignored)
         """
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
@@ -956,7 +967,7 @@ class _TotalJacInfo(object):
                 else:
                     J[inds, slc] = deriv_val.T
 
-    def par_deriv_matmat_jac_setter(self, inds):
+    def par_deriv_matmat_jac_setter(self, inds, mode):
         """
         Set the appropriate part of the total jacobian for par_deriv matrix matrix input indices.
 
@@ -964,9 +975,11 @@ class _TotalJacInfo(object):
         ----------
         inds : list of ndarray of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution. (ignored)
         """
         for matmat_idxs in inds:
-            self.matmat_jac_setter(matmat_idxs)
+            self.matmat_jac_setter(matmat_idxs, mode)
 
     def compute_totals(self):
         """
@@ -1039,7 +1052,7 @@ class _TotalJacInfo(object):
                     print('Elapsed Time:', time.time() - t0, '\n')
                     sys.stdout.flush()
 
-                jac_setter(inds)
+                jac_setter(inds, self.mode)
 
         if self.has_scaling:
             self._do_scaling(self.J_dict)
