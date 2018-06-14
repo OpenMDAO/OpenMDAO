@@ -245,7 +245,7 @@ class pyOptSparseDriver(Driver):
         lcons = [key for (key, con) in iteritems(con_meta) if con['linear']]
         if len(lcons) > 0:
             _lin_jacs = self._compute_totals(of=lcons, wrt=indep_list, return_format='dict')
-            print('lin count:', self._problem.model.linear_solver._solve_count)
+
             # convert all of our linear constraint jacs to COO format. Otherwise pyoptsparse will
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!

@@ -681,9 +681,6 @@ class _TotalJacInfo(object):
         if loc_idx != -1:
             self.input_vec[vecname]._views_flat[input_name][loc_idx] = -1.0
 
-        # print("input", idx, "loc", loc_idx)
-        print("single rel systems:", rel_systems)
-
         if cache_lin_sol:
             return rel_systems, (vecname,), idx
         else:
@@ -714,8 +711,6 @@ class _TotalJacInfo(object):
             rel_systems, vec_names, _ = self.single_input_setter(i)
             _update_rel_systems(all_rel_systems, rel_systems)
             cache |= vec_names is not None
-
-        print("simul rel systems:", all_rel_systems)
 
         if cache:
             return all_rel_systems, ('linear',), inds[0]
@@ -922,8 +917,6 @@ class _TotalJacInfo(object):
                         J[row_or_col, i] = deriv_val[idx2local[row_or_col]]
                     else:
                         J[i, row_or_col] = deriv_val[idx2local[row_or_col]]
-                else:
-                    print(output_name, "missing")
 
     def matmat_jac_setter(self, inds):
         """

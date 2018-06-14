@@ -1190,7 +1190,7 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'vectorize_derivs', 'simul_coloring', 'cache_linear_solution']
+            'vectorize_derivs', 'cache_linear_solution']
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:

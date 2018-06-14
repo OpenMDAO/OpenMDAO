@@ -1341,7 +1341,7 @@ class TestProblem(unittest.TestCase):
                     'vectorize_derivs\s+cache_linear_solution')
         assertRegex(self, output[5],
                     '^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
-                    'None\s+None\s+None\s+None\s+None\s+False\s+None\s+False')
+                    'None\s+None\s+None\s+None\s+None\s+False\s+False')
 
         # With all the optional columns and print_arrays
         stdout = sys.stdout

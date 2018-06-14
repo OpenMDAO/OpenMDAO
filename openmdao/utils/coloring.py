@@ -572,9 +572,9 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         for color, cols in enumerate(full_disjoint):
             print("%d columns in color %d" % (len(cols), color + 1))
 
-        # the first col_list entry corresponds to all uncolored columns (columns that are not disjoint
-        # wrt any other columns).  The other entries are groups of columns that do not share any
-        # nonzero row entries in common.
+        # the first col_list entry corresponds to all uncolored columns (columns that are not
+        # disjoint wrt any other columns).  The other entries are groups of columns that do not
+        # share any nonzero row entries in common.
         col_lists = [uncolored_cols]
         col_lists.extend(full_disjoint)
         lists = col_lists

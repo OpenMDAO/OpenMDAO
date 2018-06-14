@@ -1731,7 +1731,7 @@ class System(object):
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
-                       simul_coloring=None, cache_linear_solution=False):
+                       cache_linear_solution=False):
         r"""
         Add a design variable to this system.
 
