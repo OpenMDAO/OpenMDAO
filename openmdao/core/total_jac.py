@@ -110,7 +110,7 @@ class _TotalJacInfo(object):
         self.model = model = problem.model
         self.comm = problem.comm
         self.relevant = model._relevant
-        self.mode = problem._mode
+        self.mode = mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
         self.has_scaling = driver._has_scaling and driver_scaling
         self.return_format = return_format
@@ -142,16 +142,14 @@ class _TotalJacInfo(object):
         self.prom_of = prom_of
         self.prom_wrt = prom_wrt
 
-        fwd = self.mode == 'fwd'
+        fwd = mode == 'fwd'
 
-        if fwd:
-            self.input_list, self.output_list = wrt, of
-            self.input_meta, output_meta = design_vars, responses
-            self.input_vec, self.output_vec = model._vectors['residual'], model._vectors['output']
-        else:  # rev
-            self.input_list, self.output_list = of, wrt
-            self.input_meta, output_meta = responses, design_vars
-            self.input_vec, self.output_vec = model._vectors['output'], model._vectors['residual']
+        self.input_list = {'fwd': wrt, 'rev': of}
+        self.output_list = {'fwd': of, 'rev': wrt}
+        self.input_meta = {'fwd': design_vars, 'rev': responses}
+        self.output_meta = {'fwd': responses, 'rev': design_vars}
+        self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
+        self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
 
         abs2meta = model._var_allprocs_abs2meta
 
@@ -159,7 +157,7 @@ class _TotalJacInfo(object):
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
 
         if approx:
-            self._initialize_approx(output_meta)
+            self._initialize_approx(self.output_meta[mode])
         else:
             constraints = driver._cons
 
@@ -182,8 +180,10 @@ class _TotalJacInfo(object):
                 self.out_meta, out_size = self.wrt_meta, self.wrt_size
 
             if not has_lin_cons and self.simul_coloring is not None:
-                self.idx2name, self.idx2local = self._create_idx_maps(self.output_list, output_meta,
-                                                                      out_size)
+                self.idx2name = {}
+                self.idx2local = {}
+                self.idx2name[mode], self.idx2local[mode] = self._create_idx_maps(
+                    self.output_list[mode], self.output_meta[mode], out_size)
             else:
                 self.idx2name = self.idx2local = self.simul_coloring = None
 
@@ -324,15 +324,16 @@ class _TotalJacInfo(object):
         abs2meta = self.model._var_allprocs_abs2meta
         var_sizes = self.model._var_sizes
         abs2idx = self.model._var_allprocs_abs2idx
-        vois = self.input_meta
+        vois = self.input_meta[self.mode]
+        input_list = self.input_list[self.mode]
 
-        idx_tups = [None] * len(self.input_list)
+        idx_tups = [None] * len(input_list)
         loc_idxs = []
         idx_iter_dict = OrderedDict()  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
 
-        for name in self.input_list:
+        for name in input_list:
             rhsname = 'linear'
             in_var_meta = abs2meta[name]
 
@@ -653,7 +654,7 @@ class _TotalJacInfo(object):
     #
     # input setter functions
     #
-    def single_input_setter(self, idx):
+    def single_input_setter(self, idx, mode):
         """
         Set 1's into the input vector in the single index case.
 
@@ -661,6 +662,8 @@ class _TotalJacInfo(object):
         ----------
         idx : int
             Total jacobian row or column index.
+        mode : str
+            Direction of derivative solution.
 
         Returns
         -------
@@ -675,14 +678,14 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[idx]
         if loc_idx != -1:
-            self.input_vec[vecname]._views_flat[input_name][loc_idx] = -1.0
+            self.input_vec[mode][vecname]._views_flat[input_name][loc_idx] = -1.0
 
         if cache_lin_sol:
-            return rel_systems, (vecname,), idx
+            return rel_systems, (vecname,), (idx, mode)
         else:
             return rel_systems, None, None
 
-    def simul_coloring_input_setter(self, inds):
+    def simul_coloring_input_setter(self, inds, mode):
         """
         Set 1's into the input vector in the simul coloring case.
 
@@ -690,6 +693,8 @@ class _TotalJacInfo(object):
         ----------
         inds : list of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
 
         Returns
         -------
@@ -704,16 +709,16 @@ class _TotalJacInfo(object):
         cache = False
 
         for i in inds:
-            rel_systems, vec_names, _ = self.single_input_setter(i)
+            rel_systems, vec_names, _ = self.single_input_setter(i, mode)
             _update_rel_systems(all_rel_systems, rel_systems)
             cache |= vec_names is not None
 
         if cache:
-            return all_rel_systems, ('linear',), inds[0]
+            return all_rel_systems, ('linear',), (inds[0], mode)
         else:
             return all_rel_systems, None, None
 
-    def par_deriv_input_setter(self, inds):
+    def par_deriv_input_setter(self, inds, mode):
         """
         Set 1's into the input vector in the parallel derivative case.
 
@@ -721,6 +726,8 @@ class _TotalJacInfo(object):
         ----------
         inds : tuple of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
 
         Returns
         -------
@@ -735,17 +742,17 @@ class _TotalJacInfo(object):
         vec_names = []
 
         for count, i in enumerate(inds):
-            rel_systems, vnames, _ = self.single_input_setter(i)
+            rel_systems, vnames, _ = self.single_input_setter(i, mode)
             _update_rel_systems(all_rel_systems, rel_systems)
             if vnames is not None:
                 vec_names.append(vnames[0])
 
         if vec_names:
-            return all_rel_systems, vec_names, inds[0]
+            return all_rel_systems, vec_names, (inds[0], mode)
         else:
             return all_rel_systems, None, None
 
-    def matmat_input_setter(self, inds):
+    def matmat_input_setter(self, inds, mode):
         """
         Set 1's into the input vector in the matrix-matrix case.
 
@@ -753,6 +760,8 @@ class _TotalJacInfo(object):
         ----------
         inds : ndarray of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
 
         Returns
         -------
@@ -769,7 +778,7 @@ class _TotalJacInfo(object):
 
         input_name, vec_name, rel_systems, cache_lin_sol = in_idx_map[inds[0]]
 
-        dinputs = input_vec[vec_name]
+        dinputs = input_vec[mode][vec_name]
 
         for col, i in enumerate(inds):
             loc_idx = in_loc_idxs[i]
@@ -777,11 +786,11 @@ class _TotalJacInfo(object):
                 dinputs._views_flat[input_name][loc_idx, col] = -1.0
 
         if cache_lin_sol:
-            return rel_systems, (vec_name,), inds[0]
+            return rel_systems, (vec_name,), (inds[0], mode)
         else:
             return rel_systems, None, None
 
-    def par_deriv_matmat_input_setter(self, inds):
+    def par_deriv_matmat_input_setter(self, inds, mode):
         """
         Set 1's into the input vector in the matrix matrix with parallel deriv case.
 
@@ -789,6 +798,8 @@ class _TotalJacInfo(object):
         ----------
         inds : list of ndarray of int
             Total jacobian row or column indices.
+        mode : str
+            Direction of derivative solution.
 
         Returns
         -------
@@ -799,7 +810,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        input_vec = self.input_vec
+        input_vec = self.input_vec[mode]
         in_idx_map = self.in_idx_map
         in_loc_idxs = self.in_loc_idxs
 
@@ -826,7 +837,7 @@ class _TotalJacInfo(object):
                         dinputs._views_flat[input_name][loc_idx] = -1.0
 
         if cache:
-            return all_rel_systems, vec_names, inds[0][0]
+            return all_rel_systems, vec_names, (inds[0][0], mode)
         else:
             return all_rel_systems, None, None
 
@@ -845,13 +856,13 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         input_name, vecname, _, _ = self.in_idx_map[i]
-        out_views = self.output_vec[vecname]._views_flat
+        out_views = self.output_vec[mode][vecname]._views_flat
         relevant = self.relevant
         fwd = mode == 'fwd'
         J = self.J
         nproc = self.comm.size
 
-        for output_name in self.output_list:
+        for output_name in self.output_list[mode]:
             if input_name not in relevant or output_name in relevant[input_name]:
                 slc, indices, distrib = self.out_meta[output_name]
                 deriv_val = None
@@ -897,9 +908,15 @@ class _TotalJacInfo(object):
         """
         row_col_map = self.simul_coloring[1]
         out_meta = self.out_meta
-        idx2local = self.idx2local
-        idx2name = self.idx2name
-        outvecs = self.output_vec
+        try:
+            idx2name = self.idx2name[mode]
+        except KeyError:
+            self.idx2name[mode], self.idx2local[mode] = self._create_idx_maps(self.output_list,
+                                                                              output_meta,
+                                                                              out_size)
+        idx2local = self.idx2local[mode]
+
+        outvecs = self.output_vec[mode]
         fwd = mode == 'fwd'
         if self.mode == 'fwd' and not fwd:
             raise RuntimeError("Bidirectional derivative solving attempted but rev mode was not "
@@ -937,14 +954,14 @@ class _TotalJacInfo(object):
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
         input_name, vecname, _, _ = self.in_idx_map[inds[0]]
-        out_views = self.output_vec[vecname]._views_flat
-        ncol = self.output_vec[vecname]._ncol
+        out_views = self.output_vec[mode][vecname]._views_flat
+        ncol = self.output_vec[mode][vecname]._ncol
         relevant = self.relevant
         nproc = self.comm.size
         fwd = self.mode == 'fwd'
         J = self.J
 
-        for output_name in self.output_list:
+        for output_name in self.output_list[mode]:
             slc, indices, distrib = self.out_meta[output_name]
             deriv_val = out_idxs = None
             if input_name not in relevant or output_name in relevant[input_name]:
@@ -1022,7 +1039,7 @@ class _TotalJacInfo(object):
                 else:  # rev
                     vec_dinput['linear'].set_const(0.0)
 
-                rel_systems, vec_names, cache_key = input_setter(inds)
+                rel_systems, vec_names, cache_key = input_setter(inds, self.mode)
 
                 if debug_print:
                     if par_deriv and key in par_deriv:
@@ -1038,9 +1055,9 @@ class _TotalJacInfo(object):
                 # restore old linear solution if cache_linear_solution was set by the user for
                 # any input variables involved in this linear solution.
                 if cache_key is not None and not has_lin_cons:
-                    self._restore_linear_solution(vec_names, cache_key)
+                    self._restore_linear_solution(vec_names, cache_key, self.mode)
                     model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
-                    self._save_linear_solution(vec_names, cache_key)
+                    self._save_linear_solution(vec_names, cache_key, self.mode)
                 else:
                     model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
 
@@ -1150,7 +1167,7 @@ class _TotalJacInfo(object):
         recording_iteration.stack.pop()
         return totals
 
-    def _restore_linear_solution(self, vec_names, key):
+    def _restore_linear_solution(self, vec_names, key, mode):
         """
         Restore the previous linear solution.
 
@@ -1160,21 +1177,23 @@ class _TotalJacInfo(object):
             Names of output vectors to restore.
         key : hashable object
             Key to lookup linear solution.
+        mode : str
+            Direction of derivative solution.
         """
         lin_sol_cache = self.lin_sol_cache
         if key in lin_sol_cache:
             lin_sol = lin_sol_cache[key]
             for i, vec_name in enumerate(vec_names):
                 save_vec = lin_sol[i]
-                doutputs = self.output_vec[vec_name]
+                doutputs = self.output_vec[mode][vec_name]
                 for vs in doutputs._data:
                     doutputs._data[vs][:] = save_vec[vs]
         else:
             lin_sol_cache[key] = lin_sol = []
             for vec_name in vec_names:
-                lin_sol.append(deepcopy(self.output_vec[vec_name]._data))
+                lin_sol.append(deepcopy(self.output_vec[mode][vec_name]._data))
 
-    def _save_linear_solution(self, vec_names, key):
+    def _save_linear_solution(self, vec_names, key, mode):
         """
         Save the current linear solution.
 
@@ -1184,11 +1203,13 @@ class _TotalJacInfo(object):
             Names of output vectors to restore.
         key : hashable object
             Key to lookup linear solution.
+        mode : str
+            Direction of derivative solution.
         """
         lin_sol = self.lin_sol_cache[key]
         for i, vec_name in enumerate(vec_names):
             save_vec = lin_sol[i]
-            doutputs = self.output_vec[vec_name]
+            doutputs = self.output_vec[mode][vec_name]
             for vs, data in iteritems(doutputs._data):
                 save_vec[vs][:] = data
 
