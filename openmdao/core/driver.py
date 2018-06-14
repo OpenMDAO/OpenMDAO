@@ -320,14 +320,17 @@ class Driver(object):
         # if we're using simultaneous derivatives then our effective size is less
         # than the full size
         if self._simul_coloring_info:
-            lists = self._simul_coloring_info[0]
-            if lists:
-                size = len(lists[0])  # lists[0] is the uncolored row/col indices
-                size += len(lists) - 1
-            if problem._mode == 'fwd':
-                desvar_size = size
-            else:  # rev
-                response_size = size
+            if 'fwd' in self._simul_coloring_info and 'rev' in self._simul_coloring_info:
+                pass  # we're doing both!
+            else:
+                lists = self._simul_coloring_info[problem._mode][0]
+                if lists:
+                    size = len(lists[0])  # lists[0] is the uncolored row/col indices
+                    size += len(lists) - 1
+                if problem._mode == 'fwd':
+                    desvar_size = size
+                else:  # rev
+                    response_size = size
 
         if ((problem._mode == 'fwd' and desvar_size > response_size) or
                 (problem._mode == 'rev' and response_size > desvar_size)):
@@ -966,15 +969,18 @@ class Driver(object):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
 
-        tup = self._simul_coloring_info
-        if len(tup) > 2:
-            sparsity = tup[2]
-            if self._total_jac_sparsity is not None:
-                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                                   " and _total_jac_sparsity.")
-            self._total_jac_sparsity = sparsity
+        # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
+        # sparsity patterns
+        if 'sparsity' in self._simul_coloring_info:
+            sparsity = self._simul_coloring_info['sparsity']
+            del self._simul_coloring_info['sparsity']
+        else:
+            sparsity = None
 
-        self._simul_coloring_info = tup[:2]
+        if sparsity is not None and self._total_jac_sparsity is not None:
+            raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                               " and _total_jac_sparsity.")
+        self._total_jac_sparsity = sparsity
 
     def _pre_run_model_debug_print(self):
         """

@@ -408,13 +408,13 @@ def _write_sparsity(sparsity, stream):
     stream.write("}")
 
 
-def _write_coloring(mode, lists, nonzero_entries, sparsity, stream):
+def _write_coloring(modes, lists, nonzero_entries, sparsity, stream):
     """
     Write the coloring and sparsity structures to the given stream.
 
     Parameters
     ----------
-    mode : str
+    modes : list of str
         Derivative direction.
     lists : list of lists
         Lists of groups of columns of the same color.  First list is the list of all non-colored
@@ -429,48 +429,55 @@ def _write_coloring(mode, lists, nonzero_entries, sparsity, stream):
     """
     tty = stream.isatty()
     none = 'None' if tty else 'null'
-    name = 'column' if mode == 'fwd' else 'row'
 
-    stream.write("[[\n")
-    last_idx = len(lists) - 1
-    for i, lst in enumerate(lists):
-        stream.write("   %s" % lst)
-        if i < last_idx:
-            stream.write(",")
+    stream.write("{\n")
+    for m, mode in enumerate(modes):
+        name = 'column' if mode == 'fwd' else 'row'
 
-        if tty:
-            if i == 0:
-                stream.write("   # uncolored %ss" % name)
+        if m > 0:
+            stream.write(",\n")
+
+        stream.write('"%s": [[\n' % mode)
+        last_idx = len(lists) - 1
+        for i, lst in enumerate(lists):
+            stream.write("   %s" % lst)
+            if i < last_idx:
+                stream.write(",")
+
+            if tty:
+                if i == 0:
+                    stream.write("   # uncolored %ss" % name)
+                else:
+                    stream.write("   # color %d" % i)
+
+            stream.write("\n")
+
+        stream.write("],\n[\n")
+        last_idx = len(nonzero_entries) - 1
+        for i, nonzeros in enumerate(nonzero_entries):
+            if nonzeros is None:
+                stream.write("   %s" % none)
             else:
-                stream.write("   # color %d" % i)
+                stream.write("   %s" % nonzeros)
 
-        stream.write("\n")
+            if i < last_idx:
+                stream.write(",")
 
-    stream.write("],\n[\n")
-    last_idx = len(nonzero_entries) - 1
-    for i, nonzeros in enumerate(nonzero_entries):
-        if nonzeros is None:
-            stream.write("   %s" % none)
-        else:
-            stream.write("   %s" % nonzeros)
+            if tty:
+                stream.write("   # %s %d" % (name, i))
 
-        if i < last_idx:
-            stream.write(",")
+            stream.write("\n")
 
-        if tty:
-            stream.write("   # %s %d" % (name, i))
-
-        stream.write("\n")
-
-    stream.write("]")
+        stream.write("]")
+    stream.write("\n]")
 
     if sparsity:
-        stream.write(",\n")
+        stream.write(',\n"sparsity": ')
         _write_sparsity(sparsity, stream)
     else:
-        stream.write(",\n%s" % none)
+        stream.write(',\n"sparsity": %s' % none)
 
-    stream.write("]")
+    stream.write("\n}")
 
 
 def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
@@ -564,6 +571,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
                       run_model=run_model)
 
+    coloring = {}
+
     if mode == 'fwd':
         full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
         uncolored_cols = [i for i, r in enumerate(rows) if r is None]
@@ -579,6 +588,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         col_lists.extend(full_disjoint)
         lists = col_lists
         other = rows
+        coloring['fwd'] = [col_lists, rows]
     elif mode == 'rev':
         full_disjoint, cols = _get_full_disjoint_rows(J, 0, J.shape[0] - 1)
         uncolored_rows = [i for i, r in enumerate(cols) if r is None]
@@ -594,6 +604,7 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         row_lists.extend(full_disjoint)
         lists = row_lists
         other = cols
+        coloring['rev'] = [row_lists, cols]
     else:
         raise RuntimeError("get_simul_meta: invalid mode: '%s'" % mode)
 
@@ -604,29 +615,24 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
     if include_sparsity:
         sparsity = _sparsity_from_jac(J, of, wrt, driver)
+        coloring['sparsity'] = sparsity
 
     driver._total_jac = None
 
     if stream is not None:
         if stream.isatty():
             stream.write("\n########### BEGIN COLORING DATA ################\n")
-            if mode == 'fwd':
-                _write_coloring(mode, col_lists, rows, sparsity, stream)
-            else:
-                _write_coloring(mode, row_lists, cols, sparsity, stream)
+            _write_coloring([mode], lists, other, sparsity, stream)
             stream.write("\n########### END COLORING DATA ############\n")
         else:
-            if mode == 'fwd':
-                _write_coloring(mode, col_lists, rows, sparsity, stream)
-            else:
-                _write_coloring(mode, row_lists, cols, sparsity, stream)
+            _write_coloring([mode], lists, other, sparsity, stream)
 
         if show_jac:
             s = stream if stream.isatty() else sys.stdout
             s.write("\n\n")
             array_viz(J, problem, of, wrt, s)
 
-    return lists, other, sparsity
+    return coloring
 
 
 def simul_coloring_summary(problem, color_info, stream=sys.stdout):
@@ -637,36 +643,49 @@ def simul_coloring_summary(problem, color_info, stream=sys.stdout):
     ----------
     problem : Problem
         The Problem being analyzed.
-    color_info : tuple of (column_or_row_lists, row__or_column_map)
+    color_info : dict
         Coloring metadata.
     stream : file-like
         Where the output will go.
     """
-    lists, rowcol_map, sparsity = color_info
+    tot_size = tot_dv_size = tot_resp_size = 0
 
     # lists[0] are the non-colored columns or rows, which are solved individually so
     # we add all of them, along with the number of remaining lists, where each
     # sublist is a bunch of columns or rows that are solved together, to get the total colors
     # (which equals the total number of linear solves).
-    tot_colors = len(lists[0]) + len(lists) - 1
-    tot_size = 0
+    tot_colors = tot_fwd_colors = tot_rev_colors = 0
+    tot_size = tot_dv_size = tot_resp_size = 0
 
-    if problem._mode == 'fwd':
+    if 'fwd' in color_info:
         desvars = problem.driver._designvars
         for dv in desvars:
-            tot_size += desvars[dv]['size']
-    else:  # rev
+            tot_dv_size += desvars[dv]['size']
+
+        lists, _ = color_info['fwd']
+        tot_fwd_colors = len(lists[0]) + len(lists) - 1
+
+    if 'rev' in color_info:
         objs = problem.driver._objs
         cons = problem.driver._cons
         nl_cons = [cons[n] for n in cons if not cons[n]['linear']]
         for obj in objs:
-            tot_size += objs[obj]['size']
+            tot_resp_size += objs[obj]['size']
         for con in nl_cons:
-            tot_size += con['size']
+            tot_resp_size += con['size']
+
+        lists, _ = color_info['rev']
+        tot_rev_colors = len(lists[0]) + len(lists) - 1
+
+    tot_size = tot_dv_size + tot_resp_size
+    tot_colors = tot_fwd_colors + tot_rev_colors
 
     if tot_size == tot_colors or tot_colors == 0:
         stream.write("No simultaneous derivative solves are possible in this configuration.\n")
     else:
+        stream.write("\nTotal fwd colors: %d\n" % tot_fwd_colors)
+        stream.write("Total rev colors: %d\n" % tot_rev_colors)
+
         stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
                      (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
