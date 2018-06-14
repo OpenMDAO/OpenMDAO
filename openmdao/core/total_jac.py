@@ -332,8 +332,7 @@ class _TotalJacInfo(object):
         # based on simul_coloring, determine if we need to allocate data structures for
         # both fwd and rev modes
         if simul_coloring:
-            # FIXME: handle this properly
-            modes = [self.mode]
+            modes = [k for k in simul_coloring]
         else:
             modes = [self.mode]
 
