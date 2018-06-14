@@ -54,6 +54,12 @@ class _TotalJacInfo(object):
         The top level System of the System tree.
     out_meta : dict
         Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
+    of_meta : dict
+        Map of absoute output 'of' var name to tuples of the form
+        (row/column slice, indices, distrib).
+    wrt_meta : dict
+        Map of absoute output 'wrt' var name to tuples of the form
+        (row/column slice, indices, distrib).
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
@@ -147,10 +153,14 @@ class _TotalJacInfo(object):
             self.input_meta, output_meta = responses, design_vars
             self.input_vec, self.output_vec = model._vectors['output'], model._vectors['residual']
 
+        abs2meta = model._var_allprocs_abs2meta
+
+        self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta)
+        self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
+
         if approx:
             self._initialize_approx(output_meta)
         else:
-            abs2meta = model._var_allprocs_abs2meta
             constraints = driver._cons
 
             for name in of:
@@ -166,7 +176,12 @@ class _TotalJacInfo(object):
                 self._create_in_idx_map(has_lin_cons)
             in_size = self.in_loc_idxs.size
 
-            self.out_meta, out_size = self._get_tuple_map(self.output_list, output_meta, abs2meta)
+            if fwd:
+                self.out_meta, out_size = self.of_meta, self.of_size
+            else:
+                self.out_meta, out_size = self.wrt_meta, self.wrt_size
+
+            # self.out_meta, out_size = self._get_tuple_map(self.output_list, output_meta, abs2meta)
 
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name, self.idx2local = self._create_idx_maps(self.output_list, output_meta,
@@ -189,15 +204,14 @@ class _TotalJacInfo(object):
                 if self.has_scaling:
                     # for array return format, create a 'dict' view for scaling only, since
                     # our scaling data is by variable.
-                    in_meta, _ = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
                     self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                                   in_meta, self.out_meta, 'dict')
+                                                   self.wrt_meta, self.of_meta, 'dict')
                 else:
                     self.J_dict = None
             else:
-                in_meta, _ = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
                 self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                                              in_meta, self.out_meta, return_format)
+                                                              self.wrt_meta, self.of_meta,
+                                                              return_format)
 
         if self.has_scaling:
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
@@ -216,18 +230,12 @@ class _TotalJacInfo(object):
         abs2meta = model._var_allprocs_abs2meta
 
         if self.return_format == 'array':
-            self.out_meta, out_size = self._get_tuple_map(self.output_list, output_meta, abs2meta)
-            in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
-
-            if self.mode == 'fwd':
-                self.J = J = np.zeros((out_size, in_size))
-            else:  # rev
-                self.J = J = np.zeros((in_size, out_size))
+            self.J = J = np.zeros((self.of_size, self.wrt_size))
 
             # for array return format, create a 'dict' view so we can map partial subjacs into
             # the proper locations (and also do by-variable scaling if needed).
             self.J_dict = self._get_dict_J(J, self.wrt, self.prom_wrt, self.of, self.prom_of,
-                                           in_meta, self.out_meta, 'dict')
+                                           self.wrt_meta, self.of_meta, 'dict')
 
         of_set = frozenset(self.of)
         wrt_set = frozenset(self.wrt)
@@ -264,9 +272,9 @@ class _TotalJacInfo(object):
             Absolute names of output vars.
         prom_of : iter of str
             Promoted names of output vars.
-        in_meta : dict
+        wrt_meta : dict
             Dict mapping input name to array jacobian slice, indices, and distrib.
-        out_meta : dict
+        of_meta : dict
             Dict mapping output name to array jacobian slice, indices, and distrib.
         return_format : str
             Indicates the desired form of the returned jacobian.
@@ -276,25 +284,21 @@ class _TotalJacInfo(object):
         OrderedDict
             Dict form of the total jacobian that contains views of the ndarray jacobian.
         """
-        if self.mode == 'fwd':
-            meta_in = in_meta
-            meta_out = out_meta
-        else:
-            meta_out = in_meta
-            meta_in = out_meta
+        of_meta = self.of_meta
+        wrt_meta = self.wrt_meta
 
         J_dict = OrderedDict()
         if return_format == 'dict':
             for i, out in enumerate(of):
                 J_dict[prom_of[i]] = outer = OrderedDict()
-                out_slice = meta_out[out][0]
+                out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
-                    outer[prom_wrt[j]] = J[out_slice, meta_in[inp][0]]
+                    outer[prom_wrt[j]] = J[out_slice, wrt_meta[inp][0]]
         elif return_format == 'flat_dict':
             for i, out in enumerate(of):
-                out_slice = meta_out[out][0]
+                out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
-                    J_dict[prom_of[i], prom_wrt[j]] = J[out_slice, meta_in[inp][0]]
+                    J_dict[prom_of[i], prom_wrt[j]] = J[out_slice, wrt_meta[inp][0]]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)
 
@@ -1245,32 +1249,17 @@ class _TotalJacInfo(object):
         """
         Print out the derivatives when debug_print is True.
         """
-        if self.mode == 'fwd':
-            outputs = self.input_list
-            inputs = self.output_list
-        else:
-            inputs = self.input_list
-            outputs = self.output_list
-
         if self.return_format == 'dict':
             J = self.J_dict
-            for of in inputs:
-                for wrt in outputs:
+            for of in self.of:
+                for wrt in self.wrt:
                     pprint.pprint({(of, wrt): J[of][wrt]})
-
         else:
-            abs2meta = self.model._var_allprocs_abs2meta
-            in_meta, in_size = self._get_tuple_map(self.input_list, self.input_meta, abs2meta)
-            out_meta = self.out_meta
             J = self.J
-
-            if self.mode == 'fwd':
-                in_meta, out_meta = out_meta, in_meta
-
-            for i, of in enumerate(outputs):
-                out_slice = out_meta[of][0]
-                for j, wrt in enumerate(inputs):
-                    pprint.pprint({(of, wrt): J[out_slice, in_meta[wrt][0]]})
+            for i, of in enumerate(self.of):
+                out_slice = self.of_meta[of][0]
+                for j, wrt in enumerate(self.wrt):
+                    pprint.pprint({(of, wrt): J[out_slice, self.wrt_meta[wrt][0]]})
 
         print('')
         sys.stdout.flush()
