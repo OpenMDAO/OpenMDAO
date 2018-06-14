@@ -34,8 +34,6 @@ class NewtonSolver(NonlinearSolver):
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
-    _linear_solver_from_parent : bool
-        This is set to True if we are using the parent system's linear solver.
     """
 
     SOLVER = 'NL: Newton'
@@ -56,10 +54,6 @@ class NewtonSolver(NonlinearSolver):
 
         # Slot for linesearch
         self.linesearch = None
-
-        # We only need to call linearize on the linear solver
-        # if its not shared with the parent group.
-        self._linear_solver_from_parent = True
 
     @property
     def line_search(self):
@@ -107,7 +101,6 @@ class NewtonSolver(NonlinearSolver):
 
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system, self._depth + 1)
-            self._linear_solver_from_parent = False
         else:
             self.linear_solver = system.linear_solver
 
@@ -232,7 +225,7 @@ class NewtonSolver(NonlinearSolver):
         self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count < self.options['max_sub_solves'])
-        do_sub_ln = self.linear_solver is not None and self.linear_solver._linearize_children()
+        do_sub_ln = self.linear_solver._linearize_children()
 
         # Disable local fd
         approx_status = system._owns_approx_jac

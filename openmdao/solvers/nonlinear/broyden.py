@@ -5,6 +5,8 @@ Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NP
 """
 from __future__ import print_function
 
+from six.moves import range
+
 import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
@@ -211,12 +213,11 @@ class BroydenSolver(NonlinearSolver):
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_initial_jacobian']:
-            # TODO: do this
-            pass
+            Gm = self._compute_jacobian()
 
         # Set Jacobian to identity scaled by alpha.
         else:
-            Gm = -self.options['alpha'] * np.identity(self.n)
+            Gm = np.diag(-self.options['alpha'] * np.ones(self.n))
 
         return Gm
 
@@ -281,3 +282,63 @@ class BroydenSolver(NonlinearSolver):
             i += n_size
 
         return fxm
+
+    def _compute_jacobian(self):
+        """
+        Compute Jacobian for system using OpenMDAO.
+
+        Returns
+        -------
+        ndarray
+            New Jacobian.
+        """
+        system = self._system
+        states = self.options['state_vars']
+        residuals = system._residuals
+        d_res = system._vectors['residual']['linear']
+        d_out = system._vectors['output']['linear']
+
+        jac = self.Gm
+        d_res.set_const(0.0)
+        d_out.set_const(0.0)
+
+        # Disable local fd
+        approx_status = system._owns_approx_jac
+        system._owns_approx_jac = False
+
+        # Linearize model.
+        ln_solver = system.linear_solver
+        do_sub_ln = ln_solver._linearize_children()
+        my_asm_jac = ln_solver._assembled_jac
+        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+        if (my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac):
+            my_asm_jac._update(system)
+        ln_solver._linearize()
+
+        j_wrt = 0
+        for wrt_name in states:
+            wrt_size = len(residuals[wrt_name])
+            d_wrt = d_res[wrt_name]
+            for j in range(wrt_size):
+
+                # Increment each variable.
+                d_wrt[j] = 1.0
+
+                # Solve for total derivatives.
+                ln_solver.solve(['linear'], 'fwd')
+
+                # Extract results.
+                j_of = 0
+                for of_name in states:
+                    of_size = len(residuals[of_name])
+                    jac[j_of:j_of + of_size, j_wrt:j_wrt + wrt_size] = \
+                        d_out[of_name].reshape(of_size, 1)
+                    j_of += of_size
+
+                d_wrt[j] = 0.0
+                j_wrt += 1
+
+        # Enable local fd
+        system._owns_approx_jac = approx_status
+
+        return jac

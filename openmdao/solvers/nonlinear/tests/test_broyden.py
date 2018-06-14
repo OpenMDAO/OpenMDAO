@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, LinearRunOnce, ImplicitComponent, IndepVarComp
+from openmdao.api import Problem, LinearRunOnce, ImplicitComponent, IndepVarComp, DirectSolver
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.utils.assert_utils import assert_rel_error
@@ -36,6 +36,14 @@ class MixedEquation(ImplicitComponent):
         self.add_output('x3', 1.0)
         self.add_output('x45', np.ones((2, )))
 
+        self.declare_partials(of=['x12', 'x3', 'x45'], wrt='c')
+        self.declare_partials(of='x12', wrt='x12', rows=np.arange(2), cols=np.arange(2),
+                              val=-np.array([3.0, 2]))
+        self.declare_partials(of='x3', wrt='x3', rows=np.arange(1), cols=np.arange(1),
+                              val=-np.array([1.5]))
+        self.declare_partials(of='x45', wrt='x45', rows=np.arange(2), cols=np.arange(2),
+                              val=-np.array([1, 0.5]))
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         c = inputs['c']
         x = np.empty((5, ))
@@ -49,6 +57,19 @@ class MixedEquation(ImplicitComponent):
         residuals['x12'] = res[:2]
         residuals['x3'] = res[2]
         residuals['x45'] = res[3:]
+
+    def linearize(self, inputs, outputs, jacobian):
+        c = inputs['c']
+        x = np.empty((5, ))
+        x12 = outputs['x12']
+        x3 = outputs['x3']
+        x45 = outputs['x45']
+
+        jacobian['x12', 'c'] = -3.0 * x12**2
+        jacobian['x3', 'c'] = -3.0 * x3**2
+        jacobian['x45', 'c'] = -3.0 * x45**2
+
+
 
 
 class TestBryoden(unittest.TestCase):
@@ -137,23 +158,30 @@ class TestBryoden(unittest.TestCase):
         assert_rel_error(self, prob['x3'], 0.0, 1e-6)
         assert_rel_error(self, prob['x45'], np.zeros((2, )), 1e-6)
 
-    def test_error_not_state(self):
+    def test_mixed_jacobian(self):
         # Testing Broyden on a 5 state case split among 3 vars.
 
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('c', 0.01))
-        model.add_subsystem('mixed', VectorEquation())
+        model.add_subsystem('mixed', MixedEquation())
 
         model.connect('p1.c', 'mixed.c')
 
         model.nonlinear_solver = BroydenSolver()
-        model.nonlinear_solver.options['state_vars'] = ['p1.c']
+        model.nonlinear_solver.options['state_vars'] = ['mixed.x12', 'mixed.x3', 'mixed.x45']
+        model.nonlinear_solver.options['maxiter'] = 15
+        model.nonlinear_solver.options['compute_initial_jacobian'] = True
+        model.linear_solver = DirectSolver()
 
         prob.setup(check=False)
 
         prob.run_model()
+
+        assert_rel_error(self, prob['mixed.x12'], np.zeros((2, )), 1e-6)
+        assert_rel_error(self, prob['mixed.x3'], 0.0, 1e-6)
+        assert_rel_error(self, prob['mixed.x45'], np.zeros((2, )), 1e-6)
 
 if __name__ == "__main__":
     unittest.main()
