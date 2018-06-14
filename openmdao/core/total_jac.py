@@ -191,10 +191,7 @@ class _TotalJacInfo(object):
 
             # always allocate a 2D dense array and we can assign views to dict keys later if
             # return format is 'dict' or 'flat_dict'.
-            if fwd:
-                self.J = J = np.zeros((out_size, in_size))
-            else:  # rev
-                self.J = J = np.zeros((in_size, out_size))
+            self.J = J = np.zeros((self.of_size, self.wrt_size))
 
             # for dict type return formats, map var names to views of the Jacobian array.
             if return_format == 'array':
