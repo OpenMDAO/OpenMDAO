@@ -1,6 +1,8 @@
+import errno
 import os
 import unittest
 from tempfile import mkdtemp
+from shutil import rmtree
 
 from six.moves import range
 
@@ -197,73 +199,70 @@ class TestCheckConfig(unittest.TestCase):
         self.assertTrue(testlogger.contains_regex('warning',"The following inputs are not connected.*"))
         self.assertTrue(testlogger.contains_regex('info',"The following groups contain cycles.*"))
 
-    def test_warn_no_recorders(self):
-        temp_dir = mkdtemp()
-        filename = os.path.join(temp_dir, "sqlite_test")
+class TestRecorderCheckConfig(unittest.TestCase):
 
-        # No recorder set
+    def setUp(self):
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
+
+        self.filename = os.path.join(self.temp_dir, "sqlite_test")
+        self.recorder = SqliteRecorder(self.filename)
+
+    def tearDown(self):
+        os.chdir(self.orig_dir)
+        try:
+            rmtree(self.temp_dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
+    def test_recorder_check_no_recorder_set(self):
         p = Problem(model=Group())
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
         p.final_setup()
-        p.cleanup()
         self.assertTrue(testlogger.contains_regex('warning',
                                                   "The Problem has no recorder of any kind attached"))
-        # Driver recorder set
-        try:
-            p = Problem(model=Group())
-            recorder = SqliteRecorder(filename)
-            p.driver.add_recorder(recorder)
-            testlogger = TestLogger()
-            p.setup(check=True, logger=testlogger)
-            p.final_setup()
-            p.cleanup()
-            warnings = testlogger.get('warning')
-            self.assertEqual(len(warnings), 0)
-        finally:
-            if os.path.exists(filename):
-                os.remove(filename)
 
-        # System recorder set
-        try:
-            p = Problem(model=Group())
-            recorder = SqliteRecorder(filename)
-            p.model.add_recorder(recorder)
-            testlogger = TestLogger()
-            p.setup(check=True, logger=testlogger)
-            p.final_setup()
-            p.cleanup()
-            warnings = testlogger.get('warning')
-            self.assertEqual(len(warnings), 0)
-        finally:
-            if os.path.exists(filename):
-                os.remove(filename)
+    def test_recorder_check_driver_recorder_set(self):
+        p = Problem(model=Group())
+        p.driver.add_recorder(self.recorder)
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
-        # Non Linear Solver recorder set
-        try:
-            p = Problem(model=Group())
-            recorder = SqliteRecorder(filename)
-            p.model.nonlinear_solver.add_recorder(recorder)
-            testlogger = TestLogger()
-            p.setup(check=True, logger=testlogger)
-            p.final_setup()
-            p.cleanup()
-            warnings = testlogger.get('warning')
-            self.assertEqual(len(warnings), 0)
-        finally:
-            if os.path.exists(filename):
-                os.remove(filename)
+    def test_recorder_check_system_recorder_set(self):
+        p = Problem(model=Group())
+        p.model.add_recorder(self.recorder)
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
-        # Linear Solver recorder set
-            p = Problem(model=Group())
-            recorder = SqliteRecorder(filename)
-            p.model.linear_solver.add_recorder(recorder)
-            testlogger = TestLogger()
-            p.setup(check=True, logger=testlogger)
-            p.final_setup()
-            p.cleanup()
-            warnings = testlogger.get('warning')
-            self.assertEqual(len(warnings), 0)
+    def test_recorder_check_linear_solver_recorder_set(self):
+        p = Problem(model=Group())
+        p.model.nonlinear_solver.add_recorder(self.recorder)
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        p.cleanup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+    def test_recorder_check_linear_solver_recorder_set(self):
+        p = Problem(model=Group())
+        p.model.linear_solver.add_recorder(self.recorder)
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        p.cleanup()
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
 if __name__ == "__main__":
     unittest.main()
