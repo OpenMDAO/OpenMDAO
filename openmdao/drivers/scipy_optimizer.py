@@ -183,15 +183,15 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower != - sys.float_info.max \
                         or isinstance(upper, np.ndarray) or upper != sys.float_info.max:
-                    dict = OrderedDict()
-                    dict['lower'] = lower
-                    dict['upper'] = upper
-                    dict['equals'] = None
-                    dict['indices'] = None
-                    dict['adder'] = None
-                    dict['scaler'] = None
-                    dict['size'] = meta['size']
-                    self._cons[name] = dict
+                    d = OrderedDict()
+                    d['lower'] = lower
+                    d['upper'] = upper
+                    d['equals'] = None
+                    d['indices'] = None
+                    d['adder'] = None
+                    d['scaler'] = None
+                    d['size'] = meta['size']
+                    self._cons[name] = d
 
     def run(self):
         """
