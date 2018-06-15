@@ -332,7 +332,7 @@ class _TotalJacInfo(object):
         # based on simul_coloring, determine if we need to allocate data structures for
         # both fwd and rev modes
         if simul_coloring:
-            modes = [k for k in simul_coloring]
+            modes = [k for k in ('fwd', 'rev') if k in simul_coloring]
         else:
             modes = [self.mode]
 
@@ -588,7 +588,7 @@ class _TotalJacInfo(object):
         method
             Jac setter method.
         """
-        modes = [k for k in coloring_info]
+        modes = [k for k in ('fwd', 'rev') if k in coloring_info]
 
         # do all of the uncolored rows/cols first so we can mask them out
         for mode in modes:

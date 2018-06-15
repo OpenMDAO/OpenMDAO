@@ -532,8 +532,145 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     return sparsity
 
 
+def _simul_fwd(J):
+    """
+    Find simultaneous deriv data for fwd mode for the given jacobian.
+
+    Parameters
+    ----------
+    J : ndarray
+        Boolean total jacobian.
+
+    Returns
+    -------
+    tuple
+        (column_lists, rows_for_each_col)
+    """
+    full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
+    uncolored_cols = [i for i, r in enumerate(rows) if r is None]
+
+    print("%d uncolored columns" % len(uncolored_cols))
+    for color, cols in enumerate(full_disjoint):
+        print("%d columns in color %d" % (len(cols), color + 1))
+
+    # the first col_list entry corresponds to all uncolored columns (columns that are not
+    # disjoint wrt any other columns).  The other entries are groups of columns that do not
+    # share any nonzero row entries in common.
+    col_lists = [uncolored_cols]
+    col_lists.extend(full_disjoint)
+
+    return col_lists, rows
+
+
+def _simul_rev(J):
+    """
+    Find simultaneous deriv data for rev mode for the given jacobian.
+
+    Parameters
+    ----------
+    J : ndarray
+        Boolean total jacobian.
+
+    Returns
+    -------
+    tuple
+        (row_lists, cols_for_each_row)
+    """
+    full_disjoint, cols = _get_full_disjoint_rows(J, 0, J.shape[0] - 1)
+    uncolored_rows = [i for i, r in enumerate(cols) if r is None]
+
+    print("%d uncolored rows" % len(uncolored_rows))
+    for color, rows in enumerate(full_disjoint):
+        print("%d rows in color %d" % (len(rows), color + 1))
+
+    # the first row_list entry corresponds to all uncolored rows (rows that are not disjoint
+    # wrt any other rows).  The other entries are groups of rows that do not share any
+    # nonzero column entries in common.
+    row_lists = [uncolored_rows]
+    row_lists.extend(full_disjoint)
+
+    return row_lists, cols
+
+
+def _total_solves(color_info):
+    """
+    Return total number of linear solves required based on the given coloring info.
+
+    Parameters
+    ----------
+    color_info : dict
+        dict['fwd'] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        dict['rev'] = (row_lists, col_maps)
+            row_lists is a list of row lists, the first being a list of uncolored rows.
+            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+        dict['J'] = ndarray, the computed boolean jacobian.
+
+    Returns
+    -------
+    int
+        Total number of linear solves required to compute the total Jacobian.
+    """
+    row_lists = col_lists = []
+    total_solves = 0
+
+    # lists[0] are the non-colored columns or rows, which are solved individually so
+    # we add all of them, along with the number of remaining lists, where each
+    # sublist is a bunch of columns or rows that are solved together, to get the total colors
+    # (which equals the total number of linear solves).
+    if 'fwd' in color_info:
+        row_lists, _ = color_info['fwd']
+        total_solves += len(row_lists[0]) + len(row_lists[1:])
+    if 'rev' in color_info:
+        col_lists, _ = color_info['rev']
+        total_solves += len(col_lists[0]) + len(col_lists[1:])
+
+    return total_solves
+
+
+def _solves_info(color_info):
+    """
+    Return info about the number of colors given the current coloring scheme.
+
+    Parameters
+    ----------
+    color_info : dict
+        dict['fwd'] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        dict['rev'] = (row_lists, col_maps)
+            row_lists is a list of row lists, the first being a list of uncolored rows.
+            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+        dict['J'] = ndarray, the computed boolean jacobian.
+
+    Returns
+    -------
+    float
+        Total size (minimum chosed based on which mode is better).
+    float
+        Total solves.
+    str
+        Mode chosed based on lowest number of solves (without coloring).
+    """
+    rev_size, fwd_size = color_info['J'].shape
+    tot_colors = _total_solves(color_info)
+
+    if fwd_size <= rev_size:
+        mode = 'fwd'
+        tot_size = fwd_size
+    else:
+        mode = 'rev'
+        tot_size = rev_size
+
+    return tot_size, tot_colors, mode
+
+
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
-                   include_sparsity=True, setup=False, run_model=False, stream=sys.stdout):
+                   include_sparsity=True, setup=False, run_model=False, bool_jac=None,
+                   desired_improvement=0.75, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -556,76 +693,66 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         If True, run setup before calling compute_totals.
     run_model : bool
         If True, run run_model before calling compute_totals.
+    bool_jac : ndarray
+        If problem is not supplied, a previously computed boolean jacobian can be used.
+    desired_improvement : float
+        Desired improvement percentage in total number of solves per total jacobian.
     stream : file-like or None
         Stream where output coloring info will be written.
 
     Returns
     -------
-    tuple of the form (col_lists, row_maps, sparsity)
-        col_lists is a list of column lists, where the first list is the list of uncolored columns.
-        row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        sparsity is a nested dict specifying subjac sparsity for each total derivative, or None.
+    dict
+        dict['fwd'] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        dict['rev'] = (row_lists, col_maps)
+            row_lists is a list of row lists, the first being a list of uncolored rows.
+            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+        dict['J'] = ndarray, the computed boolean jacobian.
     """
-    driver = problem.driver
-
-    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
-                      run_model=run_model)
-
     coloring = {}
 
+    if bool_jac is None:
+        coloring['J'] = J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
+                                          run_model=run_model)
+    else:
+        coloring['J'] = J = bool_jac
+
     if mode == 'fwd':
-        full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
-        uncolored_cols = [i for i, r in enumerate(rows) if r is None]
-
-        print("%d uncolored columns" % len(uncolored_cols))
-        for color, cols in enumerate(full_disjoint):
-            print("%d columns in color %d" % (len(cols), color + 1))
-
-        # the first col_list entry corresponds to all uncolored columns (columns that are not
-        # disjoint wrt any other columns).  The other entries are groups of columns that do not
-        # share any nonzero row entries in common.
-        col_lists = [uncolored_cols]
-        col_lists.extend(full_disjoint)
-        lists = col_lists
-        other = rows
-        coloring['fwd'] = [col_lists, rows]
+        lists, rowcol_map = _simul_fwd(J)
+        coloring['fwd'] = [lists, rowcol_map]
     elif mode == 'rev':
-        full_disjoint, cols = _get_full_disjoint_rows(J, 0, J.shape[0] - 1)
-        uncolored_rows = [i for i, r in enumerate(cols) if r is None]
-
-        print("%d uncolored rows" % len(uncolored_rows))
-        for color, rows in enumerate(full_disjoint):
-            print("%d rows in color %d" % (len(rows), color + 1))
-
-        # the first row_list entry corresponds to all uncolored rows (rows that are not disjoint
-        # wrt any other rows).  The other entries are groups of rows that do not share any
-        # nonzero column entries in common.
-        row_lists = [uncolored_rows]
-        row_lists.extend(full_disjoint)
-        lists = row_lists
-        other = cols
-        coloring['rev'] = [row_lists, cols]
+        lists, rowcol_map = _simul_rev(J)
+        coloring['rev'] = [lists, rowcol_map]
     else:
         raise RuntimeError("get_simul_meta: invalid mode: '%s'" % mode)
 
     sparsity = None
-    if include_sparsity or (show_jac and stream is not None):
-        of = driver._get_ordered_nl_responses()
-        wrt = list(driver._designvars)
+    if problem is not None:
+        driver = problem.driver
+    else:
+        driver = None
 
-    if include_sparsity:
-        sparsity = _sparsity_from_jac(J, of, wrt, driver)
-        coloring['sparsity'] = sparsity
+    if driver is not None:
+        if include_sparsity or (show_jac and stream is not None):
+            of = driver._get_ordered_nl_responses()
+            wrt = list(driver._designvars)
 
-    driver._total_jac = None
+        if include_sparsity:
+            sparsity = _sparsity_from_jac(J, of, wrt, driver)
+            coloring['sparsity'] = sparsity
+
+        driver._total_jac = None
 
     if stream is not None:
         if stream.isatty():
             stream.write("\n########### BEGIN COLORING DATA ################\n")
-            _write_coloring([mode], lists, other, sparsity, stream)
+            _write_coloring([mode], lists, rowcol_map, sparsity, stream)
             stream.write("\n########### END COLORING DATA ############\n")
         else:
-            _write_coloring([mode], lists, other, sparsity, stream)
+            _write_coloring([mode], lists, rowcol_map, sparsity, stream)
 
         if show_jac:
             s = stream if stream.isatty() else sys.stdout
@@ -635,59 +762,25 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     return coloring
 
 
-def simul_coloring_summary(problem, color_info, stream=sys.stdout):
+def simul_coloring_summary(color_info, stream=sys.stdout):
     """
     Print a summary of simultaneous coloring info for the given problem and coloring metadata.
 
     Parameters
     ----------
-    problem : Problem
-        The Problem being analyzed.
     color_info : dict
         Coloring metadata.
     stream : file-like
         Where the output will go.
     """
-    tot_size = tot_dv_size = tot_resp_size = 0
+    tot_size, tot_colors, mode = _solves_info(color_info)
 
-    # lists[0] are the non-colored columns or rows, which are solved individually so
-    # we add all of them, along with the number of remaining lists, where each
-    # sublist is a bunch of columns or rows that are solved together, to get the total colors
-    # (which equals the total number of linear solves).
-    tot_colors = tot_fwd_colors = tot_rev_colors = 0
-    tot_size = tot_dv_size = tot_resp_size = 0
-
-    if 'fwd' in color_info:
-        desvars = problem.driver._designvars
-        for dv in desvars:
-            tot_dv_size += desvars[dv]['size']
-
-        lists, _ = color_info['fwd']
-        tot_fwd_colors = len(lists[0]) + len(lists) - 1
-
-    if 'rev' in color_info:
-        objs = problem.driver._objs
-        cons = problem.driver._cons
-        nl_cons = [cons[n] for n in cons if not cons[n]['linear']]
-        for obj in objs:
-            tot_resp_size += objs[obj]['size']
-        for con in nl_cons:
-            tot_resp_size += con['size']
-
-        lists, _ = color_info['rev']
-        tot_rev_colors = len(lists[0]) + len(lists) - 1
-
-    tot_size = tot_dv_size + tot_resp_size
-    tot_colors = tot_fwd_colors + tot_rev_colors
-
-    if tot_size == tot_colors or tot_colors == 0:
-        stream.write("No simultaneous derivative solves are possible in this configuration.\n")
+    if tot_size <= tot_colors:
+        stream.write("Simultaneous derivatives can't improve on the total number of solves "
+                     "required (%d) for %s mode in this configuration\n" % (tot_size, mode))
     else:
-        stream.write("\nTotal fwd colors: %d\n" % tot_fwd_colors)
-        stream.write("Total rev colors: %d\n" % tot_rev_colors)
-
-        stream.write("\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
-                     (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
+        stream.write("\nTotal colors vs. total size (%s mode): %d vs %d  (%.1f%% improvement)\n" %
+                     (mode, tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
 
 def dynamic_sparsity(driver):
