@@ -3,6 +3,7 @@ Helper class for total jacobian computation.
 """
 from __future__ import print_function, division
 
+import warnings
 from collections import OrderedDict
 from copy import deepcopy
 import pprint
@@ -110,7 +111,7 @@ class _TotalJacInfo(object):
         self.model = model = problem.model
         self.comm = problem.comm
         self.relevant = model._relevant
-        self.mode = mode = problem._mode
+        self.mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
         self.has_scaling = driver._has_scaling and driver_scaling
         self.return_format = return_format
@@ -142,8 +143,6 @@ class _TotalJacInfo(object):
         self.prom_of = prom_of
         self.prom_wrt = prom_wrt
 
-        fwd = mode == 'fwd'
-
         self.input_list = {'fwd': wrt, 'rev': of}
         self.output_list = {'fwd': of, 'rev': wrt}
         self.input_meta = {'fwd': design_vars, 'rev': responses}
@@ -157,7 +156,7 @@ class _TotalJacInfo(object):
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
 
         if approx:
-            self._initialize_approx(self.output_meta[mode])
+            self._initialize_approx(self.output_meta[self.mode])
         else:
             constraints = driver._cons
 
@@ -170,24 +169,36 @@ class _TotalJacInfo(object):
 
             self.simul_coloring = None if has_lin_cons else driver._simul_coloring_info
 
+            if self.simul_coloring is None:
+                modes = [self.mode]
+            else:
+                modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
+                # if our coloring has a 'best_mode' that differs from the specied mode,
+                # change it to avoid having a coloring mismatch.
+                if len(modes) == 1 and modes[0] != self.mode:
+                    raise RuntimeError("Mode in coloring, '%s', differs from specified mode, '%s'."
+                                       % (modes[0], self.mode))
+
             self.in_idx_map = {}
             self.in_loc_idxs = {}
             self.idx_iter_dict = {}
 
-            self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode] = \
-                self._create_in_idx_map(has_lin_cons)
-
             self.out_meta = {}
-            if fwd:
-                self.out_meta[mode], out_size = self.of_meta, self.of_size
-            else:
-                self.out_meta[mode], out_size = self.wrt_meta, self.wrt_size
+            for mode in modes:
+                self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode] = \
+                    self._create_in_idx_map(has_lin_cons, mode)
+
+                if mode == 'fwd':
+                    self.out_meta[mode], out_size = self.of_meta, self.of_size
+                else:
+                    self.out_meta[mode], out_size = self.wrt_meta, self.wrt_size
 
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name = {}
                 self.idx2local = {}
-                self.idx2name[mode], self.idx2local[mode] = self._create_idx_maps(
-                    self.output_list[mode], self.output_meta[mode], out_size)
+                for mode in modes:
+                    self.idx2name[mode], self.idx2local[mode] = self._create_idx_maps(
+                        self.output_list[mode], self.output_meta[mode], out_size)
             else:
                 self.idx2name = self.idx2local = self.simul_coloring = None
 
@@ -300,7 +311,7 @@ class _TotalJacInfo(object):
 
         return J_dict
 
-    def _create_in_idx_map(self, has_lin_constraints):
+    def _create_in_idx_map(self, has_lin_constraints, mode):
         """
         Create a list that maps a global index to a name, col/row range, and other data.
 
@@ -308,6 +319,8 @@ class _TotalJacInfo(object):
         ----------
         has_lin_constraints : bool
             If True, there are linear constraints used to compute the total jacobian.
+        mode : str
+            Derivative solution direction.
 
         Returns
         -------
@@ -329,141 +342,133 @@ class _TotalJacInfo(object):
 
         simul_coloring = self.simul_coloring
 
-        # based on simul_coloring, determine if we need to allocate data structures for
-        # both fwd and rev modes
-        if simul_coloring:
-            modes = [k for k in ('fwd', 'rev') if k in simul_coloring]
-        else:
-            modes = [self.mode]
+        vois = self.input_meta[mode]
+        input_list = self.input_list[mode]
 
-        for mode in modes:
-            vois = self.input_meta[mode]
-            input_list = self.input_list[mode]
+        idx_tups = [None] * len(input_list)
+        loc_idxs = []
+        idx_map = []
+        start = 0
+        end = 0
 
-            idx_tups = [None] * len(input_list)
-            loc_idxs = []
-            idx_map = []
-            start = 0
-            end = 0
+        for name in input_list:
+            rhsname = 'linear'
+            in_var_meta = abs2meta[name]
 
-            for name in input_list:
-                rhsname = 'linear'
-                in_var_meta = abs2meta[name]
+            if name in vois:
+                # if name is in vois, then it has been declared as either a design var or
+                # a constraint or an objective.
+                meta = vois[name]
+                end += meta['size']
 
-                if name in vois:
-                    # if name is in vois, then it has been declared as either a design var or
-                    # a constraint or an objective.
-                    meta = vois[name]
-                    end += meta['size']
+                parallel_deriv_color = meta['parallel_deriv_color']
+                matmat = meta['vectorize_derivs']
+                cache_lin_sol = meta['cache_linear_solution']
 
-                    parallel_deriv_color = meta['parallel_deriv_color']
-                    matmat = meta['vectorize_derivs']
-                    cache_lin_sol = meta['cache_linear_solution']
+                _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
+                if matmat or parallel_deriv_color:
+                    rhsname = name
 
-                    _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
-                    if matmat or parallel_deriv_color:
-                        rhsname = name
+                    if parallel_deriv_color and self.debug_print:
+                        if parallel_deriv_color not in self.par_deriv:
+                            self.par_deriv[parallel_deriv_color] = []
+                        self.par_deriv[parallel_deriv_color].append(name)
 
-                        if parallel_deriv_color and self.debug_print:
-                            if parallel_deriv_color not in self.par_deriv:
-                                self.par_deriv[parallel_deriv_color] = []
-                            self.par_deriv[parallel_deriv_color].append(name)
+                in_idxs = meta['indices'] if 'indices' in meta else None
 
-                    in_idxs = meta['indices'] if 'indices' in meta else None
-
-                    if in_idxs is None:
-                        # if the var is not distributed, global_size == local size
-                        irange = np.arange(in_var_meta['global_size'], dtype=int)
-                    else:
-                        irange = in_idxs
-                        # correct for any negative indices
-                        irange[in_idxs < 0] += in_var_meta['global_size']
-
-                else:  # name is not a design var or response  (should only happen during testing)
-                    end += in_var_meta['global_size']
+                if in_idxs is None:
+                    # if the var is not distributed, global_size == local size
                     irange = np.arange(in_var_meta['global_size'], dtype=int)
-                    in_idxs = parallel_deriv_color = matmat = None
-                    cache_lin_sol = False
-
-                in_var_idx = abs2idx[rhsname][name]
-                sizes = var_sizes[rhsname]['output']
-                gstart = np.sum(sizes[:iproc, in_var_idx])
-                gend = gstart + sizes[iproc, in_var_idx]
-
-                if not in_var_meta['distributed']:
-                    # if the var is not distributed, convert the indices to global.
-                    # We don't iterate over the full distributed size in this case.
-                    owner = owning_ranks[name]
-                    if owner == iproc:
-                        irange += gstart
-                    else:
-                        owner_start = np.sum(sizes[:owner, in_var_idx])
-                        irange += owner_start
-
-                # all local idxs that correspond to vars from other procs will be -1
-                # so each entry of loc_i will either contain a valid local index,
-                # indicating we should set the local vector entry to 1.0 before running
-                # solve_linear, or it will contain -1, indicating we should not set any
-                # value before calling solve_linear.
-                loc_i = np.full(irange.shape, -1, dtype=int)
-                if gend > gstart:
-                    loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
-                    if in_idxs is None:
-                        if in_var_meta['distributed']:
-                            loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
-                        else:
-                            loc_i[loc] = irange[loc] - gstart
-                    else:
-                        loc_i[loc] = irange[loc]
-                        if not in_var_meta['distributed']:
-                            loc_i[loc] -= gstart
-
-                loc_idxs.append(loc_i)
-
-                if name in relevant:
-                    rel = relevant[name]['@all'][1]
                 else:
-                    rel = _contains_all
+                    irange = in_idxs
+                    # correct for any negative indices
+                    irange[in_idxs < 0] += in_var_meta['global_size']
 
-                if parallel_deriv_color:
-                    has_par_deriv_color = True
-                    if parallel_deriv_color not in idx_iter_dict:
-                        if matmat:
-                            it = self.par_deriv_matmat_iter
-                        else:
-                            it = self.par_deriv_iter
-                        idx_iter_dict[parallel_deriv_color] = (parallel_deriv_color, matmat,
-                                                               [(start, end)], it)
+            else:  # name is not a design var or response  (should only happen during testing)
+                end += in_var_meta['global_size']
+                irange = np.arange(in_var_meta['global_size'], dtype=int)
+                in_idxs = parallel_deriv_color = matmat = None
+                cache_lin_sol = False
+
+            in_var_idx = abs2idx[rhsname][name]
+            sizes = var_sizes[rhsname]['output']
+            gstart = np.sum(sizes[:iproc, in_var_idx])
+            gend = gstart + sizes[iproc, in_var_idx]
+
+            if not in_var_meta['distributed']:
+                # if the var is not distributed, convert the indices to global.
+                # We don't iterate over the full distributed size in this case.
+                owner = owning_ranks[name]
+                if owner == iproc:
+                    irange += gstart
+                else:
+                    owner_start = np.sum(sizes[:owner, in_var_idx])
+                    irange += owner_start
+
+            # all local idxs that correspond to vars from other procs will be -1
+            # so each entry of loc_i will either contain a valid local index,
+            # indicating we should set the local vector entry to 1.0 before running
+            # solve_linear, or it will contain -1, indicating we should not set any
+            # value before calling solve_linear.
+            loc_i = np.full(irange.shape, -1, dtype=int)
+            if gend > gstart:
+                loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
+                if in_idxs is None:
+                    if in_var_meta['distributed']:
+                        loc_i[loc] = np.arange(0, gend - gstart, dtype=int)
                     else:
-                        _, old_matmat, range_list, _ = idx_iter_dict[parallel_deriv_color]
-                        if old_matmat != matmat:
-                            raise RuntimeError("Mixing of vectorized and non-vectorized derivs in "
-                                               "the same parallel color group (%s) is not "
-                                               "supported." % parallel_deriv_color)
-                        range_list.append((start, end))
-                elif matmat:
-                    if name not in idx_iter_dict:
-                        idx_iter_dict[name] = (None, matmat,
-                                               [np.arange(start, end, dtype=int)],
-                                               self.matmat_iter)
+                        loc_i[loc] = irange[loc] - gstart
+                else:
+                    loc_i[loc] = irange[loc]
+                    if not in_var_meta['distributed']:
+                        loc_i[loc] -= gstart
+
+            loc_idxs.append(loc_i)
+
+            if name in relevant:
+                rel = relevant[name]['@all'][1]
+            else:
+                rel = _contains_all
+
+            if parallel_deriv_color:
+                has_par_deriv_color = True
+                if parallel_deriv_color not in idx_iter_dict:
+                    if matmat:
+                        it = self.par_deriv_matmat_iter
                     else:
-                        raise RuntimeError("Variable name '%s' matches a parallel_deriv_color "
-                                           "name." % name)
-                elif not simul_coloring:  # plain old single index iteration
-                    idx_iter_dict[name] = (None, False,
-                                           np.arange(start, end, dtype=int),
-                                           self.single_index_iter)
+                        it = self.par_deriv_iter
+                    idx_iter_dict[parallel_deriv_color] = (parallel_deriv_color, matmat,
+                                                           [(start, end)], it)
+                else:
+                    _, old_matmat, range_list, _ = idx_iter_dict[parallel_deriv_color]
+                    if old_matmat != matmat:
+                        raise RuntimeError("Mixing of vectorized and non-vectorized derivs in "
+                                           "the same parallel color group (%s) is not "
+                                           "supported." % parallel_deriv_color)
+                    range_list.append((start, end))
+            elif matmat:
+                if name not in idx_iter_dict:
+                    idx_iter_dict[name] = (None, matmat,
+                                           [np.arange(start, end, dtype=int)],
+                                           self.matmat_iter)
+                else:
+                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color "
+                                       "name." % name)
+            elif not simul_coloring:  # plain old single index iteration
+                idx_iter_dict[name] = (None, False,
+                                       np.arange(start, end, dtype=int),
+                                       self.single_index_iter)
 
-                tup = (name, rhsname, rel, cache_lin_sol)
-                idx_map.extend([tup] * (end - start))
-                start = end
+            tup = (name, rhsname, rel, cache_lin_sol)
+            idx_map.extend([tup] * (end - start))
+            start = end
 
-            if has_par_deriv_color:
-                _fix_pdc_lengths(idx_iter_dict)
+        if has_par_deriv_color:
+            _fix_pdc_lengths(idx_iter_dict)
 
-            if simul_coloring:
-                idx_iter_dict['@simul_coloring'] = (False, False, self.simul_coloring,
-                                                    self.simul_coloring_iter)
+        if simul_coloring:
+            idx_iter_dict['@simul_coloring'] = (False, False, self.simul_coloring,
+                                                self.simul_coloring_iter)
 
         return idx_map, np.hstack(loc_idxs), idx_iter_dict
 
@@ -568,7 +573,7 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         for i in idxs:
-            yield i, self.single_input_setter, self.single_jac_setter
+            yield i, self.single_input_setter, self.single_jac_setter, self.mode
 
     def simul_coloring_iter(self, coloring_info):
         """
@@ -590,19 +595,22 @@ class _TotalJacInfo(object):
         """
         modes = [k for k in ('fwd', 'rev') if k in coloring_info]
 
-        # do all of the uncolored rows/cols first so we can mask them out
-        for mode in modes:
-            ilist = coloring_info[mode][0][0]
-            for i in ilist:
-                # do all non-colored indices individually (one linear solve per index)
-                yield i, self.single_input_setter, self.single_jac_setter
+        input_setter = self.simul_coloring_input_setter
+        jac_setter = self.simul_coloring_jac_setter
 
-        # now do all the colored rows/cols
+        # do all the colored rows/cols
         for mode in modes:
             for color, ilist in enumerate(coloring_info[mode][0]):
                 if color > 0:
                     # yield all indices for a color at once
-                    yield ilist, self.simul_coloring_input_setter, self.simul_coloring_jac_setter
+                    yield ilist, input_setter, jac_setter, mode
+
+        # do all of the uncolored rows/cols last so they can overwrite any wrong values
+        for mode in modes:
+            ilist = coloring_info[mode][0][0]
+            for i in ilist:
+                # do all non-colored indices individually (one linear solve per index)
+                yield i, self.single_input_setter, self.single_jac_setter, mode
 
     def par_deriv_iter(self, idxs):
         """
@@ -623,7 +631,7 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         for tup in zip(*idxs):
-            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter
+            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, self.mode
 
     def matmat_iter(self, idxs):
         """
@@ -644,7 +652,7 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         for idx_list in idxs:
-            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter,
+            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter, self.mode
 
     def par_deriv_matmat_iter(self, idxs):
         """
@@ -667,7 +675,7 @@ class _TotalJacInfo(object):
         # here, idxs is a list of arrays.  One array in the list for each parallel deriv
         # variable, and the entries in each array are all of the indices corresponding
         # to that variable's rows or columns in the total jacobian.
-        yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter
+        yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, self.mode
 
     #
     # input setter functions
@@ -932,9 +940,7 @@ class _TotalJacInfo(object):
         outvecs = self.output_vec[mode]
         in_idx_map = self.in_idx_map[mode]
         fwd = mode == 'fwd'
-        if self.mode == 'fwd' and not fwd:
-            raise RuntimeError("Bidirectional derivative solving attempted but rev mode was not "
-                               "set up.")
+
         J = self.J
 
         for i in inds:
@@ -1029,8 +1035,6 @@ class _TotalJacInfo(object):
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
 
-        fwd = self.mode == 'fwd'
-
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
@@ -1045,16 +1049,16 @@ class _TotalJacInfo(object):
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for key, meta in iteritems(self.idx_iter_dict[self.mode]):
             _, _, idxs, idx_iter = meta
-            for inds, input_setter, jac_setter in idx_iter(idxs):
+            for inds, input_setter, jac_setter, mode in idx_iter(idxs):
                 # this sets dinputs for the current par_deriv_color to 0
                 # dinputs is dresids in fwd, doutouts in rev
                 vec_doutput['linear'].set_const(0.0)
-                if fwd:
+                if mode == 'fwd':
                     vec_dresid['linear'].set_const(0.0)
                 else:  # rev
                     vec_dinput['linear'].set_const(0.0)
 
-                rel_systems, vec_names, cache_key = input_setter(inds, self.mode)
+                rel_systems, vec_names, cache_key = input_setter(inds, mode)
 
                 if debug_print:
                     if par_deriv and key in par_deriv:
@@ -1074,13 +1078,13 @@ class _TotalJacInfo(object):
                     model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
                     self._save_linear_solution(vec_names, cache_key, self.mode)
                 else:
-                    model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
+                    model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                 if debug_print:
                     print('Elapsed Time:', time.time() - t0, '\n')
                     sys.stdout.flush()
 
-                jac_setter(inds, self.mode)
+                jac_setter(inds, mode)
 
         if self.has_scaling:
             self._do_scaling(self.J_dict)

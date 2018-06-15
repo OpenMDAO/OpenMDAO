@@ -4,6 +4,7 @@ Routines to compute coloring for use with simultaneous derivatives.
 from __future__ import division, print_function
 
 import sys
+import warnings
 from collections import OrderedDict, defaultdict
 from itertools import combinations
 
@@ -408,7 +409,7 @@ def _write_sparsity(sparsity, stream):
     stream.write("}")
 
 
-def _write_coloring(modes, lists, nonzero_entries, sparsity, stream):
+def _write_coloring(modes, color_info, stream):
     """
     Write the coloring and sparsity structures to the given stream.
 
@@ -416,14 +417,15 @@ def _write_coloring(modes, lists, nonzero_entries, sparsity, stream):
     ----------
     modes : list of str
         Derivative direction.
-    lists : list of lists
-        Lists of groups of columns of the same color.  First list is the list of all non-colored
-        columns.
-    nonzero_entries : list of lists
-        For each colored row/column, the list of all nonzero col/row entries.
-        For non-colored rows/columns, the value is None.
-    sparsity : dict
-        Nested dict of subjac sparsity for each total derivative.
+    color_info : dict
+        dict['fwd'] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        dict['rev'] = (row_lists, col_maps)
+            row_lists is a list of row lists, the first being a list of uncolored rows.
+            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+        dict['J'] = ndarray, the computed boolean jacobian.
     stream : file-like
         Output stream.
     """
@@ -433,6 +435,8 @@ def _write_coloring(modes, lists, nonzero_entries, sparsity, stream):
     stream.write("{\n")
     for m, mode in enumerate(modes):
         name = 'column' if mode == 'fwd' else 'row'
+        lists, nonzero_entries = color_info[mode]
+        sparsity = color_info.get('sparsity')
 
         if m > 0:
             stream.write(",\n")
@@ -668,9 +672,38 @@ def _solves_info(color_info):
     return tot_size, tot_colors, mode
 
 
+def _nonzero_info(J):
+    """
+    Return nonzero row/col densities and their sorted (largest first) indices for the given J.
+
+    Parameters
+    ----------
+    J : ndarray
+        Total jacobian sparity matrix (boolean).
+
+    Returns
+    -------
+    ndarray
+        Row densities.
+    ndarray
+        Sorted row indices (most dense first).
+    ndarray
+        Column densities.
+    ndarray
+        Sorted column indices (most dense first).
+    """
+    density_by_col = np.count_nonzero(J, axis=0)
+    most_dense_cols = np.argsort(density_by_col)[::-1]
+
+    density_by_row = np.count_nonzero(J, axis=1)
+    most_dense_rows = np.argsort(density_by_row)[::-1]
+
+    return density_by_row, most_dense_rows, density_by_col, most_dense_cols
+
+
 def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   desired_improvement=0.75, stream=sys.stdout):
+                   stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -695,8 +728,6 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         If True, run run_model before calling compute_totals.
     bool_jac : ndarray
         If problem is not supplied, a previously computed boolean jacobian can be used.
-    desired_improvement : float
-        Desired improvement percentage in total number of solves per total jacobian.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -720,14 +751,132 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     else:
         coloring['J'] = J = bool_jac
 
-    if mode == 'fwd':
+    orig_J = J
+    best_coloring = {}
+
+    # look at number of dense rows/cols and total size to determine best mode
+    row_density, row_idxs, col_density, col_idxs = _nonzero_info(J)
+
+    ###################################
+    # Bidirectional coloring algorithm
+    ###################################
+    #
+    # 1. Compute density of nonzero values for all rows and columns.
+    # 2. Compute initial coloring on full jacobian.
+    # 3. In a loop, zero out rows (fwd) or cols (rev) one at a time, most dense first, then
+    #    recompute coloring and see if we get better.  Note that 'better' means the total solves in
+    #    the current direction plus the number of dense solves in the opposite direction is less
+    #    than our current best.
+    #
+    # Note that when we're done, the coloring for the chosen direction will contain a list of
+    #     column or row lists, with the first entry containing the indices of the uncolored
+    #     rows or cols for that direction, and the coloring for the opposite direction will
+    #     specify only uncolored solves, so it will have only 1 entry in its list of lists.
+    #
+    # Wnen we solve for the total jacobian, we order the solves such that all of the colored ones
+    # are done first, doing the dense ones last so that they'll overwrite any incorrect values
+    # in the jacobian resulting from our earlier colored solves.
+
+    best_colors = 99999999
+    skip_count = 0
+
+    # first look at fwd
+    while skip_count < J.shape[0] / 2:
+        if skip_count > 0:
+            coloring['J'] = J = orig_J.copy()
+            skip_rows = row_idxs[:skip_count]
+            J[skip_rows, :] = False  # zero out skipped rows
+            coloring['rev'] = ([skip_rows], [])
+
         lists, rowcol_map = _simul_fwd(J)
         coloring['fwd'] = [lists, rowcol_map]
-    elif mode == 'rev':
+
+        tot_size, tot_colors, _ = _solves_info(coloring)
+
+        # if we got worse, bail out
+        if best_colors < tot_size and tot_colors >= best_colors:
+            break
+
+        if tot_colors < best_colors:
+            best_colors = tot_colors
+
+        best_coloring['fwd'] = coloring['fwd']
+        if 'rev' in coloring:
+            best_coloring['rev'] = coloring['rev']
+        best_coloring['J'] = orig_J
+
+        skip_count += 1  # add another row to skip
+
+    best_fwd_colors = best_colors
+    best_fwd_coloring = best_coloring.copy()
+
+
+    best_coloring = {}
+    best_colors = 99999999
+    skip_count = 0
+
+    # first look at fwd
+    while skip_count < J.shape[1] / 2:
+        if skip_count > 0:
+            coloring['J'] = J = orig_J.copy()
+            skips = col_idxs[:skip_count]
+            J[:, skips] = False  # zero out skipped cols
+            coloring['fwd'] = ([skips], [])
+
         lists, rowcol_map = _simul_rev(J)
         coloring['rev'] = [lists, rowcol_map]
+
+        tot_size, tot_colors, _ = _solves_info(coloring)
+
+        # if we got worse, bail out
+        if best_colors < tot_size and tot_colors >= best_colors:
+            break
+
+        if tot_colors < best_colors:
+            best_colors = tot_colors
+
+        if 'fwd' in coloring:
+            best_coloring['fwd'] = coloring['fwd']
+        best_coloring['rev'] = coloring['rev']
+        best_coloring['J'] = orig_J
+
+        skip_count += 1  # add another row to skip
+
+    best_rev_colors = best_colors
+    best_rev_coloring = best_coloring.copy()
+
+    if 'rev' in best_fwd_coloring:
+        fwd_opp = len(best_fwd_coloring['rev'][0][0])
     else:
-        raise RuntimeError("get_simul_meta: invalid mode: '%s'" % mode)
+        fwd_opp = 0
+    if 'fwd' in best_rev_coloring:
+        rev_opp = len(best_rev_coloring['fwd'][0][0])
+    else:
+        rev_opp = 0
+
+    print("Best fwd:", best_fwd_colors, "opposites:", fwd_opp)
+    print("Best rev:", best_rev_colors, "opposites:", rev_opp)
+
+    if mode == 'rev':
+        coloring = best_rev_coloring
+        if best_fwd_colors < best_rev_colors:
+            msg = ("Best reverse coloring (%d colors) was chosen, but best forward coloring is "
+                   "better (%d colors)" % (best_rev_colors, best_fwd_colors))
+            warnings.warn(msg)
+    elif mode == 'fwd':
+        coloring = best_fwd_coloring
+        if best_rev_colors < best_fwd_colors:
+            msg = ("Best forward coloring (%d colors) was chosen, but best reverse coloring is "
+                   "better (%d colors)" % (best_fwd_colors, best_rev_colors))
+            warnings.warn(msg)
+    else:
+        if best_fwd_colors <= best_rev_colors:
+            coloring = best_fwd_coloring
+        else:
+            coloring = best_rev_coloring
+
+    # restore the original jacobian
+    coloring['J'] = J = orig_J
 
     sparsity = None
     if problem is not None:
@@ -746,13 +895,15 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
 
         driver._total_jac = None
 
+    modes = [m for m in ('fwd', 'rev') if m in coloring]
+
     if stream is not None:
         if stream.isatty():
             stream.write("\n########### BEGIN COLORING DATA ################\n")
-            _write_coloring([mode], lists, rowcol_map, sparsity, stream)
+            _write_coloring(modes, coloring, stream)
             stream.write("\n########### END COLORING DATA ############\n")
         else:
-            _write_coloring([mode], lists, rowcol_map, sparsity, stream)
+            _write_coloring(modes, coloring, stream)
 
         if show_jac:
             s = stream if stream.isatty() else sys.stdout

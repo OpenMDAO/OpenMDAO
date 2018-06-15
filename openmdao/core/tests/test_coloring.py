@@ -752,20 +752,19 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_simul_coloring(self):
 
-        # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
         p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 11 solves per driver iter  (11 vs 22)
+        # - bidirectional coloring saves 17 solves per driver iter  (5 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
 
 
 class SparsityTestCase(unittest.TestCase):
