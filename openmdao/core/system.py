@@ -1731,7 +1731,7 @@ class System(object):
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
-                       simul_coloring=None, cache_linear_solution=False):
+                       cache_linear_solution=False):
         r"""
         Add a design variable to this system.
 
@@ -1762,9 +1762,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring : ndarray or list of int
-            An array or list of integer color values.  Must match the size of the
-            design variable.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -1842,13 +1839,11 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
-        dvs['simul_deriv_color'] = simul_coloring
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False, simul_coloring=None,
-                     simul_map=None, cache_linear_solution=False):
+                     vectorize_derivs=False, cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -1891,13 +1886,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring : ndarray or list of int
-            An array or list of integer color values.  Must match the size of the
-            response variable.
-        simul_map : dict
-            Mapping of this response to each design variable where simultaneous derivs will
-            be used.  Each design variable entry is another dict keyed on color, and the values
-            in the color dict are tuples of the form (resp_idxs, color_idxs).
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2003,15 +1991,13 @@ class System(object):
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
-        resp['simul_deriv_color'] = simul_coloring
-        resp['simul_map'] = simul_map
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False, simul_coloring=None, simul_map=None,
+                       vectorize_derivs=False,
                        cache_linear_solution=False):
         r"""
         Add a constraint variable to this system.
@@ -2047,13 +2033,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring : ndarray or list of int
-            An array or list of integer color values.  Must match the size of the
-            constraint variable.
-        simul_map : dict
-            Mapping of this response to each design variable where simultaneous derivs will
-            be used.  Each design variable entry is another dict keyed on color, and the values
-            in the color dict are tuples of the form (resp_idxs, color_idxs).
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2070,13 +2049,11 @@ class System(object):
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring=simul_coloring, simul_map=simul_map,
                           cache_linear_solution=cache_linear_solution)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False, simul_coloring=None, simul_map=None,
-                      cache_linear_solution=False):
+                      vectorize_derivs=False, cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -2103,13 +2080,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring : ndarray or list of int
-            An array or list of integer color values.  Must match the size of the
-            objective variable.
-        simul_map : dict
-            Mapping of this response to each design variable where simultaneous derivs will
-            be used.  Each design variable entry is another dict keyed on color, and the values
-            in the color dict are tuples of the form (resp_idxs, color_idxs).
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2146,7 +2116,6 @@ class System(object):
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring=simul_coloring, simul_map=simul_map,
                           cache_linear_solution=cache_linear_solution)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
