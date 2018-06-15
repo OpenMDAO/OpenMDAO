@@ -70,11 +70,38 @@ class MixedEquation(ImplicitComponent):
         jacobian['x45', 'c'] = -3.0 * x45**2
 
 
+class ForBroydenResetJac(ImplicitComponent):
+    """
+    Pretty simple equation, but initial value will jump around for the first several
+    iterations to force recomputation of jacobian.
+    """
+    def setup(self):
+        self.add_input('x', 1.0)
+        self.add_output('y', 1.0)
+
+        self.declare_partials(of='y', wrt=['x', 'y'])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x = inputs['x']
+        y = outputs['y']
+
+        vals = np.array([3.0, -2.5, -50.7, 140.0, -2500.5, 3.0])
+        val = vals[min(len(vals) - 1, self.iter_count)]
+
+        residuals['y'] = val*y**2 - x
+
+    def linearize(self, inputs, outputs, jacobian):
+        x = inputs['x']
+        y = outputs['y']
+
+        jacobian['y', 'x'] = -1.0
+
+        jacobian['y', 'y'] = 6.0 * y
 
 
 class TestBryoden(unittest.TestCase):
 
-    def test_simple_Sellar(self):
+    def test_simple_sellar(self):
         # Test top level Sellar (i.e., not grouped).
 
         prob = Problem()
@@ -83,7 +110,6 @@ class TestBryoden(unittest.TestCase):
 
         prob.setup(check=False)
 
-        prob.set_solver_print(level=0)
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
 
         prob.run_model()
@@ -172,8 +198,8 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['mixed.x12', 'mixed.x3', 'mixed.x45']
         model.nonlinear_solver.options['maxiter'] = 15
-        model.nonlinear_solver.options['compute_initial_jacobian'] = True
-        model.linear_solver = DirectSolver()
+        model.nonlinear_solver.options['compute_jacobian'] = True
+        model.nonlinear_solver.linear_solver = DirectSolver()
 
         prob.setup(check=False)
 
@@ -182,6 +208,58 @@ class TestBryoden(unittest.TestCase):
         assert_rel_error(self, prob['mixed.x12'], np.zeros((2, )), 1e-6)
         assert_rel_error(self, prob['mixed.x3'], 0.0, 1e-6)
         assert_rel_error(self, prob['mixed.x45'], np.zeros((2, )), 1e-6)
+
+        # Normally takes about 13 iters, but takes around 4 if you calculate an initial
+        # Jacobian.
+        self.assertTrue(model.nonlinear_solver._iter_count < 6)
+
+    def test_simple_sellar_jacobian(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+        model.nonlinear_solver.options['compute_jacobian'] = True
+        model.nonlinear_solver.linear_solver = DirectSolver()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Normally takes about 4 iters, but takes around 3 if you calculate an initial
+        # Jacobian.
+        self.assertTrue(model.nonlinear_solver._iter_count < 4)
+
+    def test_jacobian_update(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.01))
+        model.add_subsystem('comp', ForBroydenResetJac())
+
+        model.connect('p1.x', 'comp.x')
+
+        model.nonlinear_solver = BroydenSolver()
+        model.nonlinear_solver.options['state_vars'] = ['comp.y']
+        model.nonlinear_solver.options['maxiter'] = 30
+        model.nonlinear_solver.options['compute_jacobian'] = True
+        model.nonlinear_solver.options['max_converge_failures'] = 200
+        model.nonlinear_solver.options['diverge_limit'] = np.inf
+        model.nonlinear_solver.linear_solver = DirectSolver()
+
+        prob.setup(check=False)
+
+        prob.set_solver_print(level=2)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 0.05773503, .00001)
 
 if __name__ == "__main__":
     unittest.main()
