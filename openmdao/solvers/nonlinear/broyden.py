@@ -13,6 +13,17 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 
+CITATION = """@ARTICLE{
+              Broyden1965ACo,
+              AUTHOR = "C. Broyden",
+              TITLE = "A Class of Methods for Solving Nonlinear Simultaneous Equations",
+              JOURNAL = "Mathematics of Computation",
+              VOLUME = "19",
+              YEAR = "1965",
+              PAGES = "577--593",
+              REFERRED = "[Coleman1996SaE]."
+              }"""
+
 
 class BroydenSolver(NonlinearSolver):
     """
@@ -36,6 +47,8 @@ class BroydenSolver(NonlinearSolver):
         Most recent state.
     _idx : dict
         Cache of vector indices for each state name.
+    _computed_jacobians : int
+        Number of computed jacobians.
     _converge_failures : int
         Number of consecutive iterations that failed to converge to the tol definied in options.
     _recompute_jacobian : bool
@@ -58,6 +71,8 @@ class BroydenSolver(NonlinearSolver):
         # Slot for linear solver
         self.linear_solver = None
 
+        self.cite = CITATION
+
         self.n = 0
         self._idx = {}
         self._recompute_jacobian = True
@@ -67,6 +82,7 @@ class BroydenSolver(NonlinearSolver):
         self.delta_xm = None
         self.delta_fxm = None
         self._converge_failures = 0
+        self._computed_jacobians = 0
 
     def _declare_options(self):
         """
@@ -76,14 +92,16 @@ class BroydenSolver(NonlinearSolver):
 
         self.options.declare('alpha', default=0.4,
                              desc="Value to scale the starting Jacobian, which is Identity. This "
-                                  "option does nothing if you precompute the initial Jacobian.")
+                                  "option does nothing if you compute the initial Jacobian "
+                                  "instead.")
         self.options.declare('compute_jacobian', default=False,
-                             desc="Set to True to compute the initial Jacobian, otherwise start "
-                                  "with Identity scaled by alpha.")
+                             desc="Set to True to compute an initial Jacobian, otherwise start "
+                                  "with Identity scaled by alpha. Further Jacobians may also be "
+                                  "computed depending on the other options.")
         self.options.declare('converge_limit', default=1.0,
                              desc="Ratio of current residual to previous residual above which the "
                                   "convergence is considered a failure. The Jacobian will be "
-                                  "regenerated once this has been reached a number of "
+                                  "regenerated once this condition has been reached a number of "
                                   "consecutive times as specified in max_converge_failures.")
         self.options.declare('diverge_limit', default=2.0,
                              desc="Ratio of current residual to previous residual above which the "
@@ -91,8 +109,14 @@ class BroydenSolver(NonlinearSolver):
         self.options.declare('max_converge_failures', default=3,
                              desc="The number of convergence failures before regenerating the "
                                   "Jacobian.")
+        self.options.declare('max_jacobians', default=10,
+                             desc="Maximum number of jacobians to compute.")
         self.options.declare('state_vars', [], desc="List of the state-variable/residuals that "
-                                                    "are solver states.")
+                                                    "are to be solved here.")
+        self.options.declare('update_broyden', default=True,
+                             desc="Flag controls whether to perform Broyden update to the "
+                                  "Jacobian. There are some applications where it may be useful "
+                                  "to turn this off.")
 
     def _setup_solvers(self, system, depth):
         """
@@ -107,6 +131,7 @@ class BroydenSolver(NonlinearSolver):
         """
         super(BroydenSolver, self)._setup_solvers(system, depth)
         self._recompute_jacobian = True
+        self._computed_jacobians = 0
 
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system, self._depth + 1)
@@ -259,16 +284,18 @@ class BroydenSolver(NonlinearSolver):
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
         opt = self.options
-        converge_ratio = np.linalg.norm(fxm) / np.linalg.norm(fxm1)
-        if converge_ratio > opt['diverge_limit']:
-            self._recompute_jacobian = True
-        elif converge_ratio > opt['converge_limit']:
-            self._converge_failures += 1
+        if self._computed_jacobians <= opt['max_jacobians']:
+            converge_ratio = np.linalg.norm(fxm) / np.linalg.norm(fxm1)
 
-            if self._converge_failures > opt['max_converge_failures']:
+            if converge_ratio > opt['diverge_limit']:
                 self._recompute_jacobian = True
-        else:
-            self._converge_failures = 0
+            elif converge_ratio > opt['converge_limit']:
+                self._converge_failures += 1
+
+                if self._converge_failures > opt['max_converge_failures']:
+                    self._recompute_jacobian = True
+            else:
+                self._converge_failures = 0
 
         # Cache for next iteration.
         self.delta_xm = delta_xm
@@ -286,20 +313,22 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             Updated Jacobian.
         """
+        Gm = self.Gm
+
         # Use Broyden Update.
         if not self._recompute_jacobian:
             dfxm = self.delta_fxm
-            Gm = self.Gm
             fact = 1.0 / np.linalg.norm(dfxm)**2
             Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * fact)
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
             Gm = self._compute_jacobian()
+            self._computed_jacobians += 1
 
         # Set Jacobian to identity scaled by alpha.
         # This is the default initial Jacobian used by scipy.
-        else:
+        elif self.options['update_broyden']:
             Gm = np.diag(-self.options['alpha'] * np.ones(self.n))
 
         return Gm
