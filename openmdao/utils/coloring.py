@@ -810,7 +810,6 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     best_fwd_colors = best_colors
     best_fwd_coloring = best_coloring.copy()
 
-
     best_coloring = {}
     best_colors = 99999999
     skip_count = 0

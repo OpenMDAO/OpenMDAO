@@ -184,21 +184,22 @@ class _TotalJacInfo(object):
             self.idx_iter_dict = {}
 
             self.out_meta = {}
+            out_size = {}
             for mode in modes:
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode] = \
                     self._create_in_idx_map(has_lin_cons, mode)
 
                 if mode == 'fwd':
-                    self.out_meta[mode], out_size = self.of_meta, self.of_size
+                    self.out_meta[mode], out_size[mode] = self.of_meta, self.of_size
                 else:
-                    self.out_meta[mode], out_size = self.wrt_meta, self.wrt_size
+                    self.out_meta[mode], out_size[mode] = self.wrt_meta, self.wrt_size
 
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name = {}
                 self.idx2local = {}
                 for mode in modes:
                     self.idx2name[mode], self.idx2local[mode] = self._create_idx_maps(
-                        self.output_list[mode], self.output_meta[mode], out_size)
+                        self.output_list[mode], self.output_meta[mode], out_size[mode])
             else:
                 self.idx2name = self.idx2local = self.simul_coloring = None
 
