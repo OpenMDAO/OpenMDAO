@@ -126,7 +126,7 @@ author = u'openmdao.org'
 import openmdao
 version = openmdao.__version__
 # The full version, including alpha/beta/rc tags.
-release = openmdao.__version__ + ' Alpha'
+release = openmdao.__version__ + ' Beta'
 
 # we are only doing the commit number/latest tag choice when we are on Travis.
 if 'TRAVIS_PULL_REQUEST' in os.environ:

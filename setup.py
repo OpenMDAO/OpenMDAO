@@ -1,8 +1,11 @@
 from distutils.core import setup
 
+# exec this file to set __version__
+exec(open('openmdao/__init__.py').read())
+
 setup(
     name='openmdao',
-    version='2.3.0',
+    version=__version__,
     description="OpenMDAO v2 framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
@@ -10,7 +13,7 @@ setup(
     while still solving them in a tightly coupled manner with efficient parallel numerical methods.
     """,
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Natural Language :: English',
@@ -27,7 +30,7 @@ setup(
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/2.3.0',
+    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/'+__version__,
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
