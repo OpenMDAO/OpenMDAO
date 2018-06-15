@@ -206,7 +206,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
         p.final_setup()
-        warnings = testlogger.get('warning')
+        p.cleanup()
         self.assertTrue(testlogger.contains_regex('warning',
                                                   "The Problem has no recorder of any kind attached"))
         # Driver recorder set
@@ -217,6 +217,7 @@ class TestCheckConfig(unittest.TestCase):
             testlogger = TestLogger()
             p.setup(check=True, logger=testlogger)
             p.final_setup()
+            p.cleanup()
             warnings = testlogger.get('warning')
             self.assertEqual(len(warnings), 0)
         finally:
@@ -231,6 +232,7 @@ class TestCheckConfig(unittest.TestCase):
             testlogger = TestLogger()
             p.setup(check=True, logger=testlogger)
             p.final_setup()
+            p.cleanup()
             warnings = testlogger.get('warning')
             self.assertEqual(len(warnings), 0)
         finally:
@@ -245,6 +247,7 @@ class TestCheckConfig(unittest.TestCase):
             testlogger = TestLogger()
             p.setup(check=True, logger=testlogger)
             p.final_setup()
+            p.cleanup()
             warnings = testlogger.get('warning')
             self.assertEqual(len(warnings), 0)
         finally:
@@ -258,6 +261,7 @@ class TestCheckConfig(unittest.TestCase):
             testlogger = TestLogger()
             p.setup(check=True, logger=testlogger)
             p.final_setup()
+            p.cleanup()
             warnings = testlogger.get('warning')
             self.assertEqual(len(warnings), 0)
 
