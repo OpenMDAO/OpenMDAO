@@ -42,18 +42,27 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger warnings due to having states without solves
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 2)
 
-        self.assertEqual(warnings[0],
-                         "StateConnection 'statecomp' contains implicit variables, "
+        self.assertTrue(testlogger.contains_regex('warning',"StateConnection 'statecomp' contains implicit variables, "
                          "but does not have an iterative nonlinear solver and does not "
-                         "implement 'solve_nonlinear'.")
+                         "implement 'solve_nonlinear'."))
 
-        self.assertEqual(warnings[1],
-                         "StateConnection 'statecomp' contains implicit variables, "
+        self.assertTrue(testlogger.contains_regex('warning',"StateConnection 'statecomp' contains implicit variables, "
                          "but does not have an iterative linear solver and does not "
-                         "implement 'solve_linear'.")
+                         "implement 'solve_linear'."))
+
+        # warnings = testlogger.get('warning')
+        # self.assertEqual(len(warnings), 2)
+        #
+        # self.assertEqual(warnings[0],
+        #                  "StateConnection 'statecomp' contains implicit variables, "
+        #                  "but does not have an iterative nonlinear solver and does not "
+        #                  "implement 'solve_nonlinear'.")
+        #
+        # self.assertEqual(warnings[1],
+        #                  "StateConnection 'statecomp' contains implicit variables, "
+        #                  "but does not have an iterative linear solver and does not "
+        #                  "implement 'solve_linear'.")
 
     def test_implicit_without_solve_linear(self):
         prob = Problem()
@@ -70,13 +79,17 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger solver warning because there is no linear solve
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
+        # warnings = testlogger.get('warning')
+        # self.assertEqual(len(warnings), 1)
 
-        self.assertEqual(warnings[0],
-                         "StateConnWithSolveNonlinear 'statecomp' contains implicit "
+        self.assertTrue(testlogger.contains_regex('warning',"StateConnWithSolveNonlinear 'statecomp' contains implicit "
                          "variables, but does not have an iterative linear solver "
-                         "and does not implement 'solve_linear'.")
+                         "and does not implement 'solve_linear'."))
+
+        # self.assertEqual(warnings[0],
+        #                  "StateConnWithSolveNonlinear 'statecomp' contains implicit "
+        #                  "variables, but does not have an iterative linear solver "
+        #                  "and does not implement 'solve_linear'.")
 
     def test_implicit_without_solve_nonlinear(self):
         prob = Problem()
@@ -93,13 +106,19 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger solver warning because there is no nonlinear solve
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
 
-        self.assertEqual(warnings[0],
-                         "StateConnWithSolveLinear 'statecomp' contains implicit "
+        self.assertTrue(testlogger.contains_regex('warning',
+                                                  "StateConnWithSolveLinear 'statecomp' contains implicit "
                          "variables, but does not have an iterative nonlinear solver "
-                         "and does not implement 'solve_nonlinear'.")
+                         "and does not implement 'solve_nonlinear'."))
+
+        # warnings = testlogger.get('warning')
+        # self.assertEqual(len(warnings), 1)
+        #
+        # self.assertEqual(warnings[0],
+        #                  "StateConnWithSolveLinear 'statecomp' contains implicit "
+        #                  "variables, but does not have an iterative nonlinear solver "
+        #                  "and does not implement 'solve_nonlinear'.")
 
     def test_implicit_with_solves(self):
         prob = Problem()
@@ -116,8 +135,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should not trigger any solver warnings because solve methods are implemented
+        # but there is a warning about the lack of recorder
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        self.assertEqual(len(warnings), 1)
 
     def test_implicit_iter(self):
         prob = Problem()
@@ -138,8 +158,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should not trigger any solver warnings
+        # other than lack of recorder warning
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        self.assertEqual(len(warnings), 1)
 
     def test_implicit_iter_subgroup(self):
         prob = Problem()
@@ -163,8 +184,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should not trigger solver warning because iterates in parent group
+        # but will have recorder warning
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        self.assertEqual(len(warnings), 1)
 
     def test_implicit_iter_subgroups(self):
         prob = Problem()
@@ -192,13 +214,17 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger a linear solver warning only for group 2
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
-
-        self.assertEqual(warnings[0],
-                         "StateConnection 'G2.statecomp2' contains implicit "
+        self.assertTrue(testlogger.contains_regex('warning',"StateConnection 'G2.statecomp2' contains implicit "
                          "variables, but does not have an iterative linear solver "
-                         "and does not implement 'solve_linear'.")
+                         "and does not implement 'solve_linear'."))
+
+        # warnings = testlogger.get('warning')
+        # self.assertEqual(len(warnings), 1)
+        #
+        # self.assertEqual(warnings[0],
+        #                  "StateConnection 'G2.statecomp2' contains implicit "
+        #                  "variables, but does not have an iterative linear solver "
+        #                  "and does not implement 'solve_linear'.")
 
     def test_cycle(self):
         prob = Problem()
@@ -218,16 +244,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger warnings because cycle requires iterative solvers
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 2)
-
-        self.assertEqual(warnings[0],
-                         "Group '' contains cycles [['C1', 'C2', 'C3']], but "
-                         "does not have an iterative nonlinear solver.")
-
-        self.assertEqual(warnings[1],
-                         "Group '' contains cycles [['C1', 'C2', 'C3']], but "
-                         "does not have an iterative linear solver.")
+        self.assertTrue(testlogger.contains_regex('warning',"Group .+ contains cycles .+, but does not have an iterative nonlinear solver."))
+        self.assertTrue(testlogger.contains_regex('warning',"Group .+ contains cycles .+ but "
+                         "does not have an iterative linear solver."))
 
     def test_cycle_iter(self):
         prob = Problem()
@@ -252,7 +271,8 @@ class TestCheckSolvers(unittest.TestCase):
 
         # should not trigger any solver warnings
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        # but one warning exists due to problem not having a recorder
+        self.assertEqual(len(warnings), 1)
 
     def test_cycle_direct(self):
         prob = Problem()
@@ -277,7 +297,8 @@ class TestCheckSolvers(unittest.TestCase):
 
         # should not trigger any solver warnings
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        # but one warning exists due to problem not having a recorder
+        self.assertEqual(len(warnings), 1)
 
     def test_cycle_iter_subgroup(self):
         prob = Problem()
@@ -302,8 +323,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should not trigger solver warning because iterates in parent group
+        # but one warning exists due to problem not having a recorder
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        self.assertEqual(len(warnings), 1)
 
 
 if __name__ == "__main__":

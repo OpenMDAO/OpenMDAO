@@ -300,9 +300,10 @@ def _check_solvers(problem, logger):
                        (sys.__class__.__name__, path))
                 logger.warning(msg)
 
+
 def _check_missing_recorders(problem, logger):
     """
-    Check to see if there are any recorders of any type.
+    Check to see if there are any recorders of any type on the Problem.
 
     Parameters
     ----------
@@ -311,20 +312,17 @@ def _check_missing_recorders(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    # Look for System recorders
-    for system in problem.model.system_iter(include_self=True, recurse=True):
-        if system._rec_mgr._recorders:
-            return
-
     # Look for Driver recorder
     if problem.driver._rec_mgr._recorders:
         return
 
-    # Look for Solver recorder
+    # Look for System and Solver recorders
     for system in problem.model.system_iter(include_self=True, recurse=True):
-        if system.nonlinear_solver._rec_mgr._recorders:
+        if system._rec_mgr._recorders:
             return
-        if system.linear_solver._rec_mgr._recorders:
+        if system.nonlinear_solver and system.nonlinear_solver._rec_mgr._recorders:
+            return
+        if system.linear_solver and system.linear_solver._rec_mgr._recorders:
             return
 
     msg = "The Problem has no recorder of any kind attached"

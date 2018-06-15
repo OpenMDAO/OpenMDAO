@@ -1,5 +1,6 @@
 """Miscellaneous utilities related to logging."""
 
+import re
 import sys
 import logging
 
@@ -177,3 +178,26 @@ class TestLogger(object):
             Any messages of that type that have been written to the logger.
         """
         return self._msgs[typ]
+
+    def contains_regex(self, typ, pattern):
+        """
+        Do any of the lines of stored messages of a specific type match the regex.
+
+        Parameters
+        ----------
+        typ : str
+            Type of messages ('error', 'warning', 'info') to be returned.
+
+        pattern : str
+            Regular expression used to look for matches.
+
+        Returns
+        -------
+        bool
+            True if any of the lines of stored messages of a specific type match the regex.
+        """
+        for line in self._msgs[typ]:
+            if re.search(pattern, line):
+                return True
+
+        return False
