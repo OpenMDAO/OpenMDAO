@@ -212,6 +212,7 @@ class BroydenSolver(NonlinearSolver):
 
         system = self._system
         self._converge_failures = 0
+        self._computed_jacobians = 0
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
