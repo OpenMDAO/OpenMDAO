@@ -14,7 +14,7 @@ AddSubtractComp
 Using the AddSubtractComp
 ----------------------
 
-The `add_equation` is used to set up a system of inputs to be added/subtracted (with scaling factors). 
+The `add_equation` is used to set up a system of inputs to be added/subtracted (with scaling factors).
 Each time the user adds an equation, all of the inputs and outputs must be of identical shape (this is a requirement for elementwise addition/subtraction).
 The units must also be compatible between all inputs and the output of each equation.
 
@@ -25,5 +25,6 @@ In the following example AddSubtractComp is used add thrust, drag, lift, and wei
 
 .. embed-code::
     openmdao.components.tests.test_add_subtract_comp.TestForDocs.test
+    :layout: code, output
 
 .. tags:: AddSubtractComp, Component
