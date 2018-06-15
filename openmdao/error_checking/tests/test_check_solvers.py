@@ -51,19 +51,6 @@ class TestCheckSolvers(unittest.TestCase):
                          "but does not have an iterative linear solver and does not "
                          "implement 'solve_linear'."))
 
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 2)
-        #
-        # self.assertEqual(warnings[0],
-        #                  "StateConnection 'statecomp' contains implicit variables, "
-        #                  "but does not have an iterative nonlinear solver and does not "
-        #                  "implement 'solve_nonlinear'.")
-        #
-        # self.assertEqual(warnings[1],
-        #                  "StateConnection 'statecomp' contains implicit variables, "
-        #                  "but does not have an iterative linear solver and does not "
-        #                  "implement 'solve_linear'.")
-
     def test_implicit_without_solve_linear(self):
         prob = Problem()
         model = prob.model
@@ -79,17 +66,9 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger solver warning because there is no linear solve
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 1)
-
         self.assertTrue(testlogger.contains_regex('warning',"StateConnWithSolveNonlinear 'statecomp' contains implicit "
                          "variables, but does not have an iterative linear solver "
                          "and does not implement 'solve_linear'."))
-
-        # self.assertEqual(warnings[0],
-        #                  "StateConnWithSolveNonlinear 'statecomp' contains implicit "
-        #                  "variables, but does not have an iterative linear solver "
-        #                  "and does not implement 'solve_linear'.")
 
     def test_implicit_without_solve_nonlinear(self):
         prob = Problem()
@@ -106,19 +85,10 @@ class TestCheckSolvers(unittest.TestCase):
         prob.final_setup()
 
         # should trigger solver warning because there is no nonlinear solve
-
         self.assertTrue(testlogger.contains_regex('warning',
                                                   "StateConnWithSolveLinear 'statecomp' contains implicit "
                          "variables, but does not have an iterative nonlinear solver "
                          "and does not implement 'solve_nonlinear'."))
-
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 1)
-        #
-        # self.assertEqual(warnings[0],
-        #                  "StateConnWithSolveLinear 'statecomp' contains implicit "
-        #                  "variables, but does not have an iterative nonlinear solver "
-        #                  "and does not implement 'solve_nonlinear'.")
 
     def test_implicit_with_solves(self):
         prob = Problem()
@@ -217,14 +187,6 @@ class TestCheckSolvers(unittest.TestCase):
         self.assertTrue(testlogger.contains_regex('warning',"StateConnection 'G2.statecomp2' contains implicit "
                          "variables, but does not have an iterative linear solver "
                          "and does not implement 'solve_linear'."))
-
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 1)
-        #
-        # self.assertEqual(warnings[0],
-        #                  "StateConnection 'G2.statecomp2' contains implicit "
-        #                  "variables, but does not have an iterative linear solver "
-        #                  "and does not implement 'solve_linear'.")
 
     def test_cycle(self):
         prob = Problem()

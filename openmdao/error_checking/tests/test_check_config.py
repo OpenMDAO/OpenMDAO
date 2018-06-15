@@ -2,7 +2,8 @@ import unittest
 
 from six.moves import range
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS, NonlinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS, NonlinearBlockGS, \
+                        SqliteRecorder
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
 
@@ -113,16 +114,8 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-
         self.assertTrue(testlogger.contains_regex('warning',"The following systems are executed out-of-order:"))
         self.assertTrue(testlogger.contains_regex('info',"The following groups contain cycles:"))
-
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 1)
-        # info = testlogger.get('info')
-        #
-        # self.assertEqual(info[0], "The following groups contain cycles:\n   Group '' has the following cycles: [['G1', 'C4']]\n")
-        # self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n")
 
         # test comps_only cycle check
         graph = root.compute_sys_graph(comps_only=True)
@@ -148,15 +141,8 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 2)
-
         self.assertTrue(testlogger.contains_regex('warning',"The following systems are executed out-of-order.*"))
         self.assertTrue(testlogger.contains_regex('warning',"The following components have multiple inputs connected to the same source, which can introduce unnecessary data transfer.*"))
-
-
-        # self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C1' executes out-of-order with respect to its source systems ['C2']\n")
-        # self.assertEqual(warnings[1], "The following components have multiple inputs connected to the same source, which can introduce unnecessary data transfer overhead:\n   C1 has inputs ['a', 'b'] connected to C2.y\n")
 
     def test_multi_cycles(self):
         p = Problem(model=Group())
@@ -205,20 +191,9 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-
         self.assertTrue(testlogger.contains_regex('warning',"The following systems are executed out-of-order.*"))
         self.assertTrue(testlogger.contains_regex('warning',"The following inputs are not connected.*"))
         self.assertTrue(testlogger.contains_regex('info',"The following groups contain cycles.*"))
-
-        # warnings = testlogger.get('warning')
-        # self.assertEqual(len(warnings), 2)
-        #
-        # info = testlogger.get('info')
-        # self.assertEqual(len(info), 1)
-
-        # self.assertEqual(info[0], "The following groups contain cycles:\n   Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n")
-        # self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n")
-        # self.assertTrue("The following inputs are not connected:" in warnings[1])
 
     def test_warn_no_recorders(self):
 
@@ -228,10 +203,10 @@ class TestCheckConfig(unittest.TestCase):
         p.setup(check=True, logger=testlogger)
         p.final_setup()
         warnings = testlogger.get('warning')
-        self.assertEqual(warnings[0], "The Problem has no recorder of any kind attached")
+        self.assertTrue(testlogger.contains_regex('warning',
+                                                  "The Problem has no recorder of any kind attached"))
 
         # Driver recorder set
-        from openmdao.api import SqliteRecorder
         p = Problem(model=Group())
         p.driver.add_recorder(SqliteRecorder("temp.sql"))
         testlogger = TestLogger()
