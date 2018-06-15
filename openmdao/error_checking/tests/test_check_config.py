@@ -1,4 +1,6 @@
+import os
 import unittest
+from tempfile import mkdtemp
 
 from six.moves import range
 
@@ -196,6 +198,8 @@ class TestCheckConfig(unittest.TestCase):
         self.assertTrue(testlogger.contains_regex('info',"The following groups contain cycles.*"))
 
     def test_warn_no_recorders(self):
+        temp_dir = mkdtemp()
+        filename = os.path.join(temp_dir, "sqlite_test")
 
         # No recorder set
         p = Problem(model=Group())
@@ -205,43 +209,57 @@ class TestCheckConfig(unittest.TestCase):
         warnings = testlogger.get('warning')
         self.assertTrue(testlogger.contains_regex('warning',
                                                   "The Problem has no recorder of any kind attached"))
-
         # Driver recorder set
-        p = Problem(model=Group())
-        p.driver.add_recorder(SqliteRecorder("temp.sql"))
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        p.final_setup()
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        try:
+            p = Problem(model=Group())
+            recorder = SqliteRecorder(filename)
+            p.driver.add_recorder(recorder)
+            testlogger = TestLogger()
+            p.setup(check=True, logger=testlogger)
+            p.final_setup()
+            warnings = testlogger.get('warning')
+            self.assertEqual(len(warnings), 0)
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
 
         # System recorder set
-        p = Problem(model=Group())
-        p.model.add_recorder(SqliteRecorder("temp.sql"))
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        p.final_setup()
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        try:
+            p = Problem(model=Group())
+            recorder = SqliteRecorder(filename)
+            p.model.add_recorder(recorder)
+            testlogger = TestLogger()
+            p.setup(check=True, logger=testlogger)
+            p.final_setup()
+            warnings = testlogger.get('warning')
+            self.assertEqual(len(warnings), 0)
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
 
         # Non Linear Solver recorder set
-        p = Problem(model=Group())
-        p.model.nonlinear_solver.add_recorder(SqliteRecorder("temp.sql"))
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        p.final_setup()
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
+        try:
+            p = Problem(model=Group())
+            recorder = SqliteRecorder(filename)
+            p.model.nonlinear_solver.add_recorder(recorder)
+            testlogger = TestLogger()
+            p.setup(check=True, logger=testlogger)
+            p.final_setup()
+            warnings = testlogger.get('warning')
+            self.assertEqual(len(warnings), 0)
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
 
         # Linear Solver recorder set
-        p = Problem(model=Group())
-        p.model.linear_solver.add_recorder(SqliteRecorder("temp.sql"))
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        p.final_setup()
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
-
+            p = Problem(model=Group())
+            recorder = SqliteRecorder(filename)
+            p.model.linear_solver.add_recorder(recorder)
+            testlogger = TestLogger()
+            p.setup(check=True, logger=testlogger)
+            p.final_setup()
+            warnings = testlogger.get('warning')
+            self.assertEqual(len(warnings), 0)
 
 if __name__ == "__main__":
     unittest.main()
