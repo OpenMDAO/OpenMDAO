@@ -6,6 +6,7 @@ from petsc4py import PETSc
 from six import iteritems, itervalues
 from itertools import product, chain
 
+from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
@@ -32,7 +33,7 @@ class PETScTransfer(DefaultTransfer):
             Whether to call this method in subsystems.
         """
         group._transfers = {}
-        rev = group._mode == 'rev'
+        rev = group._mode == 'rev' or Transfer._need_reverse
 
         def merge(indices_list):
             if len(indices_list) > 0:

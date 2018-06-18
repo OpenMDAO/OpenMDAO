@@ -317,9 +317,8 @@ class Driver(object):
                 self.supports['simultaneous_derivatives']):
             self._setup_simul_coloring(problem._mode)
 
-        # if we're using simultaneous derivatives then our effective size is less
-        # than the full size
-        if self._simul_coloring_info:
+            # if we're using simultaneous derivatives then our effective size is less
+            # than the full size
             if 'fwd' in self._simul_coloring_info and 'rev' in self._simul_coloring_info:
                 pass  # we're doing both!
             else:
