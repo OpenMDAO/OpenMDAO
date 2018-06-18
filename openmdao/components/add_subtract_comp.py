@@ -60,14 +60,10 @@ class AddSubtractComp(ExplicitComponent):
             each input (element-wise addition)
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        units : str or None
-            Units in which the output variables will be provided to the component during execution.
-            Default is None, which means it has no units.
-        desc : str
-            description of the variable.
         **kwargs : str
             Any other arguments to pass to the addition system
             (same as add_output method for ExplicitComponent)
+            Examples include units (str or None), desc (str)
         """
         super(AddSubtractComp, self).__init__()
 
