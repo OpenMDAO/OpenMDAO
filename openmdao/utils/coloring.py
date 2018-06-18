@@ -475,32 +475,6 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     return sparsity
 
 
-def _simul_fwd(J):
-    """
-    Find simultaneous deriv data for fwd mode for the given jacobian.
-
-    Parameters
-    ----------
-    J : ndarray
-        Boolean total jacobian.
-
-    Returns
-    -------
-    tuple
-        (column_lists, rows_for_each_col)
-    """
-    full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
-    uncolored_cols = [i for i, r in enumerate(rows) if r is None]
-
-    # the first col_list entry corresponds to all uncolored columns (columns that are not
-    # disjoint wrt any other columns).  The other entries are groups of columns that do not
-    # share any nonzero row entries in common.
-    col_lists = [uncolored_cols]
-    col_lists.extend(full_disjoint)
-
-    return col_lists, rows
-
-
 def _total_solves(color_info):
     """
     Return total number of linear solves required based on the given coloring info.
@@ -664,7 +638,15 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
             J[most_dense[skip_count - 1], :] = False  # zero out another skipped row
             rev_rows.append(most_dense[skip_count - 1])
 
-        lists, rowcol_map = _simul_fwd(J)
+        full_disjoint, rowcol_map = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
+        uncolored_cols = [i for i, r in enumerate(rowcol_map) if r is None]
+
+        # the first col_list entry corresponds to all uncolored columns (columns that are not
+        # disjoint wrt any other columns).  The other entries are groups of columns that do not
+        # share any nonzero row entries in common.
+        lists = [uncolored_cols]
+        lists.extend(full_disjoint)
+
         coloring['fwd'] = [lists, rowcol_map]
 
         tot_size, tot_colors = _solves_info(coloring, mode)
