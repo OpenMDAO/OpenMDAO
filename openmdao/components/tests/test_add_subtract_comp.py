@@ -286,8 +286,7 @@ class TestWrongScalingFactorCount(unittest.TestCase):
 
 
     def test_for_exception(self):
-        with pytest.raises(ValueError):
-            self.p.setup()
+        self.assertRaises(ValueError,self.p.setup)
 
 class TestForDocs(unittest.TestCase):
 
