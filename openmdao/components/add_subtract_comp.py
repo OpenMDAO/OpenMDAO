@@ -1,27 +1,29 @@
 """Definition of the Add/Subtract Component."""
 
 
-from openmdao.api import ExplicitComponent, IndepVarComp, Group, Problem
 import numpy as np
 from scipy import sparse as sp
 from six import string_types
 import collections
 
+from openmdao.core.explicitcomponent import ExplicitComponent
+
+
 class AddSubtractComp(ExplicitComponent):
     """Compute a vectorized element-wise addition or subtraction.
 
     Use the add_equation method to define any number of add/subtract relations
-    User defines the names of the input and output variables using add_equation(output_name='my_output', input_names=['my_1st_inp','my_2nd_inp'])
+    User defines the names of the input and output variables using add_equation(output_name='my_output', input_names=['a','b', 'c', ...])
 
     math::
         result = a * scaling_factor_a + b * scaling_factor_b + c * scaling_factor_c + ...
 
-    where a is of shape (vec_size, n)
+    where all inputs  shape (vec_size, n)
           b is of shape (vec_size, n)
           c is of shape (vec_size, n)
           result is of shape (vec_size, n)
 
-    Vectors a and b must be of the same shape, specified by the options 'vec_size' and 'length'.
+    All input vectors must be of the same shape, specified by the options 'vec_size' and 'length'.
     Use scaling factor -1 for subtraction
     """
 
@@ -33,14 +35,16 @@ class AddSubtractComp(ExplicitComponent):
         if isinstance(output_name, string_types):
             self._add_systems.append((output_name, input_names, vec_size, length, val, scaling_factors, kwargs))
         elif isinstance(output_name, collections.Iterable):
-            raise NotImplementedError('Declaring multiple addition systems on initiation is not implemented. Use a string to name a single addition relationship or use multiple add_output calls')
+            raise NotImplementedError('Declaring multiple addition systems on initiation is not implemented. '
+                                      'Use a string to name a single addition relationship or use '
+                                      'multiple add_output calls')
         elif output_name is None:
             pass
         else:
             raise ValueError(
                 "first argument to adder init must be either of type "
                 "`str' or 'None'")
-    
+
     def initialize(self):
         """Declare options.
 
@@ -51,7 +55,7 @@ class AddSubtractComp(ExplicitComponent):
 
         """
         self.options.declare('complex',default=False, desc="Allocate as complex (e.g. for complex-step verification)")
-      
+
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0, units=None,res_units=None, desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0, scaling_factors=None):
         """Add an addition/subtraction relation
@@ -69,7 +73,7 @@ class AddSubtractComp(ExplicitComponent):
             Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
             Default is 1 which results in input/output vectors of size (vec_size,)
         scaling_factors: iterable of numerics (e.g. int, float)
-            Scaling factors to apply to each input. 
+            Scaling factors to apply to each input.
             Use [1,1,...] for addition, [1,-1,...] for subtraction
             Must be same length as input_names
             Default is None which results in a scaling factor of 1 on each input (element-wise addition)
@@ -125,18 +129,11 @@ class AddSubtractComp(ExplicitComponent):
         for (output_name, input_names, vec_size, length, val, scaling_factors, kwargs) in self._add_systems:
             if isinstance(input_names,string_types):
                 input_names = [input_names]
-            try:
-                units=kwargs['units']
-            except:
-                units=None
-            try:
-                desc=kwargs['desc']
-            except:
-                desc=''
-            try:
-                var_set=kwargs['var_set']
-            except:
-                var_set=0
+
+            units=kwargs['units']
+            desc=kwargs['desc']
+            var_set=kwargs['var_set']
+
 
             if scaling_factors is None:
                 scaling_factors = np.ones(len(input_names))
@@ -147,11 +144,13 @@ class AddSubtractComp(ExplicitComponent):
                 shape=(vec_size,)
             else:
                 shape=(vec_size,length)
+
             super(AddSubtractComp, self).add_output(output_name, val, shape=shape, **kwargs)
+
             for i, input_name in enumerate(input_names):
-                super(AddSubtractComp, self).add_input(input_name, shape=shape, units=units, desc=desc+'_inp_'+input_name,var_set=var_set)
+                self.add_input(input_name, shape=shape, units=units, desc=desc+'_inp_'+input_name,var_set=var_set)
                 sf = scaling_factors[i]
-                super(AddSubtractComp, self).declare_partials([output_name],[input_name],val=sf*sp.eye(vec_size*length,format='csc'))
+                self.declare_partials([output_name],[input_name],val=sf*sp.eye(vec_size*length,format='csc'))
 
 
     def compute(self, inputs, outputs):
@@ -168,29 +167,25 @@ class AddSubtractComp(ExplicitComponent):
         for (output_name, input_names, vec_size, length, val, scaling_factors, kwargs) in self._add_systems:
             if isinstance(input_names,string_types):
                 input_names = [input_names]
-            try:
-                units=kwargs['units']
-            except:
-                units=None
-            try:
-                desc=kwargs['desc']
-            except:
-                desc=''
-            try:
-                var_set=kwargs['var_set']
-            except:
-                var_set=0
+
+            units=kwargs['units']
+            desc=kwargs['desc']
+            var_set=kwargs['var_set']
+
             if scaling_factors is None:
                 scaling_factors = np.ones(len(input_names))
             if length == 1:
                 shape=(vec_size,)
             else:
-                shape=(vec_size,length)       
+                shape=(vec_size,length)
+
             if complexify:
                 temp = np.zeros(shape,dtype=np.complex_)
             else:
                 temp=np.zeros(shape)
+
             for i, input_name in enumerate(input_names):
                 sf = scaling_factors[i]
                 temp = temp + inputs[input_name]*sf
+
             outputs[output_name] = temp

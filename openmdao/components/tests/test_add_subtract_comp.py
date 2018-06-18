@@ -5,7 +5,8 @@ import unittest
 import numpy as np
 import pytest
 
-from openmdao.api import Problem, Group, IndepVarComp, AddSubtractComp
+from openmdao.api import Problem, Group, IndepVarComp
+from openmdao.components.add_subtract_comp import AddSubtractComp
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 class TestAddSubtractCompScalars(unittest.TestCase):
@@ -43,7 +44,7 @@ class TestAddSubtractCompScalars(unittest.TestCase):
         assert_rel_error(self, out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd',compact_print=True)
+        partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 class TestAddSubtractCompNx1(unittest.TestCase):
@@ -83,7 +84,7 @@ class TestAddSubtractCompNx1(unittest.TestCase):
         assert_rel_error(self, out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd',compact_print=True)
+        partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
@@ -124,7 +125,7 @@ class TestAddSubtractCompNx3(unittest.TestCase):
         assert_rel_error(self, out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd',compact_print=True)
+        partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 class TestAddSubtractMultipleInputs(unittest.TestCase):
@@ -168,7 +169,7 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
         assert_rel_error(self, out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd',compact_print=True)
+        partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 class TestAddSubtractScalingFactors(unittest.TestCase):
@@ -212,7 +213,7 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         assert_rel_error(self, out, expected,1e-16)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd',compact_print=True)
+        partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 class TestAddSubtractUnits(unittest.TestCase):
@@ -257,7 +258,7 @@ class TestAddSubtractUnits(unittest.TestCase):
         assert_rel_error(self, out, expected,1e-8)
 
     def test_partials(self):
-        partials = self.p.check_partials(method='fd',compact_print=True)
+        partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 class TestWrongScalingFactorCount(unittest.TestCase):
@@ -298,12 +299,12 @@ class TestForDocs(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, AddSubtractComp
         from openmdao.utils.assert_utils import assert_rel_error
 
-        n = 100
+        n = 3
 
         p = Problem(model=Group())
 
         ivc = IndepVarComp()
-        #the vector represents forces at 100 time points (rows) in 2 dimensional plane (cols)
+        #the vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
         ivc.add_output(name='thrust', shape=(n,2),units='kN')
         ivc.add_output(name='drag', shape=(n,2),units='kN')
         ivc.add_output(name='lift', shape=(n,2),units='kN')
@@ -314,7 +315,7 @@ class TestForDocs(unittest.TestCase):
 
         #construct an adder/subtracter here. create a relationship through the add_equation method
         adder = AddSubtractComp()
-        adder.add_equation('total_force',input_names=['thrust','drag','lift','weight'],vec_size=n,length=2,scaling_factors=[1,-1,1,-1],units='kN')
+        adder.add_equation('total_force',input_names=['thrust','drag','lift','weight'],vec_size=n,length=2, scaling_factors=[1,-1,1,-1], units='kN')
         #note the scaling factors. we assume all forces are positive sign upstream
 
         p.model.add_subsystem(name='totalforcecomp', subsys=adder)
@@ -327,26 +328,17 @@ class TestForDocs(unittest.TestCase):
         p.setup()
 
         #set thrust to exceed drag, weight to equal lift for this scenario
-        thrust = np.zeros((n,2))
-        thrust[:,0] = np.ones((n,))*500
-        p['thrust'] = thrust
-        drag = np.zeros((n,2))
-        drag[:,0] = np.ones((n,))*400
-        p['drag'] = drag
-        weight = np.zeros((n,2))
-        weight[:,1] = np.ones((n,))*1000
-        p['weight'] = weight
-        lift = np.zeros((n,2))
-        lift[:,1] = np.ones((n,))*1000
-        p['lift'] = lift
+        p['thrust'][:,0] = [500, 600, 700]
+        p['drag'][:,0] = [400, 400, 400]
+        p['weight'][:,1] = [1000, 1001, 1002]
+        p['lift'][:,1] = [1000, 1000, 1000]
 
         p.run_model()
 
-        print(p.get_val('totalforcecomp.total_force', units='kN'))
+        # print(p.get_val('totalforcecomp.total_force', units='kN'))
 
         # Verify the results
-        expected_i = np.zeros((n,2))
-        expected_i[:,0] = np.ones((n,))*100
+        expected_i = np.array([[100, 200, 300],[0, -1, -2]]).T
         assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 
