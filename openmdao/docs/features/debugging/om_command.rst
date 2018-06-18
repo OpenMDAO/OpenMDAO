@@ -216,5 +216,5 @@ In general, usage of openmdao subcommands under MPI is the same as usual, except
 be preceded by `mpirun -n <num_procs>`.  For example:
 
 .. embed-shell-cmd::
-     :cmd: mpirun -n 2 openmdao summary multipoint_beam_opt.py
-     :dir: ../test_suite/scripts
+    :cmd: mpirun -n 2 openmdao summary multipoint_beam_opt.py
+    :dir: ../test_suite/scripts
