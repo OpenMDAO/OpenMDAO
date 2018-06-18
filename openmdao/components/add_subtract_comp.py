@@ -15,8 +15,8 @@ class AddSubtractComp(ExplicitComponent):
     Use the add_equation method to define any number of add/subtract relations
     User defines the names of the input and output variables using add_equation(output_name='my_output', input_names=['a','b', 'c', ...])
 
-    math::
-        result = a * scaling_factor_a + b * scaling_factor_b + c * scaling_factor_c + ...
+    .. math::
+        result = a * \textrm{scaling factor}_a + b * \textrm{scaling factor}_b + c * \textrm{scaling factor}_c + ...
 
     where all inputs  shape (vec_size, n)
           b is of shape (vec_size, n)

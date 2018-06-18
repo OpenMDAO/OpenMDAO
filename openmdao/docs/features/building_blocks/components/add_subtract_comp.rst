@@ -5,7 +5,7 @@
 AddSubtractComp
 ********************************************
 
-`AddSubtractComp` performs elementwise addition or subtraction between two or more compatible inputs.  It may be vectorized to provide the result at one or more points simultaneously.
+:ref:`AddSubtractComp <openmdao.components.add_subtract_comp.py>` performs elementwise addition or subtraction between two or more compatible inputs.  It may be vectorized to provide the result at one or more points simultaneously.
 
 .. math::
 
