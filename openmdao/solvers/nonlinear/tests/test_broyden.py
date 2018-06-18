@@ -155,6 +155,26 @@ class TestBryoden(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
+    def test_sellar_state_connection_fd_system(self):
+        # Sellar model closes loop with state connection instead of a cycle.
+        # This test is just fd.
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+        prob.model.approx_totals(method='fd')
+
+        prob.setup(check=False)
+
+        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Make sure we aren't iterating like crazy
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 6)
+
     def test_vector(self):
         # Testing Broyden on a 5 state single vector case.
 
