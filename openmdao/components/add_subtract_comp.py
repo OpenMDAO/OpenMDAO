@@ -16,7 +16,7 @@ class AddSubtractComp(ExplicitComponent):
     User defines the names of the input and output variables using add_equation(output_name='my_output', input_names=['a','b', 'c', ...])
 
     .. math::
-        result = a * \textrm{scaling factor}_a + b * \textrm{scaling factor}_b + c * \textrm{scaling factor}_c + ...
+        result = a * \\textrm{scaling factor}_a + b * \\textrm{scaling factor}_b + c * \\textrm{scaling factor}_c + ...
 
     where all inputs  shape (vec_size, n)
           b is of shape (vec_size, n)
