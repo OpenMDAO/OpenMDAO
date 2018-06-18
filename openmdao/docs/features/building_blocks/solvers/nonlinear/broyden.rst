@@ -44,6 +44,10 @@ The `BroydenSolver` can also be used for models where you have derivative define
 some case, a good initial jacobian is all you need, and the cheap Broyden updates on subsequent iterations
 will keep it converging towards the solution.
 
+Keep in mind that, even if you didn't declare derivatives on all your components, it is still possible to use
+finite difference (or possibly complex step) to compute a Jacobian for your model or submodel, as shown in
+the feature doc for :ref:`approximating semi-total derivatives. <feature_declare_totals_approx>`
+
 Here we show an example that uses the :ref:`electrical circuit model <using_balancecomp_tutorial>` from the
 advanced guide. We have replaced the `NewtonSolver` with a `BroydenSolver`, and set the option "compute_jacobian"
 to True so that it computes an initial Jacobian in the first iteration. Depending on the values of some of
@@ -57,3 +61,20 @@ might be recalculated if convergence stalls, though this doesn't happen in the e
 
 BroydenSolver Option Examples
 -----------------------------
+
+There are a few additional options that give you more control over when and how often the Jacobian is recomputed.
+The "diverge_limit" option allows you to define a limit to the ratio of current residual and the previous iteration's
+residual above which the solution is considered to be diverging. If this limit is exceeded, then the Jacobian is
+always recomputed on the next iteration. There is also a "converge_limit" that allows you similarly define a limit
+above which the solution is considered to be non-converging. When this limit is exceeded, the Jacobian is not immediately
+recomputed until the limit has been exceeded a number of consecutive times as defined by the "max_converge_failures"
+option. The default value for "max_converge_failures" is 3, and the default "converge_limit" is 1.0. Exploring
+these options can help you solve more quickly (or in some cases solve at all) some tougher problems.
+
+Here, we take the same circuit example from above and specify a much lower "converge_limit" and "max_converge_failures"
+to force recomputation of the Jacobian much more frequently. This results in a quicker convergence in terms of the
+number of iterations, though keep in mind that solving for the derivatives adds computational cost.
+
+  .. embed-code::
+      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_options
+      :layout: interleave

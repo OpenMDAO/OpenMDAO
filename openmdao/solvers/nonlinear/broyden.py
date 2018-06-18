@@ -293,7 +293,7 @@ class BroydenSolver(NonlinearSolver):
             elif converge_ratio > opt['converge_limit']:
                 self._converge_failures += 1
 
-                if self._converge_failures > opt['max_converge_failures']:
+                if self._converge_failures >= opt['max_converge_failures']:
                     self._recompute_jacobian = True
             else:
                 self._converge_failures = 0

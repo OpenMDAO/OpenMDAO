@@ -327,6 +327,24 @@ class TestBryoden(unittest.TestCase):
 
 class TestBryodenFeature(unittest.TestCase):
 
+    def test_sellar(self):
+        from openmdao.api import Problem, LinearRunOnce, IndepVarComp, BroydenSolver
+        from openmdao.test_suite.components.sellar import SellarStateConnection
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup()
+
+        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+
+        prob.set_solver_print(level=2)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
     def test_circuit(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
@@ -391,23 +409,71 @@ class TestBryodenFeature(unittest.TestCase):
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
-    def test_sellar(self):
-        from openmdao.api import Problem, LinearRunOnce, IndepVarComp, BroydenSolver
-        from openmdao.test_suite.components.sellar import SellarStateConnection
+    def test_circuit_options(self):
+        from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        prob = Problem()
-        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
-                                                   linear_solver=LinearRunOnce())
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
 
-        prob.setup()
+        class Circuit(Group):
 
-        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+            def setup(self):
+                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
+                self.add_subsystem('n2', Node())  # leaving defaults
 
-        prob.set_solver_print(level=2)
-        prob.run_model()
+                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
+                self.add_subsystem('R2', Resistor(R=10000.))
+                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
+                self.connect('R1.I', 'n1.I_out:0')
+                self.connect('R2.I', 'n1.I_out:1')
+
+                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
+                self.connect('R2.I', 'n2.I_in:0')
+                self.connect('D1.I', 'n2.I_out:0')
+
+                self.nonlinear_solver = BroydenSolver()
+                self.nonlinear_solver.options['maxiter'] = 20
+                self.nonlinear_solver.options['compute_jacobian'] = True
+                self.nonlinear_solver.options['converge_limit'] = 0.1
+                self.nonlinear_solver.options['max_converge_failures'] = 1
+
+                ##################################################################
+                # Assemble at the group level. Default assembled jac type is 'csc'
+                ##################################################################
+                self.options['assembled_jac_type'] = 'csc'
+                self.linear_solver = DirectSolver(assemble_jac=True)
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        p.setup()
+
+        # Specify states for Broyden to solve
+        model.circuit.nonlinear_solver.options['state_vars'] = ['n1.V', 'n2.V']
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.set_solver_print(level=2)
+        p.run_model()
+
+        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+
+        # sanity check: should sum to .1 Amps
+        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
 if __name__ == "__main__":
     unittest.main()
