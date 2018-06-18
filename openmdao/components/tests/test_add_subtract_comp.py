@@ -3,7 +3,6 @@ from __future__ import print_function, division, absolute_import
 import unittest
 
 import numpy as np
-import pytest
 
 from openmdao.api import Problem, Group, IndepVarComp
 from openmdao.components.add_subtract_comp import AddSubtractComp

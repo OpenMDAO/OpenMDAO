@@ -38,8 +38,37 @@ class AddSubtractComp(ExplicitComponent):
                  val=1.0, scaling_factors=None, **kwargs):
         """
         Allow user to create an addition/subtracton system with one-liner.
-        """
 
+        Parameters
+        ----------
+        output_name : str
+            (required) name of the result variable in this component's namespace.
+        input_names : iterable of str
+            (required) names of the input variables for this system
+        vec_size : int
+            Length of the first dimension of the input and output vectors
+            (i.e number of rows, or vector length for a 1D vector)
+            Default is 1
+        length : int
+            Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
+            Default is 1 which results in input/output vectors of size (vec_size,)
+        scaling_factors : iterable of numeric
+            Scaling factors to apply to each input.
+            Use [1,1,...] for addition, [1,-1,...] for subtraction
+            Must be same length as input_names
+            Default is None which results in a scaling factor of 1 on
+            each input (element-wise addition)
+        val : float or list or tuple or ndarray
+            The initial value of the variable being added in user-defined units. Default is 1.0.
+        units : str or None
+            Units in which the output variables will be provided to the component during execution.
+            Default is None, which means it has no units.
+        desc : str
+            description of the variable.
+        **kwargs : str
+            Any other arguments to pass to the addition system
+            (same as add_output method for ExplicitComponent)
+        """
         super(AddSubtractComp, self).__init__()
 
         self._add_systems = []
@@ -70,7 +99,6 @@ class AddSubtractComp(ExplicitComponent):
         """
         self.options.declare('complex', default=False,
                              desc="Allocate as complex (e.g. for complex-step verification)")
-
 
     def add_equation(self, output_name, input_names, vec_size=1, length=1, val=1.0,
                      units=None, res_units=None, desc='', lower=None, upper=None, ref=1.0,
@@ -138,7 +166,7 @@ class AddSubtractComp(ExplicitComponent):
 
     def add_output(self):
         """
-        This add_output method is not defined. Use add_equation instead.
+        Use add_equation instead of add_output to define equation systems.
         """
         raise NotImplementedError('Use add_equation method, not add_output method'
                                   'to create an addition/subtraction relation')
@@ -156,7 +184,6 @@ class AddSubtractComp(ExplicitComponent):
             desc = kwargs['desc']
             var_set = kwargs['var_set']
 
-
             if scaling_factors is None:
                 scaling_factors = np.ones(len(input_names))
 
@@ -171,11 +198,10 @@ class AddSubtractComp(ExplicitComponent):
 
             for i, input_name in enumerate(input_names):
                 self.add_input(input_name, shape=shape, units=units,
-                               desc=desc+'_inp_'+input_name, var_set=var_set)
+                               desc=desc + '_inp_' + input_name, var_set=var_set)
                 sf = scaling_factors[i]
                 self.declare_partials([output_name], [input_name],
-                                      val=sf*sp.eye(vec_size*length, format='csc'))
-
+                                      val=sf * sp.eye(vec_size * length, format='csc'))
 
     def compute(self, inputs, outputs):
         """
@@ -208,6 +234,6 @@ class AddSubtractComp(ExplicitComponent):
 
             for i, input_name in enumerate(input_names):
                 sf = scaling_factors[i]
-                temp = temp + inputs[input_name]*sf
+                temp = temp + inputs[input_name] * sf
 
             outputs[output_name] = temp
