@@ -147,67 +147,7 @@ def _get_full_disjoint_cols(J, start, end):
     return sorted(full_disjoint, key=lambda x: len(x)), rows
 
 
-def _get_full_disjoint_rows(J, start, end):
-    """
-    Find sets of disjoint rows between start and end in J and their corresponding columns.
-
-    Parameters
-    ----------
-    J : ndarray
-        The total jacobian.
-    start : int
-        The starting row.
-    end : int
-        The ending row.
-
-    Returns
-    -------
-    (list, dict)
-        List of lists of disjoint rows and lists of nonzero columns by row.
-    """
-    # skip desvars of size 1 since simul derivs will give no improvement
-    if (end - start) == 0:
-        return {}, {}
-
-    disjoints = defaultdict(set)
-    cols = [None] * J.shape[0]  # will contain list of nonzero cols for each row
-    for r1, r2 in combinations(range(start, end + 1), 2):  # loop over row pairs
-        # 'and' two rows together. If we get all False, then rows have disjoint column sets
-        if not np.any(J[r1, :] & J[r2, :]):
-            disjoints[r1].add(r2)
-            disjoints[r2].add(r1)
-            # ndarrays are converted to lists to be json serializable
-            if cols[r1] is None:
-                cols[r1] = [int(i) for i in np.nonzero(J[r1, :])[0]]
-            if cols[r2] is None:
-                cols[r2] = [int(i) for i in np.nonzero(J[r2, :])[0]]
-
-    full_disjoint = []
-    seen = set()
-    allcols = {}
-
-    # sort largest to smallest disjoint row sets
-    for row, rowset in sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True):
-        if row in seen:
-            continue
-        seen.add(row)
-        allcols[row] = J[row, :].copy()
-        full = [row]
-        for other_row in rowset:
-            if other_row not in seen and not np.any(allcols[row] & J[other_row, :]):
-                seen.add(other_row)
-                full.append(other_row)
-                allcols[row] |= J[other_row, :]
-
-        if len(full) > 1:
-            full_disjoint.append(sorted(full))
-        else:
-            cols[row] = None
-
-    return sorted(full_disjoint, key=lambda x: len(x)), cols
-
-
-def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model=False):
+def _get_bool_jac(prob, repeats=3, tol=1e-15, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
@@ -222,8 +162,6 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model
     ----------
     prob : Problem
         The Problem being analyzed.
-    mode : str
-        Derivative direction.
     repeats : int
         Number of times to repeat total jacobian computation.
     tol : float
@@ -243,6 +181,7 @@ def _get_bool_jac(prob, mode='fwd', repeats=3, tol=1e-15, setup=False, run_model
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
+    mode = prob._mode
 
     # TODO: should always automatically choose mode based on smallest number of rows or cols
     #       in the total jacobian (minus linear constraints)
@@ -515,7 +454,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     """
     driver = problem.driver
 
-    J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
+    J = _get_bool_jac(problem, repeats=repeats, tol=tol, setup=setup,
                       run_model=run_model)
 
     of = driver._get_ordered_nl_responses()
@@ -553,10 +492,6 @@ def _simul_fwd(J):
     full_disjoint, rows = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
     uncolored_cols = [i for i, r in enumerate(rows) if r is None]
 
-    print("%d uncolored columns" % len(uncolored_cols))
-    for color, cols in enumerate(full_disjoint):
-        print("%d columns in color %d" % (len(cols), color + 1))
-
     # the first col_list entry corresponds to all uncolored columns (columns that are not
     # disjoint wrt any other columns).  The other entries are groups of columns that do not
     # share any nonzero row entries in common.
@@ -564,36 +499,6 @@ def _simul_fwd(J):
     col_lists.extend(full_disjoint)
 
     return col_lists, rows
-
-
-def _simul_rev(J):
-    """
-    Find simultaneous deriv data for rev mode for the given jacobian.
-
-    Parameters
-    ----------
-    J : ndarray
-        Boolean total jacobian.
-
-    Returns
-    -------
-    tuple
-        (row_lists, cols_for_each_row)
-    """
-    full_disjoint, cols = _get_full_disjoint_rows(J, 0, J.shape[0] - 1)
-    uncolored_rows = [i for i, r in enumerate(cols) if r is None]
-
-    print("%d uncolored rows" % len(uncolored_rows))
-    for color, rows in enumerate(full_disjoint):
-        print("%d rows in color %d" % (len(rows), color + 1))
-
-    # the first row_list entry corresponds to all uncolored rows (rows that are not disjoint
-    # wrt any other rows).  The other entries are groups of rows that do not share any
-    # nonzero column entries in common.
-    row_lists = [uncolored_rows]
-    row_lists.extend(full_disjoint)
-
-    return row_lists, cols
 
 
 def _total_solves(color_info):
@@ -676,9 +581,9 @@ def _solves_info(color_info, dominant_mode):
     return tot_size, tot_colors
 
 
-def _compute_one_directional_coloring(J, mode):
+def _compute_one_directional_coloring(J, mode, bidirectional):
     """
-    Compute the best bidirectional coloring in a specified dominant direction.
+    Compute the best coloring in a specified dominant direction.
 
     The f_coloring function determines the direction of the dominant coloring.
 
@@ -688,6 +593,8 @@ def _compute_one_directional_coloring(J, mode):
         The boolean total jacobian.
     mode : str
         The dominant direction for solving for total derivatives.
+    bidirectional : bool
+        If True, compute a bidirectional coloring.
 
     Returns
     -------
@@ -733,20 +640,23 @@ def _compute_one_directional_coloring(J, mode):
     # are done first, doing the dense ones last so that they'll overwrite any incorrect values
     # in the jacobian resulting from our earlier colored solves.
 
-    # get density of rows
-    density = np.count_nonzero(J, axis=1) / J.shape[0]
-    most_dense = np.argsort(density)[::-1]  # ordered most dense to least
-
     rev_rows = []
     coloring = {'J': J, 'rev': [[rev_rows], []]}
     best_colors = 99999999
     best_coloring = None
 
-    # if we have any dense rows, immediately zero them out since we can't get a coloring with them.
-    full_dense = density[density == 1.0]
-    if full_dense.size > 0:
-        skip_count = full_dense.size
-    else:  # coloring is possible.  Do coloring for unaltered J to get initial best
+    if bidirectional:
+        # get density of rows
+        density = np.count_nonzero(J, axis=1) / J.shape[0]
+        most_dense = np.argsort(density)[::-1]  # ordered most dense to least
+
+        # if we have any dense rows, zero them out since we can't get a coloring with them.
+        full_dense = density[density == 1.0]
+        if full_dense.size > 0:
+            skip_count = full_dense.size
+        else:  # coloring is possible.  Do coloring for unaltered J to get initial best
+            skip_count = 0
+    else:
         skip_count = 0
 
     while skip_count < J.shape[0] / 2:
@@ -768,6 +678,9 @@ def _compute_one_directional_coloring(J, mode):
 
         best_coloring = {'fwd': coloring['fwd'], 'rev': [[rev_rows.copy()], []], 'J': orig_J}
 
+        if not bidirectional:
+            break
+
         skip_count += 1  # add another row to skip
 
     if best_coloring is None:
@@ -787,18 +700,16 @@ def _compute_one_directional_coloring(J, mode):
     return best_coloring
 
 
-def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
+def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   stream=sys.stdout):
+                   bidirectional=True, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
     Parameters
     ----------
-    problem : Problem
+    problem : Problem or None
         The Problem being analyzed.
-    mode : str
-        Derivative direction.
     repeats : int
         Number of times to repeat total jacobian computation.
     tol : float
@@ -814,6 +725,8 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         If True, run run_model before calling compute_totals.
     bool_jac : ndarray
         If problem is not supplied, a previously computed boolean jacobian can be used.
+    bidirectional : bool
+        If True, compute a bidirectional coloring.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -829,21 +742,20 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
         dict['J'] = ndarray, the computed boolean jacobian.
     """
-    if bool_jac is None:
-        J = _get_bool_jac(problem, mode=mode, repeats=repeats, tol=tol, setup=setup,
+    if problem is not None:
+        J = _get_bool_jac(problem, repeats=repeats, tol=tol, setup=setup,
                           run_model=run_model)
-    else:
+    elif bool_jac is not None:
         J = bool_jac
+    else:
+        raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
     if problem is not None:
-        mode = problem._mode
-
-    if mode in ('fwd', 'rev'):
-        coloring = _compute_one_directional_coloring(J, mode)
+        coloring = _compute_one_directional_coloring(J, problem._mode, bidirectional)
     else:
-        best_fwd_coloring = _compute_one_directional_coloring(J, 'fwd')
+        best_fwd_coloring = _compute_one_directional_coloring(J, 'fwd', bidirectional)
         _, best_fwd_colors = _solves_info(best_fwd_coloring, 'fwd')
-        best_rev_coloring = _compute_one_directional_coloring(J, 'rev')
+        best_rev_coloring = _compute_one_directional_coloring(J, 'rev', bidirectional)
         _, best_rev_colors = _solves_info(best_rev_coloring, 'rev')
 
         if best_fwd_colors <= best_rev_colors:
@@ -860,8 +772,10 @@ def get_simul_meta(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
         else:
             rev_opp = 0
 
-        print("Best fwd:", best_fwd_colors, "opposites:", fwd_opp)
-        print("Best rev:", best_rev_colors, "opposites:", rev_opp)
+        print("Best fwd:", best_fwd_colors, "fwd solves:", best_fwd_colors - fwd_opp,
+              "opposite solves:", fwd_opp)
+        print("Best rev:", best_rev_colors, "rev solves:", best_rev_colors - rev_opp,
+              "opposite solves:", rev_opp)
 
     sparsity = None
     if problem is not None:
@@ -958,7 +872,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False):
 
     # save the coloring.json file for later inspection
     with open("coloring.json", "w") as f:
-        coloring = get_simul_meta(problem, mode=problem._mode,
+        coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=True,
                                   setup=False, run_model=False, stream=f)
