@@ -370,12 +370,12 @@ def _write_coloring(modes, color_info, stream):
     """
     tty = stream.isatty()
     none = 'None' if tty else 'null'
+    sparsity = color_info.get('sparsity')
 
     stream.write("{\n")
     for m, mode in enumerate(modes):
         name = 'column' if mode == 'fwd' else 'row'
         lists, nonzero_entries = color_info[mode]
-        sparsity = color_info.get('sparsity')
 
         if m > 0:
             stream.write(",\n")
@@ -496,7 +496,6 @@ def _total_solves(color_info):
     int
         Total number of linear solves required to compute the total Jacobian.
     """
-    row_lists = col_lists = []
     total_solves = 0
 
     # lists[0] are the non-colored columns or rows, which are solved individually so
@@ -555,7 +554,28 @@ def _solves_info(color_info, dominant_mode):
     return tot_size, tot_colors
 
 
-def _compute_one_directional_coloring(J, mode, bidirectional):
+def _get_tmp_coloring(J, opp_idxs, num_opp_solves):
+    J = J.copy()
+    coloring = {'J': J, 'rev': [[op_idxs[:num_opp_solves]], []]}
+    # zero out skipped rows
+    J[op_idxs[:num_opp_solves], :] = False
+
+    full_disjoint, rowcol_map = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
+    uncolored_cols = [i for i, r in enumerate(rowcol_map) if r is None]
+
+    # the first col_list entry corresponds to all uncolored columns (columns that are not
+    # disjoint wrt any other columns).  The other entries are groups of columns that do not
+    # share any nonzero row entries in common.
+    lists = [uncolored_cols]
+    lists.extend(full_disjoint)
+
+    coloring['fwd'] = [lists, rowcol_map]
+    tot_colors = _total_solves(coloring)
+
+    return coloring, tot_colors
+
+
+def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
     """
     Compute the best coloring in a specified dominant direction.
 
@@ -569,6 +589,9 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
         The dominant direction for solving for total derivatives.
     bidirectional : bool
         If True, compute a bidirectional coloring.
+    maxiter : int or None
+        Maximum number of iterations allowed when computing bidirectional coloring.  If None,
+        iterate exhaustively.
 
     Returns
     -------
@@ -615,26 +638,41 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
     # in the jacobian resulting from our earlier colored solves.
 
     coloring = {'J': J, 'rev': [[[]], []]}
-    best_colors = 99999999
+    best_colors = J.shape[1]
     best_coloring = None
+    tot_size = J.shape[1]
 
     if bidirectional:
         # get density of rows
-        density = np.count_nonzero(J, axis=1) / J.shape[0]
+        density = np.count_nonzero(J, axis=1) / J.shape[1]
         most_dense = np.argsort(density)[::-1]  # ordered most dense to least
 
         # if we have any dense rows, zero them out since we can't get a coloring with them.
         full_dense = density[density == 1.0]
         if full_dense.size > 0:
-            skip_count = full_dense.size
+            num_opp_solves = full_dense.size
         else:  # coloring is possible.  Do coloring for unaltered J to get initial best
-            skip_count = 0
+            num_opp_solves = 0
     else:
-        skip_count = 0
+        num_opp_solves = 0
 
-    while skip_count < J.shape[0] / 2:
-        if skip_count > 0:
-            J[most_dense[skip_count - 1], :] = False  # zero out another skipped row
+    # in pratice we'll always bail before getting to maxiter
+    maxiter = tot_size if tot_size <= J.shape[0] else J.shape[0]
+
+    while num_opp_solves < maxiter:
+        if num_opp_solves + 1 >= best_colors:
+            break
+        if num_opp_solves > 0:
+            J[most_dense[:num_opp_solves], :] = False  # zero out another skipped row
+            # If each of our rows is a node in a graph, we have to have at least as
+            # many colors as the degree of that node, so overall we can't do better
+            # than the max degree of all of our row nodes.  If that plus the number
+            # of opposite direction solves is no better than our best coloring, then
+            # don't bother running the algorthm on this version of J.
+            if np.max(np.count_nonzero(J, axis=1)) + num_opp_solves >= best_colors:
+                num_opp_solves += 1
+                continue
+            coloring['rev'] = [[most_dense[:num_opp_solves]], []]
 
         full_disjoint, rowcol_map = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
         uncolored_cols = [i for i, r in enumerate(rowcol_map) if r is None]
@@ -649,23 +687,19 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
 
         tot_size, tot_colors = _solves_info(coloring, mode)
 
-        # if we got worse, bail out
-        if best_colors < tot_size and tot_colors >= best_colors:
-            break
-
         if tot_colors < best_colors:
             best_colors = tot_colors
 
         best_coloring = {
             'fwd': coloring['fwd'],
-            'rev': [[most_dense[:skip_count]], []],
+            'rev': [[most_dense[:num_opp_solves]], []],
             'J': orig_J
         }
 
         if not bidirectional:
             break
 
-        skip_count += 1  # add another row to skip
+        num_opp_solves += 1  # add another row to solve in the opposite direction
 
     if best_coloring is None:
         best_coloring = {}
@@ -686,7 +720,7 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
 
 def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   bidirectional=True, stream=sys.stdout):
+                   bidirectional=True, maxiter=None, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -711,6 +745,9 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
         If problem is not supplied, a previously computed boolean jacobian can be used.
     bidirectional : bool
         If True, compute a bidirectional coloring.
+    maxiter : int or None
+        Maximum number of iterations allowed when computing bidirectional coloring.  If None,
+        iterate exhaustively.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -735,12 +772,12 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
         raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
     if problem is not None:
-        coloring = _compute_one_directional_coloring(J, problem._mode, bidirectional)
+        coloring = _compute_one_directional_coloring(J, problem._mode, bidirectional, maxiter)
     else:
-        best_fwd_coloring = _compute_one_directional_coloring(J, 'fwd', bidirectional)
-        _, best_fwd_colors = _solves_info(best_fwd_coloring, 'fwd')
-        best_rev_coloring = _compute_one_directional_coloring(J, 'rev', bidirectional)
-        _, best_rev_colors = _solves_info(best_rev_coloring, 'rev')
+        best_fwd_coloring = _compute_one_directional_coloring(J, 'fwd', bidirectional, maxiter)
+        best_fwd_colors = _total_solves(best_fwd_coloring)
+        best_rev_coloring = _compute_one_directional_coloring(J, 'rev', bidirectional, maxiter)
+        best_rev_colors = _total_solves(best_rev_coloring)
 
         if best_fwd_colors <= best_rev_colors:
             coloring = best_fwd_coloring
@@ -761,6 +798,8 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
         print("Best rev:", best_rev_colors, "rev solves:", best_rev_colors - rev_opp,
               "opposite solves:", rev_opp)
 
+    modes = [m for m in ('fwd', 'rev') if m in coloring]
+
     sparsity = None
     if problem is not None:
         driver = problem.driver
@@ -777,8 +816,6 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
             coloring['sparsity'] = sparsity
 
         driver._total_jac = None
-
-    modes = [m for m in ('fwd', 'rev') if m in coloring]
 
     if stream is not None:
         if stream.isatty():
