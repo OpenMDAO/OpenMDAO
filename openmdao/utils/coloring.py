@@ -614,8 +614,7 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
     # are done first, doing the dense ones last so that they'll overwrite any incorrect values
     # in the jacobian resulting from our earlier colored solves.
 
-    rev_rows = []
-    coloring = {'J': J, 'rev': [[rev_rows], []]}
+    coloring = {'J': J, 'rev': [[[]], []]}
     best_colors = 99999999
     best_coloring = None
 
@@ -636,7 +635,6 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
     while skip_count < J.shape[0] / 2:
         if skip_count > 0:
             J[most_dense[skip_count - 1], :] = False  # zero out another skipped row
-            rev_rows.append(most_dense[skip_count - 1])
 
         full_disjoint, rowcol_map = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
         uncolored_cols = [i for i, r in enumerate(rowcol_map) if r is None]
@@ -658,7 +656,11 @@ def _compute_one_directional_coloring(J, mode, bidirectional):
         if tot_colors < best_colors:
             best_colors = tot_colors
 
-        best_coloring = {'fwd': coloring['fwd'], 'rev': [[rev_rows.copy()], []], 'J': orig_J}
+        best_coloring = {
+            'fwd': coloring['fwd'],
+            'rev': [[most_dense[:skip_count]], []],
+            'J': orig_J
+        }
 
         if not bidirectional:
             break
