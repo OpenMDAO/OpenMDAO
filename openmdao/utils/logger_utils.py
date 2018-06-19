@@ -179,25 +179,25 @@ class TestLogger(object):
         """
         return self._msgs[typ]
 
-    def contains_regex(self, typ, pattern):
+    def contains_line(self, typ, line):
         """
-        Do any of the lines of stored messages of a specific type match the regex.
+        Do any of the lines of stored messages of a specific type equal the given line.
 
         Parameters
         ----------
         typ : str
             Type of messages ('error', 'warning', 'info') to be returned.
 
-        pattern : str
-            Regular expression used to look for matches.
+        line : str
+            Line used to look for matches.
 
         Returns
         -------
         bool
-            True if any of the lines of stored messages of a specific type match the regex.
+            True if any of the lines of stored messages of a specific type equal the line.
         """
-        for line in self._msgs[typ]:
-            if re.search(pattern, line):
+        for s in self._msgs[typ]:
+            if s == line:
                 return True
 
         return False
