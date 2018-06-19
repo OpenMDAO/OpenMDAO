@@ -1,6 +1,5 @@
 """Miscellaneous utilities related to logging."""
 
-import re
 import sys
 import logging
 

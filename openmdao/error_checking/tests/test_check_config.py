@@ -39,7 +39,9 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        self.assertTrue(testlogger.contains_line('warning',"The following inputs are not connected:\n   G3.G4.C4.v\n   G3.G4.C4.x\n   G3.G4.u: ['G3.G4.C3.u']\n   G3.G4.x: ['G3.G4.C3.x']\n   w: ['G1.G2.C1.w']\n"))
+        self.assertTrue(testlogger.contains_line('warning',
+                "The following inputs are not connected:\n   G3.G4.C4.v\n   G3.G4.C4.x\n"
+                "   G3.G4.u: ['G3.G4.C3.u']\n   G3.G4.x: ['G3.G4.C3.x']\n   w: ['G1.G2.C1.w']\n"))
 
     def test_dataflow_1_level(self):
 
@@ -73,10 +75,13 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        self.assertTrue(testlogger.contains_line('info',"The following groups contain cycles:\n   Group '' has the following cycles: [['C1', 'C2', 'C4']]\n"))
+        self.assertTrue(testlogger.contains_line('info',
+                "The following groups contain cycles:\n   Group '' has "
+                "the following cycles: [['C1', 'C2', 'C4']]\n"))
         self.assertTrue(
             testlogger.contains_line('warning',
-                                      "The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"))
+                "The following systems are executed out-of-order:\n   "
+                "System 'C3' executes out-of-order with respect to its source systems ['C4']\n"))
 
     def test_dataflow_multi_level(self):
 
@@ -114,8 +119,13 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        self.assertTrue(testlogger.contains_line('info',"The following groups contain cycles:\n   Group '' has the following cycles: [['G1', 'C4']]\n"))
-        self.assertTrue(testlogger.contains_line('warning',"The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n"))
+        self.assertTrue(testlogger.contains_line('info',
+            "The following groups contain cycles:\n   Group '' has the "
+            "following cycles: [['G1', 'C4']]\n"))
+        self.assertTrue(testlogger.contains_line('warning',
+            "The following systems are executed out-of-order:\n   System 'C3' executes "
+            "out-of-order with respect to its source systems ['C4']\n   System 'G1.C1' executes "
+            "out-of-order with respect to its source systems ['G1.C2']\n"))
 
         # test comps_only cycle check
         graph = root.compute_sys_graph(comps_only=True)
@@ -141,8 +151,13 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        self.assertTrue(testlogger.contains_line('warning',"The following systems are executed out-of-order:\n   System 'C1' executes out-of-order with respect to its source systems ['C2']\n"))
-        self.assertTrue(testlogger.contains_line('warning',"The following components have multiple inputs connected to the same source, which can introduce unnecessary data transfer overhead:\n   C1 has inputs ['a', 'b'] connected to C2.y\n"))
+        self.assertTrue(testlogger.contains_line('warning',
+            "The following systems are executed out-of-order:\n   System 'C1' executes "
+            "out-of-order with respect to its source systems ['C2']\n"))
+        self.assertTrue(testlogger.contains_line('warning',
+            "The following components have multiple inputs connected to the same source, "
+            "which can introduce unnecessary data transfer overhead:\n   C1 has "
+            "inputs ['a', 'b'] connected to C2.y\n"))
 
     def test_multi_cycles(self):
         p = Problem(model=Group())
@@ -191,9 +206,16 @@ class TestCheckConfig(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        self.assertTrue(testlogger.contains_line('warning',"The following systems are executed out-of-order:\n   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"))
-        self.assertTrue(testlogger.contains_line('warning',"The following inputs are not connected:\n   G1.C1.b\n   G1.C11.b\n   G1.C13.b\n   G1.C22.b\n   G1.C23.b\n   G1.N1.a\n   G1.N1.b\n   G1.N2.a\n   G1.N3.a\n"))
-        self.assertTrue(testlogger.contains_line('info',"The following groups contain cycles:\n   Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n"))
+        self.assertTrue(testlogger.contains_line('warning',
+            "The following systems are executed out-of-order:\n   System 'G1.C2' executes "
+            "out-of-order with respect to its source systems ['G1.N3']\n   System 'G1.C3' executes "
+            "out-of-order with respect to its source systems ['G1.C11']\n"))
+        self.assertTrue(testlogger.contains_line('warning',
+            "The following inputs are not connected:\n   G1.C1.b\n   G1.C11.b\n   G1.C13.b\n   "
+            "G1.C22.b\n   G1.C23.b\n   G1.N1.a\n   G1.N1.b\n   G1.N2.a\n   G1.N3.a\n"))
+        self.assertTrue(testlogger.contains_line('info',
+            "The following groups contain cycles:\n   Group 'G1' has the following cycles: "
+            "[['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n"))
 
 class TestRecorderCheckConfig(unittest.TestCase):
 
@@ -220,7 +242,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
         p.setup(check=True, logger=testlogger)
         p.final_setup()
         self.assertTrue(testlogger.contains_line('warning',
-                                                  "The Problem has no recorder of any kind attached"))
+                                "The Problem has no recorder of any kind attached"))
 
     def test_recorder_check_driver_recorder_set(self):
         p = Problem(model=Group())
