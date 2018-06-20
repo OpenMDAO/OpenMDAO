@@ -87,53 +87,38 @@ class _SubjacRandomizer(object):
         self._orig_set_abs(key, subjac)
 
 
-def _get_full_disjoint_cols(J, start, end):
+def _get_full_disjoint_cols(J):
     """
-    Find sets of disjoint columns between start and end in J and their corresponding rows.
+    Find sets of disjoint columns in J and their corresponding rows.
 
     Parameters
     ----------
     J : ndarray
         The total jacobian.
-    start : int
-        The starting column.
-    end : int
-        The ending column.
 
     Returns
     -------
-    (list, dict)
-        List of lists of disjoint columns and lists of nonzero rows by column.
+    list
+        List of lists of disjoint columns
     """
-    # skip desvars of size 1 since simul derivs will give no improvement
-    if (end - start) == 0:
-        return {}, {}
-
-    # disjoints = defaultdict(set)
-    rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
-
     colors = []
+    _allrows = []
 
     # loop over all columns
     for col in range(J.shape[1]):
         # loop over each color group and stop when we find one that is disjoint with the current
         # column, or start a new color if we can't find a home.
-        for col_list, allrows in colors:
+        for i, col_list in enumerate(colors):
+            allrows = _allrows[i]
             if not np.any(allrows & J[:, col]):
                 col_list.append(col)
                 allrows |= J[:, col]
                 break
         else:
-            colors.append(([col], J[:, col].copy()))
+            colors.append([col])
+            _allrows.append(J[:, col].copy())
 
-    full_disjoint = [clist for clist, _ in colors if len(clist) > 1]
-
-    for clist in full_disjoint:
-        for col in clist:
-            # # ndarrays are converted to lists to be json serializable
-            rows[col] = list(np.nonzero(J[:, col])[0]) #[int(i) for i in np.nonzero(J[:, col])[0]]
-
-    return sorted(full_disjoint, key=lambda x: len(x)), rows
+    return colors
 
 
 def _get_bool_jac(prob, repeats=3, tol=1e-15, setup=False, run_model=False):
@@ -500,7 +485,7 @@ def _total_solves(color_info):
     return total_solves
 
 
-def _solves_info(color_info, dominant_mode):
+def _solves_info(color_info):
     """
     Return info about the number of colors given the current coloring scheme.
 
@@ -515,9 +500,6 @@ def _solves_info(color_info, dominant_mode):
             col_maps is a list of nonzero cols for each row, or None for uncolored rows.
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
         dict['J'] = ndarray, the computed boolean jacobian.
-    dominant_mode : str
-        Derivative direction where coloring is performed.  Part of the solution
-        (dense row/col solves only), may be done in the opposite direction.
 
     Returns
     -------
@@ -525,42 +507,28 @@ def _solves_info(color_info, dominant_mode):
         Total size (minimum chosed based on which mode is better).
     float
         Total solves.
-    str
-        Mode chosed based on lowest number of solves (without coloring).
     """
     rev_size, fwd_size = color_info['J'].shape
     tot_colors = _total_solves(color_info)
 
+    fwd_lists = color_info['fwd'][0] if 'fwd' in color_info else []
+    rev_lists = color_info['rev'][0] if 'rev' in color_info else []
+
+    dominant_mode = 'fwd' if len(fwd_lists) > len(rev_lists) else 'rev'
+
     if dominant_mode == 'fwd':
         tot_size = fwd_size
+        colored_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
+        opp_solves = len(rev_lists[0])
     else:
         tot_size = rev_size
+        colored_solves = len(rev_lists[0]) + len(rev_lists) - 1
+        opp_solves = len(fwd_lists[0])
 
     if tot_colors == 0:  # no coloring found
         tot_colors = tot_size
 
-    return tot_size, tot_colors
-
-
-def _get_tmp_coloring(J, opp_idxs, num_opp_solves):
-    J = J.copy()
-    coloring = {'J': J, 'rev': [[op_idxs[:num_opp_solves]], []]}
-    # zero out skipped rows
-    J[op_idxs[:num_opp_solves], :] = False
-
-    full_disjoint, rowcol_map = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
-    uncolored_cols = [i for i, r in enumerate(rowcol_map) if r is None]
-
-    # the first col_list entry corresponds to all uncolored columns (columns that are not
-    # disjoint wrt any other columns).  The other entries are groups of columns that do not
-    # share any nonzero row entries in common.
-    lists = [uncolored_cols]
-    lists.extend(full_disjoint)
-
-    coloring['fwd'] = [lists, rowcol_map]
-    tot_colors = _total_solves(coloring)
-
-    return coloring, tot_colors
+    return tot_size, tot_colors, colored_solves, opp_solves, dominant_mode
 
 
 def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
@@ -633,9 +601,10 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
     if bidirectional:
         # get density of rows
         density = np.count_nonzero(J, axis=1) / J.shape[1]
+        # TODO: there are some cases that don't work well with this heuristic. Find a better one...
         most_dense = np.argsort(density)[::-1]  # ordered most dense to least
 
-        # if we have any dense rows, zero them out since we can't get a coloring with them.
+        # if we have any dense rows, zero them all out since we can't get a coloring with them.
         full_dense = density[density == 1.0]
         if full_dense.size > 0:
             num_opp_solves = full_dense.size
@@ -648,10 +617,13 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
     maxiter = tot_size if tot_size <= J.shape[0] else J.shape[0]
 
     while num_opp_solves < maxiter:
+        # bail if trying any additional opp_solves can't do better than our curent best
         if num_opp_solves + 1 >= best_colors:
             break
+
         if num_opp_solves > 0:
             J[most_dense[:num_opp_solves], :] = False  # zero out another skipped row
+
             # If each of our rows is a node in a graph, we have to have at least as
             # many colors as the degree of that node, so overall we can't do better
             # than the max degree of all of our row nodes.  If that plus the number
@@ -660,29 +632,33 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
             if np.max(np.count_nonzero(J, axis=1)) + num_opp_solves >= best_colors:
                 num_opp_solves += 1
                 continue
-            coloring['rev'] = [[most_dense[:num_opp_solves]], []]
 
-        full_disjoint, rowcol_map = _get_full_disjoint_cols(J, 0, J.shape[1] - 1)
-        uncolored_cols = [i for i, r in enumerate(rowcol_map) if r is None]
-
-        # the first col_list entry corresponds to all uncolored columns (columns that are not
-        # disjoint wrt any other columns).  The other entries are groups of columns that do not
-        # share any nonzero row entries in common.
-        lists = [uncolored_cols]
-        lists.extend(full_disjoint)
-
-        coloring['fwd'] = [lists, rowcol_map]
-
-        tot_size, tot_colors = _solves_info(coloring, mode)
+        full_disjoint = _get_full_disjoint_cols(J)
+        tot_colors = len(full_disjoint) + num_opp_solves
 
         if tot_colors < best_colors:
             best_colors = tot_colors
 
-        best_coloring = {
-            'fwd': coloring['fwd'],
-            'rev': [[list(most_dense[:num_opp_solves])], []],
-            'J': orig_J
-        }
+            uncolored_cols = [clist[0] for clist in full_disjoint if len(clist) == 1]
+            full_disjoint = [clist for clist in full_disjoint if len(clist) > 1]
+
+            # the first lists entry corresponds to all uncolored columns (columns that are not
+            # disjoint wrt any other columns).  The other entries are groups of columns that do not
+            # share any nonzero row entries in common.
+            lists = [uncolored_cols]
+            lists.extend(full_disjoint)
+
+            rowcol_map = [None] * J.shape[1]  # will contain list of nonzero rows for each column
+            for clist in lists[1:]:
+                for col in clist:
+                    # # ndarrays are converted to lists to be json serializable
+                    rowcol_map[col] = list(np.nonzero(J[:, col])[0])
+
+            best_coloring = {
+                'fwd': [lists, rowcol_map],
+                'rev': [[list(most_dense[:num_opp_solves])], []],
+                'J': orig_J
+            }
 
         if not bidirectional:
             break
@@ -821,7 +797,7 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
     return coloring
 
 
-def simul_coloring_summary(color_info, mode, stream=sys.stdout):
+def simul_coloring_summary(color_info, stream=sys.stdout):
     """
     Print a summary of simultaneous coloring info for the given problem and coloring metadata.
 
@@ -829,19 +805,20 @@ def simul_coloring_summary(color_info, mode, stream=sys.stdout):
     ----------
     color_info : dict
         Coloring metadata.
-    mode : str
-        Dominant derivative solution direction.
     stream : file-like
         Where the output will go.
     """
-    tot_size, tot_colors = _solves_info(color_info, mode)
+    tot_size, tot_colors, colored_solves, opp_solves, mode = _solves_info(color_info)
 
     if tot_size <= tot_colors:
         stream.write("Simultaneous derivatives can't improve on the total number of solves "
                      "required (%d) for %s mode in this configuration\n" % (tot_size, mode))
     else:
-        stream.write("\nTotal colors vs. total size (%s mode): %d vs %d  (%.1f%% improvement)\n" %
-                     (mode, tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
+        stream.write("\nDominant mode: %s" % mode)
+        stream.write("\nColored solves in %s mode: %d   opposite full solves: %d" %
+                     (mode, colored_solves, opp_solves))
+        stream.write("\n\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
+                     (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
 
 
 def dynamic_sparsity(driver):
@@ -906,8 +883,6 @@ def _simul_coloring_setup_parser(parser):
                         help='number of times to repeat total derivative computation')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero')
-    parser.add_argument('-m', '--mode', action='store', dest='mode', default='fwd', type=str,
-                        help='Direction of computation for derivatives.')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the coloring.")
@@ -947,7 +922,7 @@ def _simul_coloring_cmd(options):
                                     setup=True, run_model=True,
                                     stream=outfile)
         if sys.stdout.isatty():
-            simul_coloring_summary(color_info, options.mode, stream=sys.stdout)
+            simul_coloring_summary(color_info, stream=sys.stdout)
 
         exit()
     return _simul_coloring
