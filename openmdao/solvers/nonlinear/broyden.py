@@ -349,7 +349,7 @@ class BroydenSolver(NonlinearSolver):
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
-            Gm = self._compute_jacobian()
+            Gm = self._compute_inverse_jacobian()
             print(Gm)
             self._computed_jacobians += 1
 
@@ -431,18 +431,18 @@ class BroydenSolver(NonlinearSolver):
             i, j = self._idx[name]
             linear[name] = dx[i:j]
 
-    def _compute_jacobian(self):
+    def _compute_inverse_jacobian(self):
         """
-        Compute Jacobian for system using OpenMDAO.
+        Compute inverse Jacobian for system by doing a linear solve for each state.
 
         Returns
         -------
         ndarray
-            New Jacobian.
+            New inverse Jacobian.
         """
         # TODO : Consider promoting this capability out into OpenMDAO so other solvers can use the
         # same code.
-        # TODO : Build this Jacobian in parallel if procs are available.
+        # TODO : Can do each state in parallel if procs are available.
         system = self._system
         states = self.options['state_vars']
         d_res = system._vectors['residual']['linear']

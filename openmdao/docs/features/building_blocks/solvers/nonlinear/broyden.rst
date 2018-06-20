@@ -4,7 +4,7 @@
 BroydenSolver
 *************
 
-BroydenSolver is a quasi-Newton solver that implements Broyden's first method (aka Broyden's good method) to solve
+BroydenSolver is a quasi-Newton solver that implements Broyden's second method (aka Broyden's good method) to solve
 for states that drive the residuals to zero. Unlike Newton, BroydenSovler works on a subset of your model consisting
 of just the implicit states that you specify. By default, Like Newton, Broyden's method steps in a direction defined by
 the local jacobian of derivatives, but the key is that it doesn't need to be provided with that jacobian. You can optionally
