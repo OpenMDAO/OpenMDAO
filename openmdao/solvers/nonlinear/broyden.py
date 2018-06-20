@@ -40,7 +40,9 @@ class BroydenSolver(NonlinearSolver):
     Gm : ndarray
         Most recent Jacobian matrix.
     linear_solver : LinearSolver
-        Linear solver to use for calculating jacobian.
+        Linear solver to use for calculating inverse Jacobian.
+    linesearch : NonlinearSolver
+        Line search algorithm. Default is None for no line search.
     n : int
         Total length of the states being solved.
     xm : ndarray
@@ -52,7 +54,7 @@ class BroydenSolver(NonlinearSolver):
     _converge_failures : int
         Number of consecutive iterations that failed to converge to the tol definied in options.
     _recompute_jacobian : bool
-        Flag that becomes True when Broyden detects it needs to recompute the Jacobian.
+        Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
 
     SOLVER = 'BROYDEN'
@@ -70,6 +72,9 @@ class BroydenSolver(NonlinearSolver):
 
         # Slot for linear solver
         self.linear_solver = None
+
+        # Slot for linesearch
+        self.linesearch = None
 
         self.cite = CITATION
 
@@ -138,6 +143,10 @@ class BroydenSolver(NonlinearSolver):
         else:
             self.linear_solver = system.linear_solver
 
+        if self.linesearch is not None:
+            self.linesearch._setup_solvers(self._system, self._depth + 1)
+            self.linesearch._do_subsolve = True
+
         states = self.options['state_vars']
         prom = system._var_allprocs_prom2abs_list['output']
 
@@ -188,12 +197,18 @@ class BroydenSolver(NonlinearSolver):
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
 
+        if self.linesearch is not None:
+            self.linesearch._set_solver_print(level=level, type_=type_)
+
     def _linearize(self):
         """
         Perform any required linearization operations such as matrix factorization.
         """
         if self.linear_solver is not None:
             self.linear_solver._linearize()
+
+        if self.linesearch is not None:
+            self.linesearch._linearize()
 
     def _iter_initialize(self):
         """
@@ -255,14 +270,20 @@ class BroydenSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
-        Gm = self._update_jacobian()
+        Gm = self._update_inverse_jacobian()
         fxm = self.fxm
 
         delta_xm = -Gm.dot(fxm)
-        xm = self.xm + delta_xm
 
-        # Update the new states in the model.
-        self.set_states(xm)
+        if self.linesearch:
+            print(delta_xm)
+            self.set_linear_vector(delta_xm)
+            self.linesearch.solve()
+            xm = self.get_states()
+        else:
+            # Update the new states in the model.
+            xm = self.xm + delta_xm
+            self.set_states(xm)
 
         # Run the model.
         with Recording('Broyden', 0, self):
@@ -305,30 +326,35 @@ class BroydenSolver(NonlinearSolver):
         self.xm = xm
         self.Gm = Gm
 
-    def _update_jacobian(self):
+    def _update_inverse_jacobian(self):
         """
-        Update the Jacobian for a new Broyden iteration.
+        Update the inverse Jacobian for a new Broyden iteration.
 
         Returns
         -------
         ndarray
-            Updated Jacobian.
+            Updated inverse Jacobian.
         """
         Gm = self.Gm
 
-        # Use Broyden Update.
+        # Apply the Broyden Update approximation to the previous value of the inverse jacobian.
         if not self._recompute_jacobian:
             dfxm = self.delta_fxm
-            fact = 1.0 / np.linalg.norm(dfxm)**2
-            Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * fact)
+            fact = np.linalg.norm(dfxm)
+
+            # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch. Make
+            # sure we don't update in this case because of divide by zero.
+            if fact > self.options['atol']:
+                Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0/fact**2))
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
             Gm = self._compute_jacobian()
+            print(Gm)
             self._computed_jacobians += 1
 
-        # Set Jacobian to identity scaled by alpha.
-        # This is the default initial Jacobian used by scipy.
+        # Set inverse Jacobian to identity scaled by alpha.
+        # This is the default starting point used by scipy and the general broyden algorithm.
         elif self.options['update_broyden']:
             Gm = np.diag(-self.options['alpha'] * np.ones(self.n))
 
@@ -388,6 +414,22 @@ class BroydenSolver(NonlinearSolver):
             fxm[i:j] = val
 
         return fxm
+
+    def set_linear_vector(self, dx):
+        """
+        Copy values from step into the linear vector for backtracking.
+
+        Parameters
+        ----------
+        dx : ndarray
+            Full step in the states for this iteration.
+        """
+        states = self.options['state_vars']
+        linear = self._system._vectors['output']['linear']
+        linear.set_const(0.0)
+        for name in states:
+            i, j = self._idx[name]
+            linear[name] = dx[i:j]
 
     def _compute_jacobian(self):
         """

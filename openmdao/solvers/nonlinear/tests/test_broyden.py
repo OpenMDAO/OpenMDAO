@@ -5,8 +5,10 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, LinearRunOnce, ImplicitComponent, IndepVarComp, DirectSolver
+from openmdao.api import Problem, LinearRunOnce, ImplicitComponent, IndepVarComp, DirectSolver, \
+     BoundsEnforceLS
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
+from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -343,6 +345,41 @@ class TestBryoden(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], np.array([-36.26230985,  10.20857237, -54.17658612]), 1e-6)
+
+    def test_backtracking(self):
+        top = Problem()
+        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top.model.add_subsystem('comp', ImplCompTwoStates())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nonlinear_solver = BroydenSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 25
+        top.model.nonlinear_solver.options['compute_jacobian'] = True
+        top.model.nonlinear_solver.options['diverge_limit'] = 0.5
+        top.model.nonlinear_solver.options['state_vars'] = ['comp.y', 'comp.z']
+
+        top.model.linear_solver = DirectSolver()
+
+        top.setup(check=False)
+        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+
+        # Setup again because we assigned a new linesearch
+        top.setup(check=False)
+
+        top.set_solver_print(level=2)
+        # Test lower bound: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.0
+        top['comp.z'] = 1.6
+        top.run_model()
+        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+
+        # Test upper bound: should go to the upper bound and stall
+        top['px.x'] = 0.5
+        top['comp.y'] = 0.0
+        top['comp.z'] = 2.4
+        top.run_model()
+        assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
 
 
 class TestBryodenFeature(unittest.TestCase):
