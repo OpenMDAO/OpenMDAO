@@ -679,7 +679,7 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[idx]
         if loc_idx != -1:
-            self.input_vec[vecname]._views_flat[input_name][loc_idx] = -1.0
+            self.input_vec[vecname]._views_flat[input_name][loc_idx] = 1.0
 
         if cache_lin_sol:
             return rel_systems, (vecname,), idx
@@ -778,7 +778,7 @@ class _TotalJacInfo(object):
         for col, i in enumerate(inds):
             loc_idx = in_loc_idxs[i]
             if loc_idx != -1:
-                dinputs._views_flat[input_name][loc_idx, col] = -1.0
+                dinputs._views_flat[input_name][loc_idx, col] = 1.0
 
         if cache_lin_sol:
             return rel_systems, (vec_name,), inds[0]
@@ -825,9 +825,9 @@ class _TotalJacInfo(object):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
                     if ncol > 1:
-                        dinputs._views_flat[input_name][loc_idx, col] = -1.0
+                        dinputs._views_flat[input_name][loc_idx, col] = 1.0
                     else:
-                        dinputs._views_flat[input_name][loc_idx] = -1.0
+                        dinputs._views_flat[input_name][loc_idx] = 1.0
 
         if cache:
             return all_rel_systems, vec_names, inds[0][0]
@@ -867,10 +867,14 @@ class _TotalJacInfo(object):
                         deriv_val = np.empty(slc.stop - slc.start)
                     self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
 
+                # We apply a -1 here because the derivative of the output is minus the derivative
+                # of the residual. It is also possible (and perhaps a little more efficient) to do
+                # this on the setter side instead, but it is done here to isolate it and to
+                # eliminate some possible confusion over setting -1 into the deriv res/out vectors.
                 if fwd:
-                    J[slc, i] = deriv_val
+                    J[slc, i] = -deriv_val
                 else:
-                    J[i, slc] = deriv_val
+                    J[i, slc] = -deriv_val
 
     def par_deriv_jac_setter(self, inds):
         """
@@ -912,11 +916,16 @@ class _TotalJacInfo(object):
                     indices = out_meta[output_name][1]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
-                    # print("deriv_val:", i, output_name, input_name, deriv_val)
+
+                    # We apply a -1 here because the derivative of the output is minus the
+                    # derivative of the residual. It is also possible (and perhaps a little more
+                    # efficient) to do this on the setter side instead, but it is done here to
+                    # isolate it and to eliminate some possible confusion over setting -1 into the
+                    # deriv res/out vectors.
                     if fwd:
-                        J[row_or_col, i] = deriv_val[idx2local[row_or_col]]
+                        J[row_or_col, i] = -deriv_val[idx2local[row_or_col]]
                     else:
-                        J[i, row_or_col] = deriv_val[idx2local[row_or_col]]
+                        J[i, row_or_col] = -deriv_val[idx2local[row_or_col]]
 
     def matmat_jac_setter(self, inds):
         """
@@ -951,10 +960,15 @@ class _TotalJacInfo(object):
                         deriv_val = np.empty((slc.stop - slc.start, ncol))
                     self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
 
+                # We apply a -1 here because the derivative of the output is minus the
+                # derivative of the residual. It is also possible (and perhaps a little more
+                # efficient) to do this on the setter side instead, but it is done here to
+                # isolate it and to eliminate some possible confusion over setting -1 into the
+                # deriv res/out vectors.
                 if fwd:
-                    J[slc, inds] = deriv_val
+                    J[slc, inds] = -deriv_val
                 else:
-                    J[inds, slc] = deriv_val.T
+                    J[inds, slc] = -deriv_val.T
 
     def par_deriv_matmat_jac_setter(self, inds):
         """
