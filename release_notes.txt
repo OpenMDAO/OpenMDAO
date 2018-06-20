@@ -1,4 +1,20 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.3.1
+
+June 20, 2018
+
+
+2.3.1 is a quick patch release to correct/update a few release-supporting documents such as the 2.3.0 release notes.
+However, a few new features did manage to sneak in:
+
+
+New Features:
+-------------
+* Support for simultaneous derivatives in reverse mode.
+* Added a '-m' option (possible values 'fwd' and 'rev') to the 'openmdao simul_coloring' command to allow coloring in either direction.
+* Users are now warned during 'check_config' if no recorders are defined.
+
+################################################################################################
 Release Notes for OpenMDAO 2.3.0
 
 June 12, 2018
