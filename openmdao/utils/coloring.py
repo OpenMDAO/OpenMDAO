@@ -109,40 +109,29 @@ def _get_full_disjoint_cols(J, start, end):
     if (end - start) == 0:
         return {}, {}
 
-    disjoints = defaultdict(set)
+    # disjoints = defaultdict(set)
     rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
-    for c1, c2 in combinations(range(start, end + 1), 2):  # loop over column pairs
-        # 'and' two columns together. If we get all False, then columns have disjoint row sets
-        if not np.any(J[:, c1] & J[:, c2]):
-            disjoints[c1].add(c2)
-            disjoints[c2].add(c1)
-            # ndarrays are converted to lists to be json serializable
-            if rows[c1] is None:
-                rows[c1] = [int(i) for i in np.nonzero(J[:, c1])[0]]
-            if rows[c2] is None:
-                rows[c2] = [int(i) for i in np.nonzero(J[:, c2])[0]]
 
-    full_disjoint = []
-    seen = set()
-    allrows = {}
+    colors = []
 
-    # sort largest to smallest disjoint column sets
-    for col, colset in sorted(disjoints.items(), key=lambda x: len(x[1]), reverse=True):
-        if col in seen:
-            continue
-        seen.add(col)
-        allrows[col] = J[:, col].copy()
-        full = [col]
-        for other_col in colset:
-            if other_col not in seen and not np.any(allrows[col] & J[:, other_col]):
-                seen.add(other_col)
-                full.append(other_col)
-                allrows[col] |= J[:, other_col]
-
-        if len(full) > 1:
-            full_disjoint.append(sorted(full))
+    # loop over all columns
+    for col in range(J.shape[1]):
+        # loop over each color group and stop when we find one that is disjoint with the current
+        # column, or start a new color if we can't find a home.
+        for col_list, allrows in colors:
+            if not np.any(allrows & J[:, col]):
+                col_list.append(col)
+                allrows |= J[:, col]
+                break
         else:
-            rows[col] = None
+            colors.append(([col], J[:, col].copy()))
+
+    full_disjoint = [clist for clist, _ in colors if len(clist) > 1]
+
+    for clist in full_disjoint:
+        for col in clist:
+            # # ndarrays are converted to lists to be json serializable
+            rows[col] = list(np.nonzero(J[:, col])[0]) #[int(i) for i in np.nonzero(J[:, col])[0]]
 
     return sorted(full_disjoint, key=lambda x: len(x)), rows
 
@@ -411,8 +400,7 @@ def _write_coloring(modes, color_info, stream):
 
             stream.write("\n")
 
-        stream.write("]")
-    stream.write("\n]")
+        stream.write("]]")
 
     if sparsity:
         stream.write(',\n"sparsity": ')
@@ -692,7 +680,7 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
 
         best_coloring = {
             'fwd': coloring['fwd'],
-            'rev': [[most_dense[:num_opp_solves]], []],
+            'rev': [[list(most_dense[:num_opp_solves])], []],
             'J': orig_J
         }
 
@@ -953,7 +941,6 @@ def _simul_coloring_cmd(options):
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
         color_info = get_simul_meta(prob,
-                                    mode=options.mode,
                                     repeats=options.num_jacs, tol=options.tolerance,
                                     show_jac=options.show_jac,
                                     include_sparsity=not options.no_sparsity,

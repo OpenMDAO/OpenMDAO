@@ -8,6 +8,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 import warnings
+import json
 
 from six import iteritems, iterkeys, itervalues, string_types
 from six.moves import range, cStringIO
@@ -30,6 +31,7 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.units import get_conversion
+from openmdao.utils import coloring
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -623,15 +625,16 @@ class Problem(object):
         """
         # if we're doing simul coloring and are doing (or have a chance of doing) bidirectional
         # coloring, we need to ensure that rev mode scatters are allocated.
-        if ('dynamic_simul_derivs' in self.driver.options and
-                self.driver.options['dynamic_simul_derivs']):
-            Transfer._need_reverse = True
-        elif self.driver._simul_coloring_info:
-            if isinstance(self.driver._simul_coloring_info, string_types):
-                with open(self.driver._simul_coloring_info, 'r') as f:
-                    self.driver._simul_coloring_info = json.load(f)
-            if 'rev' in self.driver._simul_coloring_info:
+        if coloring._use_sparsity:
+            if ('dynamic_simul_derivs' in self.driver.options and
+                    self.driver.options['dynamic_simul_derivs']):
                 Transfer._need_reverse = True
+            elif self.driver._simul_coloring_info:
+                if isinstance(self.driver._simul_coloring_info, string_types):
+                    with open(self.driver._simul_coloring_info, 'r') as f:
+                        self.driver._simul_coloring_info = json.load(f)
+                if 'rev' in self.driver._simul_coloring_info:
+                    Transfer._need_reverse = True
 
         if self._setup_status < 2:
             self.model._final_setup(self.comm, 'full',
