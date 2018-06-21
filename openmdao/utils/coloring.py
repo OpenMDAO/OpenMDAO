@@ -531,7 +531,7 @@ def _solves_info(color_info):
     return tot_size, tot_colors, colored_solves, opp_solves, dominant_mode
 
 
-def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
+def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
     """
     Compute the best coloring in a specified dominant direction.
 
@@ -545,9 +545,9 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
         The dominant direction for solving for total derivatives.
     bidirectional : bool
         If True, compute a bidirectional coloring.
-    maxiter : int or None
-        Maximum number of iterations allowed when computing bidirectional coloring.  If None,
-        iterate exhaustively.
+    simul_coloring_excludes : iter of int
+        A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
+        solved in the opposite direction.
 
     Returns
     -------
@@ -600,12 +600,19 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
 
     if bidirectional:
         # get density of rows
-        density = np.count_nonzero(J, axis=1) / J.shape[1]
-        # TODO: there are some cases that don't work well with this heuristic. Find a better one...
-        most_dense = np.argsort(density)[::-1]  # ordered most dense to least
+        row_score = np.count_nonzero(J, axis=1) / J.shape[1]
+        # TODO: there are some cases that don't work well with the density sorting heuristic.
+        #       Find a better one
+        if simul_coloring_excludes:
+            max_score = np.max(row_score) + 1.0
+            row_score[simul_coloring_excludes] = max_score  # make score highest for these
+            full_dense = row_score[row_score == max_score]
+        else:
+            full_dense = row_score[row_score == 1.0]
+
+        opp_solve_rows = np.argsort(row_score)[::-1]  # ordered highest score to lowest
 
         # if we have any dense rows, zero them all out since we can't get a coloring with them.
-        full_dense = density[density == 1.0]
         if full_dense.size > 0:
             num_opp_solves = full_dense.size
         else:  # coloring is possible.  Do coloring for unaltered J to get initial best
@@ -622,7 +629,7 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
             break
 
         if num_opp_solves > 0:
-            J[most_dense[:num_opp_solves], :] = False  # zero out another skipped row
+            J[opp_solve_rows[:num_opp_solves], :] = False  # zero out another skipped row
 
             # If each of our rows is a node in a graph, we have to have at least as
             # many colors as the degree of that node, so overall we can't do better
@@ -649,14 +656,14 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
             lists.extend(full_disjoint)
 
             rowcol_map = [None] * J.shape[1]  # will contain list of nonzero rows for each column
-            for clist in lists[1:]:
+            for clist in full_disjoint:
                 for col in clist:
-                    # # ndarrays are converted to lists to be json serializable
+                    # ndarrays are converted to lists to be json serializable
                     rowcol_map[col] = list(np.nonzero(J[:, col])[0])
 
             best_coloring = {
                 'fwd': [lists, rowcol_map],
-                'rev': [[list(most_dense[:num_opp_solves])], []],
+                'rev': [[list(opp_solve_rows[:num_opp_solves])], []],
                 'J': orig_J
             }
 
@@ -682,9 +689,55 @@ def _compute_one_directional_coloring(J, mode, bidirectional, maxiter):
     return best_coloring
 
 
+def _get_simul_excludes(problem):
+    """
+    Collect simul_coloring_excludes info from design vars or responses.
+
+    Parameters
+    ----------
+    problem : Problem
+        The Problem being run.
+
+    Returns
+    -------
+    list of int
+        List of jacobian row/col indices to exclude from the coloring (and solve in the
+        opposite direction).
+    """
+    offset = 0
+    simul_coloring_excludes = []
+    if problem._mode == 'fwd':
+        wrt = list(problem.driver._designvars)
+        desvars = problem.driver._designvars
+        for dv in wrt:
+            excl = desvars[dv]['simul_coloring_excludes']
+            size = desvars[dv]['size']
+            if excl:
+                if isinstance(excl, bool):
+                    simul_coloring_excludes.extend(np.arange(size) + offset)
+                else:
+                    simul_coloring_excludes.extend(np.array(excl) + offset)
+            offset += size
+
+    else:  # rev
+        of = problem.driver._get_ordered_nl_responses()
+        resps = problem.driver._responses
+        for resp in of:
+            excl = resps[resp]['simul_coloring_excludes']
+            size = resps[resp]['size']
+            if excl:
+                if isinstance(excl, bool):
+                    simul_coloring_excludes.extend(np.arange(size) + offset)
+                else:
+                    simul_coloring_excludes.extend(np.array(excl) + offset)
+            offset += size
+
+    return simul_coloring_excludes
+
+
 def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   bidirectional=True, maxiter=None, stream=sys.stdout):
+                   bidirectional=True, simul_coloring_excludes=(), stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -709,9 +762,10 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
         If problem is not supplied, a previously computed boolean jacobian can be used.
     bidirectional : bool
         If True, compute a bidirectional coloring.
-    maxiter : int or None
-        Maximum number of iterations allowed when computing bidirectional coloring.  If None,
-        iterate exhaustively.
+    simul_coloring_excludes : iter of int
+        A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
+        solved in the opposite direction. Used only if problem is None. Otherwise, problem
+        driver will supply exclude information gathered from design vars or responses.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -736,11 +790,12 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
         raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
     if problem is not None:
-        coloring = _compute_one_directional_coloring(J, problem._mode, bidirectional, maxiter)
+        simul_coloring_excludes = _get_simul_excludes(problem)
+        coloring = _compute_coloring(J, problem._mode, bidirectional, simul_coloring_excludes)
     else:
-        best_fwd_coloring = _compute_one_directional_coloring(J, 'fwd', bidirectional, maxiter)
+        best_fwd_coloring = _compute_coloring(J, 'fwd', bidirectional, simul_coloring_excludes)
         best_fwd_colors = _total_solves(best_fwd_coloring)
-        best_rev_coloring = _compute_one_directional_coloring(J, 'rev', bidirectional, maxiter)
+        best_rev_coloring = _compute_coloring(J, 'rev', bidirectional, simul_coloring_excludes)
         best_rev_colors = _total_solves(best_rev_coloring)
 
         if best_fwd_colors <= best_rev_colors:
@@ -808,12 +863,12 @@ def simul_coloring_summary(color_info, stream=sys.stdout):
     stream : file-like
         Where the output will go.
     """
-    tot_size, tot_colors, colored_solves, opp_solves, mode = _solves_info(color_info)
-
-    if tot_size <= tot_colors:
+    if 'fwd' not in color_info and 'rev' not in color_info:
+        tot_size = min(color_info['J'].shape)
         stream.write("Simultaneous derivatives can't improve on the total number of solves "
-                     "required (%d) for %s mode in this configuration\n" % (tot_size, mode))
+                     "required (%d) for this configuration\n" % tot_size)
     else:
+        tot_size, tot_colors, colored_solves, opp_solves, mode = _solves_info(color_info)
         stream.write("\nDominant mode: %s" % mode)
         stream.write("\nColored solves in %s mode: %d   opposite full solves: %d" %
                      (mode, colored_solves, opp_solves))
@@ -888,6 +943,8 @@ def _simul_coloring_setup_parser(parser):
                         "compute the coloring.")
     parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
                         help="Exclude the sparsity structure from the coloring data structure.")
+    parser.add_argument('-p', '--profile', action='store_true', dest='profile',
+                        help="Do profiling on the coloring process.")
 
 
 def _simul_coloring_cmd(options):
@@ -905,6 +962,9 @@ def _simul_coloring_cmd(options):
         The post-setup hook function.
     """
     from openmdao.core.problem import Problem
+    from openmdao.devtools.debug import profiling
+    from openmdao.utils.general_utils import do_nothing_context
+
     global _use_sparsity
 
     _use_sparsity = False
@@ -915,12 +975,15 @@ def _simul_coloring_cmd(options):
         else:
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
-        color_info = get_simul_meta(prob,
-                                    repeats=options.num_jacs, tol=options.tolerance,
-                                    show_jac=options.show_jac,
-                                    include_sparsity=not options.no_sparsity,
-                                    setup=True, run_model=True,
-                                    stream=outfile)
+
+        with profiling('coloring_profile.out') if options.profile else do_nothing_context():
+            color_info = get_simul_meta(prob,
+                                        repeats=options.num_jacs, tol=options.tolerance,
+                                        show_jac=options.show_jac,
+                                        include_sparsity=not options.no_sparsity,
+                                        setup=True, run_model=True,
+                                        stream=outfile)
+
         if sys.stdout.isatty():
             simul_coloring_summary(color_info, stream=sys.stdout)
 
