@@ -138,7 +138,7 @@ if __name__ == '__main__':
                                      n_dense_cols=rnd(3), col_density=np.random.rand(),
                                      n_blocks=rnd(3,8),
                                      min_shape=(minr,minc),
-                                     max_shape=(minr+rnd(5),minc+rnd(5)),
+                                     max_shape=(minr+rnd(10),minc+rnd(10)),
                                      n_random_pts=rnd(2))
 
     with open("color_test.out", "w") as f:
