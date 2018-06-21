@@ -5,6 +5,15 @@ How Total Derivatives are Computed
 **********************************
 
 This is a comprehensive document about how OpenMDAO solves for total derivatives.
+Total derivatives are primarily needed for gradient based optimizations methods.
+While it is possible to use finite-differences to approximate total derivatives, for larger multidisciplinary models this approach is notoriously inaccurate.
+Using OpenMDAO's total derivatives features can significantly improve the efficiency of your gradient based optimization implementation.
+
+.. note::
+
+    Total derivatives are also useful for other applications such as gradient enhanced surrogate modeling and dimensionality reduction for active subspaces.
+
+
 The goal of this document is to help you understand how the underlying algorithms work, and when they are appropriate to apply to your model.
 It is designed to be read in the order it's presented, with later sections assuming understanding of earlier ones.
 
@@ -24,27 +33,53 @@ Since we are focused on total derivatives, we will assume that the partial deriv
 Unified Derivatives Equations
 -----------------------------
 
-Total derivative calculations in OpenMDAO are based on the `Unified Derivative Equations`_
-These equations allow you to compute total derivatives across any system of nonlinear equations, by solving a linear system in the forward (direct) form:
+A model's fundamental purpose is to compute an objective or constraint as a function of design variables.
+In order to perform those computations the model moves data through many different calculations (defined in the components) using
+many intermediate variables.
+Internally, OpenMDAO doesn't distinguish between objective/constraint variables, design variables, or intermediate variables;
+they are all just variables, following the mathematical formulation prescribed by the `MAUD architecture`_, developed by Hwang and Martins.
+Using that formulation, it is possible to compute the total derivative of any explicit variable with respect to any other explicit variable by solving a linear system of equations, called the `Unified Derivative Equations`_ (UDE).
 
 .. math::
 
-    \left[\frac{\partial \mathcal{R}}{\partial U}\right] \left[\frac{du}{dr}\right] = \left[ I \right],
+    \left[\frac{\partial \mathcal{R}}{\partial o}\right] \left[\frac{do}{dr}\right] = \left[ I \right],
 
 or by solving a linear system in the reverse (adjoint) form:
 
 .. math::
 
-    \left[\frac{\partial \mathcal{R}}{\partial U}\right]^T \left[\frac{du}{dr}\right]^T = \left[ I \right].
+    \left[\frac{\partial \mathcal{R}}{\partial o}\right]^T \left[\frac{do}{dr}\right]^T = \left[ I \right].
 
-The matrix :math:`\left[\frac{\partial \mathcal{R}}{\partial U}\right]` is composed of all the partial derivatives from the model components, and the solution to the linear system gives the total derivatives :math:`\left[\frac{du}{dr}\right]`.
-In forward form, one linear solve is required per design variable.
-In reverse form, one linear solve is required per objective and constraint.
-Hence, selecting between forward and reverse is just a matter of counting how many design variables and constraints you have, and picking whichever form yields the fewest linear solves.
+Where :math:`o` denotes the vector of all the variables within the model (i.e. every output of every component), :math:`\mathcal{R}` denotes the vector of residual functions, :math:`r` is the vector of residual values,
+:math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is the Jacobian matrix of all the partial derivatives,
+and :math:`\left[\frac{do}{dr}\right]` is the matrix of total derivatives of :math:`o` with respect to :math:`r` .
+
+It might not seem like derivatives with respect to residual values are inherently useful, however we can define the residual of explicit functions carefully in order to make use of the UDE to compute meaningful total derivatives.
+If you have an explicit function, :math:`f = F(o)`, then you can define an equivalent implicit function as
+
+.. math::
+
+    r_f = f - F(o) = 0
+
+Then it follows that
+
+.. math::
+
+    \left[\frac{do}{dr_f}\right] = \left[\frac{do}{df}\right]
+
+Thus, since :math:`\left[\frac{\partial \mathcal{R}}{\partial o}\right]` is known because all the components provide their respective partial derivatives,
+we can solve the UDE linear system to compute the total derivatives we need for optimization.
+A one column from the identity matrix is chosen for the right hand side and the solutions provides one piece of :math:`\left[\frac{do}{dr}\right]`.
+
+In forward form, one linear solve is performed per design variable and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dr}\right]`.
+In reverse form, one linear solve is performed per objective/constraint and the solution vector of the UDE gives one column of :math:`\left[\frac{do}{dr}\right]^T` (or one row of :math:`\left[\frac{do}{dr}\right]`).
+Selecting between forward and reverse linear solver modes is just a matter of counting how many design variables and constraints you have, and picking whichever form yields the fewest linear solves.
 
 
 Although the forward and reverse forms of the unified derivatives equations are very simple, solving them efficiently for a range of different kinds of models requires careful implementation.
-OpenMDAO's implementation is based around the `MAUD architecture`_, developed by Hwang and Martins, which enables a modular framework to assemble and solve the Unified Derivatives Equations in a flexible and scalable way.
+In some cases, it is as simple as assembling the partial derivative Jacobian matrix and inverting it.
+In other cases, a distributed memory matrix-free linear solver is needed.
+Understanding a bit of the theory will help you to properly leverage the features in OpenMDAO to set up linear solves efficiently.
 
 .. _Unified Derivative Equations: http://mdolab.engin.umich.edu/content/review-and-unification-discrete-methods-computing-derivatives-single-and-multi-disciplinary
 

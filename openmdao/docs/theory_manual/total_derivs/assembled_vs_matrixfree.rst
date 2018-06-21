@@ -18,10 +18,11 @@ figure out what kind of linear solver structure is needed.
 ---------------------------
 Assembled-Jacobian Problems
 ---------------------------
+
 Using an assembled Jacobian means that OpenMDAO will explicitly allocate the memory for the entire
 Jacobian matrix up front, and then hold onto that and re-use it throughout the run.
 This has several computational advantages, but the major one is that it helps to reduce framework
-overhead for models with deep model hierarchies and large numbers of variables.
+overhead for models with deep system hierarchies and large numbers of variables.
 
 You should strongly consider using an assembled Jacobian if all the components in your model provide
 derivatives using the :ref:`compute_partials <comp-type-2-explicitcomp>` or
@@ -73,6 +74,8 @@ commonly see sparsity percentages in the single digits.
 
     The partial derivative Jacobian for the Sellar problem has only 18 non-zero values in it. It is 37% sparse.
 
+If you chose to use the :ref:`DirectSolver`, then it will use scipy's sparse `splu`_  method to solve linear system for total derivatives.
+
 Dense Assembled Jacobian
 ------------------------
 A :ref:`DenseJacobian<openmdao.jacobians.assembled_jacobian.py>` allocates a dense
@@ -94,7 +97,7 @@ the :ref:`DenseJacobian<openmdao.jacobians.assembled_jacobian.py>`.
 
 .. _lu_factor: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.lu_factor.html
 .. _lu_solve: https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.lu_solve.html#scipy.linalg.lu_solve
-
+.. _splu: https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.sparse.linalg.splu.html
 
 --------------------
 Matrix-Free Problems

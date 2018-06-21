@@ -315,18 +315,19 @@ class Driver(object):
         # set up simultaneous deriv coloring
         if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
-            if problem._mode == 'fwd':
-                self._setup_simul_coloring(problem._mode)
-            else:
-                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
+            self._setup_simul_coloring(problem._mode)
 
-        # if we're using simultaneous derivatives then our effective design var size is less
-        # than the full design var size
+        # if we're using simultaneous derivatives then our effective size is less
+        # than the full size
         if self._simul_coloring_info:
-            col_lists = self._simul_coloring_info[0]
-            if col_lists:
-                desvar_size = len(col_lists[0])
-                desvar_size += len(col_lists) - 1
+            lists = self._simul_coloring_info[0]
+            if lists:
+                size = len(lists[0])  # lists[0] is the uncolored row/col indices
+                size += len(lists) - 1
+            if problem._mode == 'fwd':
+                desvar_size = size
+            else:  # rev
+                response_size = size
 
         if ((problem._mode == 'fwd' and desvar_size > response_size) or
                 (problem._mode == 'rev' and response_size > desvar_size)):
@@ -957,10 +958,6 @@ class Driver(object):
         mode : str
             Derivative direction, either 'fwd' or 'rev'.
         """
-        if mode == 'rev':
-            raise NotImplementedError("Simultaneous derivatives are currently not supported "
-                                      "in 'rev' mode")
-
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:
             return
@@ -970,7 +967,6 @@ class Driver(object):
                 self._simul_coloring_info = json.load(f)
 
         tup = self._simul_coloring_info
-        column_lists, row_map = tup[:2]
         if len(tup) > 2:
             sparsity = tup[2]
             if self._total_jac_sparsity is not None:
@@ -978,7 +974,7 @@ class Driver(object):
                                    " and _total_jac_sparsity.")
             self._total_jac_sparsity = sparsity
 
-        self._simul_coloring_info = column_lists, row_map
+        self._simul_coloring_info = tup[:2]
 
     def _pre_run_model_debug_print(self):
         """

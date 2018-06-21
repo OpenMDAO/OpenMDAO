@@ -566,7 +566,7 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        coloring_info : tuple of the form (column_lists, row_map, sparsity)
+        coloring_info : tuple of the form (column_or_row_lists, row_or_column_map, sparsity)
             Row/column data needed to group colors and associate rows and columns.
 
         Yields
@@ -578,9 +578,9 @@ class _TotalJacInfo(object):
         method
             Jac setter method.
         """
-        col_lists = coloring_info[0]
+        lists = coloring_info[0]
 
-        for color, ilist in enumerate(col_lists):
+        for color, ilist in enumerate(lists):
             if color == 0:  # first outer loop gives all non-colored indices.
                 for j in ilist:
                     # do all non-colored indices individually (one linear solve per index)
@@ -679,6 +679,9 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[idx]
         if loc_idx != -1:
+
+            # We apply a -1 here because the derivative of the output is minus the derivative of
+            # the residual in openmdao.
             self.input_vec[vecname]._views_flat[input_name][loc_idx] = -1.0
 
         if cache_lin_sol:
@@ -778,6 +781,9 @@ class _TotalJacInfo(object):
         for col, i in enumerate(inds):
             loc_idx = in_loc_idxs[i]
             if loc_idx != -1:
+
+                # We apply a -1 here because the derivative of the output is minus the derivative
+                # of the residual in openmdao.
                 dinputs._views_flat[input_name][loc_idx, col] = -1.0
 
         if cache_lin_sol:
@@ -824,6 +830,9 @@ class _TotalJacInfo(object):
             for col, i in enumerate(matmat_idxs):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
+
+                    # We apply a -1 here because the derivative of the output is minus the
+                    # derivative of the residual in openmdao.
                     if ncol > 1:
                         dinputs._views_flat[input_name][loc_idx, col] = -1.0
                     else:
@@ -893,25 +902,30 @@ class _TotalJacInfo(object):
         inds : list of int
             Total jacobian row or column indices.
         """
-        row_map = self.simul_coloring[1]
+        row_col_map = self.simul_coloring[1]
         out_meta = self.out_meta
         idx2local = self.idx2local
         idx2name = self.idx2name
         outvecs = self.output_vec
+        fwd = self.mode == 'fwd'
         J = self.J
 
         for i in inds:
             input_name, vecname, _, _ = self.in_idx_map[i]
             out_views = outvecs[vecname]._views_flat
-            for row in row_map[i]:
-                output_name = idx2name[row]
+            for row_or_col in row_col_map[i]:
+                output_name = idx2name[row_or_col]
                 deriv_val = None
                 if output_name in out_views:
                     deriv_val = out_views[output_name]
                     indices = out_meta[output_name][1]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
-                    J[row, i] = deriv_val[idx2local[row]]
+
+                    if fwd:
+                        J[row_or_col, i] = deriv_val[idx2local[row_or_col]]
+                    else:
+                        J[i, row_or_col] = deriv_val[idx2local[row_or_col]]
 
     def matmat_jac_setter(self, inds):
         """
