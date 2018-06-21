@@ -511,24 +511,29 @@ def _solves_info(color_info):
     rev_size, fwd_size = color_info['J'].shape
     tot_colors = _total_solves(color_info)
 
-    fwd_lists = color_info['fwd'][0] if 'fwd' in color_info else []
-    rev_lists = color_info['rev'][0] if 'rev' in color_info else []
-
-    dominant_mode = 'fwd' if len(fwd_lists) > len(rev_lists) else 'rev'
-
-    if dominant_mode == 'fwd':
-        tot_size = fwd_size
-        colored_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
-        opp_solves = len(rev_lists[0])
-    else:
-        tot_size = rev_size
-        colored_solves = len(rev_lists[0]) + len(rev_lists) - 1
-        opp_solves = len(fwd_lists[0])
-
     if tot_colors == 0:  # no coloring found
-        tot_colors = tot_size
+        tot_colors = tot_size = min([rev_size, fwd_size])
+        colored_solves = opp_solves = 0
+        dominant_mode = 'None'
+        pct = 0.
+    else:
+        fwd_lists = color_info['fwd'][0] if 'fwd' in color_info else []
+        rev_lists = color_info['rev'][0] if 'rev' in color_info else []
 
-    return tot_size, tot_colors, colored_solves, opp_solves, dominant_mode
+        dominant_mode = 'fwd' if len(fwd_lists) > len(rev_lists) else 'rev'
+
+        if dominant_mode == 'fwd':
+            tot_size = fwd_size
+            colored_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
+            opp_solves = len(rev_lists[0])
+        else:
+            tot_size = rev_size
+            colored_solves = len(rev_lists[0]) + len(rev_lists) - 1
+            opp_solves = len(fwd_lists[0])
+
+        pct = ((tot_size - tot_colors) / tot_size * 100)
+
+    return tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode
 
 
 def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
@@ -812,10 +817,11 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
         else:
             rev_opp = 0
 
-        print("Best fwd:", best_fwd_colors, "fwd solves:", best_fwd_colors - fwd_opp,
-              "opposite solves:", fwd_opp)
-        print("Best rev:", best_rev_colors, "rev solves:", best_rev_colors - rev_opp,
-              "opposite solves:", rev_opp)
+        if stream is not None:
+            print("Best fwd:", best_fwd_colors, "fwd solves:", best_fwd_colors - fwd_opp,
+                  "opposite solves:", fwd_opp)
+            print("Best rev:", best_rev_colors, "rev solves:", best_rev_colors - rev_opp,
+                  "opposite solves:", rev_opp)
 
     modes = [m for m in ('fwd', 'rev') if m in coloring]
 
@@ -868,12 +874,12 @@ def simul_coloring_summary(color_info, stream=sys.stdout):
         stream.write("Simultaneous derivatives can't improve on the total number of solves "
                      "required (%d) for this configuration\n" % tot_size)
     else:
-        tot_size, tot_colors, colored_solves, opp_solves, mode = _solves_info(color_info)
+        tot_size, tot_colors, colored_solves, opp_solves, pct, mode = _solves_info(color_info)
         stream.write("\nDominant mode: %s" % mode)
         stream.write("\nColored solves in %s mode: %d   opposite full solves: %d" %
                      (mode, colored_solves, opp_solves))
         stream.write("\n\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
-                     (tot_colors, tot_size, ((tot_size - tot_colors) / tot_size * 100)))
+                     (tot_colors, tot_size, pct))
 
 
 def dynamic_sparsity(driver):
