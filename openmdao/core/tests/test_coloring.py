@@ -15,6 +15,8 @@ from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.coloring import get_simul_meta, _solves_info
+from openmdao.devtools.tot_jac_builder import TotJacBuilder
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -851,6 +853,42 @@ class SparsityTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_dynamic['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
+
+
+class BidirectionalTestCase(unittest.TestCase):
+
+    def setUp(self):
+        # this is an odd case where the removing the most dense row won't improve the coloring
+        self.J = J = np.array([
+            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            [1,1,0,1,0,0,0,1,0,0,0,1,0,0],
+        ], dtype=bool)
+
+    def test_exclude(self):
+        coloring = get_simul_meta(None, include_sparsity=False, setup=False, run_model=False,
+                                       bool_jac=self.J,
+                                       simul_coloring_excludes=(),
+                                       stream=None)
+        tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode = _solves_info(coloring)
+        print(tot_colors)
+
+
+        coloring = get_simul_meta(None, include_sparsity=False, setup=False, run_model=False,
+                                  bool_jac=self.J,
+                                  simul_coloring_excludes=(0,),
+                                  stream=None)
+        tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode = _solves_info(coloring)
 
 
 if __name__ == '__main__':
