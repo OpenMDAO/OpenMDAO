@@ -101,22 +101,39 @@ def _get_full_disjoint_cols(J):
     list
         List of lists of disjoint columns
     """
-    colors = []
-    _allrows = []
+    nrows, ncols = J.shape
+    empty = ()
+    disjoint_cols = [empty] * J.shape[1]
+    idxs = np.arange(ncols, dtype=int)
+    fullset = set(range(J.shape[1]))
 
-    # loop over all columns
-    for col in range(J.shape[1]):
-        # loop over each color group and stop when we find one that is disjoint with the current
-        # column, or start a new color if we can't find a home.
-        for i, col_list in enumerate(colors):
-            allrows = _allrows[i]
-            if not np.any(allrows & J[:, col]):
-                col_list.append(col)
-                allrows |= J[:, col]
-                break
-        else:
-            colors.append([col])
-            _allrows.append(J[:, col].copy())
+    # loop over rows and find all joint cols for each row
+    for i in range(nrows):
+        nzro = set(idxs[J[i]])
+        for nz in nzro:
+            if disjoint_cols[nz] is empty:
+                disjoint_cols[nz] = fullset.copy()
+            disjoint_cols[nz].difference_update(nzro)
+
+    seen = set()
+    colors = []
+
+    # loop over columns sorted in order of pair-wise disjointness
+    for col, column_set in sorted(enumerate(disjoint_cols), key=lambda x: len(x[1]), reverse=True):
+        if col in seen:
+            continue
+        seen.add(col)
+        allrows = J[:, col].copy()
+        color = [col]
+        colors.append(color)
+        # column set contains all columns that could possibly share the same color. Not all
+        # of them generally will since pairwise disjointness doesn't guarantee disjointness
+        # with every column in the set when combined.
+        for other_col in column_set:
+            if other_col not in seen and not np.any(allrows & J[:, other_col]):
+                seen.add(other_col)
+                color.append(other_col)
+                allrows |= J[:, other_col]
 
     return colors
 
