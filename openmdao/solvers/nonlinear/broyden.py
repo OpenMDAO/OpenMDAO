@@ -276,7 +276,6 @@ class BroydenSolver(NonlinearSolver):
         delta_xm = -Gm.dot(fxm)
 
         if self.linesearch:
-            print(delta_xm)
             self.set_linear_vector(delta_xm)
             self.linesearch.solve()
             xm = self.get_states()
@@ -302,6 +301,10 @@ class BroydenSolver(NonlinearSolver):
         fxm1 = fxm.copy()
         fxm = self.get_residuals()
         delta_fxm = fxm - fxm1
+
+        # States may have been further converged hierarchically.
+        xm = self.get_states()
+        delta_xm = xm - self.xm
 
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
@@ -372,7 +375,7 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of states.
         """
         states = self.options['state_vars']
-        xm = self.xm
+        xm = self.xm.copy()
         outputs = self._system._outputs
         for name in states:
             val = outputs[name]
