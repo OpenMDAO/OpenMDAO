@@ -605,15 +605,14 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
 
     if bidirectional:
         # get density of rows
+        max_score = 1.0
         row_score = np.count_nonzero(J, axis=1) / J.shape[1]
-        # TODO: there are some cases that don't work well with the density sorting heuristic.
-        #       Find a better one
         if simul_coloring_excludes:
             max_score = np.max(row_score) + 1.0
-            row_score[simul_coloring_excludes] = max_score  # make score highest for these
-            full_dense = row_score[row_score == max_score]
-        else:
-            full_dense = row_score[row_score == 1.0]
+            # make score highest for any explicitly excluded rows
+            row_score[simul_coloring_excludes] = max_score
+
+        full_dense = row_score[row_score == max_score]
 
         opp_solve_rows = np.argsort(row_score)[::-1]  # ordered highest score to lowest
 
