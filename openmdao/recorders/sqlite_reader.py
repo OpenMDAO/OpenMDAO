@@ -171,6 +171,14 @@ class SqliteCaseReader(BaseCaseReader):
             raise ValueError('SQliteCaseReader encountered an unhandled '
                              'format version: {0}'.format(self.format_version))
 
+    def load_cases(self):
+        """
+        Load all driver, solver, and system cases into memory.
+        """
+        self.driver_cases.load_cases()
+        self.solver_cases.load_cases()
+        self.system_cases.load_cases()
+
     def get_cases(self, parent=None, recursive=False):
         """
         Allow one to iterate over the driver and solver cases.
@@ -707,6 +715,26 @@ class DriverCases(BaseCases):
     Case specific to the entries that might be recorded in a Driver iteration.
     """
 
+    def load_cases(self):
+        """
+        Load all driver cases into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM driver_iterations")
+            rows = cur.fetchall()
+            for row in rows:
+                idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
+                    outputs_blob, = row
+
+                inputs_array = blob_to_array(inputs_blob)
+                outputs_array = blob_to_array(outputs_blob)
+
+                case = DriverCase(self.filename, counter, iteration_coordinate, timestamp,
+                                  success, msg, inputs_array, outputs_array,
+                                  self._prom2abs, self._abs2prom, self._abs2meta)
+                self._cases[iteration_coordinate] = case
+
     def get_case(self, case_id):
         """
         Get a case from the database.
@@ -722,6 +750,8 @@ class DriverCases(BaseCases):
             specified case/iteration.
         """
         iteration_coordinate = self.get_iteration_coordinate(case_id)
+        if iteration_coordinate in self._cases:
+            return self._cases[iteration_coordinate]
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
@@ -742,6 +772,8 @@ class DriverCases(BaseCases):
                           inputs_array, outputs_array,
                           self._prom2abs, self._abs2prom, self._abs2meta)
 
+        # save so we don't query again
+        self._cases[iteration_coordinate] = case
         return case
 
 
@@ -753,6 +785,12 @@ class SystemCases(BaseCases):
     def __init__(self, filename, abs2prom, abs2meta, prom2abs):
         super(SystemCases, self).__init__(filename, abs2prom, abs2meta, prom2abs)
         self._cases = {}
+        
+
+    def load_cases(self):
+        """
+        Load all system cases into memory.
+        """
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
             cur.execute("SELECT * FROM system_iterations")
@@ -808,6 +846,8 @@ class SystemCases(BaseCases):
                           inputs_array, outputs_array, residuals_array,
                           self._prom2abs, self._abs2prom, self._abs2meta)
 
+        # save so we don't query again
+        self._cases[iteration_coordinate] = case
         return case
 
 
@@ -815,6 +855,27 @@ class SolverCases(BaseCases):
     """
     Case specific to the entries that might be recorded in a Solver iteration.
     """
+
+    def load_cases(self):
+        """
+        Load all solver cases into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM solver_iterations")
+            rows = cur.fetchall()
+            for row in rows:
+                idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
+                input_blob, output_blob, residuals_blob = row
+
+                input_array = blob_to_array(input_blob)
+                output_array = blob_to_array(output_blob)
+                residuals_array = blob_to_array(residuals_blob)
+
+                case = SolverCase(self.filename, counter, iteration_coordinate, timestamp,
+                                  success, msg, abs_err, rel_err, input_array, output_array,
+                                  residuals_array, self._prom2abs, self._abs2prom, self._abs2meta)
+                self._cases[iteration_coordinate] = case
 
     def get_case(self, case_id):
         """
@@ -831,6 +892,8 @@ class SolverCases(BaseCases):
             specified case/iteration.
         """
         iteration_coordinate = self.get_iteration_coordinate(case_id)
+        if iteration_coordinate in self._cases:
+            return self._cases[iteration_coordinate]
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
@@ -852,4 +915,6 @@ class SolverCases(BaseCases):
                           abs_err, rel_err, input_array, output_array, residuals_array,
                           self._prom2abs, self._abs2prom, self._abs2meta)
 
+        # save so we don't query again
+        self._cases[iteration_coordinate] = case
         return case
