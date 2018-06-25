@@ -1422,6 +1422,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         else:
             sys_type = type(system).__name__
 
+        if not sys_name in derivative_data:
+            msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
+            warnings.warn(msg)
+            continue
+
         derivatives = derivative_data[sys_name]
 
         if totals:

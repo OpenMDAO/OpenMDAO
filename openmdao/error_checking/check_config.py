@@ -200,6 +200,27 @@ def _check_hanging_inputs(problem, logger):
         logger.warning(''.join(msg))
 
 
+def _check_comp_has_no_outputs(problem, logger):
+    """
+    Issue a logger warning if any components do not have any outputs.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    msg = []
+
+    for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
+        if len(comp._var_allprocs_abs_names['output']) == 0:
+            msg.append("   %s\n" % comp.pathname)
+
+    if msg:
+        logger.warning(''.join(["The following Components do not have any outputs:\n"] + msg))
+
+
 def _check_system_configs(problem, logger):
     """
     Perform any system specific configuration checks.
@@ -338,6 +359,7 @@ _checks = {
     'solvers': _check_solvers,
     'dup_inputs': _check_dup_comp_inputs,
     'missing_recorders': _check_missing_recorders,
+    'comp_has_no_outputs': _check_comp_has_no_outputs,
 }
 
 
