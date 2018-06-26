@@ -104,7 +104,8 @@ def _get_full_disjoint_cols(J):
     """
     nrows, ncols = J.shape
 
-    # start with col_matrix all True, meaning assume all columns are disjoint
+    # Start with col_matrix all True, meaning assume all columns are disjoint.
+    # Note that col_matrix is symmetric.
     col_matrix = np.ones((ncols, ncols), dtype=bool)
 
     # mark col_matrix entries as False when nonzero row entries make them non-disjoint
@@ -114,12 +115,13 @@ def _get_full_disjoint_cols(J):
             col_matrix[col, nzro] = False
             col_matrix[nzro, col] = False
 
+    # count the number of pairwise disjoint columns in each column of col_matrix
     disjoint_counts = np.count_nonzero(col_matrix, axis=0)
 
     seen = set()
     colors = []
 
-    # create a reusable rows vector for checking disjointess
+    # create a reusable rows vector for checking disjointness
     allrows = np.zeros(J.shape[0], dtype=bool)
 
     # loop over columns sorted in order of disjointness, smallest number of disjoint cols first
@@ -130,9 +132,8 @@ def _get_full_disjoint_cols(J):
         allrows[:] = J[:, col]
         color = [col]
         colors.append(color)
-        # column set contains all columns that could possibly share the same color. Not all
-        # of them generally will since pairwise disjointness doesn't guarantee disjointness
-        # with every column in the set when combined.
+        # col_matri[col, :] contains all columns that could possibly share the same color. Not all
+        # of them generally will though since pairwise disjointness is not transitive.
         for other_col in np.nonzero(col_matrix[col, :])[0]:
             if other_col not in seen and not np.any(allrows & J[:, other_col]):
                 seen.add(other_col)
