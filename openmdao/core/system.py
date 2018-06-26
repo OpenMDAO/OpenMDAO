@@ -5,24 +5,20 @@ from contextlib import contextmanager
 from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
-from itertools import product
 from numbers import Integral
 
 from six import iteritems, string_types
-from six.moves import range
 
 import numpy as np
 
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.vectors.vector import INT_DTYPE
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.array_utils import convert_neg
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
 

@@ -196,6 +196,30 @@ class TestProblemCheckPartials(unittest.TestCase):
         lines = stream.getvalue().splitlines()
         self.assertEqual(len(lines), 0)
 
+    def test_component_has_no_outputs(self):
+
+        prob = Problem()
+        root = prob.model
+
+        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        comp1 = root.add_subsystem("comp1", ExplicitComponent())
+        comp1.add_input('x', val=0.)
+
+        comp2 = root.add_subsystem("comp2", ExecComp("y=2*x"))
+
+        root.connect('indep.x', ['comp1.x', 'comp2.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        with warnings.catch_warnings(record=True) as w:
+            data = prob.check_partials(out_stream=None)
+
+        self.assertEqual(len(w), 1)
+
+        expected = "No derivative data found for Component 'comp1'."
+        self.assertEqual(str(w[0].message), expected)
+
     def test_missing_entry(self):
         class MyComp(ExplicitComponent):
             def setup(self):
