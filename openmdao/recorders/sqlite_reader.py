@@ -749,6 +749,7 @@ class DriverCases(BaseCases):
             An instance of a Driver Case populated with data from the
             specified case/iteration.
         """
+        # check to see if we've already cached this case
         iteration_coordinate = self.get_iteration_coordinate(case_id)
         if iteration_coordinate in self._cases:
             return self._cases[iteration_coordinate]
@@ -821,6 +822,7 @@ class SystemCases(BaseCases):
             An instance of a System Case populated with data from the
             specified case/iteration.
         """
+        # check to see if we've already cached this case
         iteration_coordinate = self.get_iteration_coordinate(case_id)
         if iteration_coordinate in self._cases:
             return self._cases[iteration_coordinate]
@@ -891,6 +893,7 @@ class SolverCases(BaseCases):
             An instance of a solver Case populated with data from the
             specified case/iteration.
         """
+        # check to see if we've already cached this case
         iteration_coordinate = self.get_iteration_coordinate(case_id)
         if iteration_coordinate in self._cases:
             return self._cases[iteration_coordinate]

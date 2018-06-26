@@ -877,6 +877,73 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
 
+    def test_loading_cases(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        self.assertEqual(len(cr.driver_cases._cases), 0)
+        self.assertEqual(len(cr.solver_cases._cases), 0)
+        self.assertEqual(len(cr.system_cases._cases), 0)
+
+        cr.load_cases()
+
+        # assert that we have now stored each of the cases
+        self.assertEqual(len(cr.driver_cases._cases), 1)
+        self.assertEqual(len(cr.solver_cases._cases), 7)
+        self.assertEqual(len(cr.system_cases._cases), 1)
+
+        for d in cr.driver_cases.list_cases():
+            self.assertTrue(d in cr.driver_cases._cases)
+        for so in cr.solver_cases.list_cases():
+            self.assertTrue(so in cr.solver_cases._cases)
+        for sy in cr.system_cases.list_cases():
+            self.assertTrue(sy in cr.system_cases._cases)
+
+    def test_caching_cases(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        self.assertEqual(len(cr.driver_cases._cases), 0)
+        self.assertEqual(len(cr.solver_cases._cases), 0)
+        self.assertEqual(len(cr.system_cases._cases), 0)
+
+        # get cases so they're all cached
+        for d in cr.driver_cases.list_cases():
+            cr.driver_cases.get_case(d)
+        for so in cr.solver_cases.list_cases():
+            cr.solver_cases.get_case(so)
+        for sy in cr.system_cases.list_cases():
+            cr.system_cases.get_case(sy)
+
+        # assert that we have now stored each of the cases
+        self.assertEqual(len(cr.driver_cases._cases), 1)
+        self.assertEqual(len(cr.solver_cases._cases), 7)
+        self.assertEqual(len(cr.system_cases._cases), 1)
+
+        for d in cr.driver_cases.list_cases():
+            self.assertTrue(d in cr.driver_cases._cases)
+        for so in cr.solver_cases.list_cases():
+            self.assertTrue(so in cr.solver_cases._cases)
+        for sy in cr.system_cases.list_cases():
+            self.assertTrue(sy in cr.system_cases._cases)
 
 def _assert_model_matches_case(case, system):
     '''
