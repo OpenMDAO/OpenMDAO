@@ -146,7 +146,7 @@ recording. To increase efficiency in this scenario you should use the CaseReader
 :code:`load_cases` method, which loads all driver, solver, and system cases into memory
 with minimal queries, making `get_case` far more efficient.
 
-To use this method, simply create the CaseReader, call `load_cases` method, and use the
+To use this method, simply create the CaseReader, call the `load_cases` method, and use the
 reader as you normally would.
 
 .. code-block:: console
