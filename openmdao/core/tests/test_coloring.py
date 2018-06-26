@@ -33,11 +33,11 @@ class RunOnceCounter(LinearRunOnce):
         super(RunOnceCounter, self)._iter_execute()
         self._solve_count += 1
 
+# note: size must be an even number
+SIZE = 10
 
 def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
 
-    # note: size must be an even number
-    SIZE = 10
     p = Problem()
 
     p.model.linear_solver = RunOnceCounter()
@@ -598,8 +598,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
         import numpy as np
 
-        # note: size must be an even number
-        SIZE = 10
         p = Problem()
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
@@ -857,49 +855,49 @@ class SparsityTestCase(unittest.TestCase):
 
 class BidirectionalTestCase(unittest.TestCase):
 
-    def setUp(self):
-        # this is an odd case where the removing the most dense row won't improve the coloring
-        self.J = J = np.array([
-            [1,1,1,1,0,0,0,0],
-            [1,1,1,1,0,0,0,0],
-            [1,1,1,1,0,0,0,0],
-            [1,1,1,1,0,0,0,0],
-            [1,1,0,0,1,1,0,0],
-            [1,1,0,0,1,1,0,0],
-            [1,1,0,0,1,1,0,0],
-            [1,1,0,0,1,1,0,0],
-            [1,1,0,0,0,0,1,1],
-            [1,1,0,0,0,0,1,1],
-            [1,1,0,0,0,0,1,1],
-            [1,1,0,0,0,0,1,1],
-            [0,0,0,1,0,1,0,1],
-            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            # [1,1,0,0,0,1,0,0,0,1,0,0,0,1],
-        ], dtype=bool)
-
     def test_exclude(self):
-        coloring = get_simul_meta(None, mode='fwd', include_sparsity=False, setup=False, run_model=False,
-                                       bool_jac=self.J,
-                                       simul_coloring_excludes=None,
-                                       stream=None)
+        p = Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_output("a", val=1.0)
+        indep.add_output("b", val=1.0)
+        indep.add_output("c", val=1.0)
+        indep.add_output("d", val=1.0)
+        indep.add_output("e", val=1.0)
+
+        obj = model.add_subsystem('obj', ExecComp('obj=a+b+c+d+ee'))
+        con1 = model.add_subsystem('con1', ExecComp('con=a*2.0 + b'))
+        con2 = model.add_subsystem('con2', ExecComp('con=c*3.0 + 2.0*d'))
+        con3 = model.add_subsystem('con3', ExecComp('con=ee*1.5 - 3.0*c + a'))
+
+        model.connect("indep.a", ("obj.a", "con1.a", "con3.a"))
+        model.connect("indep.b", ("obj.b", "con1.b"))
+        model.connect("indep.c", ("obj.c", "con2.c", "con3.c"))
+        model.connect("indep.d", ("obj.d", "con2.d"))
+        model.connect("indep.e", ("obj.ee", "con3.ee"))
+
+        model.add_design_var("indep.a")
+        model.add_design_var("indep.b")
+        model.add_design_var("indep.c")
+        model.add_design_var("indep.d")
+        model.add_design_var("indep.e")
+
+        model.add_objective('obj.obj')
+        model.add_constraint('con1.con')
+        model.add_constraint('con2.con')
+        model.add_constraint('con3.con', simul_coloring_excludes=True)
+
+        p.setup(mode='fwd')
+        p.run_model()
+
+        coloring = get_simul_meta(p, include_sparsity=False, setup=False, run_model=False, stream=None)
         tot_size1, tot_colors1, colored_solves1, opp_solves1, pct1, dominant_mode1 = _solves_info(coloring)
 
-        coloring = get_simul_meta(None, mode='fwd', include_sparsity=False, setup=False, run_model=False,
-                                  bool_jac=self.J,
-                                  simul_coloring_excludes=np.array([12], dtype=int),
-                                  stream=None)
-        tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode = _solves_info(coloring)
+        # this is not a great coloring. It's just done to test simul_coloring_excludes
+        self.assertEqual(opp_solves1, 2)
+        self.assertEqual(tot_colors1, 4)
+        self.assertEqual(coloring['rev'][0][0], [3,0])
 
 
 if __name__ == '__main__':

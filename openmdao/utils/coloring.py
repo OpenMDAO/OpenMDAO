@@ -735,7 +735,7 @@ def _get_simul_excludes(problem):
     """
     offset = 0
     simul_coloring_excludes = []
-    if problem._mode == 'fwd':
+    if problem._mode == 'rev':
         wrt = list(problem.driver._designvars)
         desvars = problem.driver._designvars
         for dv in wrt:
@@ -748,7 +748,7 @@ def _get_simul_excludes(problem):
                     simul_coloring_excludes.extend(np.array(excl) + offset)
             offset += size
 
-    else:  # rev
+    else:  # fwd
         of = problem.driver._get_ordered_nl_responses()
         resps = problem.driver._responses
         for resp in of:
