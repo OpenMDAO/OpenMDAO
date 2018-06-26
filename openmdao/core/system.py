@@ -1762,9 +1762,12 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : iter of int
-            A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
-            solved in the opposite direction.
+        simul_coloring_excludes : bool or iter of int
+            Only used when doing simultaneous derivatives in rev mode.  If a bool, exclude
+            from the coloring algorithm all columns in the total jacobian associated with
+            this design variable. If an iter of indices, exclude only those.  Indices, if given,
+            should be relative to this variable.  They will be automatically adjusted to map to
+            the proper columns in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -1891,9 +1894,12 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : iter of int
-            A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
-            solved in the opposite direction.
+        simul_coloring_excludes : bool or iter of int
+            Only used when doing simultaneous derivatives in fwd mode.  If a bool, exclude
+            from the coloring algorithm all rows in the total jacobian associated with
+            this response. If an iter of indices, exclude only those.  Indices, if given,
+            should be relative to this variable.  They will be automatically adjusted to map to
+            the proper rows in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2042,9 +2048,12 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : iter of int
-            A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
-            solved in the opposite direction.
+        simul_coloring_excludes : bool or iter of int
+            Only used when doing simultaneous derivatives in fwd mode.  If a bool, exclude
+            from the coloring algorithm all rows in the total jacobian associated with
+            this constraint. If an iter of indices, exclude only those.  Indices, if given,
+            should be relative to this variable.  They will be automatically adjusted to map to
+            the proper rows in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2094,9 +2103,12 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : iter of int
-            A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
-            solved in the opposite direction.
+        simul_coloring_excludes : bool or iter of int
+            Only used when doing simultaneous derivatives in fwd mode.  If a bool, exclude
+            from the coloring algorithm all rows in the total jacobian associated with
+            this objective. If an iter of indices, exclude only those.  Indices, if given,
+            should be relative to this variable.  They will be automatically adjusted to map to
+            the proper rows in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
