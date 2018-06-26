@@ -783,11 +783,6 @@ class SystemCases(BaseCases):
     Case specific to the entries that might be recorded in a System iteration.
     """
 
-    def __init__(self, filename, abs2prom, abs2meta, prom2abs):
-        super(SystemCases, self).__init__(filename, abs2prom, abs2meta, prom2abs)
-        self._cases = {}
-        
-
     def load_cases(self):
         """
         Load all system cases into memory.

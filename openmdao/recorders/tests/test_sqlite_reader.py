@@ -903,10 +903,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for d in cr.driver_cases.list_cases():
             self.assertTrue(d in cr.driver_cases._cases)
+            self.assertEqual(d, cr.driver_cases._cases[d].iteration_coordinate)
         for so in cr.solver_cases.list_cases():
             self.assertTrue(so in cr.solver_cases._cases)
+            self.assertEqual(so, cr.solver_cases._cases[so].iteration_coordinate)
         for sy in cr.system_cases.list_cases():
             self.assertTrue(sy in cr.system_cases._cases)
+            self.assertEqual(sy, cr.system_cases._cases[sy].iteration_coordinate)
 
     def test_caching_cases(self):
         prob = SellarProblem()
@@ -940,10 +943,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for d in cr.driver_cases.list_cases():
             self.assertTrue(d in cr.driver_cases._cases)
-        for so in cr.solver_cases.list_cases():
+            self.assertEqual(d, cr.driver_cases._cases[d].iteration_coordinate)
+        for o in cr.solver_cases.list_cases():
             self.assertTrue(so in cr.solver_cases._cases)
+            self.assertEqual(so, cr.solver_cases._cases[so].iteration_coordinate)
         for sy in cr.system_cases.list_cases():
             self.assertTrue(sy in cr.system_cases._cases)
+            self.assertEqual(sy, cr.system_cases._cases[sy].iteration_coordinate)
 
 def _assert_model_matches_case(case, system):
     '''
