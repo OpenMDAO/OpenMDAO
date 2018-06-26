@@ -865,15 +865,16 @@ class Driver(object):
 
         Parameters
         ----------
-        simul_info : str or tuple
+        simul_info : str or dict
 
             ::
 
                 # Information about simultaneous coloring for design vars and responses.  If a
                 # string, then simul_info is assumed to be the name of a file that contains the
-                # coloring information in JSON format.  If a tuple, the structure looks like this:
+                # coloring information in JSON format.  If a dict, the structure looks like this:
 
-                (
+                {
+                "fwd": [
                     # First, a list of column index lists, each index list representing columns
                     # having the same color, except for the very first index list, which contains
                     # indices of all columns that are not colored.
@@ -893,8 +894,12 @@ class Driver(object):
                         [ra, rb, ...]   # list of nonzero rows for column 2
                             ...
                     ],
-
-                    # The last tuple entry can be None, indicating that no sparsity structure is
+                ],
+                # This example is not a bidirectional coloring, so the opposite direction, "rev"
+                # in this case, has an empty row index list.  It could also be removed entirely.
+                "rev": [[[]], []],
+                "sparsity":
+                    # The sparsity entry can be absent, indicating that no sparsity structure is
                     # specified, or it can be a nested dictionary where the outer keys are response
                     # names, the inner keys are design variable names, and the value is a tuple of
                     # the form (row_list, col_list, shape).
@@ -909,7 +914,7 @@ class Driver(object):
                         }
                         ...
                     }
-                )
+                }
 
         """
         if self.supports['simultaneous_derivatives']:
