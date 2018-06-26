@@ -705,6 +705,8 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx != -1:
+            # We apply a -1 here because the derivative of the output is minus the derivative of
+            # the residual in openmdao.
             self.input_vec[mode][vecname]._views_flat[input_name][loc_idx] = -1.0
 
         if cache_lin_sol:
@@ -810,6 +812,9 @@ class _TotalJacInfo(object):
         for col, i in enumerate(inds):
             loc_idx = in_loc_idxs[i]
             if loc_idx != -1:
+
+                # We apply a -1 here because the derivative of the output is minus the derivative
+                # of the residual in openmdao.
                 dinputs._views_flat[input_name][loc_idx, col] = -1.0
 
         if cache_lin_sol:
@@ -858,6 +863,9 @@ class _TotalJacInfo(object):
             for col, i in enumerate(matmat_idxs):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
+
+                    # We apply a -1 here because the derivative of the output is minus the
+                    # derivative of the residual in openmdao.
                     if ncol > 1:
                         dinputs._views_flat[input_name][loc_idx, col] = -1.0
                     else:
@@ -955,7 +963,7 @@ class _TotalJacInfo(object):
                     indices = out_meta[output_name][1]
                     if indices is not None:
                         deriv_val = deriv_val[indices]
-                    # print("deriv_val:", i, output_name, input_name, deriv_val)
+
                     if fwd:
                         J[row_or_col, i] = deriv_val[idx2local[row_or_col]]
                     else:
