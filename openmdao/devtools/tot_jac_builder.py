@@ -1,6 +1,7 @@
 """
 A tool to make it easier to investigate coloring of jacobians with different sparsity structures.
 """
+from __future__ import print_function
 
 import sys
 import numpy as np

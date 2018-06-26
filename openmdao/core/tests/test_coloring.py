@@ -16,7 +16,6 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
-from openmdao.devtools.tot_jac_builder import TotJacBuilder
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
