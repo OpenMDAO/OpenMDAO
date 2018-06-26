@@ -750,25 +750,6 @@ class SystemCases(BaseCases):
     Case specific to the entries that might be recorded in a System iteration.
     """
 
-    def __init__(self, filename, abs2prom, abs2meta, prom2abs):
-        super(SystemCases, self).__init__(filename, abs2prom, abs2meta, prom2abs)
-        self._cases = {}
-        with sqlite3.connect(self.filename) as con:
-            cur = con.cursor()
-            cur.execute("SELECT * FROM system_iterations")
-            rows = cur.fetchall()
-            for row in rows:
-                idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
-                    outputs_blob, residuals_blob = row
-                inputs_array = blob_to_array(inputs_blob)
-                outputs_array = blob_to_array(outputs_blob)
-                residuals_array = blob_to_array(residuals_blob)
-
-                case = SystemCase(self.filename, counter, iteration_coordinate, timestamp,
-                                  success, msg, inputs_array, outputs_array, residuals_array,
-                                  self._prom2abs, self._abs2prom, self._abs2meta)
-                self._cases[iteration_coordinate] = case
-
     def get_case(self, case_id):
         """
         Get a case from the database.
@@ -784,8 +765,6 @@ class SystemCases(BaseCases):
             specified case/iteration.
         """
         iteration_coordinate = self.get_iteration_coordinate(case_id)
-        if iteration_coordinate in self._cases:
-            return self._cases[iteration_coordinate]
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
