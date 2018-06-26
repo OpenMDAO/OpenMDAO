@@ -857,60 +857,47 @@ class SparsityTestCase(unittest.TestCase):
 
 class BidirectionalTestCase(unittest.TestCase):
 
-    def setUp1(self):
+    def setUp(self):
         # this is an odd case where the removing the most dense row won't improve the coloring
         self.J = J = np.array([
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [0,0,0,0,0,1,0,0,0,1,0,0,0,1],
-           #[0,0,0,0,1,0,0,0,1,0,0,0,1,0],
-           #[0,0,1,0,0,0,1,0,0,0,1,0,0,0],
-        ], dtype=bool)
-
-    def setUp2(self):
-        # this is an odd case where the removing the most dense row won't improve the coloring
-        self.J = J = np.array([
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
-            [1,1,0,0,0,1,0,0,0,1,0,0,0,1],
-            [1,1,0,0,1,0,0,0,1,0,0,0,1,0],
-            [1,1,0,1,0,0,0,1,0,0,0,1,0,0],
-            [1,1,1,0,0,0,1,0,0,0,1,0,0,0],
+            [1,1,1,1,0,0,0,0],
+            [1,1,1,1,0,0,0,0],
+            [1,1,1,1,0,0,0,0],
+            [1,1,1,1,0,0,0,0],
+            [1,1,0,0,1,1,0,0],
+            [1,1,0,0,1,1,0,0],
+            [1,1,0,0,1,1,0,0],
+            [1,1,0,0,1,1,0,0],
+            [1,1,0,0,0,0,1,1],
+            [1,1,0,0,0,0,1,1],
+            [1,1,0,0,0,0,1,1],
+            [1,1,0,0,0,0,1,1],
+            [0,0,0,1,0,1,0,1],
+            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            # [1,1,1,1,1,1,0,0,0,0,0,0,0,0],
+            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            # [1,1,0,0,0,0,1,1,1,1,0,0,0,0],
+            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            # [1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+            # [1,1,0,0,0,1,0,0,0,1,0,0,0,1],
         ], dtype=bool)
 
     def test_exclude(self):
-        self.setUp2()
-        coloring = get_simul_meta(None, include_sparsity=False, setup=False, run_model=False,
+        coloring = get_simul_meta(None, mode='fwd', include_sparsity=False, setup=False, run_model=False,
                                        bool_jac=self.J,
-                                       simul_coloring_excludes=(),
+                                       simul_coloring_excludes=None,
                                        stream=None)
-        tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode = _solves_info(coloring)
-        print(tot_colors)
+        tot_size1, tot_colors1, colored_solves1, opp_solves1, pct1, dominant_mode1 = _solves_info(coloring)
 
-
-        coloring = get_simul_meta(None, include_sparsity=False, setup=False, run_model=False,
+        coloring = get_simul_meta(None, mode='fwd', include_sparsity=False, setup=False, run_model=False,
                                   bool_jac=self.J,
-                                  simul_coloring_excludes=(0,),
+                                  simul_coloring_excludes=np.array([12], dtype=int),
                                   stream=None)
         tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode = _solves_info(coloring)
 

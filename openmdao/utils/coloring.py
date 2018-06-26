@@ -3,6 +3,7 @@ Routines to compute coloring for use with simultaneous derivatives.
 """
 from __future__ import division, print_function
 
+import os
 import sys
 import warnings
 from collections import OrderedDict, defaultdict
@@ -17,6 +18,8 @@ from numpy.random import rand
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
+
+from scipy.sparse import csr_matrix
 
 # If this is True, then IF simul coloring/sparsity is specified, use it.
 # If False, don't use it regardless.
@@ -102,34 +105,37 @@ def _get_full_disjoint_cols(J):
         List of lists of disjoint columns
     """
     nrows, ncols = J.shape
-    empty = ()
-    disjoint_cols = [empty] * J.shape[1]
-    idxs = np.arange(ncols, dtype=int)
-    fullset = set(range(J.shape[1]))
 
-    # loop over rows and find all joint cols for each row
-    for i in range(nrows):
-        nzro = set(idxs[J[i]])
-        for nz in nzro:
-            if disjoint_cols[nz] is empty:
-                disjoint_cols[nz] = fullset.copy()
-            disjoint_cols[nz].difference_update(nzro)
+    # start with col_matrix all True, meaning assume all columns are disjoint
+    col_matrix = np.ones((ncols, ncols), dtype=bool)
+
+    # mark col_matrix entries as False when nonzero row entries make them non-disjoint
+    for row in range(nrows):
+        nzro = np.nonzero(J[row])[0]
+        for col in nzro:
+            col_matrix[col, nzro] = False
+            col_matrix[nzro, col] = False
+
+    disjoint_counts = np.count_nonzero(col_matrix, axis=0)
 
     seen = set()
     colors = []
 
-    # loop over columns sorted in order of pair-wise disjointness
-    for col, column_set in sorted(enumerate(disjoint_cols), key=lambda x: len(x[1]), reverse=True):
+    # create a reusable rows vector for checking disjointess
+    allrows = np.zeros(J.shape[0], dtype=bool)
+
+    # loop over columns sorted in order of disjointness, smallest number of disjoint cols first
+    for col in np.argsort(disjoint_counts):
         if col in seen:
             continue
         seen.add(col)
-        allrows = J[:, col].copy()
+        allrows[:] = J[:, col]
         color = [col]
         colors.append(color)
         # column set contains all columns that could possibly share the same color. Not all
         # of them generally will since pairwise disjointness doesn't guarantee disjointness
         # with every column in the set when combined.
-        for other_col in column_set:
+        for other_col in np.nonzero(col_matrix[col, :])[0]:
             if other_col not in seen and not np.any(allrows & J[:, other_col]):
                 seen.add(other_col)
                 color.append(other_col)
@@ -172,12 +178,9 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, setup=False, run_model=False):
     # clear out any old simul coloring info
     prob.driver._simul_coloring_info = None
     prob.driver._res_jacs = {}
-    mode = prob._mode
 
-    # TODO: should always automatically choose mode based on smallest number of rows or cols
-    #       in the total jacobian (minus linear constraints)
     if setup:
-        prob.setup(mode=mode)
+        prob.setup(mode=prob._mode)
 
     if run_model:
         prob.run_model()
@@ -624,7 +627,7 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
         # get density of rows
         max_score = 1.0
         row_score = np.count_nonzero(J, axis=1) / J.shape[1]
-        if simul_coloring_excludes:
+        if simul_coloring_excludes is not None:
             max_score = np.max(row_score) + 1.0
             # make score highest for any explicitly excluded rows
             row_score[simul_coloring_excludes] = max_score
@@ -633,9 +636,13 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
 
         opp_solve_rows = np.argsort(row_score)[::-1]  # ordered highest score to lowest
 
+        # we can use the max degree of a row to avoid wasting our time with certain iterations
+        row_degree = np.count_nonzero(J, axis=1)
+
         # if we have any dense rows, zero them all out since we can't get a coloring with them.
         if full_dense.size > 0:
             num_opp_solves = full_dense.size
+            row_degree[opp_solve_rows[:num_opp_solves]] = 0
         else:  # coloring is possible.  Do coloring for unaltered J to get initial best
             num_opp_solves = 0
     else:
@@ -651,13 +658,14 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
 
         if num_opp_solves > 0:
             J[opp_solve_rows[:num_opp_solves], :] = False  # zero out another skipped row
+            row_degree[opp_solve_rows[num_opp_solves - 1]] = 0
 
             # If each of our rows is a node in a graph, we have to have at least as
             # many colors as the degree of that node, so overall we can't do better
             # than the max degree of all of our row nodes.  If that plus the number
             # of opposite direction solves is no better than our best coloring, then
             # don't bother running the algorthm on this version of J.
-            if np.max(np.count_nonzero(J, axis=1)) + num_opp_solves >= best_colors:
+            if np.max(row_degree) + num_opp_solves >= best_colors:
                 num_opp_solves += 1
                 continue
 
@@ -753,12 +761,15 @@ def _get_simul_excludes(problem):
                     simul_coloring_excludes.extend(np.array(excl) + offset)
             offset += size
 
+    if not simul_coloring_excludes:
+        return None
+
     return simul_coloring_excludes
 
 
-def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
+def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   bidirectional=True, simul_coloring_excludes=(), stream=sys.stdout):
+                   bidirectional=True, simul_coloring_excludes=None, stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
 
@@ -766,6 +777,8 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
     ----------
     problem : Problem or None
         The Problem being analyzed.
+    mode : str or None
+        The direction for computing derivatives.  If None, use problem._mode.
     repeats : int
         Number of times to repeat total jacobian computation.
     tol : float
@@ -810,34 +823,13 @@ def get_simul_meta(problem, repeats=1, tol=1.e-15, show_jac=False,
     else:
         raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
+    if mode is None:
+        mode = problem._mode
+
     if problem is not None:
         simul_coloring_excludes = _get_simul_excludes(problem)
-        coloring = _compute_coloring(J, problem._mode, bidirectional, simul_coloring_excludes)
-    else:
-        best_fwd_coloring = _compute_coloring(J, 'fwd', bidirectional, simul_coloring_excludes)
-        best_fwd_colors = _total_solves(best_fwd_coloring)
-        best_rev_coloring = _compute_coloring(J, 'rev', bidirectional, simul_coloring_excludes)
-        best_rev_colors = _total_solves(best_rev_coloring)
 
-        if best_fwd_colors <= best_rev_colors:
-            coloring = best_fwd_coloring
-        else:
-            coloring = best_rev_coloring
-
-        if 'rev' in best_fwd_coloring:
-            fwd_opp = len(best_fwd_coloring['rev'][0][0])
-        else:
-            fwd_opp = 0
-        if 'fwd' in best_rev_coloring:
-            rev_opp = len(best_rev_coloring['fwd'][0][0])
-        else:
-            rev_opp = 0
-
-        if stream is not None:
-            print("Best fwd:", best_fwd_colors, "fwd solves:", best_fwd_colors - fwd_opp,
-                  "opposite solves:", fwd_opp)
-            print("Best rev:", best_rev_colors, "rev solves:", best_rev_colors - rev_opp,
-                  "opposite solves:", rev_opp)
+    coloring = _compute_coloring(J, mode, bidirectional, simul_coloring_excludes)
 
     modes = [m for m in ('fwd', 'rev') if m in coloring]
 
@@ -891,8 +883,8 @@ def simul_coloring_summary(color_info, stream=sys.stdout):
                      "required (%d) for this configuration\n" % tot_size)
     else:
         tot_size, tot_colors, colored_solves, opp_solves, pct, mode = _solves_info(color_info)
-        stream.write("\nDominant mode: %s" % mode)
-        stream.write("\nColored solves in %s mode: %d   opposite full solves: %d" %
+
+        stream.write("\nColored solves in %s mode: %d   opposite solves: %d" %
                      (mode, colored_solves, opp_solves))
         stream.write("\n\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
                      (tot_colors, tot_size, pct))

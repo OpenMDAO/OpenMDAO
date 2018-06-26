@@ -4,7 +4,9 @@ A tool to make it easier to investigate coloring of jacobians with different spa
 
 import sys
 import numpy as np
+
 from openmdao.utils.array_utils import array_viz
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary, _solves_info
 
 class TotJacBuilder(object):
@@ -58,9 +60,9 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, simul_coloring_excludes=(), stream=sys.stdout):
-        self.coloring = get_simul_meta(None, include_sparsity=False, setup=False, run_model=False,
-                                       bool_jac=self.J,
+    def color(self, mode, simul_coloring_excludes=None, stream=sys.stdout):
+        self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
+                                       run_model=False, bool_jac=self.J,
                                        simul_coloring_excludes=simul_coloring_excludes,
                                        stream=stream)
         return self.coloring
@@ -69,6 +71,25 @@ class TotJacBuilder(object):
         array_viz(self.J)
         print("Shape:", self.J.shape, file=stream)
         print("Density:", np.count_nonzero(self.J) / self.J.size)
+        tup = _solves_info(self.coloring)
+        dominant_mode = tup[-1]
+        if dominant_mode == 'fwd':
+            if 'rev' in self.coloring:
+                opp_rows = self.coloring['rev'][0][0]
+                Jcopy = self.J.copy()
+                Jcopy[opp_rows] = False
+            else:
+                Jcopy = self.J
+            maxdeg = np.max(np.count_nonzero(Jcopy, axis=1))
+        else:
+            if 'fwd' in self.coloring:
+                opp_cols = self.coloring['fwd'][0][0]
+                Jcopy = self.J.copy()
+                Jcopy[:, opp_cols] = False
+            else:
+                Jcopy = self.J
+            maxdeg = np.max(np.count_nonzero(Jcopy, axis=0))
+        print("Max degree:", maxdeg)
         simul_coloring_summary(self.coloring, stream=stream)
 
     def shuffle_rows(self):
@@ -127,21 +148,49 @@ class TotJacBuilder(object):
 
         return builder
 
-if __name__ == '__main__':
-    # Running this from the command line will just give a visualization of a random jacobian and
-    # its coloring.
-
+def rand_jac(stream=sys.stdout, open_mode="w"):
     rnd = np.random.randint
     minr = rnd(1, 10)
     minc = rnd(1, 10)
+
     builder = TotJacBuilder.make_jac(n_dense_rows=rnd(3), row_density=np.random.rand(),
                                      n_dense_cols=rnd(3), col_density=np.random.rand(),
                                      n_blocks=rnd(3,8),
                                      min_shape=(minr,minc),
                                      max_shape=(minr+rnd(10),minc+rnd(10)),
-                                     n_random_pts=rnd(2))
+                                     n_random_pts=rnd(5))
 
-    with open("color_test.out", "w") as f:
-        builder.color(stream=f)
+    colorings = []
 
-    builder.show()
+    for mode in ('fwd', 'rev'):
+        if isinstance(stream, str):
+            with open(stream, open_mode) as f:
+                coloring = builder.color(mode, stream=f)
+        else:
+            coloring = builder.color(mode, stream=stream)
+        colorings.append(coloring)
+
+
+    ftot_size, ftot_colors, fcolored_solves, fopp_solves, fpct, _ = _solves_info(colorings[0])
+    rtot_size, rtot_colors, rcolored_solves, ropp_solves, rpct, _ = _solves_info(colorings[1])
+
+    if ftot_colors <= rtot_colors:
+        builder.coloring = colorings[0]
+        off_mode = 'rev'
+        off_solves = rtot_colors
+        off_opps = ropp_solves
+    else:
+        off_mode = 'fwd'
+        off_solves = ftot_colors
+        off_opps = fopp_solves
+
+    builder.show(stream=stream)
+
+    print("Unused %s mode coloring:  %d solves,  %d opposite solves" %
+          (off_mode, off_solves, off_opps))
+
+
+if __name__ == '__main__':
+    # Running this from the command line will just give a visualization of a random jacobian and
+    # its coloring.
+    rand_jac()

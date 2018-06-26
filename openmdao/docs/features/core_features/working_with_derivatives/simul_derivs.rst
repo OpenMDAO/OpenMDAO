@@ -16,13 +16,9 @@ solves and much-improved performance.
 These problems are said to have separable variables.
 The concept of separability is explained in the :ref:`Theory Manual<theory_separable_variables>`.
 
-.. note::
 
-   While it is possible for problems to exist where simultaneous reverse solves would be possible,
-   OpenMDAO does not currently support simultaneous derivatives in reverse mode.
-
-
-Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically.
+Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically,
+in forward or reverse mode.
 
 
 Dynamic Coloring
@@ -78,34 +74,48 @@ coloring we would pass to :code:`set_simul_deriv_color` would look like this:
 
 .. code-block:: python
 
-    color_info = (
-        # first our list of columns grouped by color, with the first list containing any
-        # columns that are not colored (we don't have any of those in this case).
-        [
-            [],   # non-colored columns
-            [0, 2, 4, 6, 8],   # color 0
-            [1, 3, 5, 7, 9],   # color 1
-        ],
+    color_info = {
+        "fwd": [
+                # first our list of columns grouped by color, with the first list containing any
+                # columns that are not colored (we don't have any of those in this case).
+                [
+                    [],   # non-colored columns
+                    [0, 2, 4, 6, 8],   # color 0
+                    [1, 3, 5, 7, 9],   # color 1
+                ],
 
-        # next, for each column we provide either a list of nonzero row indices if the
-        # column is colored, or None if the column is not colored (we don't have any of those here).
-        [
-            [0],
-            [0],
-            [1],
-            [1],
-            [2],
-            [2],
-            [3],
-            [3],
-            [4],
-            [4],
-        ],
+                # next, for each column we provide either a list of nonzero row indices if the
+                # column is colored, or None if the column is not colored (we don't have any of those here).
+                [
+                    [0],
+                    [0],
+                    [1],
+                    [1],
+                    [2],
+                    [2],
+                    [3],
+                    [3],
+                    [4],
+                    [4],
+                ]
+            ],
+
+        # OpenMDAO supports bidirectional coloring, so it can solve for part of the jacobian in
+        # fwd mode and part in rev mode.  In this case, we don't need any rev mode solves, so
+        # the rev mode entry has an empty row list.  Note that in bidirectional coloring, there
+        # is a dominant direction and an 'opposite' direction (in this case rev), and the
+        # 'opposite' directions color_info entry will always contain an empty row/column mapping.
+        # The row/column mapping is not needed in 'opposite' mode because all 'opposite' mode
+        # solves are full solves, i.e. there is never a coloring in 'opposite' mode.
+
+        # Note that we show the opposite entry ('rev' in this case) here for the purpose of
+        # explanation, but it's also valid to remove the opposite entry completely if it's empty.
+        "rev": [[[]], []],
 
         # next we could specify our sparsity, which we need if we're using the pyOptSparseDriver
-        # as our Driver.  If our driver doesn't need sparsity, we could just replace the dict
-        # shown below with None.
-        {
+        # as our Driver.  If our driver doesn't need sparsity, we could just remove the
+        # 'sparsity' entry completely.
+        'sparsity': {
             # dictionary for our response variable, y
             'y': {
                 # dictionary for our design variable, x
@@ -116,7 +126,7 @@ coloring we would pass to :code:`set_simul_deriv_color` would look like this:
                 )
             }
         }
-    )
+    }
 
     # we would activate simultaneous derivatives by calling this on our driver
     prob.driver.set_simul_deriv_color(color_info)
@@ -163,19 +173,15 @@ would look like this:
 
     Total jacobian shape: (22, 21)
 
-    1 uncolored columns
-    5 columns in color 1
-    5 columns in color 2
-    5 columns in color 3
-    5 columns in color 4
 
     ########### BEGIN COLORING DATA ################
-    [[
+    {
+    "fwd": [[
        [20],   # uncolored columns
-       [0, 2, 4, 6, 8],   # color 1
-       [1, 3, 5, 7, 9],   # color 2
-       [10, 12, 14, 16, 18],   # color 3
-       [11, 13, 15, 17, 19],   # color 4
+       [18, 0, 2, 4, 6],   # color 1
+       [17, 1, 3, 5, 8],   # color 2
+       [16, 9, 10, 12, 14],   # color 3
+       [15, 7, 11, 13, 19]   # color 4
     ],
     [
        [1, 11, 16, 21],   # column 0
@@ -198,9 +204,14 @@ would look like this:
        [8, 19],   # column 17
        [9, 15, 20],   # column 18
        [10, 20],   # column 19
-       None,   # column 20
+       None   # column 20
+    ]],
+    "rev": [[
+       []   # uncolored rows
     ],
-    {
+    [
+    ]],
+    "sparsity": {
     "circle.area": {
        "indeps.x": [[], [], [1, 10]],
        "indeps.y": [[], [], [1, 10]],
@@ -226,9 +237,11 @@ would look like this:
        "indeps.y": [[], [], [1, 10]],
        "indeps.r": [[], [], [1, 1]]
     }
-    }]
+    }
+    }
     ########### END COLORING DATA ############
 
+    Colored solves in fwd mode: 5   opposite solves: 0
 
     Total colors vs. total size: 5 vs 21  (76.2% improvement)
 

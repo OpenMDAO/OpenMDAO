@@ -1731,7 +1731,7 @@ class System(object):
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
-                       simul_coloring_excludes=(), cache_linear_solution=False):
+                       simul_coloring_excludes=None, cache_linear_solution=False):
         r"""
         Add a design variable to this system.
 
@@ -1847,7 +1847,7 @@ class System(object):
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False, simul_coloring_excludes=(),
+                     vectorize_derivs=False, simul_coloring_excludes=None,
                      cache_linear_solution=False):
         r"""
         Add a response variable to this system.
@@ -2006,7 +2006,7 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False, simul_coloring_excludes=(),
+                       vectorize_derivs=False, simul_coloring_excludes=None,
                        cache_linear_solution=False):
         r"""
         Add a constraint variable to this system.
@@ -2066,7 +2066,7 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False, simul_coloring_excludes=(),
+                      vectorize_derivs=False, simul_coloring_excludes=None,
                       cache_linear_solution=False):
         r"""
         Add a response variable to this system.
@@ -2133,7 +2133,7 @@ class System(object):
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring_excludes=(),
+                          simul_coloring_excludes=None,
                           cache_linear_solution=cache_linear_solution)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
