@@ -19,8 +19,6 @@ from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 
-from scipy.sparse import csr_matrix
-
 # If this is True, then IF simul coloring/sparsity is specified, use it.
 # If False, don't use it regardless.
 # The command line simul_coloring and sparsity commands make this False when generating a
@@ -491,7 +489,7 @@ def _total_solves(color_info):
     """
     total_solves = 0
 
-    # lists[0] are the non-colored columns or rows, which are solved individually so
+    # lists[0] are the uncolored columns or rows, which are solved individually so
     # we add all of them, along with the number of remaining lists, where each
     # sublist is a bunch of columns or rows that are solved together, to get the total colors
     # (which equals the total number of linear solves).
@@ -648,13 +646,8 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
     else:
         num_opp_solves = 0
 
-    # in pratice we'll always bail before getting to maxiter
-    maxiter = tot_size if tot_size <= J.shape[0] else J.shape[0]
-
-    while num_opp_solves < maxiter:
-        # bail if trying any additional opp_solves can't do better than our curent best
-        if num_opp_solves + 1 >= best_colors:
-            break
+    # bail if trying any additional opp_solves can't do better than our curent best
+    while num_opp_solves + 1 < best_colors:
 
         if num_opp_solves > 0:
             J[opp_solve_rows[:num_opp_solves], :] = False  # zero out another skipped row

@@ -482,9 +482,6 @@ class ScipyOptimizeDriver(Driver):
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format='array')
-            from openmdao.utils.general_utils import printoptions
-            # with printoptions(linewidth=9999, threshold=9999999):
-            #     print(grad)
             self._grad_cache = grad
 
         except Exception as msg:

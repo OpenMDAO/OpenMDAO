@@ -173,8 +173,6 @@ class _TotalJacInfo(object):
                 modes = [self.mode]
             else:
                 modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
-                # if our coloring has a 'best_mode' that differs from the specied mode,
-                # change it to avoid having a coloring mismatch.
                 if len(modes) == 1 and modes[0] != self.mode:
                     raise RuntimeError("Mode in coloring, '%s', differs from specified mode, '%s'."
                                        % (modes[0], self.mode))
@@ -610,7 +608,7 @@ class _TotalJacInfo(object):
         for mode in modes:
             ilist = coloring_info[mode][0][0]
             for i in ilist:
-                # do all non-colored indices individually (one linear solve per index)
+                # do all uncolored indices individually (one linear solve per index)
                 yield i, self.single_input_setter, self.single_jac_setter, mode
 
     def par_deriv_iter(self, idxs):
