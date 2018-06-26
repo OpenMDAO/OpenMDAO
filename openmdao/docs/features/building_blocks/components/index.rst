@@ -16,6 +16,7 @@ Components
     metamodelunstructured_comp.rst
     ks_comp.rst
     bsplines_comp.rst
+    add_subtract_comp.rst
     cross_product_comp.rst
     dot_product_comp.rst
     matrix_vector_product_comp.rst
