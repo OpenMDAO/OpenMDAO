@@ -119,17 +119,17 @@ class SqliteCaseReader(BaseCaseReader):
 
                 # Read in iterations from Drivers, Systems, and Solvers
                 cur = con.cursor()
-                cur.execute("SELECT iteration_coordinate FROM driver_iterations")
+                cur.execute("SELECT iteration_coordinate FROM driver_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
                 self.driver_cases._case_keys = [coord[0] for coord in rows]
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
 
-                cur.execute("SELECT iteration_coordinate FROM system_iterations")
+                cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
                 self.system_cases._case_keys = [coord[0] for coord in rows]
                 self.system_cases.num_cases = len(self.system_cases._case_keys)
 
-                cur.execute("SELECT iteration_coordinate FROM solver_iterations")
+                cur.execute("SELECT iteration_coordinate FROM solver_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
