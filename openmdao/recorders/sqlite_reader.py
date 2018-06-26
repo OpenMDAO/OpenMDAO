@@ -863,7 +863,7 @@ class SolverCases(BaseCases):
             rows = cur.fetchall()
             for row in rows:
                 idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-                input_blob, output_blob, residuals_blob = row
+                    input_blob, output_blob, residuals_blob = row
 
                 input_array = blob_to_array(input_blob)
                 output_array = blob_to_array(output_blob)

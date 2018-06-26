@@ -164,16 +164,16 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT,iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
-                c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)") 
+                c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs BLOB, outputs BLOB, residuals BLOB)")
-                c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)") 
+                c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
                           "solver_inputs BLOB, solver_output BLOB, solver_residuals BLOB)")
-                c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)") 
+                c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data BLOB)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
