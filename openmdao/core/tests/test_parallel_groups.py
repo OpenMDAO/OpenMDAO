@@ -299,8 +299,8 @@ class TestParallelGroups(unittest.TestCase):
             self.assertEqual(len(testlogger.get('info')), 0)
         else:
             self.assertEqual(len(testlogger.get('error')), 1)
-            self.assertTrue(testlogger.contains_line('warning',
-                                                      "Only want to see this on rank 0"))
+            self.assertTrue(testlogger.contains('warning',
+                                                "Only want to see this on rank 0"))
             self.assertEqual(len(testlogger.get('info')), 1)
             self.assertTrue(msg in testlogger.get('error')[0])
             self.assertTrue(msg in testlogger.get('info')[0])
