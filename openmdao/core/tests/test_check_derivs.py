@@ -8,9 +8,8 @@ import warnings
 
 import numpy as np
 
-from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem, NonlinearRunOnce, \
-                         ImplicitComponent, NonlinearBlockGS, DirectSolver, ExecComp, \
-                         ScipyKrylov, NewtonSolver
+from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, \
+    IndepVarComp, ExecComp, NonlinearRunOnce, NonlinearBlockGS, ScipyKrylov, NewtonSolver
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -150,9 +149,9 @@ class TestProblemCheckPartials(unittest.TestCase):
                         msg='Error flag expected in output but not displayed')
         y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
         self.assertTrue(lines[y_wrt_x2_line+3].endswith('*'),
-                         msg='Error flag not expected in output but displayed')
+                        msg='Error flag not expected in output but displayed')
         self.assertTrue(lines[y_wrt_x2_line+5].endswith('*'),
-                         msg='Error flag not expected in output but displayed')
+                        msg='Error flag not expected in output but displayed')
 
     def test_component_only(self):
 
@@ -195,6 +194,38 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         lines = stream.getvalue().splitlines()
         self.assertEqual(len(lines), 0)
+
+    def test_component_has_no_outputs(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem("indep", IndepVarComp('x', 5.))
+        comp1 = model.add_subsystem("comp1", ExecComp("y=2*x"))
+        comp2 = model.add_subsystem("comp2", ExplicitComponent())
+        comp2.add_input('x', val=0.)
+
+        model.connect('indep.x', ['comp1.x', 'comp2.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        with warnings.catch_warnings(record=True) as w:
+            data = prob.check_partials(out_stream=None)
+
+        # warning about 'comp2'
+        self.assertEqual(len(w), 1)
+        expected = "No derivative data found for Component 'comp2'."
+        self.assertEqual(str(w[0].message), expected)
+
+        # and no derivative data for 'comp2'
+        self.assertFalse('comp2' in data)
+
+        # but we still get good derivative data for 'comp1'
+        self.assertTrue('comp1' in data)
+
+        assert_rel_error(self, data['comp1'][('y', 'x')]['J_fd'][0][0], 2., 1e-9)
+        assert_rel_error(self, data['comp1'][('y', 'x')]['J_fwd'][0][0], 2., 1e-15)
+        assert_rel_error(self, data['comp1'][('y', 'x')]['J_rev'][0][0], 2., 1e-15)
 
     def test_missing_entry(self):
         class MyComp(ExplicitComponent):
@@ -1199,8 +1230,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
 
         stream = cStringIO()
-        prob.check_partials( compact_print=False,show_only_incorrect=False)
-        prob.check_partials( out_stream=stream, compact_print=False,show_only_incorrect=True)
+        prob.check_partials(compact_print=False,show_only_incorrect=False)
+        prob.check_partials(out_stream=stream, compact_print=False,show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"),0)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"),1)
 
@@ -2014,7 +2045,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         p.model.add_objective('time', index=-1)
 
-        p.model.linear_solver=ScipyKrylov(assemble_jac=True)
+        p.model.linear_solver = ScipyKrylov(assemble_jac=True)
 
         p.setup(mode='fwd')
         p.set_solver_print(level=0)
