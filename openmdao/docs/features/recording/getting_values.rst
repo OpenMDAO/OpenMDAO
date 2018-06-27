@@ -139,7 +139,7 @@ Loading a DataBase into Memory
 ------------------------------
 
 Every time the `get_case` method is used, the case reader is making a new query
-to the DB (with the exception of recurring requests, which are cached). This doesn't
+to the database (with the exception of recurring requests, which are cached). This doesn't
 pose a problem when you only intend to access a small subset of the cases or the DB is
 already small, but can be very slow when you're requesting many cases from a large
 recording. To increase efficiency in this scenario you should use the CaseReader's
@@ -153,4 +153,14 @@ reader as you normally would.
 
     cr = CaseReader('cases.sql')
     cr.load_cases()
+    ...
+
+Alternatively, if you only intend to iterate over one or two types of cases (driver, solver, or system)
+then you can avoid pulling the entire recording into memory by using the :code:`load_cases` method on
+the CaseReader's `driver_cases`, `solver_cases`, or `system_cases` individually.
+
+.. code-block:: console
+
+    cr = CaseReader('cases.sql')
+    cr.driver_cases.load_cases()
     ...
