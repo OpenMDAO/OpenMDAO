@@ -8,8 +8,8 @@ import warnings
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp, \
-    ExecComp, NonlinearRunOnce, NonlinearBlockGS, DirectSolver, ScipyKrylov, NewtonSolver
+from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, \
+    IndepVarComp, ExecComp, NonlinearRunOnce, NonlinearBlockGS, ScipyKrylov, NewtonSolver
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
