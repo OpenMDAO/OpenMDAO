@@ -39,7 +39,7 @@ def _parent_key(d):
     """
     Return the function path of the parent of function specified by 'id' in the given dict.
     """
-    parts = d['id'].rsplit('|', 1)
+    parts = d['id'].rsplit('-', 1)
     if len(parts) == 1:
         return ''
     return parts[0]
@@ -100,7 +100,7 @@ class _Application(tornado.web.Application):
         self.call_tree = tree = defaultdict(lambda : [None, {}])
         for path, data in iteritems(self.call_data):
             data['id'] = path
-            parts = path.rsplit('|', 1)
+            parts = path.rsplit('-', 1)
             # add our node to our parent
             if len(parts) > 1:
                 tree[parts[0]][1][path] = data
