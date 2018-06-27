@@ -140,7 +140,7 @@ Loading a DataBase into Memory
 
 Every time the `get_case` method is used, the case reader is making a new query
 to the database (with the exception of recurring requests, which are cached). This doesn't
-pose a problem when you only intend to access a small subset of the cases or the DB is
+pose a problem when you only intend to access a small subset of the cases or the database is
 already small, but can be very slow when you're requesting many cases from a large
 recording. To increase efficiency in this scenario you should use the CaseReader's
 :code:`load_cases` method, which loads all driver, solver, and system cases into memory
