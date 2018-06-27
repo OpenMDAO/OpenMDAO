@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizeDriver, DefaultVector, DirectSolver, \
+                         ScipyOptimizeDriver, DirectSolver, \
                          ImplicitComponent, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 

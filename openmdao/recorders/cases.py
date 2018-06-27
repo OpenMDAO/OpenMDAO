@@ -20,6 +20,8 @@ class BaseCases(object):
         Dictionary mapping absolute variable names to variable metadata.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _cases : dict
+        Dictionary mapping iteration coordinates to cases that have already been loaded.
     """
 
     __metaclass__ = ABCMeta
@@ -45,6 +47,7 @@ class BaseCases(object):
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._prom2abs = prom2abs
+        self._cases = {}
 
     @abstractmethod
     def get_case(self, case_id):
