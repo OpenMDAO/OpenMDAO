@@ -8,7 +8,10 @@ platform:
 environment:
   matrix:
     - PYTHON: 2.7
+      CONDA: "C:\\Miniconda-x64"
+
     - PYTHON: 3.6
+      CONDA: "C:\\Miniconda36-x64"
 
 init:
   #Uncomment the following line to gain RDP access to an appveyor machine.
@@ -16,15 +19,12 @@ init:
   #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 install:
-  - set CONDA=Miniconda
-  - if "%PLATFORM%" == "x64" (set CONDA=%CONDA%-x64)
   - echo %CONDA%
-  - set PATH=C:\%CONDA%;C:\%CONDA%\Scripts;%PATH%
+  - set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
   - conda config --set always_yes yes
   # We need to do this first as other commands may not work with older versions of conda.
   - conda update conda
-  - if "%PYTHON%" == "3.6" (conda uninstall enum34)
-  - conda install python=%PYTHON% numpy scipy nose hdf5 h5py sphinx mock pip --quiet
+  - conda install python=%PYTHON% numpy=1.14 scipy nose hdf5 h5py sphinx mock pip --quiet
   #Grab testflo for running tests, to ensure examples are run
   - pip install redbaron
   - pip install git+https://github.com/OpenMDAO/testflo.git
@@ -33,7 +33,7 @@ install:
   - cd "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC"
   - vcvarsall amd64
   - ps: |
-      If ($env:CONDA -eq "Miniconda3-x64") {
+      If ($env:CONDA -eq "C:\\Miniconda36-x64") {
         If ((Test-Path Env:\MSMPI_BIN)) {throw "error: MSMPI_BIN env var exists. Msmpi already installed before we go to install it."}
         If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpiexec.exe already exists before we go to install it"}
         If ((Get-Command "mpirun.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpirun.exe already exists before we go to install it"}
@@ -43,8 +43,8 @@ install:
       }
 
   #Do these pip installs outside of powershell
-  - if "%CONDA%" == "Miniconda3-x64" (pip install http://openmdao.org/dists/mpi4py-2.0.0-cp34-none-win_amd64.whl)
-  - if "%CONDA%" == "Miniconda3-x64" (pip install http://openmdao.org/dists/petsc4py-3.6.0-cp34-none-win_amd64.whl)
+  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/mpi4py-2.0.0-cp34-none-win_amd64.whl)
+  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/petsc4py-3.6.0-cp34-none-win_amd64.whl)
 
   #Return back to continue install of OpenMDAO
   - cd C:\projects\OpenMDAO*
@@ -52,7 +52,7 @@ install:
 
 test_script:
   - ps: |
-        If ($env:CONDA -eq "Miniconda3-x64") {
+        If ($env:CONDA -eq "C:\\Miniconda36-x64") {
           $env:MSMPI_BIN = [System.Environment]::GetEnvironmentVariable("MSMPI_BIN","Machine")
           $env:Path = $env:Path + ";" + $env:MSMPI_BIN
           If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -eq $null) {throw "error: can't find mpiexec.exe after install"}
@@ -61,7 +61,6 @@ test_script:
           nmake /f Makefile.nmake all
           cd ../..
         }
-  - testflo . -n 1 -m "ptest*"
   - testflo . -n 1
 
 #after tests, need to cd down so that conf.py can be found for docbuild
