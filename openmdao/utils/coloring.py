@@ -8,6 +8,7 @@ import sys
 import warnings
 from collections import OrderedDict, defaultdict
 from itertools import combinations
+from distutils.version import LooseVersion
 
 from six import iteritems
 from six.moves import range
@@ -24,6 +25,26 @@ from openmdao.utils.array_utils import array_viz
 # The command line simul_coloring and sparsity commands make this False when generating a
 # new coloring and/or sparsity.
 _use_sparsity = True
+
+
+# numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
+# return an int instead of an array of ints, so create our own function for those versions.
+if LooseVersion(np.__version__) >= LooseVersion("1.12"):
+    _count_nonzeros = np.count_nonzero
+else:
+    def _count_nonzeros(arr, axis=None):
+        if axis == 1:  # rows
+            count = np.empty(arr.shape[0], dtype=int)
+            for row in range(arr.shape[0]):
+                count[row] = np.count_nonzero(arr[row])
+        elif axis == 0:  # cols
+            count = np.zeros(arr.shape[1], dtype=int)
+            for col in range(arr.shape[1]):
+                count[col] = np.count_nonzero(arr[:, col])
+        else:
+            return np.count_nonzero(arr)
+
+        return count
 
 
 class _SubjacRandomizer(object):
@@ -116,7 +137,7 @@ def _get_full_disjoint_cols(J):
             col_matrix[nzro, col] = False
 
     # count the number of pairwise disjoint columns in each column of col_matrix
-    disjoint_counts = np.count_nonzero(col_matrix, axis=0)
+    disjoint_counts = _count_nonzeros(col_matrix, axis=0)
 
     seen = set()
     colors = []
@@ -625,7 +646,7 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
     if bidirectional:
         # get density of rows
         max_score = 1.0
-        row_score = np.count_nonzero(J, axis=1) / J.shape[1]
+        row_score = _count_nonzeros(J, axis=1) / J.shape[1]
         if simul_coloring_excludes is not None:
             max_score = np.max(row_score) + 1.0
             # make score highest for any explicitly excluded rows
@@ -636,7 +657,7 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
         opp_solve_rows = np.argsort(row_score)[::-1]  # ordered highest score to lowest
 
         # we can use the max degree of a row to avoid wasting our time with certain iterations
-        row_degree = np.count_nonzero(J, axis=1)
+        row_degree = _count_nonzeros(J, axis=1)
 
         # if we have any dense rows, zero them all out since we can't get a coloring with them.
         if full_dense.size > 0:
