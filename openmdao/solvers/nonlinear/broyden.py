@@ -4,7 +4,7 @@ Define the BroydenSolver class.
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
 from __future__ import print_function
-
+import warnings
 from six.moves import range
 
 import numpy as np
@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.name_maps import rel_name2abs_name
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -123,6 +124,9 @@ class BroydenSolver(NonlinearSolver):
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
 
+        self.supports['gradients'] = True
+        self.supports['implicit_components'] = True
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -170,6 +174,34 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = np.empty((n, ))
         self.delta_xm = None
         self.delta_fxm = None
+
+        # Always look for states that aren't being solved so we can warn the user.
+        def _sys_recurse(system, all_states):
+            """
+            Recurse over systems, finding all states that aren't covered by
+            an appropriate solver.
+            """
+            subs = system._subsystems_myproc
+            if len(subs) == 0:
+                all_states.extend(system._list_states())
+
+            else:
+                for subsys in subs:
+                    sub_nl = subsys.nonlinear_solver
+                    if sub_nl and sub_nl.supports['implicit_components']:
+                        continue
+                    _sys_recurse(subsys, all_states)
+
+        all_states = []
+        _sys_recurse(system, all_states)
+
+        states = [rel_name2abs_name(system, rel_name) for rel_name in states]
+        missing = set(all_states).difference(states)
+        if len(missing) > 0:
+            msg = "The following states are not covered by a solver, and may have been " + \
+                   "omitted from the BroydenSolver 'state_vars': "
+            msg += ','.join(missing)
+            warnings.warn(msg)
 
     def _assembled_jac_solver_iter(self):
         """

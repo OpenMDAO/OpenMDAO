@@ -232,11 +232,13 @@ class FiniteDifference(ApproximationScheme):
                 # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
+                    print(input_delta)
                     self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
                     result_array *= coeff
                     result.iadd_data(result_array)
 
                 for of, subjac in outputs:
+                    print('of', of)
 
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]

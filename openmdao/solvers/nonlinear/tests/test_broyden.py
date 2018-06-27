@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import unittest
+import warnings
 
 import numpy as np
 
@@ -220,6 +221,32 @@ class TestBryoden(unittest.TestCase):
         assert_rel_error(self, prob['mixed.x12'], np.zeros((2, )), 1e-6)
         assert_rel_error(self, prob['mixed.x3'], 0.0, 1e-6)
         assert_rel_error(self, prob['mixed.x45'], np.zeros((2, )), 1e-6)
+
+    def test_missing_state_warning(self):
+        # Testing Broyden on a 5 state case split among 3 vars.
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('c', 0.01))
+        model.add_subsystem('mixed', MixedEquation())
+
+        model.connect('p1.c', 'mixed.c')
+
+        model.nonlinear_solver = BroydenSolver()
+        model.nonlinear_solver.options['state_vars'] = ['mixed.x12']
+        model.nonlinear_solver.options['maxiter'] = 15
+
+        prob.setup(check=False)
+
+        with warnings.catch_warnings(record=True) as w:
+            prob.run_model()
+
+        self.assertEqual(len(w), 1)
+
+        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': mixed.x3,mixed.x45"
+
+        self.assertEqual(str(w[0].message), msg)
 
     def test_mixed_promoted_vars(self):
         # Testing Broyden on a 5 state case split among 3 vars.
