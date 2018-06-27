@@ -195,9 +195,10 @@ class TestScaling(unittest.TestCase):
         model = prob.model = Group()
         model.add_subsystem('comp', EComp())
 
-        msg = "The ref argument has the wrong shape"
-        with assertRaisesRegex(self, ValueError, msg):
+        msg = "'comp': When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
+        with self.assertRaises(ValueError) as context:
             prob.setup(check=False)
+        self.assertEqual(str(context.exception), msg)
 
         class EComp(ImplicitComponent):
             def setup(self):
@@ -207,9 +208,10 @@ class TestScaling(unittest.TestCase):
         model = prob.model = Group()
         model.add_subsystem('comp', EComp())
 
-        msg = "The ref0 argument has the wrong shape"
-        with assertRaisesRegex(self, ValueError, msg):
+        msg = "'comp': When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
+        with self.assertRaises(ValueError) as context:
             prob.setup(check=False)
+        self.assertEqual(str(context.exception), msg)
 
         class EComp(ImplicitComponent):
             def setup(self):
@@ -219,9 +221,10 @@ class TestScaling(unittest.TestCase):
         model = prob.model = Group()
         model.add_subsystem('comp', EComp())
 
-        msg = "The res_ref argument has the wrong shape"
-        with assertRaisesRegex(self, ValueError, msg):
+        msg = "'comp': When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
+        with self.assertRaises(ValueError) as context:
             prob.setup(check=False)
+        self.assertEqual(str(context.exception), msg)
 
     def test_pass_through(self):
         group = Group()

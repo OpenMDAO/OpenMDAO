@@ -1805,7 +1805,7 @@ class System(object):
         else:
             design_vars = self._design_vars
 
-        design_vars[name] = dvs = OrderedDict()
+        dvs = OrderedDict()
 
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
@@ -1835,10 +1835,23 @@ class System(object):
                 raise ValueError("If specified, indices must be a sequence of integers.")
 
             indices = np.atleast_1d(indices)
-            dvs['size'] = len(indices)
+            dvs['size'] = size = len(indices)
+
+            # All refs: check the shape if necessary
+            for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
+                                       ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
+                if isinstance(item, np.ndarray):
+                    if item.size != size:
+                        raise ValueError("'%s': When adding design var '%s', %s should have size "
+                                         "%d but instead has size %d." % (self.pathname, name,
+                                                                          item_name, size,
+                                                                          item.size))
+
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
+
+        design_vars[name] = dvs
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
@@ -1983,6 +1996,25 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
+        if resp['indices'] is not None:
+            size = resp['indices'].size
+            vlist = [ref, ref0, scaler, adder]
+            nlist = ['ref', 'ref0', 'scaler', 'adder']
+            if type_ == 'con':
+                tname = 'constraint'
+                vlist.extend([upper, lower, equals])
+                nlist.extend(['upper', 'lower', 'equals'])
+            else:
+                tname = 'objective'
+
+            # All refs: check the shape if necessary
+            for item, item_name in zip(vlist, nlist):
+                if isinstance(item, np.ndarray):
+                    if item.size != size:
+                        raise ValueError("'%s': When adding %s '%s', %s should have size "
+                                         "%d but instead has size %d." % (self.pathname, tname,
+                                                                          name, item_name, size,
+                                                                          item.size))
         resp['name'] = name
         resp['ref'] = ref
         resp['ref0'] = ref0

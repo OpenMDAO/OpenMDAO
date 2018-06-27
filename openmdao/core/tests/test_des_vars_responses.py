@@ -639,6 +639,48 @@ class TestObjectiveOnModel(unittest.TestCase):
         self.assertAlmostEqual( obj_scaler*(obj_ref + obj_adder), 1.0,
                                 places=12)
 
+    def test_desvar_size_err(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        for name in ['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0']:
+            args = {name: -np.ones(2)*100}
+            with self.assertRaises(Exception) as context:
+                prob.model.add_design_var('z', indices=[1], **args)
+            self.assertEqual(str(context.exception),
+                             "'': When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+
+    def test_constraint_size_err(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        for name in ['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0']:
+            args = {name: -np.ones(2)*100}
+            with self.assertRaises(Exception) as context:
+                prob.model.add_constraint('z', indices=[1], **args)
+            self.assertEqual(str(context.exception),
+                             "'': When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+
+    def test_objective_size_err(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        for name in ['adder', 'scaler', 'ref', 'ref0']:
+            args = {name: -np.ones(2)*100}
+            with self.assertRaises(Exception) as context:
+                prob.model.add_objective('z', index=1, **args)
+            self.assertEqual(str(context.exception),
+                             "'': When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+
     def test_objective_invalid_name(self):
 
         prob = Problem()
