@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, DefaultVector, ExecComp
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp
 from openmdao.api import NewtonSolver, PETScKrylov, NonlinearBlockGS, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 
