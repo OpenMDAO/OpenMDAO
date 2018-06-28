@@ -17,7 +17,7 @@ install:
   - conda install python=%PYTHON% numpy scipy=1.0 nose hdf5 h5py sphinx mock pip --quiet
   - pip install matplotlib
   - pip install git+https://github.com/OpenMDAO/testflo.git
-  - cd C:\projects\OpenMDAO*
+  - cd C:\projects\blue*
   - pip install -e .
   - pip list
   - conda list
