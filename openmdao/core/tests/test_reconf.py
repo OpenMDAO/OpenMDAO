@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, DefaultVector
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 
 try:

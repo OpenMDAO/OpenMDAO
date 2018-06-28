@@ -19,7 +19,7 @@ from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _coll
 
 
 def _prof_node(fpath, parts):
-    pathparts = fpath.split('-')
+    pathparts = fpath.split('|')
     obj, etime, count = parts
 
     return {
@@ -150,7 +150,7 @@ def _instance_profile_callback(frame, event, arg):
         _, start, oldframe = _call_stack[-1]
         if oldframe is frame:
             final = etime()
-            path = '-'.join(s[0] for s in _call_stack)
+            path = '|'.join(s[0] for s in _call_stack)
             if path not in _inst_data:
                 _inst_data[path] = pdata = [frame.f_locals['self'], 0., 0]
             else:
@@ -175,7 +175,7 @@ def _finalize_profile():
     idents = defaultdict(dict)  # map idents to a smaller number
     for funcpath, data in iteritems(_inst_data):
         _inst_data[funcpath] = data = _prof_node(funcpath, data)
-        parts = funcpath.rsplit('-', 1)
+        parts = funcpath.rsplit('|', 1)
         fname = parts[-1]
         if fname == '$total':
             continue
@@ -204,7 +204,7 @@ def _finalize_profile():
     fname = os.path.basename(_profile_prefix)
     with open("%s.%d" % (fname, rank), 'w') as f:
         for name, data in iteritems(_inst_data):
-            new_name = '-'.join([_obj_map[s] for s in name.split('-')])
+            new_name = '|'.join([_obj_map[s] for s in name.split('|')])
             f.write("%s %d %f\n" % (new_name, data['count'], data['time']))
 
 
@@ -239,7 +239,7 @@ def _process_1_profile(fname):
     empty = [None, 0., 0]
 
     for funcpath, count, t in _iter_raw_prof_file(fname):
-        parts = funcpath.split('-')
+        parts = funcpath.split('|')
 
         tree_nodes[funcpath] = node = _prof_node(funcpath, [None, t, count])
 
@@ -332,9 +332,9 @@ def _process_profile(flist):
 
 
 def _fix_name(name, i):
-    parts = name.split('-')
+    parts = name.split('|')
     parts[0] = '$total.%d' % i
-    return '-'.join(['$total'] + parts)
+    return '|'.join(['$total'] + parts)
 
 
 def _iprof_totals_setup_parser(parser):
