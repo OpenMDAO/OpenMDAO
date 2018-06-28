@@ -17,15 +17,11 @@ install:
   - echo %CONDA%
   - set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
   - conda config --set always_yes yes
-  # We need to do this first as other commands may not work with older versions of conda.
   - conda update conda
   - conda install python=%PYTHON% numpy=1.14.2 scipy=1.0.1 nose hdf5 h5py sphinx mock pip --quiet
   - pip install redbaron
-  #Grab testflo for running tests, to ensure examples are run
   - pip install git+https://github.com/OpenMDAO/testflo.git
   - pip install matplotlib
-
-  #Return back to continue install of OpenMDAO
   - cd C:\projects\OpenMDAO*
   - pip install -e .
 
