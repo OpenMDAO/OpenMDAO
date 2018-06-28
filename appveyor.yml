@@ -13,11 +13,6 @@ environment:
     - PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
 
-init:
-  #Uncomment the following line to gain RDP access to an appveyor machine.
-  #Login info will appear in the console
-  #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-
 install:
   - echo %CONDA%
   - set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
@@ -29,37 +24,11 @@ install:
   #Grab testflo for running tests, to ensure examples are run
   - pip install git+https://github.com/OpenMDAO/testflo.git
   - pip install matplotlib
-  #We need to run these two lines to have nmake available for doctests
-  - cd "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC"
-  - vcvarsall amd64
-#  - ps: |
-#      If ($env:CONDA -eq "C:\\Miniconda36-x64") {
-#        If ((Test-Path Env:\MSMPI_BIN)) {throw "error: MSMPI_BIN env var exists. Msmpi already installed before we go to install it."}
-#        If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpiexec.exe already exists before we go to install it"}
-#        If ((Get-Command "mpirun.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpirun.exe already exists before we go to install it"}
-#        $client = new-object System.Net.WebClient
-#        $client.DownloadFile("http://openmdao.org/dists/MSMpiSetup.exe", "$pwd\MSMpiSetup.exe")
-#        .\MSMpiSetup.exe -unattend -force  | Out-Null #pipe to Out-Null in order to block until install is finished
-#      }
-
-#Do these pip installs outside of powershell
-#  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/mpi4py-2.0.0-cp34-none-win_amd64.whl)
-#  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/petsc4py-3.6.0-cp34-none-win_amd64.whl)
 
   #Return back to continue install of OpenMDAO
   - cd C:\projects\OpenMDAO*
   - pip install -e .
 
 test_script:
-  - ps: |
-        If ($env:CONDA -eq "C:\\Miniconda36-x64") {
-          $env:MSMPI_BIN = [System.Environment]::GetEnvironmentVariable("MSMPI_BIN","Machine")
-          $env:Path = $env:Path + ";" + $env:MSMPI_BIN
-          If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -eq $null) {throw "error: can't find mpiexec.exe after install"}
-          cd openmdao/docs
-          nmake /f Makefile.nmake clean
-          nmake /f Makefile.nmake all
-          cd ../..
-        }
   - testflo . -n 1
 
