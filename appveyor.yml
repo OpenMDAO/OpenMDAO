@@ -22,7 +22,7 @@ install:
   - pip install git+https://github.com/OpenMDAO/testflo.git
   - conda install git
   - cd C:\projects\OpenMDAO*
-  - git reset --hard ce324e2341ba44f93de686deb7f8923c3b553656
+  - git reset --hard b715ec0dc87ad08e6169a4776dc146f2d05a1d14
   - pip install -e .
 
 
