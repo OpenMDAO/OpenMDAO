@@ -24,27 +24,27 @@ install:
   - conda config --set always_yes yes
   # We need to do this first as other commands may not work with older versions of conda.
   - conda update conda
-  - conda install python=%PYTHON% numpy=1.14.2 scipy nose hdf5 h5py sphinx mock pip --quiet
-  #Grab testflo for running tests, to ensure examples are run
+  - conda install python=%PYTHON% numpy=1.14.2 scipy=1.0.1 nose hdf5 h5py sphinx mock pip --quiet
   - pip install redbaron
+  #Grab testflo for running tests, to ensure examples are run
   - pip install git+https://github.com/OpenMDAO/testflo.git
   - pip install matplotlib
   #We need to run these two lines to have nmake available for doctests
   - cd "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC"
   - vcvarsall amd64
-  - ps: |
-      If ($env:CONDA -eq "C:\\Miniconda36-x64") {
-        If ((Test-Path Env:\MSMPI_BIN)) {throw "error: MSMPI_BIN env var exists. Msmpi already installed before we go to install it."}
-        If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpiexec.exe already exists before we go to install it"}
-        If ((Get-Command "mpirun.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpirun.exe already exists before we go to install it"}
-        $client = new-object System.Net.WebClient
-        $client.DownloadFile("http://openmdao.org/dists/MSMpiSetup.exe", "$pwd\MSMpiSetup.exe")
-        .\MSMpiSetup.exe -unattend -force  | Out-Null #pipe to Out-Null in order to block until install is finished
-      }
+#  - ps: |
+#      If ($env:CONDA -eq "C:\\Miniconda36-x64") {
+#        If ((Test-Path Env:\MSMPI_BIN)) {throw "error: MSMPI_BIN env var exists. Msmpi already installed before we go to install it."}
+#        If ((Get-Command "mpiexec.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpiexec.exe already exists before we go to install it"}
+#        If ((Get-Command "mpirun.exe" -ErrorAction SilentlyContinue) -ne $null) {throw "error: mpirun.exe already exists before we go to install it"}
+#        $client = new-object System.Net.WebClient
+#        $client.DownloadFile("http://openmdao.org/dists/MSMpiSetup.exe", "$pwd\MSMpiSetup.exe")
+#        .\MSMpiSetup.exe -unattend -force  | Out-Null #pipe to Out-Null in order to block until install is finished
+#      }
 
-  #Do these pip installs outside of powershell
-  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/mpi4py-2.0.0-cp34-none-win_amd64.whl)
-  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/petsc4py-3.6.0-cp34-none-win_amd64.whl)
+#Do these pip installs outside of powershell
+#  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/mpi4py-2.0.0-cp34-none-win_amd64.whl)
+#  - if "%CONDA%" == "C:\\Miniconda36-x64" (pip install http://openmdao.org/dists/petsc4py-3.6.0-cp34-none-win_amd64.whl)
 
   #Return back to continue install of OpenMDAO
   - cd C:\projects\OpenMDAO*
@@ -63,7 +63,3 @@ test_script:
         }
   - testflo . -n 1
 
-#after tests, need to cd down so that conf.py can be found for docbuild
-# - cd openmdao/docs
-# - nmake /f Makefile.nmake clean
-# - nmake /f Makefile.nmake all
