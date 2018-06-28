@@ -19,12 +19,11 @@ install:
   - conda config --set always_yes yes
   - conda update conda
   - conda install python=%PYTHON% numpy scipy nose hdf5 h5py sphinx mock pip --quiet
-  - pip install redbaron
   - pip install git+https://github.com/OpenMDAO/testflo.git
-  - pip install matplotlib
-  #- cd C:\projects\OpenMDAO*
-  #- pip install -e .
-  - pip install git+git://github.com/OpenMDAO/OpenMDAO.git@ce324e2341ba44f93de686deb7f8923c3b553656
+  - conda install git
+  - cd C:\projects\OpenMDAO*
+  - git reset --hard ce324e2341ba44f93de686deb7f8923c3b553656
+  - pip install -e .
 
 
 test_script:
