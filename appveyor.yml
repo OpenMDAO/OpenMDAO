@@ -22,8 +22,10 @@ install:
   - pip install redbaron
   - pip install git+https://github.com/OpenMDAO/testflo.git
   - pip install matplotlib
-  - cd C:\projects\OpenMDAO*
-  - pip install -e .
+  #- cd C:\projects\OpenMDAO*
+  #- pip install -e .
+  - pip install git+git://github.com/OpenMDAO/OpenMDAO.git@ce324e2341ba44f93de686deb7f8923c3b553656
+
 
 test_script:
   - testflo . -n 1
