@@ -1,6 +1,5 @@
 build: false
 version: 2.3.1.{build}-{branch}
-
 platform: x64
 
 environment:
@@ -12,14 +11,16 @@ environment:
       CONDA: "C:\\Miniconda36-x64"
 
 install:
-  - echo %CONDA%
   - set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
   - conda config --set always_yes yes
   - conda update conda
   - conda install python=%PYTHON% numpy scipy=1.0 nose hdf5 h5py sphinx mock pip --quiet
+  - pip install matplotlib
   - pip install git+https://github.com/OpenMDAO/testflo.git
   - cd C:\projects\OpenMDAO*
   - pip install -e .
+  - pip list
+  - conda list
 
 test_script:
   - testflo . -n 1
