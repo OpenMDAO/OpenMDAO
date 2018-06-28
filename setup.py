@@ -72,6 +72,10 @@ setup(
             'visualization/style/*.woff',
             'visualization/*.html'
         ],
+        'openmdao.devtools.iprofile_app': [
+            'static/*.html',
+            'templates/*.html'
+        ],
         'openmdao.docs': ['*.py', '_utils/*.py'],
         'openmdao.utils': ['unit_library.ini'],
         'openmdao.test_suite': ['*.py', '*/*.py'],

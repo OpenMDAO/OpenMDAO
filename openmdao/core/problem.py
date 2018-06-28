@@ -8,8 +8,9 @@ from collections import OrderedDict, defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 import warnings
+import json
 
-from six import iteritems, iterkeys, itervalues
+from six import iteritems, iterkeys, itervalues, string_types
 from six.moves import range, cStringIO
 
 import numpy as np
@@ -23,12 +24,14 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.vectors.transfer import Transfer
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.units import get_conversion
+from openmdao.utils import coloring
 from openmdao.vectors.default_vector import DefaultVector
 
 try:
@@ -620,6 +623,19 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
+        # if we're doing simul coloring and are doing (or have a chance of doing) bidirectional
+        # coloring, we need to ensure that rev mode scatters are allocated.
+        if coloring._use_sparsity:
+            if ('dynamic_simul_derivs' in self.driver.options and
+                    self.driver.options['dynamic_simul_derivs']):
+                Transfer._need_reverse = True
+            elif self.driver._simul_coloring_info:
+                if isinstance(self.driver._simul_coloring_info, string_types):
+                    with open(self.driver._simul_coloring_info, 'r') as f:
+                        self.driver._simul_coloring_info = json.load(f)
+                if 'rev' in self.driver._simul_coloring_info:
+                    Transfer._need_reverse = True
+
         if self._setup_status < 2:
             self.model._final_setup(self.comm, 'full',
                                     force_alloc_complex=self._force_alloc_complex)
