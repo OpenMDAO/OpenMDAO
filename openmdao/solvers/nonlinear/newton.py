@@ -85,6 +85,7 @@ class NewtonSolver(NonlinearSolver):
                              desc='Maximum number of subsystem solves.')
 
         self.supports['gradients'] = True
+        self.supports['implicit_components'] = True
 
     def _setup_solvers(self, system, depth):
         """

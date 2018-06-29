@@ -4,7 +4,7 @@ Define the BroydenSolver class.
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
 from __future__ import print_function
-
+import warnings
 from six.moves import range
 
 import numpy as np
@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.name_maps import rel_name2abs_name
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -89,6 +90,9 @@ class BroydenSolver(NonlinearSolver):
         self._converge_failures = 0
         self._computed_jacobians = 0
 
+        # This gets set to True if the user doesn't declare any states.
+        self._full_inverse = False
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -122,6 +126,9 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+
+        self.supports['gradients'] = True
+        self.supports['implicit_components'] = True
 
     def _setup_solvers(self, system, depth):
         """
@@ -157,12 +164,17 @@ class BroydenSolver(NonlinearSolver):
             raise ValueError(msg.format(', '.join(bad_names)))
 
         # Size linear system
-        n = 0
         outputs = system._outputs
-        for name in states:
-            size = len(outputs[name])
-            self._idx[name] = (n, n + size)
-            n += size
+        if len(states) > 0:
+            n = 0
+            for name in states:
+                size = len(outputs[name])
+                self._idx[name] = (n, n + size)
+                n += size
+
+        else:
+            self._full_inverse = True
+            n = len(outputs.get_data())
 
         self.n = n
         self.Gm = np.empty((n, n))
@@ -170,6 +182,37 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = np.empty((n, ))
         self.delta_xm = None
         self.delta_fxm = None
+
+        if self._full_inverse:
+            return
+
+        # Always look for states that aren't being solved so we can warn the user.
+        def _sys_recurse(system, all_states):
+            """
+            Recurse over systems, finding all states that aren't covered by
+            an appropriate solver.
+            """
+            subs = system._subsystems_myproc
+            if len(subs) == 0:
+                all_states.extend(system._list_states())
+
+            else:
+                for subsys in subs:
+                    sub_nl = subsys.nonlinear_solver
+                    if sub_nl and sub_nl.supports['implicit_components']:
+                        continue
+                    _sys_recurse(subsys, all_states)
+
+        all_states = []
+        _sys_recurse(system, all_states)
+
+        states = [rel_name2abs_name(system, rel_name) for rel_name in states]
+        missing = set(all_states).difference(states)
+        if len(missing) > 0:
+            msg = "The following states are not covered by a solver, and may have been " + \
+                   "omitted from the BroydenSolver 'state_vars': "
+            msg += ','.join(missing)
+            warnings.warn(msg)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -270,15 +313,23 @@ class BroydenSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+        from time import time
+        t0 = time()
         Gm = self._update_inverse_jacobian()
+        print('jac time', time() - t0)
         fxm = self.fxm
 
         delta_xm = -Gm.dot(fxm)
 
         if self.linesearch:
+            self._solver_info.append_subsolver()
+
             self.set_linear_vector(delta_xm)
             self.linesearch.solve()
             xm = self.get_states()
+
+            self._solver_info.pop()
+
         else:
             # Update the new states in the model.
             xm = self.xm + delta_xm
@@ -352,7 +403,11 @@ class BroydenSolver(NonlinearSolver):
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
-            Gm = self._compute_inverse_jacobian()
+            if self._full_inverse:
+                Gm = self._compute_full_inverse_jacobian()
+            else:
+                Gm = self._compute_inverse_jacobian()
+
             self._computed_jacobians += 1
 
         # Set inverse Jacobian to identity scaled by alpha.
@@ -373,13 +428,18 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             Array containing values of states.
         """
-        states = self.options['state_vars']
-        xm = self.xm.copy()
         outputs = self._system._outputs
-        for name in states:
-            val = outputs[name]
-            i, j = self._idx[name]
-            xm[i:j] = val
+
+        if self._full_inverse:
+            xm = outputs.get_data().copy()
+
+        else:
+            states = self.options['state_vars']
+            xm = self.xm.copy()
+            for name in states:
+                val = outputs[name]
+                i, j = self._idx[name]
+                xm[i:j] = val
 
         return xm
 
@@ -392,11 +452,16 @@ class BroydenSolver(NonlinearSolver):
         new_val : ndarray
             New values for states.
         """
-        states = self.options['state_vars']
         outputs = self._system._outputs
-        for name in states:
-            i, j = self._idx[name]
-            outputs[name] = new_val[i:j]
+
+        if self._full_inverse:
+            outputs.set_data(new_val)
+
+        else:
+            states = self.options['state_vars']
+            for name in states:
+                i, j = self._idx[name]
+                outputs[name] = new_val[i:j]
 
     def get_residuals(self):
         """
@@ -407,13 +472,18 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             Array containing values of residuals.
         """
-        states = self.options['state_vars']
-        fxm = self.fxm
         residuals = self._system._residuals
-        for name in states:
-            val = residuals[name]
-            i, j = self._idx[name]
-            fxm[i:j] = val
+
+        if self._full_inverse:
+            fxm = self.fxm = residuals.get_data()
+
+        else:
+            states = self.options['state_vars']
+            fxm = self.fxm
+            for name in states:
+                val = residuals[name]
+                i, j = self._idx[name]
+                fxm[i:j] = val
 
         return fxm
 
@@ -426,12 +496,16 @@ class BroydenSolver(NonlinearSolver):
         dx : ndarray
             Full step in the states for this iteration.
         """
-        states = self.options['state_vars']
         linear = self._system._vectors['output']['linear']
         linear.set_const(0.0)
-        for name in states:
-            i, j = self._idx[name]
-            linear[name] = dx[i:j]
+        if self._full_inverse:
+            linear.set_data(dx)
+
+        else:
+            states = self.options['state_vars']
+            for name in states:
+                i, j = self._idx[name]
+                linear[name] = dx[i:j]
 
     def _compute_inverse_jacobian(self):
         """
@@ -450,7 +524,7 @@ class BroydenSolver(NonlinearSolver):
         d_res = system._vectors['residual']['linear']
         d_out = system._vectors['output']['linear']
 
-        jac = self.Gm
+        inv_jac = self.Gm
         d_res.set_const(0.0)
 
         # Disable local fd
@@ -480,11 +554,59 @@ class BroydenSolver(NonlinearSolver):
                 # Extract results.
                 for of_name in states:
                     i_of, j_of = self._idx[of_name]
-                    jac[i_of:j_of, i_wrt + j] = d_out[of_name]
+                    inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
                 d_wrt[j] = 0.0
 
         # Enable local fd
         system._owns_approx_jac = approx_status
 
-        return jac
+        return inv_jac
+
+    def _compute_full_inverse_jacobian(self):
+        """
+        Compute inverse Jacobian for entire system vector.
+
+        Only the DirectSolver is supported here.
+
+        Returns
+        -------
+        ndarray
+            New inverse Jacobian.
+        """
+        system = self._system
+
+        # Disable local fd
+        approx_status = system._owns_approx_jac
+        system._owns_approx_jac = False
+
+        # Linearize model.
+        ln_solver = self.linear_solver
+        do_sub_ln = ln_solver._linearize_children()
+        my_asm_jac = ln_solver._assembled_jac
+        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+        if (my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac):
+            my_asm_jac._update(system)
+
+        inv_jac = self.linear_solver._inverse()
+
+        # Enable local fd
+        system._owns_approx_jac = approx_status
+
+        return(inv_jac)
+
+    def _mpi_print_header(self):
+        """
+        Print header text before solving.
+        """
+        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+
+            pathname = self._system.pathname
+            if pathname:
+                nchar = len(pathname)
+                prefix = self._solver_info.prefix
+                header = prefix + "\n"
+                header += prefix + nchar * "=" + "\n"
+                header += prefix + pathname + "\n"
+                header += prefix + nchar * "="
+                print(header)
