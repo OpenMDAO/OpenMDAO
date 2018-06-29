@@ -348,12 +348,11 @@ class BroydenSolver(NonlinearSolver):
             # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch. Make
             # sure we don't update in this case because of divide by zero.
             if fact > self.options['atol']:
-                Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0/fact**2))
+                Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0 / fact**2))
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
             Gm = self._compute_inverse_jacobian()
-            print(Gm)
             self._computed_jacobians += 1
 
         # Set inverse Jacobian to identity scaled by alpha.
