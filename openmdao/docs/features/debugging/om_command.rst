@@ -9,6 +9,11 @@ command.  There are two types of commands available, those that perform some sor
 configuration checking on the Problem after its setup is complete, and those that are used to
 collect information about the entire run of the Problem, things like profilers and tracers.
 
+.. note::
+    The `openmdao` sub-commands, as well as any other console scripts associated with OpenMDAO, will
+    only be available if you have installed OpenMDAO using *pip*. See :ref:`Getting Started <GettingStarted>`
+
+
 All available :code:`openmdao` sub-commands can be shown using the following command:
 
 .. embed-shell-cmd::
