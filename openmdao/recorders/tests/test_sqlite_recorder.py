@@ -19,7 +19,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
+    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem, SellarStateConnection
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
@@ -1577,6 +1577,56 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+    def test_recorder_cleanup(self):
+        def assert_closed(self, recorder):
+            try:
+                recorder.connection.execute("SELECT * FROM metadata;")
+            except sqlite3.ProgrammingError as err:
+                self.assertEqual(str(err), 'Cannot operate on a closed database.')
+
+        prob = SellarProblem(SellarStateConnection)
+        prob.setup()
+
+        driver = prob.driver
+        system = prob.model.pz
+        solver = prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+
+        # create 3 different recorders
+        driver_recorder = SqliteRecorder('driver_cases.sql')
+        system_recorder = SqliteRecorder('system_cases.sql')
+        solver_recorder = SqliteRecorder('solver_cases.sql')
+
+        # add recorders
+        driver.add_recorder(driver_recorder)
+        system.add_recorder(system_recorder)
+        solver.add_recorder(solver_recorder)
+
+        # run
+        prob.run_driver()
+
+        # check recorders have been added
+        self.assertTrue(driver._rec_mgr._recorders == [driver_recorder])
+        self.assertTrue(system._rec_mgr._recorders == [system_recorder])
+        self.assertTrue(solver._rec_mgr._recorders == [solver_recorder])
+
+        # check recorders are active
+        self.assertTrue(driver_recorder.connection is not None)
+        self.assertTrue(system_recorder.connection is not None)
+        self.assertTrue(solver_recorder.connection is not None)
+
+        # cleanup
+        prob.cleanup()
+
+        # check recorders are closed
+        assert_closed(self, driver_recorder)
+        assert_closed(self, system_recorder)
+        assert_closed(self, solver_recorder)
+
+        # check recorders are removed
+        self.assertFalse(driver._rec_mgr.has_recorders())
+        self.assertFalse(system._rec_mgr.has_recorders())
+        self.assertFalse(solver._rec_mgr.has_recorders())
 
 
 class TestFeatureSqliteRecorder(unittest.TestCase):
