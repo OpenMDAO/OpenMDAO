@@ -322,6 +322,47 @@ class TestBryoden(unittest.TestCase):
         # Jacobian.
         self.assertTrue(model.nonlinear_solver._iter_count < 4)
 
+    def test_simple_sellar_full(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        model.nonlinear_solver.linear_solver = DirectSolver()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Normally takes about 5 iters, but takes around 4 if you calculate an initial
+        # Jacobian.
+        self.assertTrue(model.nonlinear_solver._iter_count < 6)
+
+    def test_simple_sellar_full_jacobian(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        model.nonlinear_solver.options['compute_jacobian'] = True
+        model.nonlinear_solver.linear_solver = DirectSolver()
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Normally takes about 5 iters, but takes around 4 if you calculate an initial
+        # Jacobian.
+        self.assertTrue(model.nonlinear_solver._iter_count < 5)
+
     def test_jacobian_update_converge_limit(self):
         # This model needs jacobian updates to converge.
 
