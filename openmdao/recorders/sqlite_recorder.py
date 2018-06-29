@@ -472,7 +472,7 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
                           "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
-    def close(self):
+    def shutdown(self):
         """
         Close database connection.
         """

@@ -109,10 +109,10 @@ class RecordingManager(object):
 
     def shutdown(self):
         """
-        Close and remove all recorders in the manager.
+        Shut down and remove all recorders.
         """
         for recorder in self._recorders:
-            recorder.close()
+            recorder.shutdown()
         self._recorders = []
 
     def record_iteration(self, recording_requester, data, metadata):

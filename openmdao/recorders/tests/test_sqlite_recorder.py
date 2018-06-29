@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
     ScipyOptimizeDriver, NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS
+    BoundsEnforceLS, ArmijoGoldsteinLS, PETScVector
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -996,7 +996,7 @@ class TestSqliteRecorder(unittest.TestCase):
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(PETScKrylov is None, "PETScKrylov is required.")
+    @unittest.skipIf(PETScVector is None, "PETSc is required.")
     def test_record_solver_linear_petsc_ksp(self):
         prob = SellarProblem()
         prob.setup()
