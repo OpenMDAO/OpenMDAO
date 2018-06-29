@@ -58,6 +58,21 @@ might be recalculated if convergence stalls, though this doesn't happen in the e
       openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit
       :layout: interleave
 
+BroydenSolver on a Full Model
+-----------------------------
+
+The example above show you how to specify the Broyden options to solve specific states in your model. You
+can also allow Broyden to solve every state (implicit and explcit) in the model by not declaring any
+states in the "state_vars" option. The main advantage to operating like this is that you don't have
+to worry about forgetting any states, especially in large models. The disadvantage is that now you
+need to calculate and update an n by n Jacobian where n is the full width of all variables in your
+model.
+
+Here is the circuit example operating on the full model:
+
+  .. embed-code::
+      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_full
+      :layout: interleave
 
 BroydenSolver Option Examples
 -----------------------------

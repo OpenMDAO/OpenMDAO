@@ -54,6 +54,8 @@ class BroydenSolver(NonlinearSolver):
         Number of computed jacobians.
     _converge_failures : int
         Number of consecutive iterations that failed to converge to the tol definied in options.
+    _full_inverse : bool
+        When True, Broyden considers the whole vector rather than a list of states.
     _recompute_jacobian : bool
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
@@ -187,11 +189,7 @@ class BroydenSolver(NonlinearSolver):
             return
 
         # Always look for states that aren't being solved so we can warn the user.
-        def _sys_recurse(system, all_states):
-            """
-            Recurse over systems, finding all states that aren't covered by
-            an appropriate solver.
-            """
+        def sys_recurse(system, all_states):
             subs = system._subsystems_myproc
             if len(subs) == 0:
                 all_states.extend(system._list_states())
@@ -201,16 +199,16 @@ class BroydenSolver(NonlinearSolver):
                     sub_nl = subsys.nonlinear_solver
                     if sub_nl and sub_nl.supports['implicit_components']:
                         continue
-                    _sys_recurse(subsys, all_states)
+                    sys_recurse(subsys, all_states)
 
         all_states = []
-        _sys_recurse(system, all_states)
+        sys_recurse(system, all_states)
 
         states = [rel_name2abs_name(system, rel_name) for rel_name in states]
         missing = set(all_states).difference(states)
         if len(missing) > 0:
             msg = "The following states are not covered by a solver, and may have been " + \
-                   "omitted from the BroydenSolver 'state_vars': "
+                  "omitted from the BroydenSolver 'state_vars': "
             msg += ','.join(missing)
             warnings.warn(msg)
 
@@ -313,10 +311,7 @@ class BroydenSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
-        from time import time
-        t0 = time()
         Gm = self._update_inverse_jacobian()
-        print('jac time', time() - t0)
         fxm = self.fxm
 
         delta_xm = -Gm.dot(fxm)
