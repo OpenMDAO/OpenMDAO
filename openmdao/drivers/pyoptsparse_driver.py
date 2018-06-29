@@ -36,7 +36,7 @@ optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
            'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
 
 # All drivers that require an initial run
-run_required = ['NSGA2']
+run_required = ['NSGA2', 'ALPSO']
 
 CITATIONS = """
 @phdthesis{hwang_thesis_2015,
