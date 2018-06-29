@@ -313,7 +313,10 @@ class BroydenSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+        from time import time
+        t0 = time()
         Gm = self._update_inverse_jacobian()
+        print('jac time', time() - t0)
         fxm = self.fxm
 
         delta_xm = -Gm.dot(fxm)
