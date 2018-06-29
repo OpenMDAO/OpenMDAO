@@ -1,5 +1,6 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
+import copy
 import sys
 import unittest
 
@@ -79,6 +80,21 @@ class ParaboloidAE(ExplicitComponent):
         partials['f_xy', 'x'] = 2.0*x - 6.0 + y
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
         self.grad_iter_count += 1
+
+
+class DataSave(ExplicitComponent):
+    """ Saves run points so that we can verify that initial point is run."""
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_output('y', val=0.0)
+
+        self.visited_points=[]
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        self.visited_points.append(copy.copy(x))
+        outputs['y'] = (x-3.0)**2
 
 
 class TestPyoptSparse(unittest.TestCase):
@@ -1464,6 +1480,31 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
+
+    def test_initial_run_NSGA2(self):
+        _, local_opt = set_pyoptsparse_opt('NSGA2')
+        if local_opt != 'NSGA2':
+            raise unittest.SkipTest("pyoptsparse is not providing NSGA2")
+
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'NSGA2'
+        prob.driver.opt_settings['maxGen'] = 1
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
