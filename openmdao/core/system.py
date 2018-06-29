@@ -2905,3 +2905,16 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        # shut down all recorders
+        self._rec_mgr.shutdown()
+
+        # do any required cleanup on solvers
+        if self._nonlinear_solver:
+            self._nonlinear_solver.cleanup()
+        if self._linear_solver:
+            self._linear_solver.cleanup()

@@ -474,7 +474,7 @@ class SqliteRecorder(BaseRecorder):
 
     def close(self):
         """
-        Close `out`.
+        Close database connection.
         """
         if self.connection:
             self.connection.close()

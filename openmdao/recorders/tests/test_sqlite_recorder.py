@@ -28,11 +28,6 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
 
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
-
 if PY2:
     import cPickle as pickle
 if PY3:
@@ -386,8 +381,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         assertDriverMetadataRecorded(self, None)
 
-    @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    # @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_system(self):
         prob = SellarProblem()
         prob.setup()
@@ -414,7 +407,6 @@ class TestSqliteRecorder(unittest.TestCase):
         obj_cmp.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
-        prob.cleanup()
 
         expected_data = [
             # data from 'd1'
@@ -630,7 +622,6 @@ class TestSqliteRecorder(unittest.TestCase):
         nl.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
-        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
@@ -989,8 +980,7 @@ class TestSqliteRecorder(unittest.TestCase):
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    # @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
+    @unittest.skipIf(PETScKrylov is None, "PETScKrylov is required.")
     def test_record_solver_linear_petsc_ksp(self):
         prob = SellarProblem()
         prob.setup()
@@ -1695,7 +1685,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(list(cr.driver_metadata['tree'].keys()),
                          ['name', 'type', 'subsystem_type', 'children'])
 
-
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -1729,7 +1718,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             'd1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS'
         ])
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
-        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
+        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
 
     def test_feature_system_metadata(self):
