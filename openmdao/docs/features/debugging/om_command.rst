@@ -11,7 +11,7 @@ collect information about the entire run of the Problem, things like profilers a
 
 .. note::
     The `openmdao` sub-commands, as well as any other console scripts associated with OpenMDAO, will
-    only be available if you have installed OpenMDAO using *pip*. See :ref:`Getting Started <getting-started>`
+    only be available if you have installed OpenMDAO using *pip*. See :ref:`Getting Started <GettingStarted>`
 
 
 All available :code:`openmdao` sub-commands can be shown using the following command:

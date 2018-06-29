@@ -1,7 +1,5 @@
 .. _GettingStarted:
 
-.. _getting-started:
-
 ***************
 Getting Started
 ***************
