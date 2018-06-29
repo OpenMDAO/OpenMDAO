@@ -7,7 +7,7 @@ import argparse
 from collections import defaultdict
 
 from openmdao.devtools.iprof_utils import _create_profile_callback, find_qualified_name, func_group, \
-     _collect_methods, _setup_func_group, _get_methods
+     _collect_methods, _setup_func_group, _get_methods, _Options
 from openmdao.utils.mpi import MPI
 
 
@@ -76,6 +76,8 @@ def setup(methods=None):
     methods : list of (glob, (classes...)) or None
         Methods to be profiled, based on glob patterns and isinstance checks.
     """
+    if not func_group:
+        _setup_func_group()
     _setup(_Options(methods=methods))
 
 

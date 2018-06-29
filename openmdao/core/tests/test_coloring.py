@@ -15,6 +15,7 @@ from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.coloring import get_simul_meta, _solves_info
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -31,11 +32,11 @@ class RunOnceCounter(LinearRunOnce):
         super(RunOnceCounter, self)._iter_execute()
         self._solve_count += 1
 
+# note: size must be an even number
+SIZE = 10
 
 def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
 
-    # note: size must be an even number
-    SIZE = 10
     p = Problem()
 
     p.model.linear_solver = RunOnceCounter()
@@ -115,7 +116,7 @@ class SimulColoringTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
 
-        color_info = [[
+        color_info = {"fwd": [[
            [20],   # uncolored columns
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
@@ -144,34 +145,34 @@ class SimulColoringTestCase(unittest.TestCase):
            [9, 16, 21],   # column 18
            [10, 21],   # column 19
            None   # column 20
-        ],
-        {
-        "circle.area": {
-           "indeps.x": [[], [], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[0], [0], [1, 1]]
-        },
-        "r_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
-        },
-        "l_conx.g": {
-           "indeps.x": [[0], [0], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[], [], [1, 1]]
-        },
-        "theta_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        },
-        "delta_theta_con.g": {
-           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        }
-        }]
+        ]],
+        "sparsity": {
+            "circle.area": {
+               "indeps.x": [[], [], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[0], [0], [1, 1]]
+            },
+            "r_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+            },
+            "l_conx.g": {
+               "indeps.x": [[0], [0], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[], [], [1, 1]]
+            },
+            "theta_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "delta_theta_con.g": {
+               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            }
+        }}
         p_color = run_opt(pyOptSparseDriver, 'fwd', color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -212,7 +213,7 @@ class SimulColoringTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        color_info = [[
+        color_info = {"fwd": [[
            [20],   # uncolored columns
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
@@ -241,34 +242,34 @@ class SimulColoringTestCase(unittest.TestCase):
            [9, 16, 21],   # column 18
            [10, 21],   # column 19
            None   # column 20
-        ],
-        {
-        "circle.area": {
-           "indeps.x": [[], [], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[0], [0], [1, 1]]
-        },
-        "r_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
-        },
-        "l_conx.g": {
-           "indeps.x": [[0], [0], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[], [], [1, 1]]
-        },
-        "theta_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        },
-        "delta_theta_con.g": {
-           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        }
-        }]
+        ]],
+            "sparsity": {
+            "circle.area": {
+               "indeps.x": [[], [], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[0], [0], [1, 1]]
+            },
+            "r_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+            },
+            "l_conx.g": {
+               "indeps.x": [[0], [0], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[], [], [1, 1]]
+            },
+            "theta_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "delta_theta_con.g": {
+               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            }
+        }}
 
         p_color = run_opt(pyOptSparseDriver, 'fwd', color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -319,7 +320,7 @@ class SimulColoringRevTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
 
-        color_info = [[
+        color_info = {"rev": [[
            [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
            [2, 21],   # color 1
            [3, 16],   # color 2
@@ -349,34 +350,34 @@ class SimulColoringRevTestCase(unittest.TestCase):
            [6, 7, 16, 17],   # row 19
            [8, 9, 18, 19],   # row 20
            [0]   # row 21
-        ],
-        {
-        "circle.area": {
-           "indeps.x": [[], [], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[0], [0], [1, 1]]
-        },
-        "r_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
-        },
-        "theta_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        },
-        "delta_theta_con.g": {
-           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        },
-        "l_conx.g": {
-           "indeps.x": [[0], [0], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[], [], [1, 1]]
-        }
-        }]
+        ]],
+        "sparsity": {
+            "circle.area": {
+               "indeps.x": [[], [], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[0], [0], [1, 1]]
+            },
+            "r_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+            },
+            "theta_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "delta_theta_con.g": {
+               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "l_conx.g": {
+               "indeps.x": [[0], [0], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[], [], [1, 1]]
+            }
+        }}
         p_color = run_opt(pyOptSparseDriver, 'rev', color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -405,13 +406,13 @@ class SimulColoringRevTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 11 solves per driver iter  (11 vs 22)
+        # - bidirectional coloring saves 17 solves per driver iter  (5 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:
@@ -424,7 +425,7 @@ class SimulColoringRevTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        color_info = [[
+        color_info = {"rev": [[
            [1, 4, 5, 6, 7, 8, 9, 10],
            [3, 17],
            [0, 11, 13, 14, 15, 16],
@@ -453,34 +454,34 @@ class SimulColoringRevTestCase(unittest.TestCase):
            [4, 5, 14, 15],
            [6, 7, 16, 17],
            [8, 9, 18, 19]
-        ],
-        {
-        "circle.area": {
-           "indeps.x": [[], [], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[0], [0], [1, 1]]
-        },
-        "r_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
-        },
-        "l_conx.g": {
-           "indeps.x": [[0], [0], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[], [], [1, 1]]
-        },
-        "theta_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        },
-        "delta_theta_con.g": {
-           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
-        }
-        }]
+        ]],
+        "sparsity": {
+            "circle.area": {
+               "indeps.x": [[], [], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[0], [0], [1, 1]]
+            },
+            "r_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
+               "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
+            },
+            "l_conx.g": {
+               "indeps.x": [[0], [0], [1, 10]],
+               "indeps.y": [[], [], [1, 10]],
+               "indeps.r": [[], [], [1, 1]]
+            },
+            "theta_con.g": {
+               "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            },
+            "delta_theta_con.g": {
+               "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
+               "indeps.r": [[], [], [5, 1]]
+            }
+        }}
 
         p_color = run_opt(pyOptSparseDriver, 'rev', color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -514,13 +515,13 @@ class SimulColoringRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 11 solves per driver iter  (11 vs 22)
+        # - coloring saves 17 solves per driver iter  (5 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
 
 
 class SimulColoringScipyTestCase(unittest.TestCase):
@@ -530,7 +531,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
 
-        color_info = [[
+        color_info = {"fwd": [[
                [20],   # uncolored columns
                [0, 2, 4, 6, 8],   # color 1
                [1, 3, 5, 7, 9],   # color 2
@@ -559,7 +560,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                [9, 15, 20],   # column 18
                [10, 20],   # column 19
                None   # column 20
-            ], None]
+            ]],
+            "sparsity": None
+        }
 
         p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info, optimizer='SLSQP', disp=False)
 
@@ -594,8 +597,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
         import numpy as np
 
-        # note: size must be an even number
-        SIZE = 10
         p = Problem()
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
@@ -657,7 +658,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.add_objective('circle.area', ref=-1)
 
         # setup coloring
-        color_info = ([
+        color_info = {"fwd": [[
            [20],   # uncolored column list
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
@@ -686,7 +687,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
            [9, 15, 20],   # column 18
            [10, 20],   # column 19
            None,   # column 20
-        ], None)
+        ]],
+        "sparsity": None
+        }
 
         p.driver.set_simul_deriv_color(color_info)
 
@@ -701,7 +704,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_simul_coloring(self):
 
-        color_info = [[
+        color_info = {"rev": [[
                [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
                [2, 21],   # color 1
                [3, 16],   # color 2
@@ -731,7 +734,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
                [6, 7, 16, 17],   # row 19
                [8, 9, 18, 19],   # row 20
                [0]   # row 21
-            ], None]
+            ]],
+            "sparsity": None}
 
         p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
         p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
@@ -747,20 +751,19 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_simul_coloring(self):
 
-        # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
         p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 11 solves per driver iter  (11 vs 22)
+        # - bidirectional coloring saves 17 solves per driver iter  (5 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
 
 
 class SparsityTestCase(unittest.TestCase):
@@ -847,6 +850,53 @@ class SparsityTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_dynamic['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
+
+
+class BidirectionalTestCase(unittest.TestCase):
+
+    def test_exclude(self):
+        p = Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_output("a", val=1.0)
+        indep.add_output("b", val=1.0)
+        indep.add_output("c", val=1.0)
+        indep.add_output("d", val=1.0)
+        indep.add_output("e", val=1.0)
+
+        obj = model.add_subsystem('obj', ExecComp('obj=a+b+c+d+ee'))
+        con1 = model.add_subsystem('con1', ExecComp('con=a*2.0 + b'))
+        con2 = model.add_subsystem('con2', ExecComp('con=c*3.0 + 2.0*d'))
+        con3 = model.add_subsystem('con3', ExecComp('con=ee*1.5 - 3.0*c + a'))
+
+        model.connect("indep.a", ("obj.a", "con1.a", "con3.a"))
+        model.connect("indep.b", ("obj.b", "con1.b"))
+        model.connect("indep.c", ("obj.c", "con2.c", "con3.c"))
+        model.connect("indep.d", ("obj.d", "con2.d"))
+        model.connect("indep.e", ("obj.ee", "con3.ee"))
+
+        model.add_design_var("indep.a")
+        model.add_design_var("indep.b")
+        model.add_design_var("indep.c")
+        model.add_design_var("indep.d")
+        model.add_design_var("indep.e")
+
+        model.add_objective('obj.obj')
+        model.add_constraint('con1.con')
+        model.add_constraint('con2.con')
+        model.add_constraint('con3.con', simul_coloring_excludes=True)
+
+        p.setup(mode='fwd')
+        p.run_model()
+
+        coloring = get_simul_meta(p, include_sparsity=False, setup=False, run_model=False, stream=None)
+        tot_size1, tot_colors1, colored_solves1, opp_solves1, pct1, dominant_mode1 = _solves_info(coloring)
+
+        # this is not a great coloring. It's just done to test simul_coloring_excludes
+        self.assertEqual(opp_solves1, 2)
+        self.assertEqual(tot_colors1, 4)
+        self.assertEqual(coloring['rev'][0][0], [3,0])
 
 
 if __name__ == '__main__':
