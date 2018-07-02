@@ -1139,8 +1139,6 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
 
-
-
     def test_feature_system_configure(self):
         from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyKrylov, NonlinearBlockGS
 

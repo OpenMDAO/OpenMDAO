@@ -620,18 +620,6 @@ class Problem(object):
             mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
                                                            all_constraints)
 
-        # if rec_inputs:
-        #     root = self.model
-        #     myinputs = {n for n in root._inputs
-        #                 if check_path(n, incl, excl)}
-        #
-        #     if MPI:
-        #         all_vars = root.comm.gather(myinputs, root=0)
-        #         if MPI.COMM_WORLD.rank == 0:
-        #             myinputs = all_vars[-1]
-        #             for d in all_vars[:-1]:
-        #                 myinputs.update(d)
-
         if MPI:  # filter based on who owns the variables
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
