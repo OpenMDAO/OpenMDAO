@@ -35,6 +35,8 @@ multi_obj_drivers = {'NSGA2'}
 optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
            'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
 
+# All optimizers that require an initial run
+run_required = ['NSGA2', 'ALPSO']
 
 CITATIONS = """
 @phdthesis{hwang_thesis_2015,
@@ -204,9 +206,10 @@ class pyOptSparseDriver(Driver):
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
 
-        # Only need initial run if we have linear constraints.
+        # Only need initial run if we have linear constraints or if we are using an optimizer that
+        # doesn't perform one initially.
         con_meta = self._cons
-        if np.any([con['linear'] for con in itervalues(self._cons)]):
+        if optimizer in run_required or np.any([con['linear'] for con in itervalues(self._cons)]):
             with RecordingDebugging(optimizer, self.iter_count, self) as rec:
                 # Initial Run
                 model._solve_nonlinear()
