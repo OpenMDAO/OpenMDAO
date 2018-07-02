@@ -274,7 +274,8 @@ class DirectSolver(LinearSolver):
         """
         Return the inverse Jacobian.
 
-        This is experimental, and used by BroydenSolver.
+        This is only used by the Broyden solver when calculating a full model Jacobian. Since it
+        is only done for a single RHS, no need for LU.
 
         Returns
         -------
@@ -346,7 +347,7 @@ class DirectSolver(LinearSolver):
             bvec.set_data(b_data)
             xvec.set_data(x_data)
 
-            # During LU decomposition, detect singularities and warn user.
+            # During inversion detect singularities and warn user.
             with warnings.catch_warnings():
 
                 if self.options['err_on_singular']:
