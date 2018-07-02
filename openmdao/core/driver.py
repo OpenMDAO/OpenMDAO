@@ -209,7 +209,8 @@ class Driver(object):
         """
         Clean up resources prior to exit.
         """
-        self._rec_mgr.close()
+        # shut down all recorders
+        self._rec_mgr.shutdown()
 
     def _declare_options(self):
         """

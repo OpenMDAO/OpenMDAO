@@ -557,6 +557,13 @@ class Solver(object):
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        # shut down all recorders
+        self._rec_mgr.shutdown()
+
 
 class NonlinearSolver(Solver):
     """
