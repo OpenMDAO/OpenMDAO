@@ -658,7 +658,8 @@ class Problem(object):
         Clean up resources prior to exit.
         """
         self.driver.cleanup()
-        self._rec_mgr.close()
+        for system in self.model.system_iter(include_self=True, recurse=True):
+            system.cleanup()
 
     def record_iteration(self, case_name):
         """

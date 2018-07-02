@@ -218,6 +218,7 @@ class BaseRecorder(object):
         """
         raise NotImplementedError("record_iteration_solver has not been overridden")
 
+<<<<<<< HEAD
     def record_iteration_problem(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Problem.
@@ -234,7 +235,10 @@ class BaseRecorder(object):
         raise NotImplementedError("record_iteration_problem has not been overridden")
 
     def close(self):
+=======
+    def shutdown(self):
+>>>>>>> dfa672629df8d390dd2959c1743b49a2861c060a
         """
-        Clean up the recorder.
+        Shut down the recorder.
         """
         pass

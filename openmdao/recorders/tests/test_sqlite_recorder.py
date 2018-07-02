@@ -11,15 +11,15 @@ from six import PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
-    NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
+    ScipyOptimizeDriver, NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS, ScipyOptimizeDriver, CaseReader
+    BoundsEnforceLS, ArmijoGoldsteinLS, ScipyOptimizeDriver, CaseReader, PETScVector
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarProblem
+    SellarProblem, SellarStateConnection
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
@@ -27,11 +27,6 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
-
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
 if PY2:
     import cPickle as pickle
@@ -177,9 +172,44 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_simple_driver_recording(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        coordinate = [0, 'SLSQP', (3, )]
+
+        expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
+        expected_objectives = {"comp.f_xy": [-27.0833]}
+        expected_constraints = {"con.c": [-15.0]}
+
+        expected_outputs = expected_desvars
+        expected_outputs.update(expected_objectives)
+        expected_outputs.update(expected_constraints)
+
+        expected_inputs = {
+            "con.x": 7.1666667,
+            "comp.y": -7.83333333,
+            "comp.x": 7.1666667,
+            "con.y": -7.8333333
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SLSQP")
+    def test_simple_driver_recording_pyoptsparse(self):
         prob = ParaboloidProblem()
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
@@ -216,14 +246,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -236,8 +262,8 @@ class TestSqliteRecorder(unittest.TestCase):
         run2_t0, run2_t1 = run_driver(prob, case_prefix='Run2')
         prob.cleanup()
 
-        run1_coord = [0, 'SLSQP', (4, )]  # 1st run, 5 iterations
-        run2_coord = [0, 'SLSQP', (1, )]  # 2nd run, 2 iterations
+        run1_coord = [0, 'SLSQP', (3, )]  # 1st run, 4 iterations
+        run2_coord = [0, 'SLSQP', (0, )]  # 2nd run, 1 iteration
 
         expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
         expected_objectives = {"comp.f_xy": [-27.0833]}
@@ -264,14 +290,10 @@ class TestSqliteRecorder(unittest.TestCase):
         )
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_driver_everything_recorded_by_default(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -386,8 +408,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         assertDriverMetadataRecorded(self, None)
 
-    @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    # @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_system(self):
         prob = SellarProblem()
         prob.setup()
@@ -414,7 +434,6 @@ class TestSqliteRecorder(unittest.TestCase):
         obj_cmp.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
-        prob.cleanup()
 
         expected_data = [
             # data from 'd1'
@@ -466,14 +485,11 @@ class TestSqliteRecorder(unittest.TestCase):
 
         assertSystemIterDataRecorded(self, expected_data, self.eps, prefix='Run#2')
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_includes(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
+
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -488,7 +504,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (4, )]
+        coordinate = [0, 'SLSQP', (3, )]
 
         expected_desvars = {"p1.x": prob["p1.x"]}
         expected_objectives = {"comp.f_xy": prob['comp.f_xy']}
@@ -511,14 +527,10 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_includes_post_setup(self):
         prob = ParaboloidProblem()
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         prob.setup()
 
@@ -535,7 +547,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (4, )]
+        coordinate = [0, 'SLSQP', (3, )]
 
         expected_desvars = {"p1.x": prob["p1.x"]}
         expected_objectives = {"comp.f_xy": prob['comp.f_xy']}
@@ -555,8 +567,6 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_record_system_with_hierarchy(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
         prob.setup(mode='rev')
@@ -582,9 +592,7 @@ class TestSqliteRecorder(unittest.TestCase):
         d1.recording_options['record_metadata'] = True
         d1.add_recorder(self.recorder)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         t0, t1 = run_driver(prob)
         prob.cleanup()
@@ -592,8 +600,8 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # check data for 'd1'
         #
-        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (0, ), 'NLRunOnce', (0, ),
-                      'mda._solve_nonlinear', (0, ), 'NonlinearBlockGS', (4,), 'mda.d1._solve_nonlinear', (4, )]
+        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
+                      'mda._solve_nonlinear', (1, ), 'NonlinearBlockGS', (0,), 'mda.d1._solve_nonlinear', (7, )]
 
         expected_inputs = {
             "mda.d1.z": [5.0, 2.0],
@@ -609,8 +617,8 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # check data for 'pz'
         #
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (1, )]
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+                      'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
@@ -630,7 +638,6 @@ class TestSqliteRecorder(unittest.TestCase):
         nl.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
-        prob.cleanup()
 
         coordinate = [0, 'Driver', (0, ), 'root._solve_nonlinear', (0, ), 'NonlinearBlockGS', (6, )]
 
@@ -990,7 +997,6 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    # @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
     def test_record_solver_linear_petsc_ksp(self):
         prob = SellarProblem()
         prob.setup()
@@ -1171,17 +1177,13 @@ class TestSqliteRecorder(unittest.TestCase):
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_record_driver_system_solver(self):
         # Test what happens when all three types are recorded: Driver, System, and Solver
 
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
         prob.setup(mode='rev')
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         #
         # Add recorders
@@ -1219,7 +1221,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Driver recording test
         #
-        coordinate = [0, 'SLSQP', (6, )]
+        coordinate = [0, 'SLSQP', (5, )]
 
         expected_desvars = {
             "pz.z": prob['pz.z'],
@@ -1243,8 +1245,8 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # System recording test
         #
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
-                      'pz._solve_nonlinear', (1, )]
+        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+                      'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
@@ -1258,8 +1260,8 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Solver recording test
         #
-        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (5, ), 'NLRunOnce', (0, ),
-                      'mda._solve_nonlinear', (5, ), 'NonlinearBlockGS', (3, )]
+        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
+                      'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
         expected_abs_error = 0.0,
         expected_rel_error = 0.0,
@@ -1278,18 +1280,13 @@ class TestSqliteRecorder(unittest.TestCase):
                                  expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_global_counter(self):
         # The case recorder maintains a global counter across all recordings
 
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
         prob.setup(mode='rev')
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-2  # to speed the test up
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         # Add recorders for Driver, System, Solver
         driver.add_recorder(self.recorder)
@@ -1411,8 +1408,6 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_record_system_recursively(self):
         # Test adding recorders to all Systems using the recurse option to add_recorder
 
@@ -1422,11 +1417,7 @@ class TestSqliteRecorder(unittest.TestCase):
         # Need to do recursive adding of recorders AFTER setup
         prob.model.add_recorder(self.recorder, recurse=True)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
-
-        t0, t1 = run_driver(prob)
+        prob.run_model()
         prob.cleanup()
 
         # Just make sure all Systems had some metadata recorded
@@ -1442,17 +1433,17 @@ class TestSqliteRecorder(unittest.TestCase):
             'con_cmp2'
         ])
 
-        # Make sure all the Systems are recorded at least once
+        # Make sure all the Systems are recorded
         assertSystemIterCoordsRecorded(self, [
-            'rank0:SLSQP|0|root._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp1._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|con_cmp2._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d1._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0|mda.d2._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|px._solve_nonlinear|0',
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
         ])
 
     def test_record_system_with_prefix(self):
@@ -1501,14 +1492,10 @@ class TestSqliteRecorder(unittest.TestCase):
             'Run2_rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
         ])
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_driver_recording_with_system_vars(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -1524,7 +1511,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (6, )]
+        coordinate = [0, 'SLSQP', (5, )]
 
         expected_desvars = {
             "pz.z": prob['pz.z'],
@@ -1590,6 +1577,58 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+    def test_recorder_cleanup(self):
+        def assert_closed(self, recorder):
+            try:
+                recorder.connection.execute("SELECT * FROM metadata;")
+            except sqlite3.ProgrammingError as err:
+                self.assertEqual(str(err), 'Cannot operate on a closed database.')
+            else:
+                self.fail('SqliteRecorder database was not closed.')
+
+        prob = SellarProblem(SellarStateConnection)
+        prob.setup()
+
+        driver = prob.driver
+        system = prob.model.pz
+        solver = prob.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+
+        # create 3 different recorders
+        driver_recorder = SqliteRecorder('driver_cases.sql')
+        system_recorder = SqliteRecorder('system_cases.sql')
+        solver_recorder = SqliteRecorder('solver_cases.sql')
+
+        # add recorders
+        driver.add_recorder(driver_recorder)
+        system.add_recorder(system_recorder)
+        solver.add_recorder(solver_recorder)
+
+        # run
+        prob.run_driver()
+
+        # check recorders have been added
+        self.assertTrue(driver._rec_mgr._recorders == [driver_recorder])
+        self.assertTrue(system._rec_mgr._recorders == [system_recorder])
+        self.assertTrue(solver._rec_mgr._recorders == [solver_recorder])
+
+        # check recorders are active
+        self.assertTrue(driver_recorder.connection is not None)
+        self.assertTrue(system_recorder.connection is not None)
+        self.assertTrue(solver_recorder.connection is not None)
+
+        # cleanup
+        prob.cleanup()
+
+        # check recorders are closed
+        assert_closed(self, driver_recorder)
+        assert_closed(self, system_recorder)
+        assert_closed(self, solver_recorder)
+
+        # check recorders are removed
+        self.assertFalse(driver._rec_mgr.has_recorders())
+        self.assertFalse(system._rec_mgr.has_recorders())
+        self.assertFalse(solver._rec_mgr.has_recorders())
 
 
 class TestFeatureSqliteRecorder(unittest.TestCase):
@@ -1695,7 +1734,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(list(cr.driver_metadata['tree'].keys()),
                          ['name', 'type', 'subsystem_type', 'children'])
 
-
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -1729,7 +1767,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             'd1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS'
         ])
         self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
-        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
+        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
 
     def test_feature_system_metadata(self):
