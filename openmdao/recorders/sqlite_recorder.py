@@ -474,7 +474,8 @@ class SqliteRecorder(BaseRecorder):
 
     def shutdown(self):
         """
-        Close database connection.
+        Shut down the recorder.
         """
+        # close database connection
         if self.connection:
             self.connection.close()
