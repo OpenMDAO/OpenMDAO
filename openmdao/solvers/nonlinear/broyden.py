@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.name_maps import rel_name2abs_name
 
 CITATION = """@ARTICLE{
@@ -192,6 +193,12 @@ class BroydenSolver(NonlinearSolver):
         def sys_recurse(system, all_states):
             subs = system._subsystems_myproc
             if len(subs) == 0:
+
+                # Skip implicit components that appear to solve themselves.
+                from openmdao.core.implicitcomponent import ImplicitComponent
+                if overrides_method('solve_nonlinear', system, ImplicitComponent):
+                    return
+
                 all_states.extend(system._list_states())
 
             else:
@@ -201,15 +208,16 @@ class BroydenSolver(NonlinearSolver):
                         continue
                     sys_recurse(subsys, all_states)
 
+
         all_states = []
         sys_recurse(system, all_states)
+        all_states = [system._var_abs2prom['output'][name] for name in all_states]
 
-        states = [rel_name2abs_name(system, rel_name) for rel_name in states]
         missing = set(all_states).difference(states)
         if len(missing) > 0:
             msg = "The following states are not covered by a solver, and may have been " + \
                   "omitted from the BroydenSolver 'state_vars': "
-            msg += ','.join(missing)
+            msg += ', '.join(missing)
             warnings.warn(msg)
 
     def _assembled_jac_solver_iter(self):

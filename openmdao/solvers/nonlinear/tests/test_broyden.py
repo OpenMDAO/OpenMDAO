@@ -244,7 +244,31 @@ class TestBryoden(unittest.TestCase):
 
         self.assertEqual(len(w), 1)
 
-        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': mixed.x3,mixed.x45"
+        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': mixed.x3, mixed.x45"
+
+        self.assertEqual(str(w[0].message), msg)
+
+        # Try again with promoted names.
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('c', 0.01))
+        model.add_subsystem('mixed', MixedEquation(), promotes=['*'])
+
+        model.connect('p1.c', 'c')
+
+        model.nonlinear_solver = BroydenSolver()
+        model.nonlinear_solver.options['state_vars'] = ['x12']
+        model.nonlinear_solver.options['maxiter'] = 15
+
+        prob.setup(check=False)
+
+        with warnings.catch_warnings(record=True) as w:
+            prob.run_model()
+
+        self.assertEqual(len(w), 1)
+
+        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': x3, x45"
 
         self.assertEqual(str(w[0].message), msg)
 
