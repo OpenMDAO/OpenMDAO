@@ -1569,8 +1569,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertEqual(comp.visited_points[0], 1.0)
         self.assertNotEqual(comp.visited_points[1], 1.0)
 
-    # This one hangs on Travis for numpy 1.12 and we can't reproduce the error anywhere where we can
-    # debug it, so we're skipping it for numpy 1.12.
+    # Seems to be a bug in numpy 1.12, fixed in later versions.
     @unittest.skipUnless(LooseVersion(np.__version__) >= LooseVersion("1.13"), "numpy >= 1.13 is required.")
     def test_initial_run_ALPSO(self):
         _, local_opt = set_pyoptsparse_opt('ALPSO')
