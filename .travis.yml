@@ -154,9 +154,9 @@ script:
 # run the tests from down here to see if it can work without being at top level
 # only do coverage on the upload machine.
 - if [ "$UPLOAD_DOCS" ]; then
-    testflo --pre_announce -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
+    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
   else
-    testflo --pre_announce -n 1 --timeout=120 openmdao;
+    testflo -n 1 --timeout=120 openmdao;
   fi
 
 after_success:
