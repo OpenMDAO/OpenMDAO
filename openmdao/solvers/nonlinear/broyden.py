@@ -208,7 +208,6 @@ class BroydenSolver(NonlinearSolver):
                         continue
                     sys_recurse(subsys, all_states)
 
-
         all_states = []
         sys_recurse(system, all_states)
         all_states = [system._var_abs2prom['output'][name] for name in all_states]
