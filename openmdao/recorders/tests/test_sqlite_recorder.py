@@ -18,8 +18,8 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder,
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem, SellarStateConnection
+from openmdao.test_suite.components.sellar import SellarProblem, \
+    SellarDerivatives, SellarDerivativesGrouped, SellarStateConnection
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
