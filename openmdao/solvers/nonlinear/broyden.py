@@ -4,16 +4,15 @@ Define the BroydenSolver class.
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
 from __future__ import print_function
+from copy import deepcopy
 import warnings
 from six.moves import range
 
 import numpy as np
 
-from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.name_maps import rel_name2abs_name
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -415,7 +414,7 @@ class BroydenSolver(NonlinearSolver):
         # Set inverse Jacobian to identity scaled by alpha.
         # This is the default starting point used by scipy and the general broyden algorithm.
         elif self.options['update_broyden']:
-            Gm = np.diag(-self.options['alpha'] * np.ones(self.n))
+            Gm = np.diag(np.full(self.n, -self.options['alpha']))
 
         return Gm
 
@@ -439,9 +438,8 @@ class BroydenSolver(NonlinearSolver):
             states = self.options['state_vars']
             xm = self.xm.copy()
             for name in states:
-                val = outputs[name]
                 i, j = self._idx[name]
-                xm[i:j] = val
+                xm[i:j] = outputs[name]
 
         return xm
 
@@ -483,9 +481,8 @@ class BroydenSolver(NonlinearSolver):
             states = self.options['state_vars']
             fxm = self.fxm
             for name in states:
-                val = residuals[name]
                 i, j = self._idx[name]
-                fxm[i:j] = val
+                fxm[i:j] = residuals[name]
 
         return fxm
 
@@ -538,7 +535,7 @@ class BroydenSolver(NonlinearSolver):
         do_sub_ln = ln_solver._linearize_children()
         my_asm_jac = ln_solver._assembled_jac
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if (my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac):
+        if my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
         self._linearize()
 
@@ -587,7 +584,7 @@ class BroydenSolver(NonlinearSolver):
         do_sub_ln = ln_solver._linearize_children()
         my_asm_jac = ln_solver._assembled_jac
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if (my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac):
+        if my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
 
         inv_jac = self.linear_solver._inverse()
@@ -595,13 +592,13 @@ class BroydenSolver(NonlinearSolver):
         # Enable local fd
         system._owns_approx_jac = approx_status
 
-        return(inv_jac)
+        return inv_jac
 
     def _mpi_print_header(self):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+        if self.options['iprint'] > 0 and self._system.comm.rank == 0:
 
             pathname = self._system.pathname
             if pathname:

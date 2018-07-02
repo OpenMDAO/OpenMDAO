@@ -15,9 +15,10 @@ import numpy as np
 from openmdao.core.problem import Problem
 from openmdao.core.indepvarcomp import IndepVarComp
 
+from openmdao.solvers.nonlinear.broyden import BroydenSolver
+from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
-from openmdao.solvers.nonlinear.newton import NewtonSolver
 
 from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
@@ -31,7 +32,8 @@ from parameterized import parameterized
 nonlinear_solvers = [
     NonlinearBlockGS,
     NonlinearBlockJac,
-    NewtonSolver
+    NewtonSolver,
+    BroydenSolver
 ]
 
 
