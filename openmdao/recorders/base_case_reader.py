@@ -20,6 +20,8 @@ class BaseCaseReader(object):
         The list of system cases to be loaded.
     solver_cases : list
         The list of solver cases to be loaded.
+    problem_cases : list
+        The list of problem cases to be loaded.
     driver_metadata : dict
         The dictionary of driver metadata to be loaded.
     system_metadata : dict

@@ -299,14 +299,7 @@ class SolverCase(Case):
 
 class ProblemCase(Case):
     """
-    Wraps data from a single iteration of a System recording to make it more accessible.
-
-    Attributes
-    ----------
-    abs_err : array
-        Solver absolute error that has been read in from the recording file.
-    rel_err : array
-        Solver relative error that has been read in from the recording file.
+    Wraps data from a single case of a Problem recording to make it more accessible.
     """
 
     def __init__(self, filename, counter, case_name, timestamp, success, msg,
@@ -320,24 +313,16 @@ class ProblemCase(Case):
             The filename from which the SystemCase was constructed.
         counter : int
             The global execution counter.
-        iteration_coordinate : str
-            The iteration coordinate, in a specific format.
+        case_name : str
+            Name used to identify this Problem case.
         timestamp : float
             Time of execution of the case
         success : str
             Success flag for the case
         msg : str
             Message associated with the case
-        abs_err : array
-            Solver absolute error to read in from the recording file.
-        rel_err : array
-            Solver relative error to read in from the recording file.
-        inputs : array
-            Solver inputs to read in from the recording file.
         outputs : array
             Solver outputs to read in from the recording file.
-        residuals : array
-            Solver residuals to read in from the recording file.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
         abs2prom : {'input': dict, 'output': dict}
@@ -346,9 +331,8 @@ class ProblemCase(Case):
             Dictionary mapping absolute variable names to variable metadata.
         """
         super(ProblemCase, self).__init__(filename, counter, case_name, timestamp,
-                                         success, msg, prom2abs, abs2prom, meta,
-                                          None, outputs,
-                                         )
+                                          success, msg, prom2abs, abs2prom, meta,
+                                          None, outputs)
 
 
 class PromotedToAbsoluteMap:

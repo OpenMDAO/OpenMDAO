@@ -101,6 +101,10 @@ class Problem(object):
         publishing work that uses this class.
     recording_options : <OptionsDictionary>
         Dictionary with problem recording options.
+    _rec_mgr : <RecordingManager>
+        Object that manages all recorders added to this problem.
+    _vars_to_record: dict
+        Dict of lists of var names indicating what to record
     """
 
     _post_setup_func = None
@@ -671,6 +675,11 @@ class Problem(object):
     def record_iteration(self, case_name):
         """
         Record the variables at the Problem level.
+
+        Parameters
+        ----------
+        case_name : str
+            Name used to identify this Problem case.
         """
         if not self._rec_mgr._recorders:
             return

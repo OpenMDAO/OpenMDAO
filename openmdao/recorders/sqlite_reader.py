@@ -10,7 +10,8 @@ import numpy as np
 
 from collections import OrderedDict
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, PromotedToAbsoluteMap
+from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
+    PromotedToAbsoluteMap
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
@@ -114,7 +115,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.solver_cases = SolverCases(self.filename, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
         self.problem_cases = ProblemCases(self.filename, self._abs2prom,
-                                        self._abs2meta, self._prom2abs)
+                                          self._abs2meta, self._prom2abs)
 
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
@@ -796,8 +797,8 @@ class ProblemCases(BaseCases):
 
         Parameters
         ----------
-        case_id : int or str
-            The integer index or string-identifier of the case to be retrieved.
+        case_name : str
+            The string-identifier of the case to be retrieved.
 
         Returns
         -------
@@ -821,8 +822,7 @@ class ProblemCases(BaseCases):
         outputs_array = blob_to_array(outputs_blob)
 
         case = ProblemCase(self.filename, counter, case_name, timestamp, success, msg,
-                          outputs_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta)
+                           outputs_array, self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case
 

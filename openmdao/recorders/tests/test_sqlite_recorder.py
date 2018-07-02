@@ -19,7 +19,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
+    SellarProblem
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
@@ -2066,7 +2066,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             'Driver_Run2_rank0:Driver|0'
         ]))
 
-    def test_problem_record(self):
+    def test_feature_problem_record(self):
+        from openmdao.api import Problem, SqliteRecorder, ScipyOptimizeDriver, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -2110,14 +2113,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         expected_objectives = {"obj": 3.18339395, }
         expected_constraints = {"con1": 0.0, "con2": -20.24472223}
 
-        for expected_set, actual_set in ((expected_desvars, desvars),
-                                         (expected_objectives, objectives),
-                                         (expected_constraints, constraints),
-                                         ):
-
-            self.assertEqual(len(expected_set), len(actual_set.keys))
-            for k in actual_set:
-                np.testing.assert_almost_equal(expected_set[k], actual_set[k])
+        self.assertAlmostEqual(desvars["x"][0], expected_desvars["x"])
+        self.assertAlmostEqual(desvars["z"][0], expected_desvars["z"][0])
+        self.assertAlmostEqual(desvars["z"][1], expected_desvars["z"][1])
+        self.assertAlmostEqual(objectives["obj"][0], expected_objectives["obj"])
+        self.assertAlmostEqual(constraints["con1"][0], expected_constraints["con1"])
+        self.assertAlmostEqual(constraints["con2"][0], expected_constraints["con2"])
 
     def test_problem_record_with_options(self):
         prob = Problem(model=SellarDerivatives())

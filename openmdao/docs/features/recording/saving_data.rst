@@ -80,7 +80,7 @@ Solver Recording Options
     Solver
     recording_options
 
-Recording on Solvers is nearly identical to recording on Systems with the additon of options for recording absolute and relative
+Recording on Solvers is nearly identical to recording on Systems with the addition of options for recording absolute and relative
 error. Below is a basic example of adding a recorder to a solver object and recording absolute error.
 
 .. embed-code::
@@ -89,6 +89,29 @@ error. Below is a basic example of adding a recorder to a solver object and reco
 
 .. note::
     A recorder can be attached to more than one object. Also, more than one recorder can be attached to an object.
+
+
+Recording on Problem Objects
+----------------------------
+
+Problem Recording Options
+^^^^^^^^^^^^^^^^^^^^^^^^^
+.. embed-options::
+    openmdao.core.problem
+    Problem
+    recording_options
+
+Recording on Problems is different from recording other objects because nothing is recorded automatically. The
+user must explicitly call the `Problem.record_iteration` method to record the current values from the `Problem`.
+Below is a basic example of adding a recorder to a `Problem` object and then recording it after a run.
+
+This feature can be useful if you only record a limited number of variables during the run but would like to see a more
+complete list of values after the run.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_problem_record
+    :layout: interleave
+
 
 
 Specifying a Case Prefix
