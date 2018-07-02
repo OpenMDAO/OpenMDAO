@@ -1489,6 +1489,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
 
+    # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
+    # Limiting this to the single travis 1.14 machine for now.
+    @unittest.skipUnless(LooseVersion(np.__version__) >= LooseVersion("1.13"), "numpy >= 1.13 is required.")
     def test_initial_run_NSGA2(self):
         _, local_opt = set_pyoptsparse_opt('NSGA2')
         if local_opt != 'NSGA2':
