@@ -10,7 +10,7 @@ import numpy as np
 
 from collections import OrderedDict
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, PromotedToAbsoluteMap
+from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, PromotedToAbsoluteMap
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
@@ -113,11 +113,13 @@ class SqliteCaseReader(BaseCaseReader):
                                         self._abs2meta, self._prom2abs)
         self.solver_cases = SolverCases(self.filename, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
+        self.problem_cases = ProblemCases(self.filename, self._abs2prom,
+                                        self._abs2meta, self._prom2abs)
 
         if self.format_version in (1,):
             with sqlite3.connect(self.filename) as con:
 
-                # Read in iterations from Drivers, Systems, and Solvers
+                # Read in iterations from Drivers, Systems, Problems, and Solvers
                 cur = con.cursor()
                 cur.execute("SELECT iteration_coordinate FROM driver_iterations")
                 rows = cur.fetchall()
@@ -133,6 +135,11 @@ class SqliteCaseReader(BaseCaseReader):
                 rows = cur.fetchall()
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
+
+                cur.execute("SELECT case_name FROM problem_cases")
+                rows = cur.fetchall()
+                self.problem_cases._case_keys = [coord[0] for coord in rows]
+                self.problem_cases.num_cases = len(self.problem_cases._case_keys)
 
                 # Read in metadata for Drivers, Systems, and Solvers
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
@@ -740,6 +747,48 @@ class DriverCases(BaseCases):
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           inputs_array, outputs_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
+
+        return case
+
+
+class ProblemCases(BaseCases):
+    """
+    Case specific to the entries that might be recorded in a Driver iteration.
+    """
+
+    def get_case(self, case_name):
+        """
+        Get a case from the database.
+
+        Parameters
+        ----------
+        case_id : int or str
+            The integer index or string-identifier of the case to be retrieved.
+
+        Returns
+        -------
+            An instance of a Driver Case populated with data from the
+            specified case/iteration.
+        """
+        # iteration_coordinate = self.get_iteration_coordinate(case_id)
+
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM problem_cases WHERE "
+                        "case_name=:case_name",
+                        {"case_name": case_name})
+            # Initialize the Case object from the iterations data
+            row = cur.fetchone()
+        con.close()
+
+        idx, counter, case_name, timestamp, success, msg, \
+            outputs_blob, = row
+
+        outputs_array = blob_to_array(outputs_blob)
+
+        case = ProblemCase(self.filename, counter, case_name, timestamp, success, msg,
+                          outputs_array,
                           self._prom2abs, self._abs2prom, self._abs2meta)
 
         return case

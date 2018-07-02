@@ -44,6 +44,7 @@ class BaseCaseReader(object):
         self.driver_cases = None
         self.system_cases = None
         self.solver_cases = None
+        self.problem_cases = None
 
         self.driver_metadata = {}
         self.system_metadata = {}

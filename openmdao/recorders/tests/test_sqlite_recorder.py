@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
     NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS
+    BoundsEnforceLS, ArmijoGoldsteinLS, ScipyOptimizeDriver, CaseReader
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -95,12 +95,18 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
-        driver.recording_options['includes'] = []
+        driver.recording_options['includes'] = ['px.x']
         driver.add_recorder(self.recorder)
 
         prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
+
+        from openmdao.api import CaseReader
+        cr = CaseReader(self.filename)
+        final_case = cr.driver_cases.get_case(-1)
+        desvars = final_case.get_desvars()
+
 
         coordinate = [0, 'Driver', (0, )]
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
@@ -2060,6 +2066,99 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             'Driver_Run2_rank0:Driver|0'
         ]))
 
+    def test_problem_record(self):
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.add_recorder(recorder)
+
+        prob.recording_options['includes'] = []
+        prob.recording_options['record_objectives'] = True
+        prob.recording_options['record_constraints'] = True
+        prob.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.record_iteration('final')
+
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        self.assertEqual(cr.problem_cases.num_cases, 1)
+        final_case = cr.problem_cases.get_case('final')
+        desvars = final_case.get_desvars()
+        objectives = final_case.get_objectives()
+        constraints = final_case.get_constraints()
+
+        expected_desvars = {"x": 0.0, "z": [1.97763888351, 0.0]}
+        expected_objectives = {"obj": 3.18339395, }
+        expected_constraints = {"con1": 0.0, "con2": -20.24472223}
+
+        for expected_set, actual_set in ((expected_desvars, desvars),
+                                         (expected_objectives, objectives),
+                                         (expected_constraints, constraints),
+                                         ):
+
+            self.assertEqual(len(expected_set), len(actual_set.keys))
+            for k in actual_set:
+                np.testing.assert_almost_equal(expected_set[k], actual_set[k])
+
+    def test_problem_record_with_options(self):
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.add_recorder(recorder)
+
+        prob.recording_options['includes'] = []
+        prob.recording_options['record_objectives'] = False
+        prob.recording_options['record_constraints'] = False
+        prob.recording_options['record_desvars'] = False
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        final_case = cr.problem_cases.get_case('final')
+        desvars = final_case.get_desvars()
+        objectives = final_case.get_objectives()
+        constraints = final_case.get_constraints()
+
+        self.assertEqual(len(desvars.keys), 0)
+        self.assertEqual(len(objectives.keys), 0)
+        self.assertEqual(len(constraints.keys), 0)
 
 if __name__ == "__main__":
     unittest.main()

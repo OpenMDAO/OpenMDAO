@@ -297,6 +297,60 @@ class SolverCase(Case):
         self.rel_err = rel_err
 
 
+class ProblemCase(Case):
+    """
+    Wraps data from a single iteration of a System recording to make it more accessible.
+
+    Attributes
+    ----------
+    abs_err : array
+        Solver absolute error that has been read in from the recording file.
+    rel_err : array
+        Solver relative error that has been read in from the recording file.
+    """
+
+    def __init__(self, filename, counter, case_name, timestamp, success, msg,
+                 outputs, prom2abs, abs2prom, meta):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The filename from which the SystemCase was constructed.
+        counter : int
+            The global execution counter.
+        iteration_coordinate : str
+            The iteration coordinate, in a specific format.
+        timestamp : float
+            Time of execution of the case
+        success : str
+            Success flag for the case
+        msg : str
+            Message associated with the case
+        abs_err : array
+            Solver absolute error to read in from the recording file.
+        rel_err : array
+            Solver relative error to read in from the recording file.
+        inputs : array
+            Solver inputs to read in from the recording file.
+        outputs : array
+            Solver outputs to read in from the recording file.
+        residuals : array
+            Solver residuals to read in from the recording file.
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
+        abs2prom : {'input': dict, 'output': dict}
+            Dictionary mapping absolute names to promoted names.
+        meta : dict
+            Dictionary mapping absolute variable names to variable metadata.
+        """
+        super(ProblemCase, self).__init__(filename, counter, case_name, timestamp,
+                                         success, msg, prom2abs, abs2prom, meta,
+                                          None, outputs,
+                                         )
+
+
 class PromotedToAbsoluteMap:
     """
     Enables access of values through promoted variable names by mapping to the absolute name.

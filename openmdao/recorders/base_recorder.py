@@ -6,6 +6,7 @@ from six import StringIO
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
+from openmdao.core.problem import Problem
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.mpi import MPI
 
@@ -167,6 +168,8 @@ class BaseRecorder(object):
             self.record_iteration_system(recording_requester, data, metadata)
         elif isinstance(recording_requester, Solver):
             self.record_iteration_solver(recording_requester, data, metadata)
+        elif isinstance(recording_requester, Problem):
+            self.record_iteration_problem(recording_requester, data, metadata)
         else:
             raise ValueError("Recorders must be attached to Drivers, Systems, or Solvers.")
 
@@ -214,6 +217,21 @@ class BaseRecorder(object):
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_iteration_solver has not been overridden")
+
+    def record_iteration_problem(self, recording_requester, data, metadata):
+        """
+        Record data and metadata from a Problem.
+
+        Parameters
+        ----------
+        recording_requester : Problem
+            Problem in need of recording.
+        data : dict
+            Dictionary containing desvars, objectives, constraints.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        raise NotImplementedError("record_iteration_problem has not been overridden")
 
     def close(self):
         """
