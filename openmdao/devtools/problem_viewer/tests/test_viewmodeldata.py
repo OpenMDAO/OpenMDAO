@@ -62,7 +62,7 @@ class TestViewModelData(unittest.TestCase):
         p.driver.add_recorder(r)
         p.setup(check=False)
         p.final_setup()
-        r.close()
+        r.shutdown()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
         tree_json = json.dumps(model_viewer_data['tree'])
@@ -94,7 +94,7 @@ class TestViewModelData(unittest.TestCase):
         p.driver.add_recorder(r)
         p.setup(check=False)
         p.final_setup()
-        r.close()
+        r.shutdown()
         view_model(self.sqlite_db_filename2, outfile=self.sqlite_filename, show_browser=False)
 
         # Check that the html file has been created and has something in it.

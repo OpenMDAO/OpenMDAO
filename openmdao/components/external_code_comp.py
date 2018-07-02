@@ -46,26 +46,26 @@ class ExternalCodeDelegate(object):
         """
         comp = self._comp
 
-        comp.options.declare('command', [], desc='command to be executed')
-        comp.options.declare('env_vars', {}, desc='Environment variables required by the command')
+        comp.options.declare('command', [], desc='Command to be executed.')
+        comp.options.declare('env_vars', {}, desc='Environment variables required by the command.')
         comp.options.declare('poll_delay', 0.0, lower=0.0,
-                             desc='Delay between polling for command completion. A value of zero '
-                                  'will use an internally computed default')
+                             desc='Delay between polling for command completion. '
+                                  'A value of zero will use an internally computed default.')
         comp.options.declare('timeout', 0.0, lower=0.0,
-                             desc='Maximum time to wait for command completion. A value of zero '
-                                  'implies an infinite wait')
+                             desc='Maximum time to wait for command completion. '
+                                  'A value of zero implies an infinite wait.')
         comp.options.declare('external_input_files', [],
-                             desc='(optional) list of input file names to check the existence '
-                                  'of before solve_nonlinear')
+                             desc='List of input files that must exist before execution, '
+                                  'otherwise an Exception is raised.')
         comp.options.declare('external_output_files', [],
-                             desc='(optional) list of input file names to check the existence of '
-                                  'after solve_nonlinear')
+                             desc='List of output files that must exist after execution, '
+                                  'otherwise an Exception is raised.')
         comp.options.declare('fail_hard', True,
                              desc="If True, external code errors raise a 'hard' exception "
-                                  "(RuntimeError).  Otherwise raise a 'soft' exception "
+                                  "(RuntimeError), otherwise errors raise a 'soft' exception "
                                   "(AnalysisError).")
         comp.options.declare('allowed_return_codes', [0],
-                             desc="Set of return codes that are considered successful.")
+                             desc="List of return codes that are considered successful.")
 
     def check_config(self, logger):
         """
@@ -155,9 +155,8 @@ class ExternalCodeDelegate(object):
             elif return_code not in comp.options['allowed_return_codes']:
                 if isinstance(comp.stderr, str):
                     if os.path.exists(comp.stderr):
-                        stderrfile = open(comp.stderr, 'r')
-                        error_desc = stderrfile.read()
-                        stderrfile.close()
+                        with open(comp.stderr, 'r') as stderrfile:
+                            error_desc = stderrfile.read()
                         err_fragment = "\nError Output:\n%s" % error_desc
                     else:
                         err_fragment = "\n[stderr %r missing]" % comp.stderr
@@ -230,7 +229,7 @@ class ExternalCodeComp(ExplicitComponent):
     Run an external code as a component.
 
     Default stdin is the 'null' device, default stdout is the console, and
-    default stderr is ``error.out``.
+    default stderr is ``external_code_comp_error.out``.
 
     Attributes
     ----------
@@ -240,11 +239,6 @@ class ExternalCodeComp(ExplicitComponent):
         Output stream external code writes to.
     stderr : str or file object
         Error stream external code writes to.
-    DEV_NULL : File object
-        NULL device.
-    STDOUT : File object
-        Special value that can be used as the stderr argument to Popen and indicates
-        that standard error should go into the same handle as standard output.
     _external_code_runner: ExternalCodeDelegate object
         The delegate object that handles all the running of the external code for this object.
     return_code : int
@@ -332,7 +326,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
     Run an external code as a component.
 
     Default stdin is the 'null' device, default stdout is the console, and
-    default stderr is ``error.out``.
+    default stderr is ``external_code_comp_error.out``.
 
     Attributes
     ----------
@@ -342,11 +336,6 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         Output stream external code writes to.
     stderr : str or file object
         Error stream external code writes to.
-    DEV_NULL : File object
-        NULL device.
-    STDOUT : File object
-        Special value that can be used as the stderr argument to Popen and indicates
-        that standard error should go into the same handle as standard output.
     _external_code_runner: ExternalCodeDelegate object
         The delegate object that handles all the running of the external code for this object.
     return_code : int
