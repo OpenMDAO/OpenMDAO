@@ -95,18 +95,12 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
-        driver.recording_options['includes'] = ['px.x']
+        driver.recording_options['includes'] = []
         driver.add_recorder(self.recorder)
 
         prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
-
-        from openmdao.api import CaseReader
-        cr = CaseReader(self.filename)
-        final_case = cr.driver_cases.get_case(-1)
-        desvars = final_case.get_desvars()
-
 
         coordinate = [0, 'Driver', (0, )]
         expected_outputs = {"px.x": [1.0, ], "pz.z": [5.0, 2.0]}
@@ -2109,16 +2103,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
-        expected_desvars = {"x": 0.0, "z": [1.97763888351, 0.0]}
-        expected_objectives = {"obj": 3.18339395, }
-        expected_constraints = {"con1": 0.0, "con2": -20.24472223}
-
-        self.assertAlmostEqual(desvars["x"][0], expected_desvars["x"])
-        self.assertAlmostEqual(desvars["z"][0], expected_desvars["z"][0])
-        self.assertAlmostEqual(desvars["z"][1], expected_desvars["z"][1])
-        self.assertAlmostEqual(objectives["obj"][0], expected_objectives["obj"])
-        self.assertAlmostEqual(constraints["con1"][0], expected_constraints["con1"])
-        self.assertAlmostEqual(constraints["con2"][0], expected_constraints["con2"])
+        self.assertAlmostEqual(desvars["x"][0], 0.0)
+        self.assertAlmostEqual(desvars["z"][0], 1.97763888351)
+        self.assertAlmostEqual(desvars["z"][1], 0.0)
+        self.assertAlmostEqual(objectives["obj"][0], 3.18339395)
+        self.assertAlmostEqual(constraints["con1"][0], 0.0)
+        self.assertAlmostEqual(constraints["con2"][0], -20.24472223)
 
     def test_problem_record_with_options(self):
         prob = Problem(model=SellarDerivatives())

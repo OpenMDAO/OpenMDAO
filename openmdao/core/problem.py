@@ -179,12 +179,12 @@ class Problem(object):
                                        desc='Record metadata')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
-                                            'driver level')
+                                            'problem level')
         self.recording_options.declare('record_objectives', types=bool, default=True,
-                                       desc='Set to True to record objectives at the driver level')
+                                       desc='Set to True to record objectives at the problem level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
-                                            'driver level')
+                                            'problem level')
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
@@ -709,7 +709,6 @@ class Problem(object):
         des_vars = {name: des_vars[name] for name in filt['des']}
         obj_vars = {name: obj_vars[name] for name in filt['obj']}
         con_vars = {name: con_vars[name] for name in filt['con']}
-        # res_vars = {name: res_vars[name] for name in filt['res']}
 
         names = model._outputs._names
         views = model._outputs._views
