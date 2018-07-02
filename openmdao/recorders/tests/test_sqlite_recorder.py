@@ -1584,6 +1584,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 recorder.connection.execute("SELECT * FROM metadata;")
             except sqlite3.ProgrammingError as err:
                 self.assertEqual(str(err), 'Cannot operate on a closed database.')
+            else:
+                self.fail('SqliteRecorder database was not closed.')
 
         prob = SellarProblem(SellarStateConnection)
         prob.setup()
