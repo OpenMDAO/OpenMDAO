@@ -532,8 +532,12 @@ class Component(System):
         # All refs: check the shape if necessary
         for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
             if not isscalar(item):
-                if atleast_1d(item).shape != metadata['shape']:
-                    raise ValueError('The %s argument has the wrong shape' % item_name)
+                it = atleast_1d(item)
+                if it.shape != metadata['shape']:
+                    raise ValueError("'{}': When adding output '{}', expected shape {} but got "
+                                     "shape {} for argument '{}'.".format(self.name, name,
+                                                                          metadata['shape'],
+                                                                          it.shape, item_name))
 
         if isscalar(ref):
             self._has_output_scaling |= ref != 1.0

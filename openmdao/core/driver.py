@@ -317,17 +317,19 @@ class Driver(object):
                 self.supports['simultaneous_derivatives']):
             self._setup_simul_coloring(problem._mode)
 
-        # if we're using simultaneous derivatives then our effective size is less
-        # than the full size
-        if self._simul_coloring_info:
-            lists = self._simul_coloring_info[0]
-            if lists:
-                size = len(lists[0])  # lists[0] is the uncolored row/col indices
-                size += len(lists) - 1
-            if problem._mode == 'fwd':
-                desvar_size = size
-            else:  # rev
-                response_size = size
+            # if we're using simultaneous derivatives then our effective size is less
+            # than the full size
+            if 'fwd' in self._simul_coloring_info and 'rev' in self._simul_coloring_info:
+                pass  # we're doing both!
+            else:
+                lists = self._simul_coloring_info[problem._mode][0]
+                if lists:
+                    size = len(lists[0])  # lists[0] is the uncolored row/col indices
+                    size += len(lists) - 1
+                if problem._mode == 'fwd':
+                    desvar_size = size
+                else:  # rev
+                    response_size = size
 
         if ((problem._mode == 'fwd' and desvar_size > response_size) or
                 (problem._mode == 'rev' and response_size > desvar_size)):
@@ -863,15 +865,16 @@ class Driver(object):
 
         Parameters
         ----------
-        simul_info : str or tuple
+        simul_info : str or dict
 
             ::
 
                 # Information about simultaneous coloring for design vars and responses.  If a
                 # string, then simul_info is assumed to be the name of a file that contains the
-                # coloring information in JSON format.  If a tuple, the structure looks like this:
+                # coloring information in JSON format.  If a dict, the structure looks like this:
 
-                (
+                {
+                "fwd": [
                     # First, a list of column index lists, each index list representing columns
                     # having the same color, except for the very first index list, which contains
                     # indices of all columns that are not colored.
@@ -891,8 +894,12 @@ class Driver(object):
                         [ra, rb, ...]   # list of nonzero rows for column 2
                             ...
                     ],
-
-                    # The last tuple entry can be None, indicating that no sparsity structure is
+                ],
+                # This example is not a bidirectional coloring, so the opposite direction, "rev"
+                # in this case, has an empty row index list.  It could also be removed entirely.
+                "rev": [[[]], []],
+                "sparsity":
+                    # The sparsity entry can be absent, indicating that no sparsity structure is
                     # specified, or it can be a nested dictionary where the outer keys are response
                     # names, the inner keys are design variable names, and the value is a tuple of
                     # the form (row_list, col_list, shape).
@@ -907,7 +914,7 @@ class Driver(object):
                         }
                         ...
                     }
-                )
+                }
 
         """
         if self.supports['simultaneous_derivatives']:
@@ -966,15 +973,18 @@ class Driver(object):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
 
-        tup = self._simul_coloring_info
-        if len(tup) > 2:
-            sparsity = tup[2]
-            if self._total_jac_sparsity is not None:
-                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                                   " and _total_jac_sparsity.")
-            self._total_jac_sparsity = sparsity
+        # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
+        # sparsity patterns
+        if 'sparsity' in self._simul_coloring_info:
+            sparsity = self._simul_coloring_info['sparsity']
+            del self._simul_coloring_info['sparsity']
+        else:
+            sparsity = None
 
-        self._simul_coloring_info = tup[:2]
+        if sparsity is not None and self._total_jac_sparsity is not None:
+            raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                               " and _total_jac_sparsity.")
+        self._total_jac_sparsity = sparsity
 
     def _pre_run_model_debug_print(self):
         """

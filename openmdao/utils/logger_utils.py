@@ -177,3 +177,26 @@ class TestLogger(object):
             Any messages of that type that have been written to the logger.
         """
         return self._msgs[typ]
+
+    def contains(self, typ, message):
+        """
+        Do any of the stored messages of a specific type equal the given message.
+
+        Parameters
+        ----------
+        typ : str
+            Type of messages ('error', 'warning', 'info') to be returned.
+
+        message : str
+            The message to match.
+
+        Returns
+        -------
+        bool
+            True if any of the lines of stored messages of a specific type equal the line.
+        """
+        for s in self._msgs[typ]:
+            if s == message:
+                return True
+
+        return False

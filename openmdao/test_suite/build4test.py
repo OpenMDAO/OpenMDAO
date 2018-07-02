@@ -11,7 +11,6 @@ from openmdao.core.group import Group
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 
 from openmdao.utils.mpi import MPI

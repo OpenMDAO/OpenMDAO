@@ -1,8 +1,14 @@
+import errno
+import os
 import unittest
+from tempfile import mkdtemp
+from shutil import rmtree
 
 from six.moves import range
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS, NonlinearBlockGS
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
+    LinearBlockGS, NonlinearBlockGS, SqliteRecorder
+
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import get_sccs_topo
 
@@ -15,7 +21,7 @@ class MyComp(ExecComp):
 class TestCheckConfig(unittest.TestCase):
 
     def test_hanging_inputs(self):
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         G1 = root.add_subsystem("G1", Group(), promotes=['*'])
@@ -30,28 +36,21 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
-
-        # Conclude setup but don't run model.
         p.final_setup()
 
-        self.assertEqual(len(testlogger.get('warning')), 1)
+        expected = (
+            "The following inputs are not connected:\n"
+            "   G3.G4.C4.v\n"
+            "   G3.G4.C4.x\n"
+            "   G3.G4.u: ['G3.G4.C3.u']\n"
+            "   G3.G4.x: ['G3.G4.C3.x']\n"
+            "   w: ['G1.G2.C1.w']\n"
+        )
 
-        expected = [
-            'G3.G4.C4.v',
-            'G3.G4.C4.x',
-            'G3.G4.u',
-            'G3.G4.x',
-            'w',
-        ]
-
-        actual = testlogger.get('warning')[0].splitlines()[1:]
-        actual = [a.split(':', 1)[0].strip().strip("'") for a in actual]
-
-        self.assertEqual(expected, actual)
+        self.assertTrue(testlogger.contains('warning', expected))
 
     def test_dataflow_1_level(self):
-
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
@@ -77,21 +76,23 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
-
-        # Conclude setup but don't run model.
         p.final_setup()
 
-        warnings = testlogger.get('warning')
-        info = testlogger.get('info')
-        self.assertEqual(len(warnings), 1)
-        self.assertEqual(len(info), 1)
+        expected_info = (
+            "The following groups contain cycles:\n"
+            "   Group '' has the following cycles: [['C1', 'C2', 'C4']]\n"
+        )
 
-        self.assertEqual(info[0], "The following groups contain cycles:\n   Group '' has the following cycles: [['C1', 'C2', 'C4']]\n")
-        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n")
+        expected_warning = (
+            "The following systems are executed out-of-order:\n"
+            "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
+        )
+
+        self.assertTrue(testlogger.contains('info', expected_info))
+        self.assertTrue(testlogger.contains('warning', expected_warning))
 
     def test_dataflow_multi_level(self):
-
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
@@ -121,16 +122,21 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
-
-        # Conclude setup but don't run model.
         p.final_setup()
 
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 1)
-        info = testlogger.get('info')
+        expected_info = (
+            "The following groups contain cycles:\n"
+            "   Group '' has the following cycles: [['G1', 'C4']]\n"
+        )
 
-        self.assertEqual(info[0], "The following groups contain cycles:\n   Group '' has the following cycles: [['G1', 'C4']]\n")
-        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C3' executes out-of-order with respect to its source systems ['C4']\n   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n")
+        expected_warning = (
+            "The following systems are executed out-of-order:\n"
+            "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
+            "   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n"
+        )
+
+        self.assertTrue(testlogger.contains('info', expected_info))
+        self.assertTrue(testlogger.contains('warning', expected_warning))
 
         # test comps_only cycle check
         graph = root.compute_sys_graph(comps_only=True)
@@ -138,7 +144,7 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
     def test_out_of_order_repeat_bug_and_dup_inputs(self):
-        p = Problem(model=Group())
+        p = Problem()
         indep = p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
         C1 = p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
         C2 = p.model.add_subsystem("C2", ExecComp("y = 2.0*a"))
@@ -152,18 +158,24 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
-
-        # Conclude setup but don't run model.
         p.final_setup()
 
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 2)
+        expected_warning_1 = (
+            "The following systems are executed out-of-order:\n"
+            "   System 'C1' executes out-of-order with respect to its source systems ['C2']\n"
+        )
 
-        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'C1' executes out-of-order with respect to its source systems ['C2']\n")
-        self.assertEqual(warnings[1], "The following components have multiple inputs connected to the same source, which can introduce unnecessary data transfer overhead:\n   C1 has inputs ['a', 'b'] connected to C2.y\n")
+        expected_warning_2 = (
+            "The following components have multiple inputs connected to the same source, "
+            "which can introduce unnecessary data transfer overhead:\n"
+            "   C1 has inputs ['a', 'b'] connected to C2.y\n"
+        )
+
+        self.assertTrue(testlogger.contains('warning', expected_warning_1))
+        self.assertTrue(testlogger.contains('warning', expected_warning_2))
 
     def test_multi_cycles(self):
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
@@ -205,19 +217,133 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
+        p.final_setup()
 
-        # Conclude setup but don't run model.
+        expected_info = (
+            "The following groups contain cycles:\n"
+            "   Group 'G1' has the following cycles: "
+            "[['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n"
+        )
+
+        expected_warning_1 = (
+            "The following systems are executed out-of-order:\n"
+            "   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n"
+            "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
+        )
+
+        expected_warning_2 = (
+            "The following inputs are not connected:\n"
+            "   G1.C1.b\n"
+            "   G1.C11.b\n"
+            "   G1.C13.b\n"
+            "   G1.C22.b\n"
+            "   G1.C23.b\n"
+            "   G1.N1.a\n"
+            "   G1.N1.b\n"
+            "   G1.N2.a\n"
+            "   G1.N3.a\n"
+        )
+
+        self.assertTrue(testlogger.contains('info', expected_info))
+        self.assertTrue(testlogger.contains('warning', expected_warning_1))
+        self.assertTrue(testlogger.contains('warning', expected_warning_2))
+
+    def test_comp_has_no_outputs(self):
+        p = Problem()
+        root = p.model
+
+        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        comp1 = root.add_subsystem("comp1", ExplicitComponent())
+        comp1.add_input('x', val=0.)
+
+        root.connect('indep.x', 'comp1.x')
+
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        expected = (
+            "The following Components do not have any outputs:\n"
+            "   comp1\n"
+        )
+
+        self.assertTrue(testlogger.contains('warning', expected))
+
+
+class TestRecorderCheckConfig(unittest.TestCase):
+
+    def setUp(self):
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
+
+        self.filename = os.path.join(self.temp_dir, "sqlite_test")
+        self.recorder = SqliteRecorder(self.filename)
+
+    def tearDown(self):
+        os.chdir(self.orig_dir)
+        try:
+            rmtree(self.temp_dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
+    def test_check_no_recorder_set(self):
+        p = Problem()
+
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        expected_warning = "The Problem has no recorder of any kind attached"
+        self.assertTrue(testlogger.contains('warning', expected_warning))
+
+    def test_check_driver_recorder_set(self):
+        p = Problem()
+        p.driver.add_recorder(self.recorder)
+
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
         p.final_setup()
 
         warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 2)
+        self.assertEqual(len(warnings), 0)
 
-        info = testlogger.get('info')
-        self.assertEqual(len(info), 1)
+    def test_check_system_recorder_set(self):
+        p = Problem()
+        p.model.add_recorder(self.recorder)
 
-        self.assertEqual(info[0], "The following groups contain cycles:\n   Group 'G1' has the following cycles: [['C13', 'C12', 'C11'], ['C23', 'C22', 'C21'], ['C3', 'C2', 'C1']]\n")
-        self.assertEqual(warnings[0], "The following systems are executed out-of-order:\n   System 'G1.C2' executes out-of-order with respect to its source systems ['G1.N3']\n   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n")
-        self.assertTrue("The following inputs are not connected:" in warnings[1])
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+    def test_check_linear_solver_recorder_set(self):
+        p = Problem()
+        p.model.nonlinear_solver.add_recorder(self.recorder)
+
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        p.cleanup()
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
+
+    def test_check_linear_solver_recorder_set(self):
+        p = Problem()
+        p.model.linear_solver.add_recorder(self.recorder)
+
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+        p.cleanup()
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 0)
 
 
 if __name__ == "__main__":

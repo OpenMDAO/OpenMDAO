@@ -200,6 +200,27 @@ def _check_hanging_inputs(problem, logger):
         logger.warning(''.join(msg))
 
 
+def _check_comp_has_no_outputs(problem, logger):
+    """
+    Issue a logger warning if any components do not have any outputs.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    msg = []
+
+    for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
+        if len(comp._var_allprocs_abs_names['output']) == 0:
+            msg.append("   %s\n" % comp.pathname)
+
+    if msg:
+        logger.warning(''.join(["The following Components do not have any outputs:\n"] + msg))
+
+
 def _check_system_configs(problem, logger):
     """
     Perform any system specific configuration checks.
@@ -301,6 +322,34 @@ def _check_solvers(problem, logger):
                 logger.warning(msg)
 
 
+def _check_missing_recorders(problem, logger):
+    """
+    Check to see if there are any recorders of any type on the Problem.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    # Look for Driver recorder
+    if problem.driver._rec_mgr._recorders:
+        return
+
+    # Look for System and Solver recorders
+    for system in problem.model.system_iter(include_self=True, recurse=True):
+        if system._rec_mgr._recorders:
+            return
+        if system.nonlinear_solver and system.nonlinear_solver._rec_mgr._recorders:
+            return
+        if system.linear_solver and system.linear_solver._rec_mgr._recorders:
+            return
+
+    msg = "The Problem has no recorder of any kind attached"
+    logger.warning(msg)
+
+
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
 _checks = {
@@ -309,6 +358,8 @@ _checks = {
     'system': _check_system_configs,
     'solvers': _check_solvers,
     'dup_inputs': _check_dup_comp_inputs,
+    'missing_recorders': _check_missing_recorders,
+    'comp_has_no_outputs': _check_comp_has_no_outputs,
 }
 
 
