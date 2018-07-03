@@ -1,7 +1,10 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
+import copy
 import sys
 import unittest
+
+from distutils.version import LooseVersion
 
 import numpy as np
 
@@ -79,6 +82,27 @@ class ParaboloidAE(ExplicitComponent):
         partials['f_xy', 'x'] = 2.0*x - 6.0 + y
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
         self.grad_iter_count += 1
+
+
+class DataSave(ExplicitComponent):
+    """ Saves run points so that we can verify that initial point is run."""
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_output('y', val=0.0)
+
+        self.visited_points=[]
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        self.visited_points.append(copy.copy(x))
+        outputs['y'] = (x-3.0)**2
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+
+        partials['y', 'x'] = 2.0*x - 6.0
 
 
 class TestPyoptSparse(unittest.TestCase):
@@ -1464,6 +1488,171 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
+
+    # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
+    # Limiting this to the single travis 1.14 machine for now.
+    @unittest.skipUnless(LooseVersion(np.__version__) >= LooseVersion("1.13"), "numpy >= 1.13 is required.")
+    def test_initial_run_NSGA2(self):
+        _, local_opt = set_pyoptsparse_opt('NSGA2')
+        if local_opt != 'NSGA2':
+            raise unittest.SkipTest("pyoptsparse is not providing NSGA2")
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['print_results'] = False
+        prob.driver.options['optimizer'] = 'NSGA2'
+        prob.driver.opt_settings['maxGen'] = 1
+        prob.driver.opt_settings['PrintOut'] = 0
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
+        self.assertNotEqual(comp.visited_points[1], 1.0)
+
+    def test_initial_run_SLSQP(self):
+        _, local_opt = set_pyoptsparse_opt('SLSQP')
+        if local_opt != 'SLSQP':
+            raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['print_results'] = False
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.opt_settings['IPRINT'] = -1
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
+        self.assertNotEqual(comp.visited_points[1], 1.0)
+
+    def test_initial_run_SNOPT(self):
+        _, local_opt = set_pyoptsparse_opt('SNOPT')
+        if local_opt != 'SNOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['print_results'] = False
+        prob.driver.options['optimizer'] = 'SNOPT'
+        prob.driver.opt_settings['iSumm'] = 0
+        prob.driver.opt_settings['iPrint'] = 0
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
+        self.assertNotEqual(comp.visited_points[1], 1.0)
+
+    # Seems to be a bug in numpy 1.12, fixed in later versions.
+    @unittest.skipUnless(LooseVersion(np.__version__) >= LooseVersion("1.13"), "numpy >= 1.13 is required.")
+    def test_initial_run_ALPSO(self):
+        _, local_opt = set_pyoptsparse_opt('ALPSO')
+        if local_opt != 'ALPSO':
+            raise unittest.SkipTest("pyoptsparse is not providing ALPSO")
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['print_results'] = False
+        prob.driver.options['optimizer'] = 'ALPSO'
+        prob.driver.opt_settings['fileout'] = 0
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
+        self.assertNotEqual(comp.visited_points[1], 1.0)
+
+    def test_initial_run_PSQP(self):
+        _, local_opt = set_pyoptsparse_opt('PSQP')
+        if local_opt != 'PSQP':
+            raise unittest.SkipTest("pyoptsparse is not providing PSQP")
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+        model.add_constraint('p1.x', lower=-200.0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['print_results'] = False
+        prob.driver.options['optimizer'] = 'PSQP'
+        prob.driver.opt_settings['IPRINT'] = 0
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
+        self.assertNotEqual(comp.visited_points[1], 1.0)
+
+    def test_initial_run_CONMIN(self):
+        _, local_opt = set_pyoptsparse_opt('CONMIN')
+        if local_opt != 'CONMIN':
+            raise unittest.SkipTest("pyoptsparse is not providing CONMIN")
+
+        # Make sure all our opts have run the initial point just once.
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        comp = model.add_subsystem('comp1', DataSave())
+        model.connect('p1.x', 'comp1.x')
+
+        model.add_design_var('p1.x', lower=-100.0, upper=100.0)
+        model.add_objective('comp1.y')
+        model.add_constraint('p1.x', lower=-200.0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['print_results'] = False
+        prob.driver.options['optimizer'] = 'CONMIN'
+        prob.driver.opt_settings['IPRINT'] = 0
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertEqual(comp.visited_points[0], 1.0)
+        self.assertNotEqual(comp.visited_points[1], 1.0)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")

@@ -215,8 +215,8 @@ class BaseRecorder(object):
         """
         raise NotImplementedError("record_iteration_solver has not been overridden")
 
-    def close(self):
+    def shutdown(self):
         """
-        Clean up the recorder.
+        Shut down the recorder.
         """
         pass
