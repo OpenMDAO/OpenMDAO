@@ -107,12 +107,13 @@ class RecordingManager(object):
             if not recorder._parallel:
                 self._has_serial_recorders = True
 
-    def close(self):
+    def shutdown(self):
         """
-        Close all recorders in the manager.
+        Shut down and remove all recorders.
         """
         for recorder in self._recorders:
-            recorder.close()
+            recorder.shutdown()
+        self._recorders = []
 
     def record_iteration(self, recording_requester, data, metadata):
         """

@@ -536,6 +536,8 @@ class Problem(object):
         Clean up resources prior to exit.
         """
         self.driver.cleanup()
+        for system in self.model.system_iter(include_self=True, recurse=True):
+            system.cleanup()
 
     def setup(self, vector_class=None, check=False, logger=None, mode='rev',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
