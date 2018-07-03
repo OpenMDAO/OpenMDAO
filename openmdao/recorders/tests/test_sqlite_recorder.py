@@ -712,10 +712,10 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (4,)]
+        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (2,)]
 
-        expected_abs_error = 3.49773898733e-9
-        expected_rel_error = expected_abs_error / 2.9086436370e-08
+        expected_abs_error = 5.46371836663e-11
+        expected_rel_error = 0.120259301544
 
         expected_solver_output = {
             "con_cmp1.con1": [-22.42830237],
