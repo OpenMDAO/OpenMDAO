@@ -4,12 +4,20 @@
 BroydenSolver
 *************
 
-BroydenSolver is a quasi-Newton solver that implements Broyden's second method (aka Broyden's good method) to solve
-for states that drive the residuals to zero. Unlike Newton, BroydenSovler works on a subset of your model consisting
-of just the implicit states that you specify. By default, Like Newton, Broyden's method steps in a direction defined by
-the local jacobian of derivatives, but the key is that it doesn't need to be provided with that jacobian. You can optionally
-provide one to improve the speed of convergence, however. BroydenSolver uses the linear solver that is slotted in
-the containing system, though you can also add a different linear solver directly to the BroydenSolver.
+BroydenSolver is a quasi-Newton solver that implements Broyden's second method to solve for values of the model's states that
+drive their residuals to zero. It does so by maintaning an approximation to the inverse of the Jacobian of the model or a subset
+of the model. In some cases this can be more efficient than NewtonSolver because updating the approximated inverse Jacobian is
+cheaper than solving the linear system. It may take more iterations because the search direction depends on an approximation,
+but the iterations take fewer operations.
+
+The BroydenSolver has two different modes of operation. It can operate on the entire model, and solve for every state in the containing
+system and all subsystems. Alternatively, it can operate on a subset of the model, and only solve for a list of states that you provide.
+The advanatage of full-model mode is that you don't have to worry about forgetting a state, particularly in large models where you might
+not be familiar with every component or variable. The disadvantage is that you are computing the inverse of a larger array every time
+you recalculate the inverse jacobian, though ideally you are not recomputing this very often. Operating on a subset of states is more
+efficient in both the linear solve and the Broyden update, but you do run the risk of missing a state. The BroydenSolver will print a
+warning if it finds any states in the model that aren't covered by a solver.
+
 
 BroydenSolver Options
 ---------------------
@@ -19,11 +27,43 @@ BroydenSolver Options
     BroydenSolver
     options
 
+
+BroydenSolver on a Full Model
+-----------------------------
+
+Here we show an example that uses the :ref:`electrical circuit model <using_balancecomp_tutorial>` from the
+advanced guide. We have replaced the `NewtonSolver` with a `BroydenSolver`, and set the maximum number of iterations
+to 20. We also assign a `DirectSolver` into the "linear_solver" slot on the `BroydenSolver`.  This is the linear solver
+that will be used to assemble the Jacobian and compute its inverse. Since we don't specify any states in the `state_vars`
+option, the BroydenSolver operates on the entire model. If you don't specify a linear_solver here, then the BroydenSolver
+will use the one from the system.
+
+.. note::
+    In this mode, only the `DirectSolver` can be used as the linear_solver.
+
+Depending on the values of some of the other options such as "converge_limit", "diverge_limit", and "max_converge_failures",
+the Jacobian might be recalculated if convergence stalls, though this doesn't happen in the electrical circuit example.
+
+  .. embed-code::
+      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_full
+      :layout: code, output
+
+BroydenSolver on a Subset of States
+-----------------------------------
+
+The `BroydenSolver` can also be used to solve for specific states. Here we consider the same circuit example, but instead
+we specify the two voltages n1.V' and 'n2.V' as our "state_vars".  In this mode, we aren't limited to just using the
+`DirectSolver`, and in this example we choose `LinearBlockGS` instead.
+
+  .. embed-code::
+      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit
+      :layout: code, output
+
 BroydenSolver for Models Without Derivatives
 --------------------------------------------
 
-The `BroydenSolver` can be used for models where you don't have derivatives defined, and don't wish to use
-finite difference to calculate them. This is the default behavior of this solver. Instead of calculating
+The `BroydenSolver` can be used for models where you don't have any partial derivatives defined, and don't wish to use
+finite difference to calculate them. This behavior is activated by setting the "compute_jacobian" option to False. Instead of calculating
 an initial Jacobian, we start with an estimate that is just the identity matrix scaled by a tunable parameter
 in the options called "alpha". As the `BroydenSolver` iterates, this estimate of the Jacobian is improved, and
 for some problems, a solution can be reached that satisfies the residual equations.
@@ -34,45 +74,7 @@ solve.
 
   .. embed-code::
       openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_sellar
-      :layout: interleave
-
-BroydenSolver for Models With Derivatives
------------------------------------------
-
-The `BroydenSolver` can also be used for models where you have derivative defined. The advantage of using a
-`BroydenSolver` here is that you may be able to solve your model with a small number of linear solutions. In
-some case, a good initial jacobian is all you need, and the cheap Broyden updates on subsequent iterations
-will keep it converging towards the solution.
-
-Keep in mind that, even if you didn't declare derivatives on all your components, it is still possible to use
-finite difference (or possibly complex step) to compute a Jacobian for your model or submodel, as shown in
-the feature doc for :ref:`approximating semi-total derivatives. <feature_declare_totals_approx>`
-
-Here we show an example that uses the :ref:`electrical circuit model <using_balancecomp_tutorial>` from the
-advanced guide. We have replaced the `NewtonSolver` with a `BroydenSolver`, and set the option "compute_jacobian"
-to True so that it computes an initial Jacobian in the first iteration. Depending on the values of some of
-the other options such as "converge_limit", "diverge_limit", and "max_converge_failures", the Jacobian
-might be recalculated if convergence stalls, though this doesn't happen in the electrical circuit example.
-
-  .. embed-code::
-      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit
-      :layout: interleave
-
-BroydenSolver on a Full Model
------------------------------
-
-The example above show you how to specify the Broyden options to solve specific states in your model. You
-can also allow Broyden to solve every state (implicit and explcit) in the model by not declaring any
-states in the "state_vars" option. The main advantage to operating like this is that you don't have
-to worry about forgetting any states, especially in large models. The disadvantage is that now you
-need to calculate and update an n by n Jacobian where n is the full width of all variables in your
-model.
-
-Here is the circuit example operating on the full model:
-
-  .. embed-code::
-      openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_full
-      :layout: interleave
+      :layout: code, output
 
 BroydenSolver Option Examples
 -----------------------------
@@ -92,4 +94,4 @@ number of iterations, though keep in mind that solving for the derivatives adds 
 
   .. embed-code::
       openmdao.solvers.nonlinear.tests.test_broyden.TestBryodenFeature.test_circuit_options
-      :layout: interleave
+      :layout: code, output

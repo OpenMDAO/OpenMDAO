@@ -105,8 +105,8 @@ class BroydenSolver(NonlinearSolver):
                              desc="Value to scale the starting Jacobian, which is Identity. This "
                                   "option does nothing if you compute the initial Jacobian "
                                   "instead.")
-        self.options.declare('compute_jacobian', default=False,
-                             desc="Set to True to compute an initial Jacobian, otherwise start "
+        self.options.declare('compute_jacobian', default=True,
+                             desc="WhenTrue, compute an initial Jacobian, otherwise start "
                                   "with Identity scaled by alpha. Further Jacobians may also be "
                                   "computed depending on the other options.")
         self.options.declare('converge_limit', default=1.0,
@@ -186,6 +186,13 @@ class BroydenSolver(NonlinearSolver):
         self.delta_fxm = None
 
         if self._full_inverse:
+
+            # Can only use DirectSolver here.
+            from openmdao.solvers.linear.direct import DirectSolver
+            if not isinstance(self.linear_solver, DirectSolver):
+                msg = "Linear solver must be DirectSolver when solving the full model."
+                raise ValueError(msg.format(', '.join(bad_names)))
+
             return
 
         # Always look for states that aren't being solved so we can warn the user.
