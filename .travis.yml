@@ -120,7 +120,7 @@ install:
   fi
 
 - if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
-    git clone https://github.com/mdolab/pyoptsparse.git;
+    git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
 
     if [ "$MASTER_BUILD" ]; then
