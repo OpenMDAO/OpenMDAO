@@ -4,7 +4,7 @@
 Setting Up a Model for Efficient Linear Solves
 ----------------------------------------------
 
-There are a number of different features that you can use control how the linear solves are performed that will have an impact on both the speed and accuracy of the linear solution.
+There are a number of different features that you can use to control how the linear solves are performed that will have an impact on both the speed and accuracy of the linear solution.
 A deeper understanding of how OpenMDAO solves the unified derivatives equations is useful in understanding when to apply certain features, and may also help you structure your model to make the most effective use of them.
 The explanation of OpenMDAO's features for improving linear solver performance are broken up into three sections below:
 
@@ -65,7 +65,7 @@ There are two basic categories of linear solver that can be used in this situati
     #. direct solvers (e.g. :ref:`DirectSolver<directsolver>`)
     #. iterative solvers (e.g. :ref:`LinearBlockGS<linearblockgs>`, :ref:`ScipyKrylov<scipyiterativesolver>`)
 
-Direct solvers make use of a the Jacobian matrix, assembled in memory, in order to compute an inverse or a factorization that can be used to solve the linear system.
+Direct solvers make use of the Jacobian matrix, assembled in memory, in order to compute an inverse or a factorization that can be used to solve the linear system.
 Conversely, iterative linear solvers find the solution to the linear system without ever needing to access the Jacobian matrix directly.
 They search for solution vectors that drive the linear residual to 0 using only matrix-vector products.
 The key idea is that **some** kind of linear solver is needed when there is coupling in your model.
@@ -106,7 +106,7 @@ Broadly speaking, there are two classes of linear solver architecture:
   * Assembled Jacobian
   * Matrix-free
 
-At any level of the hierarchy in an OpenMDAO model, you have the options of choosing between these two options.
+At any level of the hierarchy in an OpenMDAO model, you have the option of choosing between these two options.
 Simple models will often just use one linear solver architecture at the top of the model hierarchy.
 More complex models might use both architectures at different parts of the hierarchy.
 At any level of the hierarchy, you can look at the aspects of the components contained within that group in order to
@@ -169,7 +169,7 @@ commonly see sparsity percentages in the single digits.
     :align: center
     :width: 75%
 
-    The partial derivative Jacobian for the Sellar problem has only 18 non-zero values in it. It is 37% sparse.
+    The partial derivative Jacobian for the Sellar problem has only 18 non-zero values in it. Only 37% of the matrix elements are non zero.
 
 If you chose to use the :ref:`DirectSolver`, then it will use scipy's sparse `splu`_  method to solve linear system for total derivatives.
 
