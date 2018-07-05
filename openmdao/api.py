@@ -32,6 +32,7 @@ from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructur
 from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured
 from openmdao.components.multifi_meta_model_unstructured_comp \
     import MultiFiMetaModelUnStructuredComp
+from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
 
 
 # Solvers
