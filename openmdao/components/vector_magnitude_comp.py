@@ -24,7 +24,7 @@ class VectorMagnitudeComp(ExplicitComponent):
         Declare options.
         """
         self.options.declare('vec_size', types=int, default=1,
-                             desc='The number of points at which the dot product is computed')
+                             desc='The number of points at which the vector magnitude is computed')
         self.options.declare('length', types=int, default=3,
                              desc='The length of the input vector at each point')
         self.options.declare('in_name', types=string_types, default='a',
@@ -36,7 +36,7 @@ class VectorMagnitudeComp(ExplicitComponent):
 
     def setup(self):
         """
-        Declare inputs, outputs, and derivatives for the dot product component.
+        Declare inputs, outputs, and derivatives for the vector magnitude component.
         """
         opts = self.options
         vec_size = opts['vec_size']
@@ -57,7 +57,7 @@ class VectorMagnitudeComp(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         """
-        Compute the dot product of inputs `a` and `b` using np.einsum.
+        Compute the vector magnitude of input.
 
         Parameters
         ----------
@@ -72,7 +72,7 @@ class VectorMagnitudeComp(ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         """
-        Compute the sparse partials for the dot product w.r.t. the inputs.
+        Compute the sparse partials for the vector magnitude w.r.t. the inputs.
 
         Parameters
         ----------
