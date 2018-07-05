@@ -22,8 +22,8 @@ class EQConstraintComp(ExplicitComponent):
     """
 
     def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                 use_mult=False, mult_name=None, mult_val=1.0, add_constraint=False,
-                 **kwargs):
+                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, add_constraint=False,
+                 ref=None, ref0=None, adder=None, scaler=None, **kwargs):
         r"""
         Initialize an EQConstraintComp, optionally add an output constraint to the model.
 
@@ -32,12 +32,22 @@ class EQConstraintComp(ExplicitComponent):
 
         .. math::
 
-          name_{output} = name_{mult} \times name_{lhs} - name_{rhs}
+          name_{output} = \frac{name_{mult} \times name_{lhs} - name_{rhs} }{f_{norm}(name_{rhs})}
 
         Where :math:`name_{lhs}` represents the left-hand-side of the equality,
         :math:`name_{rhs}` represents the right-hand-side, and :math:`name_{mult}`
         is an optional multiplier on the left hand side. If use_mult is True then
-        the default value of the multiplier is 1.
+        the default value of the multiplier is 1.  The optional normalization function
+        :math:`f_{norm}` is computed as:
+
+        .. math::
+
+          f_{norm}(name_{rhs}) =
+          \begin{cases}
+           \left| name_{rhs} \right|, & \text{if normalize and } \left| name_{rhs} \right| \geq 2 \\
+           0.25 name_{rhs}^2 + 1,     & \text{if normalize and } \left| name_{rhs} \right| < 2 \\
+           1,                         & \text{if not normalize}
+          \end{cases}
 
         New output variables are created by calling `add_eq_output`.
 
@@ -66,8 +76,24 @@ class EQConstraintComp(ExplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given output.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
+        normalize : bool
+            Specifies whether or not the resulting output should be normalized by a quadratic
+            function of the RHS. When this option is True, the user-provided ref/ref0 scaler/adder
+            options below are typically unnecessary.
         add_constraint : bool
             Specifies whether to add an equality constraint.
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver. This option is only
+            meaningful when add_constraint=True.
+        ref0 : float or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver. This option is only
+            meaningful when add_constraint=True.
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value. Adder
+            is first in precedence. This option is only meaningful when add_constraint=True.
+        scaler : float or ndarray, optional
+            value to multiply the model value to get the scaled value. Scaler
+            is second in precedence. This option is only meaningful when add_constraint=True.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
@@ -76,7 +102,8 @@ class EQConstraintComp(ExplicitComponent):
         self._output_vars = {}
         if name is not None:
             self.add_eq_output(name, eq_units, lhs_name, rhs_name, rhs_val,
-                               use_mult, mult_name, mult_val, add_constraint, **kwargs)
+                               use_mult, mult_name, mult_val, normalize, add_constraint, ref, ref0,
+                               adder, scaler, **kwargs)
 
     def setup(self):
         """
@@ -121,7 +148,8 @@ class EQConstraintComp(ExplicitComponent):
                 self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
 
             if options['add_constraint']:
-                self.add_constraint(name, equals=0.)
+                self.add_constraint(name, equals=0., ref0=options['ref0'], ref=options['ref'],
+                                    adder=options['adder'], scaler=options['scaler'])
 
     def compute(self, inputs, outputs):
         """
@@ -138,14 +166,18 @@ class EQConstraintComp(ExplicitComponent):
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
 
-            # Indices where the rhs is near zero or not near zero
-            idxs_nz = np.where(np.abs(rhs) < 2)[0]
-            idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
-
             # Compute scaling factors
             # scale factor that normalizes by the rhs, except near 0
-            self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
-            self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+            if options['normalize']:
+                # Indices where the rhs is near zero or not near zero
+                idxs_nz = np.where(np.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+
+                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+            else:
+                self._scale_factor[:] = 1.0
+
 
             if options['use_mult']:
                 outputs[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
@@ -170,16 +202,20 @@ class EQConstraintComp(ExplicitComponent):
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
 
-            # Indices where the rhs is near zero or not near zero
-            idxs_nz = np.where(np.abs(rhs) < 2)[0]
-            idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+            if options['normalize']:
+                # Indices where the rhs is near zero or not near zero
+                idxs_nz = np.where(np.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
 
-            # scale factor that normalizes by the rhs, except near 0
-            self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
-            self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+                # scale factor that normalizes by the rhs, except near 0
+                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-            self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
-            self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
+                self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
+                self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
+            else:
+                self._scale_factor[:] = 1.0
+                self._dscale_drhs[:] = 0.0
 
             if options['use_mult']:
                 mult_name = options['mult_name']
@@ -197,8 +233,8 @@ class EQConstraintComp(ExplicitComponent):
             partials[name, lhs_name] = mult * self._scale_factor
 
     def add_eq_output(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                      use_mult=False, mult_name=None, mult_val=1.0, add_constraint=False,
-                      **kwargs):
+                      use_mult=False, mult_name=None, mult_val=1.0, normalize=True,
+                      add_constraint=False, ref=None, ref0=None, adder=None, scaler=None, **kwargs):
         """
         Add a new output variable computed via the difference equation.
 
@@ -231,8 +267,24 @@ class EQConstraintComp(ExplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val or shape option in kwargs.
+        normalize : bool
+            Specifies whether or not the resulting output should be normalized by a quadratic
+            function of the RHS. When this option is True, the user-provided ref/ref0 scaler/adder
+            options below are typically unnecessary.
         add_constraint : bool
             Specifies whether to add an equality constraint.
+        ref : float or ndarray, optional
+            Value of response variable that scales to 1.0 in the driver. This option is only
+            meaningful when add_constraint=True.
+        ref0 : float or ndarray, optional
+            Value of response variable that scales to 0.0 in the driver. This option is only
+            meaningful when add_constraint=True.
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value. Adder
+            is first in precedence. This option is only meaningful when add_constraint=True.
+        scaler : float or ndarray, optional
+            value to multiply the model value to get the scaled value. Scaler
+            is second in precedence. This option is only meaningful when add_constraint=True.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
@@ -245,4 +297,9 @@ class EQConstraintComp(ExplicitComponent):
                                    'use_mult': use_mult,
                                    'mult_name': mult_name,
                                    'mult_val': mult_val,
-                                   'add_constraint': add_constraint}
+                                   'normalize': normalize,
+                                   'add_constraint': add_constraint,
+                                   'ref': ref,
+                                   'ref0': ref0,
+                                   'adder': adder,
+                                   'scaler': scaler}
