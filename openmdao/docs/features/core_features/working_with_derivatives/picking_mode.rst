@@ -6,7 +6,7 @@ Picking Forward or Reverse Total Derivative Solve
 
 Analytic total derivatives can be calculated in either forward or reverse mode.
 In forward mode, OpenMDAO computes total derivatives with one linear solve per design variable.
-In reverse mode, it uses one linear solve per response (i.e. objective and constraints).
+In reverse mode, it uses one linear solve per response (i.e. objective or nonlinear constraint).
 So the choice of forward or reverse is problem-dependent.
 
 In OpenMDAO, the default derivative direction is 'auto'.  When mode is 'auto', OpenMDAO will
