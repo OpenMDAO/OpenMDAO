@@ -380,7 +380,7 @@ class OptionsDictionary(object):
 
     def __getitem__(self, name):
         """
-        Get an option from the local dict, global dict, or declared default.
+        Get an option from the dict or declared default.
 
         Parameters
         ----------
@@ -401,3 +401,24 @@ class OptionsDictionary(object):
                 raise RuntimeError("Option '{}' is required but has not been set.".format(name))
         except KeyError:
             raise KeyError("Option '{}' cannot be found".format(name))
+
+    def get(self, name, default=None):
+        """
+        Get an option from the dict or declared default.
+
+        Parameters
+        ----------
+        name : str
+            name of the option.
+        default : object
+            Value returned if name is not in the dict.
+
+        Returns
+        -------
+        value : -
+            value of the option.
+        """
+        if name in self._dict:
+            return self[name]
+
+        return default

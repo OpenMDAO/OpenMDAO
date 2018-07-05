@@ -319,7 +319,7 @@ class ExperimentalDriver(object):
         # set up simultaneous deriv coloring
         if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
             if problem._mode == 'fwd':
-                self._setup_simul_coloring(problem._mode)
+                self._setup_simul_coloring()
             else:
                 raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 

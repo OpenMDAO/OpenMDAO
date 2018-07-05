@@ -249,26 +249,13 @@ class Driver(object):
         """
         self._problem = problem
         model = problem.model
+        mode = problem._mode
 
         self._total_jac = None
 
-        self._objs = objs = OrderedDict()
-        self._cons = cons = OrderedDict()
-
-        self._responses = model.get_responses(recurse=True)
-        response_size = 0
-        for name, data in iteritems(self._responses):
-            if data['type'] == 'con':
-                cons[name] = data
-            else:
-                objs[name] = data
-            response_size += data['size']
-
-        # Gather up the information for design vars.
-        self._designvars = model.get_design_vars(recurse=True)
         self._has_scaling = (
-            np.any([r['scaler'] is not None for r in self._responses.values()]) or
-            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
+            np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
+            np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
         )
 
         con_set = set()
@@ -308,36 +295,13 @@ class Driver(object):
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
 
-        # set up case recording
-        self._setup_recording()
-
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
         # set up simultaneous deriv coloring
         if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
-            self._setup_simul_coloring(problem._mode)
+            self._setup_simul_coloring()
 
-            # if we're using simultaneous derivatives then our effective size is less
-            # than the full size
-            if 'fwd' in self._simul_coloring_info and 'rev' in self._simul_coloring_info:
-                pass  # we're doing both!
-            else:
-                lists = self._simul_coloring_info[problem._mode][0]
-                if lists:
-                    size = len(lists[0])  # lists[0] is the uncolored row/col indices
-                    size += len(lists) - 1
-                if problem._mode == 'fwd':
-                    desvar_size = size
-                else:  # rev
-                    response_size = size
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
+        # set up case recording
+        self._setup_recording()
 
     def _setup_recording(self):
         """
@@ -659,11 +623,11 @@ class Driver(object):
 
         return con_dict
 
-    def _get_ordered_nl_responses(self):
+    def _get_ordered_responses(self):
         """
-        Return the names of nonlinear responses in the order used by the driver.
+        Return names of nonlinear responses and linear responses in the order used by the driver.
 
-        Default order is objectives followed by nonlinear constraints.  This is used for
+        Default nonlinear order is objectives followed by nonlinear constraints.  This is used for
         simultaneous derivative coloring and sparsity determination.
 
         Returns
@@ -671,10 +635,49 @@ class Driver(object):
         list of str
             The nonlinear response names in order.
         """
-        order = list(self._objs)
-        order.extend(n for n, meta in iteritems(self._cons)
-                     if not ('linear' in meta and meta['linear']))
-        return order
+        lin_order = []
+        nl_order = list(self._objs)
+        for n, meta in iteritems(self._cons):
+            if 'linear' in meta and meta['linear']:
+                lin_order.append(n)
+            else:
+                nl_order.append(n)
+
+        return nl_order, lin_order
+
+    def _update_voi_meta(self, model):
+        """
+        Collect response and design var metadata from the model and size desvars and responses.
+
+        Parameters
+        ----------
+        model : System
+            The System that represents the entire model.
+
+        Returns
+        -------
+        int
+            Total size of responses, with linear constraints excluded.
+        int
+            Total size of design vars.
+        """
+        self._objs = objs = OrderedDict()
+        self._cons = cons = OrderedDict()
+
+        self._responses = resps = model.get_responses(recurse=True)
+        for name, data in iteritems(resps):
+            if data['type'] == 'con':
+                cons[name] = data
+            else:
+                objs[name] = data
+
+        response_size = np.sum(resps[n]['size'] for n in self._get_ordered_responses()[0])
+
+        # Gather up the information for design vars.
+        self._designvars = designvars = model.get_design_vars(recurse=True)
+        desvar_size = np.sum(data['size'] for data in itervalues(designvars))
+
+        return response_size, desvar_size
 
     def run(self):
         """
@@ -957,14 +960,9 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
-    def _setup_simul_coloring(self, mode='fwd'):
+    def _setup_simul_coloring(self):
         """
         Set up metadata for simultaneous derivative solution.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:
@@ -973,6 +971,10 @@ class Driver(object):
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
+
+        if 'rev' in self._simul_coloring_info and self._problem._orig_mode not in ('rev', 'auto'):
+            raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
+                               "been set to '%s'" % self._problem._orig_mode)
 
         # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns
