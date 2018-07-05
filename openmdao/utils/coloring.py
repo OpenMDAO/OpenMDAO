@@ -218,7 +218,7 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, setup=False, run_model=False):
     wrt = list(prob.driver._designvars)
 
     # get responses in order used by the driver
-    of, _ = prob.driver._get_ordered_responses()
+    of = prob.driver._get_ordered_nl_responses()
 
     if not of or not wrt:
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
@@ -470,7 +470,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     J = _get_bool_jac(problem, repeats=repeats, tol=tol, setup=setup,
                       run_model=run_model)
 
-    of, _ = driver._get_ordered_responses()
+    of = driver._get_ordered_nl_responses()
     wrt = list(driver._designvars)
 
     sparsity = _sparsity_from_jac(J, of, wrt, driver)
@@ -764,7 +764,7 @@ def _get_simul_excludes(problem):
             offset += size
 
     else:  # fwd
-        of, _ = problem.driver._get_ordered_responses()
+        of = problem.driver._get_ordered_nl_responses()
         resps = problem.driver._responses
         for resp in of:
             excl = resps[resp]['simul_coloring_excludes']
@@ -856,7 +856,7 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
 
     if driver is not None:
         if include_sparsity or (show_jac and stream is not None):
-            of, _ = driver._get_ordered_responses()
+            of = driver._get_ordered_nl_responses()
             wrt = list(driver._designvars)
 
         if include_sparsity:

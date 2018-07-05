@@ -551,7 +551,7 @@ class pyOptSparseDriver(Driver):
         """
         return self.options['optimizer']
 
-    def _get_ordered_responses(self):
+    def _get_ordered_nl_responses(self):
         """
         Return the names of nonlinear responses in the order used by the driver.
 
@@ -563,20 +563,18 @@ class pyOptSparseDriver(Driver):
         list of str
             The nonlinear response names in order.
         """
-        lin_order = []
         nl_order = list(self._objs)
         neq_order = []
         for n, meta in iteritems(self._cons):
-            if 'linear' in meta and meta['linear']:
-                lin_order.append(n)
-            elif meta['equals'] is not None:
-                nl_order.append(n)
-            else:
-                neq_order.append(n)
+            if 'linear' not in meta or not meta['linear']:
+                if meta['equals'] is not None:
+                    nl_order.append(n)
+                else:
+                    neq_order.append(n)
 
         nl_order.extend(neq_order)
 
-        return nl_order, lin_order
+        return nl_order
 
     def _setup_tot_jac_sparsity(self):
         """

@@ -623,9 +623,9 @@ class Driver(object):
 
         return con_dict
 
-    def _get_ordered_responses(self):
+    def _get_ordered_nl_responses(self):
         """
-        Return names of nonlinear responses and linear responses in the order used by the driver.
+        Return names of nonlinear responses in the order used by the driver.
 
         Default nonlinear order is objectives followed by nonlinear constraints.  This is used for
         simultaneous derivative coloring and sparsity determination.
@@ -635,15 +635,9 @@ class Driver(object):
         list of str
             The nonlinear response names in order.
         """
-        lin_order = []
         nl_order = list(self._objs)
-        for n, meta in iteritems(self._cons):
-            if 'linear' in meta and meta['linear']:
-                lin_order.append(n)
-            else:
-                nl_order.append(n)
-
-        return nl_order, lin_order
+        nl_order.extend(n for n, m in iteritems(self._cons) if 'linear' not in m or not m['linear'])
+        return nl_order
 
     def _update_voi_meta(self, model):
         """
@@ -671,7 +665,7 @@ class Driver(object):
             else:
                 objs[name] = data
 
-        response_size = np.sum(resps[n]['size'] for n in self._get_ordered_responses()[0])
+        response_size = np.sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True)
