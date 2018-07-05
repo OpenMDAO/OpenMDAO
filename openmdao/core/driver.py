@@ -625,9 +625,9 @@ class Driver(object):
 
     def _get_ordered_nl_responses(self):
         """
-        Return names of nonlinear responses in the order used by the driver.
+        Return the names of nonlinear responses in the order used by the driver.
 
-        Default nonlinear order is objectives followed by nonlinear constraints.  This is used for
+        Default order is objectives followed by nonlinear constraints.  This is used for
         simultaneous derivative coloring and sparsity determination.
 
         Returns
@@ -635,9 +635,10 @@ class Driver(object):
         list of str
             The nonlinear response names in order.
         """
-        nl_order = list(self._objs)
-        nl_order.extend(n for n, m in iteritems(self._cons) if 'linear' not in m or not m['linear'])
-        return nl_order
+        order = list(self._objs)
+        order.extend(n for n, meta in iteritems(self._cons)
+                     if not ('linear' in meta and meta['linear']))
+        return order
 
     def _update_voi_meta(self, model):
         """

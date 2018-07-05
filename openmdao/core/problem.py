@@ -824,7 +824,6 @@ class Problem(object):
             self.model._final_setup(self.comm, 'full',
                                     force_alloc_complex=self._force_alloc_complex)
 
-        # get updated mode in case it was originally 'auto'
         self.driver._setup_driver(self)
 
         coloring_info = self.driver._simul_coloring_info
