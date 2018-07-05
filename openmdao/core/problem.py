@@ -27,9 +27,13 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.vectors.transfer import Transfer
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
+from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
 from openmdao.utils.mpi import FakeComm
+from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring
 from openmdao.vectors.default_vector import DefaultVector
@@ -95,6 +99,12 @@ class Problem(object):
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
+    recording_options : <OptionsDictionary>
+        Dictionary with problem recording options.
+    _rec_mgr : <RecordingManager>
+        Object that manages all recorders added to this problem.
+    _vars_to_record: dict
+        Dict of lists of var names indicating what to record
     """
 
     _post_setup_func = None
@@ -154,6 +164,32 @@ class Problem(object):
         # 1 -- The `setup` method has been called, but vectors not initialized.
         # 2 -- The `final_setup` has been run, everything ready to run.
         self._setup_status = 0
+
+        self._rec_mgr = RecordingManager()
+        self._vars_to_record = {
+            'desvarnames': set(),
+            'objectivenames': set(),
+            'constraintnames': set(),
+        }
+
+        # Case recording options
+        self.recording_options = OptionsDictionary()
+
+        self.recording_options.declare('record_metadata', types=bool, default=True,
+                                       desc='Record metadata')
+        self.recording_options.declare('record_desvars', types=bool, default=True,
+                                       desc='Set to True to record design variables at the '
+                                            'problem level')
+        self.recording_options.declare('record_objectives', types=bool, default=True,
+                                       desc='Set to True to record objectives at the problem level')
+        self.recording_options.declare('record_constraints', types=bool, default=True,
+                                       desc='Set to True to record constraints at the '
+                                            'problem level')
+        self.recording_options.declare('includes', types=list, default=['*'],
+                                       desc='Patterns for variables to include in recording')
+        self.recording_options.declare('excludes', types=list, default=[],
+                                       desc='Patterns for vars to exclude in recording '
+                                            '(processed post-includes)')
 
     def __getitem__(self, name):
         """
@@ -531,6 +567,92 @@ class Problem(object):
 
         return self.run_driver()
 
+    def _setup_recording(self):
+        """
+        Set up case recording.
+        """
+        model = self.model
+        driver = self.driver
+
+        mydesvars = myobjectives = myconstraints = myresponses = set()
+
+        incl = self.recording_options['includes']
+        excl = self.recording_options['excludes']
+
+        rec_desvars = self.recording_options['record_desvars']
+        rec_objectives = self.recording_options['record_objectives']
+        rec_constraints = self.recording_options['record_constraints']
+
+        all_desvars = {n for n in driver._designvars
+                       if check_path(n, incl, excl, True)}
+        all_objectives = {n for n in driver._objs
+                          if check_path(n, incl, excl, True)}
+        all_constraints = {n for n in driver._cons
+                           if check_path(n, incl, excl, True)}
+        if rec_desvars:
+            mydesvars = all_desvars
+
+        if rec_objectives:
+            myobjectives = all_objectives
+
+        if rec_constraints:
+            myconstraints = all_constraints
+
+        # get the includes that were requested for this Driver recording
+        if incl:
+            # The my* variables are sets
+
+            # First gather all of the desired outputs
+            # The following might only be the local vars if MPI
+            mysystem_outputs = {n for n in model._outputs
+                                if check_path(n, incl, excl)}
+
+            # If MPI, and on rank 0, need to gather up all the variables
+            #    even those not local to rank 0
+            if MPI:
+                all_vars = model.comm.gather(mysystem_outputs, root=0)
+                if MPI.COMM_WORLD.rank == 0:
+                    mysystem_outputs = all_vars[-1]
+                    for d in all_vars[:-1]:
+                        mysystem_outputs.update(d)
+
+            # de-duplicate mysystem_outputs
+            mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
+                                                           all_constraints)
+
+        if MPI:  # filter based on who owns the variables
+            # TODO Eventually, we think we can get rid of this next check. But to be safe,
+            #       we are leaving it in there.
+            if not model.is_active():
+                raise RuntimeError("RecordingManager.startup should never be called when "
+                                   "running in parallel on an inactive System")
+            rrank = self.comm.rank
+            rowned = model._owning_rank
+            mydesvars = [n for n in mydesvars if rrank == rowned[n]]
+            myobjectives = [n for n in myobjectives if rrank == rowned[n]]
+            myconstraints = [n for n in myconstraints if rrank == rowned[n]]
+
+        self._filtered_vars_to_record = {
+            'des': mydesvars,
+            'obj': myobjectives,
+            'con': myconstraints,
+        }
+
+        self._rec_mgr.startup(self)
+        if self.recording_options['record_metadata']:
+            self._rec_mgr.record_metadata(self)
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the problem.
+
+        Parameters
+        ----------
+        recorder : BaseRecorder
+           A recorder instance.
+        """
+        self._rec_mgr.append(recorder)
+
     def cleanup(self):
         """
         Clean up resources prior to exit.
@@ -538,6 +660,66 @@ class Problem(object):
         self.driver.cleanup()
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
+
+    def record_iteration(self, case_name):
+        """
+        Record the variables at the Problem level.
+
+        Parameters
+        ----------
+        case_name : str
+            Name used to identify this Problem case.
+        """
+        if not self._rec_mgr._recorders:
+            return
+
+        # Get the data to record (collective calls that get across all ranks)
+        opts = self.recording_options
+        filt = self._filtered_vars_to_record
+
+        model = self.model
+        driver = self.driver
+
+        if opts['record_desvars']:
+            des_vars = driver.get_design_var_values()
+        else:
+            des_vars = {}
+
+        if opts['record_objectives']:
+            obj_vars = driver.get_objective_values()
+        else:
+            obj_vars = {}
+
+        if opts['record_constraints']:
+            con_vars = driver.get_constraint_values()
+        else:
+            con_vars = {}
+
+        des_vars = {name: des_vars[name] for name in filt['des']}
+        obj_vars = {name: obj_vars[name] for name in filt['obj']}
+        con_vars = {name: con_vars[name] for name in filt['con']}
+
+        names = model._outputs._names
+        views = model._outputs._views
+
+        if MPI:
+            des_vars = model._gather_vars(model, des_vars)
+            obj_vars = model._gather_vars(model, obj_vars)
+            con_vars = model._gather_vars(model, con_vars)
+
+        outs = {}
+        if not MPI or model.comm.rank == 0:
+            outs.update(des_vars)
+            outs.update(obj_vars)
+            outs.update(con_vars)
+
+        data = {
+            'out': outs,
+        }
+
+        metadata = create_local_meta(case_name)
+
+        self._rec_mgr.record_iteration(self, data, metadata)
 
     def setup(self, vector_class=None, check=False, logger=None, mode='rev',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
@@ -643,6 +825,8 @@ class Problem(object):
                                     force_alloc_complex=self._force_alloc_complex)
 
         self.driver._setup_driver(self)
+
+        self._setup_recording()
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:

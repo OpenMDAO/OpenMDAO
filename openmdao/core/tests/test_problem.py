@@ -8,10 +8,9 @@ from six import assertRaisesRegex, StringIO, assertRegex
 import numpy as np
 
 from openmdao.core.group import get_relevant_vars
-from openmdao.api import Problem, Group, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
+from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
 from openmdao.utils.assert_utils import assert_rel_error
-
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -1410,6 +1409,7 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs',
                                           'cache_linear_solution'],
                                )
+
 
 
 if __name__ == "__main__":
