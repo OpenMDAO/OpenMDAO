@@ -178,7 +178,6 @@ class EQConstraintComp(ExplicitComponent):
             else:
                 self._scale_factor[:] = 1.0
 
-
             if options['use_mult']:
                 outputs[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
             else:
