@@ -295,13 +295,13 @@ class Driver(object):
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
 
+        # set up case recording
+        self._setup_recording()
+
         # set up simultaneous deriv coloring
         if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
             self._setup_simul_coloring()
-
-        # set up case recording
-        self._setup_recording()
 
     def _setup_recording(self):
         """
