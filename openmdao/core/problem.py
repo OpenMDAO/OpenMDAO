@@ -721,7 +721,7 @@ class Problem(object):
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
-    def setup(self, vector_class=None, check=False, logger=None, mode='rev',
+    def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
               local_vector_class=DefaultVector):
         """
@@ -743,7 +743,9 @@ class Problem(object):
             Object for logging config checks if check is True.
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
-            reverse (adjoint). Default is 'rev'.
+            reverse (adjoint). Default is 'auto', which will pick 'fwd' or 'rev' based on
+            the direction resulting in the smallest number of linear solves required to
+            compute derivatives.
         force_alloc_complex : bool
             Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
             detect when you need to do this, but in some cases (e.g., complex step is used
@@ -778,11 +780,11 @@ class Problem(object):
                                  "when running in parallel under MPI but '%s' was specified."
                                  % distributed_vector_class.__name__)
 
-        if mode not in ['fwd', 'rev']:
+        if mode not in ['fwd', 'rev', 'auto']:
             msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
             raise ValueError(msg)
 
-        self._mode = mode
+        self._mode = self._orig_mode = mode
 
         model_comm = self.driver._setup_comm(comm)
 
@@ -807,24 +809,45 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        # if we're doing simul coloring and are doing (or have a chance of doing) bidirectional
-        # coloring, we need to ensure that rev mode scatters are allocated.
-        if coloring._use_sparsity:
-            if ('dynamic_simul_derivs' in self.driver.options and
-                    self.driver.options['dynamic_simul_derivs']):
-                Transfer._need_reverse = True
-            elif self.driver._simul_coloring_info:
-                if isinstance(self.driver._simul_coloring_info, string_types):
-                    with open(self.driver._simul_coloring_info, 'r') as f:
-                        self.driver._simul_coloring_info = json.load(f)
-                if 'rev' in self.driver._simul_coloring_info:
-                    Transfer._need_reverse = True
+        orig_mode = self._mode
+
+        response_size, desvar_size = self.driver._update_voi_meta(self.model)
+
+        # update mode if it's been set to 'auto'
+        if self._orig_mode == 'auto':
+            mode = 'rev' if response_size < desvar_size else 'fwd'
+            self._mode = mode
+        else:
+            mode = self._orig_mode
 
         if self._setup_status < 2:
             self.model._final_setup(self.comm, 'full',
                                     force_alloc_complex=self._force_alloc_complex)
 
         self.driver._setup_driver(self)
+
+        coloring_info = self.driver._simul_coloring_info
+        if coloring_info and coloring._use_sparsity:
+            # if we're using simultaneous derivatives then our effective size is less
+            # than the full size
+            if 'fwd' in coloring_info and 'rev' in coloring_info:
+                pass  # we're doing both!
+            else:
+                lists = coloring_info[mode][0]
+                if lists:
+                    size = len(lists[0])  # lists[0] is the uncolored row/col indices
+                    size += len(lists) - 1
+                if mode == 'fwd':
+                    desvar_size = size
+                else:  # rev
+                    response_size = size
+
+        if ((mode == 'fwd' and desvar_size > response_size) or
+                (mode == 'rev' and response_size > desvar_size)):
+            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
+                          "problem with %d design variables and %d response variables "
+                          "(objectives and nonlinear constraints)." %
+                          (mode, desvar_size, response_size), RuntimeWarning)
 
         self._setup_recording()
 

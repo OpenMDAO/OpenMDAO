@@ -86,7 +86,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_constraint('comp.y1')
         model.add_constraint('comp.y2')
 
-        prob.setup(check=False)
+        prob.setup(check=False, mode='auto')
 
         failed = prob.run_driver()
 
@@ -965,7 +965,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup(check=False, mode='rev')
 
         failed, output = run_driver(prob)
 

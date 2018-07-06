@@ -380,7 +380,7 @@ class OptionsDictionary(object):
 
     def __getitem__(self, name):
         """
-        Get an option from the local dict, global dict, or declared default.
+        Get an option from the dict or declared default.
 
         Parameters
         ----------

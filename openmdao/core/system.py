@@ -638,8 +638,8 @@ class System(object):
             The global communicator.
         setup_mode : str
             Must be one of 'full', 'reconf', or 'update'.
-        mode : str or None
-            Derivative direction, either 'fwd', or 'rev', or None
+        mode : str
+            Derivative direction, either 'fwd', or 'rev', or 'auto'
         distributed_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in interprocess communication.

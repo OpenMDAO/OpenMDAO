@@ -1365,7 +1365,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup(check=False, mode='rev')
 
         failed, output = run_driver(prob)
 
@@ -1646,9 +1646,9 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['print_results'] = False
         prob.driver.options['optimizer'] = 'CONMIN'
-        prob.driver.opt_settings['IPRINT'] = 0
+        prob.driver.opt_settings['IPRINT'] = 2
 
-        prob.setup()
+        prob.setup(mode='auto')
         prob.run_driver()
 
         self.assertEqual(comp.visited_points[0], 1.0)
