@@ -101,21 +101,21 @@ Adjoint Method
 The adjoint approach is derived by first substituting the expression for :math:`d y/ d x` back into the original equation for :math:`d f/d x`.
 
 .. math::
-    \frac{d f}{d x} = \frac{\partial F}{\partial x} - \underbrace{\overbrace{\frac{\partial F}{\partial y}}^{1 \times m} \overbrace{\left[\frac{\partial R}{\partial y}\right]^{-1}}^{m \times m}}_{ \psi }\frac{\partial R}{\partial x}.
+    \frac{d f}{d x} = \frac{\partial F}{\partial x} - \underbrace{\overbrace{\frac{\partial F}{\partial y}}^{1 \times m} \overbrace{\left[\frac{\partial R}{\partial y}\right]^{-1}}^{m \times m}}_{ \psi^T }\frac{\partial R}{\partial x}.
 
 By grouping :math:`\partial f/\partial y` and :math:`\left[\partial R / \partial y \right]^{-1}` into a single term we get a :math:`(1 \times m)` row vector.
-This row vector, denoted as :math:`\psi`, is called the adjoint vector.
+This row vector, denoted as :math:`\psi^T`, is called the adjoint vector.
 As long as :math:`\psi` can be computed efficiently, then the total derivative can be computable as:
 
 .. math::
-    \frac{d f}{d x} = \frac{\partial F}{\partial x} - \psi \frac{\partial R}{\partial x}.
+    \frac{d f}{d x} = \frac{\partial F}{\partial x} - \psi^T \frac{\partial R}{\partial x}.
 
-Through a bit of manipulation, we find that :math:`\psi` solved for via the linear system
+Through a bit of manipulation, we find that :math:`\psi` can be solved for via the linear system
 
 .. math::
-    \underbrace{\left[ \frac{\partial R}{\partial y}  \right]^T}_{m \times m} \overbrace{\psi^T}^{m \times 1} =  \underbrace{\frac{\partial f}{\partial y}^T}_{m \times 1},
+    \underbrace{\left[ \frac{\partial R}{\partial y}  \right]^T}_{m \times m} \overbrace{\psi}^{m \times 1} =  \underbrace{\frac{\partial f}{\partial y}^T}_{m \times 1}.
 
-gives us :math:`\psi` for the cost of a single linear solve.
+This gives us :math:`\psi` for the cost of a single linear solve.
 For a problem with more than one output, you would perform one linear solve and compute one adjoint vector for each output.
 For example, if you have one objective and two constraints, then you would perform three linear solves to compute all the total derivatives you needed.
 
