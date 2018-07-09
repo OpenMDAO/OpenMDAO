@@ -5,7 +5,7 @@ Setting Up a Model for Efficient Linear Solves
 ----------------------------------------------
 
 There are a number of different features that you can use to control how the linear solves are performed that will have an impact on both the speed and accuracy of the linear solution.
-A deeper understanding of how OpenMDAO solves the unified derivatives equations is useful in understanding when to apply certain features, and may also help you structure your model to make the most effective use of them.
+A deeper understanding of how OpenMDAO solves the unified derivatives equations is useful in understanding when to apply certain features, and may also help you structure your model to make the most effective use of these features.
 The explanation of OpenMDAO's features for improving linear solver performance are broken up into three sections below:
 
 
@@ -36,7 +36,7 @@ This is the default solver used by OpenMDAO on all :ref:`Groups<feature_grouping
     The linear system for an uncoupled system can be solved with forward substitution in forward mode
 
 If you are using *reverse* mode, then the left-hand side of the unified derivatives equations will be the transpose-Jacobian and will have an upper-triangular structure.
-The upper-triangular transpose Jacobian structure is notable because it can also be seen in the :ref:`n2 diagram<om-command-view_model>`
+The upper-triangular transpose-Jacobian structure is notable, because it can also be seen in the :ref:`n2 diagram<om-command-view_model>`
 that OpenMDAO can produce.
 
 .. figure:: matrix_figs/uncoupled_rev.png
@@ -51,7 +51,7 @@ Coupled Models
 --------------
 
 Coupled models will always have a non-triangular structure to their partial-derivative Jacobian.
-In other words, there will be non-zero entries both above and below the diagonal.
+In other words, there will be nonzero entries both above and below the diagonal.
 
 .. figure:: matrix_figs/coupled_fwd.png
     :align: center
@@ -73,23 +73,17 @@ The key idea is that **some** kind of linear solver is needed when there is coup
 Which type of solver is best for your model use is heavily case-dependent and sometimes can be a difficult question to answer absolutely.
 However, there are a few rules of thumb that can be used to guide most cases:
 
-    #. direct solvers are very simple to use and for smaller problems is likely to be the best option.
-    The only downside is that the cost of computing the factorization scales with :math:`n^3` where :math:`n` is the length of your variable vector and so the compute cost can get out of control.
-    If :math:`n` < 2000 try this solver first.
-    #. iterative solvers are more difficult to use because they do not always succeed in finding a good solution to the linear problem.
-    Often times they require preconditioners in order to be effective.
-    However, with adequate preconditioning iterative solvers can dramatically outperform direct solvers for even moderate sized problems.
-    The trade off you make is computational speed for complexity in getting the solver to work.
-    Iterative solvers can also offer significant memory savings, since there isn't a need to allocate one large matrix for all the partials.
+    #. Direct solvers are very simple to use, and for smaller problems, are likely to be the best option. The only downside is that the cost of computing the factorization scales is :math:`n^3`, where :math:`n` is the length of your variable vector, so the compute cost can get out of control. If :math:`n` < 2000, try this solver first.
+    #. Iterative solvers are more difficult to use because they do not always succeed in finding a good solution to the linear problem. Often times they require preconditioners in order to be effective. However, with adequate preconditioning, iterative solvers can dramatically outperform direct solvers for even moderate-sized problems. The trade-off you make is computational speed for complexity in getting the solver to work. Iterative solvers can also offer significant memory savings, since there isn't a need to allocate one large matrix for all the partials.
 
 .. note::
 
-    There is an analogy between linear and non-linear solvers.
+    There is a relationship between linear and non-linear solvers.
     Any coupling in your model will affect both the linear and non-linear solves,
     and thus impact which type of linear and non-linear solvers you use.
 
     In the most basic case, an uncoupled model will use the default :ref:`NonLinearRunOnce <nlrunonce>` and the :ref:`LinearRunOnce<lnrunonce>` solvers.
-    These *RunOnce* solvers are a special degenerate class of solver, which can't handle any kind of coupling or implicitness in a model.
+    These *RunOnce* solvers are a special degenerate class of Solver, which can't handle any kind of coupling or implicitness in a model.
     Any model with coupling will require an iterative nonlinear solver.
     Any model that requires an iterative nonlinear solver will also need a
     linear solver other than the default :ref:`LinearRunOnce<lnrunonce>` solver.
@@ -143,12 +137,13 @@ or :ref:`PetscKrylov<petscKrylov>`, an assembled Jacobian is generally more effi
 
 
 Sparse Assembled Jacobian
-**************************
-In the majority of cases, if an assembled Jacobian is appropriate for your model then you want to
+*************************
+
+In the majority of cases, if an assembled Jacobian is appropriate for your model, then you want to
 use the :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>`.
 The :ref:`CSCJacobian<openmdao.jacobians.assembled_jacobian.py>` only allocates memory for the
-non-zero partial derivatives.
-How does OpenMDAO know which partials are non-zero?
+nonzero partial derivatives.
+How does OpenMDAO know which partials are nonzero?
 The authors of the components in your model declared them using either a
 :ref:`dense<feature_specify_partials>` or :ref:`sparse<feature_sparse_partials>` form of :code:`declare_partials`.
 
@@ -159,22 +154,22 @@ This sparsity arises from the way components are connected to one another, becau
 a connection present, there is no need to allocate space associated with that portion of the Jacobian.
 We can see this clearly by looking at a collapsed form of the :math:`N^2` diagram with just the outputs shown.
 There are 7 scalar outputs, so we have a :math:`7 \times 7` partial derivative Jacobian.
-Out of the possible 49 matrix entries, only 18 are actually non-zero.
-That makes it 37% sparse.
-Sellar is only a tiny toy problem, but in a real problem with thousands of variables, you will more
-commonly see sparsity percentages in the single digits.
+Out of the possible 49 matrix entries, only 18 are actually nonzero. That makes it 63% sparse. Sellar is only a
+tiny toy problem, but in a real problem with thousands of variables, you will more commonly see sparsity percentages
+of over 90%.
 
 
 .. figure:: sellar_n2_outputs_only.png
     :align: center
     :width: 75%
 
-    The partial derivative Jacobian for the Sellar problem has only 18 non-zero values in it. Only 37% of the matrix elements are non zero.
+    The partial-derivative Jacobian for the Sellar problem has only 18 nonzero values in it. Only 37% of the matrix elements are nonzero.
 
 If you chose to use the :ref:`DirectSolver`, then it will use scipy's sparse `splu`_  method to solve linear system for total derivatives.
 
 Dense Assembled Jacobian
-**************************
+************************
+
 A :ref:`DenseJacobian<openmdao.jacobians.assembled_jacobian.py>` allocates a dense
 :math:`n \times n` matrix, where :math:`n` is the sum of the sizes of all output variables in your
 model, to store partial derivatives in.
@@ -185,7 +180,7 @@ Then whenever the Jacobian is needed, this dense matrix is provided.
 If you chose to use the :ref:`DirectSolver`, then it will use scipy's `lu_factor`_  and `lu_solve`_
 methods to solve linear system for total derivatives.
 
-If you have a very heavily interconnected model, where many components connect to many others then a
+If you have a very heavily-interconnected model, where many components connect to many others, then a
 :ref:`DenseJacobian<openmdao.jacobians.assembled_jacobian.py>` makes sense.
 However, the reality is that most models are very sparse at the group level even if the individual
 sub-Jacobians of the components are quite dense.
@@ -197,9 +192,9 @@ the :ref:`DenseJacobian<openmdao.jacobians.assembled_jacobian.py>`.
 .. _splu: https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.sparse.linalg.splu.html
 
 
-***********************
+********************
 Matrix-Free Problems
-***********************
+********************
 
 OpenMDAO is capable of solving linear systems in a matrix-free manner, to support situations where
 the Jacobian is too big to be fit into memory or when it's just too inefficient to do so.
