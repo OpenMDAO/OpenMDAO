@@ -320,8 +320,7 @@ class BalanceComp(ImplicitComponent):
             given by the val or shape option in kwargs.
         normalize : bool
             Specifies whether or not the resulting residual should be normalized by a quadratic
-            function of the RHS. When this option is True, the user-provided ref/ref0 scaler/adder
-            options below are typically unnecessary.
+            function of the RHS.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).

@@ -77,9 +77,10 @@ class EQConstraintComp(ExplicitComponent):
             Default value for the LHS multiplier of the given output.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
         normalize : bool
-            Specifies whether or not the resulting output should be normalized by a quadratic
-            function of the RHS. When this option is True, the user-provided ref/ref0 scaler/adder
-            options below are typically unnecessary.
+            Specifies whether or not the resulting output should be normalized by the RHS.  When
+            the RHS value is between [-2, 2], the normalization value is a quadratic function that
+            is close to one but still provides a C1 continuous function. When this option is True,
+            the user-provided ref/ref0 scaler/adder options below are typically unnecessary.
         add_constraint : bool
             Specifies whether to add an equality constraint.
         ref : float or ndarray, optional
@@ -282,7 +283,7 @@ class EQConstraintComp(ExplicitComponent):
             Value to add to the model value to get the scaled value. Adder
             is first in precedence. This option is only meaningful when add_constraint=True.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value. Scaler
+            Value to multiply the model value to get the scaled value. Scaler
             is second in precedence. This option is only meaningful when add_constraint=True.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
