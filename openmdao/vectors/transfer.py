@@ -17,10 +17,6 @@ class Transfer(object):
         communicator of the system that owns this transfer.
     """
 
-    # If this is True it will force allocation of rev transfers.  We set this when using
-    # coloring when rev coloring is active.
-    _need_reverse = False
-
     def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
         """
         Initialize all attributes.

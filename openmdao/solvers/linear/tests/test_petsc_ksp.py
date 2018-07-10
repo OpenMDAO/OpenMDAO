@@ -508,8 +508,8 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         of = ['obj']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_rel_error(self, J['obj', 'z'][0][0], 9.2654054431, .00001)
-        assert_rel_error(self, J['obj', 'z'][0][1], 1.87246623559, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][0], 4.93218027, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.73406455, .00001)
 
     def test_feature_atol(self):
         import numpy as np

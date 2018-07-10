@@ -14,4 +14,14 @@ It provides information in a more theoretical and mathematical manner to help us
 
    implicit_transformation_of_vars.rst
    setup_stack.rst
-   total_derivs/index.rst
+
+
+Total Derivatives Theory
+-------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   total_derivs/total_derivs_theory.rst
+   total_derivs/setup_linear_solvers.rst
+   total_derivs/advanced_algorithms.rst
