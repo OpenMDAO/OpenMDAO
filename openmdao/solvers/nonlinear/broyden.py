@@ -503,11 +503,11 @@ class BroydenSolver(NonlinearSolver):
             Full step in the states for this iteration.
         """
         linear = self._system._vectors['output']['linear']
-        linear.set_const(0.0)
         if self._full_inverse:
             linear.set_data(dx)
 
         else:
+            linear.set_const(0.0)
             states = self.options['state_vars']
             for name in states:
                 i, j = self._idx[name]
