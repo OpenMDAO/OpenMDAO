@@ -222,7 +222,7 @@ class BroydenSolver(NonlinearSolver):
         if len(missing) > 0:
             msg = "The following states are not covered by a solver, and may have been " + \
                   "omitted from the BroydenSolver 'state_vars': "
-            msg += ', '.join(missing)
+            msg += ', '.join(sorted(missing))
             warnings.warn(msg)
 
     def _assembled_jac_solver_iter(self):
