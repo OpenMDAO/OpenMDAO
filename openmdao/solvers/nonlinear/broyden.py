@@ -106,7 +106,7 @@ class BroydenSolver(NonlinearSolver):
                                   "option does nothing if you compute the initial Jacobian "
                                   "instead.")
         self.options.declare('compute_jacobian', default=True,
-                             desc="WhenTrue, compute an initial Jacobian, otherwise start "
+                             desc="When True, compute an initial Jacobian, otherwise start "
                                   "with Identity scaled by alpha. Further Jacobians may also be "
                                   "computed depending on the other options.")
         self.options.declare('converge_limit', default=1.0,
@@ -400,7 +400,7 @@ class BroydenSolver(NonlinearSolver):
         Gm = self.Gm
 
         # Apply the Broyden Update approximation to the previous value of the inverse jacobian.
-        if not self._recompute_jacobian:
+        if self.options['update_broyden'] and not self._recompute_jacobian:
             dfxm = self.delta_fxm
             fact = np.linalg.norm(dfxm)
 
@@ -420,7 +420,7 @@ class BroydenSolver(NonlinearSolver):
 
         # Set inverse Jacobian to identity scaled by alpha.
         # This is the default starting point used by scipy and the general broyden algorithm.
-        elif self.options['update_broyden']:
+        else:
             Gm = np.diag(np.full(self.n, -self.options['alpha']))
 
         return Gm
