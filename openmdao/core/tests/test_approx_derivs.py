@@ -99,6 +99,52 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
 
+    def test_fd_count_driver(self):
+        # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
+
+        class ParaboloidA(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+                self.add_output('g_xy', val=0.0)
+
+                self.count = 0
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+
+                outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                g_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                outputs['g_xy'] = g_xy *3
+
+                self.count += 1
+
+
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('px', IndepVarComp('x', val=3.0))
+        model.add_subsystem('py', IndepVarComp('y', val=5.0))
+        model.add_subsystem('parab', ParaboloidA())
+
+        model.connect('px.x', 'parab.x')
+        model.connect('py.y', 'parab.y')
+
+        model.add_design_var('px.x', lower=-50, upper=50)
+        model.add_objective('parab.f_xy')
+
+        model.approx_totals(method='fd')
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        derivs = prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], global_names=True)
+
+        # 1. run_model; 2. step x
+        self.assertEqual(model.parab.count, 2)
+
     def test_paraboloid_subbed(self):
         prob = Problem()
         model = prob.model = Group()
