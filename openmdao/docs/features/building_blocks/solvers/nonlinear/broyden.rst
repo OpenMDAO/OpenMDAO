@@ -10,8 +10,8 @@ of the model. In some cases this can be more efficient than NewtonSolver because
 cheaper than solving the linear system. It may take more iterations because the search direction depends on an approximation,
 but the iterations take fewer operations.
 
-The BroydenSolver has two different modes of operation. It can operate on the entire model, and solve for every state in the containing
-system and all subsystems. Alternatively, it can operate on a subset of the model, and only solve for a list of states that you provide.
+The BroydenSolver has two different modes of operation. It can operate on the entire model and solve for every state in the containing
+system and all subsystems. Alternatively, it can operate on a subset of the model and only solve for a list of states that you provide.
 The advanatage of full-model mode is that you don't have to worry about forgetting a state, particularly in large models where you might
 not be familiar with every component or variable. The disadvantage is that you are computing the inverse of a larger matrix every time
 you recalculate the inverse jacobian, though ideally you are not recomputing this very often. Operating on a subset of states is more
@@ -27,7 +27,8 @@ BroydenSolver Options
     BroydenSolver
     options
 
-The BroydenSolver also contains a slot for a linear solver and a slot for a linesearch.
+The BroydenSolver also contains a slot for a linear solver and a slot for a linesearch. See the
+:ref:`feature doc about linesearches <feature_line_search>` for more about these.
 
 
 BroydenSolver on a Full Model
