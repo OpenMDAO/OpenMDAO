@@ -149,6 +149,34 @@ class TotJacBuilder(object):
 
         return builder
 
+    @staticmethod
+    def eisenstat(n):
+        """
+        Return a builder containing an Eisenstat's example Jacobian of size n+1 x n.
+        """
+        assert n >= 6, "Eisenstat's example must have n >= 6."
+        assert n % 2 == 0, "Eisenstat's example must have even 'n'."
+
+        D1 = np.eye(n // 2, dtype=int)
+        D2 = np.eye(n // 2, dtype=int)
+        D3 = np.eye(n // 2, dtype=int)
+        B = np.ones((n // 2, n // 2), dtype=int)
+        idxs = np.arange(n // 2, dtype=int)
+        B[idxs, idxs] = 0
+        C = np.ones((1, n // 2), dtype=int)
+        O = np.zeros((1, n // 2), dtype=int)
+
+        A1 = np.hstack([D1, D2])
+        A2 = np.vstack([np.hstack([C, O]), np.hstack([D3, B])])
+
+        A = np.vstack([A1, A2])
+
+        builder = TotJacBuilder(n + 1, n)
+        builder.J[:, :] = A
+
+        return builder
+
+
 def rand_jac(stream=sys.stdout, open_mode="w"):
     rnd = np.random.randint
     minr = rnd(1, 10)
@@ -192,6 +220,24 @@ def rand_jac(stream=sys.stdout, open_mode="w"):
 
 
 if __name__ == '__main__':
-    # Running this from the command line will just give a visualization of a random jacobian and
-    # its coloring.
-    rand_jac()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-e", "--eisenstat",
+                        help="Build an Eisenstat's example matrix of size n+1 x n.",
+                        action="store", type=int, default=-1, dest="eisenstat")
+    parser.add_argument("-m", "--mode", type=str, dest="mode",
+                        help="Direction of coloring (default is fwd). Only used with -e.", 
+                        default="fwd")
+    parser.add_argument("-r", "--random", action="store_true", dest="random",
+                        help="Build and color a random matrix.")
+
+    options = parser.parse_args()
+
+    if options.random:
+        rand_jac()
+    elif options.eisenstat > -1:
+        builder = TotJacBuilder.eisenstat(options.eisenstat)
+        builder.color(options.mode)
+        builder.show()
+    else:
+        print("Nothing to do...")

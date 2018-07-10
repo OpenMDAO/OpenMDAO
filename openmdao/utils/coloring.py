@@ -38,7 +38,7 @@ else:
             for row in range(arr.shape[0]):
                 count[row] = np.count_nonzero(arr[row])
         elif axis == 0:  # cols
-            count = np.zeros(arr.shape[1], dtype=int)
+            count = np.empty(arr.shape[1], dtype=int)
             for col in range(arr.shape[1]):
                 count[col] = np.count_nonzero(arr[:, col])
         else:
@@ -109,7 +109,84 @@ class _SubjacRandomizer(object):
         self._orig_set_abs(key, subjac)
 
 
-def _get_full_disjoint_cols(J):
+def _order_by_LF(col_matrix):
+    """
+    Return columns in order of largest degree first (LF).
+
+    LF is the largest number of neighbors in the column adjacency matrix.
+
+    Parameters
+    ----------
+    col_matrix : ndarray
+        Column adjacency matrix.
+
+    Yields
+    ------
+    int
+        Column index.
+    """
+    for col in _count_nonzeros(col_matrix, axis=0).argsort()[::-1]:
+        yield col
+
+
+def _order_by_ID(col_matrix):
+    """
+    Return columns in order of incidence degree (ID).
+
+    ID is the number of already colored neighbors (neighbors are dependent columns).
+
+    Parameters
+    ----------
+    col_matrix : ndarray
+        Boolean array of column dependencies.
+
+    Yields
+    ------
+    int
+        Column index.
+    """
+    colored = []
+
+    degrees = _count_nonzeros(col_matrix, axis=0)
+
+    # use max degree column as a starting point instead of just choosing a random column
+    # since all have incidence degree of 0 when we start.
+    start = degrees.argsort()[-1]
+    colored.append(start)
+    yield start
+
+    colored_degrees = np.zeros(degrees.size, dtype=int)
+    colored_degrees[col_matrix[start]] += 1
+    colored_degrees[start] = -1
+
+    ncols = col_matrix.shape[1]
+    while len(colored) < ncols:
+        col = colored_degrees.argsort()[-1]
+        colored.append(col)
+        colored_degrees[col_matrix[col]] += 1
+        colored_degrees[colored] = -1
+        yield col
+
+
+def _J2col_matrix(J):
+    nrows, ncols = J.shape
+    col_matrix = np.zeros((ncols, ncols), dtype=bool)
+
+    # mark col_matrix entries as True when nonzero row entries make them dependent
+    for row in range(nrows):
+        nzro = np.nonzero(J[row])[0]
+        for col in nzro:
+            col_matrix[col, nzro] = True
+            col_matrix[nzro, col] = True
+
+    # zero out diagonal (column is not adjacent to itself)
+    idxs = np.arange(ncols)
+    col_matrix[idxs, idxs] = False
+
+    return col_matrix
+
+
+def _get_full_disjoint_cols(J, iter_type='ID'):
     """
     Find sets of disjoint columns in J and their corresponding rows.
 
@@ -117,51 +194,35 @@ def _get_full_disjoint_cols(J):
     ----------
     J : ndarray
         The total jacobian.
+    iter_type : str.
+        Name of column index iterator.
 
     Returns
     -------
     list
         List of lists of disjoint columns
     """
+    color_groups = []
     nrows, ncols = J.shape
+    col_matrix = _J2col_matrix(J)
 
-    # Start with col_matrix all True, meaning assume all columns are disjoint.
-    # Note that col_matrix is symmetric.
-    col_matrix = np.ones((ncols, ncols), dtype=bool)
+    col_iter = globals()['_order_by_%s' % iter_type]
 
-    # mark col_matrix entries as False when nonzero row entries make them non-disjoint
-    for row in range(nrows):
-        nzro = np.nonzero(J[row])[0]
-        for col in nzro:
-            col_matrix[col, nzro] = False
-            col_matrix[nzro, col] = False
+    # -1 indicates that a column has not been colored
+    colors = np.full(ncols, -1, dtype=int)
 
-    # count the number of pairwise disjoint columns in each column of col_matrix
-    disjoint_counts = _count_nonzeros(col_matrix, axis=0)
+    for col in col_iter(col_matrix):
+        neighbor_colors = set(colors[col_matrix[col]])
+        for color, grp in enumerate(color_groups):
+            if color not in neighbor_colors:
+                grp.add(col)
+                colors[col] = color
+                break
+        else:
+            colors[col] = len(color_groups)
+            color_groups.append(set([col]))
 
-    seen = set()
-    colors = []
-
-    # create a reusable rows vector for checking disjointness
-    allrows = np.zeros(J.shape[0], dtype=bool)
-
-    # loop over columns sorted in order of disjointness, smallest number of disjoint cols first
-    for col in np.argsort(disjoint_counts):
-        if col in seen:
-            continue
-        seen.add(col)
-        allrows[:] = J[:, col]
-        color = [col]
-        colors.append(color)
-        # col_matri[col, :] contains all columns that could possibly share the same color. Not all
-        # of them generally will though since pairwise disjointness is not transitive.
-        for other_col in np.nonzero(col_matrix[col, :])[0]:
-            if other_col not in seen and not np.any(allrows & J[:, other_col]):
-                seen.add(other_col)
-                color.append(other_col)
-                allrows |= J[:, other_col]
-
-    return colors
+    return color_groups
 
 
 def _get_bool_jac(prob, repeats=3, tol=1e-15, setup=False, run_model=False):
@@ -690,8 +751,8 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes):
         if tot_colors < best_colors:
             best_colors = tot_colors
 
-            uncolored_cols = [clist[0] for clist in full_disjoint if len(clist) == 1]
-            full_disjoint = [clist for clist in full_disjoint if len(clist) > 1]
+            uncolored_cols = [cset.pop() for cset in full_disjoint if len(cset) == 1]
+            full_disjoint = [list(cset) for cset in full_disjoint if len(cset) > 1]
 
             # the first lists entry corresponds to all uncolored columns (columns that are not
             # disjoint wrt any other columns).  The other entries are groups of columns that do not
