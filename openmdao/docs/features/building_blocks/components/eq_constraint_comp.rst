@@ -15,8 +15,18 @@ computes the output value as:
 
 .. math::
 
-  name_{output} = name_{mult} \times name_{lhs} - name_{rhs}
+  name_{output} = \frac{ name_{mult} \times name_{lhs} - name_{rhs} }{f_{norm}(name_{rhs})}
 
+The normalization function :math:`f_{norm}(name_{rhs}) takes one of the following forms:
+
+.. math::
+
+  f_{norm}(name_{rhs}) =
+  \begin{cases}
+    \left| name_{rhs} \right|,      & \text{if normalize and } \left| name_{rhs} \right| \geq 2 \\
+    0.25 name_{rhs}^2 + 1,      & \text{if normalize and } \left| name_{rhs} \right| < 2 \\
+    1,      & \text{if not normalize}
+  \end{cases}
 
 The following inputs and outputs are associated with each output variable.
 
