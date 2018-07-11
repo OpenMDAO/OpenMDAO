@@ -389,6 +389,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         recorder = SqliteRecorder("cases.sql")
         prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_model_metadata'] = False
         prob.model.recording_options['record_metadata'] = False
 
         prob.setup()
@@ -398,7 +399,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
         self.assertEqual(len(cr.system_metadata.keys()), 0)
 
-    def test_record_system_metadata_recursively(self):
+    def test_system_record_model_metadata(self):
         # first check to see if recorded recursively, which is the default
         prob = Problem(model=SellarDerivatives())
         prob.setup()
@@ -419,14 +420,40 @@ class TestSqliteRecorder(unittest.TestCase):
 
         recorder = SqliteRecorder("cases.sql")
         prob.model.add_recorder(recorder)
-
-        prob.model.recording_options['record_metadata_recursively'] = False
+        prob.model.recording_options['record_model_metadata'] = False
 
         prob.run_model()
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
         self.assertEqual(list(cr.system_metadata.keys()), ['root'])
+
+    def test_driver_record_model_metadata(self):
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(set(cr.system_metadata.keys()),
+                         set(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_model_metadata'] = False
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(len(cr.system_metadata.keys()), 0)
 
     def test_driver_without_n2_data(self):
         prob = SellarProblem()

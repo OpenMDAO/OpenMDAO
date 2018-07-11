@@ -121,7 +121,7 @@ class BaseRecorder(object):
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
         if PETScVector and isinstance(recording_requester._outputs, PETScVector):
-            return None, None # Cannot handle PETScVector yet
+            return None, None  # Cannot handle PETScVector yet
 
         from six import iteritems
         from openmdao.utils.options_dictionary import OptionsDictionary
@@ -143,7 +143,6 @@ class BaseRecorder(object):
         user_options._read_only = recording_requester.options._read_only
 
         return scaling_vecs, user_options
-
 
     def record_metadata_system(self, recording_requester):
         """

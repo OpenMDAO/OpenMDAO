@@ -262,8 +262,8 @@ class System(object):
                                        desc='Set to True to record residuals at the system level')
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
                                        default=True)
-        self.recording_options.declare('record_metadata_recursively', types=bool,
-                                       desc='Record metadata recursively below this system',
+        self.recording_options.declare('record_model_metadata', types=bool,
+                                       desc='Record metadata for all Systems in the model',
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
@@ -791,12 +791,16 @@ class System(object):
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
+        # Tell all subsystems to record their metadata if they have recorders attached
         for sub in self.system_iter(recurse=True, include_self=True):
             if sub.recording_options['record_metadata']:
                 sub._rec_mgr.record_metadata(sub)
-                if sub.recording_options['record_metadata_recursively']:
-                    for sub_sub in sub.system_iter(recurse=True, include_self=False):
-                        sub._rec_mgr.record_metadata(sub_sub)
+
+        # Also, optionally, record to the recorders attached to this System,
+        #   the system metadata for all the subsystems
+        if self.recording_options['record_model_metadata']:
+            for sub in self.system_iter(recurse=True, include_self=False):
+                self._rec_mgr.record_metadata(sub)
 
     def _setup_vars(self, recurse=True):
         """
