@@ -23,7 +23,7 @@ class BalanceComp(ImplicitComponent):
 
     def __init__(self, name=None, eq_units=None, lhs_name=None,
                  rhs_name=None, rhs_val=0.0, guess_func=None,
-                 use_mult=False, mult_name=None, mult_val=1.0, **kwargs):
+                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
@@ -32,13 +32,25 @@ class BalanceComp(ImplicitComponent):
 
         .. math::
 
-          f_{mult}(x,...) \times f_{lhs}(x,...) = f_{rhs}(x,...)
+            \mathcal{R}_{name} =
+            \frac{f_{mult}(x,...) \times f_{lhs}(x,...) - f_{rhs}(x,...)}{f_{norm}(f_{rhs}(x,...))}
+
 
         Where :math:`f_{lhs}` represents the left-hand-side of the equation,
         :math:`f_{rhs}` represents the right-hand-side, and :math:`f_{mult}`
         is an optional multiplier on the left hand side.  At least one of these
         quantities should be a function of the associated state variable.  If
-        use_mult is True the default value of the multiplier is 1.
+        use_mult is True the default value of the multiplier is 1. The optional normalization
+        function :math:`f_{norm}(f_{rhs}(x,...))` is computed as:
+
+        .. math::
+
+          f_{norm}(f_{rhs}(x,...)) =
+          \begin{cases}
+           \left| f_{rhs} \right|, & \text{if normalize and } \left| f_{rhs} \right| \geq 2 \\
+           0.25 f_{rhs}^2 + 1,     & \text{if normalize and } \left| f_{rhs} \right| < 2 \\
+           1,                      & \text{if not normalize}
+          \end{cases}
 
         New state variables, and their associated residuals are created by
         calling `add_balance`.  As an example, solving the equation
@@ -111,6 +123,9 @@ class BalanceComp(ImplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
+        normalize : bool
+            Specifies whether or not the resulting residual should be normalized by a quadratic
+            function of the RHS.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
@@ -119,7 +134,7 @@ class BalanceComp(ImplicitComponent):
         self._state_vars = {}
         if name is not None:
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val, guess_func,
-                             use_mult, mult_name, mult_val, **kwargs)
+                             use_mult, mult_name, mult_val, normalize, **kwargs)
 
     def setup(self):
         """
@@ -180,14 +195,17 @@ class BalanceComp(ImplicitComponent):
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
 
-            # Indices where the rhs is near zero or not near zero
-            idxs_nz = np.where(np.abs(rhs) < 2)[0]
-            idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+            if options['normalize']:
+                # Indices where the rhs is near zero or not near zero
+                idxs_nz = np.where(np.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
 
-            # Compute scaling factors
-            # scale factor that normalizes by the rhs, except near 0
-            self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
-            self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+                # Compute scaling factors
+                # scale factor that normalizes by the rhs, except near 0
+                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+            else:
+                self._scale_factor[:] = 1.0
 
             if options['use_mult']:
                 residuals[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
@@ -214,16 +232,20 @@ class BalanceComp(ImplicitComponent):
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
 
-            # Indices where the rhs is near zero or not near zero
-            idxs_nz = np.where(np.abs(rhs) < 2)[0]
-            idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+            if options['normalize']:
+                # Indices where the rhs is near zero or not near zero
+                idxs_nz = np.where(np.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
 
-            # scale factor that normalizes by the rhs, except near 0
-            self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
-            self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+                # scale factor that normalizes by the rhs, except near 0
+                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-            self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
-            self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
+                self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
+                self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
+            else:
+                self._scale_factor[:] = 1.0
+                self._dscale_drhs[:] = 0.0
 
             if options['use_mult']:
                 mult_name = options['mult_name']
@@ -259,7 +281,7 @@ class BalanceComp(ImplicitComponent):
 
     def add_balance(self, name, eq_units=None, lhs_name=None,
                     rhs_name=None, rhs_val=0.0, guess_func=None,
-                    use_mult=False, mult_name=None, mult_val=1.0, **kwargs):
+                    use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -296,6 +318,9 @@ class BalanceComp(ImplicitComponent):
         mult_val : int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val or shape option in kwargs.
+        normalize : bool
+            Specifies whether or not the resulting residual should be normalized by a quadratic
+            function of the RHS.
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
@@ -311,4 +336,5 @@ class BalanceComp(ImplicitComponent):
                                   'guess_func': guess_func,
                                   'use_mult': use_mult,
                                   'mult_name': mult_name,
-                                  'mult_val': mult_val}
+                                  'mult_val': mult_val,
+                                  'normalize': normalize}
