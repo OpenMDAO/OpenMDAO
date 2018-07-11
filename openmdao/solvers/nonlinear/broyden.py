@@ -316,7 +316,12 @@ class BroydenSolver(NonlinearSolver):
         float
             norm.
         """
+        # Need to cache the initial residuals, which is done in this function.
         fxm = self.get_residuals()
+        if not self._full_inverse:
+            # Use full model residual for driving the main loop convergence.
+            residuals = self._system._residuals
+            fxm = residuals.get_data()
         return np.sum(fxm**2) ** 0.5
 
     def _iter_execute(self):
