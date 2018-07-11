@@ -4,8 +4,6 @@ import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
-
 
 class TestParaboloidTLDR(unittest.TestCase):
 
@@ -40,7 +38,6 @@ class TestParaboloidTLDR(unittest.TestCase):
         # location of the minimum
         assert_rel_error(self, prob['indeps.x'], 6.6667, 1e-4)
         assert_rel_error(self, prob['indeps.y'], -7.33333, 1e-4)
-
 
 if __name__ == "__main__":
 
