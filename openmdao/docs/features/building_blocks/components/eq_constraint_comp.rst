@@ -17,7 +17,7 @@ computes the output value as:
 
   name_{output} = \frac{ name_{mult} \times name_{lhs} - name_{rhs} }{f_{norm}(name_{rhs})}
 
-The normalization function :math:`f_{norm}(name_{rhs}) takes one of the following forms:
+The normalization function :math:`f_{norm}(name_{rhs})` takes one of the following forms:
 
 .. math::
 
