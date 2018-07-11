@@ -384,6 +384,50 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         assertDriverMetadataRecorded(self, expected_driver_metadata)
 
+    def test_system_records_no_metadata(self):
+        prob = Problem(model=SellarDerivatives())
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_metadata'] = False
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(len(cr.system_metadata.keys()), 0)
+
+    def test_record_system_metadata_recursively(self):
+        # first check to see if recorded recursively, which is the default
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(set(cr.system_metadata.keys()),
+                         set(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+
+        # second check to see if not recorded recursively, when option set to False
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.model.recording_options['record_metadata_recursively'] = False
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(list(cr.system_metadata.keys()), ['root'])
+
     def test_driver_without_n2_data(self):
         prob = SellarProblem()
 

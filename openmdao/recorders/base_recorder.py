@@ -117,6 +117,34 @@ class BaseRecorder(object):
         """
         raise NotImplementedError()
 
+    def _get_metadata_system(self, recording_requester):
+        # Cannot handle PETScVector yet
+        from openmdao.api import PETScVector
+        if PETScVector and isinstance(recording_requester._outputs, PETScVector):
+            return None, None # Cannot handle PETScVector yet
+
+        from six import iteritems
+        from openmdao.utils.options_dictionary import OptionsDictionary
+        from openmdao.utils.record_util import check_path
+
+        # collect scaling arrays
+        scaling_vecs = {}
+        for kind, odict in iteritems(recording_requester._vectors):
+            scaling_vecs[kind] = scaling = {}
+            for vecname, vec in iteritems(odict):
+                scaling[vecname] = vec._scaling
+
+        # create a copy of the system's metadata excluding what is in 'options_excludes'
+        user_options = OptionsDictionary()
+        excludes = recording_requester.recording_options['options_excludes']
+        for key in recording_requester.options._dict:
+            if check_path(key, [], excludes, True):
+                user_options._dict[key] = recording_requester.options._dict[key]
+        user_options._read_only = recording_requester.options._read_only
+
+        return scaling_vecs, user_options
+
+
     def record_metadata_system(self, recording_requester):
         """
         Record system metadata.

@@ -262,6 +262,9 @@ class System(object):
                                        desc='Set to True to record residuals at the system level')
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
                                        default=True)
+        self.recording_options.declare('record_metadata_recursively', types=bool,
+                                       desc='Record metadata recursively below this system',
+                                       default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
@@ -789,7 +792,11 @@ class System(object):
             self.set_initial_values()
 
         for sub in self.system_iter(recurse=True, include_self=True):
-            sub._rec_mgr.record_metadata(sub)
+            if sub.recording_options['record_metadata']:
+                sub._rec_mgr.record_metadata(sub)
+                if sub.recording_options['record_metadata_recursively']:
+                    for sub_sub in sub.system_iter(recurse=True, include_self=False):
+                        sub._rec_mgr.record_metadata(sub_sub)
 
     def _setup_vars(self, recurse=True):
         """
