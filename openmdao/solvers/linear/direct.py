@@ -57,11 +57,11 @@ def format_singular_error(err, system, mtx):
 
     n = 0
     varname = "Unknown"
-    for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
+    varsizes = system._var_sizes['nonlinear']['output']
+    for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        n += varsizes[0][j]
         if loc <= n:
-            varname = relname
+            varname = system._var_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -99,11 +99,11 @@ def format_singular_csc_error(system, matrix):
 
     n = 0
     varname = "Unknown"
-    for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
+    varsizes = system._var_sizes['nonlinear']['output']
+    for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        n += varsizes[0][j]
         if loc <= n:
-            varname = relname
+            varname = system._var_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
