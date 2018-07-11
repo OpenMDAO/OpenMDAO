@@ -260,10 +260,10 @@ class System(object):
                                        desc='Set to True to record outputs at the system level')
         self.recording_options.declare('record_residuals', types=bool, default=True,
                                        desc='Set to True to record residuals at the system level')
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
-                                       default=True)
+        self.recording_options.declare('record_metadata', types=bool,
+                                       desc='Record metadata for this system', default=True)
         self.recording_options.declare('record_model_metadata', types=bool,
-                                       desc='Record metadata for all Systems in the model',
+                                       desc='Record metadata for all sub systems in the model',
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')

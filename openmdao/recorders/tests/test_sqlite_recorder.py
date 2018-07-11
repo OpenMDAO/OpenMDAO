@@ -1777,6 +1777,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # make sure we record metadata
         prob.driver.recording_options['record_metadata'] = True
 
+        # also record the metadata for all systems in the model
+        prob.driver.recording_options['record_model_metadata'] = True
+
         recorder = SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
 
@@ -1804,6 +1807,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # access the model tree stored in metadata
         self.assertEqual(list(cr.driver_metadata['tree'].keys()),
                          ['name', 'type', 'subsystem_type', 'children'])
+
+        # access the metadata for all the systems in the model
+        self.assertEqual(list(cr.system_metadata.keys()),
+                         ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2'])
+
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
