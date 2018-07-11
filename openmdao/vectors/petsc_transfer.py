@@ -33,7 +33,7 @@ class PETScTransfer(DefaultTransfer):
             Whether to call this method in subsystems.
         """
         group._transfers = {}
-        rev = group._mode == 'rev' or Transfer._need_reverse
+        rev = group._mode == 'rev' or group._mode == 'auto'
 
         def merge(indices_list):
             if len(indices_list) > 0:
