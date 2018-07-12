@@ -1805,12 +1805,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                                     "pz.z\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
-        self.assertEqual(list(cr.driver_metadata['tree'].keys()),
-                         ['name', 'type', 'subsystem_type', 'children'])
+        self.assertEqual(set(cr.driver_metadata['tree'].keys()),
+                         {'name', 'type', 'subsystem_type', 'children'})
 
         # access the metadata for all the systems in the model
-        self.assertEqual(list(cr.system_metadata.keys()),
-                         ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2'])
+        self.assertEqual(set(cr.system_metadata.keys()),
+                         {'root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2'})
 
 
     def test_feature_solver_metadata(self):
