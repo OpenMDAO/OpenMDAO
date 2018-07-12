@@ -5,6 +5,7 @@ from __future__ import print_function, absolute_import
 
 import re
 import sys
+import json
 import sqlite3
 import numpy as np
 
@@ -14,7 +15,7 @@ from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemC
     PromotedToAbsoluteMap
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
-from openmdao.utils.record_util import is_valid_sqlite3_db
+from openmdao.utils.record_util import is_valid_sqlite3_db, values_to_array
 from openmdao.utils.write_outputs import write_outputs
 
 from six import PY2, PY3
@@ -25,6 +26,24 @@ if PY3:
     import pickle
 
 _DEFAULT_OUT_STREAM = object()
+
+def convert_to_np_array(val):
+    """
+    Convert list to numpy array.
+
+    Parameters
+    ----------
+    val : list
+        the list to be converted to an np.array
+
+    Returns
+    -------
+    numpy.array :
+        The converted array.
+    """
+    if isinstance(val, list):
+        return np.array(val)
+    return val
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -733,11 +752,19 @@ class DriverCases(BaseCases):
             cur.execute("SELECT * FROM driver_iterations")
             rows = cur.fetchall()
             for row in rows:
-                idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-                    outputs_blob, = row
+                idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
+                    outputs_text, = row
 
-                inputs_array = blob_to_array(inputs_blob)
-                outputs_array = blob_to_array(outputs_blob)
+                inputs_array = json.loads(inputs_text)  # blob_to_array(inputs_blob)
+                outputs_array = json.loads(outputs_text)  # blob_to_array(outputs_blob)
+
+                # convert back from regular list
+                for in_out in (inputs_array, outputs_array):
+                    for var in in_out:
+                        in_out[var] = convert_to_np_array(in_out[var])
+
+                inputs_array = values_to_array(inputs_array)
+                outputs_array = values_to_array(outputs_array)
 
                 case = DriverCase(self.filename, counter, iteration_coordinate, timestamp,
                                   success, msg, inputs_array, outputs_array,
@@ -772,11 +799,19 @@ class DriverCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-            outputs_blob, = row
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
+            outputs_text, = row
 
-        inputs_array = blob_to_array(inputs_blob)
-        outputs_array = blob_to_array(outputs_blob)
+        inputs_array = json.loads(inputs_text)  # blob_to_array(inputs_blob)
+        outputs_array = json.loads(outputs_text)# blob_to_array(outputs_blob)
+
+        # convert back from regular list
+        for in_out in (inputs_array, outputs_array):
+            for var in in_out:
+                in_out[var] = convert_to_np_array(in_out[var])
+
+        inputs_array = values_to_array(inputs_array)
+        outputs_array = values_to_array(outputs_array)
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           inputs_array, outputs_array,

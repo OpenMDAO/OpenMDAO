@@ -7,6 +7,7 @@ import os
 import sqlite3
 
 import warnings
+import json
 import numpy as np
 from six import iteritems
 from six.moves import cPickle as pickle
@@ -66,6 +67,28 @@ def blob_to_array(blob):
     out.seek(0)
     return np.load(out)
 
+def convert_to_list(vals):
+    """
+    Convert values to list (so that it may be sent as JSON).
+
+    Parameters
+    ----------
+    vals : numpy.array or list or tuple
+        the object to be converted to a list
+
+    Returns
+    -------
+    list :
+        The converted list.
+    """
+    if isinstance(vals, np.ndarray):
+        return convert_to_list(vals.tolist())
+    elif isinstance(vals, (list, tuple)):
+        return [convert_to_list(item) for item in vals]
+    elif vals is None:
+        return []
+    else:
+        return vals
 
 format_version = 1
 
@@ -164,7 +187,7 @@ class SqliteRecorder(BaseRecorder):
                           "record_type TEXT, rowid INT)")
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT)")
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
@@ -282,11 +305,13 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['out']
             inputs = data['in']
 
-            outputs_array = values_to_array(outputs)
-            inputs_array = values_to_array(inputs)
+            # convert to list so this can be used in visualization
+            for in_out in (inputs, outputs):
+                for var in in_out:
+                    in_out[var] = convert_to_list(in_out[var])
 
-            outputs_blob = array_to_blob(outputs_array)
-            inputs_blob = array_to_blob(inputs_array)
+            outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -295,7 +320,7 @@ class SqliteRecorder(BaseRecorder):
                           "timestamp, success, msg, inputs, outputs) VALUES(?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_blob, outputs_blob))
+                           inputs_text, outputs_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('driver', c.lastrowid))
