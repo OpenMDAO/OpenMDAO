@@ -4,15 +4,15 @@ Define the BroydenSolver class.
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
 from __future__ import print_function
+from copy import deepcopy
 import warnings
 from six.moves import range
 
 import numpy as np
 
-from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.utils.name_maps import rel_name2abs_name
+from openmdao.utils.class_util import overrides_method
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -54,6 +54,8 @@ class BroydenSolver(NonlinearSolver):
         Number of computed jacobians.
     _converge_failures : int
         Number of consecutive iterations that failed to converge to the tol definied in options.
+    _full_inverse : bool
+        When True, Broyden considers the whole vector rather than a list of states.
     _recompute_jacobian : bool
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
@@ -103,8 +105,8 @@ class BroydenSolver(NonlinearSolver):
                              desc="Value to scale the starting Jacobian, which is Identity. This "
                                   "option does nothing if you compute the initial Jacobian "
                                   "instead.")
-        self.options.declare('compute_jacobian', default=False,
-                             desc="Set to True to compute an initial Jacobian, otherwise start "
+        self.options.declare('compute_jacobian', default=True,
+                             desc="When True, compute an initial Jacobian, otherwise start "
                                   "with Identity scaled by alpha. Further Jacobians may also be "
                                   "computed depending on the other options.")
         self.options.declare('converge_limit', default=1.0,
@@ -184,16 +186,25 @@ class BroydenSolver(NonlinearSolver):
         self.delta_fxm = None
 
         if self._full_inverse:
+
+            # Can only use DirectSolver here.
+            from openmdao.solvers.linear.direct import DirectSolver
+            if not isinstance(self.linear_solver, DirectSolver):
+                msg = "Linear solver must be DirectSolver when solving the full model."
+                raise ValueError(msg.format(', '.join(bad_names)))
+
             return
 
         # Always look for states that aren't being solved so we can warn the user.
-        def _sys_recurse(system, all_states):
-            """
-            Recurse over systems, finding all states that aren't covered by
-            an appropriate solver.
-            """
+        def sys_recurse(system, all_states):
             subs = system._subsystems_myproc
             if len(subs) == 0:
+
+                # Skip implicit components that appear to solve themselves.
+                from openmdao.core.implicitcomponent import ImplicitComponent
+                if overrides_method('solve_nonlinear', system, ImplicitComponent):
+                    return
+
                 all_states.extend(system._list_states())
 
             else:
@@ -201,17 +212,17 @@ class BroydenSolver(NonlinearSolver):
                     sub_nl = subsys.nonlinear_solver
                     if sub_nl and sub_nl.supports['implicit_components']:
                         continue
-                    _sys_recurse(subsys, all_states)
+                    sys_recurse(subsys, all_states)
 
         all_states = []
-        _sys_recurse(system, all_states)
+        sys_recurse(system, all_states)
+        all_states = [system._var_abs2prom['output'][name] for name in all_states]
 
-        states = [rel_name2abs_name(system, rel_name) for rel_name in states]
         missing = set(all_states).difference(states)
         if len(missing) > 0:
             msg = "The following states are not covered by a solver, and may have been " + \
-                   "omitted from the BroydenSolver 'state_vars': "
-            msg += ','.join(missing)
+                  "omitted from the BroydenSolver 'state_vars': "
+            msg += ', '.join(sorted(missing))
             warnings.warn(msg)
 
     def _assembled_jac_solver_iter(self):
@@ -305,7 +316,12 @@ class BroydenSolver(NonlinearSolver):
         float
             norm.
         """
+        # Need to cache the initial residuals, which is done in this function.
         fxm = self.get_residuals()
+        if not self._full_inverse:
+            # Use full model residual for driving the main loop convergence.
+            residuals = self._system._residuals
+            fxm = residuals.get_data()
         return np.sum(fxm**2) ** 0.5
 
     def _iter_execute(self):
@@ -313,10 +329,7 @@ class BroydenSolver(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
-        from time import time
-        t0 = time()
         Gm = self._update_inverse_jacobian()
-        print('jac time', time() - t0)
         fxm = self.fxm
 
         delta_xm = -Gm.dot(fxm)
@@ -392,14 +405,14 @@ class BroydenSolver(NonlinearSolver):
         Gm = self.Gm
 
         # Apply the Broyden Update approximation to the previous value of the inverse jacobian.
-        if not self._recompute_jacobian:
+        if self.options['update_broyden'] and not self._recompute_jacobian:
             dfxm = self.delta_fxm
             fact = np.linalg.norm(dfxm)
 
             # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch. Make
             # sure we don't update in this case because of divide by zero.
             if fact > self.options['atol']:
-                Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0/fact**2))
+                Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0 / fact**2))
 
         # Solve for total derivatives of user-requested residuals wrt states.
         elif self.options['compute_jacobian']:
@@ -412,8 +425,8 @@ class BroydenSolver(NonlinearSolver):
 
         # Set inverse Jacobian to identity scaled by alpha.
         # This is the default starting point used by scipy and the general broyden algorithm.
-        elif self.options['update_broyden']:
-            Gm = np.diag(-self.options['alpha'] * np.ones(self.n))
+        else:
+            Gm = np.diag(np.full(self.n, -self.options['alpha']))
 
         return Gm
 
@@ -437,9 +450,8 @@ class BroydenSolver(NonlinearSolver):
             states = self.options['state_vars']
             xm = self.xm.copy()
             for name in states:
-                val = outputs[name]
                 i, j = self._idx[name]
-                xm[i:j] = val
+                xm[i:j] = outputs[name]
 
         return xm
 
@@ -481,9 +493,8 @@ class BroydenSolver(NonlinearSolver):
             states = self.options['state_vars']
             fxm = self.fxm
             for name in states:
-                val = residuals[name]
                 i, j = self._idx[name]
-                fxm[i:j] = val
+                fxm[i:j] = residuals[name]
 
         return fxm
 
@@ -497,11 +508,11 @@ class BroydenSolver(NonlinearSolver):
             Full step in the states for this iteration.
         """
         linear = self._system._vectors['output']['linear']
-        linear.set_const(0.0)
         if self._full_inverse:
             linear.set_data(dx)
 
         else:
+            linear.set_const(0.0)
             states = self.options['state_vars']
             for name in states:
                 i, j = self._idx[name]
@@ -536,7 +547,7 @@ class BroydenSolver(NonlinearSolver):
         do_sub_ln = ln_solver._linearize_children()
         my_asm_jac = ln_solver._assembled_jac
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if (my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac):
+        if my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
         self._linearize()
 
@@ -585,7 +596,7 @@ class BroydenSolver(NonlinearSolver):
         do_sub_ln = ln_solver._linearize_children()
         my_asm_jac = ln_solver._assembled_jac
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if (my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac):
+        if my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
 
         inv_jac = self.linear_solver._inverse()
@@ -593,13 +604,13 @@ class BroydenSolver(NonlinearSolver):
         # Enable local fd
         system._owns_approx_jac = approx_status
 
-        return(inv_jac)
+        return inv_jac
 
     def _mpi_print_header(self):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+        if self.options['iprint'] > 0 and self._system.comm.rank == 0:
 
             pathname = self._system.pathname
             if pathname:
@@ -610,3 +621,14 @@ class BroydenSolver(NonlinearSolver):
                 header += prefix + pathname + "\n"
                 header += prefix + nchar * "="
                 print(header)
+
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        super(BroydenSolver, self).cleanup()
+
+        if self.linear_solver:
+            self.linear_solver.cleanup()
+        if self.linesearch:
+            self.linesearch.cleanup()

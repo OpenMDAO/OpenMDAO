@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, LinearRunOnce, ImplicitComponent, IndepVarComp, DirectSolver, \
-     BoundsEnforceLS
+     BoundsEnforceLS, LinearBlockGS
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection
@@ -142,6 +142,21 @@ class TestBryoden(unittest.TestCase):
         msg = "The following variable names were not found: junk"
         self.assertEqual(str(context.exception), msg)
 
+    def test_error_need_direct_solver(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        with self.assertRaises(ValueError) as context:
+            prob.run_model()
+
+        msg = "Linear solver must be DirectSolver when solving the full model."
+        self.assertEqual(str(context.exception), msg)
+
     def test_simple_sellar(self):
         # Test top level Sellar (i.e., not grouped).
 
@@ -152,6 +167,7 @@ class TestBryoden(unittest.TestCase):
         prob.setup(check=False)
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.run_model()
 
@@ -169,6 +185,7 @@ class TestBryoden(unittest.TestCase):
         prob.setup(check=False)
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.run_model()
 
@@ -192,6 +209,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['vec.x']
         model.nonlinear_solver.options['maxiter'] = 15
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.setup(check=False)
 
@@ -213,6 +231,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['mixed.x12', 'mixed.x3', 'mixed.x45']
         model.nonlinear_solver.options['maxiter'] = 15
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.setup(check=False)
 
@@ -236,6 +255,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['mixed.x12']
         model.nonlinear_solver.options['maxiter'] = 15
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.setup(check=False)
 
@@ -244,7 +264,32 @@ class TestBryoden(unittest.TestCase):
 
         self.assertEqual(len(w), 1)
 
-        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': mixed.x3,mixed.x45"
+        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': mixed.x3, mixed.x45"
+
+        self.assertEqual(str(w[0].message), msg)
+
+        # Try again with promoted names.
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('c', 0.01))
+        model.add_subsystem('mixed', MixedEquation(), promotes=['*'])
+
+        model.connect('p1.c', 'c')
+
+        model.nonlinear_solver = BroydenSolver()
+        model.nonlinear_solver.options['state_vars'] = ['x12']
+        model.nonlinear_solver.options['maxiter'] = 15
+        model.nonlinear_solver.options['compute_jacobian'] = False
+
+        prob.setup(check=False)
+
+        with warnings.catch_warnings(record=True) as w:
+            prob.run_model()
+
+        self.assertEqual(len(w), 1)
+
+        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': x3, x45"
 
         self.assertEqual(str(w[0].message), msg)
 
@@ -262,6 +307,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['x12', 'x3', 'x45']
         model.nonlinear_solver.options['maxiter'] = 15
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.setup(check=False)
 
@@ -285,7 +331,6 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['mixed.x12', 'mixed.x3', 'mixed.x45']
         model.nonlinear_solver.options['maxiter'] = 15
-        model.nonlinear_solver.options['compute_jacobian'] = True
         model.nonlinear_solver.linear_solver = DirectSolver()
 
         prob.setup(check=False)
@@ -310,7 +355,6 @@ class TestBryoden(unittest.TestCase):
         prob.setup(check=False)
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
-        model.nonlinear_solver.options['compute_jacobian'] = True
         model.nonlinear_solver.linear_solver = DirectSolver()
 
         prob.run_model()
@@ -332,6 +376,7 @@ class TestBryoden(unittest.TestCase):
         prob.setup(check=False)
 
         model.nonlinear_solver.linear_solver = DirectSolver()
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.run_model()
 
@@ -351,7 +396,6 @@ class TestBryoden(unittest.TestCase):
 
         prob.setup(check=False)
 
-        model.nonlinear_solver.options['compute_jacobian'] = True
         model.nonlinear_solver.linear_solver = DirectSolver()
 
         prob.run_model()
@@ -377,7 +421,6 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['comp.y']
         model.nonlinear_solver.options['maxiter'] = 20
-        model.nonlinear_solver.options['compute_jacobian'] = True
         model.nonlinear_solver.options['max_converge_failures'] = 1
         model.nonlinear_solver.options['diverge_limit'] = np.inf
         model.nonlinear_solver.linear_solver = DirectSolver()
@@ -403,7 +446,6 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver = BroydenSolver()
         model.nonlinear_solver.options['state_vars'] = ['comp.y']
         model.nonlinear_solver.options['maxiter'] = 20
-        model.nonlinear_solver.options['compute_jacobian'] = True
         model.nonlinear_solver.options['diverge_limit'] = 0.5
         model.nonlinear_solver.linear_solver = DirectSolver()
 
@@ -422,7 +464,6 @@ class TestBryoden(unittest.TestCase):
 
         top.model.nonlinear_solver = BroydenSolver()
         top.model.nonlinear_solver.options['maxiter'] = 25
-        top.model.nonlinear_solver.options['compute_jacobian'] = True
         top.model.nonlinear_solver.options['diverge_limit'] = 0.5
         top.model.nonlinear_solver.options['state_vars'] = ['comp.y', 'comp.z']
 
@@ -463,6 +504,7 @@ class TestBryodenFeature(unittest.TestCase):
         prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+        model.nonlinear_solver.options['compute_jacobian'] = False
 
         prob.set_solver_print(level=2)
         prob.run_model()
@@ -473,35 +515,7 @@ class TestBryodenFeature(unittest.TestCase):
     def test_circuit(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
-
-        class Circuit(Group):
-
-            def setup(self):
-                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
-                self.add_subsystem('n2', Node())  # leaving defaults
-
-                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
-                self.add_subsystem('R2', Resistor(R=10000.))
-                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
-
-                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
-                self.connect('R1.I', 'n1.I_out:0')
-                self.connect('R2.I', 'n1.I_out:1')
-
-                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
-                self.connect('R2.I', 'n2.I_in:0')
-                self.connect('D1.I', 'n2.I_out:0')
-
-                self.nonlinear_solver = BroydenSolver()
-                self.nonlinear_solver.options['maxiter'] = 20
-                self.nonlinear_solver.options['compute_jacobian'] = True
-
-                ##################################################################
-                # Assemble at the group level. Default assembled jac type is 'csc'
-                ##################################################################
-                self.options['assembled_jac_type'] = 'csc'
-                self.linear_solver = DirectSolver(assemble_jac=True)
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
         p = Problem()
         model = p.model
@@ -515,8 +529,14 @@ class TestBryodenFeature(unittest.TestCase):
 
         p.setup()
 
+        # Replace existing solver with BroydenSolver
+        model.circuit.nonlinear_solver = BroydenSolver()
+        model.circuit.nonlinear_solver.options['maxiter'] = 20
+
         # Specify states for Broyden to solve
         model.circuit.nonlinear_solver.options['state_vars'] = ['n1.V', 'n2.V']
+
+        model.nonlinear_solver.linear_solver = LinearBlockGS()
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
@@ -527,9 +547,6 @@ class TestBryodenFeature(unittest.TestCase):
 
         assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
         assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
@@ -537,37 +554,7 @@ class TestBryodenFeature(unittest.TestCase):
     def test_circuit_options(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
-
-        class Circuit(Group):
-
-            def setup(self):
-                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
-                self.add_subsystem('n2', Node())  # leaving defaults
-
-                self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
-                self.add_subsystem('R2', Resistor(R=10000.))
-                self.add_subsystem('D1', Diode(), promotes_inputs=[('V_out', 'Vg')])
-
-                self.connect('n1.V', ['R1.V_in', 'R2.V_in'])
-                self.connect('R1.I', 'n1.I_out:0')
-                self.connect('R2.I', 'n1.I_out:1')
-
-                self.connect('n2.V', ['R2.V_out', 'D1.V_in'])
-                self.connect('R2.I', 'n2.I_in:0')
-                self.connect('D1.I', 'n2.I_out:0')
-
-                self.nonlinear_solver = BroydenSolver()
-                self.nonlinear_solver.options['maxiter'] = 20
-                self.nonlinear_solver.options['compute_jacobian'] = True
-                self.nonlinear_solver.options['converge_limit'] = 0.1
-                self.nonlinear_solver.options['max_converge_failures'] = 1
-
-                ##################################################################
-                # Assemble at the group level. Default assembled jac type is 'csc'
-                ##################################################################
-                self.options['assembled_jac_type'] = 'csc'
-                self.linear_solver = DirectSolver(assemble_jac=True)
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 
         p = Problem()
         model = p.model
@@ -581,6 +568,12 @@ class TestBryodenFeature(unittest.TestCase):
 
         p.setup()
 
+        # Replace existing solver with BroydenSolver
+        model.circuit.nonlinear_solver = BroydenSolver()
+        model.circuit.nonlinear_solver.options['maxiter'] = 20
+        model.circuit.nonlinear_solver.options['converge_limit'] = 0.1
+        model.circuit.nonlinear_solver.options['max_converge_failures'] = 1
+
         # Specify states for Broyden to solve
         model.circuit.nonlinear_solver.options['state_vars'] = ['n1.V', 'n2.V']
 
@@ -593,9 +586,41 @@ class TestBryodenFeature(unittest.TestCase):
 
         assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
         assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+
+        # sanity check: should sum to .1 Amps
+        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+
+    def test_circuit_full(self):
+        from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
+
+        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        p.setup()
+
+        # Replace existing solver with BroydenSolver
+        model.circuit.nonlinear_solver = BroydenSolver()
+        model.circuit.nonlinear_solver.options['maxiter'] = 20
+        model.circuit.nonlinear_solver.linear_solver = DirectSolver()
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.set_solver_print(level=2)
+        p.run_model()
+
+        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
