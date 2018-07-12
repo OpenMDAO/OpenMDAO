@@ -150,7 +150,9 @@ def json_to_np_array(vals):
         named array containing the same names and values as the input values json string.
     """
     json_vals = json.loads(vals)
-    
+    if json_vals is None:
+        return None
+
     for var in json_vals:
         json_vals[var] = convert_to_np_array(json_vals[var])
 

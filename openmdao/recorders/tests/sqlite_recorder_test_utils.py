@@ -59,8 +59,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             else:
                 abs2meta = pickle.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
 
-            inputs_array = json_to_np_array(inputs_text)
-            outputs_array = json_to_np_array(outputs_text)
+            inputs_actual = json_to_np_array(inputs_text)
+            outputs_actual = json_to_np_array(outputs_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -69,8 +69,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             test.assertEqual(msg, '')
 
             for vartype, actual, expected in (
-                ('outputs', outputs_array, outputs_expected),
-                ('inputs', inputs_array, inputs_expected)
+                ('outputs', outputs_actual, outputs_expected),
+                ('inputs', inputs_actual, inputs_expected)
             ):
 
                 if expected is None:
@@ -109,9 +109,9 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
                 outputs_blob, residuals_blob = row_actual
 
-            inputs_actual = blob_to_array(inputs_blob)
-            outputs_actual = blob_to_array(outputs_blob)
-            residuals_actual = blob_to_array(residuals_blob)
+            inputs_actual = json_to_np_array(inputs_blob)
+            outputs_actual = json_to_np_array(outputs_blob)
+            residuals_actual = json_to_np_array(residuals_blob)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)

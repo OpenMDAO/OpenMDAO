@@ -867,9 +867,9 @@ class SystemCases(BaseCases):
             for row in rows:
                 idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
                     outputs_blob, residuals_blob = row
-                inputs_array = blob_to_array(inputs_blob)
-                outputs_array = blob_to_array(outputs_blob)
-                residuals_array = blob_to_array(residuals_blob)
+                inputs_array = json_to_np_array(inputs_blob)
+                outputs_array = json_to_np_array(outputs_blob)
+                residuals_array = json_to_np_array(residuals_blob)
 
                 case = SystemCase(self.filename, counter, iteration_coordinate, timestamp,
                                   success, msg, inputs_array, outputs_array, residuals_array,
@@ -908,9 +908,9 @@ class SystemCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
             outputs_blob, residuals_blob = row
 
-        inputs_array = blob_to_array(inputs_blob)
-        outputs_array = blob_to_array(outputs_blob)
-        residuals_array = blob_to_array(residuals_blob)
+        inputs_array = json_to_np_array(inputs_blob)
+        outputs_array = json_to_np_array(outputs_blob)
+        residuals_array = json_to_np_array(residuals_blob)
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           inputs_array, outputs_array, residuals_array,

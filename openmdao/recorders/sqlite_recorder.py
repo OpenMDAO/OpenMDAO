@@ -195,7 +195,7 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs BLOB, outputs BLOB, residuals BLOB)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
@@ -307,6 +307,8 @@ class SqliteRecorder(BaseRecorder):
 
             # convert to list so this can be used in visualization
             for in_out in (inputs, outputs):
+                if in_out is None:
+                    continue
                 for var in in_out:
                     in_out[var] = convert_to_list(in_out[var])
 
@@ -370,13 +372,16 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['o']
             residuals = data['r']
 
-            inputs_array = values_to_array(inputs)
-            outputs_array = values_to_array(outputs)
-            residuals_array = values_to_array(residuals)
+            # convert to list so this can be used in visualization
+            for i_o_r in (inputs, outputs, residuals):
+                if i_o_r is None:
+                    continue
+                for var in i_o_r:
+                    i_o_r[var] = convert_to_list(i_o_r[var])
 
-            inputs_blob = array_to_blob(inputs_array)
-            outputs_blob = array_to_blob(outputs_array)
-            residuals_blob = array_to_blob(residuals_array)
+            outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -386,7 +391,7 @@ class SqliteRecorder(BaseRecorder):
                           "VALUES(?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_blob, outputs_blob, residuals_blob))
+                           inputs_text, outputs_text, residuals_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('system', c.lastrowid))
