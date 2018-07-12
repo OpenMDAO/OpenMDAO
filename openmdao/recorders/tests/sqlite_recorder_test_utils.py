@@ -6,12 +6,11 @@ if PY3:
     import pickle
 
 import sqlite3
-
 import numpy as np
 
 from contextlib import contextmanager
 
-from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.utils.record_util import format_iteration_coordinate, json_to_np_array
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
@@ -53,15 +52,15 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                             'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
-                input_blob, output_blob = row_actual
+                inputs_text, outputs_text = row_actual
 
             if PY2:
                 abs2meta = pickle.loads(str(row_abs2meta[0])) if row_abs2meta[0] is not None else None
             else:
                 abs2meta = pickle.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
 
-            inputs_actual = blob_to_array(input_blob)
-            outputs_actual = blob_to_array(output_blob)
+            inputs_array = json_to_np_array(inputs_text)
+            outputs_array = json_to_np_array(outputs_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -70,8 +69,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             test.assertEqual(msg, '')
 
             for vartype, actual, expected in (
-                ('outputs', outputs_actual, outputs_expected),
-                ('inputs', inputs_actual, inputs_expected)
+                ('outputs', outputs_array, outputs_expected),
+                ('inputs', inputs_array, inputs_expected)
             ):
 
                 if expected is None:

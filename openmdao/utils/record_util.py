@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 from six.moves import map, zip
 from six import iteritems
 import os
+import json
 
 import numpy as np
 
@@ -133,6 +134,46 @@ def check_path(path, includes, excludes, include_all_path=False):
         return True
 
     return False
+
+def json_to_np_array(vals):
+    """
+    Convert from a JSON string to a numpy named array.
+
+    Parameters
+    ----------
+    vals : string
+        json string of data
+
+    Returns
+    -------
+    array: numpy named array
+        named array containing the same names and values as the input values json string.
+    """
+    json_vals = json.loads(vals)
+    
+    for var in json_vals:
+        json_vals[var] = convert_to_np_array(json_vals[var])
+
+    return values_to_array(json_vals)
+
+
+def convert_to_np_array(val):
+    """
+    Convert list to numpy array.
+
+    Parameters
+    ----------
+    val : list
+        the list to be converted to an np.array
+
+    Returns
+    -------
+    numpy.array :
+        The converted array.
+    """
+    if isinstance(val, list):
+        return np.array(val)
+    return val
 
 
 def values_to_array(values):
