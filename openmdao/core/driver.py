@@ -209,7 +209,8 @@ class Driver(object):
         """
         Clean up resources prior to exit.
         """
-        self._rec_mgr.close()
+        # shut down all recorders
+        self._rec_mgr.shutdown()
 
     def _declare_options(self):
         """
@@ -248,26 +249,13 @@ class Driver(object):
         """
         self._problem = problem
         model = problem.model
+        mode = problem._mode
 
         self._total_jac = None
 
-        self._objs = objs = OrderedDict()
-        self._cons = cons = OrderedDict()
-
-        self._responses = model.get_responses(recurse=True)
-        response_size = 0
-        for name, data in iteritems(self._responses):
-            if data['type'] == 'con':
-                cons[name] = data
-            else:
-                objs[name] = data
-            response_size += data['size']
-
-        # Gather up the information for design vars.
-        self._designvars = model.get_design_vars(recurse=True)
         self._has_scaling = (
-            np.any([r['scaler'] is not None for r in self._responses.values()]) or
-            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
+            np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
+            np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
         )
 
         con_set = set()
@@ -310,31 +298,10 @@ class Driver(object):
         # set up case recording
         self._setup_recording()
 
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
         # set up simultaneous deriv coloring
         if (coloring_mod._use_sparsity and self._simul_coloring_info and
                 self.supports['simultaneous_derivatives']):
-            self._setup_simul_coloring(problem._mode)
-
-        # if we're using simultaneous derivatives then our effective size is less
-        # than the full size
-        if self._simul_coloring_info:
-            lists = self._simul_coloring_info[0]
-            if lists:
-                size = len(lists[0])  # lists[0] is the uncolored row/col indices
-                size += len(lists) - 1
-            if problem._mode == 'fwd':
-                desvar_size = size
-            else:  # rev
-                response_size = size
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
+            self._setup_simul_coloring()
 
     def _setup_recording(self):
         """
@@ -673,6 +640,40 @@ class Driver(object):
                      if not ('linear' in meta and meta['linear']))
         return order
 
+    def _update_voi_meta(self, model):
+        """
+        Collect response and design var metadata from the model and size desvars and responses.
+
+        Parameters
+        ----------
+        model : System
+            The System that represents the entire model.
+
+        Returns
+        -------
+        int
+            Total size of responses, with linear constraints excluded.
+        int
+            Total size of design vars.
+        """
+        self._objs = objs = OrderedDict()
+        self._cons = cons = OrderedDict()
+
+        self._responses = resps = model.get_responses(recurse=True)
+        for name, data in iteritems(resps):
+            if data['type'] == 'con':
+                cons[name] = data
+            else:
+                objs[name] = data
+
+        response_size = np.sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
+
+        # Gather up the information for design vars.
+        self._designvars = designvars = model.get_design_vars(recurse=True)
+        desvar_size = np.sum(data['size'] for data in itervalues(designvars))
+
+        return response_size, desvar_size
+
     def run(self):
         """
         Execute this driver.
@@ -731,7 +732,9 @@ class Driver(object):
                 self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
                                                             return_format, approx=True,
                                                             debug_print=debug_print)
-            return total_jac.compute_totals_approx()
+                return total_jac.compute_totals_approx(initialize=True)
+            else:
+                return total_jac.compute_totals_approx()
         else:
             if total_jac is None:
                 total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
@@ -863,15 +866,16 @@ class Driver(object):
 
         Parameters
         ----------
-        simul_info : str or tuple
+        simul_info : str or dict
 
             ::
 
                 # Information about simultaneous coloring for design vars and responses.  If a
                 # string, then simul_info is assumed to be the name of a file that contains the
-                # coloring information in JSON format.  If a tuple, the structure looks like this:
+                # coloring information in JSON format.  If a dict, the structure looks like this:
 
-                (
+                {
+                "fwd": [
                     # First, a list of column index lists, each index list representing columns
                     # having the same color, except for the very first index list, which contains
                     # indices of all columns that are not colored.
@@ -891,8 +895,12 @@ class Driver(object):
                         [ra, rb, ...]   # list of nonzero rows for column 2
                             ...
                     ],
-
-                    # The last tuple entry can be None, indicating that no sparsity structure is
+                ],
+                # This example is not a bidirectional coloring, so the opposite direction, "rev"
+                # in this case, has an empty row index list.  It could also be removed entirely.
+                "rev": [[[]], []],
+                "sparsity":
+                    # The sparsity entry can be absent, indicating that no sparsity structure is
                     # specified, or it can be a nested dictionary where the outer keys are response
                     # names, the inner keys are design variable names, and the value is a tuple of
                     # the form (row_list, col_list, shape).
@@ -907,7 +915,7 @@ class Driver(object):
                         }
                         ...
                     }
-                )
+                }
 
         """
         if self.supports['simultaneous_derivatives']:
@@ -949,14 +957,9 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
-    def _setup_simul_coloring(self, mode='fwd'):
+    def _setup_simul_coloring(self):
         """
         Set up metadata for simultaneous derivative solution.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:
@@ -966,15 +969,22 @@ class Driver(object):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = json.load(f)
 
-        tup = self._simul_coloring_info
-        if len(tup) > 2:
-            sparsity = tup[2]
-            if self._total_jac_sparsity is not None:
-                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                                   " and _total_jac_sparsity.")
-            self._total_jac_sparsity = sparsity
+        if 'rev' in self._simul_coloring_info and self._problem._orig_mode not in ('rev', 'auto'):
+            raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
+                               "been set to '%s'" % self._problem._orig_mode)
 
-        self._simul_coloring_info = tup[:2]
+        # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
+        # sparsity patterns
+        if 'sparsity' in self._simul_coloring_info:
+            sparsity = self._simul_coloring_info['sparsity']
+            del self._simul_coloring_info['sparsity']
+        else:
+            sparsity = None
+
+        if sparsity is not None and self._total_jac_sparsity is not None:
+            raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                               " and _total_jac_sparsity.")
+        self._total_jac_sparsity = sparsity
 
     def _pre_run_model_debug_print(self):
         """

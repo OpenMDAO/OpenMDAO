@@ -362,7 +362,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         reraise(*exc)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
-            self._iter_count += 1
 
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))

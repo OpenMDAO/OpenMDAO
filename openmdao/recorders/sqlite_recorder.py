@@ -17,6 +17,7 @@ from openmdao.utils.record_util import values_to_array, check_path
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
+from openmdao.core.problem import Problem
 
 
 def array_to_blob(array):
@@ -162,15 +163,22 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
                           "record_type TEXT, rowid INT)")
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
-                          "counter INT,iteration_coordinate TEXT, timestamp REAL, "
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
+                c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
+                c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
+                          "counter INT, case_name TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, outputs BLOB)")
+                c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs BLOB, outputs BLOB, residuals BLOB)")
+                c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
                           "solver_inputs BLOB, solver_output BLOB, solver_residuals BLOB)")
+                c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data BLOB)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
@@ -199,6 +207,8 @@ class SqliteRecorder(BaseRecorder):
             system = recording_requester._problem.model
         elif isinstance(recording_requester, System):
             system = recording_requester
+        elif isinstance(recording_requester, Problem):
+            system = recording_requester.model
         else:
             system = recording_requester._system
 
@@ -289,6 +299,33 @@ class SqliteRecorder(BaseRecorder):
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('driver', c.lastrowid))
+
+    def record_iteration_problem(self, recording_requester, data, metadata):
+        """
+        Record data and metadata from a Problem.
+
+        Parameters
+        ----------
+        recording_requester : object
+            Problem in need of recording.
+        data : dict
+            Dictionary containing desvars, objectives, and constraints.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        if self.connection:
+            outputs = data['out']
+            outputs_array = values_to_array(outputs)
+            outputs_blob = array_to_blob(outputs_array)
+
+            with self.connection as c:
+                c = c.cursor()  # need a real cursor for lastrowid
+
+                c.execute("INSERT INTO problem_cases(counter, case_name, "
+                          "timestamp, success, msg, outputs) VALUES(?,?,?,?,?,?)",
+                          (self._counter, metadata['name'],
+                           metadata['timestamp'], metadata['success'], metadata['msg'],
+                           outputs_blob))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
@@ -469,9 +506,10 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
                           "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
-    def close(self):
+    def shutdown(self):
         """
-        Close `out`.
+        Shut down the recorder.
         """
+        # close database connection
         if self.connection:
             self.connection.close()

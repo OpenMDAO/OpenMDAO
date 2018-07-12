@@ -1,7 +1,7 @@
 """Some miscellaneous utility functions."""
 from __future__ import division
 
-import contextlib
+from contextlib import contextmanager
 import os
 import sys
 import warnings
@@ -441,7 +441,7 @@ def run_driver(prob):
     return failed, strout.getvalue()
 
 
-@contextlib.contextmanager
+@contextmanager
 def printoptions(*args, **kwds):
     """
     Context manager for setting numpy print options.
@@ -476,3 +476,21 @@ def printoptions(*args, **kwds):
         yield np.get_printoptions()
     finally:
         np.set_printoptions(**opts)
+
+
+def do_nothing_context():
+    """
+    Do nothing.
+
+    Useful when you have a block of code that only requires a context manager sometimes,
+    and you don't want to repeat the context managed block.
+
+    Returns
+    -------
+    contextmanager
+        A do nothing context manager.
+    """
+    def nothing():
+        yield None
+
+    return contextmanager(nothing)()

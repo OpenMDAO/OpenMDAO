@@ -190,6 +190,54 @@ class TestEQConstraintComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
+    def test_create_on_init_add_constraint_no_normalization(self):
+        prob = Problem()
+        model = prob.model
+
+        # find intersection of two non-parallel lines
+        model.add_subsystem('indep', IndepVarComp('x', val=-2.0))
+        model.add_subsystem('f', ExecComp('y=3*x-3', x=0.))
+        model.add_subsystem('g', ExecComp('y=2.3*x+4', x=0.))
+        model.add_subsystem('equal', EQConstraintComp('y', add_constraint=True, normalize=False,
+                                                      ref0=0, ref=100.0))
+
+        model.connect('indep.x', 'f.x')
+        model.connect('indep.x', 'g.x')
+
+        model.connect('f.y', 'equal.lhs:y')
+        model.connect('g.y', 'equal.rhs:y')
+
+        model.add_design_var('indep.x', lower=0., upper=20.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd')
+
+        # verify that the constraint has been added as requested
+        self.assertTrue('equal.y' in model.get_constraints())
+
+        # verify that the output is not being normalized
+        prob.run_model()
+        lhs = prob['f.y']
+        rhs = prob['g.y']
+        diff = lhs - rhs
+        assert_rel_error(self, prob['equal.y'], diff)
+
+        prob.driver = ScipyOptimizeDriver(disp=False)
+
+        prob.run_driver()
+
+        assert_almost_equal(prob['equal.y'], 0.)
+        assert_almost_equal(prob['indep.x'], 10.)
+        assert_almost_equal(prob['f.y'], 27.)
+        assert_almost_equal(prob['g.y'], 27.)
+
+        cpd = prob.check_partials(out_stream=None)
+
+        for (of, wrt) in cpd['equal']:
+            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
+
     def test_vectorized(self):
         prob = Problem()
         model = prob.model
@@ -215,6 +263,54 @@ class TestEQConstraintComp(unittest.TestCase):
         prob.setup(mode='fwd')
 
         prob.driver = ScipyOptimizeDriver(disp=False)
+
+        prob.run_driver()
+
+        assert_almost_equal(prob['equal.y'], np.zeros(n))
+        assert_almost_equal(prob['indep.x'], np.ones(n)*10.)
+        assert_almost_equal(prob['f.y'], np.ones(n)*27.)
+        assert_almost_equal(prob['g.y'], np.ones(n)*27.)
+
+        cpd = prob.check_partials(out_stream=None)
+
+        for (of, wrt) in cpd['equal']:
+            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
+
+    def test_vectorized_no_normalization(self):
+        prob = Problem()
+        model = prob.model
+
+        n = 100
+
+        # find intersection of two non-parallel lines, vectorized
+        model.add_subsystem('indep', IndepVarComp('x', val=-2.0*np.ones(n)))
+        model.add_subsystem('f', ExecComp('y=3*x-3', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('g', ExecComp('y=2.3*x+4', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('equal', EQConstraintComp('y', val=np.ones(n), add_constraint=True,
+                                                      normalize=False))
+        model.add_subsystem('obj_cmp', ExecComp('obj=sum(y)', y=np.zeros(n)))
+
+        model.connect('indep.x', 'f.x')
+        model.connect('indep.x', 'g.x')
+        model.connect('f.y', 'equal.lhs:y')
+        model.connect('g.y', 'equal.rhs:y')
+        model.connect('f.y', 'obj_cmp.y')
+
+        model.add_design_var('indep.x', lower=np.zeros(n), upper=20.*np.ones(n))
+        model.add_objective('obj_cmp.obj')
+
+        prob.setup(mode='fwd')
+
+        prob.driver = ScipyOptimizeDriver(disp=False)
+
+        # verify that the output is not being normalized
+        prob.run_model()
+        lhs = prob['f.y']
+        rhs = prob['g.y']
+        diff = lhs - rhs
+        assert_rel_error(self, prob['equal.y'], diff)
 
         prob.run_driver()
 

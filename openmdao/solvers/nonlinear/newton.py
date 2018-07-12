@@ -282,3 +282,14 @@ class NewtonSolver(NonlinearSolver):
                 header += prefix + pathname + "\n"
                 header += prefix + nchar * "="
                 print(header)
+
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        super(NewtonSolver, self).cleanup()
+
+        if self.linear_solver:
+            self.linear_solver.cleanup()
+        if self.linesearch:
+            self.linesearch.cleanup()

@@ -101,7 +101,6 @@ class Mygroup(Group):
 
 
 @unittest.skipIf(PETScVector is None, "PETSc is required.")
-# @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedRecorderTest(unittest.TestCase):
 
     N_PROCS = 2

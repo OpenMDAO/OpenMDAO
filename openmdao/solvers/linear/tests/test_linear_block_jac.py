@@ -136,7 +136,7 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.linear_solver = LinearBlockJac()
         model.linear_solver.options['atol'] = 1.0e-3
 
-        prob.setup()
+        prob.setup(mode='rev')
         prob.run_model()
 
         wrt = ['z']
@@ -173,7 +173,7 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.linear_solver = LinearBlockJac()
         model.linear_solver.options['rtol'] = 1.0e-3
 
-        prob.setup()
+        prob.setup(mode='rev')
         prob.run_model()
 
         wrt = ['z']

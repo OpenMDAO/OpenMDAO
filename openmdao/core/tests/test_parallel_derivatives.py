@@ -11,10 +11,11 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
+from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, \
     ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar import SellarDerivatives, \
+    SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -25,6 +26,7 @@ if MPI:
         from openmdao.vectors.petsc_vector import PETScVector
     except ImportError:
         PETScVector = None
+
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class ParDerivTestCase(unittest.TestCase):
@@ -561,7 +563,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
         prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
 
-        prob.setup( check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],

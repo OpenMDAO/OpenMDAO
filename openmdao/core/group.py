@@ -1979,7 +1979,6 @@ def get_relevant_vars(connections, desvars, responses, mode):
     """
     relevant = defaultdict(dict)
     cache = {}
-    fwd = mode == 'fwd'
 
     # Create a hybrid graph with components and all connected vars.  If a var is connected,
     # also connect it to its corresponding component.
@@ -2048,39 +2047,47 @@ def get_relevant_vars(connections, desvars, responses, mode):
                 sys_deps = set(all_ancestors(desvar.rsplit('.', 1)[0]))
 
             if common or desvar == response:
-                if fwd:
+                if mode == 'fwd' or mode == 'auto':
                     relevant[desvar][response] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)
-                else:  # rev
+                if mode == 'rev' or mode == 'auto':
                     relevant[response][desvar] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)
 
                 sys_deps.add('')  # top level Group is always relevant
 
-    if fwd:
-        inputs, outputs = desvars, responses
-    else:
-        inputs, outputs = responses, desvars
+    voi_lists = []
+    if mode == 'fwd' or mode == 'auto':
+        voi_lists.append((desvars, responses))
+    if mode == 'rev' or mode == 'auto':
+        voi_lists.append((responses, desvars))
 
     # now calculate dependencies between each VOI and all other VOIs of the
     # other type, e.g for each input VOI wrt all output VOIs.  This is only
-    # done for design vars in fwd mode or responses in rev mode.
-    for inp in inputs:
-        relinp = relevant[inp]
-        if relinp:
-            total_inps = set()
-            total_outs = set()
-            total_systems = set()
-            for out in outputs:
-                if out in relinp:
-                    dct, systems = relinp[out]
-                    total_inps.update(dct['input'])
-                    total_outs.update(dct['output'])
-                    total_systems.update(systems)
-            relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                              total_systems)
-        else:
-            relinp['@all'] = ({'input': set(), 'output': set()}, set())
+    # done for design vars in fwd mode or responses in rev mode. In auto mode,
+    # we combine the results for fwd and rev modes.
+    for inputs, outputs in voi_lists:
+        for inp in inputs:
+            relinp = relevant[inp]
+            if relinp:
+                if '@all' in relinp:
+                    dct, total_systems = relinp['@all']
+                    total_inps = dct['input']
+                    total_outs = dct['output']
+                else:
+                    total_inps = set()
+                    total_outs = set()
+                    total_systems = set()
+                for out in outputs:
+                    if out in relinp:
+                        dct, systems = relinp[out]
+                        total_inps.update(dct['input'])
+                        total_outs.update(dct['output'])
+                        total_systems.update(systems)
+                relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                                  total_systems)
+            else:
+                relinp['@all'] = ({'input': set(), 'output': set()}, set())
 
     relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
                                    ContainsAll())}

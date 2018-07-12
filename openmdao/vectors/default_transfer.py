@@ -31,7 +31,7 @@ class DefaultTransfer(Transfer):
         """
         group._transfers = {}
         iproc = group.comm.rank
-        rev = group._mode == 'rev'
+        rev = group._mode == 'rev' or group._mode == 'auto'
 
         def merge(indices_list):
             if len(indices_list) > 0:
