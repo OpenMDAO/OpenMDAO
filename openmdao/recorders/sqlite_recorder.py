@@ -178,7 +178,7 @@ class SqliteRecorder(BaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata( format_version INT, "
-                          "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB)")
+                          "abs2prom TEXT, prom2abs TEXT, abs2meta BLOB)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -280,8 +280,8 @@ class SqliteRecorder(BaseRecorder):
                     self._abs2meta[name]['explicit'] = False
 
             # store the updated abs2prom and prom2abs
-            abs2prom = pickle.dumps(self._abs2prom)
-            prom2abs = pickle.dumps(self._prom2abs)
+            abs2prom = json.dumps(self._abs2prom)
+            prom2abs = json.dumps(self._prom2abs)
             abs2meta = pickle.dumps(self._abs2meta)
 
             with self.connection as c:

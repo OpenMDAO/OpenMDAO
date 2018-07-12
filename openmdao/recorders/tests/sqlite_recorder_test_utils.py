@@ -7,6 +7,7 @@ if PY3:
 
 import sqlite3
 import numpy as np
+import json
 
 from contextlib import contextmanager
 
@@ -205,12 +206,8 @@ def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
         format_version_actual = row[0]
         format_version_expected = format_version
 
-        if PY2:
-            prom2abs = pickle.loads(str(row[1])) if row[1] is not None else None
-            abs2prom = pickle.loads(str(row[2])) if row[2] is not None else None
-        if PY3:
-            prom2abs = pickle.loads(row[1]) if row[1] is not None else None
-            abs2prom = pickle.loads(row[2]) if row[2] is not None else None
+        prom2abs = json.loads(str(row[1]))
+        abs2prom = json.loads(str(row[2]))
 
         if prom2abs is None:
             test.assertIsNone(expected_prom2abs)

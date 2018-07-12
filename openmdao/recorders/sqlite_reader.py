@@ -6,6 +6,7 @@ from __future__ import print_function, absolute_import
 import re
 import sys
 import sqlite3
+import json
 import numpy as np
 
 from collections import OrderedDict
@@ -80,13 +81,11 @@ class SqliteCaseReader(BaseCaseReader):
             self._prom2abs = None
             self._abs2meta = None
 
+            self._abs2prom = json.loads(row[1])
+            self._prom2abs = json.loads(row[2])
             if PY2:
-                self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
-                self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
                 self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
             if PY3:
-                self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
-                self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
                 self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
         con.close()
 
