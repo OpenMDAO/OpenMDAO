@@ -10,7 +10,7 @@ from openmdao.api import Problem, LinearRunOnce, ImplicitComponent, IndepVarComp
      BoundsEnforceLS, LinearBlockGS
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
-from openmdao.test_suite.components.sellar import SellarStateConnection
+from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -173,6 +173,25 @@ class TestBryoden(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+    def test_simple_sellar_cycle(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarDerivatives(nonlinear_solver=BroydenSolver(),
+                                               linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        model.nonlinear_solver.options['state_vars'] = ['y1']
+        model.nonlinear_solver.options['compute_jacobian'] = True
+
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_sellar_state_connection_fd_system(self):
         # Sellar model closes loop with state connection instead of a cycle.
