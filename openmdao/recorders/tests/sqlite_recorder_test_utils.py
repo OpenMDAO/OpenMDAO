@@ -161,8 +161,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
                 input_blob, output_blob, residuals_blob = row_actual
 
-            output_actual = blob_to_array(output_blob)
-            residuals_actual = blob_to_array(residuals_blob)
+            output_actual = json_to_np_array(output_blob)
+            residuals_actual = json_to_np_array(residuals_blob)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '

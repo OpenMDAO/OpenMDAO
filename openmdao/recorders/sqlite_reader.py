@@ -938,9 +938,9 @@ class SolverCases(BaseCases):
                 idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
                     input_blob, output_blob, residuals_blob = row
 
-                input_array = blob_to_array(input_blob)
-                output_array = blob_to_array(output_blob)
-                residuals_array = blob_to_array(residuals_blob)
+                input_array = json_to_np_array(input_blob)
+                output_array = json_to_np_array(output_blob)
+                residuals_array = json_to_np_array(residuals_blob)
 
                 case = SolverCase(self.filename, counter, iteration_coordinate, timestamp,
                                   success, msg, abs_err, rel_err, input_array, output_array,
@@ -978,9 +978,9 @@ class SolverCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
             input_blob, output_blob, residuals_blob = row
 
-        input_array = blob_to_array(input_blob)
-        output_array = blob_to_array(output_blob)
-        residuals_array = blob_to_array(residuals_blob)
+        input_array = json_to_np_array(input_blob)
+        output_array = json_to_np_array(output_blob)
+        residuals_array = json_to_np_array(residuals_blob)
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           abs_err, rel_err, input_array, output_array, residuals_array,

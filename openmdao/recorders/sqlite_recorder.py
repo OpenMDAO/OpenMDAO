@@ -416,13 +416,16 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['o']
             residuals = data['r']
 
-            inputs_array = values_to_array(inputs)
-            outputs_array = values_to_array(outputs)
-            residuals_array = values_to_array(residuals)
+            # convert to list so this can be used in visualization
+            for i_o_r in (inputs, outputs, residuals):
+                if i_o_r is None:
+                    continue
+                for var in i_o_r:
+                    i_o_r[var] = convert_to_list(i_o_r[var])
 
-            inputs_blob = array_to_blob(inputs_array)
-            outputs_blob = array_to_blob(outputs_array)
-            residuals_blob = array_to_blob(residuals_array)
+            outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -433,7 +436,7 @@ class SqliteRecorder(BaseRecorder):
                           "VALUES(?,?,?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           abs, rel, inputs_blob, outputs_blob, residuals_blob))
+                           abs, rel, inputs_text, outputs_text, residuals_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('solver', c.lastrowid))
