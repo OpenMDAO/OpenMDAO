@@ -799,7 +799,7 @@ class System(object):
         # Also, optionally, record to the recorders attached to this System,
         #   the system metadata for all the subsystems
         if self.recording_options['record_model_metadata']:
-            for sub in self.system_iter(recurse=True, include_self=False):
+            for sub in self.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
 
     def _setup_vars(self, recurse=True):
