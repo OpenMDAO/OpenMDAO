@@ -804,7 +804,7 @@ class ProblemCases(BaseCases):
                 idx, counter, case_name, timestamp, success, msg, \
                     outputs_blob, = row
 
-                outputs_array = blob_to_array(outputs_blob)
+                outputs_array = json_to_np_array(outputs_blob)
 
                 case = ProblemCase(self.filename, counter, case_name, timestamp,
                                    success, msg, outputs_array, self._prom2abs,
@@ -841,7 +841,7 @@ class ProblemCases(BaseCases):
         idx, counter, case_name, timestamp, success, msg, \
             outputs_blob, = row
 
-        outputs_array = blob_to_array(outputs_blob)
+        outputs_array = json_to_np_array(outputs_blob)
 
         case = ProblemCase(self.filename, counter, case_name, timestamp, success, msg,
                            outputs_array, self._prom2abs, self._abs2prom, self._abs2meta)

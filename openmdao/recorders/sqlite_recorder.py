@@ -191,7 +191,7 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, outputs BLOB)")
+                          "success INT, msg TEXT, outputs TEXT)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
@@ -200,7 +200,7 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
-                          "solver_inputs BLOB, solver_output BLOB, solver_residuals BLOB)")
+                          "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data BLOB)")
@@ -342,8 +342,13 @@ class SqliteRecorder(BaseRecorder):
         """
         if self.connection:
             outputs = data['out']
-            outputs_array = values_to_array(outputs)
-            outputs_blob = array_to_blob(outputs_array)
+
+            # convert to list so this can be used in visualization
+            if outputs is not None:
+                for var in outputs:
+                    outputs[var] = convert_to_list(outputs[var])
+
+            outputs_text = json.dumps(outputs)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -352,7 +357,7 @@ class SqliteRecorder(BaseRecorder):
                           "timestamp, success, msg, outputs) VALUES(?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           outputs_blob))
+                           outputs_text))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
