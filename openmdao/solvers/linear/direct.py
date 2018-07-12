@@ -60,7 +60,7 @@ def format_singular_error(err, system, mtx):
     varsizes = system._var_sizes['nonlinear']['output']
     for j, name in enumerate(system._var_allprocs_abs_names['output']):
         n += varsizes[0][j]
-        if loc <= n:
+        if loc < n:
             varname = system._var_abs2prom['output'][name]
             break
 
@@ -102,7 +102,7 @@ def format_singular_csc_error(system, matrix):
     varsizes = system._var_sizes['nonlinear']['output']
     for j, name in enumerate(system._var_allprocs_abs_names['output']):
         n += varsizes[0][j]
-        if loc <= n:
+        if loc < n:
             varname = system._var_abs2prom['output'][name]
             break
 
@@ -132,12 +132,13 @@ def format_nan_error(system, matrix):
     # need to associate each index with a variable.
     varname = []
     all_vars = system._var_allprocs_abs_names['output']
+    varsizes = system._var_sizes['nonlinear']['output']
     for row in rows:
         n = 0
-        for name in all_vars:
-            relname = system._var_abs2prom['output'][name]
-            n += len(system._outputs[relname])
-            if row <= n:
+        for j, name in enumerate(all_vars):
+            n += varsizes[0][j]
+            if row < n:
+                relname = system._var_abs2prom['output'][name]
                 varname.append("'%s'" % relname)
                 break
 
