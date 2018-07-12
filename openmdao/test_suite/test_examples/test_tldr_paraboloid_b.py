@@ -32,12 +32,20 @@ class TestParaboloidTLDR(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        # minimum value
-        assert_rel_error(self, prob['paraboloid.f'], -27.33333, 1e-6)
+        #
+        try:
+            # minimum value
+            assert_rel_error(self, prob['paraboloid.f'], -27.33333, 1e-6)
 
-        # location of the minimum
-        assert_rel_error(self, prob['indeps.x'], 6.6667, 1e-4)
-        assert_rel_error(self, prob['indeps.y'], -7.33333, 1e-4)
+            # location of the minimum
+            assert_rel_error(self, prob['indeps.x'], 6.6667, 1e-4)
+            assert_rel_error(self, prob['indeps.y'], -7.33333, 1e-4)
+        except AssertionError as err:
+            msg = str(err) + "\n If the code in this test must be changed, please go change sister example, " \
+                             "tldr_paraboloid.py, and also the front page of the OpenMDAO website!"
+            from six import reraise
+            from sys import exc_info
+            reraise(AssertionError, AssertionError(msg), exc_info()[2])
 
 if __name__ == "__main__":
 
