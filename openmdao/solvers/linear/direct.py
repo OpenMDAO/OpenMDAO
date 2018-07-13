@@ -57,11 +57,11 @@ def format_singular_error(err, system, mtx):
 
     n = 0
     varname = "Unknown"
-    for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
-        if loc <= n:
-            varname = relname
+    varsizes = system._var_sizes['nonlinear']['output']
+    for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        n += varsizes[system._owning_rank[name]][j]
+        if loc < n:
+            varname = system._var_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -99,11 +99,11 @@ def format_singular_csc_error(system, matrix):
 
     n = 0
     varname = "Unknown"
-    for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
-        if loc <= n:
-            varname = relname
+    varsizes = system._var_sizes['nonlinear']['output']
+    for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        n += varsizes[system._owning_rank[name]][j]
+        if loc < n:
+            varname = system._var_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -132,12 +132,13 @@ def format_nan_error(system, matrix):
     # need to associate each index with a variable.
     varname = []
     all_vars = system._var_allprocs_abs_names['output']
+    varsizes = system._var_sizes['nonlinear']['output']
     for row in rows:
         n = 0
-        for name in all_vars:
-            relname = system._var_abs2prom['output'][name]
-            n += len(system._outputs[relname])
-            if row <= n:
+        for j, name in enumerate(all_vars):
+            n += varsizes[system._owning_rank[name]][j]
+            if row < n:
+                relname = system._var_abs2prom['output'][name]
                 varname.append("'%s'" % relname)
                 break
 
@@ -178,6 +179,47 @@ class DirectSolver(LinearSolver):
             Flag for indicating child linearization.
         """
         return False
+
+    def _build_mtx(self):
+        """
+        Assemble a Jacobian matrix by matrix-vector-product with columns of identity.
+
+        Returns
+        -------
+        ndarray
+            Jacobian matrix.
+        """
+        system = self._system
+        bvec = system._vectors['residual']['linear']
+        xvec = system._vectors['output']['linear']
+
+        # First make a backup of the vectors
+        b_data = bvec.get_data()
+        x_data = xvec.get_data()
+
+        nmtx = x_data.size
+        eye = np.eye(nmtx)
+        mtx = np.empty((nmtx, nmtx))
+        scope_out, scope_in = system._get_scope()
+        vnames = ['linear']
+
+        # Assemble the Jacobian by running the identity matrix through apply_linear
+        for i in range(nmtx):
+            # set value of x vector to provided value
+            xvec.set_data(eye[:, i])
+
+            # apply linear
+            system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
+                                 scope_out, scope_in)
+
+            # put new value in out_vec
+            bvec.get_data(mtx[:, i])
+
+        # Restore the backed-up vectors
+        bvec.set_data(b_data)
+        xvec.set_data(x_data)
+
+        return mtx
 
     def _linearize(self):
         """
@@ -225,34 +267,7 @@ class DirectSolver(LinearSolver):
                                    " in system '%s'." % (type(mtx), system.pathname))
 
         else:
-            bvec = system._vectors['residual']['linear']
-            xvec = system._vectors['output']['linear']
-
-            # First make a backup of the vectors
-            b_data = bvec.get_data()
-            x_data = xvec.get_data()
-
-            nmtx = x_data.size
-            eye = np.eye(nmtx)
-            mtx = np.empty((nmtx, nmtx))
-            scope_out, scope_in = system._get_scope()
-            vnames = ['linear']
-
-            # Assemble the Jacobian by running the identity matrix through apply_linear
-            for i in range(nmtx):
-                # set value of x vector to provided value
-                xvec.set_data(eye[:, i])
-
-                # apply linear
-                system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
-                                     scope_out, scope_in)
-
-                # put new value in out_vec
-                bvec.get_data(mtx[:, i])
-
-            # Restore the backed-up vectors
-            bvec.set_data(b_data)
-            xvec.set_data(x_data)
+            mtx = self._build_mtx()
 
             # During LU decomposition, detect singularities and warn user.
             with warnings.catch_warnings():
@@ -269,6 +284,74 @@ class DirectSolver(LinearSolver):
                 # NaN in matrix.
                 except ValueError as err:
                     raise RuntimeError(format_nan_error(system, mtx))
+
+    def _inverse(self):
+        """
+        Return the inverse Jacobian.
+
+        This is only used by the Broyden solver when calculating a full model Jacobian. Since it
+        is only done for a single RHS, no need for LU.
+
+        Returns
+        -------
+        ndarray
+            Inverse Jacobian.
+        """
+        system = self._system
+
+        if self._assembled_jac is not None:
+
+            mtx = self._assembled_jac._int_mtx
+            ranges = self._assembled_jac._view_ranges[system.pathname]
+            matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+
+            # Dense and Sparse matrices have their own inverse method.
+            if isinstance(mtx, DenseMatrix):
+                # Detect singularities and warn user.
+                with warnings.catch_warnings():
+                    if self.options['err_on_singular']:
+                        warnings.simplefilter('error', RuntimeWarning)
+                    try:
+                        inv_jac = scipy.linalg.inv(matrix)
+                    except RuntimeWarning as err:
+                        raise RuntimeError(format_singular_error(err, system, matrix))
+
+                    # NaN in matrix.
+                    except ValueError as err:
+                        raise RuntimeError(format_nan_error(system, matrix))
+
+            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
+                try:
+                    inv_jac = scipy.sparse.linalg.inv(matrix)
+                except RuntimeError as err:
+                    if 'exactly singular' in str(err):
+                        raise RuntimeError(format_singular_csc_error(system, matrix))
+                    else:
+                        reraise(*sys.exc_info())
+            else:
+                raise RuntimeError("Direct solver not implemented for matrix type %s"
+                                   " in system '%s'." % (type(mtx), system.pathname))
+
+        else:
+            mtx = self._build_mtx()
+
+            # During inversion detect singularities and warn user.
+            with warnings.catch_warnings():
+
+                if self.options['err_on_singular']:
+                    warnings.simplefilter('error', RuntimeWarning)
+
+                try:
+                    inv_jac = scipy.linalg.inv(mtx)
+
+                except RuntimeWarning as err:
+                    raise RuntimeError(format_singular_error(err, system, mtx))
+
+                # NaN in matrix.
+                except ValueError as err:
+                    raise RuntimeError(format_nan_error(system, mtx))
+
+        return inv_jac
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
