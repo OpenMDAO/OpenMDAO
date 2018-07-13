@@ -59,7 +59,7 @@ def format_singular_error(err, system, mtx):
     varname = "Unknown"
     varsizes = system._var_sizes['nonlinear']['output']
     for j, name in enumerate(system._var_allprocs_abs_names['output']):
-        n += varsizes[0][j]
+        n += varsizes[system._owning_rank[name]][j]
         if loc < n:
             varname = system._var_abs2prom['output'][name]
             break
@@ -101,7 +101,7 @@ def format_singular_csc_error(system, matrix):
     varname = "Unknown"
     varsizes = system._var_sizes['nonlinear']['output']
     for j, name in enumerate(system._var_allprocs_abs_names['output']):
-        n += varsizes[0][j]
+        n += varsizes[system._owning_rank[name]][j]
         if loc < n:
             varname = system._var_abs2prom['output'][name]
             break
@@ -136,7 +136,7 @@ def format_nan_error(system, matrix):
     for row in rows:
         n = 0
         for j, name in enumerate(all_vars):
-            n += varsizes[0][j]
+            n += varsizes[system._owning_rank[name]][j]
             if row < n:
                 relname = system._var_abs2prom['output'][name]
                 varname.append("'%s'" % relname)
