@@ -11,4 +11,5 @@ Nonlinear Solvers
     nonlinear_block_jac.rst
     nonlinear_runonce.rst
     newton.rst
+    broyden.rst
 
