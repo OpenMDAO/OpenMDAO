@@ -233,6 +233,45 @@ class BaseRecorder(object):
         """
         raise NotImplementedError("record_iteration_problem has not been overridden")
 
+    def record_derivatives(self, recording_requester, data, metadata, **kwargs):
+        """
+        Route the record_derivatives call to the proper method.
+
+        Parameters
+        ----------
+        recording_requester : object
+            System, Solver, Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by (of, wrt) pair.
+        **kwargs : keyword args
+            Some implementations of record_derivatives need additional args.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        if not self._parallel:
+            if MPI and MPI.COMM_WORLD.rank > 0:
+                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
+
+        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
+
+        if isinstance(recording_requester, Driver):
+            self.record_iteration_driver(recording_requester, data, metadata)
+
+    def record_derivatives_driver(self, recording_requester, data, metadata):
+        """
+        Record derivatives data from a Driver.
+
+        Parameters
+        ----------
+        recording_requester : Driver
+            Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by (of, wrt) pair.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        raise NotImplementedError("record_derivatives_driver has not been overridden")
+
     def shutdown(self):
         """
         Shut down the recorder.
