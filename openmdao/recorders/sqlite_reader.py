@@ -137,7 +137,7 @@ class SqliteCaseReader(BaseCaseReader):
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
 
-                cur.execute("SELECT case_name FROM problem_cases")
+                cur.execute("SELECT case_name FROM problem_cases ORDER BY id ASC")
                 rows = cur.fetchall()
                 self.problem_cases._case_keys = [coord[0] for coord in rows]
                 self.problem_cases.num_cases = len(self.problem_cases._case_keys)
@@ -186,6 +186,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.driver_cases.load_cases()
         self.solver_cases.load_cases()
         self.system_cases.load_cases()
+        self.problem_cases.load_cases()
 
     def get_cases(self, parent=None, recursive=False):
         """
@@ -791,6 +792,25 @@ class ProblemCases(BaseCases):
     Case specific to the entries that might be recorded in a Driver iteration.
     """
 
+    def load_cases(self):
+        """
+        Load all problem cases into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM problem_cases")
+            rows = cur.fetchall()
+            for row in rows:
+                idx, counter, case_name, timestamp, success, msg, \
+                    outputs_blob, = row
+
+                outputs_array = blob_to_array(outputs_blob)
+
+                case = ProblemCase(self.filename, counter, case_name, timestamp,
+                                   success, msg, outputs_array, self._prom2abs,
+                                   self._abs2prom, self._abs2meta)
+                self._cases[case_name] = case
+
     def get_case(self, case_name):
         """
         Get a case from the database.
@@ -805,7 +825,9 @@ class ProblemCases(BaseCases):
             An instance of a Driver Case populated with data from the
             specified case/iteration.
         """
-        # iteration_coordinate = self.get_iteration_coordinate(case_id)
+        # check to see if we've already cached this case
+        if case_name in self._cases:
+            return self._cases[case_name]
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
@@ -824,6 +846,8 @@ class ProblemCases(BaseCases):
         case = ProblemCase(self.filename, counter, case_name, timestamp, success, msg,
                            outputs_array, self._prom2abs, self._abs2prom, self._abs2meta)
 
+        # save so we don't query again
+        self._cases[case_name] = case
         return case
 
 
