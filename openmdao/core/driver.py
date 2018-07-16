@@ -140,7 +140,7 @@ class Driver(object):
         self.recording_options = OptionsDictionary()
 
         self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
+                                       desc='Record Driver metadata')
         self.recording_options.declare('record_model_metadata', types=bool, default=True,
                                        desc='Record metadata for all Systems in the model')
         self.recording_options.declare('record_desvars', types=bool, default=True,

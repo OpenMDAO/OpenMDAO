@@ -1,7 +1,7 @@
 """
 Class definition for BaseRecorder, the base class for all recorders.
 """
-from six import StringIO
+from six import StringIO, iteritems
 
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
@@ -9,6 +9,8 @@ from openmdao.solvers.solver import Solver
 from openmdao.core.problem import Problem
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.mpi import MPI
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.record_util import check_path
 
 
 class BaseRecorder(object):
@@ -122,10 +124,6 @@ class BaseRecorder(object):
         from openmdao.api import PETScVector
         if PETScVector and isinstance(recording_requester._outputs, PETScVector):
             return None, None  # Cannot handle PETScVector yet
-
-        from six import iteritems
-        from openmdao.utils.options_dictionary import OptionsDictionary
-        from openmdao.utils.record_util import check_path
 
         # collect scaling arrays
         scaling_vecs = {}
