@@ -5,7 +5,7 @@ from openmdao.docs.config_params import IGNORE_LIST
 # of our source docs, as well as writing out each individual rst file.
 
 
-def generate_docs(dir, top, packages):
+def generate_docs(dir, top, packages, project_name='openmdao'):
     """
     generate_docs
     """
@@ -79,8 +79,8 @@ Source Docs
         # a sub_package, is a src file, e.g. openmdao.core.component
         sub_packages = []
         package_filename = os.path.join(packages_dir,
-                                        "openmdao." + package + ".rst")
-        package_name = "openmdao." + package
+                                        project_name + "." + package + ".rst")
+        package_name = project_name + "." + package
 
         # the sub_listing is going into each package dir and listing what's in it
         for sub_listing in sorted(os.listdir(os.path.join(dir, package.replace('.','/')))):
@@ -97,7 +97,7 @@ Source Docs
 
             # specifically don't use os.path.join here.  Even windows wants the
             # stuff in the file to have fwd slashes.
-            index.write("   packages/openmdao." + package + "\n")
+            index.write("   packages/" + project_name + "." + package + "\n")
 
             # make subpkg directory (e.g. _srcdocs/packages/core) for ref sheets
             package_dir = os.path.join(packages_dir, package)
