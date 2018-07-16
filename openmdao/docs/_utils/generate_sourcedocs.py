@@ -8,6 +8,9 @@ from openmdao.docs.config_params import IGNORE_LIST
 def generate_docs(dir, top, packages, project_name='openmdao'):
     """
     generate_docs
+
+    Can supply a project name other than `openmdao` to use this function
+    with other projects.
     """
     index_top = """:orphan:
 
