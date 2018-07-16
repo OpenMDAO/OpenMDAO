@@ -204,6 +204,7 @@ class Solver(object):
         # What the solver supports.
         self.supports = OptionsDictionary()
         self.supports.declare('gradients', types=bool, default=False)
+        self.supports.declare('implicit_components', types=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)

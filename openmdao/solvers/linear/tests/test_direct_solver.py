@@ -8,7 +8,7 @@ from six import iteritems
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, ExecComp, \
-     NewtonSolver, BalanceComp, ExplicitComponent
+     NewtonSolver, BalanceComp, ExplicitComponent, ImplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -29,6 +29,20 @@ class NanComp(ExplicitComponent):
         """Intentionally incorrect derivative."""
         J = partials
         J['y', 'x'] = np.NaN
+
+
+class SingularComp(ImplicitComponent):
+    def setup(self):
+        self.add_input('x', 1.0)
+        self.add_output('y', 1.0)
+
+        self.declare_partials(of='*', wrt='*')
+
+    def compute_partials(self, inputs, partials):
+        """Intentionally incorrect derivative."""
+        J = partials
+        J['y', 'x'] = 0.0
+        J['y', 'y'] = 0.0
 
 
 class NanComp2(ExplicitComponent):
@@ -179,7 +193,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'z'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -217,7 +231,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'z'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -254,7 +268,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'z'."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -320,7 +334,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c1.y', 'c3.y']."
+        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -353,7 +367,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c1.y', 'c3.y']."
+        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -386,7 +400,95 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c1.y', 'c3.y']."
+        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_error_on_NaN_bug(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0*np.ones((2, 2))))
+        model.add_subsystem('c1', ExecComp('y = 4.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c2', ExecComp('y = 4.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c3', ExecComp('y = 3.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c4', ExecComp('y = 2.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c5', NanComp())
+
+        model.connect('p.x', 'c1.x')
+        model.connect('c1.y', 'c2.x')
+        model.connect('c2.y', 'c3.x')
+        model.connect('c3.y', 'c4.x')
+        model.connect('c4.y', 'c5.x', src_indices=([0]))
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
+
+        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c5.y']."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_error_on_singular_with_sparsejac_bug(self):
+        prob = Problem(model=Group())
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0*np.ones((2, 2))))
+        model.add_subsystem('c1', ExecComp('y = 4.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c2', ExecComp('y = 4.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c3', ExecComp('y = 3.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c4', ExecComp('y = 2.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c5', SingularComp())
+
+        model.connect('p.x', 'c1.x')
+        model.connect('c1.y', 'c2.x')
+        model.connect('c2.y', 'c3.x')
+        model.connect('c3.y', 'c4.x')
+        model.connect('c4.y', 'c5.x', src_indices=([0]))
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
+
+        expected_msg = "Singular entry found in '' for row associated with state/residual 'c5.y'."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_error_on_singular_with_densejac_bug(self):
+        prob = Problem(model=Group())
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0*np.ones((2, 2))))
+        model.add_subsystem('c1', ExecComp('y = 4.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c2', ExecComp('y = 4.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c3', ExecComp('y = 3.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c4', ExecComp('y = 2.0*x', x=np.zeros((2, 2)), y=np.zeros((2, 2))))
+        model.add_subsystem('c5', SingularComp())
+
+        model.connect('p.x', 'c1.x')
+        model.connect('c1.y', 'c2.x')
+        model.connect('c2.y', 'c3.x')
+        model.connect('c3.y', 'c4.x')
+        model.connect('c4.y', 'c5.x', src_indices=([0]))
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.options['assembled_jac_type'] = 'dense'
+
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
+
+        expected_msg = "Singular entry found in '' for column associated with state/residual 'c5.y'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
