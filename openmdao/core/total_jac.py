@@ -14,8 +14,9 @@ import time
 
 import numpy as np
 
-from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import recording_iteration
+from openmdao.utils.general_utils import ContainsAll
+from openmdao.utils.record_util import create_local_meta
 
 
 _contains_all = ContainsAll()
@@ -1302,6 +1303,19 @@ class _TotalJacInfo(object):
 
         print('')
         sys.stdout.flush()
+
+    def record_derivatives(self, rec_mgr, metadata):
+        """
+        Record derivatives to the recorder.
+
+        Parameters
+        ----------
+        rec_mgr : <RecordingManager>
+            Object that manages all recorders added to the requester.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        rec_mgr.record_derivatives_driver(self, self.J_dict, metadata)
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
