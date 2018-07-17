@@ -597,19 +597,15 @@ class _TotalJacInfo(object):
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
-        # do all the colored rows/cols
         for mode in modes:
             for color, ilist in enumerate(coloring_info[mode][0]):
-                if color > 0:
+                if color == 0:
+                    # do all uncolored indices individually (one linear solve per index)
+                    for i in ilist:
+                        yield i, self.single_input_setter, self.single_jac_setter, mode
+                else:
                     # yield all indices for a color at once
                     yield ilist, input_setter, jac_setter, mode
-
-        # do all of the uncolored rows/cols last so they can overwrite any wrong values
-        for mode in modes:
-            ilist = coloring_info[mode][0][0]
-            for i in ilist:
-                # do all uncolored indices individually (one linear solve per index)
-                yield i, self.single_input_setter, self.single_jac_setter, mode
 
     def par_deriv_iter(self, idxs):
         """

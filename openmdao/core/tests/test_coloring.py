@@ -699,8 +699,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
 
-class SimulColoringRevScipyTestCase(unittest.TestCase):
-    """Reverse mode coloring tests."""
+class SimulColoringAutoScipyTestCase(unittest.TestCase):
+    """Auto mode coloring tests."""
 
     def test_simul_coloring(self):
 
@@ -737,8 +737,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             ]],
             "sparsity": None}
 
-        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
-        p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
+        p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'auto', color_info, optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -751,8 +751,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_simul_coloring(self):
 
-        p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
-        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+        p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
