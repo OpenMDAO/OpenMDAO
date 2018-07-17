@@ -312,7 +312,7 @@ class _TotalJacInfo(object):
             for i, out in enumerate(of):
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
-                    key = "%s|%s" % (prom_of[i], prom_wrt[j])
+                    key = "%s,%s" % (prom_of[i], prom_wrt[j])
                     J_dict[key] = J[out_slice, wrt_meta[inp][0]]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)

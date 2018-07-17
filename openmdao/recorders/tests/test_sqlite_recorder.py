@@ -206,10 +206,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy|p1.x": np.array([[0.50120438]]),
-            "comp.f_xy|p2.y": np.array([[-0.49879562]]),
-            "con.c|p1.x": np.array([[-1.0]]),
-            "con.c|p2.y": np.array([[1.0]])
+            "comp.f_xy,p1.x": np.array([[0.50120438]]),
+            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -256,10 +256,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
         expected_derivs = {
-            "comp.f_xy|p1.x": np.array([[0.50120438]]),
-            "comp.f_xy|p2.y": np.array([[-0.49879562]]),
-            "con.c|p1.x": np.array([[-1.0]]),
-            "con.c|p2.y": np.array([[1.0]])
+            "comp.f_xy,p1.x": np.array([[0.50120438]]),
+            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
         }
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
@@ -311,10 +311,10 @@ class TestSqliteRecorder(unittest.TestCase):
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
 
         expected_derivs = {
-            "comp.f_xy|p1.x": np.array([[0.50120438]]),
-            "comp.f_xy|p2.y": np.array([[-0.49879562]]),
-            "con.c|p1.x": np.array([[-1.0]]),
-            "con.c|p2.y": np.array([[1.0]])
+            "comp.f_xy,p1.x": np.array([[0.50120438]]),
+            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
         }
 
         expected_data = (

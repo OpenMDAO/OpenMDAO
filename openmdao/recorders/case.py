@@ -384,8 +384,21 @@ class PromotedToAbsoluteMap:
             io = 'output' if output else 'input'
             self.keys = []
             for n in var_names:
-                if n in self._abs2prom[io]:
-                    self.keys.append(self._abs2prom[io][n])
+
+                # Recorded derivatives.
+                if ',' in n:
+                    of, wrt = n.split(',')
+                    if of in self._abs2prom[io]:
+                        of = self._abs2prom[io][of]
+                    if wrt in self._abs2prom[io]:
+                        wrt = self._abs2prom[io][wrt]
+
+                    self.keys.append((of, wrt))
+
+                # Recorded vector variables.
+                else:
+                    if n in self._abs2prom[io]:
+                        self.keys.append(self._abs2prom[io][n])
 
     def __getitem__(self, key):
         """
@@ -418,9 +431,9 @@ class PromotedToAbsoluteMap:
                 if of in self._prom2abs['output']:
                     of = self._prom2abs['output'][of][0]
                 if wrt in self._prom2abs['output']:
-                    wrt = self._prom2abs['output'][wrt]
+                    wrt = self._prom2abs['output'][wrt][0]
 
-                return self._values['|'.join((of, wrt))]
+                return self._values[','.join((of, wrt))]
 
             # Recorded vector variables.
             else:
@@ -540,3 +553,17 @@ class DriverDerivativesCase(object):
 
         if totals is not None and totals.dtype.names:
             self.totals = PromotedToAbsoluteMap(totals[0], prom2abs, abs2prom, output=True)
+
+    def get_derivatives(self):
+        """
+        Get the derivatives and their values.
+
+        Returns
+        -------
+        PromotedToAbsoluteMap
+            Map of derivatives to their values.
+        """
+        ret_vars = {}
+        for var in self.totals._values.dtype.names:
+            ret_vars[var] = self.totals._values[var]
+        return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom, output=True)

@@ -22,6 +22,7 @@ from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 # check that pyoptsparse is installed
@@ -129,6 +130,12 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
 
+        # While thinking about derivatives, let's get them all.
+        derivs = deriv_case.get_derivatives()
+
+        self.assertEqual(set(derivs.keys),
+                         set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
+
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
         np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
@@ -146,6 +153,32 @@ class TestSqliteCaseReader(unittest.TestCase):
         print (case_keys)
         for i, iter_coord in enumerate(case_keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+    def test_feature_reading_derivatives(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP')
+        driver.recording_options['record_derivatives'] = True
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        # Get derivatives associated with the first iteration.
+        deriv_case = cr.driver_derivative_cases.get_case('rank0:SLSQP|1')
+
+        # Get all derivatives from that case.
+        derivs = deriv_case.get_derivatives()
+
+        # See what derivatives have been recorded.
+        self.assertEqual(set(derivs.keys),
+                         set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
+
+        # Get specific derivative.
+        assert_rel_error(self, derivs['obj', 'z'], [[9.61001056, 1.78448534]], 1e-4)
 
     def test_reading_system_cases(self):
         prob = SellarProblem()
