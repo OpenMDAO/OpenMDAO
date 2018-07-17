@@ -13,16 +13,15 @@ from six import iteritems, assertRaisesRegex
 
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearRunOnce, \
-    NonlinearBlockGS, ScipyKrylov, LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
+    NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
-from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 # check that pyoptsparse is installed
@@ -98,6 +97,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -108,6 +108,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cr.driver_cases.num_cases, 7)
+        self.assertEqual(cr.driver_derivative_cases.num_cases, 6)
         self.assertEqual(cr.system_cases.num_cases, 0)
         self.assertEqual(cr.solver_cases.num_cases, 0)
 
@@ -115,6 +116,14 @@ class TestSqliteCaseReader(unittest.TestCase):
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
                                        [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        deriv_case = cr.driver_derivative_cases.get_case('rank0:SLSQP|3')
+        np.testing.assert_almost_equal(deriv_case.totals['obj', 'pz.z'],
+                                       [[3.8178954 , 1.73971323]],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'

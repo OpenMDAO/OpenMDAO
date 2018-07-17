@@ -6,18 +6,19 @@ from __future__ import print_function, absolute_import
 import re
 import sys
 import sqlite3
+from collections import OrderedDict
+
+from six import PY2, PY3
+
 import numpy as np
 
-from collections import OrderedDict
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
-    PromotedToAbsoluteMap
+    PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import is_valid_sqlite3_db
 from openmdao.utils.write_outputs import write_outputs
-
-from six import PY2, PY3
 
 if PY2:
     import cPickle as pickle
@@ -110,6 +111,8 @@ class SqliteCaseReader(BaseCaseReader):
         """
         self.driver_cases = DriverCases(self.filename, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
+        self.driver_derivative_cases = DriverDerivativeCases(self.filename, self._abs2prom,
+                                                             self._abs2meta, self._prom2abs)
         self.system_cases = SystemCases(self.filename, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
         self.solver_cases = SolverCases(self.filename, self._abs2prom,
@@ -126,6 +129,12 @@ class SqliteCaseReader(BaseCaseReader):
                 rows = cur.fetchall()
                 self.driver_cases._case_keys = [coord[0] for coord in rows]
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
+
+                cur.execute("SELECT iteration_coordinate FROM driver_derivatives ORDER BY id ASC")
+                rows = cur.fetchall()
+                dcase = self.driver_derivative_cases
+                dcase._case_keys = [coord[0] for coord in rows]
+                dcase.num_cases = len(dcase._case_keys)
 
                 cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
@@ -781,6 +790,70 @@ class DriverCases(BaseCases):
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
                           inputs_array, outputs_array,
                           self._prom2abs, self._abs2prom, self._abs2meta)
+
+        # save so we don't query again
+        self._cases[iteration_coordinate] = case
+        return case
+
+
+class DriverDerivativeCases(BaseCases):
+    """
+    Case specific to the entries that might be recorded in a Driver derivatives computation.
+    """
+
+    def load_cases(self):
+        """
+        Load all driver cases into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM driver_derivatives")
+            rows = cur.fetchall()
+            for row in rows:
+                idx, counter, iteration_coordinate, timestamp, success, msg, totals_blob = row
+
+                totals_array = blob_to_array(totals_blob)
+
+                case = DriverDerivativeCase(self.filename, counter, iteration_coordinate,
+                                            timestamp, success, msg, totals_array,
+                                            self._prom2abs, self._abs2prom, self._abs2meta)
+                self._cases[iteration_coordinate] = case
+
+    def get_case(self, case_id):
+        """
+        Get a case from the database.
+
+        Parameters
+        ----------
+        case_id : int or str
+            The integer index or string-identifier of the case to be retrieved.
+
+        Returns
+        -------
+            An instance of a Driver Case populated with data from the
+            specified case/iteration.
+        """
+        # check to see if we've already cached this case
+        iteration_coordinate = self.get_iteration_coordinate(case_id)
+        if iteration_coordinate in self._cases:
+            return self._cases[iteration_coordinate]
+
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM driver_derivatives WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": iteration_coordinate})
+            # Initialize the Case object from the iterations data
+            row = cur.fetchone()
+        con.close()
+
+        idx, counter, iteration_coordinate, timestamp, success, msg, totals_blob = row
+
+        totals_array = blob_to_array(totals_blob)
+
+        case = DriverDerivativesCase(self.filename, counter, iteration_coordinate,
+                                     timestamp, success, msg, totals_array,
+                                     self._prom2abs, self._abs2prom, self._abs2meta)
 
         # save so we don't query again
         self._cases[iteration_coordinate] = case
