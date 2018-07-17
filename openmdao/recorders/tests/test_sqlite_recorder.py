@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
     ScipyOptimizeDriver, NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS, ScipyOptimizeDriver, CaseReader, PETScVector
+    BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, PETScVector
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -24,14 +24,11 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
-    assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded
+    assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
+    assertDriverDerivDataRecorded
+
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
-
-if PY2:
-    import cPickle as pickle
-if PY3:
-    import pickle
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -180,6 +177,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -206,6 +204,16 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+        expected_derivs = {
+            "comp.f_xy|p1.x": np.array([[0.50120438]]),
+            "comp.f_xy|p2.y": np.array([[-0.49879562]]),
+            "con.c|p1.x": np.array([[-1.0]]),
+            "con.c|p2.y": np.array([[1.0]])
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_derivs),)
+        assertDriverDerivDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SLSQP")
@@ -219,6 +227,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -246,6 +255,16 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
+        expected_derivs = {
+            "comp.f_xy|p1.x": np.array([[0.50120438]]),
+            "comp.f_xy|p2.y": np.array([[-0.49879562]]),
+            "con.c|p1.x": np.array([[-1.0]]),
+            "con.c|p2.y": np.array([[1.0]])
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_derivs),)
+        assertDriverDerivDataRecorded(self, expected_data, self.eps)
+
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
 
@@ -254,6 +273,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -289,6 +309,18 @@ class TestSqliteRecorder(unittest.TestCase):
             (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs),
         )
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
+
+        expected_derivs = {
+            "comp.f_xy|p1.x": np.array([[0.50120438]]),
+            "comp.f_xy|p2.y": np.array([[-0.49879562]]),
+            "con.c|p1.x": np.array([[-1.0]]),
+            "con.c|p2.y": np.array([[1.0]])
+        }
+
+        expected_data = (
+            (run1_coord, (run1_t0, run1_t1), expected_derivs),
+        )
+        assertDriverDerivDataRecorded(self, expected_data, self.eps, prefix='Run1')
 
     def test_driver_everything_recorded_by_default(self):
         prob = ParaboloidProblem()

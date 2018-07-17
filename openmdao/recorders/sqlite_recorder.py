@@ -530,7 +530,7 @@ class SqliteRecorder(BaseRecorder):
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
-                c.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
+                c.execute("INSERT INTO driver_derivatives(counter, iteration_coordinate, "
                           "timestamp, success, msg, derivatives) VALUES(?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],

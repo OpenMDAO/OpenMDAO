@@ -31,7 +31,7 @@ def database_cursor(filename):
 
 def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     """
-        Expected can be from multiple cases.
+    Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
 
@@ -87,6 +87,61 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                                         ' from recorder'.format(key))
                         # Check to see if the values in actual and expected match
                         assert_rel_error(test, actual[key], expected[key], tolerance)
+
+
+def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
+    """
+    Expected can be from multiple cases.
+    """
+    with database_cursor(test.filename) as db_cur:
+
+        # iterate through the cases
+        for coord, (t0, t1), totals_expected in expected:
+
+            iter_coord = format_iteration_coordinate(coord, prefix=prefix)
+
+            # from the database, get the actual data recorded
+            db_cur.execute("SELECT * FROM driver_derivatives WHERE "
+                           "iteration_coordinate=:iteration_coordinate",
+                           {"iteration_coordinate": iter_coord})
+            row_actual = db_cur.fetchone()
+
+            db_cur.execute("SELECT abs2meta FROM metadata")
+            row_abs2meta = db_cur.fetchone()
+
+            test.assertTrue(row_actual,
+                            'Driver iterations table does not contain the requested '
+                            'iteration coordinate: "{}"'.format(iter_coord))
+
+            counter, global_counter, iteration_coordinate, timestamp, success, msg,\
+                totals_blob = row_actual
+
+            if PY2:
+                abs2meta = pickle.loads(str(row_abs2meta[0])) if row_abs2meta[0] is not None else None
+            else:
+                abs2meta = pickle.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
+
+            totals_actual = blob_to_array(totals_blob)
+
+            # Does the timestamp make sense?
+            test.assertTrue(t0 <= timestamp and timestamp <= t1)
+
+            test.assertEqual(success, 1)
+            test.assertEqual(msg, '')
+
+            if totals_expected is None:
+                test.assertEqual(totals_actual, np.array(None, dtype=object))
+            else:
+                actual = totals_actual[0]
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual), len(totals_expected))
+                for key, value in iteritems(totals_expected):
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual.dtype.names,
+                                    '{} variable not found in actual data'
+                                    ' from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_rel_error(test, actual[key], totals_expected[key], tolerance)
 
 
 def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):

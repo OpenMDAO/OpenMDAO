@@ -255,7 +255,7 @@ class BaseRecorder(object):
         self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
 
         if isinstance(recording_requester, Driver):
-            self.record_iteration_driver(recording_requester, data, metadata)
+            self.record_derivatives_driver(recording_requester, data, metadata)
 
     def record_derivatives_driver(self, recording_requester, data, metadata):
         """
