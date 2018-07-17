@@ -695,7 +695,7 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _setup_case_recording(self, recurse=True):
+    def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
@@ -726,7 +726,7 @@ class System(object):
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_case_recording(recurse)
+                subsys._setup_recording(recurse)
 
     def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """
@@ -785,7 +785,7 @@ class System(object):
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
 
-        self._setup_case_recording(recurse=recurse)
+        self._setup_recording(recurse=recurse)
 
         # If full or reconf setup, reset this system's variables to initial values.
         if setup_mode in ('full', 'reconf'):
