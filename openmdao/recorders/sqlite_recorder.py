@@ -67,6 +67,7 @@ def blob_to_array(blob):
     out.seek(0)
     return np.load(out)
 
+
 def convert_to_list(vals):
     """
     Convert values to list (so that it may be sent as JSON).
@@ -83,10 +84,8 @@ def convert_to_list(vals):
     """
     if isinstance(vals, np.ndarray):
         return convert_to_list(vals.tolist())
-    elif isinstance(vals, (list, tuple)):
+    elif isinstance(vals, (list, tuple, set)):
         return [convert_to_list(item) for item in vals]
-    elif vals is None:
-        return []
     else:
         return vals
 
@@ -134,7 +133,8 @@ class SqliteRecorder(BaseRecorder):
             Optional. The pickle protocol version to use when pickling metadata.
         """
         if append:
-            raise NotImplementedError("Append feature not implemented for SqliteRecorder")
+            raise NotImplementedError(
+                "Append feature not implemented for SqliteRecorder")
 
         self.connection = None
         self.model_viewer_data = None
@@ -178,7 +178,7 @@ class SqliteRecorder(BaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata( format_version INT, "
-                          "abs2prom TEXT, prom2abs TEXT, abs2meta BLOB)")
+                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -188,20 +188,24 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT)")
-                c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
+                c.execute(
+                    "CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
                           "success INT, msg TEXT, outputs TEXT)")
-                c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
+                c.execute(
+                    "CREATE INDEX prob_name_ind on problem_cases(case_name)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
-                c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
+                c.execute(
+                    "CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
                           "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
-                c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
+                c.execute(
+                    "CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data BLOB)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
@@ -210,6 +214,22 @@ class SqliteRecorder(BaseRecorder):
                           "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
+
+    def _cleanup_abs2meta(self):
+        """
+        Convert all abs2meta variable properties to a form that can be dumped as JSON.
+        """
+        for name in self._abs2meta:
+            if 'lower' in self._abs2meta[name]:
+                self._abs2meta[name]['lower'] = convert_to_list(self._abs2meta[name]['lower'])
+            if 'lower' in self._abs2meta[name]:
+                self._abs2meta[name]['upper'] = convert_to_list(self._abs2meta[name]['upper'])
+            if 'size' in self._abs2meta[name] and not\
+                    isinstance(self._abs2meta[name]['size'], int):
+                self._abs2meta[name]['size'] = self._abs2meta[name]['size'].item()
+            if 'global_size' in self._abs2meta[name] and not\
+                    isinstance(self._abs2meta[name]['global_size'], int):
+                self._abs2meta[name]['global_size'] = self._abs2meta[name]['global_size'].item()
 
     def startup(self, recording_requester):
         """
@@ -262,27 +282,30 @@ class SqliteRecorder(BaseRecorder):
             for var_set, var_type in full_var_set:
                 for name in var_set:
                     if name not in self._abs2meta:
-                        self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-                        self._abs2meta[name]['type'] = set()
+                        self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy(
+                        )
+                        self._abs2meta[name]['type'] = []
                         if name in states:
                             self._abs2meta[name]['explicit'] = False
 
                     if var_type not in self._abs2meta[name]['type']:
-                        self._abs2meta[name]['type'].add(var_type)
+                        self._abs2meta[name]['type'].append(var_type)
                     self._abs2meta[name]['explicit'] = True
 
             for name in inputs:
                 self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-                self._abs2meta[name]['type'] = set()
-                self._abs2meta[name]['type'].add('input')
+                self._abs2meta[name]['type'] = []
+                self._abs2meta[name]['type'].append('input')
                 self._abs2meta[name]['explicit'] = True
                 if name in states:
                     self._abs2meta[name]['explicit'] = False
 
+            self._cleanup_abs2meta()
+
             # store the updated abs2prom and prom2abs
             abs2prom = json.dumps(self._abs2prom)
             prom2abs = json.dumps(self._prom2abs)
-            abs2meta = pickle.dumps(self._abs2meta)
+            abs2meta = json.dumps(self._abs2meta)
 
             with self.connection as c:
                 c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?",
@@ -466,7 +489,8 @@ class SqliteRecorder(BaseRecorder):
                     c.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
                               "VALUES(?,?)", (driver_class, model_viewer_data))
             except sqlite3.IntegrityError:
-                print("Metadata has already been recorded for %s." % driver_class)
+                print("Metadata has already been recorded for %s." %
+                      driver_class)
 
     def record_metadata_system(self, recording_requester):
         """
@@ -501,9 +525,11 @@ class SqliteRecorder(BaseRecorder):
 
             # try to pickle the metadata, report if it failed
             try:
-                pickled_metadata = pickle.dumps(user_options, self._pickle_version)
+                pickled_metadata = pickle.dumps(
+                    user_options, self._pickle_version)
             except Exception:
-                pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
+                pickled_metadata = pickle.dumps(
+                    OptionsDictionary(), self._pickle_version)
                 warnings.warn("Trying to record options which cannot be pickled "
                               "on system with name: %s. Use the 'options_excludes' "
                               "recording option on system objects to avoid attempting "
@@ -538,7 +564,8 @@ class SqliteRecorder(BaseRecorder):
                 path = 'root'
             id = "{}.{}".format(path, solver_class)
 
-            solver_options = pickle.dumps(recording_requester.options, self._pickle_version)
+            solver_options = pickle.dumps(
+                recording_requester.options, self._pickle_version)
 
             with self.connection as c:
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "

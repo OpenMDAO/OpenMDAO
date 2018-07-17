@@ -55,11 +55,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
                 inputs_text, outputs_text = row_actual
 
-            if PY2:
-                abs2meta = pickle.loads(str(row_abs2meta[0])) if row_abs2meta[0] is not None else None
-            else:
-                abs2meta = pickle.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
-
+            abs2meta = json.loads(row_abs2meta[0])
             inputs_actual = json_to_np_array(inputs_text)
             outputs_actual = json_to_np_array(outputs_text)
 

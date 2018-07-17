@@ -15,7 +15,7 @@ from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemC
     PromotedToAbsoluteMap
 from openmdao.recorders.cases import BaseCases
 from openmdao.recorders.sqlite_recorder import blob_to_array
-from openmdao.utils.record_util import is_valid_sqlite3_db, json_to_np_array
+from openmdao.utils.record_util import is_valid_sqlite3_db, json_to_np_array, convert_to_np_array
 from openmdao.utils.write_outputs import write_outputs
 
 from six import PY2, PY3
@@ -83,10 +83,13 @@ class SqliteCaseReader(BaseCaseReader):
 
             self._abs2prom = json.loads(row[1])
             self._prom2abs = json.loads(row[2])
-            if PY2:
-                self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
-            if PY3:
-                self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+            self._abs2meta = json.loads(row[3])
+
+            for name in self._abs2meta:
+                if 'lower' in self._abs2meta[name]:
+                    self._abs2meta[name]['lower'] = convert_to_np_array(self._abs2meta[name]['lower'])
+                if 'upper' in self._abs2meta[name]:
+                    self._abs2meta[name]['upper'] = convert_to_np_array(self._abs2meta[name]['upper'])
         con.close()
 
         self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,

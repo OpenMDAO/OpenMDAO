@@ -270,7 +270,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.input2meta['d1.y1']['units'], None)
         self.assertEqual(cr.input2meta['d1.y2']['units'], None)
         self.assertEqual(cr.output2meta['x']['explicit'], True)
-        self.assertEqual(cr.output2meta['x']['type'], {'output', 'desvar'})
+        self.assertEqual(cr.output2meta['x']['type'], ['output', 'desvar'])
         self.assertEqual(cr.input2meta['obj_cmp.y1']['explicit'], True)
         self.assertEqual(cr.input2meta['obj_cmp.y2']['explicit'], True)
         self.assertEqual(cr.output2meta['x']['lower'], -1000)
