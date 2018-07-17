@@ -147,10 +147,7 @@ class SqliteCaseReader(BaseCaseReader):
                 # Read in metadata for Drivers, Systems, and Solvers
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
                 for row in cur:
-                    if PY2:
-                        self.driver_metadata = pickle.loads(str(row[0]))
-                    if PY3:
-                        self.driver_metadata = pickle.loads(row[0])
+                    self.driver_metadata = json.loads(row[0])
 
                 cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
                 for row in cur:

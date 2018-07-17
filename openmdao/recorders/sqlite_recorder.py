@@ -207,7 +207,7 @@ class SqliteRecorder(BaseRecorder):
                 c.execute(
                     "CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                          "model_viewer_data BLOB)")
+                          "model_viewer_data TEXT)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
                           "scaling_factors BLOB, component_metadata BLOB)")
                 c.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
@@ -480,9 +480,7 @@ class SqliteRecorder(BaseRecorder):
         """
         if self.connection:
             driver_class = type(recording_requester).__name__
-            model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
-                                             self._pickle_version)
-            model_viewer_data = sqlite3.Binary(model_viewer_data)
+            model_viewer_data = json.dumps(recording_requester._model_viewer_data)
 
             try:
                 with self.connection as c:

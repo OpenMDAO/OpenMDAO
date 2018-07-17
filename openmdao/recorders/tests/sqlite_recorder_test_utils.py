@@ -233,10 +233,7 @@ def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
             test.assertIsNone(row)
             return
 
-        if PY2:
-            model_viewer_data = pickle.loads(str(row[0]))
-        if PY3:
-            model_viewer_data = pickle.loads(row[0])
+        model_viewer_data = json.loads(row[0])
 
         if expect_none_viewer_data:
             test.assertIsNone(model_viewer_data)
