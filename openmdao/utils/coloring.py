@@ -1119,8 +1119,8 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     if problem is not None:
         driver = problem.driver
         if mode is None:
-            mode = problem._mode
-        if mode != problem._mode:
+            mode = problem._orig_mode
+        if mode != problem._orig_mode:
             raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
                                (mode, problem._mode))
         start_time = time.time()
