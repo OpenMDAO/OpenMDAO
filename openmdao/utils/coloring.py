@@ -269,7 +269,6 @@ def _get_full_disjoint_bipartite(J):
         if w1 < ncols:  # it's a column
             color_group = set([w1])
             nonzero_rows[w1] = list(current_row_nz[w1])
-            edge_count += len(nonzero_rows[w1])
             nz_to_remove = current_row_nz[w1]
             current_row_nz[w1] = set()  # free up memory
 
@@ -284,12 +283,12 @@ def _get_full_disjoint_bipartite(J):
                     color_group.add(w)
                     idxs[i] = -1
                     nonzero_rows[w] = list(nz)
-                    edge_count += len(nz)
                     nz_to_remove.update(nz)
 
             column_groups.append(color_group)
 
             # remove nonzeros in colored columns
+            edge_count += len(nz_to_remove)
             for r in nz_to_remove:
                 current_col_nz[r] -= color_group
 
@@ -297,7 +296,6 @@ def _get_full_disjoint_bipartite(J):
             w1 -= ncols
             color_group = set([w1])
             nonzero_cols[w1] = list(current_col_nz[w1])
-            edge_count += len(nonzero_cols[w1])
             nz_to_remove = current_col_nz[w1]
             current_col_nz[w1] = set()  # free up memory
 
@@ -313,12 +311,12 @@ def _get_full_disjoint_bipartite(J):
                     color_group.add(w)
                     idxs[i] = -1
                     nonzero_cols[w] = list(nz)
-                    edge_count += len(nz)
                     nz_to_remove.update(nz)
 
             row_groups.append(color_group)
 
             # remove nonzeros in colored rows
+            edge_count += len(nz_to_remove)
             for c in nz_to_remove:
                 current_row_nz[c] -= color_group
 
