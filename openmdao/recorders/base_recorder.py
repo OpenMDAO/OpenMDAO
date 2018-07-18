@@ -243,10 +243,10 @@ class BaseRecorder(object):
             System, Solver, Driver in need of recording.
         data : dict
             Dictionary containing derivatives keyed by (of, wrt) pair.
-        **kwargs : keyword args
-            Some implementations of record_derivatives need additional args.
         metadata : dict
             Dictionary containing execution metadata.
+        **kwargs : keyword args
+            Some implementations of record_derivatives need additional args.
         """
         if not self._parallel:
             if MPI and MPI.COMM_WORLD.rank > 0:
