@@ -416,6 +416,85 @@ class TestSqliteRecorder(unittest.TestCase):
         }
         assertDriverMetadataRecorded(self, expected_driver_metadata)
 
+    def test_system_records_no_metadata(self):
+        prob = Problem(model=SellarDerivatives())
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_model_metadata'] = False
+        prob.model.recording_options['record_metadata'] = False
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(len(cr.system_metadata.keys()), 0)
+
+    def test_system_record_model_metadata(self):
+        # first check to see if recorded recursively, which is the default
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        # Quick check to see that keys and values were recorded
+        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+            self.assertTrue(key in cr.system_metadata.keys())
+            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
+            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+
+        # second check to see if not recorded recursively, when option set to False
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_model_metadata'] = False
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(list(cr.system_metadata.keys()), ['root'])
+        self.assertEqual(cr.system_metadata['root']['component_options']['assembled_jac_type'],
+                         'csc')
+
+    def test_driver_record_model_metadata(self):
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        # Quick check to see that keys and values were recorded
+        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+            self.assertTrue(key in cr.system_metadata.keys())
+            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
+            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_model_metadata'] = False
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(len(cr.system_metadata.keys()), 0)
+
     def test_driver_without_n2_data(self):
         prob = SellarProblem()
 
@@ -1738,6 +1817,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # make sure we record metadata
         prob.driver.recording_options['record_metadata'] = True
 
+        # also record the metadata for all systems in the model
+        prob.driver.recording_options['record_model_metadata'] = True
+
         recorder = SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
 
@@ -1763,8 +1845,20 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                                     "pz.z\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
-        self.assertEqual(list(cr.driver_metadata['tree'].keys()),
-                         ['name', 'type', 'subsystem_type', 'children'])
+        # Quick check to see that keys and values were recorded
+        self.assertEqual(set(cr.driver_metadata['tree'].keys()),
+                         {'name', 'type', 'subsystem_type', 'children'})
+        self.assertEqual(cr.driver_metadata['tree']['name'], 'root')
+        self.assertEqual(cr.driver_metadata['tree']['type'], 'root')
+        self.assertEqual(cr.driver_metadata['tree']['subsystem_type'], 'group')
+        self.assertEqual(len(cr.driver_metadata['tree']['children']), 7)
+
+        # access the metadata for all the systems in the model
+        # Quick check to see that keys and values were recorded
+        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+            self.assertTrue(key in cr.system_metadata.keys())
+            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
+            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader

@@ -140,7 +140,9 @@ class Driver(object):
         self.recording_options = OptionsDictionary()
 
         self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
+                                       desc='Record Driver metadata')
+        self.recording_options.declare('record_model_metadata', types=bool, default=True,
+                                       desc='Record metadata for all Systems in the model')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
@@ -408,6 +410,11 @@ class Driver(object):
                     from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
                     self._model_viewer_data = _get_viewer_data(problem)
             self._rec_mgr.record_metadata(self)
+
+        # Also record the system metadata to the recorders attached to this Driver
+        if self.recording_options['record_model_metadata']:
+            for sub in model.system_iter(recurse=True, include_self=True):
+                self._rec_mgr.record_metadata(sub)
 
     def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
