@@ -440,26 +440,12 @@ class SqliteRecorder(BaseRecorder):
             The System that would like to record its metadata.
         """
         if self.connection:
-            # Cannot handle PETScVector yet
-            from openmdao.api import PETScVector
-            if PETScVector and isinstance(recording_requester._outputs, PETScVector):
-                return  # Cannot handle PETScVector yet
+            scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
-            # collect scaling arrays
-            scaling_vecs = {}
-            for kind, odict in iteritems(recording_requester._vectors):
-                scaling_vecs[kind] = scaling = {}
-                for vecname, vec in iteritems(odict):
-                    scaling[vecname] = vec._scaling
+            if scaling_vecs is None:
+                return
+
             scaling_factors = pickle.dumps(scaling_vecs, self._pickle_version)
-
-            # create a copy of the system's metadata excluding what is in 'options_excludes'
-            user_options = OptionsDictionary()
-            excludes = recording_requester.recording_options['options_excludes']
-            for key in recording_requester.options._dict:
-                if check_path(key, [], excludes, True):
-                    user_options._dict[key] = recording_requester.options._dict[key]
-            user_options._read_only = recording_requester.options._read_only
 
             # try to pickle the metadata, report if it failed
             try:
@@ -481,7 +467,12 @@ class SqliteRecorder(BaseRecorder):
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
             with self.connection as c:
-                c.execute("INSERT INTO system_metadata(id, scaling_factors, component_metadata) "
+                # Because we can have a recorder attached to multiple Systems,
+                #   and because we are now recording System metadata recursively,
+                #   we can store System metadata multiple times. Need to ignore when that happens
+                #   so we don't get database errors. So use OR IGNORE
+                c.execute("INSERT OR IGNORE INTO system_metadata"
+                          "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
