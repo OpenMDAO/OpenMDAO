@@ -536,9 +536,6 @@ class SqliteRecorder(BaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            data_blob))
 
-                c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                          ('driver', c.lastrowid))
-
     def shutdown(self):
         """
         Shut down the recorder.
