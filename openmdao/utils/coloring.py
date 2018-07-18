@@ -161,10 +161,6 @@ def _J2col_matrix(J):
     """
     nrows, ncols = J.shape
 
-    # TODO: we may want to consider using something more memory efficient here.
-    #   This matrix is symmetric.  Also, there are other coloring algs that compute
-    #   a distance 2 coloring of a smaller bipartite graph of rows and cols instead of
-    #   a column adjacency matrix that could be considered if memory usage becomes a problem.
     col_matrix = np.zeros((ncols, ncols), dtype=bool)
 
     # mark col_matrix entries as True when nonzero row entries make them dependent
@@ -182,7 +178,7 @@ def _J2col_matrix(J):
 
 def _get_full_disjoint_cols(J):
     """
-    Find sets of disjoint columns in J and their corresponding rows.
+    Find sets of disjoint columns in J and their corresponding rows using a col adjacency matrix.
 
     Parameters
     ----------
@@ -217,7 +213,11 @@ def _get_full_disjoint_cols(J):
 
 def _get_full_disjoint_bipartite(J):
     """
-    Find sets of disjoint columns in J and their corresponding rows.
+    Find disjoint column and row sets in J and their corresponding rows/cols.
+
+    This finds a complete direct cover of the edges of the bipartite graph defined by J.
+    Each nonzero in J is an edge in the graph.  Each row and column in J is a vertex in
+    the graph.
 
     Parameters
     ----------
@@ -234,8 +234,8 @@ def _get_full_disjoint_bipartite(J):
     row_groups = []
     column_groups = []
 
-    row_nonzeros = [None] * ncols
-    col_nonzeros = [None] * nrows
+    nonzero_rows = [None] * ncols
+    nonzero_cols = [None] * nrows
 
     # this is just to save on vector creation in the loop
     full_idxs = np.arange(nrows + ncols, dtype=int)
@@ -268,8 +268,8 @@ def _get_full_disjoint_bipartite(J):
 
         if w1 < ncols:  # it's a column
             color_group = set([w1])
-            row_nonzeros[w1] = list(current_row_nz[w1])
-            edge_count += len(row_nonzeros[w1])
+            nonzero_rows[w1] = list(current_row_nz[w1])
+            edge_count += len(nonzero_rows[w1])
             nz_to_remove = current_row_nz[w1]
             current_row_nz[w1] = set()  # free up memory
 
@@ -283,11 +283,9 @@ def _get_full_disjoint_bipartite(J):
                 else:
                     color_group.add(w)
                     idxs[i] = -1
-                    row_nonzeros[w] = list(nz)
+                    nonzero_rows[w] = list(nz)
                     edge_count += len(nz)
                     nz_to_remove.update(nz)
-
-                # current_row_nz[w] = set()  # free up memory
 
             column_groups.append(color_group)
 
@@ -298,8 +296,8 @@ def _get_full_disjoint_bipartite(J):
         else:  # it's a row
             w1 -= ncols
             color_group = set([w1])
-            col_nonzeros[w1] = list(current_col_nz[w1])
-            edge_count += len(col_nonzeros[w1])
+            nonzero_cols[w1] = list(current_col_nz[w1])
+            edge_count += len(nonzero_cols[w1])
             nz_to_remove = current_col_nz[w1]
             current_col_nz[w1] = set()  # free up memory
 
@@ -314,7 +312,7 @@ def _get_full_disjoint_bipartite(J):
                 else:
                     color_group.add(w)
                     idxs[i] = -1
-                    col_nonzeros[w] = list(nz)
+                    nonzero_cols[w] = list(nz)
                     edge_count += len(nz)
                     nz_to_remove.update(nz)
 
@@ -326,7 +324,7 @@ def _get_full_disjoint_bipartite(J):
 
         uncolored = uncolored[uncolored != -1]
 
-    return column_groups, row_groups, row_nonzeros, col_nonzeros
+    return column_groups, row_groups, nonzero_rows, nonzero_cols
 
 
 def _tol_sweep(arr, tol=1e-15, orders=5):
@@ -875,86 +873,6 @@ def _compute_coloring(J, mode):
     }
 
     return coloring
-
-
-def _Jc2col_matrix(J, Jc):
-    """
-    Convert Jc partition of jacobian sparsity matrix to a column adjacency matrix.
-
-    Parameters
-    ----------
-    J : ndarray
-        Boolean jacobian sparsity matrix.
-    Jc : ndarray
-        Partition of jacobian sparsity matrix.
-
-    Returns
-    -------
-    ndarray
-        Column adjacency matrix.
-    """
-    nrows, ncols = J.shape
-
-    # Jc is same size a J, with any out-of-partition values set to False
-    nzcols = np.asarray(_count_nonzeros(Jc, axis=0), dtype=bool)
-    # nnz = np.nonzero(nzcols)[0]
-
-    # TODO: we may want to consider using something more memory efficient here.
-    #   This matrix is symmetric.  Also, there are other coloring algs that compute
-    #   a distance 2 coloring of a smaller bipartite graph of rows and cols instead of
-    #   a column adjacency matrix that could be considered if memory usage becomes a problem.
-    col_matrix = np.zeros((ncols, ncols), dtype=bool)
-
-    # mark col_matrix entries as True when nonzero row entries make them dependent
-    for row in range(nrows):
-        nzros = np.nonzero(J[row] & nzcols)[0]
-        if nzros.size > 1:
-            for col in nzros:
-                col_matrix[col, nzros] = True
-                col_matrix[nzros, col] = True
-
-    # zero out diagonal (column is not adjacent to itself)
-    np.fill_diagonal(col_matrix, False)
-
-    return col_matrix
-
-
-def _Jr2row_matrix(J, Jr):
-    """
-    Convert Jr partition of jacobian sparsity matrix to a row adjacency matrix.
-
-    Parameters
-    ----------
-    J : ndarray
-        Boolean jacobian sparsity matrix.
-    Jr : ndarray
-        Partition of jacobian sparsity matrix.
-
-    Returns
-    -------
-    ndarray
-        Row adjacency matrix.
-    """
-    nrows, ncols = J.shape
-
-    # Jr is same size a J, with any out-of-partition values set to False
-    nzrows = np.asarray(_count_nonzeros(Jr, axis=1), dtype=bool)
-    # nnz = _count_nonzeros(nzrows)
-
-    row_matrix = np.zeros((nrows, nrows), dtype=bool)
-
-    # mark row_matrix entries as True when nonzero row entries make them dependent
-    for col in range(ncols):
-        nzros = np.nonzero(J[:, col] & nzrows)[0]
-        if nzros.size > 1:
-            for row in nzros:
-                row_matrix[row, nzros] = True
-                row_matrix[nzros, row] = True
-
-    # zero out diagonal (column is not adjacent to itself)
-    np.fill_diagonal(row_matrix, False)
-
-    return row_matrix
 
 
 def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
