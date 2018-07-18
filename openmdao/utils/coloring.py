@@ -239,10 +239,10 @@ def _get_full_disjoint_cols(J, iter_type='ID'):
     return color_groups
 
 
-def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
+def _get_full_disjoint_cols_bipartite(J):
     """
     Find sets of disjoint columns in J and their corresponding rows.
-    
+
     Note: this modifies J.
 
     Parameters
@@ -262,7 +262,7 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
 
     row_nonzeros = [None] * ncols
     col_nonzeros = [None] * nrows
-    
+
     full_idxs = np.arange(nrows + ncols, dtype=int)
 
     degrees = np.empty(ncols + nrows, dtype=int)
@@ -273,8 +273,6 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
 
     degrees[:ncols] = col_degrees
     degrees[ncols:] = row_degrees
-    
-    print("degrees", degrees)
 
     num_edges = _count_nonzeros(J)
     edge_count = 0
@@ -288,10 +286,8 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
         w1 = uncolored[0]
         uncolored[0] = -1
         idxs = uncolored[1:]
-        print("w1", w1)
-        print("idxs", idxs)
 
-        if w1 < ncols :  # it's a column
+        if w1 < ncols:  # it's a column
             color_group = set([w1])
             assert row_nonzeros[w1] is None
             row_nonzeros[w1] = list(np.nonzero(J[:, w1])[0])
@@ -299,10 +295,8 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
 
             col_idxs = idxs < ncols
             for i, w in zip(full_idxs[:idxs.size][col_idxs], idxs[col_idxs]):
-                print("col", i, "w", w)
                 # add to group if not connected to existing group via path of length 2
                 nzeros = np.nonzero(J[:, w])[0]
-                print("nzeros", nzeros)
                 for r in nzeros:
                     if not color_group.isdisjoint(np.nonzero(J[r])[0]):
                         break
@@ -314,8 +308,7 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
                     edge_count += nzeros.size
 
             column_groups.append(color_group)
-            print("**col_group", color_group)
-            
+
             # zero out parts of J that are already colored
             for column in color_group:
                 J[:, column] = 0
@@ -329,13 +322,11 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
 
             row_idxs = idxs >= ncols
             for i, w in zip(full_idxs[:idxs.size][row_idxs], idxs[row_idxs]):
-                print("row", i, "w", w)
                 # add to group if not connected to existing group via path of length 2
                 w -= ncols
                 nzeros = np.nonzero(J[w])[0]
-                print("nzeros", nzeros)
                 for c in nzeros:
-                    if not color_group.isdisjoint(np.nonzero(J[:,c])[0]):
+                    if not color_group.isdisjoint(np.nonzero(J[:, c])[0]):
                         break
                 else:
                     color_group.add(w)
@@ -345,15 +336,12 @@ def _get_full_disjoint_cols_bipartite(J):#, iter_type='ID'):
                     edge_count += nzeros.size
 
             row_groups.append(color_group)
-            print("** row_group", color_group)
 
             # zero out parts of J that are already colored
             for row in color_group:
                 J[row] = 0
 
         uncolored = uncolored[uncolored != -1]
-        
-        print("edge_count", edge_count)
 
     return column_groups, row_groups, row_nonzeros, col_nonzeros
 
@@ -805,7 +793,7 @@ def _solves_info(color_info):
     return tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode
 
 
-def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes, iter_type='ID'):
+def _compute_coloring(J, mode, bidirectional, iter_type='ID'):
     """
     Compute a good coloring in a specified dominant direction.
 
@@ -817,9 +805,6 @@ def _compute_coloring(J, mode, bidirectional, simul_coloring_excludes, iter_type
         The dominant direction for solving for total derivatives.
     bidirectional : bool
         If True, compute a bidirectional coloring.
-    simul_coloring_excludes : iter of int
-        A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
-        solved in the opposite direction.
     iter_type : str.
         Name of column index iterator used by greedy coloring algorithm.
 
@@ -993,147 +978,96 @@ def _Jr2row_matrix(J, Jr):
     return row_matrix
 
 
-def _compute_bicoloring(J, iter_type='ID'):
-    """
-    Compute a good bidirectional coloring.
+# def _compute_bicoloring(J, iter_type='ID'):
+#     """
+#     Compute a good bidirectional coloring.
 
-    Parameters
-    ----------
-    J : ndarray
-        The boolean total jacobian.
-    iter_type : str.
-        Name of column index iterator used by greedy coloring algorithm.
+#     Parameters
+#     ----------
+#     J : ndarray
+#         The boolean total jacobian.
+#     iter_type : str.
+#         Name of column index iterator used by greedy coloring algorithm.
 
-    Returns
-    -------
-    coloring_info
-        dict
-            dict['fwd'] = (col_lists, row_maps)
-                col_lists is a list of column lists, the first being a list of uncolored columns.
-                row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-            dict['rev'] = (row_lists, col_maps)
-                row_lists is a list of row lists, the first being a list of uncolored rows.
-                col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-            dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-            dict['J'] = ndarray, the computed boolean jacobian.
-    """
-    nrows, ncols = J.shape
-    Jc_rows = []
-    Jr_cols = []
-    inactive_cols = np.zeros(ncols, dtype=bool)
-    inactive_rows = np.zeros(nrows, dtype=bool)
-    row_perm = []
-    col_perm = []
-    nzrows = _count_nonzeros(J, axis=1)
-    nzcols = _count_nonzeros(J, axis=0)
-    r = np.argmin(nzrows)
-    c = np.argmin(nzcols)
-    max_nz_Jr = max_nz_Jc = 0
-    rows_left = nrows
-    cols_left = ncols
+#     Returns
+#     -------
+#     coloring_info
+#         dict
+#             dict['fwd'] = (col_lists, row_maps)
+#                 col_lists is a list of column lists, the first being a list of uncolored columns.
+#                 row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+#             dict['rev'] = (row_lists, col_maps)
+#                 row_lists is a list of row lists, the first being a list of uncolored rows.
+#                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+#             dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+#             dict['J'] = ndarray, the computed boolean jacobian.
+#     """
+#     nrows, ncols = J.shape
+#     Jc_rows = []
+#     Jr_cols = []
+#     inactive_cols = np.zeros(ncols, dtype=bool)
+#     inactive_rows = np.zeros(nrows, dtype=bool)
+#     row_perm = []
+#     col_perm = []
+#     nzrows = _count_nonzeros(J, axis=1)
+#     nzcols = _count_nonzeros(J, axis=0)
+#     r = np.argmin(nzrows)
+#     c = np.argmin(nzcols)
+#     max_nz_Jr = max_nz_Jc = 0
+#     rows_left = nrows
+#     cols_left = ncols
 
-    # Partition J in to Jc and Jr
-    while rows_left and cols_left:
-        if max_nz_Jr + max(max_nz_Jc, nzrows[r]) <= (max_nz_Jc + max(max_nz_Jr, nzcols[c])):
-            # add a row to Jc
-            row = J[r].copy()
-            row[inactive_cols] = False
-            nz = _count_nonzeros(row)
-            if nz > max_nz_Jc:
-                max_nz_Jc = nz
-            Jc_rows.append(row)
-            row_perm.append(r)
+#     # Partition J in to Jc and Jr
+#     while rows_left and cols_left:
+#         if max_nz_Jr + max(max_nz_Jc, nzrows[r]) <= (max_nz_Jc + max(max_nz_Jr, nzcols[c])):
+#             # add a row to Jc
+#             row = J[r].copy()
+#             row[inactive_cols] = False
+#             nz = _count_nonzeros(row)
+#             if nz > max_nz_Jc:
+#                 max_nz_Jc = nz
+#             Jc_rows.append(row)
+#             row_perm.append(r)
 
-            nzrows[r] = nrows + ncols  # ensure we don't pick it again
-            inactive_rows[r] = True
-            nzcols[J[r]] -= 1
-            rows_left -= 1
-        else:  # add a column to Jr
-            col = J[:,c].copy()
-            col[inactive_rows] = False
-            nz = _count_nonzeros(col)
-            if nz > max_nz_Jr:
-                max_nz_Jr = nz
-            Jr_cols.append(col)
-            col_perm.append(c)
+#             nzrows[r] = nrows + ncols  # ensure we don't pick it again
+#             inactive_rows[r] = True
+#             nzcols[J[r]] -= 1
+#             rows_left -= 1
+#         else:  # add a column to Jr
+#             col = J[:, c].copy()
+#             col[inactive_rows] = False
+#             nz = _count_nonzeros(col)
+#             if nz > max_nz_Jr:
+#                 max_nz_Jr = nz
+#             Jr_cols.append(col)
+#             col_perm.append(c)
 
-            nzcols[c] = nrows + ncols  # ensore we don't pick it again
-            inactive_cols[c] = True
-            nzrows[J[:,c]] -= 1
-            cols_left -= 1
-            
-        r = np.argmin(nzrows)
-        c = np.argmin(nzcols)
+#             nzcols[c] = nrows + ncols  # ensore we don't pick it again
+#             inactive_cols[c] = True
+#             nzrows[J[:, c]] -= 1
+#             cols_left -= 1
 
-    # Now form Gc and Gr, column and row intersection graphs for Jc and Jr.
-    junk = _J2col_matrix(J)
+#         r = np.argmin(nzrows)
+#         c = np.argmin(nzcols)
 
-    # put Jc_rows back in proper order
-    J_arr = np.zeros((nrows, ncols), dtype=bool)
-    for i, row in enumerate(row_perm):
-        J_arr[row] = Jc_rows[i]
-    Gc = _Jc2col_matrix(J, J_arr)
+#     # Now form Gc and Gr, column and row intersection graphs for Jc and Jr.
+#     junk = _J2col_matrix(J)
 
-    J_arr[:] = False
-    for i, col in enumerate(col_perm):
-        J_arr[:, col] = Jr_cols[i]
-    Gr = _Jr2row_matrix(J, J_arr)
+#     # put Jc_rows back in proper order
+#     J_arr = np.zeros((nrows, ncols), dtype=bool)
+#     for i, row in enumerate(row_perm):
+#         J_arr[row] = Jc_rows[i]
+#     Gc = _Jc2col_matrix(J, J_arr)
 
-    print('foo')
-
-
-def _get_simul_excludes(problem):
-    """
-    Collect simul_coloring_excludes info from design vars or responses.
-
-    Parameters
-    ----------
-    problem : Problem
-        The Problem being run.
-
-    Returns
-    -------
-    list of int
-        List of jacobian row/col indices to exclude from the coloring (and solve in the
-        opposite direction).
-    """
-    offset = 0
-    simul_coloring_excludes = []
-    if problem._mode == 'rev':
-        wrt = list(problem.driver._designvars)
-        desvars = problem.driver._designvars
-        for dv in wrt:
-            excl = desvars[dv]['simul_coloring_excludes']
-            size = desvars[dv]['size']
-            if excl:
-                if isinstance(excl, bool):
-                    simul_coloring_excludes.extend(np.arange(size) + offset)
-                else:
-                    simul_coloring_excludes.extend(np.array(excl) + offset)
-            offset += size
-
-    else:  # fwd
-        of = problem.driver._get_ordered_nl_responses()
-        resps = problem.driver._responses
-        for resp in of:
-            excl = resps[resp]['simul_coloring_excludes']
-            size = resps[resp]['size']
-            if excl:
-                if isinstance(excl, bool):
-                    simul_coloring_excludes.extend(np.arange(size) + offset)
-                else:
-                    simul_coloring_excludes.extend(np.array(excl) + offset)
-            offset += size
-
-    if not simul_coloring_excludes:
-        return None
-
-    return simul_coloring_excludes
+#     J_arr[:] = False
+#     for i, col in enumerate(col_perm):
+#         J_arr[:, col] = Jr_cols[i]
+#     Gr = _Jr2row_matrix(J, J_arr)
 
 
 def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   bidirectional=True, simul_coloring_excludes=None, iter_type='ID',
+                   bidirectional=True, iter_type='ID',
                    stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
@@ -1161,10 +1095,6 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         If problem is not supplied, a previously computed boolean jacobian can be used.
     bidirectional : bool
         If True, compute a bidirectional coloring.
-    simul_coloring_excludes : iter of int
-        A collection of rows (fwd) or cols (rev) that are to be excluded from the coloring and
-        solved in the opposite direction. Used only if problem is None. Otherwise, problem
-        driver will supply exclude information gathered from design vars or responses.
     iter_type : str.
         Name of column index iterator used by greedy coloring algorithm.
     stream : file-like or None
@@ -1215,11 +1145,8 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     else:
         raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
-    if problem is not None:
-        simul_coloring_excludes = _get_simul_excludes(problem)
-
     start_time = time.time()
-    coloring = _compute_coloring(J, mode, bidirectional, simul_coloring_excludes, iter_type)
+    coloring = _compute_coloring(J, mode, bidirectional, iter_type)
     coloring['time_coloring'] = time.time() - start_time
     coloring['time_sparsity'] = time_sparsity
 
@@ -1435,24 +1362,3 @@ def _sparsity_cmd(options):
                      show_jac=options.show_jac, setup=True, run_model=True, stream=outfile)
         exit()
     return _sparsity
-
-
-if __name__ == '__main__':
-    #J = np.array([
-        #[1,1,1,1,1],
-        #[1,1,0,0,0],
-        #[1,0,1,0,0],
-        #[1,0,0,1,0],
-        #[1,0,0,0,1]
-    #], dtype=bool)
-    J = np.array([
-        [1,0,1,1,0],
-        [0,0,1,0,0],
-        [1,1,0,0,1],
-        [0,1,0,1,0],
-        [0,1,1,0,0]
-    ], dtype=bool)
-
-    #_compute_bicoloring(J)
-    col_groups, row_groups = _get_full_disjoint_cols_bipartite(J.copy())
-    print('')

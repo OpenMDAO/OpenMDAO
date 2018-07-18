@@ -61,10 +61,9 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode, simul_coloring_excludes=None, iter_type='ID', stream=sys.stdout):
+    def color(self, mode, iter_type='ID', stream=sys.stdout):
         self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
                                        run_model=False, bool_jac=self.J,
-                                       simul_coloring_excludes=simul_coloring_excludes,
                                        iter_type=iter_type, stream=stream)
         self.iter_type = iter_type
         return self.coloring
