@@ -518,7 +518,7 @@ class SqliteRecorder(BaseRecorder):
         recording_requester : object
             Driver in need of recording.
         data : dict
-            Dictionary containing derivatives keyed by (of, wrt) pair.
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
         metadata : dict
             Dictionary containing execution metadata.
         """

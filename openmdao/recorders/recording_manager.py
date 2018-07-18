@@ -163,7 +163,7 @@ class RecordingManager(object):
         recording_requester : object
             The object that needs an iteration of itself recorded.
         data : dict
-            Dictionary containing derivatives keyed by (of, wrt) to be recorded.
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
         metadata : dict
             Metadata for iteration coordinate.
         """

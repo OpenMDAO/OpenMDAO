@@ -242,7 +242,7 @@ class BaseRecorder(object):
         recording_requester : object
             System, Solver, Driver in need of recording.
         data : dict
-            Dictionary containing derivatives keyed by (of, wrt) pair.
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
         metadata : dict
             Dictionary containing execution metadata.
         **kwargs : keyword args
@@ -266,7 +266,7 @@ class BaseRecorder(object):
         recording_requester : Driver
             Driver in need of recording.
         data : dict
-            Dictionary containing derivatives keyed by (of, wrt) pair.
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
         metadata : dict
             Dictionary containing execution metadata.
         """
