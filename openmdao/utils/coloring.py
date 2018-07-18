@@ -110,26 +110,6 @@ class _SubjacRandomizer(object):
         self._orig_set_abs(key, subjac)
 
 
-def _order_by_LF(col_matrix):
-    """
-    Return columns in order of largest degree first (LF).
-
-    LF is the largest number of neighbors in the column adjacency matrix.
-
-    Parameters
-    ----------
-    col_matrix : ndarray
-        Column adjacency matrix.
-
-    Yields
-    ------
-    int
-        Column index.
-    """
-    for col in _count_nonzeros(col_matrix, axis=0).argsort()[::-1]:
-        yield col
-
-
 def _order_by_ID(col_matrix):
     """
     Return columns in order of incidence degree (ID).
@@ -200,7 +180,7 @@ def _J2col_matrix(J):
     return col_matrix
 
 
-def _get_full_disjoint_cols(J, iter_type='ID'):
+def _get_full_disjoint_cols(J):
     """
     Find sets of disjoint columns in J and their corresponding rows.
 
@@ -208,8 +188,6 @@ def _get_full_disjoint_cols(J, iter_type='ID'):
     ----------
     J : ndarray
         The total jacobian.
-    iter_type : str.
-        Name of column index iterator.
 
     Returns
     -------
@@ -220,12 +198,10 @@ def _get_full_disjoint_cols(J, iter_type='ID'):
     nrows, ncols = J.shape
     col_matrix = _J2col_matrix(J)
 
-    col_iter = globals()['_order_by_%s' % iter_type]
-
     # -1 indicates that a column has not been colored
     colors = np.full(ncols, -1, dtype=int)
 
-    for col in col_iter(col_matrix):
+    for col in _order_by_ID(col_matrix):
         neighbor_colors = set(colors[col_matrix[col]])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
@@ -775,9 +751,9 @@ def _solves_info(color_info):
     rev_size, fwd_size = color_info['J'].shape
     tot_colors = _total_solves(color_info)
 
+    fwd_solves = rev_solves = 0
     if tot_colors == 0:  # no coloring found
         tot_colors = tot_size = min([rev_size, fwd_size])
-        fwd_solves = rev_solves = 0
         pct = 0.
     else:
         fwd_lists = color_info['fwd'][0] if 'fwd' in color_info else []
@@ -790,10 +766,10 @@ def _solves_info(color_info):
         else:
             tot_size = min(fwd_size, rev_size)
 
-        if fwd_lists and fwd_lists[0]:
+        if fwd_lists:
             fwd_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
 
-        if rev_lists and rev_lists[0]:
+        if rev_lists:
             rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
 
         pct = ((tot_size - tot_colors) / tot_size * 100)
@@ -801,7 +777,7 @@ def _solves_info(color_info):
     return tot_size, tot_colors, fwd_solves, rev_solves, pct
 
 
-def _compute_coloring(J, mode, bidirectional, iter_type='ID'):
+def _compute_coloring(J, mode):
     """
     Compute a good coloring in a specified dominant direction.
 
@@ -810,11 +786,7 @@ def _compute_coloring(J, mode, bidirectional, iter_type='ID'):
     J : ndarray
         The boolean total jacobian.
     mode : str
-        The dominant direction for solving for total derivatives.
-    bidirectional : bool
-        If True, compute a bidirectional coloring.
-    iter_type : str.
-        Name of column index iterator used by greedy coloring algorithm.
+        The direction for solving for total derivatives.  If 'auto', use bidirectional coloring.
 
     Returns
     -------
@@ -829,8 +801,7 @@ def _compute_coloring(J, mode, bidirectional, iter_type='ID'):
             dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
             dict['J'] = ndarray, the computed boolean jacobian.
     """
-    if mode != 'auto':
-        bidirectional = False
+    bidirectional = mode == 'auto'
 
     rev = mode == 'rev'
 
@@ -986,96 +957,8 @@ def _Jr2row_matrix(J, Jr):
     return row_matrix
 
 
-# def _compute_bicoloring(J, iter_type='ID'):
-#     """
-#     Compute a good bidirectional coloring.
-
-#     Parameters
-#     ----------
-#     J : ndarray
-#         The boolean total jacobian.
-#     iter_type : str.
-#         Name of column index iterator used by greedy coloring algorithm.
-
-#     Returns
-#     -------
-#     coloring_info
-#         dict
-#             dict['fwd'] = (col_lists, row_maps)
-#                 col_lists is a list of column lists, the first being a list of uncolored columns.
-#                 row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-#             dict['rev'] = (row_lists, col_maps)
-#                 row_lists is a list of row lists, the first being a list of uncolored rows.
-#                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-#             dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-#             dict['J'] = ndarray, the computed boolean jacobian.
-#     """
-#     nrows, ncols = J.shape
-#     Jc_rows = []
-#     Jr_cols = []
-#     inactive_cols = np.zeros(ncols, dtype=bool)
-#     inactive_rows = np.zeros(nrows, dtype=bool)
-#     row_perm = []
-#     col_perm = []
-#     nzrows = _count_nonzeros(J, axis=1)
-#     nzcols = _count_nonzeros(J, axis=0)
-#     r = np.argmin(nzrows)
-#     c = np.argmin(nzcols)
-#     max_nz_Jr = max_nz_Jc = 0
-#     rows_left = nrows
-#     cols_left = ncols
-
-#     # Partition J in to Jc and Jr
-#     while rows_left and cols_left:
-#         if max_nz_Jr + max(max_nz_Jc, nzrows[r]) <= (max_nz_Jc + max(max_nz_Jr, nzcols[c])):
-#             # add a row to Jc
-#             row = J[r].copy()
-#             row[inactive_cols] = False
-#             nz = _count_nonzeros(row)
-#             if nz > max_nz_Jc:
-#                 max_nz_Jc = nz
-#             Jc_rows.append(row)
-#             row_perm.append(r)
-
-#             nzrows[r] = nrows + ncols  # ensure we don't pick it again
-#             inactive_rows[r] = True
-#             nzcols[J[r]] -= 1
-#             rows_left -= 1
-#         else:  # add a column to Jr
-#             col = J[:, c].copy()
-#             col[inactive_rows] = False
-#             nz = _count_nonzeros(col)
-#             if nz > max_nz_Jr:
-#                 max_nz_Jr = nz
-#             Jr_cols.append(col)
-#             col_perm.append(c)
-
-#             nzcols[c] = nrows + ncols  # ensore we don't pick it again
-#             inactive_cols[c] = True
-#             nzrows[J[:, c]] -= 1
-#             cols_left -= 1
-
-#         r = np.argmin(nzrows)
-#         c = np.argmin(nzcols)
-
-#     # Now form Gc and Gr, column and row intersection graphs for Jc and Jr.
-#     junk = _J2col_matrix(J)
-
-#     # put Jc_rows back in proper order
-#     J_arr = np.zeros((nrows, ncols), dtype=bool)
-#     for i, row in enumerate(row_perm):
-#         J_arr[row] = Jc_rows[i]
-#     Gc = _Jc2col_matrix(J, J_arr)
-
-#     J_arr[:] = False
-#     for i, col in enumerate(col_perm):
-#         J_arr[:, col] = Jr_cols[i]
-#     Gr = _Jr2row_matrix(J, J_arr)
-
-
 def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   bidirectional=True, iter_type='ID',
                    stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the given problem.
@@ -1101,10 +984,6 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         If True, run run_model before calling compute_totals.
     bool_jac : ndarray
         If problem is not supplied, a previously computed boolean jacobian can be used.
-    bidirectional : bool
-        If True, compute a bidirectional coloring.
-    iter_type : str.
-        Name of column index iterator used by greedy coloring algorithm.
     stream : file-like or None
         Stream where output coloring info will be written.
 
@@ -1147,14 +1026,14 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     elif bool_jac is not None:
         J = bool_jac
         time_sparsity = 0.
-        if mode is None or mode == 'auto':
-            mode = 'fwd' if J.shape[1] <= J.shape[0] else 'rev'
+        if mode is None:
+            mode = 'auto'
         driver = None
     else:
         raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
     start_time = time.time()
-    coloring = _compute_coloring(J, mode, bidirectional, iter_type)
+    coloring = _compute_coloring(J, mode)
     coloring['time_coloring'] = time.time() - start_time
     coloring['time_sparsity'] = time_sparsity
 

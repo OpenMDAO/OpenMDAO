@@ -61,11 +61,10 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode, iter_type='ID', stream=sys.stdout):
+    def color(self, mode, stream=sys.stdout):
         self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
                                        run_model=False, bool_jac=self.J,
-                                       iter_type=iter_type, stream=stream)
-        self.iter_type = iter_type
+                                       stream=stream)
         return self.coloring
 
     def show(self, stream=sys.stdout):
@@ -77,7 +76,6 @@ class TotJacBuilder(object):
         print("Shape:", self.J.shape, file=stream)
         print("Density:", np.count_nonzero(self.J) / self.J.size)
         print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
-        print("Iter type:", self.iter_type)
 
         simul_coloring_summary(self.coloring, stream=stream)
 
@@ -194,8 +192,6 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--mode", type=str, dest="mode",
                         help="Direction of coloring (default is fwd). Only used with -e.", 
                         default="fwd")
-    parser.add_argument('-i', '--iter', dest="iter", default="ID", 
-                        help="Column index iter for greedy coloring algorithm. Default is 'ID'.")
     parser.add_argument('-s', '--save', dest="save", default=None, 
                         help="Output file for jacobian so it can be reloaded and colored using"
                         " various methods for comparison.")
@@ -213,7 +209,7 @@ if __name__ == '__main__':
     else:  # just do a random matrix
         builder = rand_jac()
  
-    builder.color(options.mode, iter_type=options.iter)
+    builder.color(options.mode)
     builder.show()
 
     if options.save is not None:
