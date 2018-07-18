@@ -239,11 +239,9 @@ def _get_full_disjoint_cols(J, iter_type='ID'):
     return color_groups
 
 
-def _get_full_disjoint_cols_bipartite(J):
+def _get_full_disjoint_bipartite(J):
     """
     Find sets of disjoint columns in J and their corresponding rows.
-
-    Note: this modifies J.
 
     Parameters
     ----------
@@ -263,8 +261,13 @@ def _get_full_disjoint_cols_bipartite(J):
     row_nonzeros = [None] * ncols
     col_nonzeros = [None] * nrows
 
+    # this is just to save on vector creation in the loop
     full_idxs = np.arange(nrows + ncols, dtype=int)
 
+    current_row_nz = [set(np.nonzero(J[:, c])[0]) for c in range(ncols)]
+    current_col_nz = [set(np.nonzero(row)[0]) for row in J]
+
+    # we combine and sort degrees of both columns and rows
     degrees = np.empty(ncols + nrows, dtype=int)
 
     # could use these to determine overlap
@@ -274,13 +277,13 @@ def _get_full_disjoint_cols_bipartite(J):
     degrees[:ncols] = col_degrees
     degrees[ncols:] = row_degrees
 
+    sorted_degrees = np.argsort(degrees)[::-1]
+    uncolored = sorted_degrees
+
+    # each nonzero entry in J is an edge in the bipartite graph.  We have to make sure we
+    # cover every edge.
     num_edges = _count_nonzeros(J)
     edge_count = 0
-
-    sorted_degrees = np.argsort(degrees)[::-1]
-    mask = np.ones(sorted_degrees.size, dtype=bool)
-
-    uncolored = sorted_degrees
 
     while edge_count < num_edges:
         w1 = uncolored[0]
@@ -289,57 +292,61 @@ def _get_full_disjoint_cols_bipartite(J):
 
         if w1 < ncols:  # it's a column
             color_group = set([w1])
-            assert row_nonzeros[w1] is None
-            row_nonzeros[w1] = list(np.nonzero(J[:, w1])[0])
+            row_nonzeros[w1] = list(current_row_nz[w1])
             edge_count += len(row_nonzeros[w1])
+            nz_to_remove = current_row_nz[w1]
+            current_row_nz[w1] = set()  # free up memory
 
             col_idxs = idxs < ncols
             for i, w in zip(full_idxs[:idxs.size][col_idxs], idxs[col_idxs]):
+                nz = current_row_nz[w]
                 # add to group if not connected to existing group via path of length 2
-                nzeros = np.nonzero(J[:, w])[0]
-                for r in nzeros:
-                    if not color_group.isdisjoint(np.nonzero(J[r])[0]):
+                for r in nz:
+                    if not color_group.isdisjoint(current_col_nz[r]):
                         break
                 else:
                     color_group.add(w)
                     idxs[i] = -1
-                    assert row_nonzeros[w] is None
-                    row_nonzeros[w] = list(nzeros)
-                    edge_count += nzeros.size
+                    row_nonzeros[w] = list(nz)
+                    edge_count += len(nz)
+                    nz_to_remove.update(nz)
+
+                # current_row_nz[w] = set()  # free up memory
 
             column_groups.append(color_group)
 
-            # zero out parts of J that are already colored
-            for column in color_group:
-                J[:, column] = 0
+            # remove nonzeros in colored columns
+            for r in nz_to_remove:
+                current_col_nz[r] -= color_group
 
         else:  # it's a row
             w1 -= ncols
             color_group = set([w1])
-            assert col_nonzeros[w1] is None
-            col_nonzeros[w1] = list(np.nonzero(J[w1])[0])
+            col_nonzeros[w1] = list(current_col_nz[w1])
             edge_count += len(col_nonzeros[w1])
+            nz_to_remove = current_col_nz[w1]
+            current_col_nz[w1] = set()  # free up memory
 
             row_idxs = idxs >= ncols
             for i, w in zip(full_idxs[:idxs.size][row_idxs], idxs[row_idxs]):
                 # add to group if not connected to existing group via path of length 2
                 w -= ncols
-                nzeros = np.nonzero(J[w])[0]
-                for c in nzeros:
-                    if not color_group.isdisjoint(np.nonzero(J[:, c])[0]):
+                nz = current_col_nz[w]
+                for c in nz:
+                    if not color_group.isdisjoint(current_row_nz[c]):
                         break
                 else:
                     color_group.add(w)
                     idxs[i] = -1
-                    assert col_nonzeros[w] is None
-                    col_nonzeros[w] = list(nzeros)
-                    edge_count += nzeros.size
+                    col_nonzeros[w] = list(nz)
+                    edge_count += len(nz)
+                    nz_to_remove.update(nz)
 
             row_groups.append(color_group)
 
-            # zero out parts of J that are already colored
-            for row in color_group:
-                J[row] = 0
+            # remove nonzeros in colored rows
+            for c in nz_to_remove:
+                current_row_nz[c] -= color_group
 
         uncolored = uncolored[uncolored != -1]
 
@@ -734,10 +741,10 @@ def _total_solves(color_info):
     # (which equals the total number of linear solves).
     if 'fwd' in color_info:
         row_lists, _ = color_info['fwd']
-        total_solves += len(row_lists[0]) + len(row_lists[1:])
+        total_solves += len(row_lists[0]) + len(row_lists) - 1
     if 'rev' in color_info:
         col_lists, _ = color_info['rev']
-        total_solves += len(col_lists[0]) + len(col_lists[1:])
+        total_solves += len(col_lists[0]) + len(col_lists) - 1
 
     return total_solves
 
@@ -785,10 +792,10 @@ def _solves_info(color_info):
 
         if fwd_lists and fwd_lists[0]:
             fwd_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
-            
+
         if rev_lists and rev_lists[0]:
             rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
-            
+
         pct = ((tot_size - tot_colors) / tot_size * 100)
 
     return tot_size, tot_colors, fwd_solves, rev_solves, pct
@@ -841,7 +848,7 @@ def _compute_coloring(J, mode, bidirectional, iter_type='ID'):
     #
 
     if bidirectional:
-        col_groups, row_groups, rowcol_map, colrow_map = _get_full_disjoint_cols_bipartite(J.copy())
+        col_groups, row_groups, rowcol_map, colrow_map = _get_full_disjoint_bipartite(J)
     else:
         if rev:
             J = J.T
