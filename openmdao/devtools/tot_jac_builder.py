@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary, _solves_info
+from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
 
 class TotJacBuilder(object):
     def __init__(self, rows, cols):
@@ -70,28 +70,15 @@ class TotJacBuilder(object):
 
     def show(self, stream=sys.stdout):
         array_viz(self.J)
+
+        maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
+        maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
+
         print("Shape:", self.J.shape, file=stream)
         print("Density:", np.count_nonzero(self.J) / self.J.size)
-        tup = _solves_info(self.coloring)
-        dominant_mode = tup[-1]
-        if dominant_mode == 'fwd':
-            if 'rev' in self.coloring:
-                opp_rows = self.coloring['rev'][0][0]
-                Jcopy = self.J.copy()
-                Jcopy[opp_rows] = False
-            else:
-                Jcopy = self.J
-            maxdeg = np.max(np.count_nonzero(self.J, axis=1))
-        else:
-            if 'fwd' in self.coloring:
-                opp_cols = self.coloring['fwd'][0][0]
-                Jcopy = self.J.copy()
-                Jcopy[:, opp_cols] = False
-            else:
-                Jcopy = self.J
-            maxdeg = np.max(np.count_nonzero(self.J, axis=0))
-        print("Max degree:", maxdeg)
+        print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
         print("Iter type:", self.iter_type)
+
         simul_coloring_summary(self.coloring, stream=stream)
 
     def shuffle_rows(self):
@@ -196,36 +183,6 @@ def rand_jac():
                                    n_random_pts=rnd(15))
 
 
-def jac_compare(builder, iter_type='ID', stream=sys.stdout, open_mode="w"):
-    colorings = []
-
-    for mode in ('fwd', 'rev'):
-        if isinstance(stream, str):
-            with open(stream, open_mode) as f:
-                coloring = builder.color(mode, iter_type=iter_type, stream=f)
-        else:
-            coloring = builder.color(mode, iter_type=iter_type, stream=stream)
-        colorings.append(coloring)
-
-    ftot_size, ftot_colors, fcolored_solves, fopp_solves, fpct, _ = _solves_info(colorings[0])
-    rtot_size, rtot_colors, rcolored_solves, ropp_solves, rpct, _ = _solves_info(colorings[1])
-
-    if ftot_colors <= rtot_colors:
-        builder.coloring = colorings[0]
-        off_mode = 'rev'
-        off_solves = rtot_colors
-        off_opps = ropp_solves
-    else:
-        off_mode = 'fwd'
-        off_solves = ftot_colors
-        off_opps = fopp_solves
-
-    builder.show(stream=stream)
-
-    print("Unused %s mode coloring:  %d solves,  %d opposite solves" %
-        (off_mode, off_solves, off_opps))
-
-
 if __name__ == '__main__':
     import argparse
     import pickle
@@ -251,15 +208,13 @@ if __name__ == '__main__':
     if options.load is not None:
         with open(options.load, "rb") as f:
             builder = pickle.load(f)
-        builder.color(options.mode, iter_type=options.iter)
-        builder.show()
     elif options.eisenstat > -1:
         builder = TotJacBuilder.eisenstat(options.eisenstat)
-        builder.color(options.mode, iter_type=options.iter)
-        builder.show()
     else:  # just do a random matrix
         builder = rand_jac()
-        jac_compare(builder, iter_type=options.iter)
+ 
+    builder.color(options.mode, iter_type=options.iter)
+    builder.show()
 
     if options.save is not None:
         with open(options.save, "wb") as f:

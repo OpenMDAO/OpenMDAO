@@ -770,27 +770,28 @@ def _solves_info(color_info):
 
     if tot_colors == 0:  # no coloring found
         tot_colors = tot_size = min([rev_size, fwd_size])
-        colored_solves = opp_solves = 0
-        dominant_mode = 'None'
+        fwd_solves = rev_solves = 0
         pct = 0.
     else:
         fwd_lists = color_info['fwd'][0] if 'fwd' in color_info else []
         rev_lists = color_info['rev'][0] if 'rev' in color_info else []
 
-        dominant_mode = 'fwd' if len(fwd_lists) > len(rev_lists) else 'rev'
-
-        if dominant_mode == 'fwd':
+        if fwd_lists and not rev_lists:
             tot_size = fwd_size
-            colored_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
-            opp_solves = len(rev_lists[0])
-        else:
+        elif rev_lists and not fwd_lists:
             tot_size = rev_size
-            colored_solves = len(rev_lists[0]) + len(rev_lists) - 1
-            opp_solves = len(fwd_lists[0])
+        else:
+            tot_size = min(fwd_size, rev_size)
 
+        if fwd_lists and fwd_lists[0]:
+            fwd_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
+            
+        if rev_lists and rev_lists[0]:
+            rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
+            
         pct = ((tot_size - tot_colors) / tot_size * 100)
 
-    return tot_size, tot_colors, colored_solves, opp_solves, pct, dominant_mode
+    return tot_size, tot_colors, fwd_solves, rev_solves, pct
 
 
 def _compute_coloring(J, mode, bidirectional, iter_type='ID'):
@@ -1190,10 +1191,9 @@ def simul_coloring_summary(color_info, stream=sys.stdout):
         stream.write("\nSimultaneous derivatives can't improve on the total number of solves "
                      "required (%d) for this configuration\n" % tot_size)
     else:
-        tot_size, tot_colors, colored_solves, opp_solves, pct, mode = _solves_info(color_info)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(color_info)
 
-        stream.write("\nColored solves in %s mode: %d   opposite solves: %d" %
-                     (mode, colored_solves, opp_solves))
+        stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
         stream.write("\n\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
                      (tot_colors, tot_size, pct))
 
