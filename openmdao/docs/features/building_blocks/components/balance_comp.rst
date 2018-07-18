@@ -16,7 +16,19 @@ solves the following equation:
 
 .. math::
 
-    f_{mult}(x) \cdot f_{lhs}(x) = f_{rhs}(x)
+  \mathcal{R}_{name} =
+  \frac{f_{mult}(x,...) \times f_{lhs}(x,...) - f_{rhs}(x,...)}{f_{norm}(f_{rhs}(x,...))}
+
+The optional normalization function :math:`f_{norm}(f_{rhs})` is computed as:
+
+.. math::
+
+  f_{norm}(f_{rhs}(x,...)) =
+  \begin{cases}
+   \left| f_{rhs} \right|, & \text{if normalize and } \left| f_{rhs} \right| \geq 2 \\
+   0.25 f_{rhs}^2 + 1,     & \text{if normalize and } \left| f_{rhs} \right| < 2 \\
+   1,                      & \text{if not normalize}
+  \end{cases}
 
 The following inputs and outputs are associated with each implicit state.
 

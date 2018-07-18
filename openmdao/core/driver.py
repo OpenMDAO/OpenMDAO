@@ -732,7 +732,9 @@ class Driver(object):
                 self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
                                                             return_format, approx=True,
                                                             debug_print=debug_print)
-            return total_jac.compute_totals_approx()
+                return total_jac.compute_totals_approx(initialize=True)
+            else:
+                return total_jac.compute_totals_approx()
         else:
             if total_jac is None:
                 total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
