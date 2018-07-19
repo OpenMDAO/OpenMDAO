@@ -2,7 +2,7 @@
 Getting Derivatives with the Case Reader
 ****************************************
 
-If you are running with a driver that computes derivatives, you can also record and read them through the `CaseReader`.
+If you are running with a driver that computes derivatives, and you have recorded them, then you can read them through the `CaseReader`.
 The derivatives are also stored in cases, though the structure of a derivatives case is simpler than for iteration
 cases. The `CaseReader` contains a "driver_derivative_cases" object which contains a case for each time the driver
 computed derivatives. The case keys are iterations coordinates. Derivatives are recorded using the same iteration
