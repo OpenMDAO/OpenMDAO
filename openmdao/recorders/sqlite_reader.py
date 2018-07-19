@@ -130,11 +130,15 @@ class SqliteCaseReader(BaseCaseReader):
                 self.driver_cases._case_keys = [coord[0] for coord in rows]
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
 
-                cur.execute("SELECT iteration_coordinate FROM driver_derivatives ORDER BY id ASC")
-                rows = cur.fetchall()
-                dcase = self.driver_derivative_cases
-                dcase._case_keys = [coord[0] for coord in rows]
-                dcase.num_cases = len(dcase._case_keys)
+                try:
+                    cur.execute("SELECT iteration_coordinate FROM driver_derivatives ORDER BY id ASC")
+                    rows = cur.fetchall()
+                    dcase = self.driver_derivative_cases
+                    dcase._case_keys = [coord[0] for coord in rows]
+                    dcase.num_cases = len(dcase._case_keys)
+                except sqlite3.OperationalError:
+                    # Old version of the recorder.
+                    pass
 
                 cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
