@@ -232,26 +232,45 @@ def _get_full_disjoint_bipartite(J):
     nrows, ncols = J.shape
 
     row_groups = []
-    column_groups = []
-
     nonzero_rows = [None] * ncols
+    row_degrees = _count_nonzeros(J, axis=1)  # row degrees
+    uncolored_row_idxs = np.argsort(row_degrees)[::-1]
+    uncolored_row_deg = row_degrees[uncolored_row_idxs]
+
+    # offset row_degrees by ncols so all will be non-positive but still in proper order, and
+    # incidence order, which we will add later, will always be positive and so will always
+    # take precedence. This way, we'll fall back to degree as a sorting criterion when we don't
+    # have any colored adjacent columns.
+    row_degrees -= ncols
+
+    column_groups = []
     nonzero_cols = [None] * nrows
+    col_degrees = _count_nonzeros(J, axis=0)  # column degrees
+    uncolored_col_idxs = np.argsort(col_degrees)[::-1]
+    uncolored_col_deg = col_degrees[uncolored_col_idxs]
+
+    # see explanation above for the row_degrees offset
+    col_degrees -= nrows
 
     # use this to keep track of the current set of nonzeros as they are removed during coloring
     current_row_nz = [set(np.nonzero(J[:, c])[0]) for c in range(ncols)]
     current_col_nz = [set(np.nonzero(row)[0]) for row in J]
 
-    row_degrees = _count_nonzeros(J, axis=1)  # row degrees
-    col_degrees = _count_nonzeros(J, axis=0)  # column degrees
+    # rows adjacent to each row
+    row_adj = [None] * nrows
+    for r in range(nrows):
+        row_adj[r] = adj = set()
+        for c in current_col_nz[r]:
+            adj.update(current_row_nz[c])
 
-    uncolored_row_idxs = np.argsort(row_degrees)[::-1]
-    uncolored_col_idxs = np.argsort(col_degrees)[::-1]
+    # columns adjacent to each column
+    col_adj = [None] * ncols
+    for c in range(ncols):
+        col_adj[c] = adj = set()
+        for r in current_row_nz[c]:
+            adj.update(current_col_nz[r])
 
-    uncolored_row_deg = row_degrees[uncolored_row_idxs]
-    uncolored_col_deg = col_degrees[uncolored_col_idxs]
-
-    # each nonzero entry in J is an edge in the bipartite graph.  We have to make sure we
-    # cover every edge.
+    # each nonzero entry in J is an edge in the bipartite graph.  We have to cover every edge.
     num_edges = _count_nonzeros(J)
     edge_count = 0
 
@@ -259,25 +278,35 @@ def _get_full_disjoint_bipartite(J):
 
         if uncolored_col_deg[0] >= uncolored_row_deg[0]:  # choose max deg column
             max_c = uncolored_col_idxs[0]
-            uncolored_col_deg[0] = -1
+            uncolored_col_deg[0] = -nrows
             color_group = set([max_c])
             nonzero_rows[max_c] = list(current_row_nz[max_c])
             nz_to_remove = current_row_nz[max_c]
             current_row_nz[max_c] = set()  # free up memory
+            # update incidence degree of adjacent cols
+            for adj_c in col_adj[max_c]:
+                if col_degrees[adj_c] > 0:
+                    col_degrees[adj_c] += 1
+                else:
+                    col_degrees[adj_c] = 1
 
-            for i, w in enumerate(uncolored_col_idxs[1:]):
-                nz = current_row_nz[w]
+            for i, c in enumerate(uncolored_col_idxs[1:]):
+                nz = current_row_nz[c]
                 # add to group if not connected to existing group via path of length 2
                 for r in nz:
                     if not color_group.isdisjoint(current_col_nz[r]):
                         break
                 else:
-                    color_group.add(w)
-                    uncolored_col_deg[i + 1] = -1
-                    nonzero_rows[w] = list(nz)
+                    color_group.add(c)
+                    uncolored_col_deg[i + 1] = -nrows
+                    nonzero_rows[c] = list(nz)
                     nz_to_remove.update(nz)
-                    for r in nz:
-                        row_degrees[r] -= 1
+                    # update incidence degree of adjacent cols
+                    for adj_c in col_adj[c]:
+                        if col_degrees[adj_c] > 0:
+                            col_degrees[adj_c] += 1
+                        else:
+                            col_degrees[adj_c] = 1
 
             column_groups.append(color_group)
 
@@ -286,37 +315,46 @@ def _get_full_disjoint_bipartite(J):
             for r in nz_to_remove:
                 current_col_nz[r] -= color_group
 
-            uncolored_col_idxs = uncolored_col_idxs[uncolored_col_deg > 0]
+            uncolored_col_idxs = uncolored_col_idxs[uncolored_col_deg > -nrows]
             uncolored_col_deg = col_degrees[uncolored_col_idxs]
 
-            # update and resort the uncolored row degrees
-            uncolored_row_deg = row_degrees[uncolored_row_idxs]
-            sorting = np.argsort(uncolored_row_deg)[::-1]
-            uncolored_row_idxs = uncolored_row_idxs[sorting]
-            uncolored_row_deg = uncolored_row_deg[sorting]
+            # resort by incidence degree
+            sorting = np.argsort(uncolored_col_deg)[::-1]
+            uncolored_col_idxs = uncolored_col_idxs[sorting]
+            uncolored_col_deg = uncolored_col_deg[sorting]
 
         else:  # choose max deg row
             max_r = uncolored_row_idxs[0]
-            uncolored_row_deg[0] = -1
+            uncolored_row_deg[0] = -ncols
 
             color_group = set([max_r])
             nonzero_cols[max_r] = list(current_col_nz[max_r])
             nz_to_remove = current_col_nz[max_r]
             current_col_nz[max_r] = set()  # free up memory
+            # update incidence degree of adjacent rows
+            for adj_r in row_adj[max_r]:
+                if row_degrees[adj_r] > 0:
+                    row_degrees[adj_r] += 1
+                else:
+                    row_degrees[adj_r] = 1
 
-            for i, w in enumerate(uncolored_row_idxs[1:]):
-                nz = current_col_nz[w]
+            for i, r in enumerate(uncolored_row_idxs[1:]):
+                nz = current_col_nz[r]
                 # add to group if not connected to existing group via path of length 2
                 for c in nz:
                     if not color_group.isdisjoint(current_row_nz[c]):
                         break
                 else:
-                    color_group.add(w)
-                    uncolored_row_deg[i + 1] = -1
-                    nonzero_cols[w] = list(nz)
+                    color_group.add(r)
+                    uncolored_row_deg[i + 1] = -ncols
+                    nonzero_cols[r] = list(nz)
                     nz_to_remove.update(nz)
-                    for c in nz:
-                        col_degrees[c] -= 1
+                    # update incidence degree of adjacent rows
+                    for adj_r in row_adj[r]:
+                        if row_degrees[adj_r] > 0:
+                            row_degrees[adj_r] += 1
+                        else:
+                            row_degrees[adj_r] = 1
 
             row_groups.append(color_group)
 
@@ -325,14 +363,13 @@ def _get_full_disjoint_bipartite(J):
             for c in nz_to_remove:
                 current_row_nz[c] -= color_group
 
-            uncolored_row_idxs = uncolored_row_idxs[uncolored_row_deg > 0]
+            uncolored_row_idxs = uncolored_row_idxs[uncolored_row_deg > -ncols]
             uncolored_row_deg = row_degrees[uncolored_row_idxs]
 
-            # update and resort the uncolored column degrees
-            uncolored_col_deg = col_degrees[uncolored_col_idxs]
-            sorting = np.argsort(uncolored_col_deg)[::-1]
-            uncolored_col_idxs = uncolored_col_idxs[sorting]
-            uncolored_col_deg = uncolored_col_deg[sorting]
+            # resort by incidence degree
+            sorting = np.argsort(uncolored_row_deg)[::-1]
+            uncolored_row_idxs = uncolored_row_idxs[sorting]
+            uncolored_row_deg = uncolored_row_deg[sorting]
 
     return column_groups, row_groups, nonzero_rows, nonzero_cols
 
