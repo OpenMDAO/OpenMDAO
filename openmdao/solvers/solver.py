@@ -689,8 +689,10 @@ class NonlinearSolver(Solver):
         Run the apply_nonlinear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
-        self._system._apply_nonlinear()
-        recording_iteration.stack.pop()
+        try:
+            self._system._apply_nonlinear()
+        finally:
+            recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -839,10 +841,12 @@ class LinearSolver(Solver):
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems, self._mode,
-                             scope_out, scope_in)
 
-        recording_iteration.stack.pop()
+        try:
+            system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
+                                 self._mode, scope_out, scope_in)
+        finally:
+            recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
