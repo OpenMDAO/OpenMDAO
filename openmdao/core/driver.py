@@ -140,7 +140,9 @@ class Driver(object):
         self.recording_options = OptionsDictionary()
 
         self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
+                                       desc='Record Driver metadata')
+        self.recording_options.declare('record_model_metadata', types=bool, default=True,
+                                       desc='Record metadata for all Systems in the model')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
@@ -408,6 +410,11 @@ class Driver(object):
                     from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
                     self._model_viewer_data = _get_viewer_data(problem)
             self._rec_mgr.record_metadata(self)
+
+        # Also record the system metadata to the recorders attached to this Driver
+        if self.recording_options['record_model_metadata']:
+            for sub in model.system_iter(recurse=True, include_self=True):
+                self._rec_mgr.record_metadata(sub)
 
     def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
@@ -732,9 +739,9 @@ class Driver(object):
                 self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
                                                             return_format, approx=True,
                                                             debug_print=debug_print)
-                return total_jac.compute_totals_approx(initialize=True)
+                totals = total_jac.compute_totals_approx(initialize=True)
             else:
-                return total_jac.compute_totals_approx()
+                totals = total_jac.compute_totals_approx()
         else:
             if total_jac is None:
                 total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
@@ -744,7 +751,13 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            return total_jac.compute_totals()
+            totals = total_jac.compute_totals()
+
+        if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
+            metadata = create_local_meta(self._get_name())
+            total_jac.record_derivatives(self, metadata)
+
+        return totals
 
     def record_iteration(self):
         """
