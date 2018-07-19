@@ -276,6 +276,8 @@ def _get_full_disjoint_bipartite(J):
                     uncolored_col_deg[i + 1] = -1
                     nonzero_rows[w] = list(nz)
                     nz_to_remove.update(nz)
+                    for r in nz:
+                        row_degrees[r] -= 1
 
             column_groups.append(color_group)
 
@@ -284,9 +286,14 @@ def _get_full_disjoint_bipartite(J):
             for r in nz_to_remove:
                 current_col_nz[r] -= color_group
 
-            mask = uncolored_col_deg > 0
-            uncolored_col_deg = uncolored_col_deg[mask]
-            uncolored_col_idxs = uncolored_col_idxs[mask]
+            uncolored_col_idxs = uncolored_col_idxs[uncolored_col_deg > 0]
+            uncolored_col_deg = col_degrees[uncolored_col_idxs]
+
+            # update and resort the uncolored row degrees
+            uncolored_row_deg = row_degrees[uncolored_row_idxs]
+            sorting = np.argsort(uncolored_row_deg)[::-1]
+            uncolored_row_idxs = uncolored_row_idxs[sorting]
+            uncolored_row_deg = uncolored_row_deg[sorting]
 
         else:  # choose max deg row
             max_r = uncolored_row_idxs[0]
@@ -308,6 +315,8 @@ def _get_full_disjoint_bipartite(J):
                     uncolored_row_deg[i + 1] = -1
                     nonzero_cols[w] = list(nz)
                     nz_to_remove.update(nz)
+                    for c in nz:
+                        col_degrees[c] -= 1
 
             row_groups.append(color_group)
 
@@ -316,9 +325,14 @@ def _get_full_disjoint_bipartite(J):
             for c in nz_to_remove:
                 current_row_nz[c] -= color_group
 
-            mask = uncolored_row_deg > 0
-            uncolored_row_deg = uncolored_row_deg[mask]
-            uncolored_row_idxs = uncolored_row_idxs[mask]
+            uncolored_row_idxs = uncolored_row_idxs[uncolored_row_deg > 0]
+            uncolored_row_deg = row_degrees[uncolored_row_idxs]
+
+            # update and resort the uncolored column degrees
+            uncolored_col_deg = col_degrees[uncolored_col_idxs]
+            sorting = np.argsort(uncolored_col_deg)[::-1]
+            uncolored_col_idxs = uncolored_col_idxs[sorting]
+            uncolored_col_deg = uncolored_col_deg[sorting]
 
     return column_groups, row_groups, nonzero_rows, nonzero_cols
 
