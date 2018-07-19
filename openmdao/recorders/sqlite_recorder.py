@@ -165,6 +165,9 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
+                c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, derivatives BLOB)")
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
@@ -496,6 +499,33 @@ class SqliteRecorder(BaseRecorder):
             with self.connection as c:
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
                           "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
+
+    def record_derivatives_driver(self, recording_requester, data, metadata):
+        """
+        Record derivatives data from a Driver.
+
+        Parameters
+        ----------
+        recording_requester : object
+            Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        if self.connection:
+
+            data_array = values_to_array(data)
+            data_blob = array_to_blob(data_array)
+
+            with self.connection as c:
+                c = c.cursor()  # need a real cursor for lastrowid
+
+                c.execute("INSERT INTO driver_derivatives(counter, iteration_coordinate, "
+                          "timestamp, success, msg, derivatives) VALUES(?,?,?,?,?,?)",
+                          (self._counter, self._iteration_coordinate,
+                           metadata['timestamp'], metadata['success'], metadata['msg'],
+                           data_blob))
 
     def shutdown(self):
         """

@@ -739,9 +739,9 @@ class Driver(object):
                 self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
                                                             return_format, approx=True,
                                                             debug_print=debug_print)
-                return total_jac.compute_totals_approx(initialize=True)
+                totals = total_jac.compute_totals_approx(initialize=True)
             else:
-                return total_jac.compute_totals_approx()
+                totals = total_jac.compute_totals_approx()
         else:
             if total_jac is None:
                 total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
@@ -751,7 +751,13 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            return total_jac.compute_totals()
+            totals = total_jac.compute_totals()
+
+        if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
+            metadata = create_local_meta(self._get_name())
+            total_jac.record_derivatives(self, metadata)
+
+        return totals
 
     def record_iteration(self):
         """
