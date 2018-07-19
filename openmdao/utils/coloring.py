@@ -237,24 +237,21 @@ def _get_full_disjoint_bipartite(J):
     nonzero_rows = [None] * ncols
     nonzero_cols = [None] * nrows
 
-    # this is just to save on vector creation in the loop
-    full_idxs = np.arange(nrows + ncols, dtype=int)
-
+    # use this to keep track of the current set of nonzeros as they are removed during coloring
     current_row_nz = [set(np.nonzero(J[:, c])[0]) for c in range(ncols)]
     current_col_nz = [set(np.nonzero(row)[0]) for row in J]
 
-    # we combine and sort degrees of both columns and rows
-    degrees = np.empty(ncols + nrows, dtype=int)
-
-    # could use these to determine overlap
-    col_degrees = _count_nonzeros(J, axis=0)  # column degrees
     row_degrees = _count_nonzeros(J, axis=1)  # row degrees
+    col_degrees = _count_nonzeros(J, axis=0)  # column degrees
 
-    degrees[:ncols] = col_degrees
-    degrees[ncols:] = row_degrees
+    sorted_rows = np.argsort(row_degrees)[::-1]
+    sorted_cols = np.argsort(col_degrees)[::-1]
 
-    sorted_degrees = np.argsort(degrees)[::-1]
-    uncolored = sorted_degrees
+    uncolored_row_deg = row_degrees[sorted_rows]
+    uncolored_col_deg = col_degrees[sorted_cols]
+
+    uncolored_row_idxs = sorted_rows
+    uncolored_col_idxs = sorted_cols
 
     # each nonzero entry in J is an edge in the bipartite graph.  We have to make sure we
     # cover every edge.
@@ -262,18 +259,18 @@ def _get_full_disjoint_bipartite(J):
     edge_count = 0
 
     while edge_count < num_edges:
-        w1 = uncolored[0]
-        uncolored[0] = -1
-        idxs = uncolored[1:]
+        max_rd = uncolored_row_deg[0]
+        max_cd = uncolored_col_deg[0]
 
-        if w1 < ncols:  # it's a column
-            color_group = set([w1])
-            nonzero_rows[w1] = list(current_row_nz[w1])
-            nz_to_remove = current_row_nz[w1]
-            current_row_nz[w1] = set()  # free up memory
+        if max_cd >= max_rd:  # choose column
+            max_c = uncolored_col_idxs[0]
+            uncolored_col_deg[0] = -1
+            color_group = set([max_c])
+            nonzero_rows[max_c] = list(current_row_nz[max_c])
+            nz_to_remove = current_row_nz[max_c]
+            current_row_nz[max_c] = set()  # free up memory
 
-            col_idxs = idxs < ncols
-            for i, w in zip(full_idxs[:idxs.size][col_idxs], idxs[col_idxs]):
+            for i, w in enumerate(uncolored_col_idxs[1:]):
                 nz = current_row_nz[w]
                 # add to group if not connected to existing group via path of length 2
                 for r in nz:
@@ -281,7 +278,7 @@ def _get_full_disjoint_bipartite(J):
                         break
                 else:
                     color_group.add(w)
-                    idxs[i] = -1
+                    uncolored_col_deg[i + 1] = -1
                     nonzero_rows[w] = list(nz)
                     nz_to_remove.update(nz)
 
@@ -290,37 +287,47 @@ def _get_full_disjoint_bipartite(J):
             # remove nonzeros in colored columns
             edge_count += len(nz_to_remove)
             for r in nz_to_remove:
+                # old_sz = len(current_col_nz[r])
                 current_col_nz[r] -= color_group
+                # degrees[r + ncols] -= (len(current_col_nz[r]) - old_sz)
 
-        else:  # it's a row
-            w1 -= ncols
-            color_group = set([w1])
-            nonzero_cols[w1] = list(current_col_nz[w1])
-            nz_to_remove = current_col_nz[w1]
-            current_col_nz[w1] = set()  # free up memory
+            mask = uncolored_col_deg > 0
+            uncolored_col_deg = uncolored_col_deg[mask]
+            uncolored_col_idxs = uncolored_col_idxs[mask]
 
-            row_idxs = idxs >= ncols
-            for i, w in zip(full_idxs[:idxs.size][row_idxs], idxs[row_idxs]):
-                # add to group if not connected to existing group via path of length 2
-                w -= ncols
+        else:  # choose row
+            max_r = uncolored_row_idxs[0]
+            uncolored_row_deg[0] = -1
+
+            color_group = set([max_r])
+            nonzero_cols[max_r] = list(current_col_nz[max_r])
+            nz_to_remove = current_col_nz[max_r]
+            current_col_nz[max_r] = set()  # free up memory
+
+            for i, w in enumerate(uncolored_row_idxs[1:]):
                 nz = current_col_nz[w]
+                # add to group if not connected to existing group via path of length 2
                 for c in nz:
                     if not color_group.isdisjoint(current_row_nz[c]):
                         break
                 else:
                     color_group.add(w)
-                    idxs[i] = -1
+                    uncolored_row_deg[i + 1] = -1
                     nonzero_cols[w] = list(nz)
                     nz_to_remove.update(nz)
 
             row_groups.append(color_group)
 
-            # remove nonzeros in colored rows
+            # remove nonzeros in colored columns
             edge_count += len(nz_to_remove)
             for c in nz_to_remove:
+                # old_sz = len(current_row_nz[c])
                 current_row_nz[c] -= color_group
+                # degrees[c] -= (len(current_row_nz[c]) - old_sz)
 
-        uncolored = uncolored[uncolored != -1]
+            mask = uncolored_row_deg > 0
+            uncolored_row_deg = uncolored_row_deg[mask]
+            uncolored_row_idxs = uncolored_row_idxs[mask]
 
     return column_groups, row_groups, nonzero_rows, nonzero_cols
 
