@@ -67,7 +67,7 @@ def blob_to_array(blob):
     return np.load(out)
 
 
-format_version = 1
+format_version = 2
 
 
 class SqliteRecorder(BaseRecorder):
