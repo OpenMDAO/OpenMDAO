@@ -244,14 +244,11 @@ def _get_full_disjoint_bipartite(J):
     row_degrees = _count_nonzeros(J, axis=1)  # row degrees
     col_degrees = _count_nonzeros(J, axis=0)  # column degrees
 
-    sorted_rows = np.argsort(row_degrees)[::-1]
-    sorted_cols = np.argsort(col_degrees)[::-1]
+    uncolored_row_idxs = np.argsort(row_degrees)[::-1]
+    uncolored_col_idxs = np.argsort(col_degrees)[::-1]
 
-    uncolored_row_deg = row_degrees[sorted_rows]
-    uncolored_col_deg = col_degrees[sorted_cols]
-
-    uncolored_row_idxs = sorted_rows
-    uncolored_col_idxs = sorted_cols
+    uncolored_row_deg = row_degrees[uncolored_row_idxs]
+    uncolored_col_deg = col_degrees[uncolored_col_idxs]
 
     # each nonzero entry in J is an edge in the bipartite graph.  We have to make sure we
     # cover every edge.
@@ -259,10 +256,8 @@ def _get_full_disjoint_bipartite(J):
     edge_count = 0
 
     while edge_count < num_edges:
-        max_rd = uncolored_row_deg[0]
-        max_cd = uncolored_col_deg[0]
 
-        if max_cd >= max_rd:  # choose column
+        if uncolored_col_deg[0] >= uncolored_row_deg[0]:  # choose max deg column
             max_c = uncolored_col_idxs[0]
             uncolored_col_deg[0] = -1
             color_group = set([max_c])
@@ -287,15 +282,13 @@ def _get_full_disjoint_bipartite(J):
             # remove nonzeros in colored columns
             edge_count += len(nz_to_remove)
             for r in nz_to_remove:
-                # old_sz = len(current_col_nz[r])
                 current_col_nz[r] -= color_group
-                # degrees[r + ncols] -= (len(current_col_nz[r]) - old_sz)
 
             mask = uncolored_col_deg > 0
             uncolored_col_deg = uncolored_col_deg[mask]
             uncolored_col_idxs = uncolored_col_idxs[mask]
 
-        else:  # choose row
+        else:  # choose max deg row
             max_r = uncolored_row_idxs[0]
             uncolored_row_deg[0] = -1
 
@@ -321,9 +314,7 @@ def _get_full_disjoint_bipartite(J):
             # remove nonzeros in colored columns
             edge_count += len(nz_to_remove)
             for c in nz_to_remove:
-                # old_sz = len(current_row_nz[c])
                 current_row_nz[c] -= color_group
-                # degrees[c] -= (len(current_row_nz[c]) - old_sz)
 
             mask = uncolored_row_deg > 0
             uncolored_row_deg = uncolored_row_deg[mask]
