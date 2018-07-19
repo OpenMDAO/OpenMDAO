@@ -735,13 +735,19 @@ class Driver(object):
             print(len(header) * '-' + '\n')
 
         if self._problem.model._owns_approx_jac:
-            if total_jac is None:
-                self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
-                                                            return_format, approx=True,
-                                                            debug_print=debug_print)
-                totals = total_jac.compute_totals_approx(initialize=True)
-            else:
-                totals = total_jac.compute_totals_approx()
+            recording_iteration.stack.append(('_compute_totals_approx', 0))
+
+            try:
+                if total_jac is None:
+                    total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
+                                              return_format, approx=True, debug_print=debug_print)
+                    self._total_jac = total_jac
+                    totals = total_jac.compute_totals_approx(initialize=True)
+                else:
+                    totals = total_jac.compute_totals_approx()
+            finally:
+                recording_iteration.stack.pop()
+
         else:
             if total_jac is None:
                 total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
@@ -751,7 +757,12 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            totals = total_jac.compute_totals()
+            recording_iteration.stack.append(('_compute_totals', 0))
+
+            try:
+                totals = total_jac.compute_totals()
+            finally:
+                recording_iteration.stack.pop()
 
         if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
             metadata = create_local_meta(self._get_name())
