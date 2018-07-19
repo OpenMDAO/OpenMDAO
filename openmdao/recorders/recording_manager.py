@@ -154,6 +154,29 @@ class RecordingManager(object):
             if recorder._parallel or self.rank == 0:
                 recorder.record_metadata(recording_requester)
 
+    def record_derivatives(self, recording_requester, data, metadata):
+        """
+        Call record_derivatives on all recorders.
+
+        Parameters
+        ----------
+        recording_requester : object
+            The object that needs an iteration of itself recorded.
+        data : dict
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
+        metadata : dict
+            Metadata for iteration coordinate.
+        """
+        if not self._recorders:
+            return
+
+        if metadata is not None:
+            metadata['timestamp'] = time.time()
+
+        for recorder in self._recorders:
+            if recorder._parallel or MPI is None or self.rank == 0:
+                recorder.record_derivatives(recording_requester, data, metadata)
+
     def has_recorders(self):
         """
         Are there any recorders managed by this RecordingManager.
