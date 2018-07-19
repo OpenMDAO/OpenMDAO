@@ -13,11 +13,12 @@ from tempfile import mkdtemp
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
     ScipyOptimizeDriver, NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, PETScVector
+    BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, PETScVector, AnalysisError
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 
+from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
     SellarProblem, SellarStateConnection
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -882,6 +883,31 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                  expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
+
+    def test_record_pop_bug(self):
+        prob = SellarProblem()
+        model = prob.model
+
+        model.add_subsystem('ae', AEComp())
+        model.connect('y1', 'ae.x')
+        prob.setup()
+
+        model.linear_solver = ScipyKrylov()
+
+        nl = model.nonlinear_solver = NewtonSolver()
+        nl.options['solve_subsystems'] = True
+        nl.options['max_sub_solves'] = 4
+
+        ls = nl.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['c'] = 100.0  # This is pretty bogus, but it ensures that we get a few LS iterations.
+        model.add_recorder(self.recorder)
+
+        try:
+            t0, t1 = run_driver(prob)
+        except AnalysisError:
+            pass
+
+        self.assertTrue(len(recording_iteration.stack) == 0)
 
     def test_record_solver_nonlinear_block_gs(self):
         prob = SellarProblem(linear_solver=LinearBlockGS, nonlinear_solver=NonlinearBlockGS)
