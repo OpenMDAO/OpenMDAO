@@ -16,7 +16,7 @@ from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
     PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
-from openmdao.recorders.sqlite_recorder import blob_to_array
+from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.record_util import is_valid_sqlite3_db
 from openmdao.utils.write_outputs import write_outputs
 
@@ -136,9 +136,10 @@ class SqliteCaseReader(BaseCaseReader):
                     dcase = self.driver_derivative_cases
                     dcase._case_keys = [coord[0] for coord in rows]
                     dcase.num_cases = len(dcase._case_keys)
-                except sqlite3.OperationalError:
+                except sqlite3.OperationalError as err:
                     # Old version of the recorder.
-                    pass
+                    if self.format_version != 1:
+                        reraise(*sys.exc_info())
 
                 cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
