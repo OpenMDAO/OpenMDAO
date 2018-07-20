@@ -246,7 +246,7 @@ def _order_by_ID_bidir(J, color_dict):
     vertex_count = 1
     edge_count = 0
 
-    # use max degree column as a starting point instead of just choosing a random column
+    # use max degree as a starting point instead of just choosing a random row or column
     # since all have incidence degree of 0 when we start.
     col = col_degrees.argmax()
     row = row_degrees.argmax()
@@ -266,11 +266,8 @@ def _order_by_ID_bidir(J, color_dict):
 
             J[:, col] = False  # remove the edges for this column
 
-            if col_ID.size > 0:
-                col = col_ID.argmax()
-                col_deg = col_ID[col]
-            else:
-                col_deg = -1
+            col = col_ID.argmax()
+            col_deg = col_ID[col]
 
         else:
             row_ID[row_adj[row]] += 1
@@ -282,11 +279,8 @@ def _order_by_ID_bidir(J, color_dict):
 
             J[row] = False  # remove the edges for this row
 
-            if row_ID.size > 0:
-                row = row_ID.argmax()
-                row_deg = row_ID[row]
-            else:
-                row_deg = -1
+            row = row_ID.argmax()
+            row_deg = row_ID[row]
 
         vertex_count += 1
 
@@ -379,7 +373,10 @@ def _get_full_disjoint_bidir(J):
             # we've covered all of the nonzeros, so we're done
             break
 
-    return color_dict['c'][3], color_dict['r'][3], color_dict['c'][2], color_dict['r'][2]
+    _, _, col2rows, col_colors = color_dict['c']
+    _, _, row2cols, row_colors = color_dict['r']
+
+    return col_colors, row_colors, col2rows, row2cols
 
 
 def _tol_sweep(arr, tol=1e-15, orders=5):
@@ -872,7 +869,7 @@ def _compute_coloring(J, mode):
     #
 
     if bidirectional:
-        col_groups, row_groups, rowcol_map, colrow_map = _get_full_disjoint_bidir(J.copy())
+        col_groups, row_groups, col2rows, row2cols = _get_full_disjoint_bidir(J.copy())
     else:
         if rev:
             J = J.T
@@ -899,31 +896,31 @@ def _compute_coloring(J, mode):
 
     if not bidirectional:
         if clists:
-            rowcol_map = [None] * J.shape[1]  # will contain list of nonzero rows for each column
+            col2rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
             for clist in col_groups:
                 for col in clist:
                     # ndarrays are converted to lists to be json serializable
-                    rowcol_map[col] = list(np.nonzero(J[:, col])[0])
+                    col2rows[col] = list(np.nonzero(J[:, col])[0])
         else:
-            rowcol_map = []
+            col2rows = []
 
         if rlists:
-            colrow_map = [None] * J.shape[0]  # will contain list of nonzero cols for each row
+            row2cols = [None] * J.shape[0]  # will contain list of nonzero cols for each row
             for rlist in row_groups:
                 for row in rlist:
                     # ndarrays are converted to lists to be json serializable
-                    colrow_map[row] = list(np.nonzero(J[row])[0])
+                    row2cols[row] = list(np.nonzero(J[row])[0])
         else:
-            colrow_map = []
+            row2cols = []
 
     if rev:
         clists, rlists = rlists, clists
-        rowcol_map, colrow_map = colrow_map, rowcol_map
+        col2rows, row2cols = row2cols, col2rows
         J = J.T
 
     coloring = {
-        'fwd': [clists, rowcol_map],
-        'rev': [rlists, colrow_map],
+        'fwd': [clists, col2rows],
+        'rev': [rlists, row2cols],
         'J': J
     }
 
