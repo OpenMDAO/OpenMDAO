@@ -9,6 +9,7 @@ import sqlite3
 from collections import OrderedDict
 
 from six import PY2, PY3, reraise
+from six.moves import range
 
 import numpy as np
 
@@ -120,7 +121,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.problem_cases = ProblemCases(self.filename, self._abs2prom,
                                           self._abs2meta, self._prom2abs)
 
-        if self.format_version in (1, 2):
+        if self.format_version in range(1, format_version + 1):
             with sqlite3.connect(self.filename) as con:
 
                 # Read in iterations from Drivers, Systems, Problems, and Solvers

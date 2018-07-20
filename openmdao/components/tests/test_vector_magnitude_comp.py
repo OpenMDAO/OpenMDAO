@@ -49,7 +49,7 @@ class TestVectorMagnitudeCompNx3(unittest.TestCase):
             for (var, wrt) in cpd[comp]:
                 np.testing.assert_almost_equal(actual=cpd[comp][var, wrt]['J_fwd'],
                                                desired=cpd[comp][var, wrt]['J_fd'],
-                                               decimal=6)
+                                               decimal=5)
 
 
 class TestVectorMagnitudeCompNx4(unittest.TestCase):
