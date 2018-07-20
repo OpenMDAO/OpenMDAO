@@ -231,19 +231,16 @@ def _order_by_ID_bidir(J, color_dict):
         Column or row index, in order of decreasing incidence degree.
     """
     col_adj = color_dict['c'][0]
-    row_adj = color_dict['r'][0]
-
     col2rows = color_dict['c'][2]
-    row2cols = color_dict['r'][2]
-
     col_degrees = np.array([len(l) for l in col_adj])
-    row_degrees = np.array([len(l) for l in row_adj])
-
     ncols = len(col_degrees)
-    nrows = len(row_degrees)
+    col_ID = np.zeros(ncols, dtype=int)  # incidence degrees
 
-    col_colored_degrees = np.zeros(ncols, dtype=int)
-    row_colored_degrees = np.zeros(nrows, dtype=int)
+    row_adj = color_dict['r'][0]
+    row2cols = color_dict['r'][2]
+    row_degrees = np.array([len(l) for l in row_adj])
+    nrows = len(row_degrees)
+    row_ID = np.zeros(nrows, dtype=int)  # incidence degrees
 
     total_verts = nrows + ncols
     vertex_count = 1
@@ -260,8 +257,8 @@ def _order_by_ID_bidir(J, color_dict):
     while vertex_count < total_verts:
 
         if col_deg >= row_deg:
-            col_colored_degrees[col_adj[col]] += 1
-            col_colored_degrees[col] = -ncols  # ensure that this col will not have max degree again
+            col_ID[col_adj[col]] += 1
+            col_ID[col] = -ncols  # ensure that this col will not have max degree again
             col2rows[col] = list(np.nonzero(J[:, col])[0])   # convert to list for json output
             edge_count += np.count_nonzero(J[:, col])
 
@@ -269,15 +266,15 @@ def _order_by_ID_bidir(J, color_dict):
 
             J[:, col] = False  # remove the edges for this column
 
-            if col_colored_degrees.size > 0:
-                col = col_colored_degrees.argmax()
-                col_deg = col_colored_degrees[col]
+            if col_ID.size > 0:
+                col = col_ID.argmax()
+                col_deg = col_ID[col]
             else:
                 col_deg = -1
 
         else:
-            row_colored_degrees[row_adj[row]] += 1
-            row_colored_degrees[row] = -nrows  # ensure that this row will not have max degree again
+            row_ID[row_adj[row]] += 1
+            row_ID[row] = -nrows  # ensure that this row will not have max degree again
             row2cols[row] = list(np.nonzero(J[row])[0])
             edge_count += np.count_nonzero(J[row])
 
@@ -285,9 +282,9 @@ def _order_by_ID_bidir(J, color_dict):
 
             J[row] = False  # remove the edges for this row
 
-            if row_colored_degrees.size > 0:
-                row = row_colored_degrees.argmax()
-                row_deg = row_colored_degrees[row]
+            if row_ID.size > 0:
+                row = row_ID.argmax()
+                row_deg = row_ID[row]
             else:
                 row_deg = -1
 
