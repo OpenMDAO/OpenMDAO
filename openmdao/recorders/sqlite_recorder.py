@@ -21,6 +21,17 @@ from openmdao.core.system import System
 from openmdao.core.problem import Problem
 
 
+"""
+SQL case output format version history.
+---------------------------------------
+2 -- OpenMDAO 2.4, merged 20 July 2018.
+    Added support for recording derivatives from driver, resulting in a new table.
+1 -- Through OpenMDAO 2.3
+    Original implementation.
+"""
+format_version = 2
+
+
 def array_to_blob(array):
     """
     Make numpy array in to BLOB type.
@@ -72,8 +83,8 @@ def convert_to_list(vals):
     """
     Convert values to list (so that it may be sent as JSON).
 
-    Parameters
     ----------
+    Parameters
     vals : numpy.array or list or tuple
         the object to be converted to a list
 
@@ -88,9 +99,6 @@ def convert_to_list(vals):
         return [convert_to_list(item) for item in vals]
     else:
         return vals
-
-format_version = 1
-
 
 class SqliteRecorder(BaseRecorder):
     """

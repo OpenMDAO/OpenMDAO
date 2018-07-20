@@ -122,7 +122,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.problem_cases = ProblemCases(self.filename, self._abs2prom,
                                           self._abs2meta, self._prom2abs)
 
-        if self.format_version in (1,):
+        if self.format_version in (1, 2):
             with sqlite3.connect(self.filename) as con:
 
                 # Read in iterations from Drivers, Systems, Problems, and Solvers
