@@ -8,7 +8,7 @@ import sys
 import sqlite3
 from collections import OrderedDict
 
-from six import PY2, PY3
+from six import PY2, PY3, reraise
 
 import numpy as np
 
@@ -131,14 +131,16 @@ class SqliteCaseReader(BaseCaseReader):
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
 
                 try:
-                    cur.execute("SELECT iteration_coordinate FROM driver_derivatives ORDER BY id ASC")
+                    cur.execute("SELECT iteration_coordinate FROM driver_derivatives "
+                                "ORDER BY id ASC")
                     rows = cur.fetchall()
                     dcase = self.driver_derivative_cases
                     dcase._case_keys = [coord[0] for coord in rows]
                     dcase.num_cases = len(dcase._case_keys)
                 except sqlite3.OperationalError as err:
-                    # Old version of the recorder.
-                    if self.format_version != 1:
+
+                    # Cases recorded in version 1 won't have a derivatives table.
+                    if self.format_version >= 2:
                         reraise(*sys.exc_info())
 
                 cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")

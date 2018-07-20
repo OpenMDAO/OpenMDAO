@@ -1034,7 +1034,8 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join('legacy_sql', 'case_driver_01.sql')
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_01.sql')
         cr = CaseReader(filename)
 
         # Test to see if we got the correct number of cases
@@ -1068,6 +1069,19 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         for i, iter_coord in enumerate(case_keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
 
+        # While we are here, make sure we can load this case.
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            prob.model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            prob.model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        prob.load_case(seventh_slsqp_iteration_case)
+
+        _assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
 
 if __name__ == "__main__":
     unittest.main()
