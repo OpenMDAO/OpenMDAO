@@ -22,6 +22,8 @@ class BaseCaseReader(object):
         The list of solver cases to be loaded.
     problem_cases : list
         The list of problem cases to be loaded.
+    driver_derivative_cases : list
+        The list of driver derivative cases to be loaded.
     driver_metadata : dict
         The dictionary of driver metadata to be loaded.
     system_metadata : dict
@@ -43,10 +45,13 @@ class BaseCaseReader(object):
         """
         self.format_version = None
         self.filename = filename
+
         self.driver_cases = None
         self.system_cases = None
         self.solver_cases = None
         self.problem_cases = None
+
+        self.driver_derivative_cases = None
 
         self.driver_metadata = {}
         self.system_metadata = {}

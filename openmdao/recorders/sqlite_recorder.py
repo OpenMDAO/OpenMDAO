@@ -20,6 +20,17 @@ from openmdao.core.system import System
 from openmdao.core.problem import Problem
 
 
+"""
+SQL case output format version history.
+---------------------------------------
+2 -- OpenMDAO 2.4, merged 20 July 2018.
+    Added support for recording derivatives from driver, resulting in a new table.
+1 -- Through OpenMDAO 2.3
+    Original implementation.
+"""
+format_version = 2
+
+
 def array_to_blob(array):
     """
     Make numpy array in to BLOB type.
@@ -65,9 +76,6 @@ def blob_to_array(blob):
     out = io.BytesIO(blob)
     out.seek(0)
     return np.load(out)
-
-
-format_version = 1
 
 
 class SqliteRecorder(BaseRecorder):
@@ -165,6 +173,9 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
+                c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, derivatives BLOB)")
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
@@ -440,26 +451,12 @@ class SqliteRecorder(BaseRecorder):
             The System that would like to record its metadata.
         """
         if self.connection:
-            # Cannot handle PETScVector yet
-            from openmdao.api import PETScVector
-            if PETScVector and isinstance(recording_requester._outputs, PETScVector):
-                return  # Cannot handle PETScVector yet
+            scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
-            # collect scaling arrays
-            scaling_vecs = {}
-            for kind, odict in iteritems(recording_requester._vectors):
-                scaling_vecs[kind] = scaling = {}
-                for vecname, vec in iteritems(odict):
-                    scaling[vecname] = vec._scaling
+            if scaling_vecs is None:
+                return
+
             scaling_factors = pickle.dumps(scaling_vecs, self._pickle_version)
-
-            # create a copy of the system's metadata excluding what is in 'options_excludes'
-            user_options = OptionsDictionary()
-            excludes = recording_requester.recording_options['options_excludes']
-            for key in recording_requester.options._dict:
-                if check_path(key, [], excludes, True):
-                    user_options._dict[key] = recording_requester.options._dict[key]
-            user_options._read_only = recording_requester.options._read_only
 
             # try to pickle the metadata, report if it failed
             try:
@@ -481,7 +478,12 @@ class SqliteRecorder(BaseRecorder):
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
             with self.connection as c:
-                c.execute("INSERT INTO system_metadata(id, scaling_factors, component_metadata) "
+                # Because we can have a recorder attached to multiple Systems,
+                #   and because we are now recording System metadata recursively,
+                #   we can store System metadata multiple times. Need to ignore when that happens
+                #   so we don't get database errors. So use OR IGNORE
+                c.execute("INSERT OR IGNORE INTO system_metadata"
+                          "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
@@ -505,6 +507,33 @@ class SqliteRecorder(BaseRecorder):
             with self.connection as c:
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
                           "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
+
+    def record_derivatives_driver(self, recording_requester, data, metadata):
+        """
+        Record derivatives data from a Driver.
+
+        Parameters
+        ----------
+        recording_requester : object
+            Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        if self.connection:
+
+            data_array = values_to_array(data)
+            data_blob = array_to_blob(data_array)
+
+            with self.connection as c:
+                c = c.cursor()  # need a real cursor for lastrowid
+
+                c.execute("INSERT INTO driver_derivatives(counter, iteration_coordinate, "
+                          "timestamp, success, msg, derivatives) VALUES(?,?,?,?,?,?)",
+                          (self._counter, self._iteration_coordinate,
+                           metadata['timestamp'], metadata['success'], metadata['msg'],
+                           data_blob))
 
     def shutdown(self):
         """
