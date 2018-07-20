@@ -767,6 +767,16 @@ class Component(System):
         outs = list(self._var_allprocs_prom2abs_list['output'].keys())
         ins = list(self._var_allprocs_prom2abs_list['input'].keys())
         for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
+            invalid_wrt = [wrt for wrt in wrt_list if wrt not in self._var_rel_names['input']]
+            if invalid_wrt:
+                if len(invalid_wrt) == 1:
+                    msg = "Invalid variable name specified for 'wrt' option: '{}'." \
+                          .format(invalid_wrt[0])
+                else:
+                    msg = "Invalid variable names specified for 'wrt' option: {}." \
+                          .format(invalid_wrt)
+                raise ValueError(msg)
+
             for pattern in wrt_list:
                 for match in find_matches(pattern, outs + ins):
                     if match in opts:

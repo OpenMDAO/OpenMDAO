@@ -921,6 +921,48 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue('cs' in lines[5], msg='Did you change the format for printing check derivs?')
         self.assertTrue('fd' in lines[19], msg='Did you change the format for printing check derivs?')
 
+    def test_set_check_partial_options_invalid(self):
+        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
+        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
+        prob.model.add_subsystem('comp2', ParaboloidMatVec())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+        prob.model.connect('comp.f_xy', 'comp2.x')
+
+        prob.set_solver_print(level=0)
+
+        prob.setup()
+        prob.run_model()
+
+        # check invalid wrt
+        comp.set_check_partial_options(wrt=['x', 'y', 'z'])
+
+        with self.assertRaises(ValueError) as cm:
+            prob.check_partials()
+
+        self.assertEqual(str(cm.exception),
+                         "Invalid variable name specified for 'wrt' option: 'z'.")
+
+        # check invalid form
+        comp._declared_partial_checks = []  # clear previous
+        comp.set_check_partial_options(wrt=['x', 'y'], form='foo')
+
+        with self.assertRaises(ValueError) as cm:
+            prob.check_partials()
+
+        self.assertEqual(str(cm.exception),
+                         '"foo" is not a valid form of finite difference; '
+                         "must be one of ['forward', 'backward', 'central']")
+
     def test_compact_print_formatting(self):
         class MyCompShortVarNames(ExplicitComponent):
             def setup(self):
@@ -1179,7 +1221,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         # repeat the full row for the worst-case subjac (i.e., output-input pair).
         # This should only occur in the compact_print=True case.
 
-
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
@@ -1197,8 +1238,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        prob.check_partials(compact_print=True)
-        self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"),2)
+        self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
 
     def test_check_partials_show_only_incorrect(self):
         # The second is adding an option to show only the incorrect subjacs
@@ -1852,8 +1892,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        stream = cStringIO()
-        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream)
+        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=None)
 
         data = totals['con_cmp2.con2', 'px.x']
         self.assertTrue('J_fwd' in data)
