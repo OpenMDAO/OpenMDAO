@@ -563,12 +563,18 @@ class pyOptSparseDriver(Driver):
         list of str
             The nonlinear response names in order.
         """
-        order = list(self._objs)
-        order.extend(n for n, meta in iteritems(self._cons) if meta['equals'] is not None
-                     and not ('linear' in meta and meta['linear']))
-        order.extend(n for n, meta in iteritems(self._cons) if meta['equals'] is None
-                     and not ('linear' in meta and meta['linear']))
-        return order
+        nl_order = list(self._objs)
+        neq_order = []
+        for n, meta in iteritems(self._cons):
+            if 'linear' not in meta or not meta['linear']:
+                if meta['equals'] is not None:
+                    nl_order.append(n)
+                else:
+                    neq_order.append(n)
+
+        nl_order.extend(neq_order)
+
+        return nl_order
 
     def _setup_tot_jac_sparsity(self):
         """

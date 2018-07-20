@@ -415,7 +415,9 @@ class Component(System):
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
             'my_idx': len(self._var_rel_names['input']),
-            'type': 'input', 'metadata': metadata}
+            'type': 'input',
+            'metadata': metadata
+        }
         var_rel_names['input'].append(name)
 
         return metadata
@@ -584,7 +586,9 @@ class Component(System):
         var_rel2data_io[name] = {
             'prom': name, 'rel': name,
             'my_idx': len(self._var_rel_names['output']),
-            'type': 'output', 'metadata': metadata}
+            'type': 'output',
+            'metadata': metadata
+        }
         var_rel_names['output'].append(name)
 
         return metadata

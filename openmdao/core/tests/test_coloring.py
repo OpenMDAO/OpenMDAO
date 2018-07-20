@@ -187,8 +187,8 @@ class SimulColoringTestCase(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_simul_coloring_snopt(self):
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
-        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
                           dynamic_simul_derivs=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -295,12 +295,12 @@ class SimulColoringTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False,
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
                           dynamic_simul_derivs=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
         # - coloring saves 16 solves per driver iter  (5 vs 21)
@@ -578,8 +578,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
     def test_dynamic_simul_coloring(self):
 
         # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
-        p_color = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
+        p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
