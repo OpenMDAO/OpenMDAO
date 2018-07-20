@@ -236,8 +236,8 @@ def _order_by_ID_bidir(J, color_dict):
     col2rows = color_dict['c'][2]
     row2cols = color_dict['r'][2]
 
-    col_degrees = np.array([len(l) for l in col_adj])  # _count_nonzeros(col_adj, axis=0)
-    row_degrees = np.array([len(l) for l in row_adj])  # _count_nonzeros(row_adj, axis=0)
+    col_degrees = np.array([len(l) for l in col_adj])
+    row_degrees = np.array([len(l) for l in row_adj])
 
     ncols = len(col_degrees)
     nrows = len(row_degrees)
@@ -259,7 +259,7 @@ def _order_by_ID_bidir(J, color_dict):
 
     while vertex_count < total_verts:
 
-        if col_deg > -1 and col_deg >= row_deg:
+        if col_deg >= row_deg:
             col_colored_degrees[col_adj[col]] += 1
             col_colored_degrees[col] = -ncols  # ensure that this col will not have max degree again
             col2rows[col] = list(np.nonzero(J[:, col])[0])   # convert to list for json output
@@ -275,7 +275,7 @@ def _order_by_ID_bidir(J, color_dict):
             else:
                 col_deg = -1
 
-        elif row_deg > -1:
+        else:
             row_colored_degrees[row_adj[row]] += 1
             row_colored_degrees[row] = -nrows  # ensure that this row will not have max degree again
             row2cols[row] = list(np.nonzero(J[row])[0])
