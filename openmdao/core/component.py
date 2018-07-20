@@ -3,7 +3,6 @@
 from __future__ import division
 
 from collections import OrderedDict, Iterable
-from copy import deepcopy
 from itertools import product
 from six import string_types, iteritems, itervalues
 
@@ -29,8 +28,23 @@ _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
                       'exact': (None, {})}
 
 
-# Certain characters are not valid in variable names.
-forbidden_chars = ['.', '*', '?', '!', '[', ']']
+def _valid_var_name(name):
+    """
+    Determine if the proposed name is a valid variable name.
+
+    Parameters
+    ----------
+    name : str
+        Proposed name.
+
+    Returns
+    -------
+    bool
+        True if the proposed name is a valid variable name, else False.
+    """
+    forbidden_chars = ['.', '*', '?', '!', '[', ']']
+
+    return not any([True for character in forbidden_chars if character in name])
 
 
 class Component(System):
@@ -242,7 +256,6 @@ class Component(System):
 
         iproc = self.comm.rank
         nproc = self.comm.size
-        relevant = self._relevant
         vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
@@ -358,7 +371,7 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if any([True for character in forbidden_chars if character in name]):
+        if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('The val argument should be a float, list, tuple, ndarray or Iterable')
@@ -484,7 +497,7 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
-        if any([True for character in forbidden_chars if character in name]):
+        if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
@@ -682,7 +695,7 @@ class Component(System):
             method_func, default_opts = _supported_methods[method]
         except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, supported_methods.keys()))
+            raise ValueError(msg.format(method, _supported_methods.keys()))
 
         # Analytic Derivative for this Jacobian pair
         if method_func is None:  # exact
@@ -748,10 +761,18 @@ class Component(System):
             relative.  Leave undeclared to keep unchanged from previous or default value.
         """
         supported_methods = ('fd', 'cs')
-
         if method not in supported_methods:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, supported_methods.keys()))
+            msg = "Method '{}' is not supported, method must be one of {}"
+            raise ValueError(msg.format(method, supported_methods))
+
+        if step and not isinstance(step, (int, float)):
+            msg = "The value of 'step' must be numeric, but '{}' was specified."
+            raise ValueError(msg.format(step))
+
+        supported_step_calc = ('abs', 'rel')
+        if step_calc and step_calc not in supported_step_calc:
+            msg = "The value of 'step_calc' must be one of {}, but '{}' was specified."
+            raise ValueError(msg.format(supported_step_calc, step_calc))
 
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc))
@@ -770,19 +791,18 @@ class Component(System):
         opts = {}
         outs = list(self._var_allprocs_prom2abs_list['output'].keys())
         ins = list(self._var_allprocs_prom2abs_list['input'].keys())
-        for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
-            invalid_wrt = [wrt for wrt in wrt_list if wrt not in self._var_rel_names['input']]
-            if invalid_wrt:
-                if len(invalid_wrt) == 1:
-                    msg = "Invalid variable name specified for 'wrt' option: '{}'." \
-                          .format(invalid_wrt[0])
-                else:
-                    msg = "Invalid variable names specified for 'wrt' option: {}." \
-                          .format(invalid_wrt)
-                raise ValueError(msg)
 
+        invalid_wrt = []
+
+        for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
             for pattern in wrt_list:
-                for match in find_matches(pattern, outs + ins):
+                matches = find_matches(pattern, outs + ins)
+
+                # if a non-wildcard var name was specified and not found, save for later Exception
+                if len(matches) == 0 and _valid_var_name(pattern):
+                    invalid_wrt.append(pattern)
+
+                for match in matches:
                     if match in opts:
                         opt = opts[match]
 
@@ -797,6 +817,15 @@ class Component(System):
                                        'form': form,
                                        'step': step,
                                        'step_calc': step_calc}
+
+        if invalid_wrt:
+            if len(invalid_wrt) == 1:
+                msg = "Invalid 'wrt' variable specified for check_partial options on Component " \
+                      "'{}': '{}'.".format(self.pathname, invalid_wrt[0])
+            else:
+                msg = "Invalid 'wrt' variables specified for check_partial options on Component " \
+                      "'{}': {}.".format(self.pathname, invalid_wrt)
+            raise ValueError(msg)
 
         return opts
 

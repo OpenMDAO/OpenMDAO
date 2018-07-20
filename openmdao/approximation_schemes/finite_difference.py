@@ -110,7 +110,7 @@ class FiniteDifference(ApproximationScheme):
             if form in DEFAULT_ORDER:
                 fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
             else:
-                msg = '"{}" is not a valid form of finite difference; must be one of {}'
+                msg = "'{}' is not a valid form of finite difference; must be one of {}"
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
         self._exec_list.append((of, wrt, fd_options))
