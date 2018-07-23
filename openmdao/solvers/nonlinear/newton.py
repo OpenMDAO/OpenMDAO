@@ -149,9 +149,10 @@ class NewtonSolver(NonlinearSolver):
         approx_status = system._owns_approx_jac
         system._owns_approx_jac = False
 
-        system._apply_nonlinear()
-
-        recording_iteration.stack.pop()
+        try:
+            system._apply_nonlinear()
+        finally:
+            recording_iteration.stack.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
