@@ -167,10 +167,17 @@ class SqliteCaseReader(BaseCaseReader):
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
 
-                cur.execute("SELECT case_name FROM problem_cases ORDER BY id ASC")
-                rows = cur.fetchall()
-                self.problem_cases._case_keys = [coord[0] for coord in rows]
-                self.problem_cases.num_cases = len(self.problem_cases._case_keys)
+                try:
+                    cur.execute("SELECT case_name FROM problem_cases ORDER BY id ASC")
+                    rows = cur.fetchall()
+                    self.problem_cases._case_keys = [coord[0] for coord in rows]
+                    self.problem_cases.num_cases = len(self.problem_cases._case_keys)
+
+                except sqlite3.OperationalError as err:
+                    # Cases recorded in some early iterations of version 1 won't have a problem
+                    # table.
+                    if self.format_version >= 2:
+                        reraise(*sys.exc_info())
 
                 # Read in metadata for Drivers, Systems, and Solvers
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
