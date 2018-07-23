@@ -3,12 +3,14 @@ Definition of the SqliteCaseReader.
 """
 from __future__ import print_function, absolute_import
 
+import os
 import re
 import sys
 import sqlite3
 from collections import OrderedDict
 
-from six import PY2, PY3
+from six import PY2, PY3, reraise
+from six.moves import range
 
 import numpy as np
 
@@ -16,7 +18,7 @@ from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
     PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
-from openmdao.recorders.sqlite_recorder import blob_to_array
+from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.record_util import is_valid_sqlite3_db
 from openmdao.utils.write_outputs import write_outputs
 
@@ -68,8 +70,12 @@ class SqliteCaseReader(BaseCaseReader):
 
         if filename is not None:
             if not is_valid_sqlite3_db(filename):
-                raise IOError('File does not contain a valid '
-                              'sqlite database ({0})'.format(filename))
+                if not os.path.exists(filename):
+                    raise IOError('File does not exist({0})'.format(filename))
+                else:
+                    raise IOError('File does not contain a valid '
+                                  'sqlite database ({0})'.format(filename))
+
         self._coordinate_split_re = re.compile('\|\\d+\|*')
 
         with sqlite3.connect(self.filename) as con:
@@ -85,10 +91,18 @@ class SqliteCaseReader(BaseCaseReader):
                 self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
                 self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
                 self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
+
             if PY3:
-                self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
-                self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
-                self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                try:
+                    self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
+                    self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
+                    self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                except TypeError:
+                    # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+                    self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not None else None
+                    self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not None else None
+                    self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not None else None
+
         con.close()
 
         self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
@@ -120,7 +134,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.problem_cases = ProblemCases(self.filename, self._abs2prom,
                                           self._abs2meta, self._prom2abs)
 
-        if self.format_version in (1, 2):
+        if self.format_version in range(1, format_version + 1):
             with sqlite3.connect(self.filename) as con:
 
                 # Read in iterations from Drivers, Systems, Problems, and Solvers
@@ -130,11 +144,18 @@ class SqliteCaseReader(BaseCaseReader):
                 self.driver_cases._case_keys = [coord[0] for coord in rows]
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
 
-                cur.execute("SELECT iteration_coordinate FROM driver_derivatives ORDER BY id ASC")
-                rows = cur.fetchall()
-                dcase = self.driver_derivative_cases
-                dcase._case_keys = [coord[0] for coord in rows]
-                dcase.num_cases = len(dcase._case_keys)
+                try:
+                    cur.execute("SELECT iteration_coordinate FROM driver_derivatives "
+                                "ORDER BY id ASC")
+                    rows = cur.fetchall()
+                    dcase = self.driver_derivative_cases
+                    dcase._case_keys = [coord[0] for coord in rows]
+                    dcase.num_cases = len(dcase._case_keys)
+
+                except sqlite3.OperationalError as err:
+                    # Cases recorded in version 1 won't have a derivatives table.
+                    if self.format_version >= 2:
+                        reraise(*sys.exc_info())
 
                 cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
@@ -146,10 +167,17 @@ class SqliteCaseReader(BaseCaseReader):
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
 
-                cur.execute("SELECT case_name FROM problem_cases ORDER BY id ASC")
-                rows = cur.fetchall()
-                self.problem_cases._case_keys = [coord[0] for coord in rows]
-                self.problem_cases.num_cases = len(self.problem_cases._case_keys)
+                try:
+                    cur.execute("SELECT case_name FROM problem_cases ORDER BY id ASC")
+                    rows = cur.fetchall()
+                    self.problem_cases._case_keys = [coord[0] for coord in rows]
+                    self.problem_cases.num_cases = len(self.problem_cases._case_keys)
+
+                except sqlite3.OperationalError as err:
+                    # Cases recorded in some early iterations of version 1 won't have a problem
+                    # table.
+                    if self.format_version >= 2:
+                        reraise(*sys.exc_info())
 
                 # Read in metadata for Drivers, Systems, and Solvers
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
