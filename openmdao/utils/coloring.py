@@ -367,6 +367,18 @@ def _get_full_disjoint_bidir(J):
     list
         List of lists of disjoint columns and rows
     """
+    ###################################
+    # Bidirectional coloring algorithm
+    ###################################
+    #
+    # We use a greedy sequential algorithm, selecting rows or columns in order of incidence degree.
+    #
+    # Note that when we're done, the coloring for the chosen direction will contain a list of
+    #     column or row lists, with the first entry containing the indices of the uncolored
+    #     rows or cols for that direction, and the coloring for the opposite direction will
+    #     have the same format.
+    #
+
     nrows, ncols = J.shape
     idx_dtype = get_index_dtype(maxval=max(nrows, ncols))
     J_sparse = coo_matrix(J)
@@ -883,19 +895,6 @@ def _compute_coloring(J, mode):
     bidirectional = mode == 'auto'
 
     rev = mode == 'rev'
-
-    ###################################
-    # Bidirectional coloring algorithm
-    ###################################
-    #
-    # See 'An Algorithm for Complete Direct Cover' in 'Computing a Sparse Jacobian Matrix by
-    #     Rows and Columns' by Hossain and Steihaug.
-    #
-    # Note that when we're done, the coloring for the chosen direction will contain a list of
-    #     column or row lists, with the first entry containing the indices of the uncolored
-    #     rows or cols for that direction, and the coloring for the opposite direction will
-    #     have the same format.
-    #
 
     if bidirectional:
         col_groups, row_groups, col2rows, row2cols = _get_full_disjoint_bidir(J)
