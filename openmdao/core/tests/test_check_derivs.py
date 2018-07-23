@@ -942,6 +942,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
+        # check invalid wrt
+        with self.assertRaises(ValueError) as cm:
+            comp.set_check_partial_options(wrt=np.array([1.0]))
+
+        self.assertEqual(str(cm.exception),
+                         "The value of 'wrt' must be a string or list of strings, but a "
+                         "type of 'ndarray' was provided.")
+
         # check invalid method
         with self.assertRaises(ValueError) as cm:
             comp.set_check_partial_options(wrt=['*'], method='foo')

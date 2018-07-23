@@ -774,6 +774,11 @@ class Component(System):
             msg = "The value of 'step_calc' must be one of {}, but '{}' was specified."
             raise ValueError(msg.format(supported_step_calc, step_calc))
 
+        if not isinstance(wrt, (string_types, list, tuple)):
+            msg = "The value of 'wrt' must be a string or list of strings, but a type " \
+                  "of '{}' was provided."
+            raise ValueError(msg.format(type(wrt).__name__))
+
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc))
 
