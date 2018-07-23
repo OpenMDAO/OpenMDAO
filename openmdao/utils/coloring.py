@@ -16,6 +16,8 @@ from six.moves import range
 
 import numpy as np
 from numpy.random import rand
+from scipy.sparse.compressed import get_index_dtype
+from scipy.sparse import coo_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
@@ -134,7 +136,7 @@ def _order_by_ID(col_matrix):
     start = degrees.argmax()
     yield start
 
-    colored_degrees = np.zeros(degrees.size, dtype=int)
+    colored_degrees = np.zeros(degrees.size, dtype=get_index_dtype(maxval=degrees[start]))
     colored_degrees[col_matrix[start]] += 1
     colored_degrees[start] = -ncols  # ensure that this col will never have max degree again
 
@@ -195,7 +197,7 @@ def _get_full_disjoint_cols(J):
     col_matrix = _J2col_matrix(J)
 
     # -1 indicates that a column has not been colored
-    colors = np.full(ncols, -1, dtype=int)
+    colors = np.full(ncols, -1, dtype=get_index_dtype(maxval=ncols))
 
     for col in _order_by_ID(col_matrix):
         neighbor_colors = set(colors[col_matrix[col]])
@@ -211,7 +213,7 @@ def _get_full_disjoint_cols(J):
     return color_groups
 
 
-def _order_by_ID_bidir(J, color_dict):
+def _order_by_ID_bidir(J_dense, J, color_dict):
     """
     Return columns in order of incidence degree (ID).
 
@@ -219,8 +221,10 @@ def _order_by_ID_bidir(J, color_dict):
 
     Parameters
     ----------
-    J : ndarray
-        Boolean Jacobian matrix
+    J_dense : ndarray
+        Dense Jacobian sparsity matrix
+    J : coo_matrix
+        Sparse Jacobian sparsity matrix
 
     color_dict : dict
         Dictionary containing various data for row and column coloring
@@ -230,17 +234,15 @@ def _order_by_ID_bidir(J, color_dict):
     int
         Column or row index, in order of decreasing incidence degree.
     """
-    col_adj = color_dict['c'][0]
-    col2rows = color_dict['c'][2]
-    col_degrees = np.array([len(l) for l in col_adj])
-    ncols = len(col_degrees)
-    col_ID = np.zeros(ncols, dtype=int)  # incidence degrees
+    nrows, ncols = J_dense.shape
 
-    row_adj = color_dict['r'][0]
-    row2cols = color_dict['r'][2]
-    row_degrees = np.array([len(l) for l in row_adj])
-    nrows = len(row_degrees)
-    row_ID = np.zeros(nrows, dtype=int)  # incidence degrees
+    col2rows = color_dict['c'][1]
+    col_degrees = _count_nonzeros(J_dense, axis=0)
+    col_ID = np.zeros(ncols, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
+
+    row2cols = color_dict['r'][1]
+    row_degrees = _count_nonzeros(J_dense, axis=1)
+    row_ID = np.zeros(nrows, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
 
     total_verts = nrows + ncols
     vertex_count = 1
@@ -249,35 +251,58 @@ def _order_by_ID_bidir(J, color_dict):
     # use max degree as a starting point instead of just choosing a random row or column
     # since all have incidence degree of 0 when we start.
     col = col_degrees.argmax()
-    row = row_degrees.argmax()
-
     col_deg = col_degrees[col]
+
+    row = row_degrees.argmax()
     row_deg = row_degrees[row]
+
+    # keep separate copies of sparsity matrix for fwd and rev, because removing rows
+    # changes dependencies in fwd matrix and removing cols changes dependencies in rev matrix
+    # The data doesn't need to be copied. The two matrices will just use separate views of the
+    # same data.
+
+    J_fwd = J
+    J_rev = coo_matrix((J.data, (J.row, J.col)), shape=J.shape)
 
     while vertex_count < total_verts:
 
         if col_deg >= row_deg:
-            col_ID[col_adj[col]] += 1
+            # col_ID[list(col_adj[col])] += 1
+            adj = list(_dep_cols(J_fwd, col))
+            col_ID[adj] += 1
             col_ID[col] = -ncols  # ensure that this col will not have max degree again
-            col2rows[col] = list(np.nonzero(J[:, col])[0])   # convert to list for json output
-            edge_count += np.count_nonzero(J[:, col])
 
-            yield 'c', col, edge_count
+            match = J_fwd.col == col
+            nzrows = J_fwd.row[match]
+            col2rows[col] = list(nzrows)   # convert to list for json output
+            edge_count += nzrows.size
 
-            J[:, col] = False  # remove the edges for this column
+            yield 'c', col, edge_count, adj
+
+            # remove the edges for this column from J
+            keep = J_rev.col != col
+            J_rev.row = J_rev.row[keep]
+            J_rev.col = J_rev.col[keep]
 
             col = col_ID.argmax()
             col_deg = col_ID[col]
 
         else:
-            row_ID[row_adj[row]] += 1
+            adj = list(_dep_rows(J_rev, row))
+            row_ID[adj] += 1
             row_ID[row] = -nrows  # ensure that this row will not have max degree again
-            row2cols[row] = list(np.nonzero(J[row])[0])
-            edge_count += np.count_nonzero(J[row])
 
-            yield 'r', row, edge_count
+            match = J_rev.row == row
+            nzcols = J_rev.col[match]
+            row2cols[row] = list(nzcols)
+            edge_count += nzcols.size
 
-            J[row] = False  # remove the edges for this row
+            yield 'r', row, edge_count, adj
+
+            # remove the edges for this row from J
+            keep = J_fwd.row != row
+            J_fwd.row = J_fwd.row[keep]
+            J_fwd.col = J_fwd.col[keep]
 
             row = row_ID.argmax()
             row_deg = row_ID[row]
@@ -285,47 +310,46 @@ def _order_by_ID_bidir(J, color_dict):
         vertex_count += 1
 
 
-def _J2adj_list(J):
-    """
-    Convert boolean jacobian sparsity matrix to a column adjacency list of arrays.
+_empty_set = set()
 
-    Parameters
-    ----------
-    J : ndarray
-        Boolean jacobian sparsity matrix.
 
-    Returns
-    -------
-    list of ndarray
-        Column adjacency list.
-    """
-    nrows, ncols = J.shape
+def _dep_cols(J, col):
+    rows = J.row
+    cols = J.col
 
-    col_matrix = np.zeros((ncols, ncols), dtype=bool)
+    nz_rows = rows[cols == col]
 
-    # mark col_matrix entries as True when nonzero row entries make them dependent
-    for row in range(nrows):
-        nzro = np.nonzero(J[row])[0]
-        for col in nzro:
-            col_matrix[col, nzro] = True
-            col_matrix[nzro, col] = True
+    deps = []
+    if nz_rows.size > 0:
+        for row in nz_rows:
+            deps.extend(cols[rows == row])
+        deps = set(deps)
+        deps.remove(col)
+        return deps
 
-    # zero out diagonal (column is not adjacent to itself)
-    np.fill_diagonal(col_matrix, False)
+    return _empty_set
 
-    # now reduce to a lower memory 'list of arrays' version
-    adj_list = [None] * ncols
-    for i in range(ncols):
-        adj_list[i] = np.nonzero(col_matrix[i])[0]
 
-    return adj_list
+def _dep_rows(J, row):
+    rows = J.row
+    cols = J.col
+
+    nz_cols = cols[rows == row]
+
+    deps = []
+    if nz_cols.size > 0:
+        for col in nz_cols:
+            deps.extend(rows[cols == col])
+        deps = set(deps)
+        deps.remove(row)
+        return deps
+
+    return _empty_set
 
 
 def _get_full_disjoint_bidir(J):
     """
     Find sets of disjoint rows & columns in J.
-
-    Note: This modifies J.
 
     Parameters
     ----------
@@ -338,17 +362,17 @@ def _get_full_disjoint_bidir(J):
         List of lists of disjoint columns and rows
     """
     nrows, ncols = J.shape
+    idx_dtype = get_index_dtype(maxval=max(nrows, ncols))
+    J_sparse = coo_matrix(J)
 
     color_dict = {
         'c': (
-            _J2adj_list(J),  # column adjacency list
-            np.full(ncols, -1, dtype=int),   # colors, uncolored idxs = -1
+            np.full(ncols, -1, dtype=idx_dtype),   # colors, uncolored idxs = -1
             [None] * J.shape[1],    # nz rows for each column
             [],   # column color groups
         ),
         'r': (
-            _J2adj_list(J.T),  # row adjacency list
-            np.full(nrows, -1, dtype=int),   # colors, uncolored idxs = -1
+            np.full(nrows, -1, dtype=idx_dtype),   # colors, uncolored idxs = -1
             [None] * J.shape[0],    # nz cols for each row
             [],   # row color groups
         )
@@ -356,10 +380,10 @@ def _get_full_disjoint_bidir(J):
 
     num_edges = np.count_nonzero(J)
 
-    for key, idx, edge_count in _order_by_ID_bidir(J, color_dict):
-        adj, colors, _, color_groups = color_dict[key]
+    for key, idx, edge_count, adj in _order_by_ID_bidir(J, J_sparse, color_dict):
+        colors, _, color_groups = color_dict[key]
 
-        neighbor_colors = set(colors[adj[idx]])
+        neighbor_colors = set(colors[adj])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
                 grp.add(idx)
@@ -373,8 +397,8 @@ def _get_full_disjoint_bidir(J):
             # we've covered all of the nonzeros, so we're done
             break
 
-    _, _, col2rows, col_colors = color_dict['c']
-    _, _, row2cols, row_colors = color_dict['r']
+    _, col2rows, col_colors = color_dict['c']
+    _, row2cols, row_colors = color_dict['r']
 
     return col_colors, row_colors, col2rows, row2cols
 
@@ -869,7 +893,7 @@ def _compute_coloring(J, mode):
     #
 
     if bidirectional:
-        col_groups, row_groups, col2rows, row2cols = _get_full_disjoint_bidir(J.copy())
+        col_groups, row_groups, col2rows, row2cols = _get_full_disjoint_bidir(J)
     else:
         if rev:
             J = J.T

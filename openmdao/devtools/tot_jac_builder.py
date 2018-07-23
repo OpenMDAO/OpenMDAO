@@ -61,7 +61,7 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode, stream=sys.stdout):
+    def color(self, mode='auto', stream=sys.stdout):
         self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
                                        run_model=False, bool_jac=self.J,
                                        stream=stream)
@@ -190,8 +190,8 @@ if __name__ == '__main__':
                         help="Build an Eisenstat's example matrix of size n+1 x n.",
                         action="store", type=int, default=-1, dest="eisenstat")
     parser.add_argument("-m", "--mode", type=str, dest="mode",
-                        help="Direction of coloring (default is fwd). Only used with -e.", 
-                        default="fwd")
+                        help="Direction of coloring (default is auto). Only used with -e.", 
+                        default="auto")
     parser.add_argument('-s', '--save', dest="save", default=None, 
                         help="Output file for jacobian so it can be reloaded and colored using"
                         " various methods for comparison.")
