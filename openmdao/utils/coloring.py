@@ -203,12 +203,12 @@ def _get_full_disjoint_cols(J):
         neighbor_colors = set(colors[col_matrix[col]])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
-                grp.add(col)
+                grp.append(col)
                 colors[col] = color
                 break
         else:
             colors[col] = len(color_groups)
-            color_groups.append(set([col]))
+            color_groups.append([col])
 
     return color_groups
 
@@ -391,12 +391,12 @@ def _get_full_disjoint_bidir(J):
         neighbor_colors = set(colors[adj])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
-                grp.add(idx)
+                grp.append(idx)
                 colors[idx] = color
                 break
         else:
             colors[idx] = len(color_groups)
-            color_groups.append(set([idx]))
+            color_groups.append([idx])
 
         if edge_count == num_edges:
             # we've covered all of the nonzeros, so we're done
@@ -905,11 +905,11 @@ def _compute_coloring(J, mode):
         col_groups = _get_full_disjoint_cols(J)
         row_groups = []
 
-    uncolored_cols = [cset.pop() for cset in col_groups if len(cset) == 1]
-    col_groups = [list(cset) for cset in col_groups if len(cset) > 1]
+    uncolored_cols = [grp[0] for grp in col_groups if len(grp) == 1]
+    col_groups = [grp for grp in col_groups if len(grp) > 1]
 
-    uncolored_rows = [rset.pop() for rset in row_groups if len(rset) == 1]
-    row_groups = [list(rset) for rset in row_groups if len(rset) > 1]
+    uncolored_rows = [grp[0] for grp in row_groups if len(grp) == 1]
+    row_groups = [grp for grp in row_groups if len(grp) > 1]
 
     tot_colors = len(uncolored_cols) + len(uncolored_rows) + len(col_groups) + len(row_groups)
 
