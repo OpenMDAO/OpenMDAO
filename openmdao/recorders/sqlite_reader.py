@@ -91,6 +91,7 @@ class SqliteCaseReader(BaseCaseReader):
                 self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
                 self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
                 self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
+
             if PY3:
                 try:
                     self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
@@ -150,8 +151,8 @@ class SqliteCaseReader(BaseCaseReader):
                     dcase = self.driver_derivative_cases
                     dcase._case_keys = [coord[0] for coord in rows]
                     dcase.num_cases = len(dcase._case_keys)
-                except sqlite3.OperationalError as err:
 
+                except sqlite3.OperationalError as err:
                     # Cases recorded in version 1 won't have a derivatives table.
                     if self.format_version >= 2:
                         reraise(*sys.exc_info())

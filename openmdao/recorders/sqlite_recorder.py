@@ -272,6 +272,10 @@ class SqliteRecorder(BaseRecorder):
             prom2abs = pickle.dumps(self._prom2abs, self._pickle_version)
             abs2meta = pickle.dumps(self._abs2meta, self._pickle_version)
 
+            abs2prom = sqlite3.Binary(abs2prom)
+            prom2abs = sqlite3.Binary(prom2abs)
+            abs2meta = sqlite3.Binary(abs2meta)
+
             with self.connection as c:
                 c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?",
                           (abs2prom, prom2abs, abs2meta))
