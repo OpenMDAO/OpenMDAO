@@ -3,6 +3,7 @@ Definition of the SqliteCaseReader.
 """
 from __future__ import print_function, absolute_import
 
+import os
 import re
 import sys
 import sqlite3
@@ -69,8 +70,12 @@ class SqliteCaseReader(BaseCaseReader):
 
         if filename is not None:
             if not is_valid_sqlite3_db(filename):
-                raise IOError('File does not contain a valid '
-                              'sqlite database ({0})'.format(filename))
+                if not os.path.exists(filename):
+                    raise IOError('File does not exist({0})'.format(filename))
+                else:
+                    raise IOError('File does not contain a valid '
+                                  'sqlite database ({0})'.format(filename))
+
         self._coordinate_split_re = re.compile('\|\\d+\|*')
 
         with sqlite3.connect(self.filename) as con:
@@ -87,9 +92,16 @@ class SqliteCaseReader(BaseCaseReader):
                 self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
                 self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
             if PY3:
-                self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
-                self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
-                self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                try:
+                    self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
+                    self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
+                    self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                except TypeError:
+                    # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+                    self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not None else None
+                    self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not None else None
+                    self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not None else None
+
         con.close()
 
         self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,

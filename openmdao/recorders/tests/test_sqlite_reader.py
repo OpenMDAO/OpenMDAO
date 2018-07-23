@@ -59,8 +59,17 @@ class TestSqliteCaseReader(unittest.TestCase):
             tmp.write("Lorem ipsum")
             tmp.close()
 
-        with self.assertRaises(IOError):
+        with self.assertRaises(IOError) as cm:
             _ = CaseReader(filepath)
+
+        self.assertTrue(str(cm.exception).startswith('File does not contain a valid sqlite database'))
+
+    def test_bad_filename(self):
+
+        with self.assertRaises(IOError) as cm:
+            _ = CaseReader('junk.sql')
+
+        self.assertTrue(str(cm.exception).startswith('File does not exist'))
 
     def test_format_version(self):
         prob = SellarProblem()
