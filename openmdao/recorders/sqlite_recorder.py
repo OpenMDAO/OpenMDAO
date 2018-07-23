@@ -24,12 +24,14 @@ from openmdao.core.problem import Problem
 """
 SQL case output format version history.
 ---------------------------------------
+3 -- OpenMDAO 2.5
+    Storing most data as JSON rather than binary numpy arrays.
 2 -- OpenMDAO 2.4, merged 20 July 2018.
     Added support for recording derivatives from driver, resulting in a new table.
 1 -- Through OpenMDAO 2.3
     Original implementation.
 """
-format_version = 2
+format_version = 3
 
 
 def array_to_blob(array):
@@ -81,7 +83,7 @@ def blob_to_array(blob):
 
 def convert_to_list(vals):
     """
-    Convert values to list (so that it may be sent as JSON).
+    Recursively convert arrays, tuples, and sets to lists.
 
     ----------
     Parameters

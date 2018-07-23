@@ -34,19 +34,17 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         # iterate through the cases
         for coord, (t0, t1), outputs_expected, inputs_expected in expected:
             iter_coord = format_iteration_coordinate(coord, prefix=prefix)
-
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM driver_iterations WHERE "
                            "iteration_coordinate=:iteration_coordinate",
                            {"iteration_coordinate": iter_coord})
             row_actual = db_cur.fetchone()
-
-            db_cur.execute("SELECT abs2meta FROM metadata")
-            row_abs2meta = db_cur.fetchone()
 
             test.assertTrue(row_actual,
                             'Driver iterations table does not contain the requested '
@@ -55,9 +53,12 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
                 inputs_text, outputs_text = row_actual
 
-            abs2meta = json.loads(row_abs2meta[0])
-            inputs_actual = json_to_np_array(inputs_text)
-            outputs_actual = json_to_np_array(outputs_text)
+            if f_version == 3:
+                inputs_actual = json_to_np_array(inputs_text)
+                outputs_actual = json_to_np_array(outputs_text)
+            elif f_version in (1, 2):
+                inputs_actual = blob_to_array(inputs_text)
+                outputs_actual = blob_to_array(outputs_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -141,6 +142,8 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         # iterate through the cases
         for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
@@ -154,12 +157,17 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             test.assertTrue(row_actual, 'System iterations table does not contain the requested '
                                         'iteration coordinate: "{}"'.format(iter_coord))
 
-            counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-                outputs_blob, residuals_blob = row_actual
+            counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
+                outputs_text, residuals_text = row_actual
 
-            inputs_actual = json_to_np_array(inputs_blob)
-            outputs_actual = json_to_np_array(outputs_blob)
-            residuals_actual = json_to_np_array(residuals_blob)
+            if f_version == 3:
+                inputs_actual = json_to_np_array(inputs_text)
+                outputs_actual = json_to_np_array(outputs_text)
+                residuals_actual = json_to_np_array(residuals_text)
+            elif f_version in (1, 2):
+                inputs_actual = blob_to_array(inputs_text)
+                outputs_actual = blob_to_array(outputs_text)
+                residuals_actual = blob_to_array(residuals_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -192,6 +200,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         # iterate through the cases
         for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
@@ -207,10 +217,14 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                                         'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-                input_blob, output_blob, residuals_blob = row_actual
+                input_blob, output_text, residuals_text = row_actual
 
-            output_actual = json_to_np_array(output_blob)
-            residuals_actual = json_to_np_array(residuals_blob)
+            if f_version == 3:
+                output_actual = json_to_np_array(output_text)
+                residuals_actual = json_to_np_array(residuals_text)
+            elif f_version in (1, 2):
+                output_actual = blob_to_array(output_text)
+                residuals_actual = blob_to_array(residuals_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
@@ -276,6 +290,8 @@ def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
 def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
 
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = db_cur.fetchone()
