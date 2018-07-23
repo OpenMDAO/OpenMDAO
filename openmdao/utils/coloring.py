@@ -264,11 +264,17 @@ def _order_by_ID_bidir(J_dense, J, color_dict):
     J_fwd = J
     J_rev = coo_matrix((J.data, (J.row, J.col)), shape=J.shape)
 
+    rscratch = np.zeros(nrows, dtype=bool)
+    if nrows == ncols:
+        cscratch = rscratch
+    else:
+        cscratch = np.zeros(ncols, dtype=bool)
+
     while vertex_count < total_verts:
 
         if col_deg >= row_deg:
             # col_ID[list(col_adj[col])] += 1
-            adj = list(_dep_cols(J_fwd, col))
+            adj = _dep_cols(J_fwd, col, cscratch)
             col_ID[adj] += 1
             col_ID[col] = -ncols  # ensure that this col will not have max degree again
 
@@ -288,7 +294,7 @@ def _order_by_ID_bidir(J_dense, J, color_dict):
             col_deg = col_ID[col]
 
         else:
-            adj = list(_dep_rows(J_rev, row))
+            adj = _dep_rows(J_rev, row, rscratch)
             row_ID[adj] += 1
             row_ID[row] = -nrows  # ensure that this row will not have max degree again
 
@@ -310,41 +316,41 @@ def _order_by_ID_bidir(J_dense, J, color_dict):
         vertex_count += 1
 
 
-_empty_set = set()
+_empty_array = np.array([], dtype=int)
 
 
-def _dep_cols(J, col):
+def _dep_cols(J, col, scratch):
     rows = J.row
     cols = J.col
+
+    scratch[:] = False
 
     nz_rows = rows[cols == col]
 
-    deps = []
     if nz_rows.size > 0:
         for row in nz_rows:
-            deps.extend(cols[rows == row])
-        deps = set(deps)
-        deps.remove(col)
-        return deps
+            scratch[cols[rows == row]] = True
+        scratch[col] = False
+        return np.nonzero(scratch)[0]
 
-    return _empty_set
+    return _empty_array
 
 
-def _dep_rows(J, row):
+def _dep_rows(J, row, scratch):
     rows = J.row
     cols = J.col
 
+    scratch[:] = False
+
     nz_cols = cols[rows == row]
 
-    deps = []
     if nz_cols.size > 0:
         for col in nz_cols:
-            deps.extend(rows[cols == col])
-        deps = set(deps)
-        deps.remove(row)
-        return deps
+            scratch[rows[cols == col]] = True
+        scratch[row] = False
+        return np.nonzero(scratch)[0]
 
-    return _empty_set
+    return _empty_array
 
 
 def _get_full_disjoint_bidir(J):
@@ -364,6 +370,7 @@ def _get_full_disjoint_bidir(J):
     nrows, ncols = J.shape
     idx_dtype = get_index_dtype(maxval=max(nrows, ncols))
     J_sparse = coo_matrix(J)
+    num_edges = J_sparse.row.size
 
     color_dict = {
         'c': (
@@ -377,8 +384,6 @@ def _get_full_disjoint_bidir(J):
             [],   # row color groups
         )
     }
-
-    num_edges = np.count_nonzero(J)
 
     for key, idx, edge_count, adj in _order_by_ID_bidir(J, J_sparse, color_dict):
         colors, _, color_groups = color_dict[key]
