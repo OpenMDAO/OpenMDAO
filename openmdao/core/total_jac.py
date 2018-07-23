@@ -1040,7 +1040,6 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_totals', 0))
         debug_print = self.debug_print
         par_deriv = self.par_deriv
 
@@ -1109,8 +1108,6 @@ class _TotalJacInfo(object):
             # Debug outputs scaled derivatives.
             self._print_derivatives()
 
-        recording_iteration.stack.pop()
-
         return self.J_final
 
     def compute_totals_approx(self, initialize=False):
@@ -1130,8 +1127,6 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_totals', 0))
-
         of = self.of
         wrt = self.wrt
         model = self.model
@@ -1199,7 +1194,6 @@ class _TotalJacInfo(object):
         if return_format == 'array':
             totals = self.J  # change back to array version
 
-        recording_iteration.stack.pop()
         return totals
 
     def _restore_linear_solution(self, vec_names, key, mode):
@@ -1325,11 +1319,13 @@ class _TotalJacInfo(object):
         """
         recording_iteration.stack.append((requester._get_name(), requester.iter_count))
 
-        totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
-                                  self.wrt_meta, self.of_meta, 'flat_dict_structured_key')
-        requester._rec_mgr.record_derivatives(requester, totals, metadata)
+        try:
+            totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
+                                      self.wrt_meta, self.of_meta, 'flat_dict_structured_key')
+            requester._rec_mgr.record_derivatives(requester, totals, metadata)
 
-        recording_iteration.stack.pop()
+        finally:
+            recording_iteration.stack.pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
