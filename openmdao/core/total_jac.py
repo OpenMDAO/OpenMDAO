@@ -1155,7 +1155,6 @@ class _TotalJacInfo(object):
 
         # Linearize Model
         model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
-        model._linear_solver._linearize()
 
         approx_jac = model._jacobian._subjacs_info
 

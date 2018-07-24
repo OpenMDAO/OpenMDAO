@@ -9,7 +9,8 @@ import warnings
 import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, \
-    IndepVarComp, ExecComp, NonlinearRunOnce, NonlinearBlockGS, ScipyKrylov, NewtonSolver
+    IndepVarComp, ExecComp, NonlinearRunOnce, NonlinearBlockGS, ScipyKrylov, NewtonSolver, \
+    DirectSolver
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -2056,6 +2057,25 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
         assert_rel_error(self, J[('time.time', 'time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+
+        # Try again with a direct solver and sparse assembled hierarchy.
+
+        p = Problem()
+        sub = p.model.add_subsystem('sub', GaussLobattoPhase())
+
+        p.model.sub.add_objective('time', index=-1)
+
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        p.setup(mode='fwd')
+        p.set_solver_print(level=0)
+        p.run_model()
+
+        # Make sure we don't bomb out with an error.
+        J = p.check_totals(out_stream=None)
+
+        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
     def test_vector_scaled_derivs(self):
 
