@@ -135,6 +135,7 @@ def check_path(path, includes, excludes, include_all_path=False):
 
     return False
 
+
 def json_to_np_array(vals):
     """
     Convert from a JSON string to a numpy named array.

@@ -88,15 +88,23 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         con = sqlite3.connect(problem_or_rootgroup_or_filename,
                               detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
+        cur.execute("SELECT format_version FROM metadata")
+        row = cur.fetchone()
+        format_version = row[0]
+
         cur.execute("SELECT model_viewer_data FROM driver_metadata;")
-        model_pickle = cur.fetchone()
+        model_text = cur.fetchone()
         from six import PY2, PY3
-        if PY2:
-            import cPickle
-            return cPickle.loads(str(model_pickle[0]))
-        if PY3:
-            import pickle
-            return pickle.loads(model_pickle[0])
+        if row is not None:
+            if format_version == 3:
+                return json.loads(model_text[0])
+            elif format_version in (1, 2):
+                if PY2:
+                    import cPickle
+                    return cPickle.loads(str(model_text[0]))
+                if PY3:
+                    import pickle
+                    return pickle.loads(model_text[0])
     else:
         raise TypeError('get_model_viewer_data only accepts Problems, Groups or filenames')
 

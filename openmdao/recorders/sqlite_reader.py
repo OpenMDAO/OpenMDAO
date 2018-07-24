@@ -95,9 +95,11 @@ class SqliteCaseReader(BaseCaseReader):
 
                 for name in self._abs2meta:
                     if 'lower' in self._abs2meta[name]:
-                        self._abs2meta[name]['lower'] = convert_to_np_array(self._abs2meta[name]['lower'])
+                        self._abs2meta[name]['lower'] =\
+                            convert_to_np_array(self._abs2meta[name]['lower'])
                     if 'upper' in self._abs2meta[name]:
-                        self._abs2meta[name]['upper'] = convert_to_np_array(self._abs2meta[name]['upper'])
+                        self._abs2meta[name]['upper'] =\
+                            convert_to_np_array(self._abs2meta[name]['upper'])
             elif self.format_version in (1, 2):
                 if PY2:
                     self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
@@ -111,9 +113,12 @@ class SqliteCaseReader(BaseCaseReader):
                         self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
                     except TypeError:
                         # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                        self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not None else None
-                        self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not None else None
-                        self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not None else None
+                        self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not\
+                            None else None
+                        self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not\
+                            None else None
+                        self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not\
+                            None else None
 
         con.close()
 
@@ -803,8 +808,8 @@ class DriverCases(BaseCases):
             outputs_array = blob_to_array(outputs_text)
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp,
-                            success, msg, inputs_array, outputs_array,
-                            self._prom2abs, self._abs2prom, self._abs2meta)
+                          success, msg, inputs_array, outputs_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
         return case
 
     def load_cases(self):
@@ -878,8 +883,8 @@ class DriverDerivativeCases(BaseCases):
         totals_array = blob_to_array(totals_blob)
 
         case = DriverDerivativesCase(self.filename, counter, iteration_coordinate,
-                                    timestamp, success, msg, totals_array,
-                                    self._prom2abs, self._abs2prom, self._abs2meta)
+                                     timestamp, success, msg, totals_array,
+                                     self._prom2abs, self._abs2prom, self._abs2meta)
         return case
 
     def load_cases(self):
@@ -957,8 +962,8 @@ class ProblemCases(BaseCases):
             outputs_array = blob_to_array(outputs_text)
 
         case = ProblemCase(self.filename, counter, case_name, timestamp,
-                            success, msg, outputs_array, self._prom2abs,
-                            self._abs2prom, self._abs2meta)
+                           success, msg, outputs_array, self._prom2abs,
+                           self._abs2prom, self._abs2meta)
         return case
 
     def load_cases(self):
@@ -1039,8 +1044,8 @@ class SystemCases(BaseCases):
             residuals_array = blob_to_array(residuals_text)
 
         case = SystemCase(self.filename, counter, iteration_coordinate, timestamp,
-                            success, msg, inputs_array, outputs_array, residuals_array,
-                            self._prom2abs, self._abs2prom, self._abs2meta)
+                          success, msg, inputs_array, outputs_array, residuals_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
         return case
 
     def load_cases(self):
@@ -1123,8 +1128,8 @@ class SolverCases(BaseCases):
             residuals_array = blob_to_array(residuals_text)
 
         case = SolverCase(self.filename, counter, iteration_coordinate, timestamp,
-                            success, msg, abs_err, rel_err, input_array, output_array,
-                            residuals_array, self._prom2abs, self._abs2prom, self._abs2meta)
+                          success, msg, abs_err, rel_err, input_array, output_array,
+                          residuals_array, self._prom2abs, self._abs2prom, self._abs2meta)
         return case
 
     def load_cases(self):

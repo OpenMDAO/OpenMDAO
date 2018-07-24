@@ -85,8 +85,8 @@ def convert_to_list(vals):
     """
     Recursively convert arrays, tuples, and sets to lists.
 
-    ----------
     Parameters
+    ----------
     vals : numpy.array or list or tuple
         the object to be converted to a list
 
@@ -101,6 +101,7 @@ def convert_to_list(vals):
         return [convert_to_list(item) for item in vals]
     else:
         return vals
+
 
 class SqliteRecorder(BaseRecorder):
     """
