@@ -856,6 +856,14 @@ class BidirectionalTestCase(unittest.TestCase):
                                  "Eisenstat's example of size %d required %d colors but shouldn't "
                                  "need more than %d." % (n, tot_colors, n // 2 + 2))
 
+            builder_fwd = TotJacBuilder.eisenstat(n)
+            builder_fwd.color('fwd', stream=None)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.coloring)
+            self.assertEqual(n, tot_colors,
+                             "Eisenstat's example of size %d was not constructed properly. "
+                             "fwd coloring required only %d colors but should have required "
+                             "%d" % (n, tot_colors, n))
+
 
 if __name__ == '__main__':
     unittest.main()

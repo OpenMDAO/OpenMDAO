@@ -170,7 +170,6 @@ def _J2col_matrix(J):
         nzro = np.nonzero(J[row])[0]
         for col in nzro:
             col_matrix[col, nzro] = True
-            col_matrix[nzro, col] = True
 
     # zero out diagonal (column is not adjacent to itself)
     np.fill_diagonal(col_matrix, False)
@@ -213,7 +212,7 @@ def _get_full_disjoint_cols(J):
     return color_groups
 
 
-def _order_by_ID_bidir(J_dense, J, color_dict):
+def _order_by_ID_bidir(J, color_dict):
     """
     Return columns in order of incidence degree (ID).
 
@@ -221,10 +220,8 @@ def _order_by_ID_bidir(J_dense, J, color_dict):
 
     Parameters
     ----------
-    J_dense : ndarray
+    J : ndarray
         Dense Jacobian sparsity matrix
-    J : coo_matrix
-        Sparse Jacobian sparsity matrix
 
     color_dict : dict
         Dictionary containing various data for row and column coloring
@@ -234,14 +231,14 @@ def _order_by_ID_bidir(J_dense, J, color_dict):
     int
         Column or row index, in order of decreasing incidence degree.
     """
-    nrows, ncols = J_dense.shape
+    nrows, ncols = J.shape
 
     col2rows = color_dict['c'][1]
-    col_degrees = _count_nonzeros(J_dense, axis=0)
+    col_degrees = _count_nonzeros(J, axis=0)
     col_ID = np.zeros(ncols, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
 
     row2cols = color_dict['r'][1]
-    row_degrees = _count_nonzeros(J_dense, axis=1)
+    row_degrees = _count_nonzeros(J, axis=1)
     row_ID = np.zeros(nrows, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
 
     total_verts = nrows + ncols
@@ -261,19 +258,19 @@ def _order_by_ID_bidir(J_dense, J, color_dict):
     # The data doesn't need to be copied. The two matrices will just use separate views of the
     # same data.
 
-    J_fwd = J
-    J_rev = coo_matrix((J.data, (J.row, J.col)), shape=J.shape)
+    J_fwd = coo_matrix(J)
+    J_rev = coo_matrix((J_fwd.data, (J_fwd.row, J_fwd.col)), shape=J.shape)
 
-    rscratch = np.zeros(nrows, dtype=bool)
-    if nrows == ncols:
-        cscratch = rscratch
+    if nrows > ncols:
+        rscratch = np.zeros(nrows, dtype=bool)
+        cscratch = rscratch[:ncols]
     else:
         cscratch = np.zeros(ncols, dtype=bool)
+        rscratch = cscratch[:nrows]
 
     while vertex_count < total_verts:
 
         if col_deg >= row_deg:
-            # col_ID[list(col_adj[col])] += 1
             adj = _dep_cols(J_fwd, col, cscratch)
             col_ID[adj] += 1
             col_ID[col] = -ncols  # ensure that this col will not have max degree again
@@ -381,8 +378,7 @@ def _get_full_disjoint_bidir(J):
 
     nrows, ncols = J.shape
     idx_dtype = get_index_dtype(maxval=max(nrows, ncols))
-    J_sparse = coo_matrix(J)
-    num_edges = J_sparse.row.size
+    num_edges = np.count_nonzero(J)
 
     color_dict = {
         'c': (
@@ -397,7 +393,7 @@ def _get_full_disjoint_bidir(J):
         )
     }
 
-    for key, idx, edge_count, adj in _order_by_ID_bidir(J, J_sparse, color_dict):
+    for key, idx, edge_count, adj in _order_by_ID_bidir(J, color_dict):
         colors, _, color_groups = color_dict[key]
 
         neighbor_colors = set(colors[adj])
@@ -410,9 +406,11 @@ def _get_full_disjoint_bidir(J):
             colors[idx] = len(color_groups)
             color_groups.append([idx])
 
-        if edge_count == num_edges:
+        if edge_count >= num_edges:
             # we've covered all of the nonzeros, so we're done
             break
+
+    assert(edge_count == num_edges)
 
     _, col2rows, col_colors = color_dict['c']
     _, row2cols, row_colors = color_dict['r']
