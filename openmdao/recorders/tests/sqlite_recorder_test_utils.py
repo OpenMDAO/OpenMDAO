@@ -72,7 +72,10 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    test.assertEqual(actual, np.array(None, dtype=object))
+                    if f_version == 3:
+                        test.assertIsNone(actual)
+                    if f_version in (1, 2):
+                        test.assertEqual(actual, np.array(None, dtype=object))
                 else:
                     actual = actual[0]
                     # Check to see if the number of values in actual and expected match
@@ -182,7 +185,10 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    test.assertEqual(actual, np.array(None, dtype=object))
+                    if f_version == 3:
+                        test.assertIsNone(actual)
+                    if f_version in (1, 2):
+                        test.assertEqual(actual, np.array(None, dtype=object))
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
@@ -245,7 +251,10 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    test.assertEqual(actual, np.array(None, dtype=object))
+                    if f_version == 3:
+                        test.assertIsNone(actual)
+                    if f_version in (1, 2):
+                        test.assertEqual(actual, np.array(None, dtype=object))
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
