@@ -3,7 +3,7 @@ Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
 from six.moves import map, zip
-from six import iteritems, PY2, PY3
+from six import iteritems
 import os
 import json
 
