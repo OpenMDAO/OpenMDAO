@@ -144,8 +144,7 @@ class SqliteRecorder(BaseRecorder):
             Optional. The pickle protocol version to use when pickling metadata.
         """
         if append:
-            raise NotImplementedError(
-                "Append feature not implemented for SqliteRecorder")
+            raise NotImplementedError("Append feature not implemented for SqliteRecorder")
 
         self.connection = None
         self.model_viewer_data = None
@@ -206,19 +205,16 @@ class SqliteRecorder(BaseRecorder):
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
                           "success INT, msg TEXT, outputs TEXT)")
-                c.execute(
-                    "CREATE INDEX prob_name_ind on problem_cases(case_name)")
+                c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
-                c.execute(
-                    "CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
+                c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
                           "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
-                c.execute(
-                    "CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
+                c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data TEXT)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
@@ -296,8 +292,7 @@ class SqliteRecorder(BaseRecorder):
             for var_set, var_type in full_var_set:
                 for name in var_set:
                     if name not in self._abs2meta:
-                        self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy(
-                        )
+                        self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
                         self._abs2meta[name]['type'] = []
                         if name in states:
                             self._abs2meta[name]['explicit'] = False
@@ -342,7 +337,7 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['out']
             inputs = data['in']
 
-            # convert to list so this can be used in visualization
+            # convert to list so this can be dumped as JSON
             for in_out in (inputs, outputs):
                 if in_out is None:
                     continue
@@ -380,7 +375,7 @@ class SqliteRecorder(BaseRecorder):
         if self.connection:
             outputs = data['out']
 
-            # convert to list so this can be used in visualization
+            # convert to list so this can be dumped as JSON
             if outputs is not None:
                 for var in outputs:
                     outputs[var] = convert_to_list(outputs[var])
@@ -414,7 +409,7 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['o']
             residuals = data['r']
 
-            # convert to list so this can be used in visualization
+            # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
                 if i_o_r is None:
                     continue
@@ -458,7 +453,7 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['o']
             residuals = data['r']
 
-            # convert to list so this can be used in visualization
+            # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
                 if i_o_r is None:
                     continue
@@ -501,8 +496,7 @@ class SqliteRecorder(BaseRecorder):
                     c.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
                               "VALUES(?,?)", (driver_class, model_viewer_data))
             except sqlite3.IntegrityError:
-                print("Metadata has already been recorded for %s." %
-                      driver_class)
+                print("Metadata has already been recorded for %s." % driver_class)
 
     def record_metadata_system(self, recording_requester):
         """
@@ -523,11 +517,9 @@ class SqliteRecorder(BaseRecorder):
 
             # try to pickle the metadata, report if it failed
             try:
-                pickled_metadata = pickle.dumps(
-                    user_options, self._pickle_version)
+                pickled_metadata = pickle.dumps(user_options, self._pickle_version)
             except Exception:
-                pickled_metadata = pickle.dumps(
-                    OptionsDictionary(), self._pickle_version)
+                pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
                 warnings.warn("Trying to record options which cannot be pickled "
                               "on system with name: %s. Use the 'options_excludes' "
                               "recording option on system objects to avoid attempting "
@@ -567,8 +559,7 @@ class SqliteRecorder(BaseRecorder):
                 path = 'root'
             id = "{}.{}".format(path, solver_class)
 
-            solver_options = pickle.dumps(
-                recording_requester.options, self._pickle_version)
+            solver_options = pickle.dumps(recording_requester.options, self._pickle_version)
 
             with self.connection as c:
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
