@@ -104,8 +104,15 @@ class FiniteDifference(ApproximationScheme):
         of, wrt = abs_key
         fd_options = DEFAULT_FD_OPTIONS.copy()
         fd_options.update(kwargs)
+
         if fd_options['order'] is None:
-            fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
+            form = fd_options['form']
+            if form in DEFAULT_ORDER:
+                fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
+            else:
+                msg = "'{}' is not a valid form of finite difference; must be one of {}"
+                raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
+
         self._exec_list.append((of, wrt, fd_options))
 
     @staticmethod
