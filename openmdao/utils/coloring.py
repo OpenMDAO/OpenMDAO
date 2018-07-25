@@ -232,6 +232,7 @@ def _order_by_ID_bidir(J, color_dict):
         Column or row index, in order of decreasing incidence degree.
     """
     nrows, ncols = J.shape
+    num_edges = np.count_nonzero(J)
 
     col2rows = color_dict['c'][1]
     col_degrees = _count_nonzeros(J, axis=0)
@@ -241,8 +242,6 @@ def _order_by_ID_bidir(J, color_dict):
     row_degrees = _count_nonzeros(J, axis=1)
     row_ID = np.zeros(nrows, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
 
-    total_verts = nrows + ncols
-    vertex_count = 1
     edge_count = 0
 
     # use max degree as a starting point instead of just choosing a random row or column
@@ -255,9 +254,6 @@ def _order_by_ID_bidir(J, color_dict):
 
     # keep separate copies of sparsity matrix for fwd and rev, because removing rows
     # changes dependencies in fwd matrix and removing cols changes dependencies in rev matrix
-    # The data doesn't need to be copied. The two matrices will just use separate views of the
-    # same data.
-
     J_fwd = coo_matrix(J)
     J_rev = coo_matrix((J_fwd.data, (J_fwd.row, J_fwd.col)), shape=J.shape)
 
@@ -268,7 +264,7 @@ def _order_by_ID_bidir(J, color_dict):
         cscratch = np.zeros(ncols, dtype=bool)
         rscratch = cscratch[:nrows]
 
-    while vertex_count < total_verts:
+    while edge_count < num_edges:
 
         if col_deg >= row_deg:
             adj = _dep_cols(J_fwd, col, cscratch)
@@ -280,7 +276,7 @@ def _order_by_ID_bidir(J, color_dict):
             col2rows[col] = list(nzrows)   # convert to list for json output
             edge_count += nzrows.size
 
-            yield 'c', col, edge_count, adj
+            yield 'c', col, adj
 
             # remove the edges for this column from J
             keep = J_rev.col != col
@@ -300,7 +296,7 @@ def _order_by_ID_bidir(J, color_dict):
             row2cols[row] = list(nzcols)
             edge_count += nzcols.size
 
-            yield 'r', row, edge_count, adj
+            yield 'r', row, adj
 
             # remove the edges for this row from J
             keep = J_fwd.row != row
@@ -310,7 +306,7 @@ def _order_by_ID_bidir(J, color_dict):
             row = row_ID.argmax()
             row_deg = row_ID[row]
 
-        vertex_count += 1
+    assert edge_count == num_edges
 
 
 _empty_array = np.array([], dtype=int)
@@ -378,7 +374,6 @@ def _get_full_disjoint_bidir(J):
 
     nrows, ncols = J.shape
     idx_dtype = get_index_dtype(maxval=max(nrows, ncols))
-    num_edges = np.count_nonzero(J)
 
     color_dict = {
         'c': (
@@ -393,7 +388,7 @@ def _get_full_disjoint_bidir(J):
         )
     }
 
-    for key, idx, edge_count, adj in _order_by_ID_bidir(J, color_dict):
+    for key, idx, adj in _order_by_ID_bidir(J, color_dict):
         colors, _, color_groups = color_dict[key]
 
         neighbor_colors = set(colors[adj])
@@ -405,12 +400,6 @@ def _get_full_disjoint_bidir(J):
         else:
             colors[idx] = len(color_groups)
             color_groups.append([idx])
-
-        if edge_count >= num_edges:
-            # we've covered all of the nonzeros, so we're done
-            break
-
-    assert(edge_count == num_edges)
 
     _, col2rows, col_colors = color_dict['c']
     _, row2cols, row_colors = color_dict['r']
