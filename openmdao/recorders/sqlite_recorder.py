@@ -237,12 +237,13 @@ class SqliteRecorder(BaseRecorder):
                 self._abs2meta[name]['lower'] = convert_to_list(self._abs2meta[name]['lower'])
             if 'lower' in self._abs2meta[name]:
                 self._abs2meta[name]['upper'] = convert_to_list(self._abs2meta[name]['upper'])
-            if 'size' in self._abs2meta[name] and not\
-                    isinstance(self._abs2meta[name]['size'], int):
-                self._abs2meta[name]['size'] = self._abs2meta[name]['size'].item()
-            if 'global_size' in self._abs2meta[name] and not\
-                    isinstance(self._abs2meta[name]['global_size'], int):
-                self._abs2meta[name]['global_size'] = self._abs2meta[name]['global_size'].item()
+            for prop in self._abs2meta[name]:
+                val = self._abs2meta[name][prop]
+                if isinstance(val, np.int8) or isinstance(val, np.int16) or\
+                   isinstance(val, np.int32) or isinstance(val, np.int64):
+                    self._abs2meta[name][prop] = val.item()
+                elif isinstance(val, tuple):
+                    self._abs2meta[name][prop] = [int(v) for v in val]
 
     def startup(self, recording_requester):
         """
