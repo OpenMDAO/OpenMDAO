@@ -3,7 +3,7 @@ Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
 from six.moves import map, zip
-from six import iteritems
+from six import iteritems, PY2, PY3
 import os
 import json
 
@@ -196,7 +196,7 @@ def values_to_array(values):
     if values:
         dtype_tuples = []
         for name, value in iteritems(values):
-            tple = (name, '{}f8'.format(value.shape))
+            tple = (str(name), '{}f8'.format(value.shape))
             dtype_tuples.append(tple)
 
         array = np.zeros((1,), dtype=dtype_tuples)

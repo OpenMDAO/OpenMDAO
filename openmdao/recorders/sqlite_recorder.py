@@ -24,7 +24,7 @@ from openmdao.core.problem import Problem
 """
 SQL case output format version history.
 ---------------------------------------
-3 -- OpenMDAO 2.5
+3 -- OpenMDAO 2.4
     Storing most data as JSON rather than binary numpy arrays.
 2 -- OpenMDAO 2.4, merged 20 July 2018.
     Added support for recording derivatives from driver, resulting in a new table.
