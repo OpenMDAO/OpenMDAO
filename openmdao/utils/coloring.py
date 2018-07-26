@@ -214,9 +214,9 @@ def _get_full_disjoint_cols(J):
 
 def _order_by_ID_bidir(J, color_dict):
     """
-    Return columns in order of incidence degree (ID).
+    Return rows/columns in order of incidence degree (ID).
 
-    ID is the number of already colored neighbors (neighbors are dependent columns).
+    ID is the number of already colored neighbors (neighbors are dependent rows/columns).
 
     Parameters
     ----------
@@ -235,27 +235,23 @@ def _order_by_ID_bidir(J, color_dict):
     num_edges = np.count_nonzero(J)
 
     col2rows = color_dict['c'][1]
-    col_degrees = _count_nonzeros(J, axis=0)
-    col_ID = np.zeros(ncols, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
 
+    col_ID = np.asarray(_count_nonzeros(J, axis=0), dtype=np.float32)
+    # make largest value < 1 so when we add colored neighbors later, entries with an 
+    # instance degree will always be larger than ones with just a scaled degree, but
+    # in the absence of any positive instance degree, regular degrees will still sort in
+    # the proper order.
+    col_ID /= (col_ID.max() + 1)
+ 
     row2cols = color_dict['r'][1]
-    row_degrees = _count_nonzeros(J, axis=1)
-    row_ID = np.zeros(nrows, dtype=get_index_dtype(maxval=max(J.shape)))  # incidence degrees
+    row_ID = np.asarray(_count_nonzeros(J, axis=1), dtype=np.float32)
+    row_ID /= (row_ID.max() + 1)
 
     edge_count = 0
 
-    # use max degree as a starting point instead of just choosing a random row or column
-    # since all have incidence degree of 0 when we start.
-    col = col_degrees.argmax()
-    col_deg = col_degrees[col]
-
-    row = row_degrees.argmax()
-    row_deg = row_degrees[row]
-
-    # keep separate copies of sparsity matrix for fwd and rev, because removing rows
-    # changes dependencies in fwd matrix and removing cols changes dependencies in rev matrix
-    J_fwd = coo_matrix(J)
-    J_rev = coo_matrix((J_fwd.data, (J_fwd.row, J_fwd.col)), shape=J.shape)
+    J_sparse = coo_matrix(J)
+    J_fwd = coo_matrix((J_sparse.data, (J_sparse.row, J_sparse.col)), shape=J.shape)
+    J_rev = coo_matrix((J_sparse.data, (J_sparse.row, J_sparse.col)), shape=J.shape)
 
     if nrows > ncols:
         rscratch = np.zeros(nrows, dtype=bool)
@@ -264,12 +260,20 @@ def _order_by_ID_bidir(J, color_dict):
         cscratch = np.zeros(ncols, dtype=bool)
         rscratch = cscratch[:nrows]
 
+    # use max degree as a starting point instead of just choosing a random row or column
+    # since all have incidence degree of 0 when we start.
+    col = col_ID.argmax()
+    col_deg = col_ID[col]
+
+    row = row_ID.argmax()
+    row_deg = row_ID[row]
+
     while edge_count < num_edges:
 
-        if col_deg >= row_deg:
-            adj = _dep_cols(J_fwd, col, cscratch)
+        if col_deg > row_deg:
+            adj = _dep_cols(J_sparse, col, cscratch)
             col_ID[adj] += 1
-            col_ID[col] = -ncols  # ensure that this col will not have max degree again
+            col_ID[col] = -ncols - 1  # ensure that this col will not have max degree again
 
             match = J_fwd.col == col
             nzrows = J_fwd.row[match]
@@ -287,9 +291,9 @@ def _order_by_ID_bidir(J, color_dict):
             col_deg = col_ID[col]
 
         else:
-            adj = _dep_rows(J_rev, row, rscratch)
+            adj = _dep_rows(J_sparse, row, rscratch)
             row_ID[adj] += 1
-            row_ID[row] = -nrows  # ensure that this row will not have max degree again
+            row_ID[row] = -nrows - 1   # ensure that this row will not have max degree again
 
             match = J_rev.row == row
             nzcols = J_rev.col[match]
