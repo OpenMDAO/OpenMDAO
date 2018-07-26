@@ -866,6 +866,15 @@ class BidirectionalTestCase(unittest.TestCase):
                              "fwd coloring required only %d colors but should have required "
                              "%d" % (n, tot_colors, n))
 
+    def test_arrowhead(self):
+        for n in range(5, 50, 5):
+            builder = TotJacBuilder(n, n)
+            builder.add_row(0)
+            builder.add_col(0)
+            builder.add_block_diag([(1,1)] * (n-1), 1, 1)
+            builder.color('auto', stream=None)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            self.assertEqual(tot_colors, 3)
 
 if __name__ == '__main__':
     unittest.main()

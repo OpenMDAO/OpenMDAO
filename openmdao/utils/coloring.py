@@ -212,203 +212,111 @@ def _get_full_disjoint_cols(J):
     return color_groups
 
 
-def _order_by_ID_bidir(J, color_dict):
+def MNCO_bidir(J):
     """
-    Return rows/columns in order of incidence degree (ID).
+    Compute bidirectional coloring using Minimum Nonzero Count order (MNCO).
 
-    ID is the number of already colored neighbors (neighbors are dependent rows/columns).
+    Based on the partitioning algorithm found in "The Efficient Computation of Sparse
+    Jacobian Matrices Using Automatic Differentiation" by Coleman and Verma.
 
     Parameters
     ----------
     J : ndarray
         Dense Jacobian sparsity matrix
 
-    color_dict : dict
-        Dictionary containing various data for row and column coloring
-
-    Yields
-    ------
-    int
-        Column or row index, in order of decreasing incidence degree.
-    """
-    nrows, ncols = J.shape
-    num_edges = np.count_nonzero(J)
-
-    col2rows = color_dict['c'][1]
-
-    col_ID = np.asarray(_count_nonzeros(J, axis=0), dtype=np.float32)
-    # make largest value < 1 so when we add colored neighbors later, entries with an 
-    # instance degree will always be larger than ones with just a scaled degree, but
-    # in the absence of any positive instance degree, regular degrees will still sort in
-    # the proper order.
-    col_ID /= (col_ID.max() + 1)
- 
-    row2cols = color_dict['r'][1]
-    row_ID = np.asarray(_count_nonzeros(J, axis=1), dtype=np.float32)
-    row_ID /= (row_ID.max() + 1)
-
-    edge_count = 0
-
-    J_sparse = coo_matrix(J)
-    J_fwd = coo_matrix((J_sparse.data, (J_sparse.row, J_sparse.col)), shape=J.shape)
-    J_rev = coo_matrix((J_sparse.data, (J_sparse.row, J_sparse.col)), shape=J.shape)
-
-    if nrows > ncols:
-        rscratch = np.zeros(nrows, dtype=bool)
-        cscratch = rscratch[:ncols]
-    else:
-        cscratch = np.zeros(ncols, dtype=bool)
-        rscratch = cscratch[:nrows]
-
-    # use max degree as a starting point instead of just choosing a random row or column
-    # since all have incidence degree of 0 when we start.
-    col = col_ID.argmax()
-    col_deg = col_ID[col]
-
-    row = row_ID.argmax()
-    row_deg = row_ID[row]
-
-    while edge_count < num_edges:
-
-        if col_deg > row_deg:
-            adj = _dep_cols(J_sparse, col, cscratch)
-            col_ID[adj] += 1
-            col_ID[col] = -ncols - 1  # ensure that this col will not have max degree again
-
-            match = J_fwd.col == col
-            nzrows = J_fwd.row[match]
-            col2rows[col] = list(nzrows)   # convert to list for json output
-            edge_count += nzrows.size
-
-            yield 'c', col, adj
-
-            # remove the edges for this column from J
-            keep = J_rev.col != col
-            J_rev.row = J_rev.row[keep]
-            J_rev.col = J_rev.col[keep]
-
-            col = col_ID.argmax()
-            col_deg = col_ID[col]
-
-        else:
-            adj = _dep_rows(J_sparse, row, rscratch)
-            row_ID[adj] += 1
-            row_ID[row] = -nrows - 1   # ensure that this row will not have max degree again
-
-            match = J_rev.row == row
-            nzcols = J_rev.col[match]
-            row2cols[row] = list(nzcols)
-            edge_count += nzcols.size
-
-            yield 'r', row, adj
-
-            # remove the edges for this row from J
-            keep = J_fwd.row != row
-            J_fwd.row = J_fwd.row[keep]
-            J_fwd.col = J_fwd.col[keep]
-
-            row = row_ID.argmax()
-            row_deg = row_ID[row]
-
-    assert edge_count == num_edges
-
-
-_empty_array = np.array([], dtype=int)
-
-
-def _dep_cols(J, col, scratch):
-    rows = J.row
-    cols = J.col
-
-    scratch[:] = False
-
-    nz_rows = rows[cols == col]
-
-    if nz_rows.size > 0:
-        for row in nz_rows:
-            scratch[cols[rows == row]] = True
-        scratch[col] = False
-        return np.nonzero(scratch)[0]
-
-    return _empty_array
-
-
-def _dep_rows(J, row, scratch):
-    rows = J.row
-    cols = J.col
-
-    scratch[:] = False
-
-    nz_cols = cols[rows == row]
-
-    if nz_cols.size > 0:
-        for col in nz_cols:
-            scratch[rows[cols == col]] = True
-        scratch[row] = False
-        return np.nonzero(scratch)[0]
-
-    return _empty_array
-
-
-def _get_full_disjoint_bidir(J):
-    """
-    Find sets of disjoint rows & columns in J.
-
-    Parameters
-    ----------
-    J : ndarray
-        The total jacobian.
-
     Returns
     -------
-    list
-        List of lists of disjoint columns and rows
+    coloring_info
+        dict
+            dict['fwd'] = (col_lists, row_maps)
+                col_lists is a list of column lists, the first being a list of uncolored columns.
+                row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+            dict['rev'] = (row_lists, col_maps)
+                row_lists is a list of row lists, the first being a list of uncolored rows.
+                col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+            dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+            dict['J'] = ndarray, the computed boolean jacobian.
     """
-    ###################################
-    # Bidirectional coloring algorithm
-    ###################################
-    #
-    # We use a greedy sequential algorithm, selecting rows or columns in order of incidence degree.
-    #
-    # Note that when we're done, the coloring for the chosen direction will contain a list of
-    #     column or row lists, with the first entry containing the indices of the uncolored
-    #     rows or cols for that direction, and the coloring for the opposite direction will
-    #     have the same format.
-    #
-
     nrows, ncols = J.shape
-    idx_dtype = get_index_dtype(maxval=max(nrows, ncols))
 
-    color_dict = {
-        'c': (
-            np.full(ncols, -1, dtype=idx_dtype),   # colors, uncolored idxs = -1
-            [None] * J.shape[1],    # nz rows for each column
-            [],   # column color groups
-        ),
-        'r': (
-            np.full(nrows, -1, dtype=idx_dtype),   # colors, uncolored idxs = -1
-            [None] * J.shape[0],    # nz cols for each row
-            [],   # row color groups
-        )
+    M_col_nonzeros = _count_nonzeros(J, axis=0)
+    M_row_nonzeros = _count_nonzeros(J, axis=1)
+
+    M = coo_matrix(J)
+    M_rows = M.row
+    M_cols = M.col
+    M = None  # clean up memory
+
+    Jc_rows = [None] * nrows
+    Jr_cols = [None] * ncols
+
+    row_i = col_i = 0
+
+    # partition J into Jc and Jr
+    # We build Jc from bottom up and Jr from right to left.
+    r = M_row_nonzeros.argmin()
+    c = M_col_nonzeros.argmin()
+
+    nnz_r = M_row_nonzeros[r]
+    nnz_c = M_col_nonzeros[c]
+
+    Jc_nz_max = 0
+    Jr_nz_max = 0
+
+    while M_rows.size + M_cols.size > 0:
+        if Jr_nz_max + max(Jc_nz_max, nnz_r) < (Jc_nz_max + max(Jr_nz_max, nnz_c)):
+            Jc_rows[r] = M_cols[M_rows == r]
+            Jc_nz_max = max(Jc_rows[r].size, Jc_nz_max)
+
+            keep = M_rows != r
+            M_rows = M_rows[keep]
+            M_cols = M_cols[keep]
+
+            M_row_nonzeros[r] = ncols  # make sure we don't pick this one again
+            M_col_nonzeros[Jc_rows[r]] -= 1
+            r = M_row_nonzeros.argmin()
+            nnz_r = M_row_nonzeros[r]
+
+            row_i += 1
+        else:
+            Jr_cols[c] = M_rows[M_cols == c]
+            Jr_nz_max = max(Jr_cols[c].size, Jr_nz_max)
+
+            keep = M_cols != c
+            M_rows = M_rows[keep]
+            M_cols = M_cols[keep]
+
+            M_col_nonzeros[c] = nrows  # make sure we don't pick this one again
+            M_row_nonzeros[Jr_cols[c]] -= 1
+            c = M_col_nonzeros.argmin()
+            nnz_c = M_col_nonzeros[c]
+
+            col_i += 1
+
+    coloring = {
+        'J': J
     }
 
-    for key, idx, adj in _order_by_ID_bidir(J, color_dict):
-        colors, _, color_groups = color_dict[key]
+    jac = np.zeros(J.shape, dtype=bool)
+    if row_i > 0:
+        # build Jc and do fwd coloring on it
+        for i, cols in enumerate(Jc_rows):
+            if cols is not None:
+                jac[i][cols] = True
 
-        neighbor_colors = set(colors[adj])
-        for color, grp in enumerate(color_groups):
-            if color not in neighbor_colors:
-                grp.append(idx)
-                colors[idx] = color
-                break
-        else:
-            colors[idx] = len(color_groups)
-            color_groups.append([idx])
+        coloring['fwd'] = _compute_coloring(jac, 'fwd')['fwd']
 
-    _, col2rows, col_colors = color_dict['c']
-    _, row2cols, row_colors = color_dict['r']
+    if col_i > 0:
+        # build Jr and do rev coloring
+        Jr = jac
+        Jr[:] = False
+        for i, rows in enumerate(Jr_cols):
+            if rows is not None:
+                Jr[rows, i] = True
 
-    return col_colors, row_colors, col2rows, row2cols
+        coloring['rev'] = _compute_coloring(Jr, 'rev')['rev']
+
+    return coloring
 
 
 def _tol_sweep(arr, tol=1e-15, orders=5):
@@ -888,20 +796,14 @@ def _compute_coloring(J, mode):
     rev = mode == 'rev'
 
     if bidirectional:
-        col_groups, row_groups, col2rows, row2cols = _get_full_disjoint_bidir(J)
-    else:
-        if rev:
-            J = J.T
-        col_groups = _get_full_disjoint_cols(J)
-        row_groups = []
+        return MNCO_bidir(J)
+
+    if rev:
+        J = J.T
+    col_groups = _get_full_disjoint_cols(J)
 
     uncolored_cols = [grp[0] for grp in col_groups if len(grp) == 1]
     col_groups = [grp for grp in col_groups if len(grp) > 1]
-
-    uncolored_rows = [grp[0] for grp in row_groups if len(grp) == 1]
-    row_groups = [grp for grp in row_groups if len(grp) > 1]
-
-    tot_colors = len(uncolored_cols) + len(uncolored_rows) + len(col_groups) + len(row_groups)
 
     # the first lists entry corresponds to all uncolored columns (columns that are not
     # disjoint wrt any other columns).  The other entries are groups of columns that do not
@@ -909,39 +811,22 @@ def _compute_coloring(J, mode):
     clists = [uncolored_cols]
     clists.extend(col_groups)
 
-    # now do the same for rows
-    rlists = [uncolored_rows]
-    rlists.extend(row_groups)
-
-    if not bidirectional:
-        if clists:
-            col2rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
-            for clist in col_groups:
-                for col in clist:
-                    # ndarrays are converted to lists to be json serializable
-                    col2rows[col] = list(np.nonzero(J[:, col])[0])
-        else:
-            col2rows = []
-
-        if rlists:
-            row2cols = [None] * J.shape[0]  # will contain list of nonzero cols for each row
-            for rlist in row_groups:
-                for row in rlist:
-                    # ndarrays are converted to lists to be json serializable
-                    row2cols[row] = list(np.nonzero(J[row])[0])
-        else:
-            row2cols = []
+    col2rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
+    for clist in col_groups:
+        for col in clist:
+            # ndarrays are converted to lists to be json serializable
+            col2rows[col] = list(np.nonzero(J[:, col])[0])
 
     if rev:
-        clists, rlists = rlists, clists
-        col2rows, row2cols = row2cols, col2rows
-        J = J.T
-
-    coloring = {
-        'fwd': [clists, col2rows],
-        'rev': [rlists, row2cols],
-        'J': J
-    }
+        coloring = {
+            'rev': [clists, col2rows],
+            'J': J
+        }
+    else:
+        coloring = {
+            'fwd': [clists, col2rows],
+            'J': J
+        }
 
     return coloring
 
