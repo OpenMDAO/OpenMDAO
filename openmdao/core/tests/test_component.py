@@ -206,6 +206,7 @@ class TestExplicitComponent(unittest.TestCase):
         class MyComp(NewBase):
             def __init__(self, **kwargs):
                 super(MyComp, self).__init__(**kwargs)
+
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
@@ -309,6 +310,45 @@ class TestExplicitComponent(unittest.TestCase):
 
         # pretend we reconfigured
         prob.setup(check=False)
+
+    def test_read_only(self):
+        # verify that vectors are read-only:
+        # 1. inputs during compute
+        # 2. inputs and outputs during apply_nonlinear
+        # 3. inputs during compute_partials
+
+        class Square(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=3.)
+                self.add_output('y', val=3.)
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x']**2
+
+                inputs['x'] = 0.  # should not be allowed
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 2.
+
+                inputs['x'] = -1.  # should not be allowed
+
+        prob = Problem(Square())
+        prob.setup()
+
+        # check compute
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' while in read only mode.")
+
+        # check compute partials
+        with self.assertRaises(ValueError) as cm:
+            prob.check_partials()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' while in read only mode.")
 
 
 class TestImplicitComponent(unittest.TestCase):

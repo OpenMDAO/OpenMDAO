@@ -106,6 +106,8 @@ class Vector(object):
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
+    read_only : bool
+        When True, values in the vector cannot be changed via the user getter/setter API.
     """
 
     _vector_info = VectorInfo()
@@ -188,6 +190,8 @@ class Vector(object):
         self._initialize_views()
 
         self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
+
+        self.read_only = False
 
     def __str__(self):
         """
@@ -393,6 +397,10 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
+        if self.read_only:
+            msg = "Attempt to set value of '{}' while in read only mode."
+            raise ValueError(msg.format(name))
+
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self._icol is None:
