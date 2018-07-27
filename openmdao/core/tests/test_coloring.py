@@ -892,6 +892,23 @@ class BidirectionalTestCase(unittest.TestCase):
 
         self.assertEqual(tot_colors, 21)
 
+        # verify that unidirectional colorings are much worse (105 vs 21 for bidirectional)
+        coloring = get_simul_meta(None, 'fwd', include_sparsity=False, setup=False,
+                                  run_model=False, bool_jac=mat,
+                                  stream=None)
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+
+        self.assertEqual(tot_colors, 105)
+
+        coloring = get_simul_meta(None, 'rev', include_sparsity=False, setup=False,
+                                  run_model=False, bool_jac=mat,
+                                  stream=None)
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+
+        self.assertEqual(tot_colors, 105)
+
 
 if __name__ == '__main__':
     unittest.main()
