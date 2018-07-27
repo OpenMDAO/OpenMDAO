@@ -314,7 +314,7 @@ class TestExplicitComponent(unittest.TestCase):
         class BadComp(TestExplCompSimpleDense):
             def compute_partials(self, inputs, partials):
                 super(BadComp, self).compute_partials(inputs, partials)
-                inputs['length'] = -1.  # should not be allowed
+                inputs['length'] = 0.  # should not be allowed
 
         prob = Problem(BadComp())
         prob.setup()
@@ -350,7 +350,7 @@ class TestImplicitComponent(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['x'], np.ones(2))
 
-    def test_inputs_read_only(self):
+    def test_apply_nonlinear_inputs_read_only(self):
         class BadComp(TestImplCompSimple):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
@@ -368,7 +368,7 @@ class TestImplicitComponent(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' while in read only mode.")
 
-    def test_outputs_read_only(self):
+    def test_apply_nonlinear_outputs_read_only(self):
         class BadComp(TestImplCompSimple):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
