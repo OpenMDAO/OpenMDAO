@@ -69,15 +69,13 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        self._inputs.read_only = True
-        self._outputs.read_only = True
+        self._inputs.read_only = self._outputs.read_only = True
 
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
 
-        self._inputs.read_only = False
-        self._outputs.read_only = False
+        self._inputs.read_only = self._outputs.read_only = False
 
     def _solve_nonlinear(self):
         """
@@ -272,7 +270,12 @@ class ImplicitComponent(Component):
             # override FD'd values.
             for approximation in itervalues(self._approx_schemes):
                 approximation.compute_approximations(self, jac=self._jacobian)
+
+            self._inputs.read_only = self._outputs.read_only = True
+
             self.linearize(self._inputs, self._outputs, self._jacobian)
+
+            self._inputs.read_only = self._outputs.read_only = False
 
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)

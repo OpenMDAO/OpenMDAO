@@ -8,7 +8,6 @@ import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
     NewtonSolver, ScipyKrylov
-from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -481,7 +480,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp2.x'], 3.)
 
     def test_apply_nonlinear_inputs_read_only(self):
-        class BadComp(TestImplCompSimple):
+        class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
                 inputs['a'] = 0.  # should not be allowed
@@ -500,7 +499,7 @@ class ImplicitCompTestCase(unittest.TestCase):
                          "while it is in read only mode.")
 
     def test_apply_nonlinear_outputs_read_only(self):
-        class BadComp(TestImplCompSimple):
+        class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
                 outputs['x'] = 0.  # should not be allowed
@@ -513,6 +512,62 @@ class ImplicitCompTestCase(unittest.TestCase):
         # check output vector
         with self.assertRaises(ValueError) as cm:
             prob.model.run_apply_nonlinear()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_solve_nonlinear_inputs_read_only(self):
+        class BadComp(QuadraticComp):
+            def solve_nonlinear(self, inputs, outputs):
+                super(BadComp, self).solve_nonlinear(inputs, outputs)
+                inputs['a'] = 0.
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "while it is in read only mode.")
+
+    def test_linearize_inputs_read_only(self):
+        class BadComp(QuadraticLinearize):
+            def linearize(self, inputs, outputs, partials):
+                super(BadComp, self).linearize(inputs, outputs, partials)
+                inputs['a'] = 0.
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_linearize()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "while it is in read only mode.")
+
+    def test_linearize_outputs_read_only(self):
+        class BadComp(QuadraticLinearize):
+            def linearize(self, inputs, outputs, partials):
+                super(BadComp, self).linearize(inputs, outputs, partials)
+                outputs['x'] = 0.
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
