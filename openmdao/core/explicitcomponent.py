@@ -72,7 +72,6 @@ class ExplicitComponent(Component):
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
-        other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta[out_abs]
             out_name = abs2prom_out[out_abs]
@@ -155,9 +154,6 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
-        abs2prom = self._var_abs2prom
-        abs2meta = self._var_abs2meta
-
         for abs_key, meta in iteritems(self._subjacs_info):
 
             if meta['value'] is None:
@@ -211,11 +207,16 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
+        self._inputs.read_only = True
+
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
                 failed = self.compute(self._inputs, self._outputs)
+
+        self._inputs.read_only = False
+
         return bool(failed), 0., 0.
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):

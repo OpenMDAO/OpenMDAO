@@ -69,9 +69,15 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        self._inputs.read_only = True
+        self._outputs.read_only = True
+
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+
+        self._inputs.read_only = False
+        self._outputs.read_only = False
 
     def _solve_nonlinear(self):
         """
@@ -89,21 +95,24 @@ class ImplicitComponent(Component):
         # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
 
+        self._inputs.read_only = True
+
         if self._nonlinear_solver is not None:
             with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                 result = self._nonlinear_solver.solve()
-            return result
-
         else:
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                     result = self.solve_nonlinear(self._inputs, self._outputs)
-            if result is None:
-                return False, 0., 0.
-            elif type(result) is bool:
-                return result, 0., 0.
-            else:
-                return result
+
+        self._inputs.read_only = False
+
+        if result is None:
+            return False, 0., 0.
+        elif type(result) is bool:
+            return result, 0., 0.
+        else:
+            return result
 
     def _guess_nonlinear(self):
         """

@@ -3,18 +3,17 @@ from __future__ import division
 
 import numpy as np
 import unittest
-import warnings
 
 from six.moves import range
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.core.component import Component
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
+    TestExplCompSimpleDense
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.test_suite.components.simple_comps import TestExplCompDeprecated
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -227,14 +226,10 @@ class TestExplicitComponent(unittest.TestCase):
     def test_add_input_output_dupes(self):
 
         class Comp(ExplicitComponent):
-
             def setup(self):
-
                 self.add_input('x', val=3.0)
                 self.add_input('x', val=3.0)
-
                 self.add_output('y', val=3.0)
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -248,14 +243,10 @@ class TestExplicitComponent(unittest.TestCase):
             prob.setup(check=False)
 
         class Comp(ExplicitComponent):
-
             def setup(self):
-
                 self.add_input('x', val=3.0)
-
                 self.add_output('y', val=3.0)
                 self.add_output('y', val=3.0)
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -269,14 +260,10 @@ class TestExplicitComponent(unittest.TestCase):
             prob.setup(check=False)
 
         class Comp(ExplicitComponent):
-
             def setup(self):
-
                 self.add_input('x', val=3.0)
-
                 self.add_output('x', val=3.0)
                 self.add_output('y', val=3.0)
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -292,12 +279,9 @@ class TestExplicitComponent(unittest.TestCase):
         # Make sure we can reconfigure.
 
         class Comp(ExplicitComponent):
-
             def setup(self):
-
                 self.add_input('x', val=3.0)
                 self.add_output('y', val=3.0)
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -312,28 +296,17 @@ class TestExplicitComponent(unittest.TestCase):
         prob.setup(check=False)
 
     def test_read_only(self):
-        # verify that vectors are read-only:
-        # 1. inputs during compute
-        # 2. inputs and outputs during apply_nonlinear
-        # 3. inputs during compute_partials
-
-        class Square(ExplicitComponent):
-            def setup(self):
-                self.add_input('x', val=3.)
-                self.add_output('y', val=3.)
-                self.declare_partials('*', '*')
-
+        # verify that inputs vector is read-only during compute and compute_partials
+        class BadComp(TestExplCompSimpleDense):
             def compute(self, inputs, outputs):
-                outputs['y'] = inputs['x']**2
-
+                super(BadComp, self).compute(inputs, outputs)
                 inputs['x'] = 0.  # should not be allowed
 
             def compute_partials(self, inputs, partials):
-                partials['y', 'x'] = 2.
-
+                super(BadComp, self).compute_partials(inputs, partials)
                 inputs['x'] = -1.  # should not be allowed
 
-        prob = Problem(Square())
+        prob = Problem(BadComp())
         prob.setup()
 
         # check compute
@@ -373,6 +346,44 @@ class TestImplicitComponent(unittest.TestCase):
         prob['rhs'] = np.ones(2)
         prob.run_model()
         assert_rel_error(self, prob['x'], np.ones(2))
+
+    def test_inputs_read_only(self):
+        # verify that inputs vector is read-only during apply_nonlinear
+        class BadComp(TestImplCompSimple):
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                inputs['x'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_nonlinear()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' while in read only mode.")
+
+    def test_outputs_read_only(self):
+        # verify that outputs vector is read-only during apply_nonlinear
+        class BadComp(TestImplCompSimple):
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                outputs['y'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check output vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_nonlinear()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'y' while in read only mode.")
 
 
 class TestRangePartials(unittest.TestCase):
@@ -420,8 +431,8 @@ class TestRangePartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        assert_rel_error(self, prob['vSum'], np.array([2.,3.,4.,5.]), 0.00001)
-        assert_rel_error(self, prob['vProd'], np.array([0.,2.,4.,6.]), 0.00001)
+        assert_rel_error(self, prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)
+        assert_rel_error(self, prob['vProd'], np.array([0., 2., 4., 6.]), 0.00001)
 
 
 if __name__ == '__main__':
