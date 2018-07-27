@@ -183,7 +183,7 @@ class Vector(object):
             if root_vector is None:
                 raise RuntimeError(
                     'Cannot resize the vector because the root vector has not yet '
-                    + ' been created in system %s' % system.pathname)
+                    'been created in system %s' % system.pathname)
             self._update_root_data()
 
         self._initialize_data(root_vector)
@@ -400,8 +400,8 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self.read_only:
-                msg = "Attempt to set value of '{}' while in read only mode."
-                raise ValueError(msg.format(name))
+                msg = "Attempt to set value of '{}' in {} vector while it is in read only mode."
+                raise ValueError(msg.format(name, self._kind))
 
             if self._icol is None:
                 slc = _full_slice

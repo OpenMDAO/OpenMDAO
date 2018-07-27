@@ -240,6 +240,8 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        self._inputs.read_only = True
+
         J = self._jacobian if jac is None else jac
 
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
@@ -263,6 +265,12 @@ class ExplicitComponent(Component):
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
 
+                        # set appropriate vector to read_only to help prevent user error
+                        if mode == 'fwd':
+                            d_inputs.read_only = True
+                        elif mode == 'rev':
+                            d_residuals.read_only = True
+
                         # We used to negate the residual here, and then re-negate after the hook.
 
                         if d_inputs._ncol > 1:
@@ -281,6 +289,10 @@ class ExplicitComponent(Component):
                                 d_residuals._icol = None
                         else:
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
+
+                        d_inputs.read_only = d_residuals.read_only = False
+
+        self._inputs.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """

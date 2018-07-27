@@ -9,8 +9,7 @@ from six import assertRaisesRegex
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 from openmdao.core.component import Component
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
-    TestExplCompSimpleDense
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
@@ -295,37 +294,6 @@ class TestExplicitComponent(unittest.TestCase):
         # pretend we reconfigured
         prob.setup(check=False)
 
-    def test_compute_inputs_read_only(self):
-        class BadComp(TestExplCompSimple):
-            def compute(self, inputs, outputs):
-                super(BadComp, self).compute(inputs, outputs)
-                inputs['length'] = 0.  # should not be allowed
-
-        prob = Problem(BadComp())
-        prob.setup()
-
-        with self.assertRaises(ValueError) as cm:
-            prob.run_model()
-
-        self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' while in read only mode.")
-
-    def test_compute_partials_inputs_read_only(self):
-        class BadComp(TestExplCompSimpleDense):
-            def compute_partials(self, inputs, partials):
-                super(BadComp, self).compute_partials(inputs, partials)
-                inputs['length'] = 0.  # should not be allowed
-
-        prob = Problem(BadComp())
-        prob.setup()
-        prob.run_model()
-
-        with self.assertRaises(ValueError) as cm:
-            prob.check_partials()
-
-        self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'length' while in read only mode.")
-
 
 class TestImplicitComponent(unittest.TestCase):
 
@@ -349,42 +317,6 @@ class TestImplicitComponent(unittest.TestCase):
         prob['rhs'] = np.ones(2)
         prob.run_model()
         assert_rel_error(self, prob['x'], np.ones(2))
-
-    def test_apply_nonlinear_inputs_read_only(self):
-        class BadComp(TestImplCompSimple):
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
-                inputs['a'] = 0.  # should not be allowed
-
-        prob = Problem()
-        prob.model.add_subsystem('bad', BadComp())
-        prob.setup()
-        prob.run_model()
-
-        # check input vector
-        with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_nonlinear()
-
-        self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'a' while in read only mode.")
-
-    def test_apply_nonlinear_outputs_read_only(self):
-        class BadComp(TestImplCompSimple):
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
-                outputs['x'] = 0.  # should not be allowed
-
-        prob = Problem()
-        prob.model.add_subsystem('bad', BadComp())
-        prob.setup()
-        prob.run_model()
-
-        # check output vector
-        with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_nonlinear()
-
-        self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' while in read only mode.")
 
 
 class TestRangePartials(unittest.TestCase):
