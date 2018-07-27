@@ -9,6 +9,7 @@ import numpy as np
 import math
 
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
+from scipy.sparse import load_npz
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver
@@ -17,6 +18,8 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+import openmdao.test_suite
+
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -875,6 +878,20 @@ class BidirectionalTestCase(unittest.TestCase):
             builder.color('auto', stream=None)
             tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
             self.assertEqual(tot_colors, 3)
+
+    def test_can_715(self):
+        matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
+
+        # uses matrix can_715 from the sparse matrix collection website
+        mat = load_npz(os.path.join(matdir, 'can_715.npz')).toarray()
+        coloring = get_simul_meta(None, 'auto', include_sparsity=False, setup=False,
+                                  run_model=False, bool_jac=mat,
+                                  stream=None)
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+
+        self.assertEqual(tot_colors, 21)
+
 
 if __name__ == '__main__':
     unittest.main()

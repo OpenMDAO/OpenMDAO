@@ -214,7 +214,7 @@ def _get_full_disjoint_cols(J):
 
 def MNCO_bidir(J):
     """
-    Compute bidirectional coloring using Minimum Nonzero Count order (MNCO).
+    Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
 
     Based on the partitioning algorithm found in "The Efficient Computation of Sparse
     Jacobian Matrices Using Automatic Differentiation" by Coleman and Verma.

@@ -78,7 +78,11 @@ setup(
         ],
         'openmdao.docs': ['*.py', '_utils/*.py'],
         'openmdao.utils': ['unit_library.ini'],
-        'openmdao.test_suite': ['*.py', '*/*.py'],
+        'openmdao.test_suite': [
+            '*.py', 
+            '*/*.py',
+            'matrices/*.npz'
+        ],
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
     install_requires=[
