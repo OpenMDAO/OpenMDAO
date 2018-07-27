@@ -143,8 +143,8 @@ example.
 
 .. _feature_automatic_coloring:
 
-Automatic Generation of Coloring
-################################
+Automatic Generation of Static Coloring
+#######################################
 Although you *can* compute the coloring manually if you know enough information about your problem,
 doing so can be challenging and error prone. Also, even small changes to your model,
 e.g., adding new constraints or changing the sparsity of a sub-component, can change the
