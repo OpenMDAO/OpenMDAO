@@ -850,24 +850,24 @@ class SparsityTestCase(unittest.TestCase):
 
 
 class BidirectionalTestCase(unittest.TestCase):
-    def test_eisenstat(self):
-        for n in range(6, 20, 2):
-            builder = TotJacBuilder.eisenstat(n)
-            builder.color('auto', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
-            self.assertLessEqual(tot_colors, n // 2 + 2, 
-                                 "Eisenstat's example of size %d required %d colors but shouldn't "
-                                 "need more than %d." % (n, tot_colors, n // 2 + 2))
+    # def test_eisenstat(self):
+    #     for n in range(6, 20, 2):
+    #         builder = TotJacBuilder.eisenstat(n)
+    #         builder.color('auto', stream=None)
+    #         tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+    #         self.assertLessEqual(tot_colors, n // 2 + 2, 
+    #                              "Eisenstat's example of size %d required %d colors but shouldn't "
+    #                              "need more than %d." % (n, tot_colors, n // 2 + 2))
 
-            builder_fwd = TotJacBuilder.eisenstat(n)
-            builder_fwd.color('fwd', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.coloring)
-            # The columns of Eisenstat's example are pairwise nonorthogonal, so fwd coloring
-            # should require n colors.
-            self.assertEqual(n, tot_colors,
-                             "Eisenstat's example of size %d was not constructed properly. "
-                             "fwd coloring required only %d colors but should have required "
-                             "%d" % (n, tot_colors, n))
+    #         builder_fwd = TotJacBuilder.eisenstat(n)
+    #         builder_fwd.color('fwd', stream=None)
+    #         tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.coloring)
+    #         # The columns of Eisenstat's example are pairwise nonorthogonal, so fwd coloring
+    #         # should require n colors.
+    #         self.assertEqual(n, tot_colors,
+    #                          "Eisenstat's example of size %d was not constructed properly. "
+    #                          "fwd coloring required only %d colors but should have required "
+    #                          "%d" % (n, tot_colors, n))
 
     def test_arrowhead(self):
         for n in range(5, 50, 5):

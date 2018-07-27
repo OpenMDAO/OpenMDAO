@@ -260,13 +260,14 @@ def MNCO_bidir(J):
     nnz_r = M_row_nonzeros[r]
     nnz_c = M_col_nonzeros[c]
 
-    Jc_nz_max = 0
-    Jr_nz_max = 0
+    Jc_nz_max = 0   # max row nonzeros in Jc
+    Jr_nz_max = 0   # max col nonzeros in Jr
 
     while M_rows.size + M_cols.size > 0:
+        print("nnz_r", nnz_r, "nnz_c", nnz_c)
         if Jr_nz_max + max(Jc_nz_max, nnz_r) < (Jc_nz_max + max(Jr_nz_max, nnz_c)):
             Jc_rows[r] = M_cols[M_rows == r]
-            Jc_nz_max = max(Jc_rows[r].size, Jc_nz_max)
+            Jc_nz_max = max(nnz_r, Jc_nz_max)
 
             keep = M_rows != r
             M_rows = M_rows[keep]
@@ -274,13 +275,14 @@ def MNCO_bidir(J):
 
             M_row_nonzeros[r] = ncols  # make sure we don't pick this one again
             M_col_nonzeros[Jc_rows[r]] -= 1
+
             r = M_row_nonzeros.argmin()
             nnz_r = M_row_nonzeros[r]
 
             row_i += 1
         else:
             Jr_cols[c] = M_rows[M_cols == c]
-            Jr_nz_max = max(Jr_cols[c].size, Jr_nz_max)
+            Jr_nz_max = max(nnz_c, Jr_nz_max)
 
             keep = M_cols != c
             M_rows = M_rows[keep]
@@ -288,6 +290,7 @@ def MNCO_bidir(J):
 
             M_col_nonzeros[c] = nrows  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
+
             c = M_col_nonzeros.argmin()
             nnz_c = M_col_nonzeros[c]
 
