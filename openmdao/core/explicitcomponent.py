@@ -355,8 +355,12 @@ class ExplicitComponent(Component):
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             if self._has_compute_partials:
+                self._inputs.read_only = True
+
                 # We used to negate the jacobian here, and then re-negate after the hook.
                 self.compute_partials(self._inputs, self._jacobian)
+
+                self._inputs.read_only = False
 
     def compute(self, inputs, outputs):
         """

@@ -107,7 +107,7 @@ class Vector(object):
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
     read_only : bool
-        When True, values in the vector cannot be changed via the user getter/setter API.
+        When True, values in the vector cannot be changed via the user __setitem__ API.
     """
 
     _vector_info = VectorInfo()
@@ -397,12 +397,12 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        if self.read_only:
-            msg = "Attempt to set value of '{}' while in read only mode."
-            raise ValueError(msg.format(name))
-
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
+            if self.read_only:
+                msg = "Attempt to set value of '{}' while in read only mode."
+                raise ValueError(msg.format(name))
+
             if self._icol is None:
                 slc = _full_slice
                 oldval = self._views[abs_name]

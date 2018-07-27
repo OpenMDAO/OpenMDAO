@@ -295,33 +295,36 @@ class TestExplicitComponent(unittest.TestCase):
         # pretend we reconfigured
         prob.setup(check=False)
 
-    def test_read_only(self):
-        # verify that inputs vector is read-only during compute and compute_partials
-        class BadComp(TestExplCompSimpleDense):
+    def test_compute_inputs_read_only(self):
+        class BadComp(TestExplCompSimple):
             def compute(self, inputs, outputs):
                 super(BadComp, self).compute(inputs, outputs)
-                inputs['x'] = 0.  # should not be allowed
-
-            def compute_partials(self, inputs, partials):
-                super(BadComp, self).compute_partials(inputs, partials)
-                inputs['x'] = -1.  # should not be allowed
+                inputs['length'] = 0.  # should not be allowed
 
         prob = Problem(BadComp())
         prob.setup()
 
-        # check compute
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' while in read only mode.")
+                         "Attempt to set value of 'length' while in read only mode.")
 
-        # check compute partials
+    def test_compute_partials_inputs_read_only(self):
+        class BadComp(TestExplCompSimpleDense):
+            def compute_partials(self, inputs, partials):
+                super(BadComp, self).compute_partials(inputs, partials)
+                inputs['length'] = -1.  # should not be allowed
+
+        prob = Problem(BadComp())
+        prob.setup()
+        prob.run_model()
+
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' while in read only mode.")
+                         "Attempt to set value of 'length' while in read only mode.")
 
 
 class TestImplicitComponent(unittest.TestCase):
@@ -348,11 +351,10 @@ class TestImplicitComponent(unittest.TestCase):
         assert_rel_error(self, prob['x'], np.ones(2))
 
     def test_inputs_read_only(self):
-        # verify that inputs vector is read-only during apply_nonlinear
         class BadComp(TestImplCompSimple):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
-                inputs['x'] = 0.  # should not be allowed
+                inputs['a'] = 0.  # should not be allowed
 
         prob = Problem()
         prob.model.add_subsystem('bad', BadComp())
@@ -364,14 +366,13 @@ class TestImplicitComponent(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'x' while in read only mode.")
+                         "Attempt to set value of 'a' while in read only mode.")
 
     def test_outputs_read_only(self):
-        # verify that outputs vector is read-only during apply_nonlinear
         class BadComp(TestImplCompSimple):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
-                outputs['y'] = 0.  # should not be allowed
+                outputs['x'] = 0.  # should not be allowed
 
         prob = Problem()
         prob.model.add_subsystem('bad', BadComp())
@@ -383,7 +384,7 @@ class TestImplicitComponent(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "Attempt to set value of 'y' while in read only mode.")
+                         "Attempt to set value of 'x' while in read only mode.")
 
 
 class TestRangePartials(unittest.TestCase):
