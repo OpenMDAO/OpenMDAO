@@ -14,8 +14,9 @@ import time
 
 import numpy as np
 
-from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import recording_iteration
+from openmdao.utils.general_utils import ContainsAll
+from openmdao.utils.record_util import create_local_meta
 
 
 _contains_all = ContainsAll()
@@ -305,6 +306,14 @@ class _TotalJacInfo(object):
                 out_slice = of_meta[out][0]
                 for j, inp in enumerate(wrt):
                     J_dict[prom_of[i], prom_wrt[j]] = J[out_slice, wrt_meta[inp][0]]
+        elif return_format == 'flat_dict_structured_key':
+            # This format is supported by the recorders (specifically the sql recorder), which use
+            # numpy structured arrays.
+            for i, out in enumerate(of):
+                out_slice = of_meta[out][0]
+                for j, inp in enumerate(wrt):
+                    key = "%s,%s" % (prom_of[i], prom_wrt[j])
+                    J_dict[key] = J[out_slice, wrt_meta[inp][0]]
         else:
             raise ValueError("'%s' is not a valid jacobian return format." % return_format)
 
@@ -1027,7 +1036,6 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_totals', 0))
         debug_print = self.debug_print
         par_deriv = self.par_deriv
 
@@ -1096,8 +1104,6 @@ class _TotalJacInfo(object):
             # Debug outputs scaled derivatives.
             self._print_derivatives()
 
-        recording_iteration.stack.pop()
-
         return self.J_final
 
     def compute_totals_approx(self, initialize=False):
@@ -1117,8 +1123,6 @@ class _TotalJacInfo(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        recording_iteration.stack.append(('_compute_totals', 0))
-
         of = self.of
         wrt = self.wrt
         model = self.model
@@ -1147,7 +1151,6 @@ class _TotalJacInfo(object):
 
         # Linearize Model
         model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
-        model._linear_solver._linearize()
 
         approx_jac = model._jacobian._subjacs_info
 
@@ -1186,7 +1189,6 @@ class _TotalJacInfo(object):
         if return_format == 'array':
             totals = self.J  # change back to array version
 
-        recording_iteration.stack.pop()
         return totals
 
     def _restore_linear_solution(self, vec_names, key, mode):
@@ -1298,6 +1300,27 @@ class _TotalJacInfo(object):
 
         print('')
         sys.stdout.flush()
+
+    def record_derivatives(self, requester, metadata):
+        """
+        Record derivatives to the recorder.
+
+        Parameters
+        ----------
+        requester : <Driver>
+            Object requesting derivatives.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        recording_iteration.stack.append((requester._get_name(), requester.iter_count))
+
+        try:
+            totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
+                                      self.wrt_meta, self.of_meta, 'flat_dict_structured_key')
+            requester._rec_mgr.record_derivatives(requester, totals, metadata)
+
+        finally:
+            recording_iteration.stack.pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):

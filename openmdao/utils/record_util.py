@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 from six.moves import map, zip
 from six import iteritems
 import os
+import json
 
 import numpy as np
 
@@ -135,6 +136,49 @@ def check_path(path, includes, excludes, include_all_path=False):
     return False
 
 
+def json_to_np_array(vals):
+    """
+    Convert from a JSON string to a numpy named array.
+
+    Parameters
+    ----------
+    vals : string
+        json string of data
+
+    Returns
+    -------
+    array: numpy named array
+        named array containing the same names and values as the input values json string.
+    """
+    json_vals = json.loads(vals)
+    if json_vals is None:
+        return None
+
+    for var in json_vals:
+        json_vals[var] = convert_to_np_array(json_vals[var])
+
+    return values_to_array(json_vals)
+
+
+def convert_to_np_array(val):
+    """
+    Convert list to numpy array.
+
+    Parameters
+    ----------
+    val : list
+        the list to be converted to an np.array
+
+    Returns
+    -------
+    numpy.array :
+        The converted array.
+    """
+    if isinstance(val, list):
+        return np.array(val)
+    return val
+
+
 def values_to_array(values):
     """
     Convert a dict of variable names and values into a numpy named array.
@@ -152,7 +196,7 @@ def values_to_array(values):
     if values:
         dtype_tuples = []
         for name, value in iteritems(values):
-            tple = (name, '{}f8'.format(value.shape))
+            tple = (str(name), '{}f8'.format(value.shape))
             dtype_tuples.append(tple)
 
         array = np.zeros((1,), dtype=dtype_tuples)

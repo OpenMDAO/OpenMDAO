@@ -65,11 +65,12 @@ class TestViewModelData(unittest.TestCase):
         r.shutdown()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
-        tree_json = json.dumps(model_viewer_data['tree'])
-        conns_json = json.dumps(model_viewer_data['connections_list'])
 
-        self.assertEqual(self.expected_tree_json, tree_json)
-        self.assertEqual(self.expected_conns_json, conns_json)
+        expected_tree = json.loads(self.expected_tree_json)
+        expected_conns = json.loads(self.expected_conns_json)
+
+        self.assertDictEqual(expected_tree, model_viewer_data['tree'])
+        self.assertEqual(expected_conns, model_viewer_data['connections_list'])
 
     def test_view_model_from_problem(self):
         """

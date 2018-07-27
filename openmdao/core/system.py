@@ -260,7 +260,10 @@ class System(object):
                                        desc='Set to True to record outputs at the system level')
         self.recording_options.declare('record_residuals', types=bool, default=True,
                                        desc='Set to True to record residuals at the system level')
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+        self.recording_options.declare('record_metadata', types=bool,
+                                       desc='Record metadata for this system', default=True)
+        self.recording_options.declare('record_model_metadata', types=bool,
+                                       desc='Record metadata for all sub systems in the model',
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
@@ -692,7 +695,7 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _setup_case_recording(self, recurse=True):
+    def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
@@ -723,7 +726,7 @@ class System(object):
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_case_recording(recurse)
+                subsys._setup_recording(recurse)
 
     def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """
@@ -782,14 +785,22 @@ class System(object):
         self._setup_partials(recurse=recurse)
         self._setup_jacobians(recurse=recurse)
 
-        self._setup_case_recording(recurse=recurse)
+        self._setup_recording(recurse=recurse)
 
         # If full or reconf setup, reset this system's variables to initial values.
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
+        # Tell all subsystems to record their metadata if they have recorders attached
         for sub in self.system_iter(recurse=True, include_self=True):
-            sub._rec_mgr.record_metadata(sub)
+            if sub.recording_options['record_metadata']:
+                sub._rec_mgr.record_metadata(sub)
+
+        # Also, optionally, record to the recorders attached to this System,
+        #   the system metadata for all the subsystems
+        if self.recording_options['record_model_metadata']:
+            for sub in self.system_iter(recurse=True, include_self=True):
+                self._rec_mgr.record_metadata(sub)
 
     def _setup_vars(self, recurse=True):
         """

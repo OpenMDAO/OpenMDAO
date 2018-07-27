@@ -77,6 +77,7 @@ setup(
             'templates/*.html'
         ],
         'openmdao.docs': ['*.py', '_utils/*.py'],
+        'openmdao.recorders': ['tests/legacy_sql/*.sql'],
         'openmdao.utils': ['unit_library.ini'],
         'openmdao.test_suite': [
             '*.py', 
