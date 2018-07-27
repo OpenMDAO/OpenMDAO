@@ -19,10 +19,14 @@ The concept of separability is explained in the :ref:`Theory Manual<theory_separ
 
 Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically.
 
-In general, when using simultaneous derivatives, you should always set up your model with 
-`mode='auto'` in order to allow bidirectional coloring to be used.  Bidirectional coloring can
-significantly decrease the number of linear solves needed to generate the total Jacobian relative
-to coloring only in fwd or rev mode.
+When using simultaneous derivatives, setting `mode='auto'` will indicate that bidirectional coloring 
+should be used.  Bidirectional coloring can significantly decrease the number of linear solves needed 
+to generate the total Jacobian relative to coloring only in fwd or rev mode.
+
+.. note::
+
+    Bidirectional coloring is a new feature and should be considered *experimental* at this
+    point.
 
 
 Dynamic Coloring

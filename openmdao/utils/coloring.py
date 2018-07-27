@@ -264,7 +264,6 @@ def MNCO_bidir(J):
     Jr_nz_max = 0   # max col nonzeros in Jr
 
     while M_rows.size + M_cols.size > 0:
-        print("nnz_r", nnz_r, "nnz_c", nnz_c)
         if Jr_nz_max + max(Jc_nz_max, nnz_r) < (Jc_nz_max + max(Jr_nz_max, nnz_c)):
             Jc_rows[r] = M_cols[M_rows == r]
             Jc_nz_max = max(nnz_r, Jc_nz_max)
@@ -318,6 +317,17 @@ def MNCO_bidir(J):
                 Jr[rows, i] = True
 
         coloring['rev'] = _compute_coloring(Jr, 'rev')['rev']
+
+    # there are some cases where J is partitioned such that everything ends up on the wrong side,
+    # so do a check using unidirectional coloring if our coloring is worse than min(ncols, nrows)
+    if _total_solves(coloring) >= min(nrows, ncols):
+        coloring['fwd'] = _compute_coloring(J, 'fwd')['fwd']
+        coloring['rev'] = _compute_coloring(J, 'rev')['rev']
+
+        if _total_solves(coloring, do_rev=False) <= _total_solves(coloring, do_fwd=False):
+            del coloring['rev']
+        else:
+            del coloring['fwd']
 
     return coloring
 
@@ -681,7 +691,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     return sparsity
 
 
-def _total_solves(color_info):
+def _total_solves(color_info, do_fwd=True, do_rev=True):
     """
     Return total number of linear solves required based on the given coloring info.
 
@@ -696,6 +706,10 @@ def _total_solves(color_info):
             col_maps is a list of nonzero cols for each row, or None for uncolored rows.
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
         dict['J'] = ndarray, the computed boolean jacobian.
+    do_fwd : bool
+        If True, add fwd colors to total.
+    do_rev : bool
+        If True, add rev colors to total.
 
     Returns
     -------
@@ -708,10 +722,10 @@ def _total_solves(color_info):
     # we add all of them, along with the number of remaining lists, where each
     # sublist is a bunch of columns or rows that are solved together, to get the total colors
     # (which equals the total number of linear solves).
-    if 'fwd' in color_info:
+    if do_fwd and 'fwd' in color_info:
         row_lists, _ = color_info['fwd']
         total_solves += len(row_lists[0]) + len(row_lists) - 1
-    if 'rev' in color_info:
+    if do_rev and 'rev' in color_info:
         col_lists, _ = color_info['rev']
         total_solves += len(col_lists[0]) + len(col_lists) - 1
 
