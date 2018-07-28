@@ -116,8 +116,12 @@ class ImplicitComponent(Component):
         """
         Provide initial guess for states.
         """
+        self._inputs.read_only = self._residuals.read_only = True
+
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+
+        self._inputs.read_only = self._residuals.read_only = False
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
