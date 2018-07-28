@@ -265,7 +265,8 @@ class ExplicitComponent(Component):
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
 
-                        # set appropriate vector to read_only to help prevent user error
+                        # set appropriate vectors to read_only to help prevent user error
+                        self._inputs.read_only = True
                         if mode == 'fwd':
                             d_inputs.read_only = True
                         elif mode == 'rev':
@@ -290,7 +291,7 @@ class ExplicitComponent(Component):
                         else:
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
 
-                        d_inputs.read_only = d_residuals.read_only = False
+                        self._inputs.read_only = d_inputs.read_only = d_residuals.read_only = False
 
         self._inputs.read_only = False
 

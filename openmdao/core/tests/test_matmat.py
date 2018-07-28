@@ -79,6 +79,34 @@ class QuadraticCompVectorized(ImplicitComponent):
             d_residuals['x'] = self.inv_jac * d_outputs['x']
 
 
+class QCVProblem(Problem):
+    """
+    A QuadraticCompVectorized problem with configurable component class.
+    """
+
+    def __init__(self, comp_class=QuadraticCompVectorized):
+        super(QCVProblem, self).__init__()
+
+        model = self.model
+
+        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1.add_output('a', np.array([1.0, 2.0, 3.0]))
+        comp1.add_output('b', np.array([2.0, 3.0, 4.0]))
+        comp1.add_output('c', np.array([-1.0, -2.0, -3.0]))
+        model.add_subsystem('comp', comp_class())
+
+        model.connect('p.a', 'comp.a')
+        model.connect('p.b', 'comp.b')
+        model.connect('p.c', 'comp.c')
+
+        model.add_design_var('p.a', vectorize_derivs=True)
+        model.add_design_var('p.b', vectorize_derivs=True)
+        model.add_design_var('p.c', vectorize_derivs=True)
+        model.add_constraint('comp.x', vectorize_derivs=True)
+
+        model.linear_solver = LinearBlockGS()
+
+
 class RectangleCompVectorized(ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
@@ -650,25 +678,7 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
 
     def test_implicit(self):
-        prob = Problem()
-        model = prob.model
-
-        comp1 = model.add_subsystem('p', IndepVarComp())
-        comp1.add_output('a', np.array([1.0, 2.0, 3.0]))
-        comp1.add_output('b', np.array([2.0, 3.0, 4.0]))
-        comp1.add_output('c', np.array([-1.0, -2.0, -3.0]))
-        model.add_subsystem('comp', QuadraticCompVectorized())
-
-        model.connect('p.a', 'comp.a')
-        model.connect('p.b', 'comp.b')
-        model.connect('p.c', 'comp.c')
-
-        model.add_design_var('p.a', vectorize_derivs=True)
-        model.add_design_var('p.b', vectorize_derivs=True)
-        model.add_design_var('p.c', vectorize_derivs=True)
-        model.add_constraint('comp.x', vectorize_derivs=True)
-
-        model.linear_solver = LinearBlockGS()
+        prob = QCVProblem()
 
         prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
@@ -678,6 +688,101 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
         assert_rel_error(self, J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
         assert_rel_error(self, J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
+
+    def test_apply_multi_linear_inputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # inputs is read_only, should raise exception
+                inputs['a'] = np.zeros(inputs['a'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "while it is in read only mode.")
+
+    def test_apply_multi_linear_outputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # outputs is read_only, should raise exception
+                outputs['x'] = np.zeros(outputs['x'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_apply_multi_linear_dinputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # d_inputs is read_only, should raise exception
+                d_inputs['a'] = np.zeros(inputs['a'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "while it is in read only mode.")
+
+    def test_apply_multi_linear_doutputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # d_outputs is read_only, should raise exception
+                d_outputs['x'] = np.zeros(outputs['x'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_apply_multi_linear_dresids_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # d_residuals is read_only, should raise exception
+                d_residuals['x'] = np.zeros(outputs['x'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in residual vector "
+                         "while it is in read only mode.")
 
 
 class JacVec(ExplicitComponent):
@@ -895,6 +1000,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in input vector "
                          "while it is in read only mode.")
+
 
 if __name__ == '__main__':
     unittest.main()

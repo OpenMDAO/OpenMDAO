@@ -239,6 +239,9 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value'), 0)
         self.assertEqual(text.count('resids'), 2)
 
+
+class ImplicitCompGuessTestCase(unittest.TestCase):
+
     def test_guess_nonlinear(self):
 
         class ImpWithInitial(QuadraticLinearize):
@@ -479,6 +482,9 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp2.x'], 3.)
 
+
+class ImplicitCompReadOnlyTestCase(unittest.TestCase):
+
     def test_apply_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
@@ -521,7 +527,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
                 super(BadComp, self).solve_nonlinear(inputs, outputs)
-                inputs['a'] = 0.
+                inputs['a'] = 0.  # should not be allowed
 
         prob = Problem()
         prob.model.add_subsystem('bad', BadComp())
@@ -539,7 +545,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
                 super(BadComp, self).linearize(inputs, outputs, partials)
-                inputs['a'] = 0.
+                inputs['a'] = 0.  # should not be allowed
 
         prob = Problem()
         prob.model.add_subsystem('bad', BadComp())
@@ -558,7 +564,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
                 super(BadComp, self).linearize(inputs, outputs, partials)
-                outputs['x'] = 0.
+                outputs['x'] = 0.  # should not be allowed
 
         prob = Problem()
         prob.model.add_subsystem('bad', BadComp())
@@ -571,6 +577,146 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_apply_linear_inputs_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                super(BadComp, self).apply_linear(inputs, outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
+                inputs['a'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_linear(['linear'], 'fwd')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "while it is in read only mode.")
+
+    def test_apply_linear_outputs_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                super(BadComp, self).apply_linear(inputs, outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
+                outputs['x'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_linear(['linear'], 'fwd')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_apply_linear_dinputs_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                super(BadComp, self).apply_linear(inputs, outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
+                d_inputs['a'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_linear(['linear'], 'fwd')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "while it is in read only mode.")
+
+    def test_apply_linear_doutputs_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                super(BadComp, self).apply_linear(inputs, outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
+                d_outputs['x'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_linear(['linear'], 'fwd')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_apply_linear_dresids_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                super(BadComp, self).apply_linear(inputs, outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
+                d_residuals['x'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_apply_linear(['linear'], 'rev')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in residual vector "
+                         "while it is in read only mode.")
+
+    def test_solve_linear_doutputs_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def solve_linear(self, d_outputs, d_residuals, mode):
+                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                d_outputs['x'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+        prob.model.run_linearize()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_solve_linear(['linear'], 'rev')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "while it is in read only mode.")
+
+    def test_solve_linear_dresids_read_only(self):
+        class BadComp(QuadraticJacVec):
+            def solve_linear(self, d_outputs, d_residuals, mode):
+                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                d_residuals['x'] = 0.  # should not be allowed
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+        prob.model.run_linearize()
+
+        # check input vector
+        with self.assertRaises(ValueError) as cm:
+            prob.model.run_solve_linear(['linear'], 'fwd')
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in residual vector "
                          "while it is in read only mode.")
 
 

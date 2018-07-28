@@ -159,6 +159,13 @@ class ImplicitComponent(Component):
                 if not self.matrix_free:
                     continue
 
+                # set appropriate vectors to read_only to help prevent user error
+                self._inputs.read_only = self._outputs.read_only = True
+                if mode == 'fwd':
+                    d_inputs.read_only = d_outputs.read_only = True
+                elif mode == 'rev':
+                    d_residuals.read_only = True
+
                 # Jacobian and vectors are all unscaled, dimensional
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
@@ -182,6 +189,9 @@ class ImplicitComponent(Component):
                         else:
                             self.apply_linear(self._inputs, self._outputs,
                                               d_inputs, d_outputs, d_residuals, mode)
+
+                self._inputs.read_only = self._outputs.read_only = False
+                d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -221,6 +231,12 @@ class ImplicitComponent(Component):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_residuals.read_only = True
+                elif mode == 'rev':
+                    d_outputs.read_only = True
+
                 with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._solve_linear', self.iter_count, self):
                         if d_outputs._ncol > 1:
@@ -251,6 +267,8 @@ class ImplicitComponent(Component):
                     failed = failed or result[0]
                     abs_errors.append(result[1])
                     rel_errors.append(result[2])
+
+                d_outputs.read_only = d_residuals.read_only = False
 
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
