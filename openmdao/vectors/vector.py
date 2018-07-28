@@ -400,7 +400,7 @@ class Vector(object):
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self.read_only:
-                msg = "Attempt to set value of '{}' in {} vector while it is in read only mode."
+                msg = "Attempt to set value of '{}' in {} vector when it is read only."
                 raise ValueError(msg.format(name, self._kind))
 
             if self._icol is None:

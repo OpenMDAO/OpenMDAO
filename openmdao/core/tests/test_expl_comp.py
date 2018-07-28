@@ -670,7 +670,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'length' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_compute_partials_inputs_read_only(self):
         class BadComp(TestExplCompSimpleDense):
@@ -687,7 +687,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'length' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only(self):
         class BadComp(RectangleJacVec):
@@ -704,7 +704,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'length' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
 
 if __name__ == '__main__':

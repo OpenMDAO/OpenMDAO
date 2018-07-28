@@ -513,7 +513,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_guess_nonlinear_resids_read_only(self):
         class ImpWithInitial(ImplicitComponent):
@@ -546,7 +546,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'y' in residual vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
 
 class ImplicitCompReadOnlyTestCase(unittest.TestCase):
@@ -568,7 +568,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_apply_nonlinear_outputs_read_only(self):
         class BadComp(QuadraticComp):
@@ -587,7 +587,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_solve_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
@@ -605,7 +605,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_linearize_inputs_read_only(self):
         class BadComp(QuadraticLinearize):
@@ -624,7 +624,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_linearize_outputs_read_only(self):
         class BadComp(QuadraticLinearize):
@@ -643,7 +643,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_apply_linear_inputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -663,7 +663,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_apply_linear_outputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -683,7 +683,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_apply_linear_dinputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -703,7 +703,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' in input vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_apply_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -723,7 +723,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_apply_linear_dresids_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -743,7 +743,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in residual vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_solve_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -763,7 +763,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
     def test_solve_linear_dresids_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -783,7 +783,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in residual vector "
-                         "while it is in read only mode.")
+                         "when it is read only.")
 
 
 class QuadGroup(Group):
