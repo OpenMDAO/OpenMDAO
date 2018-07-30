@@ -240,8 +240,6 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        self._inputs.read_only = True
-
         J = self._jacobian if jac is None else jac
 
         with Recording(self.pathname + '._apply_linear', self.iter_count, self):
@@ -292,8 +290,6 @@ class ExplicitComponent(Component):
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
 
                         self._inputs.read_only = d_inputs.read_only = d_residuals.read_only = False
-
-        self._inputs.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
