@@ -177,6 +177,17 @@ class _TotalJacInfo(object):
                 if len(modes) == 1 and modes[0] != self.mode:
                     raise RuntimeError("Mode in coloring, '%s', differs from specified mode, '%s'."
                                        % (modes[0], self.mode))
+                elif problem._orig_mode != 'auto' and len(modes) > 1:
+                    raise RuntimeError("Problem mode is not 'auto' but coloring contains both 'fwd' and 'rev'.")
+
+                # check that coloring Jac is same size as current one
+                if self.simul_coloring['J'].shape != (self.of_size, self.wrt_size):
+                    orig_shape = self.simul_coloring['J'].shape
+                    warnings.warn("compute_totals called with a jacobian of different size (%d, %d) than the one defined "
+                                  "during coloring (%d, %d), so coloring will be turned off." %
+                                  (self.of_size, self.wrt_size, orig_shape[0], orig_shape[1]))
+                    self.simul_coloring = None
+                    modes = [self.mode]
 
             self.in_idx_map = {}
             self.in_loc_idxs = {}
