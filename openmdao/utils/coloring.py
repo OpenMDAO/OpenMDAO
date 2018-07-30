@@ -837,7 +837,7 @@ def _compute_coloring(J, mode):
     if rev:
         coloring = {
             'rev': [clists, col2rows],
-            'J': J
+            'J': J.T
         }
     else:
         coloring = {
@@ -1014,7 +1014,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False):
     with open("coloring.json", "w") as f:
         coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
-                                  tol=1.e-15, include_sparsity=True,
+                                  tol=1.e-15, include_sparsity=do_sparsity,
                                   setup=False, run_model=False, stream=f)
     driver.set_simul_deriv_color(coloring)
     driver._setup_simul_coloring()
