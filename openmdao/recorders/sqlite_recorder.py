@@ -18,6 +18,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
+from openmdao.solvers.solver import Solver
 
 
 def array_to_blob(array):
@@ -155,7 +156,7 @@ class SqliteRecorder(BaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata( format_version INT, "
-                          "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB)")
+                          "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, var_settings BLOB)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -209,8 +210,11 @@ class SqliteRecorder(BaseRecorder):
             system = recording_requester
         elif isinstance(recording_requester, Problem):
             system = recording_requester.model
-        else:
+        elif isinstance(recording_requester, Solver):
             system = recording_requester._system
+        else:
+            raise ValueError('Driver encountered a recording_requester it cannot handle'
+                             ': {0}'.format(recording_requester))
 
         # grab all of the units and type (collective calls)
         states = system._list_states_allprocs()
@@ -261,9 +265,15 @@ class SqliteRecorder(BaseRecorder):
             prom2abs = pickle.dumps(self._prom2abs)
             abs2meta = pickle.dumps(self._abs2meta)
 
+            var_settings = {}
+            var_settings.update(desvars)
+            var_settings.update(objectives)
+            var_settings.update(constraints)
+            var_settings_blob = pickle.dumps(var_settings)
+
             with self.connection as c:
-                c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?",
-                          (abs2prom, prom2abs, abs2meta))
+                c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?",
+                          (abs2prom, prom2abs, abs2meta, var_settings_blob))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """

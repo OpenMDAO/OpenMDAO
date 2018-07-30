@@ -27,6 +27,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import determine_adder_scaler
 
 if PY2:
     import cPickle as pickle
@@ -2188,6 +2189,57 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(len(desvars.keys), 0)
         self.assertEqual(len(objectives.keys), 0)
         self.assertEqual(len(constraints.keys), 0)
+
+    def test_simple_paraboloid_scaled_desvars(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+
+        ref = 5.0
+        ref0 = -5.0
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=ref, ref0=ref0)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=ref, ref0=ref0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0)
+
+        prob.setup(check=False, mode='fwd')
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1,scaled=False)
+        unscaled_x = last_case.outputs['x'][0]
+        unscaled_y = last_case.outputs['y'][0]
+        last_case = cr.driver_cases.get_case(-1,scaled=True)
+        scaled_x = last_case.outputs['x'][0]
+        scaled_y = last_case.outputs['y'][0]
+
+        adder, scaler = determine_adder_scaler(ref0, ref, None, None)
+        self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
+        self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+
 
 if __name__ == "__main__":
     unittest.main()

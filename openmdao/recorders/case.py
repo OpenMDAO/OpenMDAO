@@ -1,6 +1,7 @@
 """
 A Case class.
 """
+from six import iteritems, string_types
 
 
 class Case(object):
@@ -161,10 +162,15 @@ class Case(object):
 class DriverCase(Case):
     """
     Wrap data from a single iteration of a Driver recording to make it more easily accessible.
+
+    Attributes
+    ----------
+    _var_settings : dict
+        Dictionary mapping absolute variable names to variable settings.
     """
 
     def __init__(self, filename, counter, iteration_coordinate, timestamp, success,
-                 msg, inputs, outputs, prom2abs, abs2prom, meta):
+                 msg, inputs, outputs, prom2abs, abs2prom, meta, var_settings):
         """
         Initialize.
 
@@ -192,10 +198,25 @@ class DriverCase(Case):
             Dictionary mapping absolute names to promoted names.
         meta : dict
             Dictionary mapping absolute variable names to variable metadata.
+        var_settings : dict
+            Dictionary mapping absolute variable names to variable settings.
         """
         super(DriverCase, self).__init__(filename, counter, iteration_coordinate,
                                          timestamp, success, msg, prom2abs,
                                          abs2prom, meta, inputs, outputs)
+        self._var_settings = var_settings
+
+    def scale(self):
+        """
+        Scale the outputs array using _var_settings.
+        """
+        for name, val in zip(self.outputs._values.dtype.names, self.outputs._values):
+            if name in self._var_settings:
+                # physical to scaled
+                if self._var_settings[name]['adder'] is not None:
+                    self.outputs._values[name] += self._var_settings[name]['adder']
+                if self._var_settings[name]['scaler'] is not None:
+                    self.outputs._values[name] *= self._var_settings[name]['scaler']
 
 
 class SystemCase(Case):
