@@ -520,8 +520,7 @@ class SimulColoringRevTestCase(unittest.TestCase):
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
-        self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
+        self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,(p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
 
 
 class SimulColoringScipyTestCase(unittest.TestCase):
