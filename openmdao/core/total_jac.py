@@ -122,22 +122,32 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv = {}
 
+        driver_wrt = list(design_vars)
+        driver_of = driver._get_ordered_nl_responses()
+
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
-            wrt = prom_wrt = list(design_vars)
+            wrt = prom_wrt = driver_wrt
         else:
             prom_wrt = wrt
             if not global_names:
                 wrt = [prom2abs[name][0] for name in prom_wrt]
 
         if of is None:
-            of = list(driver._objs)
-            of.extend(driver._cons)
-            prom_of = of
+            of = prom_of = driver_of
         else:
             prom_of = of
             if not global_names:
                 of = [prom2abs[name][0] for name in prom_of]
+
+        # if we don't get wrt and of from driver, turn off coloring
+        skip_coloring = wrt != driver_wrt or of != driver_of
+        if skip_coloring:
+            warnings.warn("compute_totals called using a different list of design vars and "
+                          "responses than those used to define coloring, so coloring will be "
+                          "turned off.  coloring design vars: %s, current design vars: %s, "
+                          "coloring responses: %s, current responses: %s." %
+                          (driver_wrt, wrt, driver_of, of))
 
         self.of = of
         self.wrt = wrt
@@ -168,7 +178,10 @@ class _TotalJacInfo(object):
             else:
                 has_lin_cons = False
 
-            self.simul_coloring = None if has_lin_cons else driver._simul_coloring_info
+            if has_lin_cons or skip_coloring:
+                self.simul_coloring = None
+            else:
+                self.simul_coloring = driver._simul_coloring_info
 
             if self.simul_coloring is None:
                 modes = [self.mode]
@@ -178,16 +191,8 @@ class _TotalJacInfo(object):
                     raise RuntimeError("Mode in coloring, '%s', differs from specified mode, '%s'."
                                        % (modes[0], self.mode))
                 elif problem._orig_mode != 'auto' and len(modes) > 1:
-                    raise RuntimeError("Problem mode is not 'auto' but coloring contains both 'fwd' and 'rev'.")
-
-                # check that coloring Jac is same size as current one
-                if self.simul_coloring['J'].shape != (self.of_size, self.wrt_size):
-                    orig_shape = self.simul_coloring['J'].shape
-                    warnings.warn("compute_totals called with a jacobian of different size (%d, %d) than the one defined "
-                                  "during coloring (%d, %d), so coloring will be turned off." %
-                                  (self.of_size, self.wrt_size, orig_shape[0], orig_shape[1]))
-                    self.simul_coloring = None
-                    modes = [self.mode]
+                    raise RuntimeError("Problem mode is not 'auto' but coloring contains both "
+                                       "'fwd' and 'rev'.")
 
             self.in_idx_map = {}
             self.in_loc_idxs = {}

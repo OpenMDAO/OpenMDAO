@@ -235,7 +235,6 @@ def MNCO_bidir(J):
                 row_lists is a list of row lists, the first being a list of uncolored rows.
                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
             dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-            dict['J'] = ndarray, the computed boolean jacobian.
     """
     nrows, ncols = J.shape
 
@@ -295,9 +294,7 @@ def MNCO_bidir(J):
 
             col_i += 1
 
-    coloring = {
-        'J': J
-    }
+    coloring = {}
 
     jac = np.zeros(J.shape, dtype=bool)
     if row_i > 0:
@@ -581,7 +578,6 @@ def _write_coloring(modes, color_info, stream):
             row_lists is a list of row lists, the first being a list of uncolored rows.
             col_maps is a list of nonzero cols for each row, or None for uncolored rows.
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-        dict['J'] = ndarray, the computed boolean jacobian.
     stream : file-like
         Output stream.
     """
@@ -705,7 +701,6 @@ def _total_solves(color_info, do_fwd=True, do_rev=True):
             row_lists is a list of row lists, the first being a list of uncolored rows.
             col_maps is a list of nonzero cols for each row, or None for uncolored rows.
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-        dict['J'] = ndarray, the computed boolean jacobian.
     do_fwd : bool
         If True, add fwd colors to total.
     do_rev : bool
@@ -732,12 +727,14 @@ def _total_solves(color_info, do_fwd=True, do_rev=True):
     return total_solves
 
 
-def _solves_info(color_info):
+def _solves_info(J, color_info):
     """
     Return info about the number of colors given the current coloring scheme.
 
     Parameters
     ----------
+    J : ndarray
+        Jacobian sparsity matrix.
     color_info : dict
         dict['fwd'] = (col_lists, row_maps)
             col_lists is a list of column lists, the first being a list of uncolored columns.
@@ -746,7 +743,6 @@ def _solves_info(color_info):
             row_lists is a list of row lists, the first being a list of uncolored rows.
             col_maps is a list of nonzero cols for each row, or None for uncolored rows.
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-        dict['J'] = ndarray, the computed boolean jacobian.
 
     Returns
     -------
@@ -755,7 +751,7 @@ def _solves_info(color_info):
     float
         Total solves.
     """
-    rev_size, fwd_size = color_info['J'].shape
+    rev_size, fwd_size = J.shape
     tot_colors = _total_solves(color_info)
 
     fwd_solves = rev_solves = 0
@@ -806,11 +802,10 @@ def _compute_coloring(J, mode):
                 row_lists is a list of row lists, the first being a list of uncolored rows.
                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
             dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-            dict['J'] = ndarray, the computed boolean jacobian.
     """
     bidirectional = mode == 'auto'
-
     rev = mode == 'rev'
+    nrows, ncols = J.shape
 
     if bidirectional:
         return MNCO_bidir(J)
@@ -837,12 +832,10 @@ def _compute_coloring(J, mode):
     if rev:
         coloring = {
             'rev': [clists, col2rows],
-            'J': J.T
         }
     else:
         coloring = {
             'fwd': [clists, col2rows],
-            'J': J
         }
 
     return coloring
@@ -888,7 +881,6 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
             row_lists is a list of row lists, the first being a list of uncolored rows.
             col_maps is a list of nonzero cols for each row, or None for uncolored rows.
         dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-        dict['J'] = ndarray, the computed boolean jacobian.
         dict['time_sparsity'] = float, the time to compute the sparsity matrix.
         dict['time_coloring'] = float, the time to compute the coloring, given the sparsity matrix.
     """
@@ -949,12 +941,14 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     return coloring
 
 
-def simul_coloring_summary(color_info, stream=sys.stdout):
+def simul_coloring_summary(J, color_info, stream=sys.stdout):
     """
     Print a summary of simultaneous coloring info for the given problem and coloring metadata.
 
     Parameters
     ----------
+    J : ndarray
+        Jacobian sparsity matrix.
     color_info : dict
         Coloring metadata.
     stream : file-like
@@ -964,11 +958,11 @@ def simul_coloring_summary(color_info, stream=sys.stdout):
     stream.write("Time to compute coloring: %f\n" % color_info.get('time_coloring', 0.))
 
     if 'fwd' not in color_info and 'rev' not in color_info:
-        tot_size = min(color_info['J'].shape)
+        tot_size = min(J.shape)
         stream.write("\nSimultaneous derivatives can't improve on the total number of solves "
                      "required (%d) for this configuration\n" % tot_size)
     else:
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(color_info)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(J, color_info)
 
         stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
         stream.write("\n\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
@@ -1084,7 +1078,7 @@ def _simul_coloring_cmd(options):
                                         stream=outfile)
 
         if sys.stdout.isatty():
-            simul_coloring_summary(color_info, stream=sys.stdout)
+            simul_coloring_summary(prob.driver._tot_jac.J, color_info, stream=sys.stdout)
 
         exit()
     return _simul_coloring

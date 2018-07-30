@@ -77,7 +77,7 @@ class TotJacBuilder(object):
         print("Density:", np.count_nonzero(self.J) / self.J.size)
         print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
 
-        simul_coloring_summary(self.coloring, stream=stream)
+        simul_coloring_summary(self.J, self.coloring, stream=stream)
 
     def shuffle_rows(self):
         np.random.shuffle(self.J)

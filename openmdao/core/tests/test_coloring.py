@@ -854,7 +854,7 @@ class BidirectionalTestCase(unittest.TestCase):
         for n in range(6, 20, 2):
             builder = TotJacBuilder.eisenstat(n)
             builder.color('auto', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.J, builder.coloring)
             if tot_colors == n // 2 + 3:
                 raise unittest.SkipTest("Current bicoloring algorithm requires n/2 + 3 solves, so skipping for now.")
             self.assertLessEqual(tot_colors, n // 2 + 2, 
@@ -863,7 +863,7 @@ class BidirectionalTestCase(unittest.TestCase):
 
             builder_fwd = TotJacBuilder.eisenstat(n)
             builder_fwd.color('fwd', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.coloring)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.J, builder_fwd.coloring)
             # The columns of Eisenstat's example are pairwise nonorthogonal, so fwd coloring
             # should require n colors.
             self.assertEqual(n, tot_colors,
@@ -878,10 +878,13 @@ class BidirectionalTestCase(unittest.TestCase):
             builder.add_col(0)
             builder.add_block_diag([(1,1)] * (n-1), 1, 1)
             builder.color('auto', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.J, builder.coloring)
             self.assertEqual(tot_colors, 3)
 
     def test_can_715(self):
+        # this test is just to show the superiority of bicoloring vs. single coloring in 
+        # either direction.  Bicoloring gives only 21 colors in this case vs. 105 for either
+        # fwd or rev.
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
 
         # uses matrix can_715 from the sparse matrix collection website
@@ -890,7 +893,7 @@ class BidirectionalTestCase(unittest.TestCase):
                                   run_model=False, bool_jac=mat,
                                   stream=None)
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(mat, coloring)
 
         self.assertEqual(tot_colors, 21)
 
@@ -899,7 +902,7 @@ class BidirectionalTestCase(unittest.TestCase):
                                   run_model=False, bool_jac=mat,
                                   stream=None)
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(mat, coloring)
 
         self.assertEqual(tot_colors, 105)
 
@@ -907,7 +910,7 @@ class BidirectionalTestCase(unittest.TestCase):
                                   run_model=False, bool_jac=mat,
                                   stream=None)
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(mat, coloring)
 
         self.assertEqual(tot_colors, 105)
 
