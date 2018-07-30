@@ -140,15 +140,6 @@ class _TotalJacInfo(object):
             if not global_names:
                 of = [prom2abs[name][0] for name in prom_of]
 
-        # if we don't get wrt and of from driver, turn off coloring
-        skip_coloring = wrt != driver_wrt or of != driver_of
-        if skip_coloring:
-            warnings.warn("compute_totals called using a different list of design vars and "
-                          "responses than those used to define coloring, so coloring will be "
-                          "turned off.  coloring design vars: %s, current design vars: %s, "
-                          "coloring responses: %s, current responses: %s." %
-                          (driver_wrt, wrt, driver_of, of))
-
         self.of = of
         self.wrt = wrt
         self.prom_of = prom_of
@@ -171,12 +162,23 @@ class _TotalJacInfo(object):
         else:
             constraints = driver._cons
 
+            skip_coloring = False
             for name in of:
                 if name in constraints and constraints[name]['linear']:
                     has_lin_cons = True
                     break
             else:
                 has_lin_cons = False
+
+                # if we don't get wrt and of from driver, turn off coloring
+                skip_coloring = wrt != driver_wrt or of != driver_of
+                if skip_coloring:
+                    msg = ("compute_totals called using a different list of design vars and/or "
+                           "responses than those used to define coloring, so coloring will "
+                           "be turned off.\ncoloring design vars: %s, current design vars: "
+                           "%s\ncoloring responses: %s, current responses: %s." %
+                           (driver_wrt, wrt, driver_of, of))
+                    warnings.warn(msg)
 
             if has_lin_cons or skip_coloring:
                 self.simul_coloring = None
@@ -187,12 +189,6 @@ class _TotalJacInfo(object):
                 modes = [self.mode]
             else:
                 modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
-                if len(modes) == 1 and modes[0] != self.mode:
-                    raise RuntimeError("Mode in coloring, '%s', differs from specified mode, '%s'."
-                                       % (modes[0], self.mode))
-                elif problem._orig_mode != 'auto' and len(modes) > 1:
-                    raise RuntimeError("Problem mode is not 'auto' but coloring contains both "
-                                       "'fwd' and 'rev'.")
 
             self.in_idx_map = {}
             self.in_loc_idxs = {}

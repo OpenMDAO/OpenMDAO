@@ -998,6 +998,11 @@ class Driver(object):
             if revcol:
                 raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
                                    "been set to '%s'" % self._problem._orig_mode)
+        if 'fwd' in self._simul_coloring_info and self._problem._orig_mode not in ('fwd', 'auto'):
+            fwdcol = self._simul_coloring_info['fwd'][0][0]
+            if fwdcol:
+                raise RuntimeError("Simultaneous coloring does forward solves but mode has "
+                                   "been set to '%s'" % self._problem._orig_mode)
 
         # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns

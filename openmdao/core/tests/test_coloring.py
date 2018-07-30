@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import shutil
 import tempfile
+import warnings
 
 import unittest
 import numpy as np
@@ -523,12 +524,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
 class SimulColoringScipyTestCase(unittest.TestCase):
 
-    def test_simul_coloring_fwd(self):
-
-        # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
-
-        color_info = {"fwd": [[
+    def setUp(self):
+        self.color_info = {"fwd": [[
                [20],   # uncolored columns
                [0, 2, 4, 6, 8],   # color 1
                [1, 3, 5, 7, 9],   # color 2
@@ -561,7 +558,11 @@ class SimulColoringScipyTestCase(unittest.TestCase):
             "sparsity": None
         }
 
-        p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info, optimizer='SLSQP', disp=False)
+    def test_simul_coloring_fwd(self):
+
+        # first, run w/o coloring
+        p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'fwd', self.color_info, optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -571,6 +572,21 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
+        
+        # check for proper handling if someone calls compute_totals on Problem with different set or different order 
+        # of desvars/responses than were used to define the coloring.  Behavior should be that coloring is turned off 
+        # and a warning is issued.
+        with warnings.catch_warnings(record=True) as w:
+            p_color.compute_totals(of=['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g'], 
+                                   wrt=['x', 'y', 'r'])
+        self.assertEqual(len(w), 1)
+        self.assertEqual(str(w[0].message), "compute_totals called using a different list of design vars and/or responses than those used to define coloring, so coloring will be turned off.\ncoloring design vars: ['indeps.x', 'indeps.y', 'indeps.r'], current design vars: ['indeps.x', 'indeps.y', 'indeps.r']\ncoloring responses: ['circle.area', 'r_con.g', 'theta_con.g', 'delta_theta_con.g', 'l_conx.g'], current responses: ['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g'].")
+
+    def test_bad_mode(self):
+        with self.assertRaises(Exception) as context:
+            p_color = run_opt(ScipyOptimizeDriver, 'rev', self.color_info, optimizer='SLSQP', disp=False)
+        self.assertEqual(str(context.exception),
+                         "Simultaneous coloring does forward solves but mode has been set to 'rev'")
 
     def test_dynamic_simul_coloring_auto(self):
 
@@ -699,9 +715,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 class SimulColoringRevScipyTestCase(unittest.TestCase):
     """Rev mode coloring tests."""
 
-    def test_simul_coloring(self):
-
-        color_info = {"rev": [[
+    def setUp(self):
+        self.color_info = {"rev": [[
                [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
                [2, 21],   # color 1
                [3, 16],   # color 2
@@ -734,6 +749,10 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             ]],
             "sparsity": None}
 
+    def test_simul_coloring(self):
+
+        color_info = self.color_info
+
         p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
         p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
 
@@ -745,6 +764,12 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         # - (total_solves - 1) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
                          (p_color.model.linear_solver._solve_count - 1) / 11)
+    
+    def test_bad_mode(self):
+        with self.assertRaises(Exception) as context:
+            p_color = run_opt(ScipyOptimizeDriver, 'fwd', self.color_info, optimizer='SLSQP', disp=False)
+        self.assertEqual(str(context.exception),
+                         "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 
     def test_dynamic_simul_coloring(self):
 
