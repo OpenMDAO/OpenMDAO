@@ -626,20 +626,17 @@ class SqliteCaseReader(BaseCaseReader):
         if get_outputs and case.outputs is None:
             return variables
 
-        outputs = case.outputs._values if case.outputs is not None else None
-        residuals = case.residuals._values if case.residuals is not None else None
-        inputs = case.inputs._values if case.inputs is not None else None
         if get_outputs:
-            for var_name in outputs.dtype.names:
-                variables[var_name] = {'value': outputs[var_name]}
-                if residuals is not None and var_name in residuals.dtype.names:
-                    variables[var_name]['residuals'] = residuals[var_name]
+            for abs_name in case.outputs:
+                variables[abs_name] = {'value': case.outputs[abs_name]}
+                if case.residuals is not None and abs_name in case.residuals:
+                    variables[abs_name]['residuals'] = case.residuals[abs_name]
                 else:
-                    variables[var_name]['residuals'] = 'Not Recorded'
+                    variables[abs_name]['residuals'] = 'Not Recorded'
         elif inputs is not None:
-            for var_name in inputs.dtype.names:
-                if var_name not in variables:
-                    variables[var_name] = {'value': inputs[var_name]}
+            for abs_name in case.inputs:
+                if abs_name not in variables:
+                    variables[abs_name] = {'value': case.inputs[abs_name]}
 
         return variables
 
@@ -688,25 +685,25 @@ class SqliteCaseReader(BaseCaseReader):
             if not coord_map[iter_key]:
                 coord_map[iter_key] = True
                 case = self.system_cases.get_case(iteration)
+                print('case.inputs:', case.inputs)
                 if get_outputs and case.outputs is None:
                     continue
                 if not get_outputs and case.inputs is None:
                     continue
-                outputs = case.outputs._values if case.outputs is not None else None
-                residuals = case.residuals._values if case.residuals is not None else None
-                inputs = case.inputs._values if case.inputs is not None else None
+
                 if get_outputs:
-                    for var_name in outputs.dtype.names:
-                        if var_name not in variables:
-                            variables[var_name] = {'value': outputs[var_name]}
-                            if residuals is not None and var_name in residuals.dtype.names:
-                                variables[var_name]['residuals'] = residuals[var_name]
+                    for abs_name in case.outputs:
+                        if abs_name not in variables:
+                            variables[abs_name] = {'value': case.outputs[abs_name]}
+                            if case.residuals is not None and abs_name in case.residuals:
+                                variables[abs_name]['residuals'] = case.residuals[abs_name]
                             else:
-                                variables[var_name]['residuals'] = 'Not Recorded'
-                elif inputs is not None:
-                    for var_name in inputs.dtype.names:
-                        if var_name not in variables:
-                            variables[var_name] = {'value': inputs[var_name]}
+                                variables[abs_name]['residuals'] = 'Not Recorded'
+                elif case.inputs is not None:
+                    for abs_name in case.inputs:
+                        abs_name = case.prom2abs['input'][abs_name][0]
+                        if abs_name not in variables:
+                            variables[abs_name] = {'value': case.inputs[abs_name]}
 
         return variables
 

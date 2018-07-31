@@ -2,6 +2,12 @@
 A Case class.
 """
 
+import re
+
+import numpy as np
+
+from pprint import pprint
+
 
 class Case(object):
     """
@@ -82,6 +88,9 @@ class Case(object):
         self.prom2abs = prom2abs
         self.abs2prom = abs2prom
 
+        print('meta:')
+        pprint(meta)
+
         if inputs is not None and inputs.dtype.names:
             self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
         if outputs is not None and outputs.dtype.names:
@@ -152,9 +161,10 @@ class Case(object):
             return PromotedToAbsoluteMap({}, self.prom2abs, self.abs2prom)
 
         ret_vars = {}
-        for var in self.outputs._values.dtype.names:
+        for var in self.outputs:
             if var_type in self.meta[var]['type']:
-                ret_vars[var] = self.outputs._values[var]
+                ret_vars[var] = self.outputs[var]
+
         return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom)
 
 
@@ -335,7 +345,7 @@ class ProblemCase(Case):
                                           None, outputs)
 
 
-class PromotedToAbsoluteMap:
+class PromotedToAbsoluteMap(dict):
     """
     Enables access of values through promoted variable names by mapping to the absolute name.
 
@@ -370,35 +380,33 @@ class PromotedToAbsoluteMap:
         output : bool
             True if this should map using output variable names, False for input variable names.
         """
-        self._values = values
+        super(PromotedToAbsoluteMap, self).__init__()
+
+        # self._values = values
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
         self._is_output = output
-        self._iteration_index = 0
 
-        if self._values is None:
-            self.keys = []
+        # populate dictionary keyed on absolute names
+        names = values.keys() if isinstance(values, dict) else values.dtype.names
+
+        if self._is_output:
+            abs2prom = self._abs2prom['output']
         else:
-            var_names = list(self._values.keys()) if isinstance(self._values, dict)\
-                else self._values.dtype.names
-            io = 'output' if output else 'input'
-            self.keys = []
-            for n in var_names:
+            abs2prom = self._abs2prom['input']
 
-                # Recorded derivatives.
-                if ',' in n:
-                    of, wrt = n.split(',')
-                    if of in self._abs2prom[io]:
-                        of = self._abs2prom[io][of]
-                    if wrt in self._abs2prom[io]:
-                        wrt = self._abs2prom[io][wrt]
-
-                    self.keys.append((of, wrt))
-
-                # Recorded vector variables.
+        for n in names:
+            if isinstance(n, tuple) or ',' in n:
+                print('deriv key:', n)
+                if isinstance(n, tuple):
+                    of, wrt = n
                 else:
-                    if n in self._abs2prom[io]:
-                        self.keys.append(self._abs2prom[io][n])
+                    of, wrt = re.sub('[( )]', '', n).split(',')
+
+                self[(of, wrt)] = values[n]
+
+            elif n in abs2prom:
+                self[n] = values[n]
 
     def __getitem__(self, key):
         """
@@ -407,81 +415,53 @@ class PromotedToAbsoluteMap:
         Parameters
         ----------
         key : string
-            Variable name.
+            Absolute or promoted variable name.
 
         Returns
         -------
         array :
             An array entry value that corresponds to the given variable name.
         """
-        var_names = list(self._values.keys()) if isinstance(self._values, dict)\
-            else self._values.dtype.names
-
-        # user trying to access via absolute name rather than promoted
-        if '.' in key:
-            if key in var_names:
-                return self._values[key]
-
-        # outputs only have one option in _prom2abs
         if self._is_output:
+            prom2abs = self._prom2abs['output']
+            # print('prom2abs:')
+            # pprint(prom2abs)
 
-            # Recorded derivatives.
-            if isinstance(key, tuple):
-                of, wrt = key
-                if of in self._prom2abs['output']:
-                    of = self._prom2abs['output'][of][0]
-                if wrt in self._prom2abs['output']:
-                    wrt = self._prom2abs['output'][wrt][0]
+            if isinstance(key, tuple) or ',' in key:
+                if isinstance(key, tuple):
+                    of, wrt = key
+                else:
+                    of, wrt = re.sub('[( )]', '', key).split(',')
 
-                return self._values[','.join((of, wrt))]
+                # Recorded derivatives.
+                if of in prom2abs:
+                    of = prom2abs[of][0]
+                if wrt in prom2abs:
+                    wrt = prom2abs[wrt][0]
 
-            # Recorded vector variables.
+                mykey = (of, wrt)
+
+            elif key in prom2abs:
+                mykey = prom2abs[key][0]
+
             else:
-                return self._values[self._prom2abs['output'][key][0]]
+                mykey = key
 
-        # inputs may have multiple options, so we try until we succeed
-        for k in self._prom2abs['input'][key]:
-            if k in var_names:
-                return self._values[k]
+            # print('key:', key, 'mykey:', mykey)
+            return super(PromotedToAbsoluteMap, self).__getitem__(mykey)
 
-        raise ValueError("no field of name " + key)
+        else:
+            mykeys = self.keys()
+            if key in mykeys:
+                return super(PromotedToAbsoluteMap, self).__getitem__(key)
+            else:
+                # inputs may have multiple options, so we try until we succeed
+                prom2abs = self._prom2abs['input']
+                for k in prom2abs[key]:
+                    if k in mykeys:
+                        return super(PromotedToAbsoluteMap, self).__getitem__(key)
 
-    def __iter__(self):
-        """
-        Initialize iteration.
-
-        Returns
-        -------
-        Iterator
-            Object which can iterate over map keys.
-        """
-        self._iteration_index = 0
-        return self
-
-    def next(self):
-        """
-        Get the next key iteration.
-
-        Returns
-        -------
-        string
-            Next key in the keys array.
-        """
-        if self._iteration_index >= len(self.keys):
-            raise StopIteration
-        self._iteration_index += 1
-        return self.keys[self._iteration_index - 1]
-
-    def __next__(self):
-        """
-        Get the next key iteration.
-
-        Returns
-        -------
-        string
-            Next key in the keys array.
-        """
-        return self.next()
+        raise KeyError(key)
 
 
 class DriverDerivativesCase(object):
@@ -564,6 +544,6 @@ class DriverDerivativesCase(object):
             Map of derivatives to their values.
         """
         ret_vars = {}
-        for var in self.totals._values.dtype.names:
-            ret_vars[var] = self.totals._values[var]
+        for key in self.totals:
+            ret_vars[key] = self.totals[key]
         return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom, output=True)

@@ -133,7 +133,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         deriv_case = cr.driver_derivative_cases.get_case('rank0:SLSQP|3')
         np.testing.assert_almost_equal(deriv_case.totals['obj', 'pz.z'],
-                                       [[3.8178954 , 1.73971323]],
+                                       [[3.8178954, 1.73971323]],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -142,7 +142,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # While thinking about derivatives, let's get them all.
         derivs = deriv_case.get_derivatives()
 
-        self.assertEqual(set(derivs.keys),
+        self.assertEqual(set(derivs.keys()),
                          set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
 
         # Test values from one case, the last case
@@ -183,7 +183,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         derivs = deriv_case.get_derivatives()
 
         # See what derivatives have been recorded.
-        self.assertEqual(set(derivs.keys),
+        self.assertEqual(set(derivs.keys()),
                          set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
 
         # Get specific derivative.
@@ -580,7 +580,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
+        print("=======================")
         inputs = cr.list_inputs(None, True, True, True)
+        print('inputs:', inputs)
+        print("=======================")
 
         expected_inputs = {
             'obj_cmp.x': {'value': [1.]},
@@ -649,7 +652,9 @@ class TestSqliteCaseReader(unittest.TestCase):
                                          (expected_constraints, constraints),
                                          (expected_responses, responses)):
 
-            self.assertEqual(len(expected_set), len(actual_set.keys))
+            print('expected:', expected_set)
+            print('actual:', actual_set)
+            self.assertEqual(len(expected_set), len(actual_set.keys()))
             for k in actual_set:
                 np.testing.assert_almost_equal(expected_set[k], actual_set[k])
 
@@ -1005,6 +1010,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertTrue(case in case_type._cases)
                 self.assertEqual(case, case_type._cases[case].iteration_coordinate)
 
+
 def _assert_model_matches_case(case, system):
     '''
     Check to see if the values in the case match those in the model.
@@ -1016,12 +1022,12 @@ def _assert_model_matches_case(case, system):
     system : System object
         System to be used for the comparison.
     '''
-    case_inputs = case.inputs._values
+    case_inputs = case.inputs
     model_inputs = system._inputs
     for name, model_input in iteritems(model_inputs._views):
-        np.testing.assert_almost_equal(case_inputs[name],model_input)
+        np.testing.assert_almost_equal(case_inputs[name], model_input)
 
-    case_outputs = case.outputs._values
+    case_outputs = case.outputs
     model_outputs = system._outputs
     for name, model_output in iteritems(model_outputs._views):
         np.testing.assert_almost_equal(case_outputs[name],model_output)

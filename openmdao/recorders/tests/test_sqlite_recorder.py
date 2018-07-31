@@ -1976,7 +1976,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
         first_system_case = cr.system_cases.get_case(0)
-        recorded_inputs = first_system_case.inputs.keys
+        recorded_inputs = first_system_case.inputs.keys()
         self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
 
     def test_feature_driver_options(self):
@@ -2008,9 +2008,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
         first_driver_case = cr.driver_cases.get_case(0)
-        recorded_objectives = first_driver_case.get_objectives().keys
-        recorded_constraints = first_driver_case.get_constraints().keys
-        recorded_desvars = first_driver_case.get_desvars().keys
+        recorded_objectives = first_driver_case.get_objectives().keys()
+        recorded_constraints = first_driver_case.get_constraints().keys()
+        recorded_desvars = first_driver_case.get_desvars().keys()
 
         self.assertEqual(set(recorded_objectives), {'obj'})
         self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
@@ -2135,9 +2135,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         recorded_constraints = first_driver_case.get_constraints()
         recorded_desvars = first_driver_case.get_desvars()
 
-        self.assertEqual(set(recorded_objectives.keys), {'obj'})
-        self.assertEqual(set(recorded_constraints.keys), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars.keys), {'x', 'z'})
+        self.assertEqual(set(recorded_objectives.keys()), {'obj'})
+        self.assertEqual(set(recorded_constraints.keys()), {'con1', 'con2'})
+        self.assertEqual(set(recorded_desvars.keys()), {'x', 'z'})
 
         self.assertAlmostEqual(recorded_objectives['obj'][0], 28.58830817)
         self.assertAlmostEqual(recorded_desvars['x'][0], 1.)
@@ -2337,9 +2337,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
-        self.assertEqual(len(desvars.keys), 0)
-        self.assertEqual(len(objectives.keys), 0)
-        self.assertEqual(len(constraints.keys), 0)
+        self.assertEqual(len(desvars.keys()), 0)
+        self.assertEqual(len(objectives.keys()), 0)
+        self.assertEqual(len(constraints.keys()), 0)
 
 if __name__ == "__main__":
     unittest.main()
