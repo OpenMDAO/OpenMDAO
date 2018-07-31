@@ -13,14 +13,14 @@ from six import iteritems, assertRaisesRegex
 
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearRunOnce, \
-    NonlinearBlockGS, ScipyKrylov, LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
+    NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
@@ -59,8 +59,17 @@ class TestSqliteCaseReader(unittest.TestCase):
             tmp.write("Lorem ipsum")
             tmp.close()
 
-        with self.assertRaises(IOError):
+        with self.assertRaises(IOError) as cm:
             _ = CaseReader(filepath)
+
+        self.assertTrue(str(cm.exception).startswith('File does not contain a valid sqlite database'))
+
+    def test_bad_filename(self):
+
+        with self.assertRaises(IOError) as cm:
+            _ = CaseReader('junk.sql')
+
+        self.assertTrue(str(cm.exception).startswith('File does not exist'))
 
     def test_format_version(self):
         prob = SellarProblem()
@@ -98,6 +107,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -108,6 +118,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cr.driver_cases.num_cases, 7)
+        self.assertEqual(cr.driver_derivative_cases.num_cases, 6)
         self.assertEqual(cr.system_cases.num_cases, 0)
         self.assertEqual(cr.solver_cases.num_cases, 0)
 
@@ -119,6 +130,20 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
+
+        deriv_case = cr.driver_derivative_cases.get_case('rank0:SLSQP|3')
+        np.testing.assert_almost_equal(deriv_case.totals['obj', 'pz.z'],
+                                       [[3.8178954 , 1.73971323]],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # While thinking about derivatives, let's get them all.
+        derivs = deriv_case.get_derivatives()
+
+        self.assertEqual(set(derivs.keys),
+                         set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
@@ -137,6 +162,32 @@ class TestSqliteCaseReader(unittest.TestCase):
         print (case_keys)
         for i, iter_coord in enumerate(case_keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+    def test_feature_reading_derivatives(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP')
+        driver.recording_options['record_derivatives'] = True
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        # Get derivatives associated with the first iteration.
+        deriv_case = cr.driver_derivative_cases.get_case('rank0:SLSQP|1')
+
+        # Get all derivatives from that case.
+        derivs = deriv_case.get_derivatives()
+
+        # See what derivatives have been recorded.
+        self.assertEqual(set(derivs.keys),
+                         set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
+
+        # Get specific derivative.
+        assert_rel_error(self, derivs['obj', 'z'], [[9.61001056, 1.78448534]], 1e-4)
 
     def test_reading_system_cases(self):
         prob = SellarProblem()
@@ -270,7 +321,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.input2meta['d1.y1']['units'], None)
         self.assertEqual(cr.input2meta['d1.y2']['units'], None)
         self.assertEqual(cr.output2meta['x']['explicit'], True)
-        self.assertEqual(cr.output2meta['x']['type'], {'output', 'desvar'})
+        self.assertEqual(cr.output2meta['x']['type'], ['output', 'desvar'])
         self.assertEqual(cr.input2meta['obj_cmp.y1']['explicit'], True)
         self.assertEqual(cr.input2meta['obj_cmp.y2']['explicit'], True)
         self.assertEqual(cr.output2meta['x']['lower'], -1000)
@@ -376,6 +427,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for c in cr.get_cases():
             self.assertEqual(c.iteration_coordinate, expected_coords[ind])
             ind += 1
+        self.assertEqual(ind, len(expected_coords))
 
         coords_2 = [
             'rank0:SLSQP|0',
@@ -397,6 +449,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for c in cr.get_cases(recursive=True):
             self.assertEqual(c.iteration_coordinate, coords_2[ind])
             ind += 1
+        self.assertEqual(ind, len(coords_2))
 
         coord_children = [
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0'
@@ -407,17 +460,17 @@ class TestSqliteCaseReader(unittest.TestCase):
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_get_child_cases_system(self):
-        prob = SellarProblem(SellarDerivativesGrouped)
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
+        prob.setup()
 
         model = prob.model
         model.add_recorder(self.recorder)
         model.nonlinear_solver.add_recorder(self.recorder)
 
-        prob.setup()
         prob.run_driver()
         prob.cleanup()
 
@@ -436,6 +489,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for c in cr.get_cases(recursive=True):
             self.assertEqual(c.iteration_coordinate, coords[ind])
             ind += 1
+        self.assertEqual(ind, len(coords))
 
     def test_list_outputs(self):
         prob = SellarProblem()
@@ -971,6 +1025,376 @@ def _assert_model_matches_case(case, system):
     model_outputs = system._outputs
     for name, model_output in iteritems(model_outputs._views):
         np.testing.assert_almost_equal(case_outputs[name],model_output)
+
+
+class TestSqliteCaseReaderLegacy(unittest.TestCase):
+
+    def setUp(self):
+        recording_iteration.stack = []  # reset to avoid problems from earlier tests
+
+    def test_driver_v3(self):
+        """
+        Backwards compatibility version 3.
+        Legacy case recording file generated using code from test_record_driver_system_solver
+        test in test_sqlite_recorder.py
+        """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_solver_system_03.sql')
+        cr = CaseReader(filename)
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(cr.driver_cases.num_cases, 6)
+
+        # Test to see if the access by case keys works:
+        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
+                                       [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        case_keys = cr.driver_cases.list_cases()
+        for i, iter_coord in enumerate(case_keys):
+            self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+        # Test driver metadata
+        self.assertIsNotNone(cr.driver_metadata)
+        self.assertTrue('tree' in cr.driver_metadata)
+        self.assertTrue('connections_list' in cr.driver_metadata)
+
+        # While we are here, make sure we can load this case.
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            prob.model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            prob.model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        prob.load_case(seventh_slsqp_iteration_case)
+
+        _assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_driver_v2(self):
+        """ Backwards compatibility version 2. """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_solver_system_02.sql')
+        cr = CaseReader(filename)
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(cr.driver_cases.num_cases, 7)
+
+        # Test to see if the access by case keys works:
+        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
+                                       [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        case_keys = cr.driver_cases.list_cases()
+        for i, iter_coord in enumerate(case_keys):
+            self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+        # Test driver metadata
+        self.assertIsNotNone(cr.driver_metadata)
+        self.assertTrue('tree' in cr.driver_metadata)
+        self.assertTrue('connections_list' in cr.driver_metadata)
+
+        # While we are here, make sure we can load this case.
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            prob.model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            prob.model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        prob.load_case(seventh_slsqp_iteration_case)
+
+        _assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_solver_v2(self):
+        """ Backwards compatibility version 2. """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_solver_system_02.sql')
+        cr = CaseReader(filename)
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(cr.solver_cases.num_cases, 7)
+
+        # Test to see if the access by case keys works:
+        sixth_solver_iteration = cr.solver_cases.get_case('rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0')
+        np.testing.assert_almost_equal(sixth_solver_iteration.outputs['z'],
+                                       [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # Test values from one case, the last case
+        last_case = cr.solver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        case_keys = cr.solver_cases.list_cases()
+        for i, iter_coord in enumerate(case_keys):
+            self.assertEqual(iter_coord, 'rank0:SLSQP|{}|root._solve_nonlinear|{}|NLRunOnce|0'.format(i, i))
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_system_v2(self):
+        """ Backwards compatibility version 2. """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_solver_system_02.sql')
+        cr = CaseReader(filename)
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(cr.system_cases.num_cases, 7)
+
+        # Test to see if the access by case keys works:
+        sixth_system_case = cr.system_cases.get_case('rank0:SLSQP|5|root._solve_nonlinear|5')
+        np.testing.assert_almost_equal(sixth_system_case.outputs['z'],
+                                       [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # Test values from one case, the last case
+        last_case = cr.system_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        case_keys = cr.system_cases.list_cases()
+        for i, iter_coord in enumerate(case_keys):
+            self.assertEqual(iter_coord, 'rank0:SLSQP|{}|root._solve_nonlinear|{}'.format(i, i))
+
+        # Test metadata read correctly
+        self.assertEqual(cr.output2meta['mda.d2.y2']['type'], {'output'})
+        self.assertEqual(cr.output2meta['mda.d2.y2']['size'], 1)
+        self.assertTrue(cr.output2meta['mda.d2.y2']['explicit'], {'output'})
+        self.assertEqual(cr.input2meta['mda.d1.z']['type'], {'input'})
+        self.assertEqual(cr.input2meta['mda.d1.z']['size'], 2)
+        self.assertIsNone(cr.input2meta['mda.d1.z']['units'])
+        self.assertTrue(cr.output2meta['mda.d2.y2']['explicit'], {'output'})
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_driver_v1(self):
+        """ Backwards compatibility oldest version. """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_01.sql')
+        cr = CaseReader(filename)
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(cr.driver_cases.num_cases, 7)
+        self.assertEqual(cr.system_cases.num_cases, 0)
+        self.assertEqual(cr.solver_cases.num_cases, 0)
+
+        # Test to see if the access by case keys works:
+        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
+                                       [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        case_keys = cr.driver_cases.list_cases()
+        for i, iter_coord in enumerate(case_keys):
+            self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+        # While we are here, make sure we can load this case.
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            prob.model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            prob.model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        prob.load_case(seventh_slsqp_iteration_case)
+
+        _assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
+    def test_driver_v1_pre_problem(self):
+        """ Backwards compatibility oldest version. """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        driver.options['print_results'] = False
+        driver.opt_settings['ACC'] = 1e-9
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_driver_pre01.sql')
+        cr = CaseReader(filename)
+
+        # Test to see if we got the correct number of cases
+        self.assertEqual(cr.driver_cases.num_cases, 7)
+        self.assertEqual(cr.system_cases.num_cases, 0)
+        self.assertEqual(cr.solver_cases.num_cases, 0)
+
+        # Test to see if the access by case keys works:
+        seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
+        np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
+                                       [1.97846296,  -2.21388305e-13],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1)
+        np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('pz.z'))
+        np.testing.assert_almost_equal(last_case.outputs['x'], [-0.00309521],
+                                       decimal=2,
+                                       err_msg='Case reader gives '
+                                       'incorrect Parameter value'
+                                       ' for {0}'.format('px.x'))
+
+        # Test to see if the case keys (iteration coords) come back correctly
+        case_keys = cr.driver_cases.list_cases()
+        for i, iter_coord in enumerate(case_keys):
+            self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+
+        # While we are here, make sure we can load this case.
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            prob.model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            prob.model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        prob.load_case(seventh_slsqp_iteration_case)
+
+        _assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
 
 
 if __name__ == "__main__":

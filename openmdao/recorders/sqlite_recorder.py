@@ -2,11 +2,13 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
+from copy import deepcopy
 import io
 import os
 import sqlite3
 
 import warnings
+import json
 import numpy as np
 from six import iteritems
 from six.moves import cPickle as pickle
@@ -19,6 +21,21 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
 from openmdao.solvers.solver import Solver
+
+
+"""
+SQL case output format version history.
+---------------------------------------
+4 -- OpenMDAO 2.4
+    Added variable settings metadata that contains scaling info.
+3 -- OpenMDAO 2.4
+    Storing most data as JSON rather than binary numpy arrays.
+2 -- OpenMDAO 2.4, merged 20 July 2018.
+    Added support for recording derivatives from driver, resulting in a new table.
+1 -- Through OpenMDAO 2.3
+    Original implementation.
+"""
+format_version = 4
 
 
 def array_to_blob(array):
@@ -68,7 +85,26 @@ def blob_to_array(blob):
     return np.load(out)
 
 
-format_version = 1
+def convert_to_list(vals):
+    """
+    Recursively convert arrays, tuples, and sets to lists.
+
+    Parameters
+    ----------
+    vals : numpy.array or list or tuple
+        the object to be converted to a list
+
+    Returns
+    -------
+    list :
+        The converted list.
+    """
+    if isinstance(vals, np.ndarray):
+        return convert_to_list(vals.tolist())
+    elif isinstance(vals, (list, tuple, set)):
+        return [convert_to_list(item) for item in vals]
+    else:
+        return vals
 
 
 class SqliteRecorder(BaseRecorder):
@@ -156,7 +192,7 @@ class SqliteRecorder(BaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata( format_version INT, "
-                          "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, var_settings BLOB)")
+                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -165,29 +201,80 @@ class SqliteRecorder(BaseRecorder):
                           "record_type TEXT, rowid INT)")
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs BLOB, outputs BLOB)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT)")
+                c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
+                          "counter INT, iteration_coordinate TEXT, timestamp REAL, "
+                          "success INT, msg TEXT, derivatives BLOB)")
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, outputs BLOB)")
+                          "success INT, msg TEXT, outputs TEXT)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs BLOB, outputs BLOB, residuals BLOB)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
-                          "solver_inputs BLOB, solver_output BLOB, solver_residuals BLOB)")
+                          "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                          "model_viewer_data BLOB)")
+                          "model_viewer_data TEXT)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
                           "scaling_factors BLOB, component_metadata BLOB)")
                 c.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                           "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
+
+    def _cleanup_abs2meta(self):
+        """
+        Convert all abs2meta variable properties to a form that can be dumped as JSON.
+        """
+        for name in self._abs2meta:
+            if 'lower' in self._abs2meta[name]:
+                self._abs2meta[name]['lower'] = convert_to_list(self._abs2meta[name]['lower'])
+            if 'upper' in self._abs2meta[name]:
+                self._abs2meta[name]['upper'] = convert_to_list(self._abs2meta[name]['upper'])
+            for prop in self._abs2meta[name]:
+                val = self._abs2meta[name][prop]
+                if isinstance(val, np.int8) or isinstance(val, np.int16) or\
+                   isinstance(val, np.int32) or isinstance(val, np.int64):
+                    self._abs2meta[name][prop] = val.item()
+                elif isinstance(val, tuple):
+                    self._abs2meta[name][prop] = [int(v) for v in val]
+
+    def _cleanup_var_settings(self, var_settings):
+        """
+        Convert all var_settings variable properties to a form that can be dumped as JSON.
+
+        Parameters
+        ----------
+        var_settings : dict
+            Dictionary mapping absolute variable names to variable settings.
+
+        Returns
+        -------
+        var_settings : dict
+            Dictionary mapping absolute variable names to var settings that are JSON compatible.
+        """
+        # otherwise we trample on values that are used elsewhere
+        var_settings = deepcopy(var_settings)
+        for name in var_settings:
+            if 'lower' in var_settings[name]:
+                var_settings[name]['lower'] = convert_to_list(var_settings[name]['lower'])
+            if 'upper' in var_settings[name]:
+                var_settings[name]['upper'] = convert_to_list(var_settings[name]['upper'])
+            for prop in var_settings[name]:
+                val = var_settings[name][prop]
+                if isinstance(val, np.int8) or isinstance(val, np.int16) or\
+                   isinstance(val, np.int32) or isinstance(val, np.int64):
+                    var_settings[name][prop] = val.item()
+                elif isinstance(val, tuple):
+                    var_settings[name][prop] = [int(v) for v in val]
+
+        return var_settings
 
     def startup(self, recording_requester):
         """
@@ -244,36 +331,39 @@ class SqliteRecorder(BaseRecorder):
                 for name in var_set:
                     if name not in self._abs2meta:
                         self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-                        self._abs2meta[name]['type'] = set()
+                        self._abs2meta[name]['type'] = []
                         if name in states:
                             self._abs2meta[name]['explicit'] = False
 
                     if var_type not in self._abs2meta[name]['type']:
-                        self._abs2meta[name]['type'].add(var_type)
+                        self._abs2meta[name]['type'].append(var_type)
                     self._abs2meta[name]['explicit'] = True
 
             for name in inputs:
                 self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-                self._abs2meta[name]['type'] = set()
-                self._abs2meta[name]['type'].add('input')
+                self._abs2meta[name]['type'] = []
+                self._abs2meta[name]['type'].append('input')
                 self._abs2meta[name]['explicit'] = True
                 if name in states:
                     self._abs2meta[name]['explicit'] = False
 
+            self._cleanup_abs2meta()
+
             # store the updated abs2prom and prom2abs
-            abs2prom = pickle.dumps(self._abs2prom)
-            prom2abs = pickle.dumps(self._prom2abs)
-            abs2meta = pickle.dumps(self._abs2meta)
+            abs2prom = json.dumps(self._abs2prom)
+            prom2abs = json.dumps(self._prom2abs)
+            abs2meta = json.dumps(self._abs2meta)
 
             var_settings = {}
             var_settings.update(desvars)
             var_settings.update(objectives)
             var_settings.update(constraints)
-            var_settings_blob = pickle.dumps(var_settings)
+            var_settings = self._cleanup_var_settings(var_settings)
+            var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:
                 c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?",
-                          (abs2prom, prom2abs, abs2meta, var_settings_blob))
+                          (abs2prom, prom2abs, abs2meta, var_settings_json))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
@@ -292,11 +382,15 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['out']
             inputs = data['in']
 
-            outputs_array = values_to_array(outputs)
-            inputs_array = values_to_array(inputs)
+            # convert to list so this can be dumped as JSON
+            for in_out in (inputs, outputs):
+                if in_out is None:
+                    continue
+                for var in in_out:
+                    in_out[var] = convert_to_list(in_out[var])
 
-            outputs_blob = array_to_blob(outputs_array)
-            inputs_blob = array_to_blob(inputs_array)
+            outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -305,7 +399,7 @@ class SqliteRecorder(BaseRecorder):
                           "timestamp, success, msg, inputs, outputs) VALUES(?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_blob, outputs_blob))
+                           inputs_text, outputs_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('driver', c.lastrowid))
@@ -325,8 +419,13 @@ class SqliteRecorder(BaseRecorder):
         """
         if self.connection:
             outputs = data['out']
-            outputs_array = values_to_array(outputs)
-            outputs_blob = array_to_blob(outputs_array)
+
+            # convert to list so this can be dumped as JSON
+            if outputs is not None:
+                for var in outputs:
+                    outputs[var] = convert_to_list(outputs[var])
+
+            outputs_text = json.dumps(outputs)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -335,7 +434,7 @@ class SqliteRecorder(BaseRecorder):
                           "timestamp, success, msg, outputs) VALUES(?,?,?,?,?,?)",
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           outputs_blob))
+                           outputs_text))
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
@@ -355,13 +454,16 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['o']
             residuals = data['r']
 
-            inputs_array = values_to_array(inputs)
-            outputs_array = values_to_array(outputs)
-            residuals_array = values_to_array(residuals)
+            # convert to list so this can be dumped as JSON
+            for i_o_r in (inputs, outputs, residuals):
+                if i_o_r is None:
+                    continue
+                for var in i_o_r:
+                    i_o_r[var] = convert_to_list(i_o_r[var])
 
-            inputs_blob = array_to_blob(inputs_array)
-            outputs_blob = array_to_blob(outputs_array)
-            residuals_blob = array_to_blob(residuals_array)
+            outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -371,7 +473,7 @@ class SqliteRecorder(BaseRecorder):
                           "VALUES(?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_blob, outputs_blob, residuals_blob))
+                           inputs_text, outputs_text, residuals_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('system', c.lastrowid))
@@ -396,13 +498,16 @@ class SqliteRecorder(BaseRecorder):
             outputs = data['o']
             residuals = data['r']
 
-            inputs_array = values_to_array(inputs)
-            outputs_array = values_to_array(outputs)
-            residuals_array = values_to_array(residuals)
+            # convert to list so this can be dumped as JSON
+            for i_o_r in (inputs, outputs, residuals):
+                if i_o_r is None:
+                    continue
+                for var in i_o_r:
+                    i_o_r[var] = convert_to_list(i_o_r[var])
 
-            inputs_blob = array_to_blob(inputs_array)
-            outputs_blob = array_to_blob(outputs_array)
-            residuals_blob = array_to_blob(residuals_array)
+            outputs_text = json.dumps(outputs)
+            inputs_text = json.dumps(inputs)
+            residuals_text = json.dumps(residuals)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
@@ -413,7 +518,7 @@ class SqliteRecorder(BaseRecorder):
                           "VALUES(?,?,?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           abs, rel, inputs_blob, outputs_blob, residuals_blob))
+                           abs, rel, inputs_text, outputs_text, residuals_text))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
                           ('solver', c.lastrowid))
@@ -429,9 +534,7 @@ class SqliteRecorder(BaseRecorder):
         """
         if self.connection:
             driver_class = type(recording_requester).__name__
-            model_viewer_data = pickle.dumps(recording_requester._model_viewer_data,
-                                             self._pickle_version)
-            model_viewer_data = sqlite3.Binary(model_viewer_data)
+            model_viewer_data = json.dumps(recording_requester._model_viewer_data)
 
             try:
                 with self.connection as c:
@@ -450,26 +553,12 @@ class SqliteRecorder(BaseRecorder):
             The System that would like to record its metadata.
         """
         if self.connection:
-            # Cannot handle PETScVector yet
-            from openmdao.api import PETScVector
-            if PETScVector and isinstance(recording_requester._outputs, PETScVector):
-                return  # Cannot handle PETScVector yet
+            scaling_vecs, user_options = self._get_metadata_system(recording_requester)
 
-            # collect scaling arrays
-            scaling_vecs = {}
-            for kind, odict in iteritems(recording_requester._vectors):
-                scaling_vecs[kind] = scaling = {}
-                for vecname, vec in iteritems(odict):
-                    scaling[vecname] = vec._scaling
+            if scaling_vecs is None:
+                return
+
             scaling_factors = pickle.dumps(scaling_vecs, self._pickle_version)
-
-            # create a copy of the system's metadata excluding what is in 'options_excludes'
-            user_options = OptionsDictionary()
-            excludes = recording_requester.recording_options['options_excludes']
-            for key in recording_requester.options._dict:
-                if check_path(key, [], excludes, True):
-                    user_options._dict[key] = recording_requester.options._dict[key]
-            user_options._read_only = recording_requester.options._read_only
 
             # try to pickle the metadata, report if it failed
             try:
@@ -491,7 +580,12 @@ class SqliteRecorder(BaseRecorder):
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
             with self.connection as c:
-                c.execute("INSERT INTO system_metadata(id, scaling_factors, component_metadata) "
+                # Because we can have a recorder attached to multiple Systems,
+                #   and because we are now recording System metadata recursively,
+                #   we can store System metadata multiple times. Need to ignore when that happens
+                #   so we don't get database errors. So use OR IGNORE
+                c.execute("INSERT OR IGNORE INTO system_metadata"
+                          "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))
 
     def record_metadata_solver(self, recording_requester):
@@ -515,6 +609,33 @@ class SqliteRecorder(BaseRecorder):
             with self.connection as c:
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
                           "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
+
+    def record_derivatives_driver(self, recording_requester, data, metadata):
+        """
+        Record derivatives data from a Driver.
+
+        Parameters
+        ----------
+        recording_requester : object
+            Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        if self.connection:
+
+            data_array = values_to_array(data)
+            data_blob = array_to_blob(data_array)
+
+            with self.connection as c:
+                c = c.cursor()  # need a real cursor for lastrowid
+
+                c.execute("INSERT INTO driver_derivatives(counter, iteration_coordinate, "
+                          "timestamp, success, msg, derivatives) VALUES(?,?,?,?,?,?)",
+                          (self._counter, self._iteration_coordinate,
+                           metadata['timestamp'], metadata['success'], metadata['msg'],
+                           data_blob))
 
     def shutdown(self):
         """

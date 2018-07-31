@@ -1,7 +1,7 @@
 """
 Class definition for BaseRecorder, the base class for all recorders.
 """
-from six import StringIO
+from six import StringIO, iteritems
 
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
@@ -9,6 +9,8 @@ from openmdao.solvers.solver import Solver
 from openmdao.core.problem import Problem
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.mpi import MPI
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.record_util import check_path
 
 
 class BaseRecorder(object):
@@ -116,6 +118,29 @@ class BaseRecorder(object):
             The Driver that would like to record its metadata.
         """
         raise NotImplementedError()
+
+    def _get_metadata_system(self, recording_requester):
+        # Cannot handle PETScVector yet
+        from openmdao.api import PETScVector
+        if PETScVector and isinstance(recording_requester._outputs, PETScVector):
+            return None, None  # Cannot handle PETScVector yet
+
+        # collect scaling arrays
+        scaling_vecs = {}
+        for kind, odict in iteritems(recording_requester._vectors):
+            scaling_vecs[kind] = scaling = {}
+            for vecname, vec in iteritems(odict):
+                scaling[vecname] = vec._scaling
+
+        # create a copy of the system's metadata excluding what is in 'options_excludes'
+        user_options = OptionsDictionary()
+        excludes = recording_requester.recording_options['options_excludes']
+        for key in recording_requester.options._dict:
+            if check_path(key, [], excludes, True):
+                user_options._dict[key] = recording_requester.options._dict[key]
+        user_options._read_only = recording_requester.options._read_only
+
+        return scaling_vecs, user_options
 
     def record_metadata_system(self, recording_requester):
         """
@@ -232,6 +257,44 @@ class BaseRecorder(object):
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_iteration_problem has not been overridden")
+
+    def record_derivatives(self, recording_requester, data, metadata, **kwargs):
+        """
+        Route the record_derivatives call to the proper method.
+
+        Parameters
+        ----------
+        recording_requester : object
+            System, Solver, Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
+        metadata : dict
+            Dictionary containing execution metadata.
+        **kwargs : keyword args
+            Some implementations of record_derivatives need additional args.
+        """
+        if not self._parallel:
+            if MPI and MPI.COMM_WORLD.rank > 0:
+                raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
+
+        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
+
+        self.record_derivatives_driver(recording_requester, data, metadata)
+
+    def record_derivatives_driver(self, recording_requester, data, metadata):
+        """
+        Record derivatives data from a Driver.
+
+        Parameters
+        ----------
+        recording_requester : Driver
+            Driver in need of recording.
+        data : dict
+            Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
+        metadata : dict
+            Dictionary containing execution metadata.
+        """
+        raise NotImplementedError("record_derivatives_driver has not been overridden")
 
     def shutdown(self):
         """

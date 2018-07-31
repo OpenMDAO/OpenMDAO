@@ -405,8 +405,21 @@ class PromotedToAbsoluteMap:
             io = 'output' if output else 'input'
             self.keys = []
             for n in var_names:
-                if n in self._abs2prom[io]:
-                    self.keys.append(self._abs2prom[io][n])
+
+                # Recorded derivatives.
+                if ',' in n:
+                    of, wrt = n.split(',')
+                    if of in self._abs2prom[io]:
+                        of = self._abs2prom[io][of]
+                    if wrt in self._abs2prom[io]:
+                        wrt = self._abs2prom[io][wrt]
+
+                    self.keys.append((of, wrt))
+
+                # Recorded vector variables.
+                else:
+                    if n in self._abs2prom[io]:
+                        self.keys.append(self._abs2prom[io][n])
 
     def __getitem__(self, key):
         """
@@ -415,7 +428,7 @@ class PromotedToAbsoluteMap:
         Parameters
         ----------
         key : string
-            variable name.
+            Variable name.
 
         Returns
         -------
@@ -432,7 +445,20 @@ class PromotedToAbsoluteMap:
 
         # outputs only have one option in _prom2abs
         if self._is_output:
-            return self._values[self._prom2abs['output'][key][0]]
+
+            # Recorded derivatives.
+            if isinstance(key, tuple):
+                of, wrt = key
+                if of in self._prom2abs['output']:
+                    of = self._prom2abs['output'][of][0]
+                if wrt in self._prom2abs['output']:
+                    wrt = self._prom2abs['output'][wrt][0]
+
+                return self._values[','.join((of, wrt))]
+
+            # Recorded vector variables.
+            else:
+                return self._values[self._prom2abs['output'][key][0]]
 
         # inputs may have multiple options, so we try until we succeed
         for k in self._prom2abs['input'][key]:
@@ -477,3 +503,88 @@ class PromotedToAbsoluteMap:
             Next key in the keys array.
         """
         return self.next()
+
+
+class DriverDerivativesCase(object):
+    """
+    Wrap data from a derivative calculation in a Driver recording to make it more accessible.
+
+    Attributes
+    ----------
+    filename : str
+        The file from which the case was loaded.
+    counter : int
+        The global execution counter.
+    iteration_coordinate : str
+        The string that holds the full unique identifier for this iteration.
+    timestamp : float
+        Time of execution of the case.
+    success : str
+        Success flag for the case.
+    msg : str
+        Message associated with the case.
+    prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
+    totals : PromotedToAbsoluteMap
+        Map of inputs to values recorded.
+    """
+
+    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, totals,
+                 prom2abs, abs2prom, meta):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The filename from which the Case was constructed.
+        counter : int
+            The global execution counter.
+        iteration_coordinate : str
+            The string that holds the full unique identifier for this iteration.
+        timestamp : float
+            Time of execution of the case.
+        success : str
+            Success flag for the case.
+        msg : str
+            Message associated with the case.
+        totals : array
+            Derivatives to read in from the recording file.
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
+        abs2prom : {'input': dict, 'output': dict}
+            Dictionary mapping absolute names to promoted names.
+        meta : dict
+            Dictionary mapping absolute variable names to variable metadata.
+        """
+        self.filename = filename
+        self.counter = counter
+        self.iteration_coordinate = iteration_coordinate
+
+        self.timestamp = timestamp
+        self.success = success
+        self.msg = msg
+        self.meta = meta
+        self.prom2abs = prom2abs
+        self.abs2prom = abs2prom
+
+        if totals is not None and totals.dtype.names:
+            self.totals = PromotedToAbsoluteMap(totals[0], prom2abs, abs2prom, output=True)
+
+    def get_derivatives(self):
+        """
+        Get the derivatives and their values.
+
+        Returns
+        -------
+        PromotedToAbsoluteMap
+            Map of derivatives to their values.
+        """
+        ret_vars = {}
+        for var in self.totals._values.dtype.names:
+            ret_vars[var] = self.totals._values[var]
+        return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom, output=True)
