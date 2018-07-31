@@ -23,6 +23,7 @@ any of the following:
     #. Driver iterations
     #. System iterations
     #. Solver iterations
+    #. Driver derivatives
 
 Retrieving Cases
 ----------------
@@ -143,7 +144,7 @@ to the database (with the exception of recurring requests, which are cached). Th
 pose a problem when you only intend to access a small subset of the cases or the database is
 already small, but can be very slow when you're requesting many cases from a large
 recording. To increase efficiency in this scenario you should use the CaseReader's
-:code:`load_cases` method, which loads all driver, solver, and system cases into memory
+:code:`load_cases` method, which loads all driver, solver, system, and problem cases into memory
 with minimal queries.
 
 To use this method, simply create the CaseReader, call the `load_cases` method, and use the
@@ -155,9 +156,9 @@ reader as you normally would.
     cr.load_cases()
     ...
 
-Alternatively, if you only intend to iterate over one or two types of cases (driver, solver, or system)
+Alternatively, if you only intend to iterate over one or two types of cases (driver, solver, system, or problem)
 then you can avoid pulling the entire recording into memory by using the :code:`load_cases` method on
-the CaseReader's `driver_cases`, `solver_cases`, or `system_cases` individually.
+the CaseReader's `driver_cases`, `solver_cases`, `system_cases`, or `problem_cases` individually.
 
 .. code-block:: console
 

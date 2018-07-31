@@ -69,9 +69,13 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        self._inputs.read_only = self._outputs.read_only = True
+
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+
+        self._inputs.read_only = self._outputs.read_only = False
 
     def _solve_nonlinear(self):
         """
@@ -89,28 +93,35 @@ class ImplicitComponent(Component):
         # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
 
+        self._inputs.read_only = True
+
         if self._nonlinear_solver is not None:
             with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                 result = self._nonlinear_solver.solve()
-            return result
-
         else:
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                     result = self.solve_nonlinear(self._inputs, self._outputs)
-            if result is None:
-                return False, 0., 0.
-            elif type(result) is bool:
-                return result, 0., 0.
-            else:
-                return result
+
+        self._inputs.read_only = False
+
+        if result is None:
+            return False, 0., 0.
+        elif type(result) is bool:
+            return result, 0., 0.
+        else:
+            return result
 
     def _guess_nonlinear(self):
         """
         Provide initial guess for states.
         """
+        self._inputs.read_only = self._residuals.read_only = True
+
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+
+        self._inputs.read_only = self._residuals.read_only = False
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -152,6 +163,13 @@ class ImplicitComponent(Component):
                 if not self.matrix_free:
                     continue
 
+                # set appropriate vectors to read_only to help prevent user error
+                self._inputs.read_only = self._outputs.read_only = True
+                if mode == 'fwd':
+                    d_inputs.read_only = d_outputs.read_only = True
+                elif mode == 'rev':
+                    d_residuals.read_only = True
+
                 # Jacobian and vectors are all unscaled, dimensional
                 with self._unscaled_context(
                         outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
@@ -175,6 +193,9 @@ class ImplicitComponent(Component):
                         else:
                             self.apply_linear(self._inputs, self._outputs,
                                               d_inputs, d_outputs, d_residuals, mode)
+
+                self._inputs.read_only = self._outputs.read_only = False
+                d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -214,6 +235,12 @@ class ImplicitComponent(Component):
                 d_outputs = self._vectors['output'][vec_name]
                 d_residuals = self._vectors['residual'][vec_name]
 
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_residuals.read_only = True
+                elif mode == 'rev':
+                    d_outputs.read_only = True
+
                 with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     with Recording(self.pathname + '._solve_linear', self.iter_count, self):
                         if d_outputs._ncol > 1:
@@ -245,6 +272,8 @@ class ImplicitComponent(Component):
                     abs_errors.append(result[1])
                     rel_errors.append(result[2])
 
+                d_outputs.read_only = d_residuals.read_only = False
+
             return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
     def _linearize(self, jac=None, sub_do_ln=True):
@@ -263,7 +292,12 @@ class ImplicitComponent(Component):
             # override FD'd values.
             for approximation in itervalues(self._approx_schemes):
                 approximation.compute_approximations(self, jac=self._jacobian)
+
+            self._inputs.read_only = self._outputs.read_only = True
+
             self.linearize(self._inputs, self._outputs, self._jacobian)
+
+            self._inputs.read_only = self._outputs.read_only = False
 
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)

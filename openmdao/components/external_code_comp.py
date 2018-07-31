@@ -22,7 +22,6 @@ class ExternalCodeDelegate(object):
     ----------
     _comp : ExternalCodeComp or ExternalCodeImplicitComp object
         The external code object this delegate is associated with.
-
     """
 
     def __init__(self, comp):
@@ -33,16 +32,12 @@ class ExternalCodeDelegate(object):
         ----------
         comp : ExternalCodeComp or ExternalCodeImplicitComp object
             The external code object this delegate is associated with.
-
         """
         self._comp = comp
 
     def declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
-
-        Options are declared here because this class is intended to be subclassed by
-        the end user. The `initialize` method is left available for user-defined options.
         """
         comp = self._comp
 

@@ -6,12 +6,12 @@ if PY3:
     import pickle
 
 import sqlite3
-
 import numpy as np
+import json
 
 from contextlib import contextmanager
 
-from openmdao.utils.record_util import format_iteration_coordinate
+from openmdao.utils.record_util import format_iteration_coordinate, json_to_np_array
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
@@ -31,37 +31,34 @@ def database_cursor(filename):
 
 def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     """
-        Expected can be from multiple cases.
+    Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         # iterate through the cases
         for coord, (t0, t1), outputs_expected, inputs_expected in expected:
             iter_coord = format_iteration_coordinate(coord, prefix=prefix)
-
             # from the database, get the actual data recorded
             db_cur.execute("SELECT * FROM driver_iterations WHERE "
                            "iteration_coordinate=:iteration_coordinate",
                            {"iteration_coordinate": iter_coord})
             row_actual = db_cur.fetchone()
 
-            db_cur.execute("SELECT abs2meta FROM metadata")
-            row_abs2meta = db_cur.fetchone()
-
             test.assertTrue(row_actual,
                             'Driver iterations table does not contain the requested '
                             'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
-                input_blob, output_blob = row_actual
+                inputs_text, outputs_text = row_actual
 
-            if PY2:
-                abs2meta = pickle.loads(str(row_abs2meta[0])) if row_abs2meta[0] is not None else None
-            else:
-                abs2meta = pickle.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
-
-            inputs_actual = blob_to_array(input_blob)
-            outputs_actual = blob_to_array(output_blob)
+            if f_version == 3:
+                inputs_actual = json_to_np_array(inputs_text)
+                outputs_actual = json_to_np_array(outputs_text)
+            elif f_version in (1, 2):
+                inputs_actual = blob_to_array(inputs_text)
+                outputs_actual = blob_to_array(outputs_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -75,7 +72,10 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    test.assertEqual(actual, np.array(None, dtype=object))
+                    if f_version == 3:
+                        test.assertIsNone(actual)
+                    if f_version in (1, 2):
+                        test.assertEqual(actual, np.array(None, dtype=object))
                 else:
                     actual = actual[0]
                     # Check to see if the number of values in actual and expected match
@@ -89,11 +89,64 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                         assert_rel_error(test, actual[key], expected[key], tolerance)
 
 
+def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
+    """
+    Expected can be from multiple cases.
+    """
+    with database_cursor(test.filename) as db_cur:
+
+        # iterate through the cases
+        for coord, (t0, t1), totals_expected in expected:
+
+            iter_coord = format_iteration_coordinate(coord, prefix=prefix)
+
+            # from the database, get the actual data recorded
+            db_cur.execute("SELECT * FROM driver_derivatives WHERE "
+                           "iteration_coordinate=:iteration_coordinate",
+                           {"iteration_coordinate": iter_coord})
+            row_actual = db_cur.fetchone()
+
+            db_cur.execute("SELECT abs2meta FROM metadata")
+            row_abs2meta = db_cur.fetchone()
+
+            test.assertTrue(row_actual,
+                            'Driver iterations table does not contain the requested '
+                            'iteration coordinate: "{}"'.format(iter_coord))
+
+            counter, global_counter, iteration_coordinate, timestamp, success, msg,\
+                totals_blob = row_actual
+            abs2meta = json.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
+
+            totals_actual = blob_to_array(totals_blob)
+
+            # Does the timestamp make sense?
+            test.assertTrue(t0 <= timestamp and timestamp <= t1)
+
+            test.assertEqual(success, 1)
+            test.assertEqual(msg, '')
+
+            if totals_expected is None:
+                test.assertEqual(totals_actual, np.array(None, dtype=object))
+            else:
+                actual = totals_actual[0]
+                # Check to see if the number of values in actual and expected match
+                test.assertEqual(len(actual), len(totals_expected))
+                for key, value in iteritems(totals_expected):
+                    # Check to see if the keys in the actual and expected match
+                    test.assertTrue(key in actual.dtype.names,
+                                    '{} variable not found in actual data'
+                                    ' from recorder'.format(key))
+                    # Check to see if the values in actual and expected match
+                    assert_rel_error(test, actual[key], totals_expected[key], tolerance)
+
+
 def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
     """
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         # iterate through the cases
         for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
@@ -107,12 +160,17 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             test.assertTrue(row_actual, 'System iterations table does not contain the requested '
                                         'iteration coordinate: "{}"'.format(iter_coord))
 
-            counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-                outputs_blob, residuals_blob = row_actual
+            counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
+                outputs_text, residuals_text = row_actual
 
-            inputs_actual = blob_to_array(inputs_blob)
-            outputs_actual = blob_to_array(outputs_blob)
-            residuals_actual = blob_to_array(residuals_blob)
+            if f_version == 3:
+                inputs_actual = json_to_np_array(inputs_text)
+                outputs_actual = json_to_np_array(outputs_text)
+                residuals_actual = json_to_np_array(residuals_text)
+            elif f_version in (1, 2):
+                inputs_actual = blob_to_array(inputs_text)
+                outputs_actual = blob_to_array(outputs_text)
+                residuals_actual = blob_to_array(residuals_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1)
@@ -127,7 +185,10 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    test.assertEqual(actual, np.array(None, dtype=object))
+                    if f_version == 3:
+                        test.assertIsNone(actual)
+                    if f_version in (1, 2):
+                        test.assertEqual(actual, np.array(None, dtype=object))
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
@@ -145,6 +206,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         # iterate through the cases
         for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
@@ -160,10 +223,14 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                                         'iteration coordinate: "{}"'.format(iter_coord))
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-                input_blob, output_blob, residuals_blob = row_actual
+                input_blob, output_text, residuals_text = row_actual
 
-            output_actual = blob_to_array(output_blob)
-            residuals_actual = blob_to_array(residuals_blob)
+            if f_version == 3:
+                output_actual = json_to_np_array(output_text)
+                residuals_actual = json_to_np_array(residuals_text)
+            elif f_version in (1, 2):
+                output_actual = blob_to_array(output_text)
+                residuals_actual = blob_to_array(residuals_text)
 
             # Does the timestamp make sense?
             test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
@@ -184,7 +251,10 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    test.assertEqual(actual, np.array(None, dtype=object))
+                    if f_version == 3:
+                        test.assertIsNone(actual)
+                    if f_version in (1, 2):
+                        test.assertEqual(actual, np.array(None, dtype=object))
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
@@ -206,12 +276,8 @@ def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
         format_version_actual = row[0]
         format_version_expected = format_version
 
-        if PY2:
-            prom2abs = pickle.loads(str(row[1])) if row[1] is not None else None
-            abs2prom = pickle.loads(str(row[2])) if row[2] is not None else None
-        if PY3:
-            prom2abs = pickle.loads(row[1]) if row[1] is not None else None
-            abs2prom = pickle.loads(row[2]) if row[2] is not None else None
+        prom2abs = json.loads(str(row[1]))
+        abs2prom = json.loads(str(row[2]))
 
         if prom2abs is None:
             test.assertIsNone(expected_prom2abs)
@@ -233,6 +299,8 @@ def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
 def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
 
     with database_cursor(test.filename) as db_cur:
+        db_cur.execute("SELECT format_version FROM metadata")
+        f_version = db_cur.fetchone()[0]
 
         db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = db_cur.fetchone()
@@ -241,10 +309,7 @@ def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
             test.assertIsNone(row)
             return
 
-        if PY2:
-            model_viewer_data = pickle.loads(str(row[0]))
-        if PY3:
-            model_viewer_data = pickle.loads(row[0])
+        model_viewer_data = json.loads(row[0])
 
         if expect_none_viewer_data:
             test.assertIsNone(model_viewer_data)

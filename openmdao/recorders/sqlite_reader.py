@@ -3,21 +3,25 @@ Definition of the SqliteCaseReader.
 """
 from __future__ import print_function, absolute_import
 
+import os
 import re
 import sys
 import sqlite3
+from collections import OrderedDict
+
+from six import PY2, PY3, reraise
+from six.moves import range
+
+import json
 import numpy as np
 
-from collections import OrderedDict
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
-    PromotedToAbsoluteMap
+    PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
-from openmdao.recorders.sqlite_recorder import blob_to_array
-from openmdao.utils.record_util import is_valid_sqlite3_db
+from openmdao.utils.record_util import is_valid_sqlite3_db, json_to_np_array, convert_to_np_array
+from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.write_outputs import write_outputs
-
-from six import PY2, PY3
 
 if PY2:
     import cPickle as pickle
@@ -67,8 +71,12 @@ class SqliteCaseReader(BaseCaseReader):
 
         if filename is not None:
             if not is_valid_sqlite3_db(filename):
-                raise IOError('File does not contain a valid '
-                              'sqlite database ({0})'.format(filename))
+                if not os.path.exists(filename):
+                    raise IOError('File does not exist({0})'.format(filename))
+                else:
+                    raise IOError('File does not contain a valid '
+                                  'sqlite database ({0})'.format(filename))
+
         self._coordinate_split_re = re.compile('\|\\d+\|*')
 
         with sqlite3.connect(self.filename) as con:
@@ -80,14 +88,38 @@ class SqliteCaseReader(BaseCaseReader):
             self._prom2abs = None
             self._abs2meta = None
 
-            if PY2:
-                self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
-                self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
-                self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
-            if PY3:
-                self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
-                self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
-                self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+            if self.format_version == 3:
+                self._abs2prom = json.loads(row[1])
+                self._prom2abs = json.loads(row[2])
+                self._abs2meta = json.loads(row[3])
+
+                for name in self._abs2meta:
+                    if 'lower' in self._abs2meta[name]:
+                        self._abs2meta[name]['lower'] =\
+                            convert_to_np_array(self._abs2meta[name]['lower'])
+                    if 'upper' in self._abs2meta[name]:
+                        self._abs2meta[name]['upper'] =\
+                            convert_to_np_array(self._abs2meta[name]['upper'])
+            elif self.format_version in (1, 2):
+                if PY2:
+                    self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
+                    self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
+                    self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
+
+                if PY3:
+                    try:
+                        self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
+                        self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
+                        self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                    except TypeError:
+                        # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+                        self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not\
+                            None else None
+                        self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not\
+                            None else None
+                        self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not\
+                            None else None
+
         con.close()
 
         self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
@@ -108,16 +140,19 @@ class SqliteCaseReader(BaseCaseReader):
         The `iterations` table is read to load the keys which identify
         the individual cases/iterations from the recorded file.
         """
-        self.driver_cases = DriverCases(self.filename, self._abs2prom,
+        self.driver_cases = DriverCases(self.filename, self.format_version, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
-        self.system_cases = SystemCases(self.filename, self._abs2prom,
+        self.driver_derivative_cases = DriverDerivativeCases(self.filename, self.format_version,
+                                                             self._abs2prom, self._abs2meta,
+                                                             self._prom2abs)
+        self.system_cases = SystemCases(self.filename, self.format_version, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
-        self.solver_cases = SolverCases(self.filename, self._abs2prom,
+        self.solver_cases = SolverCases(self.filename, self.format_version, self._abs2prom,
                                         self._abs2meta, self._prom2abs)
-        self.problem_cases = ProblemCases(self.filename, self._abs2prom,
+        self.problem_cases = ProblemCases(self.filename, self.format_version, self._abs2prom,
                                           self._abs2meta, self._prom2abs)
 
-        if self.format_version in (1,):
+        if self.format_version in range(1, format_version + 1):
             with sqlite3.connect(self.filename) as con:
 
                 # Read in iterations from Drivers, Systems, Problems, and Solvers
@@ -126,6 +161,19 @@ class SqliteCaseReader(BaseCaseReader):
                 rows = cur.fetchall()
                 self.driver_cases._case_keys = [coord[0] for coord in rows]
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
+
+                try:
+                    cur.execute("SELECT iteration_coordinate FROM driver_derivatives "
+                                "ORDER BY id ASC")
+                    rows = cur.fetchall()
+                    dcase = self.driver_derivative_cases
+                    dcase._case_keys = [coord[0] for coord in rows]
+                    dcase.num_cases = len(dcase._case_keys)
+
+                except sqlite3.OperationalError as err:
+                    # Cases recorded in version 1 won't have a derivatives table.
+                    if self.format_version >= 2:
+                        reraise(*sys.exc_info())
 
                 cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
                 rows = cur.fetchall()
@@ -137,18 +185,29 @@ class SqliteCaseReader(BaseCaseReader):
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
 
-                cur.execute("SELECT case_name FROM problem_cases")
-                rows = cur.fetchall()
-                self.problem_cases._case_keys = [coord[0] for coord in rows]
-                self.problem_cases.num_cases = len(self.problem_cases._case_keys)
+                try:
+                    cur.execute("SELECT case_name FROM problem_cases ORDER BY id ASC")
+                    rows = cur.fetchall()
+                    self.problem_cases._case_keys = [coord[0] for coord in rows]
+                    self.problem_cases.num_cases = len(self.problem_cases._case_keys)
+
+                except sqlite3.OperationalError as err:
+                    # Cases recorded in some early iterations of version 1 won't have a problem
+                    # table.
+                    if self.format_version >= 2:
+                        reraise(*sys.exc_info())
 
                 # Read in metadata for Drivers, Systems, and Solvers
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
-                for row in cur:
-                    if PY2:
-                        self.driver_metadata = pickle.loads(str(row[0]))
-                    if PY3:
-                        self.driver_metadata = pickle.loads(row[0])
+                row = cur.fetchone()
+                if row is not None:
+                    if self.format_version == 3:
+                        self.driver_metadata = json.loads(row[0])
+                    elif self.format_version in (1, 2):
+                        if PY2:
+                            self.driver_metadata = pickle.loads(str(row[0]))
+                        if PY3:
+                            self.driver_metadata = pickle.loads(row[0])
 
                 cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
                 for row in cur:
@@ -186,6 +245,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.driver_cases.load_cases()
         self.solver_cases.load_cases()
         self.system_cases.load_cases()
+        self.problem_cases.load_cases()
 
     def get_cases(self, parent=None, recursive=False):
         """
@@ -723,6 +783,35 @@ class DriverCases(BaseCases):
     Case specific to the entries that might be recorded in a Driver iteration.
     """
 
+    def _extract_case_from_row(self, row):
+        """
+        Pull data out of a queried SQLite row.
+
+        Parameters
+        ----------
+        row : (id, counter, iter_coordinate, timestamp, success, msg, inputs, outputs)
+            Queried SQLite driver table row.
+
+        Returns
+        -------
+        DriverCase
+            Case for associated row.
+        """
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
+            outputs_text, = row
+
+        if self.format_version == 3:
+            inputs_array = json_to_np_array(inputs_text)
+            outputs_array = json_to_np_array(outputs_text)
+        elif self.format_version in (1, 2):
+            inputs_array = blob_to_array(inputs_text)
+            outputs_array = blob_to_array(outputs_text)
+
+        case = DriverCase(self.filename, counter, iteration_coordinate, timestamp,
+                          success, msg, inputs_array, outputs_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
+        return case
+
     def load_cases(self):
         """
         Load all driver cases into memory.
@@ -732,16 +821,8 @@ class DriverCases(BaseCases):
             cur.execute("SELECT * FROM driver_iterations")
             rows = cur.fetchall()
             for row in rows:
-                idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-                    outputs_blob, = row
-
-                inputs_array = blob_to_array(inputs_blob)
-                outputs_array = blob_to_array(outputs_blob)
-
-                case = DriverCase(self.filename, counter, iteration_coordinate, timestamp,
-                                  success, msg, inputs_array, outputs_array,
-                                  self._prom2abs, self._abs2prom, self._abs2meta)
-                self._cases[iteration_coordinate] = case
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
 
     def get_case(self, case_id):
         """
@@ -771,18 +852,85 @@ class DriverCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob, \
-            outputs_blob, = row
-
-        inputs_array = blob_to_array(inputs_blob)
-        outputs_array = blob_to_array(outputs_blob)
-
-        case = DriverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          inputs_array, outputs_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta)
+        case = self._extract_case_from_row(row)
 
         # save so we don't query again
-        self._cases[iteration_coordinate] = case
+        self._cases[case.iteration_coordinate] = case
+        return case
+
+
+class DriverDerivativeCases(BaseCases):
+    """
+    Case specific to the entries that might be recorded in a Driver derivatives computation.
+    """
+
+    def _extract_case_from_row(self, row):
+        """
+        Pull data out of a queried SQLite row.
+
+        Parameters
+        ----------
+        row : (id, counter, iter_coordinate, timestamp, success, msg, totals)
+            Queried SQLite driver derivatives table row.
+
+        Returns
+        -------
+        DriverDerivativesCase
+            Case for associated row.
+        """
+        idx, counter, iteration_coordinate, timestamp, success, msg, totals_blob = row
+
+        totals_array = blob_to_array(totals_blob)
+
+        case = DriverDerivativesCase(self.filename, counter, iteration_coordinate,
+                                     timestamp, success, msg, totals_array,
+                                     self._prom2abs, self._abs2prom, self._abs2meta)
+        return case
+
+    def load_cases(self):
+        """
+        Load all driver cases into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM driver_derivatives")
+            rows = cur.fetchall()
+            for row in rows:
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
+
+    def get_case(self, case_id):
+        """
+        Get a case from the database.
+
+        Parameters
+        ----------
+        case_id : int or str
+            The integer index or string-identifier of the case to be retrieved.
+
+        Returns
+        -------
+            An instance of a Driver Case populated with data from the
+            specified case/iteration.
+        """
+        # check to see if we've already cached this case
+        iteration_coordinate = self.get_iteration_coordinate(case_id)
+        if iteration_coordinate in self._cases:
+            return self._cases[iteration_coordinate]
+
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM driver_derivatives WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": iteration_coordinate})
+            # Initialize the Case object from the iterations data
+            row = cur.fetchone()
+        con.close()
+
+        case = self._extract_case_from_row(row)
+
+        # save so we don't query again
+        self._cases[case.iteration_coordinate] = case
         return case
 
 
@@ -790,6 +938,45 @@ class ProblemCases(BaseCases):
     """
     Case specific to the entries that might be recorded in a Driver iteration.
     """
+
+    def _extract_case_from_row(self, row):
+        """
+        Pull data out of a queried SQLite row.
+
+        Parameters
+        ----------
+        row : (id, counter, iter_coordinate, timestamp, success, msg, outputs)
+            Queried SQLite problems table row.
+
+        Returns
+        -------
+        ProblemCase
+            Case for associated row.
+        """
+        idx, counter, case_name, timestamp, success, msg, \
+            outputs_text, = row
+
+        if self.format_version == 3:
+            outputs_array = json_to_np_array(outputs_text)
+        elif self.format_version in (1, 2):
+            outputs_array = blob_to_array(outputs_text)
+
+        case = ProblemCase(self.filename, counter, case_name, timestamp,
+                           success, msg, outputs_array, self._prom2abs,
+                           self._abs2prom, self._abs2meta)
+        return case
+
+    def load_cases(self):
+        """
+        Load all problem cases into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM problem_cases")
+            rows = cur.fetchall()
+            for row in rows:
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
 
     def get_case(self, case_name):
         """
@@ -805,7 +992,9 @@ class ProblemCases(BaseCases):
             An instance of a Driver Case populated with data from the
             specified case/iteration.
         """
-        # iteration_coordinate = self.get_iteration_coordinate(case_id)
+        # check to see if we've already cached this case
+        if case_name in self._cases:
+            return self._cases[case_name]
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
@@ -816,14 +1005,10 @@ class ProblemCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        idx, counter, case_name, timestamp, success, msg, \
-            outputs_blob, = row
+        case = self._extract_case_from_row(row)
 
-        outputs_array = blob_to_array(outputs_blob)
-
-        case = ProblemCase(self.filename, counter, case_name, timestamp, success, msg,
-                           outputs_array, self._prom2abs, self._abs2prom, self._abs2meta)
-
+        # save so we don't query again
+        self._cases[case_name] = case
         return case
 
 
@@ -831,6 +1016,37 @@ class SystemCases(BaseCases):
     """
     Case specific to the entries that might be recorded in a System iteration.
     """
+
+    def _extract_case_from_row(self, row):
+        """
+        Pull data out of a queried SQLite row.
+
+        Parameters
+        ----------
+        row : (id, counter, iter_coordinate, timestamp, success, msg, inputs, outputs, residuals)
+            Queried SQLite systems table row.
+
+        Returns
+        -------
+        SystemCase
+            Case for associated row.
+        """
+        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text,\
+            outputs_text, residuals_text = row
+
+        if self.format_version == 3:
+            inputs_array = json_to_np_array(inputs_text)
+            outputs_array = json_to_np_array(outputs_text)
+            residuals_array = json_to_np_array(residuals_text)
+        elif self.format_version in (1, 2):
+            inputs_array = blob_to_array(inputs_text)
+            outputs_array = blob_to_array(outputs_text)
+            residuals_array = blob_to_array(residuals_text)
+
+        case = SystemCase(self.filename, counter, iteration_coordinate, timestamp,
+                          success, msg, inputs_array, outputs_array, residuals_array,
+                          self._prom2abs, self._abs2prom, self._abs2meta)
+        return case
 
     def load_cases(self):
         """
@@ -841,16 +1057,8 @@ class SystemCases(BaseCases):
             cur.execute("SELECT * FROM system_iterations")
             rows = cur.fetchall()
             for row in rows:
-                idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
-                    outputs_blob, residuals_blob = row
-                inputs_array = blob_to_array(inputs_blob)
-                outputs_array = blob_to_array(outputs_blob)
-                residuals_array = blob_to_array(residuals_blob)
-
-                case = SystemCase(self.filename, counter, iteration_coordinate, timestamp,
-                                  success, msg, inputs_array, outputs_array, residuals_array,
-                                  self._prom2abs, self._abs2prom, self._abs2meta)
-                self._cases[iteration_coordinate] = case
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
 
     def get_case(self, case_id):
         """
@@ -880,20 +1088,10 @@ class SystemCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        # inputs , outputs , residuals
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_blob,\
-            outputs_blob, residuals_blob = row
-
-        inputs_array = blob_to_array(inputs_blob)
-        outputs_array = blob_to_array(outputs_blob)
-        residuals_array = blob_to_array(residuals_blob)
-
-        case = SystemCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          inputs_array, outputs_array, residuals_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta)
+        case = self._extract_case_from_row(row)
 
         # save so we don't query again
-        self._cases[iteration_coordinate] = case
+        self._cases[case.iteration_coordinate] = case
         return case
 
 
@@ -901,6 +1099,38 @@ class SolverCases(BaseCases):
     """
     Case specific to the entries that might be recorded in a Solver iteration.
     """
+
+    def _extract_case_from_row(self, row):
+        """
+        Pull data out of a queried SQLite row.
+
+        Parameters
+        ----------
+        row : (id, counter, iter_coordinate, timestamp, success, msg, abs_err, rel_err,
+               inputs, outputs, residuals)
+            Queried SQLite solvers table row.
+
+        Returns
+        -------
+        SolverCase
+            Case for associated row.
+        """
+        idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
+            input_text, output_text, residuals_text = row
+
+        if self.format_version == 3:
+            input_array = json_to_np_array(input_text)
+            output_array = json_to_np_array(output_text)
+            residuals_array = json_to_np_array(residuals_text)
+        elif self.format_version in (1, 2):
+            input_array = blob_to_array(input_text)
+            output_array = blob_to_array(output_text)
+            residuals_array = blob_to_array(residuals_text)
+
+        case = SolverCase(self.filename, counter, iteration_coordinate, timestamp,
+                          success, msg, abs_err, rel_err, input_array, output_array,
+                          residuals_array, self._prom2abs, self._abs2prom, self._abs2meta)
+        return case
 
     def load_cases(self):
         """
@@ -911,17 +1141,8 @@ class SolverCases(BaseCases):
             cur.execute("SELECT * FROM solver_iterations")
             rows = cur.fetchall()
             for row in rows:
-                idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-                    input_blob, output_blob, residuals_blob = row
-
-                input_array = blob_to_array(input_blob)
-                output_array = blob_to_array(output_blob)
-                residuals_array = blob_to_array(residuals_blob)
-
-                case = SolverCase(self.filename, counter, iteration_coordinate, timestamp,
-                                  success, msg, abs_err, rel_err, input_array, output_array,
-                                  residuals_array, self._prom2abs, self._abs2prom, self._abs2meta)
-                self._cases[iteration_coordinate] = case
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
 
     def get_case(self, case_id):
         """
@@ -951,16 +1172,7 @@ class SolverCases(BaseCases):
             row = cur.fetchone()
         con.close()
 
-        idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-            input_blob, output_blob, residuals_blob = row
-
-        input_array = blob_to_array(input_blob)
-        output_array = blob_to_array(output_blob)
-        residuals_array = blob_to_array(residuals_blob)
-
-        case = SolverCase(self.filename, counter, iteration_coordinate, timestamp, success, msg,
-                          abs_err, rel_err, input_array, output_array, residuals_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta)
+        case = self._extract_case_from_row(row)
 
         # save so we don't query again
         self._cases[iteration_coordinate] = case

@@ -270,16 +270,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         # predict for current inputs
         if vec_size > 1:
-            inputs = self._vec_to_array_vectorized(inputs)
+            flat_inputs = self._vec_to_array_vectorized(inputs)
         else:
-            inputs = self._vec_to_array(inputs)
+            flat_inputs = self._vec_to_array(inputs)
 
         for name, shape in self._surrogate_output_names:
             surrogate = self._metadata(name).get('surrogate')
 
             if vec_size == 1:
                 # Non vectorized.
-                predicted = surrogate.predict(inputs)
+                predicted = surrogate.predict(flat_inputs)
                 if isinstance(predicted, tuple):  # rmse option
                     self._metadata(name)['rmse'] = predicted[1]
                     predicted = predicted[0]
@@ -288,7 +288,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             elif overrides_method('vectorized_predict', surrogate, SurrogateModel):
                 # Vectorized; surrogate provides vectorized computation.
                 # TODO: This code is untested because no surrogates provide this option.
-                predicted = surrogate.vectorized_predict(inputs.flat)
+                predicted = surrogate.vectorized_predict(flat_inputs.flat)
                 if isinstance(predicted, tuple):  # rmse option
                     self._metadata(name)['rmse'] = predicted[1]
                     predicted = predicted[0]
@@ -303,7 +303,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 predicted = np.zeros(output_shape)
                 rmse = self._metadata(name)['rmse'] = []
                 for i in range(vec_size):
-                    pred_i = surrogate.predict(inputs[i])
+                    pred_i = surrogate.predict(flat_inputs[i])
                     if isinstance(pred_i, tuple):  # rmse option
                         rmse.append(pred_i[1])
                         pred_i = pred_i[0]
