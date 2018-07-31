@@ -53,7 +53,7 @@ Source Docs
     if not os.path.isdir(packages_dir):
         os.mkdir(packages_dir)
 
-    # look for directories in the openmdao level, one up from docs
+    # look for directories in the openaero level, one up from docs
     # those directories will be the openmdao packages
     # auto-generate the top-level index.rst file for _srcdocs, based on
     # openmdao packages:

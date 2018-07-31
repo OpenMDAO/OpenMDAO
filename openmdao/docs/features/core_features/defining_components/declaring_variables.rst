@@ -1,4 +1,4 @@
-.. _declaring-variables:
+.. _`declaring-variables`:
 
 *******************
 Declaring Variables

@@ -89,4 +89,4 @@ matplotlib:
 
 # run the tagging preprocessors
 tagg:
-	python _utils/preprocess_tags.py
+	python utils/preprocess_tags.py

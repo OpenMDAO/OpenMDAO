@@ -10,8 +10,8 @@ from numpydoc.docscrape import NumpyDocString, Reader
 from mock import Mock
 
 from openmdao.docs.config_params import MOCK_MODULES
-from openmdao.docs._utils.patch import do_monkeypatch
-from openmdao.docs._utils.upload_doc_version import get_doc_version
+from openmdao.docs.utils.patch import do_monkeypatch
+from openmdao.docs.utils.upload_doc_version import get_doc_version
 
 # Only mock the ones that don't import.
 for mod_name in MOCK_MODULES:
@@ -22,49 +22,6 @@ for mod_name in MOCK_MODULES:
 
 # start off running the monkeypatch to keep options/parameters
 # usable in docstring for autodoc.
-
-
-def __init__(self, docstring, config={}):
-    """
-    init
-    """
-    docstring = textwrap.dedent(docstring).split('\n')
-
-    self._doc = Reader(docstring)
-    self._parsed_data = {
-        'Signature': '',
-        'Summary': [''],
-        'Extended Summary': [],
-        'Parameters': [],
-        'Options': [],
-        'Returns': [],
-        'Yields': [],
-        'Raises': [],
-        'Warns': [],
-        'Other Parameters': [],
-        'Attributes': [],
-        'Methods': [],
-        'See Also': [],
-        'Notes': [],
-        'Warnings': [],
-        'References': '',
-        'Examples': '',
-        'index': {}
-    }
-
-    try:
-        self._parse()
-    except ParseError as e:
-        e.docstring = orig_docstring
-        raise
-
-    # In creation of docs, remove private Attributes (beginning with '_')
-    # with a crazy list comprehension
-    self._parsed_data["Attributes"][:] = [att for att in self._parsed_data["Attributes"]
-                                          if not att[0].startswith('_')]
-
-NumpyDocString.__init__ = __init__
-
 do_monkeypatch()
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -72,7 +29,7 @@ do_monkeypatch()
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('./_exts'))
+sys.path.insert(0, os.path.abspath('./exts'))
 
 # -- General configuration ------------------------------------------------
 
@@ -179,7 +136,7 @@ packages = [
 ]
 
 if os.path.isfile("make_sourcedocs"):
-    from openmdao.docs._utils.generate_sourcedocs import generate_docs
+    from openmdao.docs.utils.generate_sourcedocs import generate_docs
     generate_docs("..", "../..", packages)
 
 # The name of the Pygments (syntax highlighting) style to use.
