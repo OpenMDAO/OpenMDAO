@@ -102,7 +102,7 @@ class SqliteCaseReader(BaseCaseReader):
             self._abs2meta = None
             self._var_settings = None
 
-            if self.format_version == 4:
+            if self.format_version >= 4:
                 self._var_settings = json.loads(row[4])
 
             if self.format_version >= 3:

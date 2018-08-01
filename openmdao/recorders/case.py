@@ -1,7 +1,7 @@
 """
 A Case class.
 """
-from six import iteritems, string_types
+from six import iteritems
 
 
 class Case(object):
