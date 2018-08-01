@@ -1,4 +1,42 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.4.0
+
+August 1, 2018
+
+New Features:
+--------------
+- Better error message when upper and lower have the wrong shape for add_design_var and add_constraint methods.
+- pyOptSparseDriver now runs the initial condition for ALPSO and NSGA-II optimizers.
+- Normalization in EQConstraintComp and BalanceComp is now optional.
+
+- New Components in the standard library:
+    - VectorMagnitudeComp
+
+- New Solvers in the standard library:
+    - BroydenSolver
+
+- New CaseRecording/CaseReading Features:
+    - <Problem>.load_case() method lets you pull values from a case back into the problem.
+    - Updated the Case recording format for better performance.
+    - User can call <Problem>.record_iteration() to save specific cases.
+      Recording options for this method are separate from driver/solver options.
+      This is so you can record one (or more) cases manually with *ALL* the variables in it if you want to.
+
+Backwards Incompatible API Changes:
+------------------------------------
+- The input and output vectors are now put into read-only modes within certain component methods.
+  NOTE: This REALLY REALLY should not break anyone's models, but it is technically a backwards-incompatible change...
+        If you were changing values in these arrays when you shouldn't have been, you're going to get an error now.
+        Fix it... the new error is enforcing correct behavior.
+        If it was working before, you got lucky.
+
+Bug Fixes:
+------------
+- Various small bug fixes to check_partials and check_totals.
+- ArmijoGoldstein linesearch iteration counter works correctly now.
+- the record_derivatives recorder_option now actually does something!
+
+################################################################################################
 Release Notes for OpenMDAO 2.3.1
 
 June 20, 2018
