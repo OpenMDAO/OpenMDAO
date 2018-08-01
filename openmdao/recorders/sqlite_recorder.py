@@ -2,6 +2,7 @@
 Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
+from copy import deepcopy
 import io
 import os
 import sqlite3
@@ -19,11 +20,14 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
+from openmdao.solvers.solver import Solver
 
 
 """
 SQL case output format version history.
 ---------------------------------------
+4 -- OpenMDAO 2.4
+    Added variable settings metadata that contains scaling info.
 3 -- OpenMDAO 2.4
     Storing most data as JSON rather than binary numpy arrays.
 2 -- OpenMDAO 2.4, merged 20 July 2018.
@@ -31,7 +35,7 @@ SQL case output format version history.
 1 -- Through OpenMDAO 2.3
     Original implementation.
 """
-format_version = 3
+format_version = 4
 
 
 def array_to_blob(array):
@@ -188,7 +192,7 @@ class SqliteRecorder(BaseRecorder):
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
                 c.execute("CREATE TABLE metadata( format_version INT, "
-                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT)")
+                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
@@ -231,7 +235,7 @@ class SqliteRecorder(BaseRecorder):
         for name in self._abs2meta:
             if 'lower' in self._abs2meta[name]:
                 self._abs2meta[name]['lower'] = convert_to_list(self._abs2meta[name]['lower'])
-            if 'lower' in self._abs2meta[name]:
+            if 'upper' in self._abs2meta[name]:
                 self._abs2meta[name]['upper'] = convert_to_list(self._abs2meta[name]['upper'])
             for prop in self._abs2meta[name]:
                 val = self._abs2meta[name][prop]
@@ -240,6 +244,37 @@ class SqliteRecorder(BaseRecorder):
                     self._abs2meta[name][prop] = val.item()
                 elif isinstance(val, tuple):
                     self._abs2meta[name][prop] = [int(v) for v in val]
+
+    def _cleanup_var_settings(self, var_settings):
+        """
+        Convert all var_settings variable properties to a form that can be dumped as JSON.
+
+        Parameters
+        ----------
+        var_settings : dict
+            Dictionary mapping absolute variable names to variable settings.
+
+        Returns
+        -------
+        var_settings : dict
+            Dictionary mapping absolute variable names to var settings that are JSON compatible.
+        """
+        # otherwise we trample on values that are used elsewhere
+        var_settings = deepcopy(var_settings)
+        for name in var_settings:
+            if 'lower' in var_settings[name]:
+                var_settings[name]['lower'] = convert_to_list(var_settings[name]['lower'])
+            if 'upper' in var_settings[name]:
+                var_settings[name]['upper'] = convert_to_list(var_settings[name]['upper'])
+            for prop in var_settings[name]:
+                val = var_settings[name][prop]
+                if isinstance(val, np.int8) or isinstance(val, np.int16) or\
+                   isinstance(val, np.int32) or isinstance(val, np.int64):
+                    var_settings[name][prop] = val.item()
+                elif isinstance(val, tuple):
+                    var_settings[name][prop] = [int(v) for v in val]
+
+        return var_settings
 
     def startup(self, recording_requester):
         """
@@ -262,8 +297,11 @@ class SqliteRecorder(BaseRecorder):
             system = recording_requester
         elif isinstance(recording_requester, Problem):
             system = recording_requester.model
-        else:
+        elif isinstance(recording_requester, Solver):
             system = recording_requester._system
+        else:
+            raise ValueError('Driver encountered a recording_requester it cannot handle'
+                             ': {0}'.format(recording_requester))
 
         # grab all of the units and type (collective calls)
         states = system._list_states_allprocs()
@@ -316,9 +354,16 @@ class SqliteRecorder(BaseRecorder):
             prom2abs = json.dumps(self._prom2abs)
             abs2meta = json.dumps(self._abs2meta)
 
+            var_settings = {}
+            var_settings.update(desvars)
+            var_settings.update(objectives)
+            var_settings.update(constraints)
+            var_settings = self._cleanup_var_settings(var_settings)
+            var_settings_json = json.dumps(var_settings)
+
             with self.connection as c:
-                c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?",
-                          (abs2prom, prom2abs, abs2meta))
+                c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?",
+                          (abs2prom, prom2abs, abs2meta, var_settings_json))
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         """

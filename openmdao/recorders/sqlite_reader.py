@@ -3,6 +3,7 @@ Definition of the SqliteCaseReader.
 """
 from __future__ import print_function, absolute_import
 
+from copy import deepcopy
 import os
 import re
 import sys
@@ -56,6 +57,8 @@ class SqliteCaseReader(BaseCaseReader):
         Dictionary mapping promoted names to absolute names.
     _coordinate_split_re : RegularExpression
         Regular expression used for splitting iteration coordinates.
+    _var_settings : dict
+        Dictionary mapping absolute variable names to variable settings.
     """
 
     def __init__(self, filename):
@@ -81,14 +84,28 @@ class SqliteCaseReader(BaseCaseReader):
 
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT format_version, abs2prom, prom2abs, abs2meta FROM metadata")
+
+            # need to see what columns are in the metadata table before we query it
+            cursor = cur.execute('select * from metadata')
+            names = [description[0] for description in cursor.description]
+            if "var_settings" in names:
+                cur.execute(
+                    "SELECT format_version, abs2prom, prom2abs, abs2meta, var_settings "
+                    "FROM metadata")
+            else:
+                cur.execute(
+                    "SELECT format_version, abs2prom, prom2abs, abs2meta FROM metadata")
             row = cur.fetchone()
             self.format_version = row[0]
             self._abs2prom = None
             self._prom2abs = None
             self._abs2meta = None
+            self._var_settings = None
 
-            if self.format_version == 3:
+            if self.format_version >= 4:
+                self._var_settings = json.loads(row[4])
+
+            if self.format_version >= 3:
                 self._abs2prom = json.loads(row[1])
                 self._prom2abs = json.loads(row[2])
                 self._abs2meta = json.loads(row[3])
@@ -141,7 +158,7 @@ class SqliteCaseReader(BaseCaseReader):
         the individual cases/iterations from the recorded file.
         """
         self.driver_cases = DriverCases(self.filename, self.format_version, self._abs2prom,
-                                        self._abs2meta, self._prom2abs)
+                                        self._abs2meta, self._prom2abs, self._var_settings)
         self.driver_derivative_cases = DriverDerivativeCases(self.filename, self.format_version,
                                                              self._abs2prom, self._abs2meta,
                                                              self._prom2abs)
@@ -201,7 +218,7 @@ class SqliteCaseReader(BaseCaseReader):
                 cur.execute("SELECT model_viewer_data FROM driver_metadata")
                 row = cur.fetchone()
                 if row is not None:
-                    if self.format_version == 3:
+                    if self.format_version >= 3:
                         self.driver_metadata = json.loads(row[0])
                     elif self.format_version in (1, 2):
                         if PY2:
@@ -774,7 +791,34 @@ class SqliteCaseReader(BaseCaseReader):
 class DriverCases(BaseCases):
     """
     Case specific to the entries that might be recorded in a Driver iteration.
+
+    Attributes
+    ----------
+    _var_settings : dict
+        Dictionary mapping absolute variable names to variable settings.
     """
+
+    def __init__(self, filename, format_version, abs2prom, abs2meta, prom2abs, var_settings):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the recording file from which to instantiate the case reader.
+        format_version : int
+            The version of the format assumed when loading the file.
+        abs2prom : {'input': dict, 'output': dict}
+            Dictionary mapping absolute names to promoted names.
+        abs2meta : dict
+            Dictionary mapping absolute variable names to variable metadata.
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
+        var_settings : dict
+            Dictionary mapping absolute variable names to variable settings.
+        """
+        super(DriverCases, self).__init__(filename, format_version, abs2prom, abs2meta, prom2abs)
+        self._var_settings = var_settings
 
     def _extract_case_from_row(self, row):
         """
@@ -793,7 +837,7 @@ class DriverCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
             outputs_text, = row
 
-        if self.format_version == 3:
+        if self.format_version >= 3:
             inputs_array = json_to_np_array(inputs_text)
             outputs_array = json_to_np_array(outputs_text)
         elif self.format_version in (1, 2):
@@ -802,7 +846,7 @@ class DriverCases(BaseCases):
 
         case = DriverCase(self.filename, counter, iteration_coordinate, timestamp,
                           success, msg, inputs_array, outputs_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta)
+                          self._prom2abs, self._abs2prom, self._abs2meta, self._var_settings)
         return case
 
     def load_cases(self):
@@ -817,7 +861,7 @@ class DriverCases(BaseCases):
                 case = self._extract_case_from_row(row)
                 self._cases[case.iteration_coordinate] = case
 
-    def get_case(self, case_id):
+    def get_case(self, case_id, scaled=False):
         """
         Get a case from the database.
 
@@ -825,6 +869,8 @@ class DriverCases(BaseCases):
         ----------
         case_id : int or str
             The integer index or string-identifier of the case to be retrieved.
+        scaled : bool
+            If True, return variables scaled. Otherwise, return physical values.
 
         Returns
         -------
@@ -834,21 +880,29 @@ class DriverCases(BaseCases):
         # check to see if we've already cached this case
         iteration_coordinate = self.get_iteration_coordinate(case_id)
         if iteration_coordinate in self._cases:
-            return self._cases[iteration_coordinate]
+            case = self._cases[iteration_coordinate]
+        else:
+            # Get an unscaled case if does not already exist in _cases
+            with sqlite3.connect(self.filename) as con:
+                cur = con.cursor()
+                cur.execute("SELECT * FROM driver_iterations WHERE "
+                            "iteration_coordinate=:iteration_coordinate",
+                            {"iteration_coordinate": iteration_coordinate})
+                # Initialize the Case object from the iterations data
+                row = cur.fetchone()
+            con.close()
 
-        with sqlite3.connect(self.filename) as con:
-            cur = con.cursor()
-            cur.execute("SELECT * FROM driver_iterations WHERE "
-                        "iteration_coordinate=:iteration_coordinate",
-                        {"iteration_coordinate": iteration_coordinate})
-            # Initialize the Case object from the iterations data
-            row = cur.fetchone()
-        con.close()
+            case = self._extract_case_from_row(row)
 
-        case = self._extract_case_from_row(row)
+            # save so we don't query again
+            self._cases[case.iteration_coordinate] = case
 
-        # save so we don't query again
-        self._cases[case.iteration_coordinate] = case
+        if scaled:
+            # We have to do some scaling first before we return it
+            # Need to make a copy, otherwise we modify the object in the cache
+            case = deepcopy(case)
+            case.scale()
+
         return case
 
 
@@ -949,7 +1003,7 @@ class ProblemCases(BaseCases):
         idx, counter, case_name, timestamp, success, msg, \
             outputs_text, = row
 
-        if self.format_version == 3:
+        if self.format_version >= 3:
             outputs_array = json_to_np_array(outputs_text)
         elif self.format_version in (1, 2):
             outputs_array = blob_to_array(outputs_text)
@@ -1027,7 +1081,7 @@ class SystemCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text,\
             outputs_text, residuals_text = row
 
-        if self.format_version == 3:
+        if self.format_version >= 3:
             inputs_array = json_to_np_array(inputs_text)
             outputs_array = json_to_np_array(outputs_text)
             residuals_array = json_to_np_array(residuals_text)
@@ -1111,7 +1165,7 @@ class SolverCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
             input_text, output_text, residuals_text = row
 
-        if self.format_version == 3:
+        if self.format_version >= 3:
             input_array = json_to_np_array(input_text)
             output_array = json_to_np_array(output_text)
             residuals_array = json_to_np_array(residuals_text)
