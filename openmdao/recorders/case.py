@@ -154,7 +154,7 @@ class Case(object):
             return PromotedToAbsoluteMap({}, self.prom2abs, self.abs2prom)
 
         ret_vars = {}
-        for var in self.outputs:
+        for var in self.outputs.absolute_names():
             if var_type in self.meta[var]['type']:
                 ret_vars[var] = self.outputs[var]
 
@@ -212,7 +212,7 @@ class DriverCase(Case):
         """
         Scale the outputs array using _var_settings.
         """
-        for name in self.outputs:
+        for name in self.outputs.absolute_names():
             if name in self._var_settings:
                 # physical to scaled
                 if self._var_settings[name]['adder'] is not None:
@@ -364,18 +364,12 @@ class PromotedToAbsoluteMap(dict):
 
     Attributes
     ----------
-    keys : array
-        Array of this map's keys as promoted variable names.
-    _values : array
-        Array of values accessible via absolute variable name.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _is_output : bool
         True if this should map using output variable names, False for input variable names.
-    _iteration_index : int
-        integer indicating the next key to return when iterating.
     """
 
     def __init__(self, values, prom2abs, abs2prom, output=True):
@@ -460,7 +454,7 @@ class PromotedToAbsoluteMap(dict):
             return super(PromotedToAbsoluteMap, self).__getitem__(mykey)
 
         else:
-            mykeys = self.keys()
+            mykeys = super(PromotedToAbsoluteMap, self).keys()
             if key in mykeys:
                 return super(PromotedToAbsoluteMap, self).__getitem__(key)
             else:
@@ -483,11 +477,9 @@ class PromotedToAbsoluteMap(dict):
         """
         return super(PromotedToAbsoluteMap, self).__repr__()
 
-    def promoted_names(self):
+    def keys(self):
         """
         Yield promoted names for variables contained in this dictionary.
-
-        Similar to keys() but with promoted variable names instead of absolute names.
 
         Yields
         ------
@@ -499,7 +491,7 @@ class PromotedToAbsoluteMap(dict):
         else:
             abs2prom = self._abs2prom['input']
 
-        for abs_name in self.keys():
+        for abs_name in super(PromotedToAbsoluteMap, self).keys():
             if isinstance(abs_name, tuple):
                 of, wrt = abs_name
                 of = abs2prom[of]
@@ -509,6 +501,30 @@ class PromotedToAbsoluteMap(dict):
                 prom_name = abs2prom[abs_name]
 
             yield prom_name
+
+    def absolute_names(self):
+        """
+        Yield absolute names for variables contained in this dictionary.
+
+        Similar to keys() but with absolute variable names instead of promoted names.
+
+        Yields
+        ------
+        list
+            list of absolute names for variables contained in this dictionary.
+        """
+        return super(PromotedToAbsoluteMap, self).keys()
+
+    def __iter__(self):
+        """
+        Yield an iterator over promoted names for variables contained in this dictionary.
+
+        Returns
+        -------
+        listiterator
+            iterator over the variable names.
+        """
+        return self.keys()
 
 
 class DriverDerivativesCase(object):
@@ -591,6 +607,6 @@ class DriverDerivativesCase(object):
             Map of derivatives to their values.
         """
         ret_vars = {}
-        for key in self.totals:
+        for key in self.totals.absolute_names():
             ret_vars[key] = self.totals[key]
         return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom, output=True)

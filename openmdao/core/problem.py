@@ -1556,7 +1556,7 @@ class Problem(object):
         """
         inputs = case.inputs if case.inputs is not None else None
         if inputs:
-            for name in inputs:
+            for name in inputs.absolute_names():
                 if name not in self.model._var_abs_names['input']:
                     raise KeyError("Input variable, '{}', recorded in the case is not "
                                    "found in the model".format(name))
@@ -1564,7 +1564,7 @@ class Problem(object):
 
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
-            for name in outputs:
+            for name in outputs.absolute_names():
                 if name not in self.model._var_abs_names['output']:
                     raise KeyError("Output variable, '{}', recorded in the case is not "
                                    "found in the model".format(name))

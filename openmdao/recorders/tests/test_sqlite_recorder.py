@@ -1133,7 +1133,8 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0,
+        coordinate = [
+            0,
             'Driver', (0,),
             'root._solve_nonlinear', (0,),
             'NewtonSolver', (2,),
@@ -2041,7 +2042,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
         first_system_case = cr.system_cases.get_case(0)
         recorded_inputs = first_system_case.inputs.keys()
-        self.assertEqual(set(recorded_inputs), {'obj_cmp.y2', 'obj_cmp.y1', 'obj_cmp.z'})
+        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
 
     def test_feature_driver_options(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
@@ -2076,9 +2077,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         recorded_constraints = first_driver_case.get_constraints().keys()
         recorded_desvars = first_driver_case.get_desvars().keys()
 
-        self.assertEqual(set(recorded_objectives), {'obj_cmp.obj'})
-        self.assertEqual(set(recorded_constraints), {'con_cmp1.con1', 'con_cmp2.con2'})
-        self.assertEqual(set(recorded_desvars), {'px.x', 'pz.z'})
+        self.assertEqual(set(recorded_objectives), {'obj'})
+        self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
+        self.assertEqual(set(recorded_desvars), {'x', 'z'})
 
     def test_feature_solver_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -2199,21 +2200,21 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         recorded_constraints = first_driver_case.get_constraints()
         recorded_desvars = first_driver_case.get_desvars()
 
-        # dictionary keys are the absolute path names
-        self.assertEqual(set(recorded_objectives.keys()), {'obj_cmp.obj'})
-        self.assertEqual(set(recorded_constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
-        self.assertEqual(set(recorded_desvars.keys()), {'px.x', 'pz.z'})
+        # keys() will give you the promoted variable names
+        self.assertEqual(set(recorded_objectives.keys()), {'obj'})
+        self.assertEqual(set(recorded_constraints.keys()), {'con1', 'con2'})
+        self.assertEqual(set(recorded_desvars.keys()), {'x', 'z'})
 
-        # alternatively, you can get the promoted names
-        self.assertEqual(set(recorded_objectives.promoted_names()), {'obj'})
-        self.assertEqual(set(recorded_constraints.promoted_names()), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars.promoted_names()), {'x', 'z'})
+        # alternatively, you can get the absolute names
+        self.assertEqual(set(recorded_objectives.absolute_names()), {'obj_cmp.obj'})
+        self.assertEqual(set(recorded_constraints.absolute_names()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(recorded_desvars.absolute_names()), {'px.x', 'pz.z'})
 
-        # you can access variable values via either the absolute or promoted name
-        self.assertAlmostEqual(recorded_objectives['obj_cmp.obj'][0], 28.58830817)
+        # you can access variable values via either the promoted or absolute name
         self.assertAlmostEqual(recorded_objectives['obj'][0], 28.58830817)
-        self.assertAlmostEqual(recorded_desvars['px.x'][0], 1.)
+        self.assertAlmostEqual(recorded_objectives['obj_cmp.obj'][0], 28.58830817)
         self.assertAlmostEqual(recorded_desvars['x'][0], 1.)
+        self.assertAlmostEqual(recorded_desvars['px.x'][0], 1.)
 
     def test_feature_load_system_case_for_restart(self):
         #######################################################################
@@ -2410,10 +2411,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
-        self.assertEqual(len(desvars.keys()), 0)
-        self.assertEqual(len(objectives.keys()), 0)
-        self.assertEqual(len(constraints.keys()), 0)
-
+        self.assertEqual(len(desvars), 0)
+        self.assertEqual(len(objectives), 0)
+        self.assertEqual(len(constraints), 0)
 
     def test_simple_paraboloid_scaled_desvars(self):
 

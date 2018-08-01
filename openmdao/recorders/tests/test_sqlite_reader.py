@@ -143,7 +143,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # While thinking about derivatives, let's get them all.
         derivs = deriv_case.get_derivatives()
 
-        self.assertEqual(set(derivs.promoted_names()), set([
+        self.assertEqual(set(derivs.keys()), set([
             ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
             ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
         ]))
@@ -186,7 +186,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         derivs = deriv_case.get_derivatives()
 
         # See what derivatives have been recorded.
-        self.assertEqual(set(derivs.promoted_names()), set([
+        self.assertEqual(set(derivs.keys()), set([
             ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
             ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
         ]))

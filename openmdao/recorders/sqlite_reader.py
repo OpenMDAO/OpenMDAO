@@ -644,14 +644,14 @@ class SqliteCaseReader(BaseCaseReader):
             return variables
 
         if get_outputs:
-            for abs_name in case.outputs:
+            for abs_name in case.outputs.absolute_names():
                 variables[abs_name] = {'value': case.outputs[abs_name]}
                 if case.residuals is not None and abs_name in case.residuals:
                     variables[abs_name]['residuals'] = case.residuals[abs_name]
                 else:
                     variables[abs_name]['residuals'] = 'Not Recorded'
         elif case.inputs is not None:
-            for abs_name in case.inputs:
+            for abs_name in case.inputs.absolute_names():
                 if abs_name not in variables:
                     variables[abs_name] = {'value': case.inputs[abs_name]}
 
@@ -709,7 +709,7 @@ class SqliteCaseReader(BaseCaseReader):
                     continue
 
                 if get_outputs:
-                    for abs_name in case.outputs:
+                    for abs_name in case.outputs.absolute_names():
                         if abs_name not in variables:
                             variables[abs_name] = {'value': case.outputs[abs_name]}
                             if case.residuals is not None and abs_name in case.residuals:
@@ -717,7 +717,7 @@ class SqliteCaseReader(BaseCaseReader):
                             else:
                                 variables[abs_name]['residuals'] = 'Not Recorded'
                 elif case.inputs is not None:
-                    for abs_name in case.inputs:
+                    for abs_name in case.inputs.absolute_names():
                         if abs_name not in variables:
                             variables[abs_name] = {'value': case.inputs[abs_name]}
 
