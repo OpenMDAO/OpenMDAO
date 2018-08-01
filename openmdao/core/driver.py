@@ -782,17 +782,17 @@ class Driver(object):
         filt = self._filtered_vars_to_record
 
         if opts['record_desvars']:
-            des_vars = self.get_design_var_values()
+            des_vars = self.get_design_var_values(unscaled=True)
         else:
             des_vars = {}
 
         if opts['record_objectives']:
-            obj_vars = self.get_objective_values()
+            obj_vars = self.get_objective_values(unscaled=True)
         else:
             obj_vars = {}
 
         if opts['record_constraints']:
-            con_vars = self.get_constraint_values()
+            con_vars = self.get_constraint_values(unscaled=True)
         else:
             con_vars = {}
 

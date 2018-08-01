@@ -55,7 +55,7 @@ class BaseCases(object):
         self._cases = {}
 
     @abstractmethod
-    def get_case(self, case_id):
+    def get_case(self, case_id, scaled=False):
         """
         Get cases.
 
@@ -64,6 +64,8 @@ class BaseCases(object):
         case_id : str or int
             If int, the index of the case to be read in the case iterations.
             If given as a string, it is the identifier of the case.
+        scaled : bool
+            If True, return the scaled values.
 
         Returns
         -------
