@@ -508,8 +508,8 @@ class PromotedToAbsoluteMap(dict):
 
         Similar to keys() but with absolute variable names instead of promoted names.
 
-        Yields
-        ------
+        Returns
+        -------
         list
             list of absolute names for variables contained in this dictionary.
         """
