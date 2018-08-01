@@ -1,5 +1,5 @@
 Setting Up Travis CI for Your OpenMDAO Plugin
-*********************************************
+=============================================
 
 Continuous integration using Travis CI is a way to make sure all your building and testing protocols remain
 functioning over time. For general assistance on how to get your initial Travis account set up, and how to make a .travis.yml
@@ -23,18 +23,14 @@ travis-sphinx needs an alt docs location, because OpenMDAO-dependent projects sh
 rather in projectname/docs
 
 
-
-
-Private key info, (for transfer of data)
-----------------------------------------
-
 Coverage
 --------
 
 Set up an account at the website coveralls.io, and then activate the repo for coverage results. This sets up the site to
 receive results. The other side is taken care of in your .travis.yml file, as I will show in an example:
 
-.. code-block::
+.. code-block:: python
+
     script:
         testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
 
@@ -53,9 +49,9 @@ The concept of build caching on Travis CI is intended to speed up the build, and
 By caching the builds of dependencies/requirements that rarely change, we can get right to of various dependencies to speed up the build and the  docbuild
 which probably requires a document of its own.
 
-**************************************************
+
 Automating Doc Build and Deployment from Travis CI
-**************************************************
+==================================================
 
 The following process is a one-time setup for the owner of a project to complete.  Once it is finished, it will become
 transparent to other developers and users. The process outlined here is to get a project's docs to build on Travis CI, and then
