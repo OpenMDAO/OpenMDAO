@@ -106,6 +106,8 @@ class Vector(object):
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
+    read_only : bool
+        When True, values in the vector cannot be changed via the user __setitem__ API.
     """
 
     _vector_info = VectorInfo()
@@ -181,13 +183,15 @@ class Vector(object):
             if root_vector is None:
                 raise RuntimeError(
                     'Cannot resize the vector because the root vector has not yet '
-                    + ' been created in system %s' % system.pathname)
+                    'been created in system %s' % system.pathname)
             self._update_root_data()
 
         self._initialize_data(root_vector)
         self._initialize_views()
 
         self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
+
+        self.read_only = False
 
     def __str__(self):
         """
@@ -395,6 +399,10 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
+            if self.read_only:
+                msg = "Attempt to set value of '{}' in {} vector when it is read only."
+                raise ValueError(msg.format(name, self._kind))
+
             if self._icol is None:
                 slc = _full_slice
                 oldval = self._views[abs_name]

@@ -96,7 +96,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
         model_text = cur.fetchone()
         from six import PY2, PY3
         if row is not None:
-            if format_version == 3:
+            if format_version >= 3:
                 return json.loads(model_text[0])
             elif format_version in (1, 2):
                 if PY2:

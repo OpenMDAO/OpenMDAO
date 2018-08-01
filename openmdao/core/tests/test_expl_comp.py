@@ -12,6 +12,8 @@ from openmdao.api import Problem, ExplicitComponent, NewtonSolver, ScipyKrylov, 
     IndepVarComp, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import SubSellar
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
+    TestExplCompSimpleDense
 from openmdao.utils.general_utils import printoptions
 
 
@@ -21,6 +23,7 @@ class RectangleComp(ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
     """
+
     def setup(self):
         self.add_input('length', val=1.)
         self.add_input('width', val=1.)
@@ -126,19 +129,19 @@ class ExplCompTestCase(unittest.TestCase):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('comp2.length', { 'value' :[3.]}),
-            ('comp2.width',  { 'value' :[2.]}),
-            ('comp3.length', { 'value' :[3.]}),
-            ('comp3.width',  { 'value' :[2.]}),
+            ('comp2.length', {'value': [3.]}),
+            ('comp2.width',  {'value': [2.]}),
+            ('comp3.length', {'value': [3.]}),
+            ('comp3.width',  {'value': [2.]}),
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.length', { 'value' :[3.]}),
-            ('comp1.width',  { 'value' :[2.]}),
-            ('comp2.area',   { 'value' :[6.]}),
-            ('comp3.area',   { 'value' :[6.]}),
+            ('comp1.length', {'value': [3.]}),
+            ('comp1.width',  {'value': [2.]}),
+            ('comp2.area',   {'value': [6.]}),
+            ('comp3.area',   {'value': [6.]}),
         ])
 
         # list states
@@ -160,16 +163,14 @@ class ExplCompTestCase(unittest.TestCase):
 
         model.add_subsystem('p1', IndepVarComp('x', 12.0,
                                                lower=1.0, upper=100.0,
-                                               ref = 1.1, ref0 = 2.1,
-                                               units='inch',
-                                               ))
+                                               ref=1.1, ref0=2.1,
+                                               units='inch'))
         model.add_subsystem('p2', IndepVarComp('y', 1.0,
                                                lower=2.0, upper=200.0,
-                                               ref = 1.2, res_ref = 2.2,
-                                               units='ft',
-                                               ))
+                                               ref=1.2, res_ref=2.2,
+                                               units='ft'))
         model.add_subsystem('comp', ExecComp('z=x+y',
-                                             x={'value': 0.0, 'units':'inch'},
+                                             x={'value': 0.0, 'units': 'inch'},
                                              y={'value': 0.0, 'units': 'inch'},
                                              z={'value': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
@@ -180,19 +181,18 @@ class ExplCompTestCase(unittest.TestCase):
         prob.run_model()
 
         # list_inputs tests
-        # Cannot do exact equality here because the units cause comp.y to be slightly different than 12.0
+        # Can't do exact equality here because units cause comp.y to be slightly different than 12.0
         stream = cStringIO()
         inputs = prob.model.list_inputs(units=True, out_stream=stream)
         tol = 1e-7
-        for actual, expected in zip(sorted(inputs),
-                                    [
-                                        ('comp.x', {'value': [12.], 'units':'inch'}),
-                                        ('comp.y', {'value': [12.], 'units':'inch'}),
-                                    ]
-                                    ):
+        for actual, expected in zip(sorted(inputs), [
+            ('comp.x', {'value': [12.], 'units': 'inch'}),
+            ('comp.y', {'value': [12.], 'units': 'inch'})
+        ]):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
             assert_rel_error(self, expected[1]['value'], actual[1]['value'], tol)
+
         text = stream.getvalue()
         self.assertEqual(1, text.count("Input(s) in 'model'"))
         self.assertEqual(1, text.count('varname'))
@@ -202,7 +202,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(1, text.count('    x'))
         self.assertEqual(1, text.count('    y'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(8,num_non_empty_lines)
+        self.assertEqual(8, num_non_empty_lines)
 
         # list_outputs tests
 
@@ -236,8 +236,7 @@ class ExplCompTestCase(unittest.TestCase):
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
             ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
-                         ],
-            sorted(outputs))
+        ], sorted(outputs))
 
         text = stream.getvalue()
         self.assertEqual(1, text.count('varname'))
@@ -254,7 +253,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(1, text.count('p2.y'))
         self.assertEqual(1, text.count('comp.z'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(9,num_non_empty_lines)
+        self.assertEqual(9, num_non_empty_lines)
 
     def test_for_feature_docs_list_vars_options(self):
 
@@ -265,12 +264,12 @@ class ExplCompTestCase(unittest.TestCase):
 
         model.add_subsystem('p1', IndepVarComp('x', 12.0,
                                                lower=1.0, upper=100.0,
-                                               ref = 1.1, ref0 = 2.1,
+                                               ref=1.1, ref0=2.1,
                                                units='inch',
                                                ))
         model.add_subsystem('p2', IndepVarComp('y', 1.0,
                                                lower=2.0, upper=200.0,
-                                               ref = 1.2, res_ref = 2.2,
+                                               ref=1.2, res_ref=2.2,
                                                units='ft',
                                                ))
         model.add_subsystem('comp', ExecComp('z=x+y',
@@ -298,14 +297,13 @@ class ExplCompTestCase(unittest.TestCase):
                                           print_arrays=False)
 
         self.assertEqual(sorted(outputs), [
-            ('comp.z', {'value': [ 24.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
-                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0} ),
-            ('p1.x', {'value': [ 12.], 'resids': [ 0.], 'units': 'inch', 'shape': (1,),
-                      'lower': [ 1.], 'upper': [ 100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1} ),
-            ('p2.y', {'value': [ 1.], 'resids': [ 0.], 'units': 'ft', 'shape': (1,),
-                      'lower': [ 2.], 'upper': [ 200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
-            ]
-            )
+            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+                        'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
+            ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+                      'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
+            ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+                      'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+        ])
 
         outputs = prob.model.list_outputs(implicit=False,
                                           values=True,
@@ -406,7 +404,8 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(text.count('5 Explicit Output'), 1)
         # make sure they are in the correct order
-        self.assertTrue(text.find("pz.z") < text.find('sub1.sub2.g1.d1.y1') < text.find('sub1.sub2.g1.d2.y2') < \
+        self.assertTrue(text.find("pz.z") < text.find('sub1.sub2.g1.d1.y1') <
+                        text.find('sub1.sub2.g1.d2.y2') <
                         text.find('g2.d1.y1') < text.find('g2.d2.y2'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(11, num_non_empty_lines)
@@ -447,12 +446,13 @@ class ExplCompTestCase(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] + 10.0
 
-        size = 100 # how many items in the array
+        size = 100  # how many items in the array
 
         prob = Problem()
         prob.model = Group()
 
-        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'), promotes=['x'])
+        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
+                                 promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
 
         prob.setup(check=False)
@@ -633,8 +633,8 @@ class ExplCompTestCase(unittest.TestCase):
                                print_arrays=True)
 
         with printoptions(edgeitems=3, infstr='inf',
-                          linewidth = 75, nanstr = 'nan', precision = 8,
-                          suppress = False, threshold = 1000, formatter = None):
+                          linewidth=75, nanstr='nan', precision=8,
+                          suppress=False, threshold=1000, formatter=None):
 
             prob.model.list_outputs(values=True,
                                     implicit=False,
@@ -655,6 +655,56 @@ class ExplCompTestCase(unittest.TestCase):
                                     scaling=True,
                                     hierarchical=True,
                                     print_arrays=True)
+
+    def test_compute_inputs_read_only(self):
+        class BadComp(TestExplCompSimple):
+            def compute(self, inputs, outputs):
+                super(BadComp, self).compute(inputs, outputs)
+                inputs['length'] = 0.  # should not be allowed
+
+        prob = Problem(BadComp())
+        prob.setup()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'length' in input vector "
+                         "when it is read only.")
+
+    def test_compute_partials_inputs_read_only(self):
+        class BadComp(TestExplCompSimpleDense):
+            def compute_partials(self, inputs, partials):
+                super(BadComp, self).compute_partials(inputs, partials)
+                inputs['length'] = 0.  # should not be allowed
+
+        prob = Problem(BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.check_partials()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'length' in input vector "
+                         "when it is read only.")
+
+    def test_compute_jacvec_product_inputs_read_only(self):
+        class BadComp(RectangleJacVec):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                super(BadComp, self).compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
+                inputs['length'] = 0.  # should not be allowed
+
+        prob = Problem(BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.check_partials()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'length' in input vector "
+                         "when it is read only.")
 
 
 if __name__ == '__main__':

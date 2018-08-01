@@ -53,7 +53,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
                 inputs_text, outputs_text = row_actual
 
-            if f_version == 3:
+            if f_version >= 3:
                 inputs_actual = json_to_np_array(inputs_text)
                 outputs_actual = json_to_np_array(outputs_text)
             elif f_version in (1, 2):
@@ -163,7 +163,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
                 outputs_text, residuals_text = row_actual
 
-            if f_version == 3:
+            if f_version >= 3:
                 inputs_actual = json_to_np_array(inputs_text)
                 outputs_actual = json_to_np_array(outputs_text)
                 residuals_actual = json_to_np_array(residuals_text)
@@ -225,7 +225,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
                 input_blob, output_text, residuals_text = row_actual
 
-            if f_version == 3:
+            if f_version >= 3:
                 output_actual = json_to_np_array(output_text)
                 residuals_actual = json_to_np_array(residuals_text)
             elif f_version in (1, 2):

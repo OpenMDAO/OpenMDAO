@@ -5,8 +5,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, \
-                         ScipyOptimizeDriver, DirectSolver, \
-                         ImplicitComponent, LinearBlockGS
+    ScipyOptimizeDriver, ImplicitComponent, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -19,6 +18,7 @@ class QuadraticCompVectorized(ImplicitComponent):
     Solution via Quadratic Formula:
     x = (-b + sqrt(b^2 - 4ac)) / 2a
     """
+
     def setup(self):
         self.add_input('a', val=np.array([1.0, 2.0, 3.0]))
         self.add_input('b', val=np.array([2.0, 3.0, 4.0]))
@@ -79,10 +79,39 @@ class QuadraticCompVectorized(ImplicitComponent):
             d_residuals['x'] = self.inv_jac * d_outputs['x']
 
 
+class QCVProblem(Problem):
+    """
+    A QuadraticCompVectorized problem with configurable component class.
+    """
+
+    def __init__(self, comp_class=QuadraticCompVectorized):
+        super(QCVProblem, self).__init__()
+
+        model = self.model
+
+        comp1 = model.add_subsystem('p', IndepVarComp())
+        comp1.add_output('a', np.array([1.0, 2.0, 3.0]))
+        comp1.add_output('b', np.array([2.0, 3.0, 4.0]))
+        comp1.add_output('c', np.array([-1.0, -2.0, -3.0]))
+        model.add_subsystem('comp', comp_class())
+
+        model.connect('p.a', 'comp.a')
+        model.connect('p.b', 'comp.b')
+        model.connect('p.c', 'comp.c')
+
+        model.add_design_var('p.a', vectorize_derivs=True)
+        model.add_design_var('p.b', vectorize_derivs=True)
+        model.add_design_var('p.c', vectorize_derivs=True)
+        model.add_constraint('comp.x', vectorize_derivs=True)
+
+        model.linear_solver = LinearBlockGS()
+
+
 class RectangleCompVectorized(ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
     """
+
     def setup(self):
         self.add_input('length', val=np.array([3.0, 4.0, 5.0]))
         self.add_input('width', val=np.array([1.0, 2.0, 3.0]))
@@ -253,11 +282,13 @@ def lagrange_matrices(x_disc, x_interp):
 
     return Li, Di
 
+
 class LGLFit(ExplicitComponent):
     """
     Given values at discretization nodes, provide interpolated values at midpoint nodes and
     an approximation of arclength.
     """
+
     def initialize(self):
         self.options.declare(name='num_nodes', types=int)
 
@@ -322,7 +353,6 @@ class ArcLengthFunction(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['f_arclength'] = np.sqrt(1 + inputs['yp_lgl']**2)
 
-
     def compute_partials(self, inputs, partials):
         partials['f_arclength', 'yp_lgl'] = inputs['yp_lgl'] / np.sqrt(1 + inputs['yp_lgl']**2)
 
@@ -331,6 +361,7 @@ class ArcLengthQuadrature(ExplicitComponent):
     """
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
+
     def initialize(self):
         self.options.declare(name='num_nodes', types=int)
 
@@ -343,9 +374,9 @@ class ArcLengthQuadrature(ExplicitComponent):
         _, self.w_lgl = lgl(n)
 
         self._mask = np.ones(n)
-        self._mask[0] = 2 # / (n * (n - 1))
-        self._mask[-1] = 2 # / (n * (n - 1))
-        #self._mask = self._mask * np.pi
+        self._mask[0] = 2  # / (n * (n - 1))
+        self._mask[-1] = 2  # / (n * (n - 1))
+        # self._mask = self._mask * np.pi
 
         da_df = np.atleast_2d(self.w_lgl*np.pi*self._mask)
 
@@ -371,16 +402,15 @@ class Phase(Group):
 
         # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
         self.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n), desc='values at LGL nodes'),
-                              promotes_outputs=['y_lgl'])
+                           promotes_outputs=['y_lgl'])
 
         # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
         x_lgl, _ = lgl(n)
-        x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
-        x_mid = (x_lgl[1:] + x_lgl[:-1]) * 0.5 # midpoints on [-pi, pi]
+        x_lgl = x_lgl * np.pi  # put x_lgl on [-pi, pi]
+        x_mid = (x_lgl[1:] + x_lgl[:-1]) * 0.5  # midpoints on [-pi, pi]
         self.add_subsystem('truth', IndepVarComp('y_mid',
                                                  val=np.sin(x_mid),
                                                  desc='truth values at midpoint nodes'))
-
 
         # Step 3: Make a polynomial fitting component
         self.add_subsystem('lgl_fit', LGLFit(num_nodes=n))
@@ -391,7 +421,6 @@ class Phase(Group):
         # Step 5: Compute the integrand of the arclength function then quadrature it
         self.add_subsystem('arclength_func', ArcLengthFunction(num_nodes=n))
         self.add_subsystem('arclength_quad', ArcLengthQuadrature(num_nodes=n))
-
 
         self.connect('y_lgl', 'lgl_fit.y_lgl')
         self.connect('truth.y_mid', 'defect.y_truth')
@@ -418,6 +447,7 @@ class Summer(ExplicitComponent):
         for i in range(self.options['n_phases']):
             outputs['total_arc_length'] += inputs['arc_length:p%d' % i]
 
+
 def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     n = order + 1
 
@@ -425,13 +455,13 @@ def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
 
     # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
     p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n),
-                          desc='values at LGL nodes'),
+                                                    desc='values at LGL nodes'),
                           promotes_outputs=['y_lgl'])
 
     # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
     x_lgl, _ = lgl(n)
-    x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
-    x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
+    x_lgl = x_lgl * np.pi  # put x_lgl on [-pi, pi]
+    x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0  # midpoints on [-pi, pi]
     p.model.add_subsystem('truth', IndepVarComp('y_mid',
                                                 val=np.sin(x_mid),
                                                 desc='truth values at midpoint nodes'))
@@ -452,11 +482,14 @@ def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     p.model.connect('lgl_fit.yp_lgl', 'arclength_func.yp_lgl')
     p.model.connect('arclength_func.f_arclength', 'arclength_quad.f_arclength')
 
-    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
-    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
+    p.model.add_design_var('y_lgl', lower=-1000.0, upper=1000.0,
+                           parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
+    p.model.add_constraint('defect.defect', lower=-1e-6, upper=1e-6,
+                           parallel_deriv_color=congroup, vectorize_derivs=vectorize)
     p.model.add_objective('arclength_quad.arclength')
     p.driver = ScipyOptimizeDriver()
     return p, np.sin(x_lgl)
+
 
 def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=False):
     N_PHASES = nphases
@@ -472,8 +505,10 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
         p.model.add_subsystem(p_name, Phase(order=PHASE_ORDER))
         p.model.connect('%s.arclength_quad.arclength' % p_name, 'sum.arc_length:%s' % p_name)
 
-        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0, parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
-        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6, parallel_deriv_color=congroup, vectorize_derivs=vectorize)
+        p.model.add_design_var('%s.y_lgl' % p_name, lower=-1000.0, upper=1000.0,
+                               parallel_deriv_color=dvgroup, vectorize_derivs=vectorize)
+        p.model.add_constraint('%s.defect.defect' % p_name, lower=-1e-6, upper=1e-6,
+                               parallel_deriv_color=congroup, vectorize_derivs=vectorize)
 
     p.model.add_subsystem('sum', Summer(n_phases=N_PHASES))
 
@@ -481,19 +516,17 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
     p.driver = ScipyOptimizeDriver()
 
     x_lgl, _ = lgl(n)
-    x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
-    x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
+    x_lgl = x_lgl * np.pi  # put x_lgl on [-pi, pi]
+    # x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0  # midpoints on [-pi, pi]
 
     return p, np.sin(x_lgl)
 
 
-
 class MatMatTestCase(unittest.TestCase):
-
 
     def test_feature_vectorized_derivs(self):
         import numpy as np
-        from openmdao.api import ExplicitComponent, ExecComp, IndepVarComp, Problem, ScipyOptimizeDriver
+        from openmdao.api import ExplicitComponent, IndepVarComp, Problem, ScipyOptimizeDriver
 
         SIZE = 5
 
@@ -538,7 +571,6 @@ class MatMatTestCase(unittest.TestCase):
 
                 J['g', 'y'] = 2*inputs['y']
 
-
         p = Problem()
 
         dvs = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
@@ -553,7 +585,6 @@ class MatMatTestCase(unittest.TestCase):
         p.model.add_constraint('g', upper=0, vectorize_derivs=True)
         p.model.add_objective('f')
 
-
         p.setup(mode='rev')
 
         p.run_model()
@@ -567,15 +598,15 @@ class MatMatTestCase(unittest.TestCase):
     def test_simple_multi_fwd(self):
         p, expected = simple_model(order=20, vectorize=True)
 
-        p.setup(check=False, mode='fwd')
+        p.setup(mode='fwd')
 
         p.run_driver()
 
-        #import matplotlib.pyplot as plt
+        # import matplotlib.pyplot as plt
 
-        #plt.plot(p['y_lgl'], 'bo')
-        #plt.plot(expected, 'go')
-        #plt.show()
+        # plt.plot(p['y_lgl'], 'bo')
+        # plt.plot(expected, 'go')
+        # plt.show()
 
         y_lgl = p['y_lgl']
         assert_rel_error(self, expected, y_lgl, 1.e-5)
@@ -583,7 +614,7 @@ class MatMatTestCase(unittest.TestCase):
     def test_simple_multi_rev(self):
         p, expected = simple_model(order=20, vectorize=True)
 
-        p.setup(check=False, mode='rev')
+        p.setup(mode='rev')
 
         p.run_driver()
 
@@ -594,7 +625,7 @@ class MatMatTestCase(unittest.TestCase):
         N_PHASES = 4
         p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
-        p.setup(check=False, mode='fwd')
+        p.setup(mode='fwd')
 
         p.run_driver()
 
@@ -614,7 +645,7 @@ class MatMatTestCase(unittest.TestCase):
         N_PHASES = 4
         p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
-        p.setup(check=False, mode='rev')
+        p.setup(mode='rev')
 
         p.run_driver()
 
@@ -639,7 +670,7 @@ class MatMatTestCase(unittest.TestCase):
         model.add_design_var('p.width', vectorize_derivs=True)
         model.add_constraint('comp.area', vectorize_derivs=True)
 
-        prob.setup(check=False, mode='rev')
+        prob.setup(mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(of=['comp.area'], wrt=['p.length', 'p.width'])
@@ -647,27 +678,9 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, J['comp.area', 'p.width'], np.diag(np.array([3.0, 4.0, 5.0])))
 
     def test_implicit(self):
-        prob = Problem()
-        model = prob.model
+        prob = QCVProblem()
 
-        comp1 = model.add_subsystem('p', IndepVarComp())
-        comp1.add_output('a', np.array([1.0, 2.0, 3.0]))
-        comp1.add_output('b', np.array([2.0, 3.0, 4.0]))
-        comp1.add_output('c', np.array([-1.0, -2.0, -3.0]))
-        model.add_subsystem('comp', QuadraticCompVectorized())
-
-        model.connect('p.a', 'comp.a')
-        model.connect('p.b', 'comp.b')
-        model.connect('p.c', 'comp.c')
-
-        model.add_design_var('p.a', vectorize_derivs=True)
-        model.add_design_var('p.b', vectorize_derivs=True)
-        model.add_design_var('p.c', vectorize_derivs=True)
-        model.add_constraint('comp.x', vectorize_derivs=True)
-
-        model.linear_solver = LinearBlockGS()
-
-        prob.setup(check=False, mode='fwd')
+        prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -675,6 +688,102 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, J['comp.x', 'p.a'], np.diag(np.array([-0.06066017, -0.05, -0.03971954])), 1e-4)
         assert_rel_error(self, J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
         assert_rel_error(self, J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
+
+    def test_apply_multi_linear_inputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # inputs is read_only, should raise exception
+                inputs['a'] = np.zeros(inputs['a'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "when it is read only.")
+
+    def test_apply_multi_linear_outputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # outputs is read_only, should raise exception
+                outputs['x'] = np.zeros(outputs['x'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "when it is read only.")
+
+    def test_apply_multi_linear_dinputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # d_inputs is read_only, should raise exception
+                d_inputs['a'] = np.zeros(inputs['a'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'a' in input vector "
+                         "when it is read only.")
+
+    def test_apply_multi_linear_doutputs_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # d_outputs is read_only, should raise exception
+                d_outputs['x'] = np.zeros(outputs['x'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in output vector "
+                         "when it is read only.")
+
+    def test_apply_multi_linear_dresids_read_only(self):
+        class BadComp(QuadraticCompVectorized):
+            def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                # d_residuals is read_only, should raise exception
+                d_residuals['x'] = np.zeros(outputs['x'].shape)
+
+        prob = QCVProblem(comp_class=BadComp)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in residual vector "
+                         "when it is read only.")
+
 
 class JacVec(ExplicitComponent):
 
@@ -712,8 +821,7 @@ class MultiJacVec(JacVec):
 
 
 class ComputeMultiJacVecTestCase(unittest.TestCase):
-    def setup_model(self, size, multi, vectorize, mode):
-        comp_class = MultiJacVec if multi else JacVec
+    def setup_model(self, size, comp_class, vectorize, mode):
         p = Problem()
         model = p.model
         model.add_subsystem('px', IndepVarComp('x', val=(np.arange(5, dtype=float) + 1.) * 3.0))
@@ -727,12 +835,12 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         model.add_design_var('py.y', vectorize_derivs=vectorize)
         model.add_constraint('comp.f_xy', vectorize_derivs=vectorize)
 
-        p.setup(check=False, mode=mode)
+        p.setup(mode=mode)
         p.run_model()
         return p
 
     def test_compute_multi_jacvec_prod_fwd(self):
-        p = self.setup_model(size=5, multi=False, vectorize=False, mode='fwd')
+        p = self.setup_model(size=5, comp_class=JacVec, vectorize=False, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -740,7 +848,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev(self):
-        p = self.setup_model(size=5, multi=False, vectorize=False, mode='rev')
+        p = self.setup_model(size=5, comp_class=JacVec, vectorize=False, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -748,7 +856,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_vectorize(self):
-        p = self.setup_model(size=5, multi=False, vectorize=True, mode='fwd')
+        p = self.setup_model(size=5, comp_class=JacVec, vectorize=True, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -756,7 +864,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_vectorize(self):
-        p = self.setup_model(size=5, multi=False, vectorize=True, mode='rev')
+        p = self.setup_model(size=5, comp_class=JacVec, vectorize=True, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -764,7 +872,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_multi(self):
-        p = self.setup_model(size=5, multi=True, vectorize=False, mode='fwd')
+        p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -772,7 +880,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_multi(self):
-        p = self.setup_model(size=5, multi=True, vectorize=False, mode='rev')
+        p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -780,7 +888,7 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_fwd_vectorize_multi(self):
-        p = self.setup_model(size=5, multi=True, vectorize=True, mode='fwd')
+        p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='fwd')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
@@ -788,12 +896,111 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
 
     def test_compute_multi_jacvec_prod_rev_vectorize_multi(self):
-        p = self.setup_model(size=5, multi=True, vectorize=True, mode='rev')
+        p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='rev')
 
         J = p.compute_totals(of=['comp.f_xy'], wrt=['px.x', 'py.y'])
 
         assert_rel_error(self, J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_rel_error(self, J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_jacvec_product_mode_read_only(self):
+        class BadComp(JacVec):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                # mode condition is reversed, should raise exception
+                if mode == 'rev':
+                    if 'x' in d_inputs:
+                        d_outputs['f_xy'] += d_inputs['x'] * inputs['y']
+                    if 'y' in d_inputs:
+                        d_outputs['f_xy'] += d_inputs['y'] * inputs['x']
+                else:
+                    d_fxy = d_outputs['f_xy']
+                    if 'x' in d_inputs:
+                        d_inputs['x'] += d_fxy * inputs['y']
+                    if 'y' in d_inputs:
+                        d_inputs['y'] += d_fxy * inputs['x']
+
+        p = self.setup_model(size=5, comp_class=BadComp, vectorize=True, mode='fwd')
+
+        with self.assertRaises(ValueError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in input vector "
+                         "when it is read only.")
+
+        p = self.setup_model(size=5, comp_class=BadComp, vectorize=True, mode='rev')
+
+        with self.assertRaises(ValueError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'f_xy' in residual vector "
+                         "when it is read only.")
+
+    def test_compute_jacvec_product_inputs_read_only(self):
+        class BadComp(JacVec):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                # inputs is read_only, should raise exception
+                inputs['x'] = np.zeros(self.size)
+
+        p = self.setup_model(size=5, comp_class=BadComp, vectorize=True, mode='fwd')
+
+        with self.assertRaises(ValueError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in input vector "
+                         "when it is read only.")
+
+    def test_compute_multi_jacvec_product_mode_read_only(self):
+        class BadComp(JacVec):
+            def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                # mode condition is reversed, should raise exception
+                if mode == 'rev':
+                    if 'x' in d_inputs:
+                        d_outputs['f_xy'] += d_inputs['x'] * inputs['y']
+                    if 'y' in d_inputs:
+                        d_outputs['f_xy'] += d_inputs['y'] * inputs['x']
+                else:
+                    d_fxy = d_outputs['f_xy']
+                    if 'x' in d_inputs:
+                        d_inputs['x'] += d_fxy * inputs['y']
+                    if 'y' in d_inputs:
+                        d_inputs['y'] += d_fxy * inputs['x']
+
+        p = self.setup_model(size=5, comp_class=BadComp, vectorize=True, mode='fwd')
+
+        with self.assertRaises(ValueError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in input vector "
+                         "when it is read only.")
+
+        p = self.setup_model(size=5, comp_class=BadComp, vectorize=True, mode='rev')
+
+        with self.assertRaises(ValueError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'f_xy' in residual vector "
+                         "when it is read only.")
+
+    def test_compute_multi_jacvec_product_inputs_read_only(self):
+        class BadComp(JacVec):
+            def compute_multi_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                # inputs is read_only, should raise exception
+                inputs['x'] = np.zeros(self.size)
+
+        p = self.setup_model(size=5, comp_class=BadComp, vectorize=True, mode='fwd')
+
+        with self.assertRaises(ValueError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Attempt to set value of 'x' in input vector "
+                         "when it is read only.")
+
 
 if __name__ == '__main__':
     unittest.main()
