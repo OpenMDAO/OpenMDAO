@@ -25,7 +25,7 @@ from openmdao.utils.write_outputs import write_outputs
 
 if PY2:
     import cPickle as pickle
-if PY3:
+elif PY3:
     import pickle
 
 _DEFAULT_OUT_STREAM = object()
@@ -170,8 +170,8 @@ class SqliteCaseReader(BaseCaseReader):
                     dcase._case_keys = [coord[0] for coord in rows]
                     dcase.num_cases = len(dcase._case_keys)
 
-                except sqlite3.OperationalError as err:
-                    # Cases recorded in version 1 won't have a derivatives table.
+                except sqlite3.OperationalError:
+                    # Cases recorded in version 1 won't have a 'derivatives' table.
                     if self.format_version >= 2:
                         reraise(*sys.exc_info())
 
@@ -191,9 +191,9 @@ class SqliteCaseReader(BaseCaseReader):
                     self.problem_cases._case_keys = [coord[0] for coord in rows]
                     self.problem_cases.num_cases = len(self.problem_cases._case_keys)
 
-                except sqlite3.OperationalError as err:
-                    # Cases recorded in some early iterations of version 1 won't have a problem
-                    # table.
+                except sqlite3.OperationalError:
+                    # Cases recorded in some early iterations of version 1 won't have
+                    # the 'problem_cases' table.
                     if self.format_version >= 2:
                         reraise(*sys.exc_info())
 
@@ -552,8 +552,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         if sys_vars is not None and len(sys_vars) > 0:
             for name in sys_vars:
-                if residuals_tol and residuals_vars is not None and\
-                   sys_vars[name]['residuals'] is not 'Not Recorded' and\
+                if residuals_tol and \
+                   sys_vars[name]['residuals'] is not 'Not Recorded' and \
                    np.linalg.norm(sys_vars[name]['residuals']) < residuals_tol:
                     continue
                 outs = {}
@@ -633,7 +633,7 @@ class SqliteCaseReader(BaseCaseReader):
                     variables[abs_name]['residuals'] = case.residuals[abs_name]
                 else:
                     variables[abs_name]['residuals'] = 'Not Recorded'
-        elif inputs is not None:
+        elif case.inputs is not None:
             for abs_name in case.inputs:
                 if abs_name not in variables:
                     variables[abs_name] = {'value': case.inputs[abs_name]}
@@ -701,7 +701,6 @@ class SqliteCaseReader(BaseCaseReader):
                                 variables[abs_name]['residuals'] = 'Not Recorded'
                 elif case.inputs is not None:
                     for abs_name in case.inputs:
-                        abs_name = case.prom2abs['input'][abs_name][0]
                         if abs_name not in variables:
                             variables[abs_name] = {'value': case.inputs[abs_name]}
 
@@ -757,9 +756,6 @@ class SqliteCaseReader(BaseCaseReader):
         """
         if out_stream is None:
             return
-
-        # Only local metadata but the most complete
-        meta = self._abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()

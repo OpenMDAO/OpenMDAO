@@ -4,10 +4,6 @@ A Case class.
 
 import re
 
-import numpy as np
-
-from pprint import pprint
-
 
 class Case(object):
     """
@@ -87,9 +83,6 @@ class Case(object):
         self.meta = meta
         self.prom2abs = prom2abs
         self.abs2prom = abs2prom
-
-        print('meta:')
-        pprint(meta)
 
         if inputs is not None and inputs.dtype.names:
             self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
@@ -347,7 +340,7 @@ class ProblemCase(Case):
 
 class PromotedToAbsoluteMap(dict):
     """
-    Enables access of values through promoted variable names by mapping to the absolute name.
+    Enables access of values through absolute or promoted variable names.
 
     Attributes
     ----------
@@ -397,7 +390,6 @@ class PromotedToAbsoluteMap(dict):
 
         for n in names:
             if isinstance(n, tuple) or ',' in n:
-                print('deriv key:', n)
                 if isinstance(n, tuple):
                     of, wrt = n
                 else:
@@ -424,8 +416,6 @@ class PromotedToAbsoluteMap(dict):
         """
         if self._is_output:
             prom2abs = self._prom2abs['output']
-            # print('prom2abs:')
-            # pprint(prom2abs)
 
             if isinstance(key, tuple) or ',' in key:
                 if isinstance(key, tuple):
@@ -447,7 +437,6 @@ class PromotedToAbsoluteMap(dict):
             else:
                 mykey = key
 
-            # print('key:', key, 'mykey:', mykey)
             return super(PromotedToAbsoluteMap, self).__getitem__(mykey)
 
         else:
@@ -459,9 +448,47 @@ class PromotedToAbsoluteMap(dict):
                 prom2abs = self._prom2abs['input']
                 for k in prom2abs[key]:
                     if k in mykeys:
-                        return super(PromotedToAbsoluteMap, self).__getitem__(key)
+                        return super(PromotedToAbsoluteMap, self).__getitem__(k)
 
         raise KeyError(key)
+
+    def __repr__(self):
+        """
+        Return the dictionary representation.
+
+        Returns
+        -------
+        dict
+            The dictionary.
+        """
+        return super(PromotedToAbsoluteMap, self).__repr__()
+
+    def promoted_names(self):
+        """
+        Yield promoted names for variables contained in this dictionary.
+
+        Similar to keys() but with promoted variable names instead of absolute names.
+
+        Yields
+        ------
+        list
+            list of promoted names for variables contained in this dictionary.
+        """
+        if self._is_output:
+            abs2prom = self._abs2prom['output']
+        else:
+            abs2prom = self._abs2prom['input']
+
+        for abs_name in self.keys():
+            if isinstance(abs_name, tuple):
+                of, wrt = abs_name
+                of = abs2prom[of]
+                wrt = abs2prom[wrt]
+                prom_name = (of, wrt)
+            else:
+                prom_name = abs2prom[abs_name]
+
+            yield prom_name
 
 
 class DriverDerivativesCase(object):

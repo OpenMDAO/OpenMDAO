@@ -60,14 +60,15 @@ class TestSqliteCaseReader(unittest.TestCase):
             tmp.close()
 
         with self.assertRaises(IOError) as cm:
-            _ = CaseReader(filepath)
+            CaseReader(filepath)
 
-        self.assertTrue(str(cm.exception).startswith('File does not contain a valid sqlite database'))
+        msg = 'File does not contain a valid sqlite database'
+        self.assertTrue(str(cm.exception).startswith(msg))
 
     def test_bad_filename(self):
 
         with self.assertRaises(IOError) as cm:
-            _ = CaseReader('junk.sql')
+            CaseReader('junk.sql')
 
         self.assertTrue(str(cm.exception).startswith('File does not exist'))
 
@@ -142,8 +143,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         # While thinking about derivatives, let's get them all.
         derivs = deriv_case.get_derivatives()
 
-        self.assertEqual(set(derivs.keys()),
-                         set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
+        self.assertEqual(set(derivs.promoted_names()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
 
         # Test values from one case, the last case
         last_case = cr.driver_cases.get_case(-1)
@@ -183,8 +186,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         derivs = deriv_case.get_derivatives()
 
         # See what derivatives have been recorded.
-        self.assertEqual(set(derivs.keys()),
-                         set([('obj', 'z'), ('con2', 'z'), ('con1', 'x'), ('obj', 'x'), ('con2', 'x'), ('con1', 'z')]))
+        self.assertEqual(set(derivs.promoted_names()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
 
         # Get specific derivative.
         assert_rel_error(self, derivs['obj', 'z'], [[9.61001056, 1.78448534]], 1e-4)
@@ -285,7 +290,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = prob.model
 
         # the Sellar problem but with units
-        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m', lower=-1000, upper=1000), promotes=['x'])
+        model.add_subsystem('px', IndepVarComp('x', 1.0, units='m', lower=-1000, upper=1000),
+                            promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -317,13 +323,17 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr.output2meta['x']['units'], 'm')
         self.assertEqual(cr.input2meta['obj_cmp.y1']['units'], 'm')
         self.assertEqual(cr.input2meta['obj_cmp.y2']['units'], 'cm')
+
         self.assertEqual(cr.input2meta['d1.x']['units'], None)
-        self.assertEqual(cr.input2meta['d1.y1']['units'], None)
         self.assertEqual(cr.input2meta['d1.y2']['units'], None)
+        self.assertEqual(cr.output2meta['d1.y1']['units'], None)
+
         self.assertEqual(cr.output2meta['x']['explicit'], True)
         self.assertEqual(cr.output2meta['x']['type'], ['output', 'desvar'])
+
         self.assertEqual(cr.input2meta['obj_cmp.y1']['explicit'], True)
         self.assertEqual(cr.input2meta['obj_cmp.y2']['explicit'], True)
+
         self.assertEqual(cr.output2meta['x']['lower'], -1000)
         self.assertEqual(cr.output2meta['x']['upper'], 1000)
         self.assertEqual(cr.output2meta['y2']['upper'], None)
@@ -343,15 +353,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader(self.filename)
+        metadata = CaseReader(self.filename).solver_metadata
 
         self.assertEqual(
-            sorted(cr.solver_metadata.keys()),
+            sorted(metadata.keys()),
             sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
         )
-        self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
-        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'],10)
-        self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
+        self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
+        self.assertEqual(metadata['root.LinearBlockGS']['solver_class'], 'LinearBlockGS')
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -365,7 +375,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
-        driver.recording_options['includes'] = ['mda.d2.y2',]
+        driver.recording_options['includes'] = ['mda.d2.y2']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -512,13 +522,34 @@ class TestSqliteCaseReader(unittest.TestCase):
                                   True, True, True)
 
         expected_outputs = {
-            'd2.y2': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [12.0584882]},
-            'con_cmp1.con1': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [-22.4283024]},
-            'pz.z': {'lower': None, 'ref': 1.0, 'resids': [0., 0.], 'shape': (2,), 'values': [5., 2.]},
-            'obj_cmp.obj': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [28.5883082]},
-            'px.x': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [1.]},
-            'con_cmp2.con2': {'lower': None, 'ref': 1.0, 'resids': [0.], 'shape': (1,), 'values': [-11.9415118]},
-            'd1.y1': {'lower': None, 'ref': 1.0, 'resids': [1.318e-10], 'shape': (1,), 'values': [25.5883024]}
+            'd2.y2': {
+                'lower': None, 'ref': 1.0,
+                'resids': [0.], 'shape': (1,), 'values': [12.0584882]
+            },
+            'con_cmp1.con1': {
+                'lower': None, 'ref': 1.0,
+                'resids': [0.], 'shape': (1,), 'values': [-22.4283024]
+            },
+            'pz.z': {
+                'lower': None, 'ref': 1.0,
+                'resids': [0., 0.], 'shape': (2,), 'values': [5., 2.]
+            },
+            'obj_cmp.obj': {
+                'lower': None, 'ref': 1.0,
+                'resids': [0.], 'shape': (1,), 'values': [28.5883082]
+            },
+            'px.x': {
+                'lower': None, 'ref': 1.0,
+                'resids': [0.], 'shape': (1,), 'values': [1.]
+            },
+            'con_cmp2.con2': {
+                'lower': None, 'ref': 1.0,
+                'resids': [0.], 'shape': (1,), 'values': [-11.9415118]
+            },
+            'd1.y1': {
+                'lower': None, 'ref': 1.0,
+                'resids': [1.318e-10], 'shape': (1,), 'values': [25.5883024]
+            }
         }
 
         self.assertEqual(len(outputs), 7)
@@ -533,7 +564,13 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(vals['value'], expected['values'])
 
         expected_outputs_case = {
-            'd1.y1': {'lower': None, 'ref': 1.0, 'resids': [1.318e-10], 'shape': (1,), 'values': [25.5454859]}
+            'd1.y1': {
+                'lower': None,
+                'ref': 1.0,
+                'resids': [1.318e-10],
+                'shape': (1,),
+                'values': [25.5454859]
+            }
         }
 
         sys_case = cr.system_cases.get_case(1)
@@ -652,10 +689,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                                          (expected_constraints, constraints),
                                          (expected_responses, responses)):
 
-            print('expected:', expected_set)
-            print('actual:', actual_set)
-            self.assertEqual(len(expected_set), len(actual_set.keys()))
-            for k in actual_set:
+            self.assertEqual(len(expected_set), len(actual_set))
+            for k in expected_set:
                 np.testing.assert_almost_equal(expected_set[k], actual_set[k])
 
     def test_simple_load_system_cases(self):
@@ -755,7 +790,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = prob.model
         model.add_subsystem('c1', comp)
         model.add_subsystem('c2', SpeedComp())
-        model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
+        model.add_subsystem('c3', ExecComp('f=speed', speed={'units': 'm/s'}))
         model.connect('c1.distance', 'c2.distance')
         model.connect('c1.time', 'c2.time')
         model.connect('c2.speed', 'c3.speed')
@@ -1030,7 +1065,7 @@ def _assert_model_matches_case(case, system):
     case_outputs = case.outputs
     model_outputs = system._outputs
     for name, model_output in iteritems(model_outputs._views):
-        np.testing.assert_almost_equal(case_outputs[name],model_output)
+        np.testing.assert_almost_equal(case_outputs[name], model_output)
 
 
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
@@ -1120,13 +1155,14 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
         filename = os.path.join(filename, 'case_driver_solver_system_02.sql')
-        cr = CaseReader(filename)
+
+        cases = CaseReader(filename).solver_cases
 
         # Test to see if we got the correct number of cases
-        self.assertEqual(cr.solver_cases.num_cases, 7)
+        self.assertEqual(cases.num_cases, 7)
 
         # Test to see if the access by case keys works:
-        sixth_solver_iteration = cr.solver_cases.get_case('rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0')
+        sixth_solver_iteration = cases.get_case('rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0')
         np.testing.assert_almost_equal(sixth_solver_iteration.outputs['z'],
                                        [1.97846296,  -2.21388305e-13],
                                        decimal=2,
@@ -1135,7 +1171,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
                                        ' for {0}'.format('pz.z'))
 
         # Test values from one case, the last case
-        last_case = cr.solver_cases.get_case(-1)
+        last_case = cases.get_case(-1)
         np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'],
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1147,9 +1183,10 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
                                        ' for {0}'.format('px.x'))
 
         # Test to see if the case keys (iteration coords) come back correctly
-        case_keys = cr.solver_cases.list_cases()
+        case_keys = cases.list_cases()
+        coord = 'rank0:SLSQP|{}|root._solve_nonlinear|{}|NLRunOnce|0'
         for i, iter_coord in enumerate(case_keys):
-            self.assertEqual(iter_coord, 'rank0:SLSQP|{}|root._solve_nonlinear|{}|NLRunOnce|0'.format(i, i))
+            self.assertEqual(iter_coord, coord.format(i, i))
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")

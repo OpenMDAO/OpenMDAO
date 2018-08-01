@@ -7,7 +7,6 @@ import numpy as np
 import sqlite3
 
 from shutil import rmtree
-from six import PY2, PY3
 from tempfile import mkdtemp
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
@@ -448,7 +447,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
             value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # second check to see if not recorded recursively, when option set to False
         prob = Problem(model=SellarDerivatives())
@@ -481,7 +480,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
             value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         prob = Problem(model=SellarDerivatives())
         prob.setup()
@@ -712,8 +711,15 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # check data for 'd1'
         #
-        coordinate = [0, 'SLSQP', (0, ), 'root._solve_nonlinear', (1, ), 'NLRunOnce', (0, ),
-                      'mda._solve_nonlinear', (1, ), 'NonlinearBlockGS', (0,), 'mda.d1._solve_nonlinear', (7, )]
+        coordinate = [
+            0,
+            'SLSQP', (0, ),
+            'root._solve_nonlinear', (1, ),
+            'NLRunOnce', (0, ),
+            'mda._solve_nonlinear', (1, ),
+            'NonlinearBlockGS', (0,),
+            'mda.d1._solve_nonlinear', (7, )
+        ]
 
         expected_inputs = {
             "mda.d1.z": [5.0, 2.0],
@@ -723,7 +729,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"mda.d1.y1": [25.5883027, ], }
         expected_residuals = {"mda.d1.y1": [0.0, ], }
 
-        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
+        expected_data = (
+            (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
+        )
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
         #
@@ -736,7 +744,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
         expected_residuals = {"pz.z": [0.0, 0.0], }
 
-        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
+        expected_data = (
+            (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
+        )
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver(self):
@@ -817,14 +827,20 @@ class TestSqliteRecorder(unittest.TestCase):
         nl.options['max_sub_solves'] = 4
 
         ls = nl.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['c'] = 100.0  # This is pretty bogus, but it ensures that we get a few LS iterations.
+        ls.options['c'] = 100.0  # This is bogus, but it ensures that we get a few LS iterations.
         ls.add_recorder(self.recorder)
 
         t0, t1 = run_driver(prob)
 
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'ArmijoGoldsteinLS', (2,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (3,),
+            'ArmijoGoldsteinLS', (2,)
+        ]
 
         expected_abs_error = 5.46371836663e-11
         expected_rel_error = 0.120259301544
@@ -863,7 +879,13 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (1,), 'BoundsEnforceLS', (0,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (1,),
+            'BoundsEnforceLS', (0,)
+        ]
 
         expected_abs_error = 7.02783609310096e-10
         expected_rel_error = 8.078674883382422e-07
@@ -899,7 +921,7 @@ class TestSqliteRecorder(unittest.TestCase):
         nl.options['max_sub_solves'] = 4
 
         ls = nl.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['c'] = 100.0  # This is pretty bogus, but it ensures that we get a few LS iterations.
+        ls.options['c'] = 100.0  # This is bogus, but it ensures that we get a few LS iterations.
         model.add_recorder(self.recorder)
 
         try:
@@ -1059,7 +1081,13 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # No norms so no expected norms
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'DirectSolver', (0,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (2,),
+            'DirectSolver', (0,)
+        ]
 
         expected_abs_error = None
         expected_rel_error = None
@@ -1086,7 +1114,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self,expected_data, self.eps)
+        assertSolverIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_solver_linear_scipy_iterative_solver(self):
         prob = SellarProblem()
@@ -1104,7 +1132,12 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'ScipyKrylov', (1,)]
+        coordinate = [0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (2,),
+            'ScipyKrylov', (1,)
+        ]
 
         expected_abs_error = 0.0
         expected_rel_error = 0.0
@@ -1150,7 +1183,13 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'PETScKrylov', (3,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (2,),
+            'PETScKrylov', (3,)
+        ]
 
         expected_abs_error = 0.0
         expected_rel_error = 0.0
@@ -1195,7 +1234,13 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (2,), 'LinearBlockGS', (6,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (2,),
+            'LinearBlockGS', (6,)
+        ]
 
         expected_abs_error = 9.109083208861876e-11
         expected_rel_error = 9.114367543620551e-12
@@ -1230,7 +1275,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        ln = nl.linear_solver = LinearRunOnce() # used for analytic derivatives
+        ln = nl.linear_solver = LinearRunOnce()  # used for analytic derivatives
         ln.recording_options['record_abs_error'] = True
         ln.recording_options['record_rel_error'] = True
         ln.recording_options['record_solver_residuals'] = True
@@ -1240,7 +1285,13 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (9,), 'LinearRunOnce', (0,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (9,),
+            'LinearRunOnce', (0,)
+        ]
 
         expected_abs_error = None
         expected_rel_error = None
@@ -1275,7 +1326,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        ln = nl.linear_solver = LinearBlockJac() # used for analytic derivatives
+        ln = nl.linear_solver = LinearBlockJac()  # used for analytic derivatives
         ln.recording_options['record_abs_error'] = True
         ln.recording_options['record_rel_error'] = True
         ln.recording_options['record_solver_residuals'] = True
@@ -1285,7 +1336,13 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'Driver', (0,), 'root._solve_nonlinear', (0,), 'NewtonSolver', (3,), 'LinearBlockJac', (9,)]
+        coordinate = [
+            0,
+            'Driver', (0,),
+            'root._solve_nonlinear', (0,),
+            'NewtonSolver', (3,),
+            'LinearBlockJac', (9,)
+        ]
 
         expected_abs_error = 9.947388408259769e-11
         expected_rel_error = 4.330301334141486e-08
@@ -1500,7 +1557,9 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_outputs = {"comp2.x": [3.0, ], }
         expected_residuals = {"comp2.x": [0.0, ], }
 
-        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
+        expected_data = (
+            (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
+        )
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
     def test_multidimensional_arrays(self):
@@ -1542,7 +1601,9 @@ class TestSqliteRecorder(unittest.TestCase):
             'areas': [[0., 0.], [0., 0.]],
         }
 
-        expected_data = ((coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),)
+        expected_data = (
+            (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
+        )
         assertSystemIterDataRecorded(self, expected_data, self.eps)
 
     def test_record_system_recursively(self):
@@ -1638,7 +1699,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_inputs'] = False
-        driver.recording_options['includes'] = ['mda.d2.y2',]
+        driver.recording_options['includes'] = ['mda.d2.y2']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -1784,7 +1845,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                 raise e
 
     def test_feature_simple_driver_recording(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
+        from openmdao.api import Problem, IndepVarComp, ExecComp, \
             ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
@@ -1884,7 +1945,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
             value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1915,12 +1976,14 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
 
-        self.assertEqual(sorted(cr.solver_metadata.keys()), [
+        metadata = cr.solver_metadata
+
+        self.assertEqual(sorted(metadata.keys()), [
             'd1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS'
         ])
-        self.assertEqual(cr.solver_metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
-        self.assertEqual(cr.solver_metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
-        self.assertEqual(cr.solver_metadata['root.LinearBlockGS']['solver_class'],'LinearBlockGS')
+        self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
+        self.assertEqual(metadata['root.LinearBlockGS']['solver_class'], 'LinearBlockGS')
 
     def test_feature_system_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1977,7 +2040,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
         first_system_case = cr.system_cases.get_case(0)
         recorded_inputs = first_system_case.inputs.keys()
-        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
+        self.assertEqual(set(recorded_inputs), {'obj_cmp.y2', 'obj_cmp.y1', 'obj_cmp.z'})
 
     def test_feature_driver_options(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
@@ -2012,13 +2075,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         recorded_constraints = first_driver_case.get_constraints().keys()
         recorded_desvars = first_driver_case.get_desvars().keys()
 
-        self.assertEqual(set(recorded_objectives), {'obj'})
-        self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars), {'x', 'z'})
+        self.assertEqual(set(recorded_objectives), {'obj_cmp.obj'})
+        self.assertEqual(set(recorded_constraints), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(recorded_desvars), {'px.x', 'pz.z'})
 
     def test_feature_solver_options(self):
-        import numpy as np
-
         from openmdao.api import Problem, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -2040,13 +2101,15 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertAlmostEqual(first_solver_case.abs_err, 2.2545141)
 
     def test_feature_circuit_with_recorder(self):
-        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, CaseReader, SqliteRecorder
+        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, \
+            CaseReader, SqliteRecorder
         from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
 
         class Circuit(Group):
 
             def setup(self):
-                self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
+                self.add_subsystem('n1', Node(n_in=1, n_out=2),
+                                   promotes_inputs=[('I_in:0', 'I_in')])
                 self.add_subsystem('n2', Node())  # leaving defaults
 
                 self.add_subsystem('R1', Resistor(R=100.), promotes_inputs=[('V_out', 'Vg')])
@@ -2135,11 +2198,20 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         recorded_constraints = first_driver_case.get_constraints()
         recorded_desvars = first_driver_case.get_desvars()
 
-        self.assertEqual(set(recorded_objectives.keys()), {'obj'})
-        self.assertEqual(set(recorded_constraints.keys()), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars.keys()), {'x', 'z'})
+        # dictionary keys are the absolute path names
+        self.assertEqual(set(recorded_objectives.keys()), {'obj_cmp.obj'})
+        self.assertEqual(set(recorded_constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
+        self.assertEqual(set(recorded_desvars.keys()), {'px.x', 'pz.z'})
 
+        # alternatively, you can get the promoted names
+        self.assertEqual(set(recorded_objectives.promoted_names()), {'obj'})
+        self.assertEqual(set(recorded_constraints.promoted_names()), {'con1', 'con2'})
+        self.assertEqual(set(recorded_desvars.promoted_names()), {'x', 'z'})
+
+        # you can access variable values via either the absolute or promoted name
+        self.assertAlmostEqual(recorded_objectives['obj_cmp.obj'][0], 28.58830817)
         self.assertAlmostEqual(recorded_objectives['obj'][0], 28.58830817)
+        self.assertAlmostEqual(recorded_desvars['px.x'][0], 1.)
         self.assertAlmostEqual(recorded_desvars['x'][0], 1.)
 
     def test_feature_load_system_case_for_restart(self):
@@ -2340,6 +2412,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(len(desvars.keys()), 0)
         self.assertEqual(len(objectives.keys()), 0)
         self.assertEqual(len(constraints.keys()), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
