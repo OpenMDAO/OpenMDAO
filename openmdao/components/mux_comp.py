@@ -41,8 +41,7 @@ class MuxComp(ExplicitComponent):
         self.options.declare('vec_size', types=int, default=2,
                              desc='The number of elements to be combined into an output.')
 
-    def add_var(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                units=None, desc='', axis=0):
+    def add_var(self, name, val=1.0, shape=None, units=None, desc='', axis=0):
         """
         Add an output variable to be muxed, and all associated input variables.
 
@@ -114,7 +113,7 @@ class MuxComp(ExplicitComponent):
                 for j in range(in_size):
                     in_templates[i].flat[:] = 0
                     in_templates[i].flat[j] = 1
-                    np.stack(in_templates, axis=ax, out=temp_out)
+                    temp_out[...] = np.stack(in_templates, axis=ax)
                     cs.append(j)
                     rs.append(int(np.nonzero(temp_out.flat)[0]))
 
@@ -137,4 +136,4 @@ class MuxComp(ExplicitComponent):
         for var in self._vars:
             ax = self._vars[var]['axis']
             vals = [inputs[self._input_names[var][i]] for i in range(vec_size)]
-            np.stack(vals, axis=ax, out=outputs[var])
+            outputs[var][...] = np.stack(vals, axis=ax)
