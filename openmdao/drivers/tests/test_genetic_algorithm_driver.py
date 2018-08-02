@@ -165,9 +165,6 @@ class TestSimpleGA(unittest.TestCase):
         np.random.seed(1)
 
         class ValueErrorComp(ExplicitComponent):
-            """
-            Raises value error. AnalysisError should return the original error.
-            """
             def setup(self):
                 self.add_input('x', 1.0)
                 self.add_output('f', 1.0)
