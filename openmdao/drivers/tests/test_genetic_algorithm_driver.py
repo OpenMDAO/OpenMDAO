@@ -153,13 +153,44 @@ class TestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
-        # Note, GA doesn't do so well with the continunous vars, naturally, so we reduce the space
-        # as much as we can. Objective is stll rather random, but it is close. GA does a great job
+        # Note, GA doesn't do so well with the continuous vars, naturally, so we reduce the space
+        # as much as we can. Objective is still rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
         self.assertLess(prob['mass'], 6.0)
         assert_rel_error(self, prob['mat1'], 3, 1e-5)
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
-        #Material 3 can be anything
+        # Material 3 can be anything
+
+    def test_analysis_error(self):
+        np.random.seed(1)
+
+        class ValueErrorComp(ExplicitComponent):
+            """
+            Raises value error. AnalysisError should return the original error.
+            """
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('f', 1.0)
+
+            def compute(self, inputs, outputs):
+                raise ValueError
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', 0.0))
+        model.add_subsystem('comp', ValueErrorComp())
+
+        model.connect('p.x', 'comp.x')
+
+        model.add_design_var('p.x', lower=-5.0, upper=10.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver(max_gen=75, pop_size=25)
+        prob.driver._randomstate = 1
+        prob.setup(check=False)
+        # prob.run_driver()
+        self.assertRaises(ValueError, prob.run_driver)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
