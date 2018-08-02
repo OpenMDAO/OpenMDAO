@@ -97,15 +97,13 @@ class MuxComp(ExplicitComponent):
 
             self._input_names[var] = []
 
-            temp_out = np.zeros(out_shape, dtype=int)
-
             for i in range(vec_size):
                 in_name = '{0}_{1}'.format(var, i)
                 self._input_names[var].append(in_name)
 
                 self.add_input(name=in_name, shape=in_shape, **kwgs)
 
-                in_templates = [np.zeros(in_shape, dtype=int) for i in range(vec_size)]
+                in_templates = [np.zeros(in_shape, dtype=int) for _ in range(vec_size)]
 
                 rs = []
                 cs = []
@@ -113,9 +111,9 @@ class MuxComp(ExplicitComponent):
                 for j in range(in_size):
                     in_templates[i].flat[:] = 0
                     in_templates[i].flat[j] = 1
-                    temp_out[...] = np.stack(in_templates, axis=ax)
+                    temp_out = np.stack(in_templates, axis=ax)
                     cs.append(j)
-                    rs.append(int(np.nonzero(temp_out.flat)[0]))
+                    rs.append(int(np.nonzero(temp_out.ravel())[0]))
 
                 self.declare_partials(of=var, wrt=in_name, rows=rs, cols=cs, val=1.0)
 

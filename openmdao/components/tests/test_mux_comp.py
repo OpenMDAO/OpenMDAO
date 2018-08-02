@@ -25,10 +25,9 @@ class TestMuxCompOptions(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        demux_comp = p.model.add_subsystem(name='mux_comp',
-                                                subsys=MuxComp(vec_size=nn))
+        mux_comp = p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=nn))
 
-        demux_comp.add_var('a', shape=(1,), axis=2)
+        mux_comp.add_var('a', shape=(1,), axis=2)
 
         for i in range(nn):
             p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
@@ -55,11 +54,10 @@ class TestMuxCompOptions(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        demux_comp = p.model.add_subsystem(name='mux_comp',
-                                                subsys=MuxComp(vec_size=nn))
+        mux_comp = p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=nn))
 
-        demux_comp.add_var('a', shape=(a_size,), axis=0)
-        demux_comp.add_var('b', shape=(b_size,), axis=2)
+        mux_comp.add_var('a', shape=(a_size,), axis=0)
+        mux_comp.add_var('b', shape=(b_size,), axis=2)
 
         for i in range(nn):
             p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
@@ -87,11 +85,10 @@ class TestMuxCompScalar(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        demux_comp = self.p.model.add_subsystem(name='mux_comp',
-                                                subsys=MuxComp(vec_size=self.nn))
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=self.nn))
 
-        demux_comp.add_var('a', shape=(1,), axis=0)
-        demux_comp.add_var('b', shape=(1,), axis=1)
+        mux_comp.add_var('a', shape=(1,), axis=0)
+        mux_comp.add_var('b', shape=(1,), axis=1)
 
         for i in range(self.nn):
             self.p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
@@ -122,7 +119,7 @@ class TestMuxCompScalar(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
-class TestDemuxComp1D(unittest.TestCase):
+class TestMuxComp1D(unittest.TestCase):
 
     def setUp(self):
         self.nn = 10
@@ -141,11 +138,10 @@ class TestDemuxComp1D(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        demux_comp = self.p.model.add_subsystem(name='mux_comp',
-                                                subsys=MuxComp(vec_size=self.nn))
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=self.nn))
 
-        demux_comp.add_var('a', shape=(a_size,), axis=0)
-        demux_comp.add_var('b', shape=(b_size,), axis=1)
+        mux_comp.add_var('a', shape=(a_size,), axis=0)
+        mux_comp.add_var('b', shape=(b_size,), axis=1)
 
         for i in range(self.nn):
             self.p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
@@ -176,7 +172,7 @@ class TestDemuxComp1D(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
-class TestDemuxComp2D(unittest.TestCase):
+class TestMuxComp2D(unittest.TestCase):
 
     def setUp(self):
         self.nn = 10
@@ -196,12 +192,11 @@ class TestDemuxComp2D(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        demux_comp = self.p.model.add_subsystem(name='mux_comp',
-                                                subsys=MuxComp(vec_size=self.nn))
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=self.nn))
 
-        demux_comp.add_var('a', shape=a_shape, axis=0)
-        demux_comp.add_var('b', shape=b_shape, axis=1)
-        demux_comp.add_var('c', shape=b_shape, axis=2)
+        mux_comp.add_var('a', shape=a_shape, axis=0)
+        mux_comp.add_var('b', shape=b_shape, axis=1)
+        mux_comp.add_var('c', shape=b_shape, axis=2)
 
         for i in range(self.nn):
             self.p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
@@ -264,8 +259,7 @@ class TestForDocs(unittest.TestCase):
                               subsys=ivc,
                               promotes_outputs=['x', 'y', 'z'])
 
-        mux_comp = p.model.add_subsystem(name='mux',
-                                         subsys=MuxComp(vec_size=n))
+        mux_comp = p.model.add_subsystem(name='mux', subsys=MuxComp(vec_size=n))
 
         mux_comp.add_var('r', shape=(m,), axis=1, units='m')
 
