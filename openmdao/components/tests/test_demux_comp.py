@@ -204,7 +204,7 @@ class TestForDocs(unittest.TestCase):
 
         p.run_model()
 
-        expected = np.arctan( p['pos_ecef'][:, 1] / p['pos_ecef'][:, 0])
+        expected = np.arctan(p['pos_ecef'][:, 1] / p['pos_ecef'][:, 0])
         assert_rel_error(self, p.get_val('longitude_comp.long'), expected)
 
 

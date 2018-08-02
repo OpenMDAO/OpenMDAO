@@ -11,9 +11,24 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 class MuxComp(ExplicitComponent):
     """
     Mux one or more inputs along a given axis.
+
+    Attributes
+    ----------
+    _vars : dict
+        Container mapping name of variables to be muxed with additional data.
+    _input_names : dict
+        Container mapping name of variables to be muxed with associated inputs.
     """
 
     def __init__(self, **kwargs):
+        """
+        Instantiate MuxComp and populate private members.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Arguments to be passed to the component initialization method.
+        """
         super(MuxComp, self).__init__(**kwargs)
 
         self._vars = {}
@@ -29,7 +44,7 @@ class MuxComp(ExplicitComponent):
     def add_var(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                 units=None, desc='', axis=0):
         """
-        Add an output variable to be muxed, and all associated input variables
+        Add an output variable to be muxed, and all associated input variables.
 
         Parameters
         ----------
@@ -39,17 +54,8 @@ class MuxComp(ExplicitComponent):
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
         shape : int or tuple or list or None
-            Shape of the input variables to be muxed, only required if src_indices not provided and
-            val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
-            The global indices of the source variable to transfer data from.
-            A value of None implies this input depends on all entries of source.
-            Default is None. The shapes of the target and src_indices must match,
-            and form of the entries within is determined by the value of 'flat_src_indices'.
-        flat_src_indices : bool
-            If True, each entry of src_indices is assumed to be an index into the
-            flattened source.  Otherwise each entry must be a tuple or list of size equal
-            to the number of dimensions of the source.
+            Shape of the input variables to be muxed, only required if val is not an array.
+            Default is None.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -59,9 +65,7 @@ class MuxComp(ExplicitComponent):
             The axis along which the elements will be selected.  Note the axis must have length
             vec_size, otherwise a RuntimeError is raised at setup.
         """
-        self._vars[name] = {'val': val, 'shape': shape, 'src_indices': src_indices,
-                            'flat_src_indices': flat_src_indices, 'units': units,
-                            'desc': desc, 'axis': axis}
+        self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis}
 
     def setup(self):
         """
