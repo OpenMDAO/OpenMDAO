@@ -986,7 +986,9 @@ class Problem(object):
 
             for comp in comps:
 
-                comp.run_linearize()
+                # Only really need to linearize once.
+                if mode == 'fwd':
+                    comp.run_linearize()
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
