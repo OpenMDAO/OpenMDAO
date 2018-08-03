@@ -426,6 +426,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.model.recording_options['record_metadata'] = False
 
         prob.setup()
+        prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
 
@@ -440,6 +441,7 @@ class TestSqliteRecorder(unittest.TestCase):
         recorder = SqliteRecorder("cases.sql")
         prob.model.add_recorder(recorder)
 
+        prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
 
@@ -458,6 +460,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.model.add_recorder(recorder)
         prob.model.recording_options['record_model_metadata'] = False
 
+        prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
 
@@ -473,6 +476,7 @@ class TestSqliteRecorder(unittest.TestCase):
         recorder = SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
 
+        prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
 
@@ -490,6 +494,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_model_metadata'] = False
 
+        prob.set_solver_print(level=0)
         prob.run_model()
         prob.cleanup()
 
@@ -2196,25 +2201,22 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
         first_driver_case = cr.driver_cases.get_case(0)
-        recorded_objectives = first_driver_case.get_objectives()
-        recorded_constraints = first_driver_case.get_constraints()
-        recorded_desvars = first_driver_case.get_desvars()
+
+        objs = first_driver_case.get_objectives()
+        cons = first_driver_case.get_constraints()
+        dvs = first_driver_case.get_desvars()
 
         # keys() will give you the promoted variable names
-        self.assertEqual(set(recorded_objectives.keys()), {'obj'})
-        self.assertEqual(set(recorded_constraints.keys()), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars.keys()), {'x', 'z'})
+        self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
+                         (['obj'], ['con1', 'con2'], ['x', 'z']))
 
         # alternatively, you can get the absolute names
-        self.assertEqual(set(recorded_objectives.absolute_names()), {'obj_cmp.obj'})
-        self.assertEqual(set(recorded_constraints.absolute_names()), {'con_cmp1.con1', 'con_cmp2.con2'})
-        self.assertEqual(set(recorded_desvars.absolute_names()), {'px.x', 'pz.z'})
+        self.assertEqual((sorted(objs.absolute_names()), sorted(cons.absolute_names()), sorted(dvs.absolute_names())),
+                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['px.x', 'pz.z']))
 
-        # you can access variable values via either the promoted or absolute name
-        self.assertAlmostEqual(recorded_objectives['obj'][0], 28.58830817)
-        self.assertAlmostEqual(recorded_objectives['obj_cmp.obj'][0], 28.58830817)
-        self.assertAlmostEqual(recorded_desvars['x'][0], 1.)
-        self.assertAlmostEqual(recorded_desvars['px.x'][0], 1.)
+        # you can access variable values using either the promoted or the absolute name
+        self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
+        self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
 
     def test_feature_load_system_case_for_restart(self):
         #######################################################################

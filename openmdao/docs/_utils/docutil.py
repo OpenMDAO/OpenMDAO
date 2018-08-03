@@ -725,15 +725,24 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
 
                 if module is None:
                     globals_dict = {
-                            '__file__': path,
-                            '__name__': '__main__',
-                            '__package__': None,
-                            '__cached__': None,
+                        '__file__': path,
+                        '__name__': '__main__',
+                        '__package__': None,
+                        '__cached__': None,
                     }
                 else:
                     globals_dict = module.__dict__
 
-                exec(code_to_run, globals_dict)
+                try:
+                    exec(code_to_run, globals_dict)
+                except Exception as err:
+                    # print code (with line numbers) to facilitate debugging
+                    for n, line in enumerate(code_to_run.split('\n')):
+                        print('%4d: %s' % (n, line), file=stderr)
+                    raise
+                finally:
+                    sys.stdout = stdout
+                    sys.stderr = stderr
 
             output = strout.getvalue()
 
