@@ -359,6 +359,12 @@ class SqliteRecorder(BaseRecorder):
             var_settings.update(objectives)
             var_settings.update(constraints)
             var_settings = self._cleanup_var_settings(var_settings)
+            for key, data in iteritems(var_settings):
+                print(key)
+                for key2 in data:
+                    if isinstance(data[key2], np.ndarray):
+                        data[key2] = data[key2].tolist()
+
             var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:

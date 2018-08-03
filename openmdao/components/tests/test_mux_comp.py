@@ -21,9 +21,7 @@ class TestMuxCompOptions(unittest.TestCase):
         for i in range(nn):
             ivc.add_output(name='a_{0}'.format(i), val=1.0)
 
-        p.model.add_subsystem(name='ivc',
-                                   subsys=ivc,
-                                   promotes_outputs=['*'])
+        p.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['*'])
 
         mux_comp = p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=nn))
 

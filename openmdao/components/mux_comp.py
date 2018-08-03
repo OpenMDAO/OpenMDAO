@@ -61,8 +61,8 @@ class MuxComp(ExplicitComponent):
         desc : str
             description of the variable
         axis : int
-            The axis along which the elements will be selected.  Note the axis must have length
-            vec_size, otherwise a RuntimeError is raised at setup.
+            The axis along which the elements will be stacked.  Note that N-dimensional inputs
+            cannot be stacked along an axis greater than N.
         """
         self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis}
 

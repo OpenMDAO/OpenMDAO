@@ -10,7 +10,7 @@ multiple inputs into a single value (mux).  This can be useful in situations whe
 from multiple components need to be fed into a single vectorized component.
 
 `DemuxComp` takes a single input of arbitary shape (the size of at least one axis must be equal
-to `vec_size`).  In can then be broken along that axis, resulting in `vec_size` outputs.
+to `vec_size`).  It can then be broken along that axis, resulting in `vec_size` outputs.
 
 `MuxComp` combines two or more inputs into a single output by stacking them along an axis.
 
@@ -36,16 +36,11 @@ For DemuxComp, the name of the given variable is the **input**.  It is demuxed i
 names are appended with `_n` where `n` is an integer from 0 through `vec_size`-1.  Conversely, for
 MuxComp, the given variable name is the output, and each input is appended with `_n`.
 
-.. py:method:: add_var(self, name, val=1.0, shape=None, units=None, desc='', axis=0):
+.. automethod:: openmdao.components.mux_comp.MuxComp.add_var
+    :noindex:
 
-    Add a variable to be muxed or demuxed, and all associated input/output variables
-
-    :param str name: The name of the variable in this component's namespace.
-    :param float, list, tuple, ndarray, Iterable val: The initial value of the variable being added in user-defined units. Default is 1.0.
-    :param int, tuple, list, or None shape: Shape of the *input* variable, only required if src_indices not provided and val is not an array. Default is None.
-    :param str units: Units in which this input variable will be provided to the component during execution. Default is None, which means it is unitless.
-    :param str desc: Description of the variable
-    :param int axis: The axis along which the elements will be muxed or demuxed.  Default is 0.
+.. automethod:: openmdao.components.demux_comp.DemuxComp.add_var
+    :noindex:
 
 Example: Demuxing a 3-column matrix into constituent vectors
 ------------------------------------------------------------
@@ -62,7 +57,7 @@ and use the first two to compute the longitude at the given position vector.
 Example: Muxing 3 (n x 1) columns into a single (n x 3) matrix
 --------------------------------------------------------------
 
-In this example we start with three (n x 1) column vectors (`x`, `y`, and `z`) and with to
+In this example we start with three (n x 1) column vectors (`x`, `y`, and `z`) and
 combine them into a single position vector `r` (n x 3).  This is achieved by stacking the vectors
 along `axis = 1`.  Like the previous example, this is somewhat contrived but is intended to demonstrate
 the capabilities of the MuxComp.

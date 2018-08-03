@@ -20,9 +20,7 @@ class TestDemuxCompOptions(unittest.TestCase):
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(nn,))
 
-        p.model.add_subsystem(name='ivc',
-                                   subsys=ivc,
-                                   promotes_outputs=['a'])
+        p.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['a'])
 
         demux_comp = p.model.add_subsystem(name='demux_comp', subsys=DemuxComp(vec_size=nn))
 
@@ -33,7 +31,7 @@ class TestDemuxCompOptions(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.setup()
         self.assertEqual(str(ctx.exception),
-                         'Invalid axis (1) for variable of shape (10,)')
+                         "Invalid axis (1) for variable 'a' of shape (10,)")
             
     def test_axis_with_wrong_size(self):
         nn = 10
@@ -57,8 +55,8 @@ class TestDemuxCompOptions(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.setup()
         self.assertEqual(str(ctx.exception),
-                         'Variable a cannot be demuxed along axis 1. Axis size is '
-                         '7 but vec_size is 10.')
+                         "Variable 'a' cannot be demuxed along axis 1. Axis size is "
+                         "7 but vec_size is 10.")
 
 
 class TestDemuxComp1D(unittest.TestCase):
