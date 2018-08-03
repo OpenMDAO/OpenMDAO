@@ -20,7 +20,7 @@ from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarProblem, SellarStateConnection
+    SellarProblem, SellarStateConnection, SellarProblemWithArrays
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
@@ -216,6 +216,31 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
         assertDriverDerivDataRecorded(self, expected_data, self.eps)
+
+    def test_driver_recording_ndarray_var_settings(self):
+        prob = SellarProblemWithArrays()
+
+        driver = prob.driver
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['includes'] = []
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        coordinate = [0, 'Driver', (0, )]
+        expected_constraints = {
+            "con_cmp1.con1": [-22.42830237, ],
+            "con_cmp2.con2": [-11.94151185, ],
+        }
+        expected_outputs = expected_constraints
+
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SLSQP")
