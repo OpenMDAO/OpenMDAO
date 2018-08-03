@@ -409,10 +409,35 @@ class PromotedToAbsoluteMap(dict):
                 else:
                     of, wrt = re.sub('[( )]', '', n).split(',')
 
-                self[(of, wrt)] = values[n]
+                super(PromotedToAbsoluteMap, self).__setitem__((of, wrt), values[n])
 
             elif n in abs2prom:
-                self[n] = values[n]
+                super(PromotedToAbsoluteMap, self).__setitem__(n, values[n])
+
+
+    def __setitem__(self, key, value):
+        """
+        Use the variable name to get the corresponding value.
+
+        Parameters
+        ----------
+        key : string
+            Absolute or promoted variable name.
+        value : any
+            value for variable
+        """
+        raise ValueError('Dictionary is read-only.')
+
+    def update(self, map):
+        """
+        Use the variable name to get the corresponding value.
+
+        Parameters
+        ----------
+        map : dict
+            mapping of key:value pairs
+        """
+        raise ValueError('Dictionary is read-only.')
 
     def __getitem__(self, key):
         """
@@ -466,17 +491,6 @@ class PromotedToAbsoluteMap(dict):
 
         raise KeyError(key)
 
-    def __repr__(self):
-        """
-        Return the dictionary representation.
-
-        Returns
-        -------
-        dict
-            The dictionary.
-        """
-        return super(PromotedToAbsoluteMap, self).__repr__()
-
     def keys(self):
         """
         Yield promoted names for variables contained in this dictionary.
@@ -517,7 +531,7 @@ class PromotedToAbsoluteMap(dict):
 
     def __iter__(self):
         """
-        Yield an iterator over promoted names for variables contained in this dictionary.
+        Yield an iterator over promoted names for variables in this dictionary.
 
         Returns
         -------
@@ -525,6 +539,18 @@ class PromotedToAbsoluteMap(dict):
             iterator over the variable names.
         """
         return self.keys()
+
+    def items(self):
+        """
+        Yield an iterator over promoted names and values for variables in this dictionary.
+
+        Returns
+        -------
+        listiterator
+            iterator over the variable names.
+        """
+        for prom_name in self.keys():
+            yield prom_name, self[prom_name]
 
 
 class DriverDerivativesCase(object):

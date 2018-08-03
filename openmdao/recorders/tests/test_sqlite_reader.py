@@ -1046,6 +1046,59 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertEqual(case, case_type._cases[case].iteration_coordinate)
 
 
+class TestPromotedToAbsoluteMap(unittest.TestCase):
+    def setUp(self):
+        self.dir = mkdtemp()
+        self.original_path = os.getcwd()
+        os.chdir(self.dir)
+
+    def tearDown(self):
+        os.chdir(self.original_path)
+        try:
+            rmtree(self.dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
+    def test_dict(self):
+        # verify that the PromotedToAbsolfSellarPrputeMap object returned by case
+        # "get" variable functions properly implements a read-only dict interface
+        prob = SellarProblem(SellarDerivativesGrouped)
+        driver = prob.driver
+
+        recorder = SqliteRecorder("cases.sql")
+
+        driver.add_recorder(recorder)
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        first_driver_case = cr.driver_cases.get_case(0)
+
+        objs = first_driver_case.get_objectives()
+        cons = first_driver_case.get_constraints()
+        dvs = first_driver_case.get_desvars()
+
+        self.assertTrue(isinstance(dvs, dict))
+        self.assertEqual(sorted(dvs.keys()), ['x', 'z'])
+        self.assertEqual(sorted(dvs.items()), [('x', dvs['x']), ('z', dvs['z'])])
+
+        with self.assertRaises(ValueError) as context:
+            dvs['foo'] = 'bar'
+        self.assertEqual(str(context.exception), 'Dictionary is read-only.')
+
+        with self.assertRaises(ValueError) as context:
+            dvs.update({'foo': 'bar'})
+        self.assertEqual(str(context.exception), 'Dictionary is read-only.')
+
+
 def _assert_model_matches_case(case, system):
     '''
     Check to see if the values in the case match those in the model.
