@@ -27,14 +27,23 @@ Adding Variables
 A single `MuxComp` or `DemuxComp` can mux or demux multiple variables, so long as all variables
 are compatible with the given `vec_size`.  Variables are added via the `add_var` method.
 
-The axis along which the muxing/demuxing is to occur is given via the axis argument.  For DemuxComp,
-the specified axis must be be less than or equal to the number of dimensions in shape,
-otherwise an exception is raised.  In addition, the axis on which the Demuxing is to be done must
-have length `vec_size`.  For MuxComp, a valid stacking axis is less than *ndim* + 1.
+The axis along which the muxing/demuxing is to occur is given via the axis argument.
+For DemuxComp, the specified axis index must be the index of one of the input dimensions (you cannot demux along axis 3 of a 2D input).
+In addition, the axis on which the Demuxing is to be done must have length `vec_size`.
+
+For MuxComp, the variables are joined along a new dimension, the index of which is given by axis.
+The specified axis follows the convention used by the `numpy.stack` function.
+Giving `axis = 0` will stack the inputs along the first axis (vertically).
+Giving `axis = 1` will stack the inputs along the second axis (horizontally).
+Giving `axis = -1` will stack the inputs along the last axis, and so is dependent on the shape of the inputs.
+Due to the axis convention of `numpy.stack`, the axis index is only valid if it is less than or
+equal to the number of dimensions in the inputs.
+For example, 1D arrays can be stacked vertically (`axis = 0`) or horizontally (`axis = 1`), but not
+depth-wise (`axis = 2`).
 
 For DemuxComp, the name of the given variable is the **input**.  It is demuxed into variables whose
-names are appended with `_n` where `n` is an integer from 0 through `vec_size`-1.  Conversely, for
-MuxComp, the given variable name is the output, and each input is appended with `_n`.
+names are appended with `_n` where `n` is an integer from 0 through `vec_size`-1.
+Conversely, for MuxComp, the given variable name is the output, and each input is appended with `_n`.
 
 .. automethod:: openmdao.components.mux_comp.MuxComp.add_var
     :noindex:
