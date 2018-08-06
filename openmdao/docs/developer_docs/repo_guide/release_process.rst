@@ -57,7 +57,7 @@ First, go sign up for an account at pypi.org.  Here you can set all the settings
 To be able to do any of the following commands on pypi, you need a  ~/.pypirc file that looks like this:
 (your username will obviously be different)
 
-.. code-block::
+.. code::
 
     [distutils]
     index-servers =
