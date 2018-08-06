@@ -41,5 +41,5 @@ Caching
 -------
 
 The concept of build caching on Travis CI is intended to speed up the build, and therefore the entire build/test cycle on Travis CI.
-By caching the builds of dependencies/requirements that rarely change, we can get right to of various dependencies to speed up the build and the  docbuild
-which probably requires a document of its own.
+By caching the builds of dependencies/requirements that rarely change, we can get right to of various dependencies to speed up the build and the docbuild.
+This topic probably requires a document of its own, coming soon.

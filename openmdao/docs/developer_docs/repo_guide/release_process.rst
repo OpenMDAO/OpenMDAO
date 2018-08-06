@@ -1,7 +1,8 @@
 Release Process to Make Your Project Pip-Installable
 ====================================================
 
-Git
+
+git
 ---
 
 Make sure everything you want for the release is merged in on Github and has tested successfully on your CI.
@@ -54,22 +55,22 @@ pypi
 
 First, go sign up for an account at pypi.org.  Here you can set all the settings that pertain to your account.
 
-To be able to do any of the following commands on pypi, you need a  ~/.pypirc file that looks like this:
-(your username will obviously be different)
+To be able to do any of the following commands on pypi, you need to create on your local machine, a  ~/.pypirc file that
+looks like this: (your username will obviously be different)
 
 .. code::
 
     [distutils]
     index-servers =
       pypi
-      pypitest
 
     [pypi]
     repository: https://upload.pypi.org/legacy/
-    username: openmdao
+    username: uname
     password: xxxxxxxxxxxxxxxx
 
 
+OK, so how do we USE this to make a release?
 
 First, we need to build a source distribution, so from the top level, where setup.py lives.:
 
@@ -81,7 +82,6 @@ Finally, we upload this file up to pypi using `twine`:
 
 :code:`twine upload dist/projectname-1.0.0.tar.gz`
 
-You should be able to watch the dist upload. Then go to your page at pypi and make sure the new release is there.
-
+You should be able to watch the dist upload. Then, go to your page at pypi.org and make sure the new release is visible there.
 
 Finally, tell the team and users that your release is done.  Wait for everything to fall apart.
