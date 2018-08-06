@@ -1090,14 +1090,6 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         self.assertEqual(sorted(dvs.keys()), ['x', 'z'])
         self.assertEqual(sorted(dvs.items()), [('x', dvs['x']), ('z', dvs['z'])])
 
-        with self.assertRaises(ValueError) as context:
-            dvs['foo'] = 'bar'
-        self.assertEqual(str(context.exception), 'Dictionary is read-only.')
-
-        with self.assertRaises(ValueError) as context:
-            dvs.update({'foo': 'bar'})
-        self.assertEqual(str(context.exception), 'Dictionary is read-only.')
-
 
 def _assert_model_matches_case(case, system):
     '''

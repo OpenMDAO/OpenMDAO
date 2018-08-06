@@ -2456,10 +2456,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # Test values from one case, the last case
-        last_case = cr.driver_cases.get_case(-1,scaled=False)
+        last_case = cr.driver_cases.get_case(-1, scaled=False)
         unscaled_x = last_case.outputs['x'][0]
         unscaled_y = last_case.outputs['y'][0]
-        last_case = cr.driver_cases.get_case(-1,scaled=True)
+        last_case = cr.driver_cases.get_case(-1, scaled=True)
         scaled_x = last_case.outputs['x'][0]
         scaled_y = last_case.outputs['y'][0]
 

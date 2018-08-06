@@ -364,6 +364,10 @@ class PromotedToAbsoluteMap(dict):
 
     Attributes
     ----------
+    _values : array
+        Array of values accessible via absolute variable name.
+    _keys : array
+        Absolute variable names that map to the values in the _values array.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
     _abs2prom : {'input': dict, 'output': dict}
@@ -389,55 +393,45 @@ class PromotedToAbsoluteMap(dict):
         """
         super(PromotedToAbsoluteMap, self).__init__()
 
-        # self._values = values
+        # save provided values and keys, which are absolute names
+        self._values = values
+        self._keys = values.keys() if isinstance(values, dict) else values.dtype.names
+
+        # save promoted/absolute name mappings
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
+
         self._is_output = output
 
-        # populate dictionary keyed on absolute names
-        names = values.keys() if isinstance(values, dict) else values.dtype.names
-
-        if self._is_output:
+        if output:
+            prom2abs = self._prom2abs['output']
             abs2prom = self._abs2prom['output']
         else:
+            prom2abs = self._prom2abs['input']
             abs2prom = self._abs2prom['input']
 
-        for n in names:
-            if isinstance(n, tuple) or ',' in n:
-                if isinstance(n, tuple):
-                    of, wrt = n
+        # populate dict keyed on promoted name, using value for the first
+        # absolute name found in values that maps to the promoted name
+        for prom_name in prom2abs:
+            for abs_name in prom2abs[prom_name]:
+                if abs_name in self._keys:
+                    super(PromotedToAbsoluteMap, self).__setitem__(prom_name, values[abs_name])
+                    break
+
+        # add derivatives, using promoted (of, wrt)
+        for key in self._keys:
+            if isinstance(key, tuple) or ',' in key:
+                if isinstance(key, tuple):
+                    of, wrt = key
                 else:
-                    of, wrt = re.sub('[( )]', '', n).split(',')
+                    of, wrt = re.sub('[( )]', '', key).split(',')
 
-                super(PromotedToAbsoluteMap, self).__setitem__((of, wrt), values[n])
+                if of in abs2prom:
+                    of = abs2prom[of]
+                if wrt in abs2prom:
+                    wrt = abs2prom[wrt]
 
-            elif n in abs2prom:
-                super(PromotedToAbsoluteMap, self).__setitem__(n, values[n])
-
-
-    def __setitem__(self, key, value):
-        """
-        Use the variable name to get the corresponding value.
-
-        Parameters
-        ----------
-        key : string
-            Absolute or promoted variable name.
-        value : any
-            value for variable
-        """
-        raise ValueError('Dictionary is read-only.')
-
-    def update(self, map):
-        """
-        Use the variable name to get the corresponding value.
-
-        Parameters
-        ----------
-        map : dict
-            mapping of key:value pairs
-        """
-        raise ValueError('Dictionary is read-only.')
+                super(PromotedToAbsoluteMap, self).__setitem__((of, wrt), values[key])
 
     def __getitem__(self, key):
         """
@@ -453,68 +447,76 @@ class PromotedToAbsoluteMap(dict):
         array :
             An array entry value that corresponds to the given variable name.
         """
+        if key in self._keys:
+            return self._values[key]
+
+        elif key in self:
+            return super(PromotedToAbsoluteMap, self).__getitem__(key)
+
+        elif isinstance(key, tuple) or ',' in key:
+            if isinstance(key, tuple):
+                of, wrt = key
+            else:
+                of, wrt = re.sub('[( )]', '', key).split(',')
+
+            prom2abs = self._prom2abs['output']
+            if of in prom2abs:
+                of = prom2abs[of][0]
+            if wrt in prom2abs:
+                wrt = prom2abs[wrt][0]
+
+            return self._values['%s,%s' % (of, wrt)]
+
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        """
+        Set the value for the given key, which may use absolute or promoted names.
+
+        Parameters
+        ----------
+        key : string
+            Absolute or promoted variable name.
+        value : any
+            value for variable
+        """
         if self._is_output:
             prom2abs = self._prom2abs['output']
-
-            if isinstance(key, tuple) or ',' in key:
-                if isinstance(key, tuple):
-                    of, wrt = key
-                else:
-                    of, wrt = re.sub('[( )]', '', key).split(',')
-
-                # Recorded derivatives.
-                if of in prom2abs:
-                    of = prom2abs[of][0]
-                if wrt in prom2abs:
-                    wrt = prom2abs[wrt][0]
-
-                mykey = (of, wrt)
-
-            elif key in prom2abs:
-                mykey = prom2abs[key][0]
-
-            else:
-                mykey = key
-
-            return super(PromotedToAbsoluteMap, self).__getitem__(mykey)
-
-        else:
-            mykeys = super(PromotedToAbsoluteMap, self).keys()
-            if key in mykeys:
-                return super(PromotedToAbsoluteMap, self).__getitem__(key)
-            else:
-                # inputs may have multiple options, so we try until we succeed
-                prom2abs = self._prom2abs['input']
-                for k in prom2abs[key]:
-                    if k in mykeys:
-                        return super(PromotedToAbsoluteMap, self).__getitem__(k)
-
-        raise KeyError(key)
-
-    def keys(self):
-        """
-        Yield promoted names for variables contained in this dictionary.
-
-        Yields
-        ------
-        list
-            list of promoted names for variables contained in this dictionary.
-        """
-        if self._is_output:
             abs2prom = self._abs2prom['output']
         else:
+            prom2abs = self._prom2abs['input']
             abs2prom = self._abs2prom['input']
 
-        for abs_name in super(PromotedToAbsoluteMap, self).keys():
-            if isinstance(abs_name, tuple):
-                of, wrt = abs_name
-                of = abs2prom[of]
-                wrt = abs2prom[wrt]
-                prom_name = (of, wrt)
+        if isinstance(key, tuple) or ',' in key:
+            # derivative, could be absolute or promoted names
+            if isinstance(key, tuple):
+                of, wrt = key
             else:
-                prom_name = abs2prom[abs_name]
+                of, wrt = re.sub('[( )]', '', key).split(',')
 
-            yield prom_name
+            if of not in self._keys:
+                of = prom2abs(of)
+            if wrt not in self._keys:
+                wrt = prom2abs(wrt)
+
+            abs_key = '%s,%s' % (of, wrt)
+            self._values[abs_key] = value
+
+            for of in abs2prom[of]:
+                for wrt in abs2prom[wrt]:
+                    super(PromotedToAbsoluteMap, self).__setitem__((of, wrt), value)
+
+        elif key in self._keys:
+            # absolute name
+            self._values[key] = value
+            super(PromotedToAbsoluteMap, self).__setitem__(abs2prom[key], value)
+        else:
+            # promoted name, propagate to all promoted vars
+            for abs_name in prom2abs[key]:
+                if abs_name in self._keys:
+                    self._values[abs_name] = value
+            super(PromotedToAbsoluteMap, self).__setitem__(key, value)
 
     def absolute_names(self):
         """
@@ -527,30 +529,13 @@ class PromotedToAbsoluteMap(dict):
         list
             list of absolute names for variables contained in this dictionary.
         """
-        return super(PromotedToAbsoluteMap, self).keys()
-
-    def __iter__(self):
-        """
-        Yield an iterator over promoted names for variables in this dictionary.
-
-        Returns
-        -------
-        listiterator
-            iterator over the variable names.
-        """
-        return self.keys()
-
-    def items(self):
-        """
-        Yield an iterator over promoted names and values for variables in this dictionary.
-
-        Returns
-        -------
-        listiterator
-            iterator over the variable names.
-        """
-        for prom_name in self.keys():
-            yield prom_name, self[prom_name]
+        for key in self._keys:
+            if ',' in key:
+                # return derivative keys as tuples instead of strings
+                of, wrt = re.sub('[( )]', '', key).split(',')
+                yield (of, wrt)
+            else:
+                yield key
 
 
 class DriverDerivativesCase(object):
