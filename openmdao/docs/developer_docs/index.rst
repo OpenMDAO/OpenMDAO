@@ -61,3 +61,4 @@ continuous integration on Travis CI, and releasing software are some of the topi
     repo_guide/github.rst
     repo_guide/travis.rst
     repo_guide/release_process.rst
+    repo_guide/advanced_operations.rst
