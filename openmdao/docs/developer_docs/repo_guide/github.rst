@@ -1,31 +1,31 @@
 github-pages Repository Setup
 =============================
 
-If you want to publish to github-pages, your docs built on Travis CI, make sure your Github repository is set up to be public,
+If you want to publish to github-pages, from your docs built on Travis CI, make sure your Github repository is set up to be public,
 otherwise some of the instructions in this document may not work for you.
 
 Personal Access Token
 ---------------------
 
-A personal access token is something created on Github, to allow another service to access Github,
+A Personal Access Token is something created on Github, to allow another service (e.g. Travis) to access Github,
 with a certain amount of permission.  Once you create a Personal Access Token, it will be visible for
-one viewing, and you must copy it then use it immediately before you lose it.
+one viewing, and you must copy it then use it immediately before you lose it (and then you have to make another one).
 
 To create a Personal Access Token:
-Github *account* Settings (**not** Repo Settings)->Dev Settings->Personal Access Token
+Log in to githb.com.  Go to Github *account* Settings (**not** Repo Settings)->Dev Settings->Personal Access Token
 The menu will look like this:
 
 .. image::
     images/AccessToken1.png
 
-Give the access token the name GH_TOKEN, and the permission "repo access":
+Give the access token the name GH_TOKEN, and the permission "repo access," as pictured:
 
 .. image::
     images/AccessToken2.png
 
 You'll need this token to allow the transfer of your documents to github-pages, once they are built on Travis CI.
 
-Then on Travis CI, you'll need to go to your Environment Variables section, and create a new env
+Then on Travis CI, you'll need to go to your Environment Variables section, and create a new env var, as shown here:
 
 .. image::
     images/TravisEnv.png
@@ -48,7 +48,7 @@ travis-sphinx Usage
 via TravisCI.
 
 Once your personal access token is set up, you can begin using travis-sphinx within your Sphinx configuration file. (docs/conf.py)
-The two calls that should be used are:
+The two calls that should be used are, in their respective doc sections:
 
 .. code-block:: python
 
