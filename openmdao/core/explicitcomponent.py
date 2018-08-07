@@ -72,7 +72,6 @@ class ExplicitComponent(Component):
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
-        other_names = []
         for out_abs in self._var_abs_names['output']:
             meta = abs2meta[out_abs]
             out_name = abs2prom_out[out_abs]
@@ -155,9 +154,6 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
-        abs2prom = self._var_abs2prom
-        abs2meta = self._var_abs2meta
-
         for abs_key, meta in iteritems(self._subjacs_info):
 
             if meta['value'] is None:
@@ -211,11 +207,16 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
+        self._inputs.read_only = True
+
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
                 failed = self.compute(self._inputs, self._outputs)
+
+        self._inputs.read_only = False
+
         return bool(failed), 0., 0.
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
@@ -262,6 +263,13 @@ class ExplicitComponent(Component):
                     with self._unscaled_context(
                             outputs=[self._outputs], residuals=[d_residuals]):
 
+                        # set appropriate vectors to read_only to help prevent user error
+                        self._inputs.read_only = True
+                        if mode == 'fwd':
+                            d_inputs.read_only = True
+                        elif mode == 'rev':
+                            d_residuals.read_only = True
+
                         # We used to negate the residual here, and then re-negate after the hook.
 
                         if d_inputs._ncol > 1:
@@ -280,6 +288,8 @@ class ExplicitComponent(Component):
                                 d_residuals._icol = None
                         else:
                             self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
+
+                        self._inputs.read_only = d_inputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -354,8 +364,12 @@ class ExplicitComponent(Component):
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             if self._has_compute_partials:
+                self._inputs.read_only = True
+
                 # We used to negate the jacobian here, and then re-negate after the hook.
                 self.compute_partials(self._inputs, self._jacobian)
+
+                self._inputs.read_only = False
 
     def compute(self, inputs, outputs):
         """

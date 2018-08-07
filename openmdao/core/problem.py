@@ -1563,18 +1563,20 @@ class Problem(object):
             A Case from a CaseRecorder file.
         """
         inputs = case.inputs._values if case.inputs is not None else None
-        for name, val in zip(inputs.dtype.names, inputs):
-            if name not in self.model._var_abs_names['input']:
-                raise KeyError("Input variable, '{}', recorded in the case is not "
-                               "found in the model".format(name))
-            self[name] = val
+        if inputs:
+            for name, val in zip(inputs.dtype.names, inputs):
+                if name not in self.model._var_abs_names['input']:
+                    raise KeyError("Input variable, '{}', recorded in the case is not "
+                                   "found in the model".format(name))
+                self[name] = val
 
         outputs = case.outputs._values if case.outputs is not None else None
-        for name, val in zip(outputs.dtype.names, outputs):
-            if name not in self.model._var_abs_names['output']:
-                raise KeyError("Output variable, '{}', recorded in the case is not "
-                               "found in the model".format(name))
-            self[name] = val
+        if outputs:
+            for name, val in zip(outputs.dtype.names, outputs):
+                if name not in self.model._var_abs_names['output']:
+                    raise KeyError("Output variable, '{}', recorded in the case is not "
+                                   "found in the model".format(name))
+                self[name] = val
 
         return
 
