@@ -273,6 +273,47 @@ def _get_full_disjoint_col_matrix_cols(col_matrix):
     return color_groups
 
 
+def _color_partition(J, Jpart):
+    """
+    Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
+
+    Based on the partitioning algorithm found in "The Efficient Computation of Sparse
+    Jacobian Matrices Using Automatic Differentiation" by Coleman and Verma.
+
+    Parameters
+    ----------
+    J : ndarray
+        Dense jacobian sparsity matrix
+    Jpart : ndarray
+        Partition of the jacobian sparsity matrix.
+
+    Returns
+    -------
+    list
+        List of color groups.  First group is uncolored.
+    list
+        List of nonzero rows for each column.
+    """
+    ncols = Jpart.shape[1]
+    col_nonzeros = _count_nonzeros(Jpart, axis=0)
+    row_nonzeros = _count_nonzeros(Jpart, axis=1)
+    col_keep = col_nonzeros > 0
+    row_keep = row_nonzeros > 0
+    idxmap = np.arange(ncols, dtype=int)[col_keep]
+    intersection_mat = _Jc2col_matrix_direct(J, Jpart)
+    intersection_mat = intersection_mat[col_keep]
+    intersection_mat = intersection_mat[:, col_keep]
+    col_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
+    for i, group in enumerate(col_groups):
+        col_groups[i] = sorted([idxmap[c] for c in group if col_keep[idxmap[c]]])
+    col_groups = _split_groups(col_groups)
+    col2row = [None] * ncols
+    for col in idxmap:
+        col2row[col] = [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
+
+    return [col_groups, col2row]
+
+
 def MNCO_bidir(J):
     """
     Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
@@ -370,63 +411,21 @@ def MNCO_bidir(J):
                 Jc[i][cols] = True
                 nnz_Jc += len(cols)
 
-        col_nonzeros = _count_nonzeros(Jc, axis=0)
-        row_nonzeros = _count_nonzeros(Jc, axis=1)
-        col_keep = col_nonzeros > 0
-        row_keep = row_nonzeros > 0
-        idxmap = np.arange(ncols, dtype=int)[col_keep]
-        intersection_mat = _Jc2col_matrix_direct(J, Jc)
-        intersection_mat = intersection_mat[col_keep]
-        intersection_mat = intersection_mat[:, col_keep]
-        col_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
-        for i, group in enumerate(col_groups):
-            col_groups[i] = sorted([idxmap[c] for c in group if col_keep[idxmap[c]]])
-        col_groups = _split_groups(col_groups)
-        col2row = [None] * ncols
-        for col in idxmap:
-            col2row[col] = [r for r in np.nonzero(Jc[:, col])[0] if row_keep[r]]
-        coloring['fwd'] = [col_groups, col2row]
+        coloring['fwd'] = _color_partition(J, Jc)
+        jac[:] = False
 
     if col_i > 0:
-        # build Jr and do rev coloring
         Jr = jac
-        Jr[:] = False
+        # build Jr and do rev coloring
         for i, rows in enumerate(Jr_cols):
             if rows is not None:
                 Jr[rows, i] = True
                 nnz_Jr += len(rows)
 
-        row_nonzeros = _count_nonzeros(Jr, axis=1)
-        col_nonzeros = _count_nonzeros(Jr, axis=0)
-        row_keep = row_nonzeros > 0
-        col_keep = col_nonzeros > 0
-        idxmap = np.arange(nrows, dtype=int)[row_keep]
-        intersection_mat = _Jc2col_matrix_direct(J.T, Jr.T)
-        intersection_mat = intersection_mat[row_keep]
-        intersection_mat = intersection_mat[:, row_keep]
-        row_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
-
-        for i, group in enumerate(row_groups):
-            row_groups[i] = sorted([idxmap[r] for r in group if row_keep[idxmap[r]]])
-        row_groups = _split_groups(row_groups)
-        row2col = [None] * nrows
-        for row in idxmap:
-            row2col[row] = [c for c in np.nonzero(Jr[row])[0] if col_keep[c]]
-        coloring['rev'] = [row_groups, row2col]
+        coloring['rev'] = _color_partition(J.T, Jr.T)
 
     if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
-
-    # there are some cases where J is partitioned such that everything ends up on the wrong side,
-    # so do a check using unidirectional coloring if our coloring is worse than min(ncols, nrows)
-    if _total_solves(coloring) >= min(nrows, ncols):
-        coloring['fwd'] = _compute_coloring(J, 'fwd')['fwd']
-        coloring['rev'] = _compute_coloring(J, 'rev')['rev']
-
-        if _total_solves(coloring, do_rev=False) <= _total_solves(coloring, do_fwd=False):
-            del coloring['rev']
-        else:
-            del coloring['fwd']
 
     # _check_coloring(J, coloring)
 
