@@ -106,8 +106,7 @@ class EmbedShellCmdDirective(Directive):
             cmdstr = self.options['cmd']
             cmd = cmdstr.split()
         else:
-            raise SphinxError("'cmd' is not defined for "
-                                            "embed-shell-cmd.")
+            raise SphinxError("'cmd' is not defined for embed-shell-cmd.")
 
         startdir = os.getcwd()
 
@@ -126,8 +125,14 @@ class EmbedShellCmdDirective(Directive):
         try:
             output = subprocess.check_output(cmd, stderr=stderr).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
-            raise SphinxError("Running of embedded shell command '{}' in docs failed. "
-                              "Output was: \n{}".format(cmdstr, err.output.decode('utf-8')))
+            # Generally means the source couldn't be inspected or imported. Raise as a Directive
+            # warning (level 2 in docutils).
+            # This way, the sphinx build does not terminate if, for example, you are building on
+            # an environment where mpi or pyoptsparse are missing.
+            msg = "Running of embedded shell command '{}' in docs failed. " + \
+                  "Output was: \n{}".format(cmdstr, err.output.decode('utf-8'))
+            raise self.directive_error(2, msg)
+
         finally:
             os.chdir(startdir)
 
