@@ -1074,14 +1074,13 @@ class TestSqliteCaseReader(unittest.TestCase):
                                               g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         thetas = np.linspace(0, np.pi/4, SIZE)
+
         model.add_subsystem('theta_con', ExecComp('g=arctan(y/x) - theta',
                                                   g=np.ones(SIZE), x=np.ones(SIZE),
                                                   y=np.ones(SIZE), theta=thetas))
         model.add_subsystem('delta_theta_con', ExecComp('g = arctan(y/x)[::2]-arctan(y/x)[1::2]',
                                                         g=np.ones(SIZE//2), x=np.ones(SIZE),
                                                         y=np.ones(SIZE)))
-
-        thetas = np.linspace(0, np.pi/4, SIZE)
 
         model.add_subsystem('l_conx', ExecComp('g=x-1', g=np.ones(SIZE), x=np.ones(SIZE)))
 
