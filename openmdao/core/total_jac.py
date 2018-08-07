@@ -614,7 +614,6 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         modes = [k for k in ('fwd', 'rev') if k in coloring_info]
-
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
@@ -623,7 +622,7 @@ class _TotalJacInfo(object):
                 if color == 0:
                     # do all uncolored indices individually (one linear solve per index)
                     for i in ilist:
-                        yield i, self.single_input_setter, self.single_jac_setter, mode
+                        yield [i], input_setter, jac_setter, mode
                 else:
                     # yield all indices for a color at once
                     yield ilist, input_setter, jac_setter, mode
@@ -970,7 +969,11 @@ class _TotalJacInfo(object):
         for i in inds:
             input_name, vecname, _, _ = in_idx_map[i]
             out_views = outvecs[vecname]._views_flat
-            for row_or_col in row_col_map[i]:
+            rcmap = row_col_map[i]
+            if rcmap is None:
+                self.single_jac_setter(i, mode)
+                continue
+            for row_or_col in rcmap:
                 output_name = idx2name[row_or_col]
                 deriv_val = None
                 if output_name in out_views:
@@ -1070,44 +1073,44 @@ class _TotalJacInfo(object):
         model._linear_solver._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for key, meta in iteritems(self.idx_iter_dict[self.mode]):
-            _, _, idxs, idx_iter = meta
-            for inds, input_setter, jac_setter, mode in idx_iter(idxs):
-                # this sets dinputs for the current par_deriv_color to 0
-                # dinputs is dresids in fwd, doutouts in rev
-                vec_doutput['linear'].set_const(0.0)
-                if mode == 'fwd':
-                    vec_dresid['linear'].set_const(0.0)
-                else:  # rev
-                    vec_dinput['linear'].set_const(0.0)
+        for iter_mode in self.idx_iter_dict:
+            for key, meta in iteritems(self.idx_iter_dict[iter_mode]):
+                _, _, idxs, idx_iter = meta
+                for inds, input_setter, jac_setter, mode in idx_iter(idxs):
+                    # this sets dinputs for the current par_deriv_color to 0
+                    # dinputs is dresids in fwd, doutouts in rev
+                    vec_doutput['linear'].set_const(0.0)
+                    if mode == 'fwd':
+                        vec_dresid['linear'].set_const(0.0)
+                    else:  # rev
+                        vec_dinput['linear'].set_const(0.0)
 
-                rel_systems, vec_names, cache_key = input_setter(inds, mode)
+                    rel_systems, vec_names, cache_key = input_setter(inds, mode)
 
-                if debug_print:
-                    if par_deriv and key in par_deriv:
-                        varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
-                        print('Solving color:', key, varlist)
+                    if debug_print:
+                        if par_deriv and key in par_deriv:
+                            varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
+                            print('Solving color:', key, varlist)
+                        else:
+                            print('Solving variable:', key)
+
+                        sys.stdout.flush()
+                        t0 = time.time()
+
+                    # restore old linear solution if cache_linear_solution was set by the user for
+                    # any input variables involved in this linear solution.
+                    if cache_key is not None and not has_lin_cons:
+                        self._restore_linear_solution(vec_names, cache_key, self.mode)
+                        model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
+                        self._save_linear_solution(vec_names, cache_key, self.mode)
                     else:
-                        print('Solving variable:', key)
+                        model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
-                    sys.stdout.flush()
+                    if debug_print:
+                        print('Elapsed Time:', time.time() - t0, '\n')
+                        sys.stdout.flush()
 
-                    t0 = time.time()
-
-                # restore old linear solution if cache_linear_solution was set by the user for
-                # any input variables involved in this linear solution.
-                if cache_key is not None and not has_lin_cons:
-                    self._restore_linear_solution(vec_names, cache_key, self.mode)
-                    model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
-                    self._save_linear_solution(vec_names, cache_key, self.mode)
-                else:
-                    model._solve_linear(model._lin_vec_names, mode, rel_systems)
-
-                if debug_print:
-                    print('Elapsed Time:', time.time() - t0, '\n')
-                    sys.stdout.flush()
-
-                jac_setter(inds, mode)
+                    jac_setter(inds, mode)
 
         if self.has_scaling:
             self._do_scaling(self.J_dict)
@@ -1115,6 +1118,8 @@ class _TotalJacInfo(object):
         if debug_print:
             # Debug outputs scaled derivatives.
             self._print_derivatives()
+
+        # np.save("total_jac.npy", self.J)
 
         return self.J_final
 

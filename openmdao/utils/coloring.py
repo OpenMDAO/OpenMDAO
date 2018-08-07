@@ -131,6 +131,9 @@ def _order_by_ID(col_matrix):
     degrees = _count_nonzeros(col_matrix, axis=0)
     ncols = degrees.size
 
+    if ncols == 0:
+        return
+
     # use max degree column as a starting point instead of just choosing a random column
     # since all have incidence degree of 0 when we start.
     start = degrees.argmax()
@@ -177,6 +180,48 @@ def _J2col_matrix(J):
     return col_matrix
 
 
+def _Jc2col_matrix_direct(J, Jc):
+    """
+    Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
+
+    This creates the column adjacency matrix used for direct jacobian determination
+    as described in "The efficient Computation of Sparse Jacobian Matrices Using
+    Automatic Differentiation" by Coleman and Verma.
+
+    Parameters
+    ----------
+    J : ndarray
+        Boolean jacobian sparsity matrix.
+    Jc : ndarray
+        Boolean sparsity matrix of a partition of J.
+
+    Returns
+    -------
+    ndarray
+        Column adjacency matrix.
+    """
+    assert J.shape == Jc.shape
+
+    nrows, ncols = J.shape
+
+    col_matrix = np.zeros((ncols, ncols), dtype=bool)
+
+    col_nzs = _count_nonzeros(Jc, axis=0)
+
+    # mark col_matrix entries as True when nonzero row entries make them dependent
+    for row in range(nrows):
+        nzro = np.nonzero(J[row])[0]
+        for col1, col2 in combinations(nzro, 2):
+            if col_nzs[col1] > 0 and col_nzs[col2] > 0 and (Jc[row, col1] or Jc[row, col2]):
+                col_matrix[col1, col2] = True
+                col_matrix[col2, col1] = True
+
+    # zero out diagonal (column is not adjacent to itself)
+    np.fill_diagonal(col_matrix, False)
+
+    return col_matrix
+
+
 def _get_full_disjoint_cols(J):
     """
     Find sets of disjoint columns in J and their corresponding rows using a col adjacency matrix.
@@ -191,9 +236,25 @@ def _get_full_disjoint_cols(J):
     list
         List of lists of disjoint columns
     """
+    return _get_full_disjoint_col_matrix_cols(_J2col_matrix(J))
+
+
+def _get_full_disjoint_col_matrix_cols(col_matrix):
+    """
+    Find sets of disjoint columns in a column intersection matrix.
+
+    Parameters
+    ----------
+    col_matrix : ndarray
+        Column intersection matrix
+
+    Returns
+    -------
+    list
+        List of lists of disjoint columns
+    """
     color_groups = []
-    nrows, ncols = J.shape
-    col_matrix = _J2col_matrix(J)
+    _, ncols = col_matrix.shape
 
     # -1 indicates that a column has not been colored
     colors = np.full(ncols, -1, dtype=get_index_dtype(maxval=ncols))
@@ -238,8 +299,10 @@ def MNCO_bidir(J):
     """
     nrows, ncols = J.shape
 
-    M_col_nonzeros = _count_nonzeros(J, axis=0)
-    M_row_nonzeros = _count_nonzeros(J, axis=1)
+    orig_col_nonzeros = _count_nonzeros(J, axis=0)
+    M_col_nonzeros = orig_col_nonzeros.copy()
+    orig_row_nonzeros = _count_nonzeros(J, axis=1)
+    M_row_nonzeros = orig_row_nonzeros.copy()
 
     M = coo_matrix(J)
     M_rows = M.row
@@ -296,14 +359,34 @@ def MNCO_bidir(J):
 
     coloring = {}
 
+    nnz_Jc = nnz_Jr = 0
     jac = np.zeros(J.shape, dtype=bool)
+
     if row_i > 0:
+        Jc = jac
         # build Jc and do fwd coloring on it
         for i, cols in enumerate(Jc_rows):
             if cols is not None:
-                jac[i][cols] = True
+                Jc[i][cols] = True
 
-        coloring['fwd'] = _compute_coloring(jac, 'fwd')['fwd']
+        nnz_Jc = np.count_nonzero(Jc)
+
+        col_nonzeros = _count_nonzeros(Jc, axis=0)
+        row_nonzeros = _count_nonzeros(Jc, axis=1)
+        col_keep = col_nonzeros > 0
+        row_keep = row_nonzeros > 0
+        idxmap = np.arange(ncols, dtype=int)[col_keep]
+        intersection_mat = _Jc2col_matrix_direct(J, Jc)
+        intersection_mat = intersection_mat[col_keep]
+        intersection_mat = intersection_mat[:, col_keep]
+        col_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
+        for i, group in enumerate(col_groups):
+            col_groups[i] = sorted([idxmap[c] for c in group if col_keep[idxmap[c]]])
+        col_groups = _split_groups(col_groups)
+        col2row = [None] * ncols
+        for col in idxmap:
+            col2row[col] = [r for r in np.nonzero(Jc[:, col])[0] if row_keep[r]]
+        coloring['fwd'] = [col_groups, col2row]
 
     if col_i > 0:
         # build Jr and do rev coloring
@@ -313,7 +396,29 @@ def MNCO_bidir(J):
             if rows is not None:
                 Jr[rows, i] = True
 
-        coloring['rev'] = _compute_coloring(Jr, 'rev')['rev']
+        nnz_Jr = np.count_nonzero(Jr)
+
+        row_nonzeros = _count_nonzeros(Jr, axis=1)
+        col_nonzeros = _count_nonzeros(Jr, axis=0)
+        row_keep = row_nonzeros > 0
+        col_keep = col_nonzeros > 0
+        Jr_save = Jr.copy()
+        idxmap = np.arange(nrows, dtype=int)[row_keep]
+        intersection_mat = _Jc2col_matrix_direct(J.T, Jr.T)
+        intersection_mat = intersection_mat[row_keep]
+        intersection_mat = intersection_mat[:, row_keep]
+        row_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
+
+        for i, group in enumerate(row_groups):
+            row_groups[i] = sorted([idxmap[r] for r in group if row_keep[idxmap[r]]])
+        row_groups = _split_groups(row_groups)
+        row2col = [None] * nrows
+        for row in idxmap:
+            row2col[row] = [c for c in np.nonzero(Jr[row])[0] if col_keep[c]]
+        coloring['rev'] = [row_groups, row2col]
+
+    if np.count_nonzero(J) > nnz_Jc + nnz_Jr:
+        raise RuntimeError("Some nonzeros are not covered by partitioned jacs")
 
     # there are some cases where J is partitioned such that everything ends up on the wrong side,
     # so do a check using unidirectional coloring if our coloring is worse than min(ncols, nrows)
@@ -325,6 +430,8 @@ def MNCO_bidir(J):
             del coloring['rev']
         else:
             del coloring['fwd']
+
+    # _check_coloring(J, coloring)
 
     return coloring
 
@@ -470,6 +577,9 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
+
+    # with open("array_viz.out", "w") as f:
+    #     array_viz(boolJ, stream=f)
 
     return boolJ
 
@@ -727,14 +837,12 @@ def _total_solves(color_info, do_fwd=True, do_rev=True):
     return total_solves
 
 
-def _solves_info(J, color_info):
+def _solves_info(color_info):
     """
     Return info about the number of colors given the current coloring scheme.
 
     Parameters
     ----------
-    J : ndarray
-        Jacobian sparsity matrix.
     color_info : dict
         dict['fwd'] = (col_lists, row_maps)
             col_lists is a list of column lists, the first being a list of uncolored columns.
@@ -751,7 +859,9 @@ def _solves_info(J, color_info):
     float
         Total solves.
     """
-    rev_size, fwd_size = J.shape
+    rev_size = color_info.get('nrows', -1)
+    fwd_size = color_info.get('ncols', -1)
+
     tot_colors = _total_solves(color_info)
 
     fwd_solves = rev_solves = 0
@@ -775,9 +885,28 @@ def _solves_info(J, color_info):
         if rev_lists:
             rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
 
-        pct = ((tot_size - tot_colors) / tot_size * 100)
+        if tot_size <= 0:
+            pct = 0.
+        else:
+            pct = ((tot_size - tot_colors) / tot_size * 100)
+
+    if tot_size < 0:
+        tot_size = '?'
 
     return tot_size, tot_colors, fwd_solves, rev_solves, pct
+
+
+def _split_groups(groups):
+    uncolored = [grp[0] for grp in groups if len(grp) == 1]
+    groups = [grp for grp in groups if len(grp) > 1]
+
+    # the first lists entry corresponds to all uncolored columns (columns that are not
+    # disjoint wrt any other columns).  The other entries are groups of columns that do not
+    # share any nonzero row entries in common.
+    clists = [uncolored]
+    clists.extend(groups)
+
+    return clists
 
 
 def _compute_coloring(J, mode):
@@ -812,30 +941,21 @@ def _compute_coloring(J, mode):
 
     if rev:
         J = J.T
-    col_groups = _get_full_disjoint_cols(J)
-
-    uncolored_cols = [grp[0] for grp in col_groups if len(grp) == 1]
-    col_groups = [grp for grp in col_groups if len(grp) > 1]
-
-    # the first lists entry corresponds to all uncolored columns (columns that are not
-    # disjoint wrt any other columns).  The other entries are groups of columns that do not
-    # share any nonzero row entries in common.
-    clists = [uncolored_cols]
-    clists.extend(col_groups)
+    col_groups = _split_groups(_get_full_disjoint_cols(J))
 
     col2rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
-    for clist in col_groups:
-        for col in clist:
+    for lst in col_groups:
+        for col in lst:
             # ndarrays are converted to lists to be json serializable
             col2rows[col] = list(np.nonzero(J[:, col])[0])
 
     if rev:
         coloring = {
-            'rev': [clists, col2rows],
+            'rev': [col_groups, col2rows],
         }
     else:
         coloring = {
-            'fwd': [clists, col2rows],
+            'fwd': [col_groups, col2rows],
         }
 
     return coloring
@@ -917,8 +1037,13 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
 
     start_time = time.time()
     coloring = _compute_coloring(J, mode)
+
+    # colored_array_viz(J, coloring)
+
     coloring['time_coloring'] = time.time() - start_time
     coloring['time_sparsity'] = time_sparsity
+    coloring['nrows'] = J.shape[0]
+    coloring['ncols'] = J.shape[1]
 
     modes = [m for m in ('fwd', 'rev') if m in coloring]
 
@@ -941,14 +1066,12 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     return coloring
 
 
-def simul_coloring_summary(J, color_info, stream=sys.stdout):
+def simul_coloring_summary(color_info, stream=sys.stdout):
     """
     Print a summary of simultaneous coloring info for the given problem and coloring metadata.
 
     Parameters
     ----------
-    J : ndarray
-        Jacobian sparsity matrix.
     color_info : dict
         Coloring metadata.
     stream : file-like
@@ -957,15 +1080,20 @@ def simul_coloring_summary(J, color_info, stream=sys.stdout):
     stream.write("\nTime to compute sparsity: %f\n" % color_info.get('time_sparsity', 0.))
     stream.write("Time to compute coloring: %f\n" % color_info.get('time_coloring', 0.))
 
+    nrows = color_info.get('nrows', -1)
+    ncols = color_info.get('ncols', -1)
+
     if 'fwd' not in color_info and 'rev' not in color_info:
-        tot_size = min(J.shape)
+        tot_size = min(nrows, ncols)
+        if tot_size < 0:
+            tot_size = '?'
         stream.write("\nSimultaneous derivatives can't improve on the total number of solves "
-                     "required (%d) for this configuration\n" % tot_size)
+                     "required (%s) for this configuration\n" % tot_size)
     else:
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(J, color_info)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(color_info)
 
         stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
-        stream.write("\n\nTotal colors vs. total size: %d vs %d  (%.1f%% improvement)\n" %
+        stream.write("\n\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)\n" %
                      (tot_colors, tot_size, pct))
 
 
@@ -1078,7 +1206,7 @@ def _simul_coloring_cmd(options):
                                         stream=outfile)
 
         if sys.stdout.isatty():
-            simul_coloring_summary(prob.driver._tot_jac.J, color_info, stream=sys.stdout)
+            simul_coloring_summary(color_info, stream=sys.stdout)
 
         exit()
     return _simul_coloring
@@ -1133,3 +1261,163 @@ def _sparsity_cmd(options):
                      show_jac=options.show_jac, setup=True, run_model=True, stream=outfile)
         exit()
     return _sparsity
+
+
+def _check_coloring(J, coloring):
+    """
+    Raise an exception if any problems are found with the coloring info.
+
+    Parameters
+    ----------
+    J : ndarray
+        Jacobian sparsity matrix.
+    coloring : dict
+        Metadata required for coloring.
+    """
+    # check for any overlapping nonzeros
+    fwd_coloring = coloring.get('fwd')
+    rev_coloring = coloring.get('rev')
+
+    if fwd_coloring is not None:
+        col_idx_groups = fwd_coloring[0]
+        all_cols = set()
+        for grp in col_idx_groups:
+            all_cols.update(grp)
+
+        col2row = fwd_coloring[1]
+        fwd_nzs = []
+        for col, rows in enumerate(col2row):
+            if rows is not None:
+                fwd_nzs.extend([(r, col) for r in rows])
+            elif col in all_cols:  # full solve
+                full_nzs = [(r, col) for r in np.nonzero(J[:, col])[0]]
+                fwd_nzs.extend(full_nzs)
+
+        fwd_nz_set = set(fwd_nzs)
+        if len(fwd_nzs) != len(fwd_nz_set):
+            raise RuntimeError("Duplicated nonzeros found in fwd coloring.")
+
+        # find any nonzeros that are left out of any of our columns
+        for c in all_cols:
+            rnz = col2row[c]
+            Jnz = np.nonzero(J[:, c])[0]
+            missing = set(Jnz).difference(rnz)
+            print("missing for col %d" % c, missing)
+
+    if rev_coloring is not None:
+        row_idx_groups = rev_coloring[0]
+        all_rows = set()
+        for grp in row_idx_groups:
+            all_rows.update(grp)
+
+        row2col = rev_coloring[1]
+        rev_nzs = []
+        for row, cols in enumerate(row2col):
+            if cols is not None:
+                rev_nzs.extend([(row, c) for c in cols])
+            elif row in all_rows:  # full solve
+                rev_nzs.extend([(row, c) for c in np.nonzero(J[row])[0]])
+
+        rev_nz_set = set(rev_nzs)
+        if len(rev_nzs) != len(rev_nz_set):
+            raise RuntimeError("Duplicated nonzeros found in rev coloring.")
+
+        # find any nonzeros that are left out of any of our columns
+        for r in all_rows:
+            cnz = row2col[r]
+            Jnz = np.nonzero(J[r])[0]
+            missing = set(Jnz).difference(cnz)
+            print("missing for row %d" % r, missing)
+
+    if fwd_coloring is not None and rev_coloring is not None:
+        common = fwd_nz_set.intersection(rev_nzs)
+        if common:
+            raise RuntimeError("Coloring has overlapping nonzeros: %s" % list(common))
+
+        computed_nzs = len(fwd_nz_set) + len(rev_nz_set)
+        nzs = np.count_nonzero(J)
+        if computed_nzs != nzs:
+            raise RuntimeError("Colored nonzeros (%d) != nonzeros in J (%d)" % (computed_nzs, nzs))
+
+
+def colored_array_viz(arr, coloring, prob=None, of=None, wrt=None, stream=sys.stdout):
+    """
+    Display the structure of a boolean array in a compact form.
+
+    If prob, of, and wrt are supplied, print the name of the response alongside
+    each row and print the names of the design vars, aligned with each column, at
+    the bottom.
+
+    Parameters
+    ----------
+    arr : ndarray
+        Array being visualized.
+    coloring : dict
+        Metadata needed for coloring.
+    prob : Problem or None
+        Problem object.
+    of : list of str or None
+        Names of response variables used in derivative calculation.
+    wrt : list of str or None
+        Names of design variables used in derivative calculation.
+    stream : file-like
+        Stream where output will be written.
+    """
+    if len(arr.shape) != 2:
+        raise RuntimeError("array_viz only works for 2d arrays.")
+
+    charr = np.full(arr.shape, '.', dtype=str)
+
+    full_rows = np.arange(arr.shape[0], dtype=int)
+    full_cols = np.arange(arr.shape[0], dtype=int)
+
+    if 'fwd' in coloring:
+        col2row = coloring['fwd'][1]
+        for grp in coloring['fwd'][0]:
+            for c in grp:
+                rows = col2row[c]
+                if rows is None:
+                    rows = full_rows
+                charr[rows, c] = 'f'
+
+    if 'rev' in coloring:
+        row2col = coloring['rev'][1]
+        for grp in coloring['rev'][0]:
+            for r in grp:
+                cols = row2col[r]
+                if cols is None:
+                    cols = full_cols
+                for c in cols:
+                    if charr[r, c] == 'f':
+                        # overlap!
+                        charr[r, c] = 'O'
+                    else:
+                        charr[r, c] = 'r'
+
+    for r in range(arr.shape[0]):
+        for c in range(arr.shape[1]):
+            if arr[r, c] and charr[r, c] == '.':
+                charr[r, c] = 'x'  # mark nonzero as uncolored
+
+    if prob is None or of is None or wrt is None:
+        for r in range(arr.shape[0]):
+            for c in range(arr.shape[1]):
+                stream.write(charr[r, c])
+            stream.write(' %d\n' % r)
+    else:
+        row = 0
+        for res in of:
+            for r in range(row, row + prob.driver._responses[res]['size']):
+                col = 0
+                for dv in wrt:
+                    for c in range(col, col + prob.driver._designvars[dv]['size']):
+                        stream.write(charr[r, c])
+                    col = c + 1
+                stream.write(' %d  %s\n' % (r, res))
+            row = r + 1
+
+        start = 0
+        for name in wrt:
+            tab = ' ' * start
+            stream.write('%s|%s\n' % (tab, name))
+            start += prob.driver._designvars[name]['size']
