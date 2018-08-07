@@ -779,7 +779,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - bidirectional coloring saves 11 solves per driver iter  (5 vs 22)
+        # - bidirectional coloring saves 11 solves per driver iter  (11 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,

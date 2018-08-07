@@ -208,7 +208,7 @@ def _Jc2col_matrix_direct(J, Jc):
 
     col_keep = _count_nonzeros(Jc, axis=0) > 0
 
-    # mark col_matrix entries as True when nonzero row entries make them dependent
+    # mark col_matrix[col1, col2] as True when Jc[row, col1] is True OR Jc[row, col2] is True
     for row in range(nrows):
         nzro = np.nonzero(J[row] & col_keep)[0]
         for col1, col2 in combinations(nzro, 2):
@@ -275,10 +275,9 @@ def _get_full_disjoint_col_matrix_cols(col_matrix):
 
 def _color_partition(J, Jpart):
     """
-    Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
+    Compute a single directional fwd coloring using partition Jpart.
 
-    Based on the partitioning algorithm found in "The Efficient Computation of Sparse
-    Jacobian Matrices Using Automatic Differentiation" by Coleman and Verma.
+    This routine is used to compute a fwd coloring on Jc and a rev coloring on Jr.T.
 
     Parameters
     ----------
@@ -299,14 +298,20 @@ def _color_partition(J, Jpart):
     row_nonzeros = _count_nonzeros(Jpart, axis=1)
     col_keep = col_nonzeros > 0
     row_keep = row_nonzeros > 0
+
+    # use this to map indices back to the full J indices.
     idxmap = np.arange(ncols, dtype=int)[col_keep]
+
     intersection_mat = _Jc2col_matrix_direct(J, Jpart)
     intersection_mat = intersection_mat[col_keep]
     intersection_mat = intersection_mat[:, col_keep]
+
     col_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
+
     for i, group in enumerate(col_groups):
         col_groups[i] = sorted([idxmap[c] for c in group if col_keep[idxmap[c]]])
     col_groups = _split_groups(col_groups)
+
     col2row = [None] * ncols
     for col in idxmap:
         col2row[col] = [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
@@ -340,15 +345,13 @@ def MNCO_bidir(J):
     """
     nrows, ncols = J.shape
 
-    orig_col_nonzeros = _count_nonzeros(J, axis=0)
-    M_col_nonzeros = orig_col_nonzeros.copy()
-    orig_row_nonzeros = _count_nonzeros(J, axis=1)
-    M_row_nonzeros = orig_row_nonzeros.copy()
+    M_col_nonzeros = _count_nonzeros(J, axis=0)
+    M_row_nonzeros = _count_nonzeros(J, axis=1)
 
     M = coo_matrix(J)
     M_rows = M.row
     M_cols = M.col
-    M = None  # clean up memory
+    M = None  # we don't need sparse matrix data array, so clean up memory
 
     Jc_rows = [None] * nrows
     Jr_cols = [None] * ncols
@@ -945,16 +948,7 @@ def _compute_coloring(J, mode):
             # ndarrays are converted to lists to be json serializable
             col2rows[col] = list(np.nonzero(J[:, col])[0])
 
-    if rev:
-        coloring = {
-            'rev': [col_groups, col2rows],
-        }
-    else:
-        coloring = {
-            'fwd': [col_groups, col2rows],
-        }
-
-    return coloring
+    return {mode: [col_groups, col2rows]}
 
 
 def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
@@ -1338,7 +1332,10 @@ def _check_coloring(J, coloring):
 
 def colored_array_viz(arr, coloring, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
-    Display the structure of a boolean array in a compact form.
+    Display the structure of a boolean array with coloring info for each nonzero value.
+
+    Forward mode colored nonzeros are denoted by 'f', reverse mode nonzeros by 'r',
+    overlapping nonzeros by 'O' and uncolored nonzeros by 'x'.  Zeros are denoted by '.'.
 
     If prob, of, and wrt are supplied, print the name of the response alongside
     each row and print the names of the design vars, aligned with each column, at
