@@ -617,10 +617,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        print("=======================")
         inputs = cr.list_inputs(None, True, True, True)
-        print('inputs:', inputs)
-        print("=======================")
 
         expected_inputs = {
             'obj_cmp.x': {'value': [1.]},
@@ -904,8 +901,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.set_solver_print(level=0)
-
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
@@ -1061,9 +1056,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
-    def test_dict(self):
-        # verify that the PromotedToAbsolfSellarPrputeMap object returned by case
-        # "get" variable functions properly implements a read-only dict interface
+    def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)
         driver = prob.driver = ScipyOptimizeDriver()
 
@@ -1099,8 +1092,8 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         self.assertEqual(dvs['pz.z'][0], dvs['z'][0])
         self.assertEqual(dvs['pz.z'][1], dvs['z'][1])
 
-        # verify we can set the value using either prmoted or absolute name as key
-        # (this is necessary for copying to work correctly)
+        # verify we can set the value using either promoted or absolute name as key
+        # (although users wouldn't do this, it is necessary for copying to work correctly)
         dvs['x'] = 111.
         self.assertEqual(dvs['x'], 111.)
         self.assertEqual(dvs['px.x'], 111.)
@@ -1129,7 +1122,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         self.assertEqual(derivs['obj_cmp.obj,x'], expected)
 
         # verify we can set derivs via tuple or string, with promoted or absolute names
-        # (this is necessary for copying to work correctly)
+        # (although users wouldn't do this, it is necessary for copying to work correctly)
         for key, value in [(('obj', 'x'), 111.), (('obj', 'px.x'), 222.),
                            ('obj_cmp.obj,x', 333.),('obj_cmp.obj,px.x', 444.)]:
             derivs[key] = value

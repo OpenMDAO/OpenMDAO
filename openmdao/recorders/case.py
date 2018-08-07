@@ -425,7 +425,8 @@ class PromotedToAbsoluteMap(dict):
                         super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
                     elif key in prom2abs:
                         # key is promoted name
-                        self._values[prom2abs[key]] = values[key]
+                        for abs_key in prom2abs[key]:
+                            self._values[abs_key] = values[key]
                         super(PromotedToAbsoluteMap, self).__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
@@ -492,9 +493,11 @@ class PromotedToAbsoluteMap(dict):
             An array entry value that corresponds to the given variable name.
         """
         if key in self._keys:
+            # absolute name
             return self._values[key]
 
         elif key in self:
+            # promoted name
             return super(PromotedToAbsoluteMap, self).__getitem__(key)
 
         elif isinstance(key, tuple) or ',' in key:
@@ -527,10 +530,7 @@ class PromotedToAbsoluteMap(dict):
             abs_keys, prom_key = self._deriv_keys(key)
 
             for abs_key in abs_keys:
-                if abs_key in self._keys:
-                    self._values[abs_key] = value
-                else:
-                    raise KeyError(key)
+                self._values[abs_key] = value
 
             super(PromotedToAbsoluteMap, self).__setitem__(prom_key, value)
 
