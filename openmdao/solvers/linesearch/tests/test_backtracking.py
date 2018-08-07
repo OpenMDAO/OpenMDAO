@@ -307,7 +307,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
 
     def test_read_only_bug(self):
         # this tests for a bug in which guess_nonlinear failed due to the output
-        # vector being left in a read only state after the AnanlysisError
+        # vector being left in a read only state after the AnalysisError
 
         top = Problem()
         top.model = Group()
