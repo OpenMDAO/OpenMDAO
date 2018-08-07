@@ -368,8 +368,7 @@ def MNCO_bidir(J):
         for i, cols in enumerate(Jc_rows):
             if cols is not None:
                 Jc[i][cols] = True
-
-        nnz_Jc = np.count_nonzero(Jc)
+                nnz_Jc += len(cols)
 
         col_nonzeros = _count_nonzeros(Jc, axis=0)
         row_nonzeros = _count_nonzeros(Jc, axis=1)
@@ -395,8 +394,7 @@ def MNCO_bidir(J):
         for i, rows in enumerate(Jr_cols):
             if rows is not None:
                 Jr[rows, i] = True
-
-        nnz_Jr = np.count_nonzero(Jr)
+                nnz_Jr += len(rows)
 
         row_nonzeros = _count_nonzeros(Jr, axis=1)
         col_nonzeros = _count_nonzeros(Jr, axis=0)
