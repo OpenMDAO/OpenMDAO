@@ -1,22 +1,21 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
+from __future__ import print_function
+
 import sys
 import os
 import re
 import tokenize
 import importlib
 import inspect
-import sqlite3
 import subprocess
 import tempfile
 import unittest
 import traceback
 from docutils import nodes
 
-import numpy as np
-
-from six import StringIO, PY3
+from six import StringIO
 from six.moves import range, zip, cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
@@ -27,6 +26,7 @@ if sys.version_info[0] == 2:
     import cgi as cgiesc
 else:
     import html as cgiesc
+
 from openmdao.utils.general_utils import printoptions
 
 sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite database file
@@ -594,7 +594,6 @@ def dedent(src):
     """
 
     lines = src.split('\n')
-    start = 0
     if lines:
         for i, line in enumerate(lines):
             lstrip = line.lstrip()
@@ -647,7 +646,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
             use_mpi = False
         else:
             N_PROCS = getattr(cls, 'N_PROCS', 1)
-            use_mpi =  N_PROCS > 1
+            use_mpi = N_PROCS > 1
 
     try:
         # use subprocess to run code to avoid any nasty interactions between codes
@@ -735,7 +734,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
 
                 try:
                     exec(code_to_run, globals_dict)
-                except Exception as err:
+                except Exception:
                     # print code (with line numbers) to facilitate debugging
                     for n, line in enumerate(code_to_run.split('\n')):
                         print('%4d: %s' % (n, line), file=stderr)
