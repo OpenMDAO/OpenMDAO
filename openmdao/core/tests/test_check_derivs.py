@@ -239,6 +239,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.declare_partials(of='*', wrt='*')
 
+                self.lin_count = 0
+
             def compute(self, inputs, outputs):
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
@@ -246,6 +248,8 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """Intentionally left out derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([3.0])
+                self.lin_count += 1
+
 
         prob = Problem()
         prob.model = Group()
@@ -262,6 +266,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
+
+        self.assertEqual(prob.model.comp.lin_count, 1)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']

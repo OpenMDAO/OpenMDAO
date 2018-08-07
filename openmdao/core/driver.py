@@ -559,7 +559,7 @@ class Driver(object):
 
         return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
-    def get_objective_values(self, unscaled=False, filter=None):
+    def get_objective_values(self, unscaled=False, filter=None, ignore_indices=False):
         """
         Return objective values.
 
@@ -569,6 +569,8 @@ class Driver(object):
             Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of objective names used by recorders.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -580,10 +582,12 @@ class Driver(object):
         else:
             objs = self._objs
 
-        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled)
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled,
+                                     ignore_indices=ignore_indices)
                 for n in objs}
 
-    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None):
+    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None,
+                              ignore_indices=False):
         """
         Return constraint values.
 
@@ -599,6 +603,8 @@ class Driver(object):
             Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of constraint names used by recorders.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -626,7 +632,8 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled)
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled,
+                                               ignore_indices=ignore_indices)
 
         return con_dict
 
@@ -782,17 +789,17 @@ class Driver(object):
         filt = self._filtered_vars_to_record
 
         if opts['record_desvars']:
-            des_vars = self.get_design_var_values(unscaled=True)
+            des_vars = self.get_design_var_values(unscaled=True, ignore_indices=True)
         else:
             des_vars = {}
 
         if opts['record_objectives']:
-            obj_vars = self.get_objective_values(unscaled=True)
+            obj_vars = self.get_objective_values(unscaled=True, ignore_indices=True)
         else:
             obj_vars = {}
 
         if opts['record_constraints']:
-            con_vars = self.get_constraint_values(unscaled=True)
+            con_vars = self.get_constraint_values(unscaled=True, ignore_indices=True)
         else:
             con_vars = {}
 

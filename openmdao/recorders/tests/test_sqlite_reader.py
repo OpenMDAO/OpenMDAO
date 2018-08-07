@@ -1040,6 +1040,92 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertTrue(case in case_type._cases)
                 self.assertEqual(case, case_type._cases[case].iteration_coordinate)
 
+    def test_reading_driver_cases_with_indices(self):
+        # note: size must be an even number
+        SIZE = 10
+        prob = Problem()
+
+        driver = prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['disp'] = False
+
+        recorder = SqliteRecorder(self.filename)
+        driver.add_recorder(recorder)
+        driver.recording_options['includes'] = ['*']
+
+        model = prob.model
+        indeps = model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+
+        # the following were randomly generated using np.random.random(10)*2-1 to randomly
+        # disperse them within a unit circle centered at the origin.
+        indeps.add_output('x', np.array([
+            0.55994437, -0.95923447, 0.21798656, -0.02158783, 0.62183717,
+            0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886
+        ]))
+        indeps.add_output('y', np.array([
+            0.52577864, 0.30894559, 0.8420792, 0.35039912, -0.67290778,
+            -0.86236787, -0.97500023, 0.47739414, 0.51174103, 0.10052582
+        ]))
+        indeps.add_output('r', .7)
+
+        model.add_subsystem('circle', ExecComp('area = pi * r**2'))
+
+        model.add_subsystem('r_con', ExecComp('g = x**2 + y**2 - r**2',
+                                              g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+
+        thetas = np.linspace(0, np.pi/4, SIZE)
+        model.add_subsystem('theta_con', ExecComp('g=arctan(y/x) - theta',
+                                                  g=np.ones(SIZE), x=np.ones(SIZE),
+                                                  y=np.ones(SIZE), theta=thetas))
+        model.add_subsystem('delta_theta_con', ExecComp('g = arctan(y/x)[::2]-arctan(y/x)[1::2]',
+                                                        g=np.ones(SIZE//2), x=np.ones(SIZE),
+                                                        y=np.ones(SIZE)))
+
+        thetas = np.linspace(0, np.pi/4, SIZE)
+
+        model.add_subsystem('l_conx', ExecComp('g=x-1', g=np.ones(SIZE), x=np.ones(SIZE)))
+
+        model.connect('r', ('circle.r', 'r_con.r'))
+        model.connect('x', ['r_con.x', 'theta_con.x', 'delta_theta_con.x'])
+        model.connect('x', 'l_conx.x')
+        model.connect('y', ['r_con.y', 'theta_con.y', 'delta_theta_con.y'])
+
+        model.add_design_var('x', indices=[0, 3])
+        model.add_design_var('y')
+        model.add_design_var('r', lower=.5, upper=10)
+
+        # nonlinear constraints
+        model.add_constraint('r_con.g', equals=0)
+
+        IND = np.arange(SIZE, dtype=int)
+        EVEN_IND = IND[0::2]  # all odd indices
+        model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+
+        # this constrains x[0] to be 1 (see definition of l_conx)
+        model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0, ])
+
+        # linear constraint
+        model.add_constraint('y', equals=0, indices=[0], linear=True)
+
+        model.add_objective('circle.area', ref=-1)
+
+        prob.setup(mode='fwd')
+        prob.run_driver()
+        prob.cleanup()
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        cr = CaseReader(self.filename)
+        case = cr.driver_cases.get_case(0)
+        prob.load_case(case)
+
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):
     def setUp(self):
@@ -1124,7 +1210,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         # verify we can set derivs via tuple or string, with promoted or absolute names
         # (although users wouldn't normally do this, it's used when copying)
         for key, value in [(('obj', 'x'), 111.), (('obj', 'px.x'), 222.),
-                           ('obj_cmp.obj,x', 333.),('obj_cmp.obj,px.x', 444.)]:
+                           ('obj_cmp.obj,x', 333.), ('obj_cmp.obj,px.x', 444.)]:
             derivs[key] = value
             self.assertEqual(derivs[('obj', 'x')], value)
             self.assertEqual(derivs[('obj', 'px.x')], value)
@@ -1179,7 +1265,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         """
         prob = SellarProblem(SellarDerivativesGrouped)
 
-        driver = prob.driver = ScipyOptimizeDriver()
+        prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False

@@ -23,6 +23,7 @@ from pyDOE2 import lhs
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent import concurrent_eval
 from openmdao.utils.mpi import MPI
+from openmdao.core.analysis_error import AnalysisError
 
 
 class SimpleGADriver(Driver):
