@@ -1101,12 +1101,12 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
 
         # verify we can set the value using either prmoted or absolute name as key
         # (this is necessary for copying to work correctly)
-        dv['x'] = 111.
-        self.assertEqual(dv['x'], 111.)
-        self.assertEqual(dv['px.x'], 111.)
-        dv['px.x'] = 222.
-        self.assertEqual(dv['x'], 222.)
-        self.assertEqual(dv['px.x'], 222.)
+        dvs['x'] = 111.
+        self.assertEqual(dvs['x'], 111.)
+        self.assertEqual(dvs['px.x'], 111.)
+        dvs['px.x'] = 222.
+        self.assertEqual(dvs['x'], 222.)
+        self.assertEqual(dvs['px.x'], 222.)
 
         # verify deriv keys are tuples as expected, both promoted and absolute
         self.assertEqual(set(derivs.keys()), set([
