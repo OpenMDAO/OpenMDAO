@@ -602,3 +602,23 @@ class SellarProblem(Problem):
 
         # default to non-verbose
         self.set_solver_print(0)
+
+
+class SellarProblemWithArrays(Problem):
+    """
+    The Sellar problem with ndarray variable options
+    """
+
+    def __init__(self, model_class=SellarDerivatives, **kwargs):
+        super(SellarProblemWithArrays, self).__init__(model_class(**kwargs))
+
+        model = self.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        # default to non-verbose
+        self.set_solver_print(0)
