@@ -207,15 +207,15 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        self._inputs.read_only = True
-
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(
                     outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
-                failed = self.compute(self._inputs, self._outputs)
-
-        self._inputs.read_only = False
+                self._inputs.read_only = True
+                try:
+                    failed = self.compute(self._inputs, self._outputs)
+                finally:
+                    self._inputs.read_only = False
 
         return bool(failed), 0., 0.
 
@@ -271,25 +271,27 @@ class ExplicitComponent(Component):
                             d_residuals.read_only = True
 
                         # We used to negate the residual here, and then re-negate after the hook.
-
-                        if d_inputs._ncol > 1:
-                            if self.supports_multivecs:
-                                self.compute_multi_jacvec_product(self._inputs, d_inputs,
-                                                                  d_residuals, mode)
+                        try:
+                            if d_inputs._ncol > 1:
+                                if self.supports_multivecs:
+                                    self.compute_multi_jacvec_product(self._inputs, d_inputs,
+                                                                      d_residuals, mode)
+                                else:
+                                    for i in range(d_inputs._ncol):
+                                        # need to make the multivecs look like regular single vecs
+                                        # since the component doesn't know about multivecs.
+                                        d_inputs._icol = i
+                                        d_residuals._icol = i
+                                        self.compute_jacvec_product(self._inputs, d_inputs,
+                                                                    d_residuals, mode)
+                                    d_inputs._icol = None
+                                    d_residuals._icol = None
                             else:
-                                for i in range(d_inputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_inputs._icol = i
-                                    d_residuals._icol = i
-                                    self.compute_jacvec_product(self._inputs, d_inputs,
-                                                                d_residuals, mode)
-                                d_inputs._icol = None
-                                d_residuals._icol = None
-                        else:
-                            self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
-
-                        self._inputs.read_only = d_inputs.read_only = d_residuals.read_only = False
+                                self.compute_jacvec_product(self._inputs, d_inputs,
+                                                            d_residuals, mode)
+                        finally:
+                            self._inputs.read_only = False
+                            d_inputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -366,10 +368,11 @@ class ExplicitComponent(Component):
             if self._has_compute_partials:
                 self._inputs.read_only = True
 
-                # We used to negate the jacobian here, and then re-negate after the hook.
-                self.compute_partials(self._inputs, self._jacobian)
-
-                self._inputs.read_only = False
+                try:
+                    # We used to negate the jacobian here, and then re-negate after the hook.
+                    self.compute_partials(self._inputs, self._jacobian)
+                finally:
+                    self._inputs.read_only = False
 
     def compute(self, inputs, outputs):
         """
