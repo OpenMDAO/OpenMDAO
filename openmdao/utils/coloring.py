@@ -206,13 +206,13 @@ def _Jc2col_matrix_direct(J, Jc):
 
     col_matrix = np.zeros((ncols, ncols), dtype=bool)
 
-    col_nzs = _count_nonzeros(Jc, axis=0)
+    col_keep = _count_nonzeros(Jc, axis=0) > 0
 
     # mark col_matrix entries as True when nonzero row entries make them dependent
     for row in range(nrows):
-        nzro = np.nonzero(J[row])[0]
+        nzro = np.nonzero(J[row] & col_keep)[0]
         for col1, col2 in combinations(nzro, 2):
-            if col_nzs[col1] > 0 and col_nzs[col2] > 0 and (Jc[row, col1] or Jc[row, col2]):
+            if Jc[row, col1] or Jc[row, col2]:
                 col_matrix[col1, col2] = True
                 col_matrix[col2, col1] = True
 

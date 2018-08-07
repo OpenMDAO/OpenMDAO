@@ -914,6 +914,7 @@ class BidirectionalTestCase(unittest.TestCase):
 
         # uses matrix can_715 from the sparse matrix collection website
         mat = load_npz(os.path.join(matdir, 'can_715.npz')).toarray()
+        mat = np.asarray(mat, dtype=bool)
         coloring = get_simul_meta(None, 'auto', include_sparsity=False, setup=False,
                                   run_model=False, bool_jac=mat,
                                   stream=None)
