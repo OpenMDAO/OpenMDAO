@@ -262,10 +262,10 @@ class SqliteRecorder(BaseRecorder):
         # otherwise we trample on values that are used elsewhere
         var_settings = deepcopy(var_settings)
         for name in var_settings:
-            if 'lower' in var_settings[name]:
-                var_settings[name]['lower'] = convert_to_list(var_settings[name]['lower'])
-            if 'upper' in var_settings[name]:
-                var_settings[name]['upper'] = convert_to_list(var_settings[name]['upper'])
+            # if 'lower' in var_settings[name]:
+            #     var_settings[name]['lower'] = convert_to_list(var_settings[name]['lower'])
+            # if 'upper' in var_settings[name]:
+            #     var_settings[name]['upper'] = convert_to_list(var_settings[name]['upper'])
             for prop in var_settings[name]:
                 val = var_settings[name][prop]
                 if isinstance(val, np.int8) or isinstance(val, np.int16) or\
@@ -273,6 +273,8 @@ class SqliteRecorder(BaseRecorder):
                     var_settings[name][prop] = val.item()
                 elif isinstance(val, tuple):
                     var_settings[name][prop] = [int(v) for v in val]
+                elif isinstance(val, np.ndarray):
+                    var_settings[name][prop] = convert_to_list(var_settings[name][prop])
 
         return var_settings
 
