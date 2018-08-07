@@ -361,7 +361,7 @@ class ProblemCase(Case):
 
 class PromotedToAbsoluteMap(dict):
     """
-    Enables access of values through absolute or promoted variable names.
+    A dictionary thath enables accessing values via absolute or promoted variable names.
 
     Attributes
     ----------
@@ -383,8 +383,8 @@ class PromotedToAbsoluteMap(dict):
 
         Parameters
         ----------
-        values : array
-            Array of values accessible via absolute variable name.
+        values : array or dict
+            Numpy structured array or dictionary of values.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
         abs2prom : {'input': dict, 'output': dict}
@@ -396,7 +396,6 @@ class PromotedToAbsoluteMap(dict):
 
         self._is_output = output
 
-        # save promoted/absolute name mappings
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
 

@@ -1093,7 +1093,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         self.assertEqual(dvs['pz.z'][1], dvs['z'][1])
 
         # verify we can set the value using either promoted or absolute name as key
-        # (although users wouldn't do this, it is necessary for copying to work correctly)
+        # (although users wouldn't normally do this, it's used when copying or scaling)
         dvs['x'] = 111.
         self.assertEqual(dvs['x'], 111.)
         self.assertEqual(dvs['px.x'], 111.)
@@ -1122,7 +1122,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         self.assertEqual(derivs['obj_cmp.obj,x'], expected)
 
         # verify we can set derivs via tuple or string, with promoted or absolute names
-        # (although users wouldn't do this, it is necessary for copying to work correctly)
+        # (although users wouldn't normally do this, it's used when copying)
         for key, value in [(('obj', 'x'), 111.), (('obj', 'px.x'), 222.),
                            ('obj_cmp.obj,x', 333.),('obj_cmp.obj,px.x', 444.)]:
             derivs[key] = value
