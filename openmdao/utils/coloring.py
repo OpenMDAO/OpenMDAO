@@ -402,7 +402,6 @@ def MNCO_bidir(J):
         col_nonzeros = _count_nonzeros(Jr, axis=0)
         row_keep = row_nonzeros > 0
         col_keep = col_nonzeros > 0
-        Jr_save = Jr.copy()
         idxmap = np.arange(nrows, dtype=int)[row_keep]
         intersection_mat = _Jc2col_matrix_direct(J.T, Jr.T)
         intersection_mat = intersection_mat[row_keep]
@@ -417,8 +416,8 @@ def MNCO_bidir(J):
             row2col[row] = [c for c in np.nonzero(Jr[row])[0] if col_keep[c]]
         coloring['rev'] = [row_groups, row2col]
 
-    if np.count_nonzero(J) > nnz_Jc + nnz_Jr:
-        raise RuntimeError("Some nonzeros are not covered by partitioned jacs")
+    if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
+        raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
 
     # there are some cases where J is partitioned such that everything ends up on the wrong side,
     # so do a check using unidirectional coloring if our coloring is worse than min(ncols, nrows)
