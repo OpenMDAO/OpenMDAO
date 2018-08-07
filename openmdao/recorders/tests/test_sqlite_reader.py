@@ -1065,7 +1065,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         # verify that the PromotedToAbsolfSellarPrputeMap object returned by case
         # "get" variable functions properly implements a read-only dict interface
         prob = SellarProblem(SellarDerivativesGrouped)
-        driver = prob.driver
+        driver = prob.driver = ScipyOptimizeDriver()
 
         recorder = SqliteRecorder("cases.sql")
 
@@ -1074,21 +1074,81 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_derivatives'] = True
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        first_driver_case = cr.driver_cases.get_case(0)
 
-        objs = first_driver_case.get_objectives()
-        cons = first_driver_case.get_constraints()
-        dvs = first_driver_case.get_desvars()
+        driver_case = cr.driver_cases.get_case(-1)
+        deriv_case = cr.driver_derivative_cases.get_case(-1)
 
+        dvs = driver_case.get_desvars()
+        derivs = deriv_case.get_derivatives()
+
+        # verify that map looks and acts like a regular dict
         self.assertTrue(isinstance(dvs, dict))
         self.assertEqual(sorted(dvs.keys()), ['x', 'z'])
         self.assertEqual(sorted(dvs.items()), [('x', dvs['x']), ('z', dvs['z'])])
+
+        # verify that using absolute names works the same as using promoted names
+        self.assertEqual(sorted(dvs.absolute_names()), ['px.x', 'pz.z'])
+        self.assertEqual(dvs['px.x'], dvs['x'])
+        self.assertEqual(dvs['pz.z'][0], dvs['z'][0])
+        self.assertEqual(dvs['pz.z'][1], dvs['z'][1])
+
+        # verify we can set the value using either prmoted or absolute name as key
+        # (this is necessary for copying to work correctly)
+        dv['x'] = 111.
+        self.assertEqual(dv['x'], 111.)
+        self.assertEqual(dv['px.x'], 111.)
+        dv['px.x'] = 222.
+        self.assertEqual(dv['x'], 222.)
+        self.assertEqual(dv['px.x'], 222.)
+
+        # verify deriv keys are tuples as expected, both promoted and absolute
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+        self.assertEqual(set(derivs.absolute_names()), set([
+            ('obj_cmp.obj', 'pz.z'), ('con_cmp2.con2', 'pz.z'), ('con_cmp1.con1', 'px.x'),
+            ('obj_cmp.obj', 'px.x'), ('con_cmp2.con2', 'px.x'), ('con_cmp1.con1', 'pz.z')
+        ]))
+
+        # verify we can access derivs via tuple or string, with promoted or absolute names
+        J = prob.compute_totals(of=['obj'], wrt=['x'])
+        expected = J[('obj', 'x')]
+        self.assertEqual(derivs[('obj', 'x')], expected)
+        self.assertEqual(derivs[('obj', 'px.x')], expected)
+        self.assertEqual(derivs[('obj_cmp.obj', 'px.x')], expected)
+        self.assertEqual(derivs['obj,x'], expected)
+        self.assertEqual(derivs['obj,px.x'], expected)
+        self.assertEqual(derivs['obj_cmp.obj,x'], expected)
+
+        # verify we can set derivs via tuple or string, with promoted or absolute names
+        # (this is necessary for copying to work correctly)
+        for key, value in [(('obj', 'x'), 111.), (('obj', 'px.x'), 222.),
+                           ('obj_cmp.obj,x', 333.),('obj_cmp.obj,px.x', 444.)]:
+            derivs[key] = value
+            self.assertEqual(derivs[('obj', 'x')], value)
+            self.assertEqual(derivs[('obj', 'px.x')], value)
+            self.assertEqual(derivs[('obj_cmp.obj', 'px.x')], value)
+            self.assertEqual(derivs['obj,x'], value)
+            self.assertEqual(derivs['obj,px.x'], value)
+            self.assertEqual(derivs['obj_cmp.obj,x'], value)
+
+        # verify that we didn't mess up deriv keys by setting values
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+        self.assertEqual(set(derivs.absolute_names()), set([
+            ('obj_cmp.obj', 'pz.z'), ('con_cmp2.con2', 'pz.z'), ('con_cmp1.con1', 'px.x'),
+            ('obj_cmp.obj', 'px.x'), ('con_cmp2.con2', 'px.x'), ('con_cmp1.con1', 'pz.z')
+        ]))
 
 
 def _assert_model_matches_case(case, system):

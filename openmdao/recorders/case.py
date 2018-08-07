@@ -3,6 +3,7 @@ A Case class.
 """
 
 import re
+import itertools
 
 
 class Case(object):
@@ -393,15 +394,11 @@ class PromotedToAbsoluteMap(dict):
         """
         super(PromotedToAbsoluteMap, self).__init__()
 
-        # save provided values and keys, which are absolute names
-        self._values = values
-        self._keys = values.keys() if isinstance(values, dict) else values.dtype.names
+        self._is_output = output
 
         # save promoted/absolute name mappings
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
-
-        self._is_output = output
 
         if output:
             prom2abs = self._prom2abs['output']
@@ -410,28 +407,75 @@ class PromotedToAbsoluteMap(dict):
             prom2abs = self._prom2abs['input']
             abs2prom = self._abs2prom['input']
 
-        # populate dict keyed on promoted name, using value for the first
-        # absolute name found in values that maps to the promoted name
-        for prom_name in prom2abs:
-            for abs_name in prom2abs[prom_name]:
-                if abs_name in self._keys:
-                    super(PromotedToAbsoluteMap, self).__setitem__(prom_name, values[abs_name])
-                    break
-
-        # add derivatives, using promoted (of, wrt)
-        for key in self._keys:
-            if isinstance(key, tuple) or ',' in key:
-                if isinstance(key, tuple):
-                    of, wrt = key
+        if isinstance(values, dict):
+            # dict of values, keyed on either absolute or promoted names
+            self._values = {}
+            for key in values.keys():
+                if isinstance(key, tuple) or ',' in key:
+                    # derivative keys can be either (of, wrt) or 'of,wrt'
+                    abs_keys, prom_key = self._deriv_keys(key)
+                    for abs_key in abs_keys:
+                        self._values[abs_key] = values[key]
+                    super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
                 else:
-                    of, wrt = re.sub('[( )]', '', key).split(',')
+                    if key in abs2prom:
+                        # key is absolute name
+                        self._values[key] = values[key]
+                        prom_key = abs2prom[key]
+                        super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                    elif key in prom2abs:
+                        # key is promoted name
+                        self._values[prom2abs[key]] = values[key]
+                        super(PromotedToAbsoluteMap, self).__setitem__(key, values[key])
+            self._keys = self._values.keys()
+        else:
+            # numpy structured array, which will always use absolute names
+            self._values = values
+            self._keys = values.dtype.names
+            for key in self._keys:
+                if key in abs2prom:
+                    prom_key = abs2prom[key]
+                    super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                elif ',' in key:
+                    # derivative keys will be a string in the form of 'of,wrt'
+                    abs_keys, prom_key = self._deriv_keys(key)
+                    super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
 
-                if of in abs2prom:
-                    of = abs2prom[of]
-                if wrt in abs2prom:
-                    wrt = abs2prom[wrt]
+    def _deriv_keys(self, key):
+        """
+        Get the absolute and promoted name versions of the provided derivative key.
 
-                super(PromotedToAbsoluteMap, self).__setitem__((of, wrt), values[key])
+        Parameters
+        ----------
+        key : tuple or string
+            derivative key as either (of, wrt) or 'of,wrt'.
+
+        Returns
+        -------
+        list of tuples:
+            list of (of, wrt) mapping the provided key to absolute names.
+        tuple :
+            (of, wrt) mapping the provided key to promoted names.
+        """
+        prom2abs = self._prom2abs['output']
+        abs2prom = self._abs2prom['output']
+
+        # derivative could be tuple or string, using absolute or promoted names
+        if isinstance(key, tuple):
+            of, wrt = key
+        else:
+            of, wrt = re.sub('[( )]', '', key).split(',')
+
+        # if promoted, will map to all connected absolute names
+        abs_of = [of] if of in abs2prom else prom2abs[of]
+        abs_wrt = [wrt] if wrt in abs2prom else prom2abs[wrt]
+        abs_keys = ['%s,%s' % (o, w) for o, w in itertools.product(abs_of, abs_wrt)]
+
+        prom_of = of if of in prom2abs else abs2prom[of]
+        prom_wrt = wrt if wrt in prom2abs else abs2prom[wrt]
+        prom_key = (prom_of, prom_wrt)
+
+        return abs_keys, prom_key
 
     def __getitem__(self, key):
         """
@@ -454,21 +498,11 @@ class PromotedToAbsoluteMap(dict):
             return super(PromotedToAbsoluteMap, self).__getitem__(key)
 
         elif isinstance(key, tuple) or ',' in key:
-            if isinstance(key, tuple):
-                of, wrt = key
-            else:
-                of, wrt = re.sub('[( )]', '', key).split(',')
+            # derivative keys can be either (of, wrt) or 'of,wrt'
+            abs_keys, prom_key = self._deriv_keys(key)
+            return super(PromotedToAbsoluteMap, self).__getitem__(prom_key)
 
-            prom2abs = self._prom2abs['output']
-            if of in prom2abs:
-                of = prom2abs[of][0]
-            if wrt in prom2abs:
-                wrt = prom2abs[wrt][0]
-
-            return self._values['%s,%s' % (of, wrt)]
-
-        else:
-            raise KeyError(key)
+        raise KeyError(key)
 
     def __setitem__(self, key, value):
         """
@@ -489,33 +523,26 @@ class PromotedToAbsoluteMap(dict):
             abs2prom = self._abs2prom['input']
 
         if isinstance(key, tuple) or ',' in key:
-            # derivative, could be absolute or promoted names
-            if isinstance(key, tuple):
-                of, wrt = key
-            else:
-                of, wrt = re.sub('[( )]', '', key).split(',')
+            # derivative keys can be either (of, wrt) or 'of,wrt'
+            abs_keys, prom_key = self._deriv_keys(key)
 
-            if of not in self._keys:
-                of = prom2abs(of)
-            if wrt not in self._keys:
-                wrt = prom2abs(wrt)
+            for abs_key in abs_keys:
+                if abs_key in self._keys:
+                    self._values[abs_key] = value
+                else:
+                    raise KeyError(key)
 
-            abs_key = '%s,%s' % (of, wrt)
-            self._values[abs_key] = value
-
-            for of in abs2prom[of]:
-                for wrt in abs2prom[wrt]:
-                    super(PromotedToAbsoluteMap, self).__setitem__((of, wrt), value)
+            super(PromotedToAbsoluteMap, self).__setitem__(prom_key, value)
 
         elif key in self._keys:
             # absolute name
             self._values[key] = value
             super(PromotedToAbsoluteMap, self).__setitem__(abs2prom[key], value)
         else:
-            # promoted name, propagate to all promoted vars
-            for abs_name in prom2abs[key]:
-                if abs_name in self._keys:
-                    self._values[abs_name] = value
+            # promoted name, propagate to all connected absolute names
+            for abs_key in prom2abs[key]:
+                if abs_key in self._keys:
+                    self._values[abs_key] = value
             super(PromotedToAbsoluteMap, self).__setitem__(key, value)
 
     def absolute_names(self):
