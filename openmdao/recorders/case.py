@@ -524,10 +524,10 @@ class PromotedToAbsoluteMap(dict):
 
         Similar to keys() but with absolute variable names instead of promoted names.
 
-        Returns
-        -------
-        list
-            list of absolute names for variables contained in this dictionary.
+        Yields
+        ------
+        str
+            absolute names for variables contained in this dictionary.
         """
         for key in self._keys:
             if ',' in key:
