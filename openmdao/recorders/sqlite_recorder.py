@@ -26,6 +26,9 @@ from openmdao.solvers.solver import Solver
 """
 SQL case output format version history.
 ---------------------------------------
+5 -- OpenMDAO 2.4
+    More general handling of ndarray variable settings metadata.  Stores metadata keys which
+    are ndarrays in a separate 'ndarrays' entry to var_settings.
 4 -- OpenMDAO 2.4
     Added variable settings metadata that contains scaling info.
 3 -- OpenMDAO 2.4
@@ -262,10 +265,6 @@ class SqliteRecorder(BaseRecorder):
         # otherwise we trample on values that are used elsewhere
         var_settings = deepcopy(var_settings)
         for name in var_settings:
-            # if 'lower' in var_settings[name]:
-            #     var_settings[name]['lower'] = convert_to_list(var_settings[name]['lower'])
-            # if 'upper' in var_settings[name]:
-            #     var_settings[name]['upper'] = convert_to_list(var_settings[name]['upper'])
             for prop in var_settings[name]:
                 val = var_settings[name][prop]
                 if isinstance(val, np.int8) or isinstance(val, np.int16) or\
