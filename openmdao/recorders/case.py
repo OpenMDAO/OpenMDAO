@@ -361,7 +361,7 @@ class ProblemCase(Case):
 
 class PromotedToAbsoluteMap(dict):
     """
-    A dictionary thath enables accessing values via absolute or promoted variable names.
+    A dictionary that enables accessing values via absolute or promoted variable names.
 
     Attributes
     ----------
