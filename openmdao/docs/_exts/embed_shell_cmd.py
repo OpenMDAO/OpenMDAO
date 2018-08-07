@@ -125,8 +125,7 @@ class EmbedShellCmdDirective(Directive):
         try:
             output = subprocess.check_output(cmd, stderr=stderr).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
-            # Generally means the source couldn't be inspected or imported. Raise as a Directive
-            # warning (level 2 in docutils).
+            # Failed cases raised as a Directive warning (level 2 in docutils).
             # This way, the sphinx build does not terminate if, for example, you are building on
             # an environment where mpi or pyoptsparse are missing.
             msg = "Running of embedded shell command '{}' in docs failed. " + \

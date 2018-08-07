@@ -1666,7 +1666,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
     def test_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriverJunk
+        from openmdao.api import Problem, pyOptSparseDriver
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = Problem()
