@@ -10,6 +10,8 @@ class BaseCases(object):
     ----------
     filename : str
         The name of the file from which the recorded cases are to be loaded.
+    format_version : int
+        The version of the format assumed when loading the file.
     num_cases : int
         The number of cases contained in the recorded file.
     _case_keys : tuple
@@ -26,7 +28,7 @@ class BaseCases(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, filename, abs2prom, abs2meta, prom2abs):
+    def __init__(self, filename, format_version, abs2prom, abs2meta, prom2abs):
         """
         Initialize.
 
@@ -34,6 +36,8 @@ class BaseCases(object):
         ----------
         filename : str
             The name of the recording file from which to instantiate the case reader.
+        format_version : int
+            The version of the format assumed when loading the file.
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         abs2meta : dict
@@ -44,13 +48,14 @@ class BaseCases(object):
         self._case_keys = ()
         self.num_cases = 0
         self.filename = filename
+        self.format_version = format_version
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._prom2abs = prom2abs
         self._cases = {}
 
     @abstractmethod
-    def get_case(self, case_id):
+    def get_case(self, case_id, scaled=False):
         """
         Get cases.
 
@@ -59,6 +64,8 @@ class BaseCases(object):
         case_id : str or int
             If int, the index of the case to be read in the case iterations.
             If given as a string, it is the identifier of the case.
+        scaled : bool
+            If True, return the scaled values.
 
         Returns
         -------

@@ -94,6 +94,6 @@ The implementation of each method will be illustrated using a simple implicit co
   find one of the roots of a second-order quadratic equation. Which root you get depends on the initial guess.
 
   .. embed-code::
-      openmdao.core.tests.test_impl_comp.ImplicitCompTestCase.test_guess_nonlinear_feature
+      openmdao.core.tests.test_impl_comp.ImplicitCompGuessTestCase.test_guess_nonlinear_feature
 
 .. tags:: Component, ImplicitComponent

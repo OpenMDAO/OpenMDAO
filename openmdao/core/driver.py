@@ -140,7 +140,9 @@ class Driver(object):
         self.recording_options = OptionsDictionary()
 
         self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
+                                       desc='Record Driver metadata')
+        self.recording_options.declare('record_model_metadata', types=bool, default=True,
+                                       desc='Record metadata for all Systems in the model')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
@@ -409,6 +411,11 @@ class Driver(object):
                     self._model_viewer_data = _get_viewer_data(problem)
             self._rec_mgr.record_metadata(self)
 
+        # Also record the system metadata to the recorders attached to this Driver
+        if self.recording_options['record_model_metadata']:
+            for sub in model.system_iter(recurse=True, include_self=True):
+                self._rec_mgr.record_metadata(sub)
+
     def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
@@ -552,7 +559,7 @@ class Driver(object):
 
         return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
-    def get_objective_values(self, unscaled=False, filter=None):
+    def get_objective_values(self, unscaled=False, filter=None, ignore_indices=False):
         """
         Return objective values.
 
@@ -562,6 +569,8 @@ class Driver(object):
             Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of objective names used by recorders.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -573,10 +582,12 @@ class Driver(object):
         else:
             objs = self._objs
 
-        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled)
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled,
+                                     ignore_indices=ignore_indices)
                 for n in objs}
 
-    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None):
+    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None,
+                              ignore_indices=False):
         """
         Return constraint values.
 
@@ -592,6 +603,8 @@ class Driver(object):
             Set to True if unscaled (physical) design variables are desired.
         filter : list
             List of constraint names used by recorders.
+        ignore_indices : bool
+            Set to True if the full array is desired, not just those indicated by indices.
 
         Returns
         -------
@@ -619,7 +632,8 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled)
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled,
+                                               ignore_indices=ignore_indices)
 
         return con_dict
 
@@ -728,13 +742,19 @@ class Driver(object):
             print(len(header) * '-' + '\n')
 
         if self._problem.model._owns_approx_jac:
-            if total_jac is None:
-                self._total_jac = total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
-                                                            return_format, approx=True,
-                                                            debug_print=debug_print)
-                return total_jac.compute_totals_approx(initialize=True)
-            else:
-                return total_jac.compute_totals_approx()
+            recording_iteration.stack.append(('_compute_totals_approx', 0))
+
+            try:
+                if total_jac is None:
+                    total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
+                                              return_format, approx=True, debug_print=debug_print)
+                    self._total_jac = total_jac
+                    totals = total_jac.compute_totals_approx(initialize=True)
+                else:
+                    totals = total_jac.compute_totals_approx()
+            finally:
+                recording_iteration.stack.pop()
+
         else:
             if total_jac is None:
                 total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
@@ -744,7 +764,18 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            return total_jac.compute_totals()
+            recording_iteration.stack.append(('_compute_totals', 0))
+
+            try:
+                totals = total_jac.compute_totals()
+            finally:
+                recording_iteration.stack.pop()
+
+        if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
+            metadata = create_local_meta(self._get_name())
+            total_jac.record_derivatives(self, metadata)
+
+        return totals
 
     def record_iteration(self):
         """
@@ -758,17 +789,17 @@ class Driver(object):
         filt = self._filtered_vars_to_record
 
         if opts['record_desvars']:
-            des_vars = self.get_design_var_values()
+            des_vars = self.get_design_var_values(unscaled=True, ignore_indices=True)
         else:
             des_vars = {}
 
         if opts['record_objectives']:
-            obj_vars = self.get_objective_values()
+            obj_vars = self.get_objective_values(unscaled=True, ignore_indices=True)
         else:
             obj_vars = {}
 
         if opts['record_constraints']:
-            con_vars = self.get_constraint_values()
+            con_vars = self.get_constraint_values(unscaled=True, ignore_indices=True)
         else:
             con_vars = {}
 

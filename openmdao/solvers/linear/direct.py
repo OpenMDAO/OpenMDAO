@@ -57,11 +57,11 @@ def format_singular_error(err, system, mtx):
 
     n = 0
     varname = "Unknown"
-    for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
-        if loc <= n:
-            varname = relname
+    varsizes = system._var_sizes['nonlinear']['output']
+    for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        n += varsizes[system._owning_rank[name]][j]
+        if loc < n:
+            varname = system._var_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -99,11 +99,11 @@ def format_singular_csc_error(system, matrix):
 
     n = 0
     varname = "Unknown"
-    for name in system._var_allprocs_abs_names['output']:
-        relname = system._var_abs2prom['output'][name]
-        n += len(system._outputs[relname])
-        if loc <= n:
-            varname = relname
+    varsizes = system._var_sizes['nonlinear']['output']
+    for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        n += varsizes[system._owning_rank[name]][j]
+        if loc < n:
+            varname = system._var_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
@@ -132,12 +132,13 @@ def format_nan_error(system, matrix):
     # need to associate each index with a variable.
     varname = []
     all_vars = system._var_allprocs_abs_names['output']
+    varsizes = system._var_sizes['nonlinear']['output']
     for row in rows:
         n = 0
-        for name in all_vars:
-            relname = system._var_abs2prom['output'][name]
-            n += len(system._outputs[relname])
-            if row <= n:
+        for j, name in enumerate(all_vars):
+            n += varsizes[system._owning_rank[name]][j]
+            if row < n:
+                relname = system._var_abs2prom['output'][name]
                 varname.append("'%s'" % relname)
                 break
 

@@ -13,25 +13,24 @@ from tempfile import mkdtemp
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
     ScipyOptimizeDriver, NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS, ScipyOptimizeDriver, CaseReader, PETScVector
+    BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, PETScVector, AnalysisError
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 
+from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarProblem, SellarStateConnection
+    SellarProblem, SellarStateConnection, SellarProblemWithArrays
 from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
-    assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded
+    assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
+    assertDriverDerivDataRecorded
+
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
-
-if PY2:
-    import cPickle as pickle
-if PY3:
-    import pickle
+from openmdao.utils.general_utils import determine_adder_scaler
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -180,6 +179,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -205,6 +205,41 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
+        assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+        expected_derivs = {
+            "comp.f_xy,p1.x": np.array([[0.50120438]]),
+            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_derivs),)
+        assertDriverDerivDataRecorded(self, expected_data, self.eps)
+
+    def test_driver_recording_ndarray_var_settings(self):
+        prob = SellarProblemWithArrays()
+
+        driver = prob.driver
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['includes'] = []
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        t0, t1 = run_driver(prob)
+        prob.cleanup()
+
+        coordinate = [0, 'Driver', (0, )]
+        expected_constraints = {
+            "con_cmp1.con1": [-22.42830237, ],
+            "con_cmp2.con2": [-11.94151185, ],
+        }
+        expected_outputs = expected_constraints
+
+        expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
@@ -219,6 +254,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -246,6 +282,16 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_outputs, expected_inputs),)
         assertDriverIterDataRecorded(self, expected_data, self.eps)
 
+        expected_derivs = {
+            "comp.f_xy,p1.x": np.array([[0.50120438]]),
+            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
+        }
+
+        expected_data = ((coordinate, (t0, t1), expected_derivs),)
+        assertDriverDerivDataRecorded(self, expected_data, self.eps)
+
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
 
@@ -254,6 +300,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_derivatives'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -289,6 +336,18 @@ class TestSqliteRecorder(unittest.TestCase):
             (run2_coord, (run2_t0, run2_t1), expected_outputs, expected_inputs),
         )
         assertDriverIterDataRecorded(self, expected_data, self.eps, prefix='Run2')
+
+        expected_derivs = {
+            "comp.f_xy,p1.x": np.array([[0.50120438]]),
+            "comp.f_xy,p2.y": np.array([[-0.49879562]]),
+            "con.c,p1.x": np.array([[-1.0]]),
+            "con.c,p2.y": np.array([[1.0]])
+        }
+
+        expected_data = (
+            (run1_coord, (run1_t0, run1_t1), expected_derivs),
+        )
+        assertDriverDerivDataRecorded(self, expected_data, self.eps, prefix='Run1')
 
     def test_driver_everything_recorded_by_default(self):
         prob = ParaboloidProblem()
@@ -383,6 +442,85 @@ class TestSqliteRecorder(unittest.TestCase):
             'tree_children_length': 7,
         }
         assertDriverMetadataRecorded(self, expected_driver_metadata)
+
+    def test_system_records_no_metadata(self):
+        prob = Problem(model=SellarDerivatives())
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_model_metadata'] = False
+        prob.model.recording_options['record_metadata'] = False
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(len(cr.system_metadata.keys()), 0)
+
+    def test_system_record_model_metadata(self):
+        # first check to see if recorded recursively, which is the default
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        # Quick check to see that keys and values were recorded
+        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+            self.assertTrue(key in cr.system_metadata.keys())
+            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
+            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+
+        # second check to see if not recorded recursively, when option set to False
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_model_metadata'] = False
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(list(cr.system_metadata.keys()), ['root'])
+        self.assertEqual(cr.system_metadata['root']['component_options']['assembled_jac_type'],
+                         'csc')
+
+    def test_driver_record_model_metadata(self):
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        # Quick check to see that keys and values were recorded
+        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+            self.assertTrue(key in cr.system_metadata.keys())
+            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
+            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
+
+        prob = Problem(model=SellarDerivatives())
+        prob.setup()
+
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_model_metadata'] = False
+
+        prob.run_model()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        self.assertEqual(len(cr.system_metadata.keys()), 0)
 
     def test_driver_without_n2_data(self):
         prob = SellarProblem()
@@ -771,6 +909,31 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                                  expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
+
+    def test_record_pop_bug(self):
+        prob = SellarProblem()
+        model = prob.model
+
+        model.add_subsystem('ae', AEComp())
+        model.connect('y1', 'ae.x')
+        prob.setup()
+
+        model.linear_solver = ScipyKrylov()
+
+        nl = model.nonlinear_solver = NewtonSolver()
+        nl.options['solve_subsystems'] = True
+        nl.options['max_sub_solves'] = 4
+
+        ls = nl.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['c'] = 100.0  # This is pretty bogus, but it ensures that we get a few LS iterations.
+        model.add_recorder(self.recorder)
+
+        try:
+            t0, t1 = run_driver(prob)
+        except AnalysisError:
+            pass
+
+        self.assertTrue(len(recording_iteration.stack) == 0)
 
     def test_record_solver_nonlinear_block_gs(self):
         prob = SellarProblem(linear_solver=LinearBlockGS, nonlinear_solver=NonlinearBlockGS)
@@ -1706,6 +1869,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # make sure we record metadata
         prob.driver.recording_options['record_metadata'] = True
 
+        # also record the metadata for all systems in the model
+        prob.driver.recording_options['record_model_metadata'] = True
+
         recorder = SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
 
@@ -1731,8 +1897,20 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                                     "pz.z\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
-        self.assertEqual(list(cr.driver_metadata['tree'].keys()),
-                         ['name', 'type', 'subsystem_type', 'children'])
+        # Quick check to see that keys and values were recorded
+        self.assertEqual(set(cr.driver_metadata['tree'].keys()),
+                         {'name', 'type', 'subsystem_type', 'children'})
+        self.assertEqual(cr.driver_metadata['tree']['name'], 'root')
+        self.assertEqual(cr.driver_metadata['tree']['type'], 'root')
+        self.assertEqual(cr.driver_metadata['tree']['subsystem_type'], 'group')
+        self.assertEqual(len(cr.driver_metadata['tree']['children']), 7)
+
+        # access the metadata for all the systems in the model
+        # Quick check to see that keys and values were recorded
+        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
+            self.assertTrue(key in cr.system_metadata.keys())
+            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
+            self.assertEqual(value, 'csc') # quick check only. Too much to check exhaustively
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -2188,6 +2366,57 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(len(desvars.keys), 0)
         self.assertEqual(len(objectives.keys), 0)
         self.assertEqual(len(constraints.keys), 0)
+
+    def test_simple_paraboloid_scaled_desvars(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+
+        ref = 5.0
+        ref0 = -5.0
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=ref, ref0=ref0)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=ref, ref0=ref0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=10.0, upper=11.0)
+
+        prob.setup(check=False, mode='fwd')
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        # Test values from one case, the last case
+        last_case = cr.driver_cases.get_case(-1,scaled=False)
+        unscaled_x = last_case.outputs['x'][0]
+        unscaled_y = last_case.outputs['y'][0]
+        last_case = cr.driver_cases.get_case(-1,scaled=True)
+        scaled_x = last_case.outputs['x'][0]
+        scaled_y = last_case.outputs['y'][0]
+
+        adder, scaler = determine_adder_scaler(ref0, ref, None, None)
+        self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
+        self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,5 +9,6 @@ Recording Data
 
     saving_data.rst
     getting_values.rst
+    getting_derivatives.rst
     getting_metadata.rst
     iterating_hierarchically.rst
