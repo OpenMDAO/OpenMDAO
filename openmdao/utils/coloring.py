@@ -185,8 +185,9 @@ def _Jc2col_matrix_direct(J, Jc):
     Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
 
     This creates the column adjacency matrix used for direct jacobian determination
-    as described in "The efficient Computation of Sparse Jacobian Matrices Using
-    Automatic Differentiation" by Coleman and Verma.
+    as described in Coleman, T.F., Verma, A. (1998) The efficient Computation of Sparse Jacobian 
+    Matrices Using Automatic Differentiation. SIAM Journal on Scientific Computing, 19(4),
+    1210-1233.
 
     Parameters
     ----------
@@ -323,8 +324,9 @@ def MNCO_bidir(J):
     """
     Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
 
-    Based on the partitioning algorithm found in "The Efficient Computation of Sparse
-    Jacobian Matrices Using Automatic Differentiation" by Coleman and Verma.
+    Based on the algorithm found in Coleman, T.F., Verma, A. (1998) The efficient Computation 
+    of Sparse Jacobian Matrices Using Automatic Differentiation. SIAM Journal on Scientific 
+    Computing, 19(4), 1210-1233.
 
     Parameters
     ----------
@@ -1028,8 +1030,6 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     start_time = time.time()
     coloring = _compute_coloring(J, mode)
 
-    # colored_array_viz(J, coloring)
-
     coloring['time_coloring'] = time.time() - start_time
     coloring['time_sparsity'] = time_sparsity
     coloring['nrows'] = J.shape[0]
@@ -1051,7 +1051,8 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         if show_jac:
             s = stream if stream.isatty() else sys.stdout
             s.write("\n\n")
-            array_viz(J, problem, of, wrt, s)
+            colored_array_viz(J, coloring, prob=problem, of=of, wrt=wrt, stream=s)
+
 
     return coloring
 
@@ -1108,7 +1109,7 @@ def dynamic_sparsity(driver):
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_simul_coloring(driver, do_sparsity=False):
+def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1118,6 +1119,8 @@ def dynamic_simul_coloring(driver, do_sparsity=False):
         The driver performing the optimization.
     do_sparsity : bool
         If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
+    show_jac : bool
+        If True, display a visualization of the colored jacobian.
     """
     problem = driver._problem
     driver._total_jac = None
@@ -1127,7 +1130,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False):
         coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=do_sparsity,
-                                  setup=False, run_model=False, stream=f)
+                                  setup=False, run_model=False, show_jac=show_jac, stream=f)
     driver.set_simul_deriv_color(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:

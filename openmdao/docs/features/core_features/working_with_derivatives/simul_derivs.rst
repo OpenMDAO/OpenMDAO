@@ -16,12 +16,21 @@ solves and much-improved performance.
 These problems are said to have separable variables.
 The concept of separability is explained in the :ref:`Theory Manual<theory_separable_variables>`.
 
-
 Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically.
+
+When mode is set to 'fwd' or 'rev', a unidirectional coloring algorithm is used to group columns
+or rows, respectively, for simultaneous derivative calculation.  The algorithm used in this case
+is the greedy algorithm with ordering by incidence degree found in 
+T. F. Coleman and J. J. More, *Estimation of sparse Jacobian matrices and graph coloring
+problems*, SIAM J. Numer. Anal., 20 (1983), pp. 187–209.
 
 When using simultaneous derivatives, setting `mode='auto'` will indicate that bidirectional coloring 
 should be used.  Bidirectional coloring can significantly decrease the number of linear solves needed 
 to generate the total Jacobian relative to coloring only in fwd or rev mode.
+
+For more information on the bidirectional coloring algorithm, see
+T. F. Coleman and A. Verma, *The efficient computation of sparse Jacobian matrices using automatic 
+differentiation*, SIAM J. Sci. Comput., 19 (1998), pp. 1210–1233.
 
 .. note::
 
