@@ -4,13 +4,12 @@ from __future__ import division, print_function
 
 import sys
 
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 import warnings
-import json
 
-from six import iteritems, iterkeys, itervalues, string_types
+from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
 
 import numpy as np
@@ -24,7 +23,6 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.vectors.transfer import Transfer
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
@@ -574,7 +572,7 @@ class Problem(object):
         model = self.model
         driver = self.driver
 
-        mydesvars = myobjectives = myconstraints = myresponses = set()
+        mydesvars = myobjectives = myconstraints = set()
 
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
@@ -699,9 +697,6 @@ class Problem(object):
         obj_vars = {name: obj_vars[name] for name in filt['obj']}
         con_vars = {name: con_vars[name] for name in filt['con']}
 
-        names = model._outputs._names
-        views = model._outputs._views
-
         if MPI:
             des_vars = model._gather_vars(model, des_vars)
             obj_vars = model._gather_vars(model, obj_vars)
@@ -809,8 +804,6 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        orig_mode = self._mode
-
         response_size, desvar_size = self.driver._update_voi_meta(self.model)
 
         # update mode if it's been set to 'auto'
@@ -832,7 +825,7 @@ class Problem(object):
             # than the full size
             if 'fwd' in coloring_info and 'rev' in coloring_info:
                 pass  # we're doing both!
-            else:
+            elif mode in coloring_info:
                 lists = coloring_info[mode][0]
                 if lists:
                     size = len(lists[0])  # lists[0] is the uncolored row/col indices
@@ -1283,7 +1276,6 @@ class Problem(object):
                 forward - fd, adjoint - fd, forward - adjoint.
         """
         model = self.model
-        global_names = False
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -1564,21 +1556,21 @@ class Problem(object):
         case : Case object
             A Case from a CaseRecorder file.
         """
-        inputs = case.inputs._values if case.inputs is not None else None
+        inputs = case.inputs if case.inputs is not None else None
         if inputs:
-            for name, val in zip(inputs.dtype.names, inputs):
+            for name in inputs.absolute_names():
                 if name not in self.model._var_abs_names['input']:
                     raise KeyError("Input variable, '{}', recorded in the case is not "
                                    "found in the model".format(name))
-                self[name] = val
+                self[name] = inputs[name]
 
-        outputs = case.outputs._values if case.outputs is not None else None
+        outputs = case.outputs if case.outputs is not None else None
         if outputs:
-            for name, val in zip(outputs.dtype.names, outputs):
+            for name in outputs.absolute_names():
                 if name not in self.model._var_abs_names['output']:
                     raise KeyError("Output variable, '{}', recorded in the case is not "
                                    "found in the model".format(name))
-                self[name] = val
+                self[name] = outputs[name]
 
         return
 
