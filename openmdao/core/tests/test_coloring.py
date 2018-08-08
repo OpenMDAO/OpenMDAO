@@ -3,12 +3,14 @@ from __future__ import print_function
 import os
 import shutil
 import tempfile
+import warnings
 
 import unittest
 import numpy as np
 import math
 
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
+from scipy.sparse import load_npz
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver
@@ -16,6 +18,9 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
+from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+import openmdao.test_suite
+
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
@@ -109,10 +114,10 @@ def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
     return p
 
 
-class SimulColoringTestCase(unittest.TestCase):
+class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_simul_coloring_snopt(self):
+    def test_simul_coloring_snopt_fwd(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
 
@@ -185,7 +190,7 @@ class SimulColoringTestCase(unittest.TestCase):
                          (p_color.model.linear_solver._solve_count - 21) / 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_dynamic_simul_coloring_snopt(self):
+    def test_dynamic_simul_coloring_snopt_auto(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
@@ -202,7 +207,7 @@ class SimulColoringTestCase(unittest.TestCase):
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
-    def test_simul_coloring_pyoptsparse_slsqp(self):
+    def test_simul_coloring_pyoptsparse_slsqp_fwd(self):
         try:
             from pyoptsparse import OPT
         except ImportError:
@@ -284,7 +289,7 @@ class SimulColoringTestCase(unittest.TestCase):
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
 
-    def test_dynamic_simul_coloring_pyoptsparse_slsqp(self):
+    def test_dynamic_simul_coloring_pyoptsparse_slsqp_auto(self):
         try:
             from pyoptsparse import OPT
         except ImportError:
@@ -312,7 +317,7 @@ class SimulColoringTestCase(unittest.TestCase):
                          (p_color.model.linear_solver._solve_count - 21 * 4) / 5)
 
 
-class SimulColoringRevTestCase(unittest.TestCase):
+class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
     """Reverse coloring tests for pyoptsparse."""
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -321,36 +326,36 @@ class SimulColoringRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
 
         color_info = {"rev": [[
-           [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
-           [2, 21],   # color 1
-           [3, 16],   # color 2
-           [1, 17, 18, 19, 20],   # color 3
-           [0, 11, 12, 13, 14, 15]   # color 4
-        ],
-        [
-           [20],   # row 0
-           [0, 10, 20],   # row 1
-           [1, 11, 20],   # row 2
-           [2, 12, 20],   # row 3
-           None,   # row 4
-           None,   # row 5
-           None,   # row 6
-           None,   # row 7
-           None,   # row 8
-           None,   # row 9
-           None,   # row 10
-           [0, 10],   # row 11
-           [2, 12],   # row 12
-           [4, 14],   # row 13
-           [6, 16],   # row 14
-           [8, 18],   # row 15
-           [0, 1, 10, 11],   # row 16
-           [2, 3, 12, 13],   # row 17
-           [4, 5, 14, 15],   # row 18
-           [6, 7, 16, 17],   # row 19
-           [8, 9, 18, 19],   # row 20
-           [0]   # row 21
-        ]],
+            [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
+            [1, 18, 19, 20, 21],   # color 1
+            [0, 17, 13, 14, 15, 16],   # color 2
+            [2, 11],   # color 3
+            [3, 12]   # color 4
+            ],
+            [
+            [20],   # row 0
+            [0, 10, 20],   # row 1
+            [1, 11, 20],   # row 2
+            [2, 12, 20],   # row 3
+            None,   # row 4
+            None,   # row 5
+            None,   # row 6
+            None,   # row 7
+            None,   # row 8
+            None,   # row 9
+            None,   # row 10
+            [0],   # row 11
+            [0, 10],   # row 12
+            [2, 12],   # row 13
+            [4, 14],   # row 14
+            [6, 16],   # row 15
+            [8, 18],   # row 16
+            [0, 1, 10, 11],   # row 17
+            [2, 3, 12, 13],   # row 18
+            [4, 5, 14, 15],   # row 19
+            [6, 7, 16, 17],   # row 20
+            [8, 9, 18, 19]   # row 21
+            ]],
         "sparsity": {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
@@ -386,18 +391,11 @@ class SimulColoringRevTestCase(unittest.TestCase):
         # - coloring saves 11 solves per driver iter  (11 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - (total_solves - 1) / (solves_per_iter) should be equal between the two cases
-
-        # for some reason in rev mode the formula above does not hold true.  But, the number of solves
-        # for the colored case is even more than 50% better, so we'll just test for that to make sure
-        # things are working...
-        #self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         #(p_color.model.linear_solver._solve_count - 1) / 11)
-
-        # verify non-colored performs more than twice as many solves
-        self.assertGreater((p.model.linear_solver._solve_count - 1) / (p_color.model.linear_solver._solve_count - 1), 2.0)
+        self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
+                         (p_color.model.linear_solver._solve_count - 1) / 11)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_dynamic_simul_coloring_snopt(self):
+    def test_dynamic_rev_simul_coloring_snopt(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
@@ -406,13 +404,13 @@ class SimulColoringRevTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - bidirectional coloring saves 17 solves per driver iter  (5 vs 22)
+        # - bidirectional coloring saves 11 solves per driver iter  (11 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:
@@ -496,7 +494,7 @@ class SimulColoringRevTestCase(unittest.TestCase):
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
                          (p_color.model.linear_solver._solve_count - 1) / 11)
 
-    def test_dynamic_simul_coloring_pyoptsparse_slsqp(self):
+    def test_dynamic_rev_simul_coloring_pyoptsparse_slsqp(self):
         try:
             from pyoptsparse import OPT
         except ImportError:
@@ -515,23 +513,19 @@ class SimulColoringRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
-        # - coloring saves 17 solves per driver iter  (5 vs 22)
+        # - coloring saves 11 solves per driver iter  (11 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
 
 
 class SimulColoringScipyTestCase(unittest.TestCase):
 
-    def test_simul_coloring(self):
-
-        # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
-
-        color_info = {"fwd": [[
+    def setUp(self):
+        self.color_info = {"fwd": [[
                [20],   # uncolored columns
                [0, 2, 4, 6, 8],   # color 1
                [1, 3, 5, 7, 9],   # color 2
@@ -564,7 +558,11 @@ class SimulColoringScipyTestCase(unittest.TestCase):
             "sparsity": None
         }
 
-        p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info, optimizer='SLSQP', disp=False)
+    def test_simul_coloring_fwd(self):
+
+        # first, run w/o coloring
+        p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'fwd', self.color_info, optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -574,8 +572,23 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # - (total_solves - 21) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 21) / 21,
                          (p_color.model.linear_solver._solve_count - 21) / 5)
+        
+        # check for proper handling if someone calls compute_totals on Problem with different set or different order 
+        # of desvars/responses than were used to define the coloring.  Behavior should be that coloring is turned off 
+        # and a warning is issued.
+        with warnings.catch_warnings(record=True) as w:
+            p_color.compute_totals(of=['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g'], 
+                                   wrt=['x', 'y', 'r'])
+        self.assertEqual(len(w), 1)
+        self.assertEqual(str(w[0].message), "compute_totals called using a different list of design vars and/or responses than those used to define coloring, so coloring will be turned off.\ncoloring design vars: ['indeps.x', 'indeps.y', 'indeps.r'], current design vars: ['indeps.x', 'indeps.y', 'indeps.r']\ncoloring responses: ['circle.area', 'r_con.g', 'theta_con.g', 'delta_theta_con.g', 'l_conx.g'], current responses: ['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g'].")
 
-    def test_dynamic_simul_coloring(self):
+    def test_bad_mode(self):
+        with self.assertRaises(Exception) as context:
+            p_color = run_opt(ScipyOptimizeDriver, 'rev', self.color_info, optimizer='SLSQP', disp=False)
+        self.assertEqual(str(context.exception),
+                         "Simultaneous coloring does forward solves but mode has been set to 'rev'")
+
+    def test_dynamic_simul_coloring_auto(self):
 
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
@@ -700,11 +713,10 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
 
 class SimulColoringRevScipyTestCase(unittest.TestCase):
-    """Reverse mode coloring tests."""
+    """Rev mode coloring tests."""
 
-    def test_simul_coloring(self):
-
-        color_info = {"rev": [[
+    def setUp(self):
+        self.color_info = {"rev": [[
                [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
                [2, 21],   # color 1
                [3, 16],   # color 2
@@ -737,6 +749,10 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             ]],
             "sparsity": None}
 
+    def test_simul_coloring(self):
+
+        color_info = self.color_info
+
         p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
         p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
 
@@ -748,6 +764,12 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         # - (total_solves - 1) / (solves_per_iter) should be equal between the two cases
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
                          (p_color.model.linear_solver._solve_count - 1) / 11)
+    
+    def test_bad_mode(self):
+        with self.assertRaises(Exception) as context:
+            p_color = run_opt(ScipyOptimizeDriver, 'fwd', self.color_info, optimizer='SLSQP', disp=False)
+        self.assertEqual(str(context.exception),
+                         "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 
     def test_dynamic_simul_coloring(self):
 
@@ -757,13 +779,13 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - bidirectional coloring saves 17 solves per driver iter  (5 vs 22)
+        # - bidirectional coloring saves 11 solves per driver iter  (11 vs 22)
         # - initial solve for linear constraints takes 1 in both cases (only done once)
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model.linear_solver._solve_count - 1) / 22,
-                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 5)
+                         (p_color.model.linear_solver._solve_count - 1 - 22 * 3) / 11)
 
 
 class SparsityTestCase(unittest.TestCase):
@@ -853,50 +875,70 @@ class SparsityTestCase(unittest.TestCase):
 
 
 class BidirectionalTestCase(unittest.TestCase):
+    def test_eisenstat(self):
+        for n in range(6, 20, 2):
+            builder = TotJacBuilder.eisenstat(n)
+            builder.color('auto', stream=None)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            if tot_colors == n // 2 + 3:
+                raise unittest.SkipTest("Current bicoloring algorithm requires n/2 + 3 solves, so skipping for now.")
+            self.assertLessEqual(tot_colors, n // 2 + 2, 
+                                 "Eisenstat's example of size %d required %d colors but shouldn't "
+                                 "need more than %d." % (n, tot_colors, n // 2 + 2))
 
-    def test_exclude(self):
-        p = Problem()
-        model = p.model
+            builder_fwd = TotJacBuilder.eisenstat(n)
+            builder_fwd.color('fwd', stream=None)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.coloring)
+            # The columns of Eisenstat's example are pairwise nonorthogonal, so fwd coloring
+            # should require n colors.
+            self.assertEqual(n, tot_colors,
+                             "Eisenstat's example of size %d was not constructed properly. "
+                             "fwd coloring required only %d colors but should have required "
+                             "%d" % (n, tot_colors, n))
 
-        indep = model.add_subsystem('indep', IndepVarComp())
-        indep.add_output("a", val=1.0)
-        indep.add_output("b", val=1.0)
-        indep.add_output("c", val=1.0)
-        indep.add_output("d", val=1.0)
-        indep.add_output("e", val=1.0)
+    def test_arrowhead(self):
+        for n in range(5, 50, 5):
+            builder = TotJacBuilder(n, n)
+            builder.add_row(0)
+            builder.add_col(0)
+            builder.add_block_diag([(1,1)] * (n-1), 1, 1)
+            builder.color('auto', stream=None)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            self.assertEqual(tot_colors, 3)
 
-        obj = model.add_subsystem('obj', ExecComp('obj=a+b+c+d+ee'))
-        con1 = model.add_subsystem('con1', ExecComp('con=a*2.0 + b'))
-        con2 = model.add_subsystem('con2', ExecComp('con=c*3.0 + 2.0*d'))
-        con3 = model.add_subsystem('con3', ExecComp('con=ee*1.5 - 3.0*c + a'))
+    def test_can_715(self):
+        # this test is just to show the superiority of bicoloring vs. single coloring in 
+        # either direction.  Bicoloring gives only 21 colors in this case vs. 105 for either
+        # fwd or rev.
+        matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
 
-        model.connect("indep.a", ("obj.a", "con1.a", "con3.a"))
-        model.connect("indep.b", ("obj.b", "con1.b"))
-        model.connect("indep.c", ("obj.c", "con2.c", "con3.c"))
-        model.connect("indep.d", ("obj.d", "con2.d"))
-        model.connect("indep.e", ("obj.ee", "con3.ee"))
+        # uses matrix can_715 from the sparse matrix collection website
+        mat = load_npz(os.path.join(matdir, 'can_715.npz')).toarray()
+        mat = np.asarray(mat, dtype=bool)
+        coloring = get_simul_meta(None, 'auto', include_sparsity=False, setup=False,
+                                  run_model=False, bool_jac=mat,
+                                  stream=None)
 
-        model.add_design_var("indep.a")
-        model.add_design_var("indep.b")
-        model.add_design_var("indep.c")
-        model.add_design_var("indep.d")
-        model.add_design_var("indep.e")
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
 
-        model.add_objective('obj.obj')
-        model.add_constraint('con1.con')
-        model.add_constraint('con2.con')
-        model.add_constraint('con3.con', simul_coloring_excludes=True)
+        self.assertEqual(tot_colors, 21)
 
-        p.setup(mode='fwd')
-        p.run_model()
+        # verify that unidirectional colorings are much worse (105 vs 21 for bidirectional)
+        coloring = get_simul_meta(None, 'fwd', include_sparsity=False, setup=False,
+                                  run_model=False, bool_jac=mat,
+                                  stream=None)
 
-        coloring = get_simul_meta(p, include_sparsity=False, setup=False, run_model=False, stream=None)
-        tot_size1, tot_colors1, colored_solves1, opp_solves1, pct1, dominant_mode1 = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
 
-        # this is not a great coloring. It's just done to test simul_coloring_excludes
-        self.assertEqual(opp_solves1, 2)
-        self.assertEqual(tot_colors1, 4)
-        self.assertEqual(coloring['rev'][0][0], [3,0])
+        self.assertEqual(tot_colors, 105)
+
+        coloring = get_simul_meta(None, 'rev', include_sparsity=False, setup=False,
+                                  run_model=False, bool_jac=mat,
+                                  stream=None)
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+
+        self.assertEqual(tot_colors, 105)
 
 
 if __name__ == '__main__':

@@ -16,9 +16,26 @@ solves and much-improved performance.
 These problems are said to have separable variables.
 The concept of separability is explained in the :ref:`Theory Manual<theory_separable_variables>`.
 
+Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically.
 
-Simultaneous derivative coloring in OpenMDAO can be performed either statically or dynamically,
-in forward or reverse mode.
+When mode is set to 'fwd' or 'rev', a unidirectional coloring algorithm is used to group columns
+or rows, respectively, for simultaneous derivative calculation.  The algorithm used in this case
+is the greedy algorithm with ordering by incidence degree found in 
+T. F. Coleman and J. J. More, *Estimation of sparse Jacobian matrices and graph coloring
+problems*, SIAM J. Numer. Anal., 20 (1983), pp. 187–209.
+
+When using simultaneous derivatives, setting `mode='auto'` will indicate that bidirectional coloring 
+should be used.  Bidirectional coloring can significantly decrease the number of linear solves needed 
+to generate the total Jacobian relative to coloring only in fwd or rev mode.
+
+For more information on the bidirectional coloring algorithm, see
+T. F. Coleman and A. Verma, *The efficient computation of sparse Jacobian matrices using automatic 
+differentiation*, SIAM J. Sci. Comput., 19 (1998), pp. 1210–1233.
+
+.. note::
+
+    Bidirectional coloring is a new feature and should be considered *experimental* at this
+    point.
 
 
 Dynamic Coloring
@@ -45,7 +62,7 @@ For example:
 
 
 Whenever a dynamic coloring is computed, the coloring is written to a file called *coloring.json*
-for later inspection.
+for later inspection and/or 'static' use.
 
 
 Static Coloring
@@ -102,11 +119,7 @@ coloring we would pass to :code:`set_simul_deriv_color` would look like this:
 
         # OpenMDAO supports bidirectional coloring, so it can solve for part of the jacobian in
         # fwd mode and part in rev mode.  In this case, we don't need any rev mode solves, so
-        # the rev mode entry has an empty row list.  Note that in bidirectional coloring, there
-        # is a dominant direction and an 'opposite' direction (in this case rev), and the
-        # 'opposite' directions color_info entry will always contain an empty row/column mapping.
-        # The row/column mapping is not needed in 'opposite' mode because all 'opposite' mode
-        # solves are full solves, i.e. there is never a coloring in 'opposite' mode.
+        # the rev mode entry has an empty row list.
 
         # Note that we show the opposite entry ('rev' in this case) here for the purpose of
         # explanation, but it's also valid to remove the opposite entry completely if it's empty.
@@ -139,18 +152,19 @@ example.
 
 .. _feature_automatic_coloring:
 
-Automatic Generation of Coloring
-################################
+Automatic Generation of Static Coloring
+#######################################
 Although you *can* compute the coloring manually if you know enough information about your problem,
-doing so can be challenging. Also, even small changes to your model,
+doing so can be challenging and error prone. Also, even small changes to your model,
 e.g., adding new constraints or changing the sparsity of a sub-component, can change the
 coloring of your model. So care must be taken to keep the coloring up to date when
 you change your model.
 
 To streamline the process, OpenMDAO provides an automatic coloring algorithm that uses the
-sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all of the components in your model.
-So if you're not :ref:`specifying the sparsity of the partial derivatives<feature_sparse_partials>`
-of your components, then it won't be possible to find an automatic coloring
+sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all 
+of the components in your model.
+So you should :ref:`specify the sparsity of the partial derivatives<feature_sparse_partials>`
+of your components in order to make it possible to find a more optimal automatic coloring
 for your model.
 
 The *color_info* data structure can be generated automatically using the following command:
@@ -344,9 +358,8 @@ The coloring will be written in json format to the given file and can be loaded 
 
 
 If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
-or that you don't gain very much by coloring, don't be surprised.
-Problems that have the necessary total Jacobian sparsity to allow simultaneous derivatives are
-relatively uncommon.
+or that you don't gain very much by coloring, don't be surprised.  Not all total Jacobians are 
+sparse enough to benefit signficantly from simultaneous derivatives.
 
 
 Checking that it works
