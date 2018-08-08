@@ -142,8 +142,8 @@ class TotJacBuilder(object):
 
         Should be colorable with n/2 + 2 colors using bidirectional coloring.
 
-        The columns in Eisenstat’s example are pairwise structurally nonorthogonal, so
-        a fwd directional coloring would require n groups.
+        The columns in Eisenstat's example are pairwise structurally nonorthogonal,
+        so a fwd directional coloring would require n groups.
         """
         assert n >= 6, "Eisenstat's example must have n >= 6."
         assert n % 2 == 0, "Eisenstat's example must have even 'n'."
