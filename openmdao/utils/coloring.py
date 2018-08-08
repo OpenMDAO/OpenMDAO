@@ -185,7 +185,7 @@ def _Jc2col_matrix_direct(J, Jc):
     Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
 
     This creates the column adjacency matrix used for direct jacobian determination
-    as described in Coleman, T.F., Verma, A. (1998) The efficient Computation of Sparse Jacobian 
+    as described in Coleman, T.F., Verma, A. (1998) The efficient Computation of Sparse Jacobian
     Matrices Using Automatic Differentiation. SIAM Journal on Scientific Computing, 19(4),
     1210-1233.
 
@@ -324,8 +324,8 @@ def MNCO_bidir(J):
     """
     Compute bidirectional coloring using Minimum Nonzero Count Order (MNCO).
 
-    Based on the algorithm found in Coleman, T.F., Verma, A. (1998) The efficient Computation 
-    of Sparse Jacobian Matrices Using Automatic Differentiation. SIAM Journal on Scientific 
+    Based on the algorithm found in Coleman, T.F., Verma, A. (1998) The efficient Computation
+    of Sparse Jacobian Matrices Using Automatic Differentiation. SIAM Journal on Scientific
     Computing, 19(4), 1210-1233.
 
     Parameters
@@ -1052,7 +1052,6 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
             s = stream if stream.isatty() else sys.stdout
             s.write("\n\n")
             colored_array_viz(J, coloring, prob=problem, of=of, wrt=wrt, stream=s)
-
 
     return coloring
 
