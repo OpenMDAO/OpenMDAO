@@ -111,18 +111,22 @@ class RelaxationLS(LineSearch):
             norm0 = 1.0
         self._norm0 = norm0
 
-        # Determine relaxation parameter.
         norm_far = self.options['norm_far']
         norm_near = self.options['norm_near']
         alpha_far = self.options['initial_relaxation']
+
+        # Determine relaxation parameter and apply it.
         if norm0 >= norm_far:
             alpha = alpha_far
+            u += alpha*du
+
         elif norm0 > norm_near:
             alpha = alpha_far + (1.0 - alpha_far) * (norm0 - norm_near) / (norm_far - norm_near)
-        else:
-            alpha = 1.0
+            u += alpha*du
 
-        u += alpha*du
+        else:
+            u += du
+
 
         if self.options['print_bound_enforce']:
             _print_violations(u, system._lower_bounds, system._upper_bounds)
