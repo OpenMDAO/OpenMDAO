@@ -825,7 +825,7 @@ class Problem(object):
             # than the full size
             if 'fwd' in coloring_info and 'rev' in coloring_info:
                 pass  # we're doing both!
-            else:
+            elif mode in coloring_info:
                 lists = coloring_info[mode][0]
                 if lists:
                     size = len(lists[0])  # lists[0] is the uncolored row/col indices
