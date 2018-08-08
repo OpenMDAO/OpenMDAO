@@ -148,7 +148,7 @@ script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
-    make all;
+    make travis;
   fi
 
 # run the tests from down here to see if it can work without being at top level
