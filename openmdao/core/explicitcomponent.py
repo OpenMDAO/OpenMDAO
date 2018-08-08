@@ -182,7 +182,11 @@ class ExplicitComponent(Component):
                 # Sign of the residual is minus the sign of the output vector.
                 residuals *= -1.0
 
-                self.compute(self._inputs, outputs)
+                self._inputs.read_only = True
+                try:
+                    self.compute(self._inputs, outputs)
+                finally:
+                    self._inputs.read_only = False
 
                 # Restore any complex views if under complex step.
                 if outputs._vector_info._under_complex_step:
@@ -208,8 +212,7 @@ class ExplicitComponent(Component):
         super(ExplicitComponent, self)._solve_nonlinear()
 
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-            with self._unscaled_context(
-                    outputs=[self._outputs], residuals=[self._residuals]):
+            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
                 self._inputs.read_only = True
                 try:
