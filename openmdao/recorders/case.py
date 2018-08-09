@@ -365,8 +365,8 @@ class PromotedToAbsoluteMap(dict):
 
     Attributes
     ----------
-    _values : array
-        Array of values accessible via absolute variable name.
+    _values : array or dict
+        Array or dict of values accessible via absolute variable name.
     _keys : array
         Absolute variable names that map to the values in the _values array.
     _prom2abs : {'input': dict, 'output': dict}
