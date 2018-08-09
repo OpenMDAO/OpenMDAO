@@ -88,7 +88,7 @@ class ExplicitComponent(Component):
                                    val=np.full(meta['size'], -1.))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):
         """
         Add an output variable to the component.
 
@@ -131,9 +131,6 @@ class ExplicitComponent(Component):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
 
         Returns
         -------
@@ -147,8 +144,7 @@ class ExplicitComponent(Component):
                                                          val=val, shape=shape, units=units,
                                                          res_units=res_units, desc=desc,
                                                          lower=lower, upper=upper,
-                                                         ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         var_set=var_set)
+                                                         ref=ref, ref0=ref0, res_ref=res_ref)
 
     def _set_partials_meta(self):
         """

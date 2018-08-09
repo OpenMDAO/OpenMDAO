@@ -77,8 +77,6 @@ class Vector(object):
     _data : {}
         Dict of the actual allocated data (depends on implementation), keyed
         by varset name.
-    _indices : list
-        List of indices mapping the varset-grouped data to the global vector.
     _vector_info : <VectorInfo>
         Object to store some global info, such as complex step state.
     _imag_views : dict
@@ -157,8 +155,7 @@ class Vector(object):
         self._names = self._views
 
         self._root_vector = None
-        self._data = {}
-        self._indices = {}
+        self._data = None
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
@@ -254,11 +251,9 @@ class Vector(object):
             Array combining the data of all the varsets.
         """
         if new_array is None:
-            ncol = self._ncol
-            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
-
-        for set_name, data in iteritems(self._data):
-            new_array[self._indices[set_name]] = data
+            new_array = self._data.copy()
+        else:
+            new_array[:] = self._data
 
         return new_array
 
@@ -271,8 +266,7 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
-        for set_name, data in iteritems(self._data):
-            data[:] = array[self._indices[set_name]]
+        self._data[:] = array
 
     def iadd_data(self, array):
         """
@@ -283,8 +277,7 @@ class Vector(object):
         array : ndarray
             Array to set to the data for all the varsets.
         """
-        for set_name, data in iteritems(self._data):
-            data += array[self._indices[set_name]]
+        self._data += array
 
     def _contains_abs(self, abs_name):
         """
@@ -534,15 +527,13 @@ class Vector(object):
         """
         scaling = self._scaling[scale_to]
         if self._ncol == 1:
-            for set_name, data in iteritems(self._data):
-                data *= scaling[set_name][1]
-                if scaling[set_name][0] is not None:  # nonlinear only
-                    data += scaling[set_name][0]
+            self._data *= scaling[1]
+            if scaling[0] is not None:  # nonlinear only
+                self._data += scaling[0]
         else:
-            for set_name, data in iteritems(self._data):
-                data *= scaling[set_name][1][:, np.newaxis]
-                if scaling[set_name][0] is not None:  # nonlinear only
-                    data += scaling[set_name][0]
+            self._data *= scaling[1][:, np.newaxis]
+            if scaling[0] is not None:  # nonlinear only
+                self._data += scaling[0]
 
     def set_vec(self, vec):
         """

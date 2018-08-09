@@ -194,8 +194,8 @@ class DirectSolver(LinearSolver):
         xvec = system._vectors['output']['linear']
 
         # First make a backup of the vectors
-        b_data = bvec.get_data()
-        x_data = xvec.get_data()
+        b_data = bvec._data.copy()
+        x_data = xvec._data.copy()
 
         nmtx = x_data.size
         eye = np.eye(nmtx)
@@ -213,11 +213,11 @@ class DirectSolver(LinearSolver):
                                  scope_out, scope_in)
 
             # put new value in out_vec
-            bvec.get_data(mtx[:, i])
+            mtx[:, i] = bvec._data
 
         # Restore the backed-up vectors
-        bvec.set_data(b_data)
-        xvec.set_data(x_data)
+        bvec._data[:] = b_data
+        xvec._data[:] = x_data
 
         return mtx
 
@@ -405,19 +405,16 @@ class DirectSolver(LinearSolver):
                 # AssembledJacobians are unscaled.
                 if self._assembled_jac is not None:
                     with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                        b_data = b_vec.get_data()
                         if (isinstance(self._assembled_jac._int_mtx,
                                        (COOMatrix, CSRMatrix, CSCMatrix))):
-                            x_data = self._lu.solve(b_data, trans_splu)
+                            x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
                         else:
-                            x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
-                        x_vec.set_data(x_data)
+                            x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
+                                                                   trans=trans_lu)
 
                 # MVP-generated jacobians are scaled.
                 else:
-                    b_data = b_vec.get_data()
-                    x_data = scipy.linalg.lu_solve(self._lup, b_data, trans=trans_lu)
-                    x_vec.set_data(x_data)
+                    x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)
 
                 rec.abs = 0.0
                 rec.rel = 0.0

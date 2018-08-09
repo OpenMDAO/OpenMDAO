@@ -28,6 +28,14 @@ _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
                       'exact': (None, {})}
 
 
+# the following metadata will be accessible for vars on all procs
+global_meta_names = {
+    'input': ('units', 'shape', 'size'),
+    'output': ('units', 'shape', 'size',
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
+}
+
+
 def _valid_var_name(name):
     """
     Determine if the proposed name is a valid variable name.
@@ -160,7 +168,7 @@ class Component(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Count variables, total and by var_set.
+        Count total variables.
 
         Parameters
         ----------
@@ -169,27 +177,16 @@ class Component(System):
         """
         super(Component, self)._setup_vars()
         num_var = self._num_var
-        num_var_byset = self._num_var_byset
         data = self._var_rel2data_io
 
         for vec_name in self._lin_rel_vec_name_list:
             num_var[vec_name] = {}
-            num_var_byset[vec_name] = {}
             # Compute num_var
             for type_ in ['input', 'output']:
                 relnames = self._var_allprocs_relevant_names[vec_name][type_]
                 num_var[vec_name][type_] = len(relnames)
 
-                num_var_byset[vec_name][type_] = vbyset = {}
-                # Compute num_var_byset
-                for name in relnames:
-                    set_name = data[name.rsplit('.', 1)[-1]]['metadata']['var_set']
-                    if set_name not in vbyset:
-                        vbyset[set_name] = 0
-                    vbyset[set_name] += 1
-
         self._num_var['nonlinear'] = self._num_var['linear']
-        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
 
     def _setup_var_data(self, recurse=True):
         """
@@ -200,6 +197,7 @@ class Component(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
+        global global_meta_names
         super(Component, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
         abs_names = self._var_abs_names
@@ -213,13 +211,6 @@ class Component(System):
             prefix = self.pathname + '.'
         else:
             prefix = ''
-
-        # the following metadata will be accessible for vars on all procs
-        global_meta_names = {
-            'input': ('units', 'shape', 'size', 'var_set'),
-            'output': ('units', 'shape', 'size', 'var_set',
-                       'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
-        }
 
         for type_ in ['input', 'output']:
             for prom_name in self._var_rel_names[type_]:
@@ -259,47 +250,28 @@ class Component(System):
         vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
-        sizes_byset = self._var_sizes_byset
 
         # Initialize empty arrays
         for vec_name in vec_names:
             sizes[vec_name] = {}
-            sizes_byset[vec_name] = {}
 
             for type_ in ('input', 'output'):
                 sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
 
-                sizes_byset[vec_name][type_] = {}
-                for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
-                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
-
-            allprocs_abs2idx_byset = self._var_allprocs_abs2idx_byset[vec_name]
-
-            # Compute _var_sizes and _var_sizes_byset
+            # Compute _var_sizes
             abs2meta = self._var_abs2meta
             for type_ in ('input', 'output'):
                 sz = sizes[vec_name][type_]
-                sz_byset = sizes_byset[vec_name][type_]
                 for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
-                    meta = abs2meta[abs_name]
-                    set_name = meta['var_set']
-                    size = meta['size']
-                    idx_byset = allprocs_abs2idx_byset[abs_name]
-
-                    sz[iproc, idx] = size
-                    sz_byset[set_name][iproc, idx_byset] = size
+                    sz[iproc, idx] = abs2meta[abs_name]['size']
 
         if self.comm.size > 1:
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]
-                sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                    for set_name, sbyset in iteritems(sizes_byset[type_]):
-                        self.comm.Allgather(sbyset[iproc, :], sbyset)
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
-        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -322,7 +294,7 @@ class Component(System):
             self._approx_partials(of, wrt, method=method, **kwargs)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', var_set=0):
+                  units=None, desc=''):
         """
         Add an input variable to the component.
 
@@ -350,9 +322,6 @@ class Component(System):
             during execution. Default is None, which means it is unitless.
         desc : str
             description of the variable
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for
-            reconfigurability. Default is 0.
 
         Returns
         -------
@@ -403,14 +372,8 @@ class Component(System):
             metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
         metadata['flat_src_indices'] = flat_src_indices
 
-        # units: taken as is
         metadata['units'] = units
-
-        # desc: taken as is
         metadata['desc'] = desc
-
-        # var_set: taken as is
-        metadata['var_set'] = var_set
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -436,7 +399,7 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
         """
         Add an output variable to the component.
 
@@ -476,9 +439,6 @@ class Component(System):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
 
         Returns
         -------
@@ -573,13 +533,9 @@ class Component(System):
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
         res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
 
-        # ref, ref0, res_ref: taken as is
         metadata['ref'] = ref
         metadata['ref0'] = ref0
         metadata['res_ref'] = res_ref
-
-        # var_set: taken as is
-        metadata['var_set'] = var_set
 
         metadata['distributed'] = self.distributed
 
