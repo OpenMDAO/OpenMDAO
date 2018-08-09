@@ -65,6 +65,12 @@ class DefaultVector(Vector):
             ext_sizes_t[1],
         )
 
+        root_vec._data = np.concatenate([
+            root_vec._data[:old_sizes[0]],
+            np.zeros(new_sizes[1]),
+            root_vec._data[old_sizes[0] + old_sizes[1]:],
+        ])
+
         root_vec._initialize_views()
 
     def _extract_data(self):

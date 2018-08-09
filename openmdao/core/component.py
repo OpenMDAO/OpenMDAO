@@ -177,7 +177,6 @@ class Component(System):
         """
         super(Component, self)._setup_vars()
         num_var = self._num_var
-        data = self._var_rel2data_io
 
         for vec_name in self._lin_rel_vec_name_list:
             num_var[vec_name] = {}
