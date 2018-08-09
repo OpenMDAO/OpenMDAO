@@ -1092,7 +1092,7 @@ class Group(System):
 
     def _get_var_offsets(self):
         """
-        Compute distributed offsets for variables in var sets.
+        Compute distributed offsets for variables.
 
         Only PETScTransfer currently requests these.
 
