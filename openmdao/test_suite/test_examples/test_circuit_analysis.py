@@ -46,7 +46,7 @@ class Diode(ExplicitComponent):
         deltaV = inputs['V_in'] - inputs['V_out']
         Is = self.options['Is']
         Vt = self.options['Vt']
-        outputs['I'] = Is * np.exp(deltaV / Vt - 1)
+        outputs['I'] = Is * (np.exp(deltaV / Vt) - 1.0)
 
 
 class Node(ImplicitComponent):
@@ -157,11 +157,11 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
@@ -213,11 +213,11 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
@@ -288,11 +288,11 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
+        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
+        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
@@ -354,10 +354,10 @@ class TestCircuit(unittest.TestCase):
         p.run_model()
 
         assert_rel_error(self, p['circuit.n1.V'], 1.5, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.676232, 1e-5)
+        assert_rel_error(self, p['circuit.n2.V'], 0.65113362, 1e-5)
         assert_rel_error(self, p['circuit.R1.I'], 0.015, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 8.23767999e-05, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 8.23767999e-05, 1e-5)
+        assert_rel_error(self, p['circuit.R2.I'], 8.48866375e-05, 1e-5)
+        assert_rel_error(self, p['circuit.D1.I'], 8.48866375e-05, 1e-5)
 
 
 if __name__ == "__main__":

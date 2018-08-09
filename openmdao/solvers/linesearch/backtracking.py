@@ -57,6 +57,19 @@ class BoundsEnforceLS(LineSearch):
 
     SOLVER = 'LS: BCHK'
 
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(BoundsEnforceLS, self).__init__(**kwargs)
+
+        self._iter_count = 0
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.

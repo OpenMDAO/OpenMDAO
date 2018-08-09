@@ -1,4 +1,6 @@
 """
+RelaxationLS class definition.
+
 RelaxationLS is a linesearch that implements a relaxation scheme that gradually ramps the
 relaxation factor from a user selected value up to 1.0 across two selectable cut-off values
 of the residual norm.
@@ -7,6 +9,8 @@ RelaxationLS Also checks bounds and enforces them by one of three methods.
 
 """
 from __future__ import print_function
+
+import numpy as np
 
 from openmdao.solvers.linesearch.backtracking import _print_violations
 from openmdao.solvers.solver import LineSearch
@@ -31,6 +35,19 @@ class RelaxationLS(LineSearch):
 
     SOLVER = 'LS: RLX'
 
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(RelaxationLS, self).__init__(**kwargs)
+
+        self._iter_count = 0
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -52,7 +69,7 @@ class RelaxationLS(LineSearch):
         # Main control parameters.
         opt.declare('initial_relaxation', default=0.25,
                     desc="Initial value of relaxation parameter (i.e., far from solution.)")
-        opt.declare('norm_far', default=1e-2,
+        opt.declare('norm_far', default=1e-1,
                     desc='Value of absolute residual norm above which the initial relaxation is '
                     'used.')
         opt.declare('norm_near', default=1e-3,
@@ -117,16 +134,14 @@ class RelaxationLS(LineSearch):
 
         # Determine relaxation parameter and apply it.
         if norm0 >= norm_far:
-            alpha = alpha_far
-            u += alpha*du
+            u.add_scal_vec(alpha_far, du)
 
         elif norm0 > norm_near:
             alpha = alpha_far + (1.0 - alpha_far) * (norm0 - norm_near) / (norm_far - norm_near)
-            u += alpha*du
+            u.add_scal_vec(alpha, du)
 
         else:
             u += du
-
 
         if self.options['print_bound_enforce']:
             _print_violations(u, system._lower_bounds, system._upper_bounds)
