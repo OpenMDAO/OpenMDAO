@@ -273,8 +273,8 @@ class ExplicitComponent(Component):
                         elif mode == 'rev':
                             d_residuals.read_only = True
 
-                        # We used to negate the residual here, and then re-negate after the hook.
                         try:
+                            # We used to negate the residual here, and then re-negate after the hook
                             if d_inputs._ncol > 1:
                                 if self.supports_multivecs:
                                     self.compute_multi_jacvec_product(self._inputs, d_inputs,
