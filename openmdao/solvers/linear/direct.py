@@ -206,7 +206,7 @@ class DirectSolver(LinearSolver):
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i in range(nmtx):
             # set value of x vector to provided value
-            xvec.set_data(eye[:, i])
+            xvec._data[:] = eye[:, i]
 
             # apply linear
             system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',

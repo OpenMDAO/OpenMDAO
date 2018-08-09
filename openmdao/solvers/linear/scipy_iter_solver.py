@@ -242,16 +242,16 @@ class ScipyKrylov(LinearSolver):
 
             self._iter_count = 0
             if solver is gmres:
-                x, info = solver(linop, b_vec.get_data(), M=M, restart=restart,
+                x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
             else:
-                x, info = solver(linop, b_vec.get_data(), M=M,
+                x, info = solver(linop, b_vec._data.copy(), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
 
             fail |= (info != 0)
-            x_vec.set_data(x)
+            x_vec._data[:] = x
 
         # TODO: implement this properly
 
@@ -287,7 +287,7 @@ class ScipyKrylov(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         # set value of b vector to KSP provided value
-        b_vec.set_data(in_vec)
+        b_vec._data[:] = in_vec
 
         # call the preconditioner
         self._solver_info.append_precon()
@@ -295,7 +295,7 @@ class ScipyKrylov(LinearSolver):
         self._solver_info.pop()
 
         # return resulting value of x vector
-        return x_vec.get_data()
+        return x_vec._data.copy()
 
     @property
     def preconditioner(self):
