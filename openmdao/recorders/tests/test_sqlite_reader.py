@@ -126,7 +126,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1283,7 +1283,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1349,7 +1349,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1416,7 +1416,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # Test to see if the access by case keys works:
         sixth_solver_iteration = cases.get_case('rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0')
         np.testing.assert_almost_equal(sixth_solver_iteration.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1464,7 +1464,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # Test to see if the access by case keys works:
         sixth_system_case = cr.system_cases.get_case('rank0:SLSQP|5|root._solve_nonlinear|5')
         np.testing.assert_almost_equal(sixth_system_case.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1522,7 +1522,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'
@@ -1585,7 +1585,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|5')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
-                                       [1.97846296,  -2.21388305e-13],
+                                       [1.97846296, -2.21388305e-13],
                                        decimal=2,
                                        err_msg='Case reader gives '
                                        'incorrect Parameter value'

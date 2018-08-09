@@ -418,9 +418,13 @@ class SellarStateConnection(Group):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        sub = self.add_subsystem('sub', Group(), promotes=['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2'])
+        sub = self.add_subsystem('sub', Group(),
+                                 promotes=['x', 'z', 'y1',
+                                           'state_eq.y2_actual', 'state_eq.y2_command',
+                                           'd1.y2', 'd2.y2'])
 
-        subgrp = sub.add_subsystem('state_eq_group', Group(), promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
+        subgrp = sub.add_subsystem('state_eq_group', Group(),
+                                   promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -507,7 +511,7 @@ class SellarImplicitDis1(ImplicitComponent):
 
         y1 = outputs['y1']
 
-        resids['y1'] =  -(z1**2 + z2 + x1 - 0.2*y2 - y1)
+        resids['y1'] = -(z1**2 + z2 + x1 - 0.2*y2 - y1)
 
     def linearize(self, inputs, outputs, J):
         """
