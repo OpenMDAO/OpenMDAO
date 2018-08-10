@@ -58,32 +58,6 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-    #def test_fan_out_grouped_varsets(self):
-        #prob = Problem(FanOutGroupedVarSets())
-
-        #prob.setup(check=False, mode='fwd')
-        #prob.set_solver_print(level=0)
-        #prob.run_model()
-
-        #J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
-
-        #assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-        #assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
-
-        #assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
-        #assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
-
-        #prob.setup(check=False, mode='rev')
-        #prob.run_model()
-
-        #J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
-
-        #assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
-        #assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
-
-        #assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
-        #assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
-
     def test_fan_in_grouped(self):
 
         prob = Problem()

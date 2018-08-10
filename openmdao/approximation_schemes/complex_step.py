@@ -116,7 +116,7 @@ class ComplexStep(ApproximationScheme):
         system._inputs._vector_info._under_complex_step = True
 
         # create a scratch array
-        out_tmp = system._outputs.get_data()
+        out_tmp = system._outputs._data.copy()
         results_clone = current_vec._clone(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
@@ -223,12 +223,12 @@ class ComplexStep(ApproximationScheme):
             else:
                 inputs._imag_views_flat[in_name][idxs] += delta
 
-        results_vec.get_data(out_tmp)
+        out_tmp = results_vec._data.copy()
         run_model()
 
         # TODO: Grab only results of interest
         result_clone.set_vec(results_vec)
-        results_vec.set_data(out_tmp)
+        results_vec._data[:] = out_tmp
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._imag_views_flat:

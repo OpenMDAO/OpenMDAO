@@ -125,13 +125,13 @@ class ScipyKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def _mat_vec(self, in_vec):
+    def _mat_vec(self, in_arr):
         """
         Compute matrix-vector product.
 
         Parameters
         ----------
-        in_vec : ndarray
+        in_arr : ndarray
             the incoming array (combines all varsets).
 
         Returns
@@ -149,16 +149,16 @@ class ScipyKrylov(LinearSolver):
             x_vec = system._vectors['residual'][vec_name]
             b_vec = system._vectors['output'][vec_name]
 
-        x_vec.set_data(in_vec)
+        x_vec._data[:] = in_arr
         scope_out, scope_in = system._get_scope()
         system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
                              scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
-        # print('in', in_vec)
-        # print('out', b_vec.get_data())
+        # print('in', in_arr)
+        # print('out', b_vec._data)
 
-        return b_vec.get_data()
+        return b_vec._data
 
     def _monitor(self, res):
         """
@@ -227,7 +227,7 @@ class ScipyKrylov(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            x_vec_combined = x_vec.get_data()
+            x_vec_combined = x_vec._data
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)
@@ -242,16 +242,16 @@ class ScipyKrylov(LinearSolver):
 
             self._iter_count = 0
             if solver is gmres:
-                x, info = solver(linop, b_vec.get_data(), M=M, restart=restart,
+                x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
             else:
-                x, info = solver(linop, b_vec.get_data(), M=M,
+                x, info = solver(linop, b_vec._data.copy(), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
                                  callback=self._monitor)
 
             fail |= (info != 0)
-            x_vec.set_data(x)
+            x_vec._data[:] = x
 
         # TODO: implement this properly
 
@@ -287,7 +287,7 @@ class ScipyKrylov(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         # set value of b vector to KSP provided value
-        b_vec.set_data(in_vec)
+        b_vec._data[:] = in_vec
 
         # call the preconditioner
         self._solver_info.append_precon()
@@ -295,7 +295,7 @@ class ScipyKrylov(LinearSolver):
         self._solver_info.pop()
 
         # return resulting value of x vector
-        return x_vec.get_data()
+        return x_vec._data.copy()
 
     @property
     def preconditioner(self):

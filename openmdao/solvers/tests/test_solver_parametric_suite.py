@@ -65,13 +65,13 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             d_residuals.set_const(2.0)
             d_outputs.set_const(0.0)
             prob.model.run_solve_linear(['linear'], 'fwd')
-            result = d_outputs.get_data()
+            result = d_outputs._data
             assert_rel_error(self, result, [-2., 2.])
 
             d_outputs.set_const(2.0)
             d_residuals.set_const(0.0)
             prob.model.run_solve_linear(['linear'], 'rev')
-            result = d_residuals.get_data()
+            result = d_residuals._data
             assert_rel_error(self, result, [2., -2.])
 
     def test_direct_solver_group(self):
@@ -93,15 +93,13 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         d_outputs.set_const(0.0)
         prob.model.run_solve_linear(['linear'], 'fwd')
         result = d_outputs._data
-        assert_rel_error(self, result[1], prob.model.expected_solution[0], 1e-15)
-        assert_rel_error(self, result[5], prob.model.expected_solution[1], 1e-15)
+        assert_rel_error(self, result, prob.model.expected_solution, 1e-15)
 
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         prob.model.run_solve_linear(['linear'], 'rev')
         result = d_residuals._data
-        assert_rel_error(self, result[1], prob.model.expected_solution[0], 1e-15)
-        assert_rel_error(self, result[5], prob.model.expected_solution[1], 1e-15)
+        assert_rel_error(self, result, prob.model.expected_solution, 1e-15)
 
     @parametric_suite(
         assembled_jac=[False, True],

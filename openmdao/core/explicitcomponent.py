@@ -88,7 +88,7 @@ class ExplicitComponent(Component):
                                    val=np.full(meta['size'], -1.))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):
         """
         Add an output variable to the component.
 
@@ -131,9 +131,6 @@ class ExplicitComponent(Component):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
 
         Returns
         -------
@@ -147,8 +144,7 @@ class ExplicitComponent(Component):
                                                          val=val, shape=shape, units=units,
                                                          res_units=res_units, desc=desc,
                                                          lower=lower, upper=upper,
-                                                         ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         var_set=var_set)
+                                                         ref=ref, ref0=ref0, res_ref=res_ref)
 
     def _set_partials_meta(self):
         """
@@ -182,7 +178,11 @@ class ExplicitComponent(Component):
                 # Sign of the residual is minus the sign of the output vector.
                 residuals *= -1.0
 
-                self.compute(self._inputs, outputs)
+                self._inputs.read_only = True
+                try:
+                    self.compute(self._inputs, outputs)
+                finally:
+                    self._inputs.read_only = False
 
                 # Restore any complex views if under complex step.
                 if outputs._vector_info._under_complex_step:
@@ -207,15 +207,14 @@ class ExplicitComponent(Component):
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
-        self._inputs.read_only = True
-
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-            with self._unscaled_context(
-                    outputs=[self._outputs], residuals=[self._residuals]):
+            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_const(0.0)
-                failed = self.compute(self._inputs, self._outputs)
-
-        self._inputs.read_only = False
+                self._inputs.read_only = True
+                try:
+                    failed = self.compute(self._inputs, self._outputs)
+                finally:
+                    self._inputs.read_only = False
 
         return bool(failed), 0., 0.
 
@@ -270,26 +269,28 @@ class ExplicitComponent(Component):
                         elif mode == 'rev':
                             d_residuals.read_only = True
 
-                        # We used to negate the residual here, and then re-negate after the hook.
-
-                        if d_inputs._ncol > 1:
-                            if self.supports_multivecs:
-                                self.compute_multi_jacvec_product(self._inputs, d_inputs,
-                                                                  d_residuals, mode)
+                        try:
+                            # We used to negate the residual here, and then re-negate after the hook
+                            if d_inputs._ncol > 1:
+                                if self.supports_multivecs:
+                                    self.compute_multi_jacvec_product(self._inputs, d_inputs,
+                                                                      d_residuals, mode)
+                                else:
+                                    for i in range(d_inputs._ncol):
+                                        # need to make the multivecs look like regular single vecs
+                                        # since the component doesn't know about multivecs.
+                                        d_inputs._icol = i
+                                        d_residuals._icol = i
+                                        self.compute_jacvec_product(self._inputs, d_inputs,
+                                                                    d_residuals, mode)
+                                    d_inputs._icol = None
+                                    d_residuals._icol = None
                             else:
-                                for i in range(d_inputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_inputs._icol = i
-                                    d_residuals._icol = i
-                                    self.compute_jacvec_product(self._inputs, d_inputs,
-                                                                d_residuals, mode)
-                                d_inputs._icol = None
-                                d_residuals._icol = None
-                        else:
-                            self.compute_jacvec_product(self._inputs, d_inputs, d_residuals, mode)
-
-                        self._inputs.read_only = d_inputs.read_only = d_residuals.read_only = False
+                                self.compute_jacvec_product(self._inputs, d_inputs,
+                                                            d_residuals, mode)
+                        finally:
+                            self._inputs.read_only = False
+                            d_inputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -366,10 +367,11 @@ class ExplicitComponent(Component):
             if self._has_compute_partials:
                 self._inputs.read_only = True
 
-                # We used to negate the jacobian here, and then re-negate after the hook.
-                self.compute_partials(self._inputs, self._jacobian)
-
-                self._inputs.read_only = False
+                try:
+                    # We used to negate the jacobian here, and then re-negate after the hook.
+                    self.compute_partials(self._inputs, self._jacobian)
+                finally:
+                    self._inputs.read_only = False
 
     def compute(self, inputs, outputs):
         """

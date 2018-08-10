@@ -34,8 +34,7 @@ class LinearBlockJac(BlockLinearSolver):
             for vec_name in vec_names:
                 b_vec = system._vectors['residual'][vec_name]
                 b_vec *= -1.0
-                for varset, data in iteritems(self._rhs_vecs[vec_name]):
-                    b_vec._data[varset] += data
+                b_vec._data += self._rhs_vecs[vec_name]
 
             for subsys in subs:
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
@@ -51,8 +50,7 @@ class LinearBlockJac(BlockLinearSolver):
 
                 b_vec = system._vectors['output'][vec_name]
                 b_vec *= -1.0
-                for varset, data in iteritems(self._rhs_vecs[vec_name]):
-                    b_vec._data[varset] += data
+                b_vec._data += self._rhs_vecs[vec_name]
 
             for subsys in subs:
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
