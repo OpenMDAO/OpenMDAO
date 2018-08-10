@@ -100,7 +100,7 @@ install:
     ./miniconda.sh -b  -p $HOME/miniconda;
     export PATH=$HOME/miniconda/bin:$PATH;
     conda install --yes python=$PY;
-    conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+    conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
   else
     export PATH=$HOME/miniconda/bin:$PATH;
   fi
@@ -148,7 +148,7 @@ script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
-    make all;
+    make travis;
   fi
 
 # run the tests from down here to see if it can work without being at top level

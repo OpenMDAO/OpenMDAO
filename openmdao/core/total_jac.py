@@ -122,18 +122,19 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv = {}
 
+        driver_wrt = list(design_vars)
+        driver_of = driver._get_ordered_nl_responses()
+
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
-            wrt = prom_wrt = list(design_vars)
+            wrt = prom_wrt = driver_wrt
         else:
             prom_wrt = wrt
             if not global_names:
                 wrt = [prom2abs[name][0] for name in prom_wrt]
 
         if of is None:
-            of = list(driver._objs)
-            of.extend(driver._cons)
-            prom_of = of
+            of = prom_of = driver_of
         else:
             prom_of = of
             if not global_names:
@@ -164,19 +165,26 @@ class _TotalJacInfo(object):
             for name in of:
                 if name in constraints and constraints[name]['linear']:
                     has_lin_cons = True
+                    self.simul_coloring = None
                     break
             else:
                 has_lin_cons = False
+                self.simul_coloring = driver._simul_coloring_info
 
-            self.simul_coloring = None if has_lin_cons else driver._simul_coloring_info
+                # if we don't get wrt and of from driver, turn off coloring
+                if self.simul_coloring is not None and (wrt != driver_wrt or of != driver_of):
+                    msg = ("compute_totals called using a different list of design vars and/or "
+                           "responses than those used to define coloring, so coloring will "
+                           "be turned off.\ncoloring design vars: %s, current design vars: "
+                           "%s\ncoloring responses: %s, current responses: %s." %
+                           (driver_wrt, wrt, driver_of, of))
+                    warnings.warn(msg)
+                    self.simul_coloring = None
 
             if self.simul_coloring is None:
                 modes = [self.mode]
             else:
                 modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
-                if len(modes) == 1 and modes[0] != self.mode:
-                    raise RuntimeError("Mode in coloring, '%s', differs from specified mode, '%s'."
-                                       % (modes[0], self.mode))
 
             self.in_idx_map = {}
             self.in_loc_idxs = {}
@@ -602,23 +610,18 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         modes = [k for k in ('fwd', 'rev') if k in coloring_info]
-
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
-        # do all the colored rows/cols
         for mode in modes:
             for color, ilist in enumerate(coloring_info[mode][0]):
-                if color > 0:
+                if color == 0:
+                    # do all uncolored indices individually (one linear solve per index)
+                    for i in ilist:
+                        yield [i], input_setter, jac_setter, mode
+                else:
                     # yield all indices for a color at once
                     yield ilist, input_setter, jac_setter, mode
-
-        # do all of the uncolored rows/cols last so they can overwrite any wrong values
-        for mode in modes:
-            ilist = coloring_info[mode][0][0]
-            for i in ilist:
-                # do all uncolored indices individually (one linear solve per index)
-                yield i, self.single_input_setter, self.single_jac_setter, mode
 
     def par_deriv_iter(self, idxs):
         """
@@ -962,7 +965,11 @@ class _TotalJacInfo(object):
         for i in inds:
             input_name, vecname, _, _ = in_idx_map[i]
             out_views = outvecs[vecname]._views_flat
-            for row_or_col in row_col_map[i]:
+            rcmap = row_col_map[i]
+            if rcmap is None:
+                self.single_jac_setter(i, mode)
+                continue
+            for row_or_col in rcmap:
                 output_name = idx2name[row_or_col]
                 deriv_val = None
                 if output_name in out_views:
@@ -1062,44 +1069,44 @@ class _TotalJacInfo(object):
         model._linear_solver._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for key, meta in iteritems(self.idx_iter_dict[self.mode]):
-            _, _, idxs, idx_iter = meta
-            for inds, input_setter, jac_setter, mode in idx_iter(idxs):
-                # this sets dinputs for the current par_deriv_color to 0
-                # dinputs is dresids in fwd, doutouts in rev
-                vec_doutput['linear'].set_const(0.0)
-                if mode == 'fwd':
-                    vec_dresid['linear'].set_const(0.0)
-                else:  # rev
-                    vec_dinput['linear'].set_const(0.0)
+        for iter_mode in self.idx_iter_dict:
+            for key, meta in iteritems(self.idx_iter_dict[iter_mode]):
+                _, _, idxs, idx_iter = meta
+                for inds, input_setter, jac_setter, mode in idx_iter(idxs):
+                    # this sets dinputs for the current par_deriv_color to 0
+                    # dinputs is dresids in fwd, doutouts in rev
+                    vec_doutput['linear'].set_const(0.0)
+                    if mode == 'fwd':
+                        vec_dresid['linear'].set_const(0.0)
+                    else:  # rev
+                        vec_dinput['linear'].set_const(0.0)
 
-                rel_systems, vec_names, cache_key = input_setter(inds, mode)
+                    rel_systems, vec_names, cache_key = input_setter(inds, mode)
 
-                if debug_print:
-                    if par_deriv and key in par_deriv:
-                        varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
-                        print('Solving color:', key, varlist)
+                    if debug_print:
+                        if par_deriv and key in par_deriv:
+                            varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
+                            print('Solving color:', key, varlist)
+                        else:
+                            print('Solving variable:', key)
+
+                        sys.stdout.flush()
+                        t0 = time.time()
+
+                    # restore old linear solution if cache_linear_solution was set by the user for
+                    # any input variables involved in this linear solution.
+                    if cache_key is not None and not has_lin_cons:
+                        self._restore_linear_solution(vec_names, cache_key, self.mode)
+                        model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
+                        self._save_linear_solution(vec_names, cache_key, self.mode)
                     else:
-                        print('Solving variable:', key)
+                        model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
-                    sys.stdout.flush()
+                    if debug_print:
+                        print('Elapsed Time:', time.time() - t0, '\n')
+                        sys.stdout.flush()
 
-                    t0 = time.time()
-
-                # restore old linear solution if cache_linear_solution was set by the user for
-                # any input variables involved in this linear solution.
-                if cache_key is not None and not has_lin_cons:
-                    self._restore_linear_solution(vec_names, cache_key, self.mode)
-                    model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
-                    self._save_linear_solution(vec_names, cache_key, self.mode)
-                else:
-                    model._solve_linear(model._lin_vec_names, mode, rel_systems)
-
-                if debug_print:
-                    print('Elapsed Time:', time.time() - t0, '\n')
-                    sys.stdout.flush()
-
-                jac_setter(inds, mode)
+                    jac_setter(inds, mode)
 
         if self.has_scaling:
             self._do_scaling(self.J_dict)
@@ -1107,6 +1114,8 @@ class _TotalJacInfo(object):
         if debug_print:
             # Debug outputs scaled derivatives.
             self._print_derivatives()
+
+        # np.save("total_jac.npy", self.J)
 
         return self.J_final
 

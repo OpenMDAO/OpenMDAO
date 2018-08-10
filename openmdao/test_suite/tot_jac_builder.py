@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary, _solves_info
+from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
 
 class TotJacBuilder(object):
     def __init__(self, rows, cols):
@@ -61,37 +61,23 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode, simul_coloring_excludes=None, stream=sys.stdout):
+    def color(self, mode='auto', stream=sys.stdout):
         self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
                                        run_model=False, bool_jac=self.J,
-                                       simul_coloring_excludes=simul_coloring_excludes,
                                        stream=stream)
         return self.coloring
 
     def show(self, stream=sys.stdout):
         array_viz(self.J)
+
+        maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
+        maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
+
         print("Shape:", self.J.shape, file=stream)
         print("Density:", np.count_nonzero(self.J) / self.J.size)
-        tup = _solves_info(self.coloring)
-        dominant_mode = tup[-1]
-        if dominant_mode == 'fwd':
-            if 'rev' in self.coloring:
-                opp_rows = self.coloring['rev'][0][0]
-                Jcopy = self.J.copy()
-                Jcopy[opp_rows] = False
-            else:
-                Jcopy = self.J
-            maxdeg = np.max(np.count_nonzero(Jcopy, axis=1))
-        else:
-            if 'fwd' in self.coloring:
-                opp_cols = self.coloring['fwd'][0][0]
-                Jcopy = self.J.copy()
-                Jcopy[:, opp_cols] = False
-            else:
-                Jcopy = self.J
-            maxdeg = np.max(np.count_nonzero(Jcopy, axis=0))
-        print("Max degree:", maxdeg)
-        simul_coloring_summary(self.coloring, stream=stream)
+        print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
+
+        simul_coloring_summary(self.J, self.coloring, stream=stream)
 
     def shuffle_rows(self):
         np.random.shuffle(self.J)
@@ -149,49 +135,83 @@ class TotJacBuilder(object):
 
         return builder
 
-def rand_jac(stream=sys.stdout, open_mode="w"):
+    @staticmethod
+    def eisenstat(n):
+        """
+        Return a builder containing an Eisenstat's example Jacobian of size n+1 x n.
+
+        Should be colorable with n/2 + 2 colors using bidirectional coloring.
+
+        The columns in Eisenstat's example are pairwise structurally nonorthogonal,
+        so a fwd directional coloring would require n groups.
+        """
+        assert n >= 6, "Eisenstat's example must have n >= 6."
+        assert n % 2 == 0, "Eisenstat's example must have even 'n'."
+
+        D1 = np.eye(n // 2, dtype=int)
+        D2 = np.eye(n // 2, dtype=int)
+        D3 = np.eye(n // 2, dtype=int)
+        B = np.ones((n // 2, n // 2), dtype=int)
+        idxs = np.arange(n // 2, dtype=int)
+        B[idxs, idxs] = 0
+        C = np.ones((1, n // 2), dtype=int)
+        O = np.zeros((1, n // 2), dtype=int)
+
+        A1 = np.hstack([D1, D2])
+        A2 = np.vstack([np.hstack([C, O]), np.hstack([D3, B])])
+
+        A = np.vstack([A1, A2])
+
+        builder = TotJacBuilder(n + 1, n)
+        builder.J[:, :] = A
+
+        return builder
+
+
+def rand_jac():
     rnd = np.random.randint
     minr = rnd(1, 10)
     minc = rnd(1, 10)
 
-    builder = TotJacBuilder.make_jac(n_dense_rows=rnd(3), row_density=np.random.rand(),
-                                     n_dense_cols=rnd(3), col_density=np.random.rand(),
-                                     n_blocks=rnd(3,8),
-                                     min_shape=(minr,minc),
-                                     max_shape=(minr+rnd(10),minc+rnd(10)),
-                                     n_random_pts=rnd(5))
-
-    colorings = []
-
-    for mode in ('fwd', 'rev'):
-        if isinstance(stream, str):
-            with open(stream, open_mode) as f:
-                coloring = builder.color(mode, stream=f)
-        else:
-            coloring = builder.color(mode, stream=stream)
-        colorings.append(coloring)
-
-
-    ftot_size, ftot_colors, fcolored_solves, fopp_solves, fpct, _ = _solves_info(colorings[0])
-    rtot_size, rtot_colors, rcolored_solves, ropp_solves, rpct, _ = _solves_info(colorings[1])
-
-    if ftot_colors <= rtot_colors:
-        builder.coloring = colorings[0]
-        off_mode = 'rev'
-        off_solves = rtot_colors
-        off_opps = ropp_solves
-    else:
-        off_mode = 'fwd'
-        off_solves = ftot_colors
-        off_opps = fopp_solves
-
-    builder.show(stream=stream)
-
-    print("Unused %s mode coloring:  %d solves,  %d opposite solves" %
-          (off_mode, off_solves, off_opps))
+    return  TotJacBuilder.make_jac(n_dense_rows=rnd(5), row_density=np.random.rand(),
+                                   n_dense_cols=rnd(5), col_density=np.random.rand(),
+                                   n_blocks=rnd(3,8),
+                                   min_shape=(minr,minc),
+                                   max_shape=(minr+rnd(10),minc+rnd(10)),
+                                   n_random_pts=rnd(15))
 
 
 if __name__ == '__main__':
-    # Running this from the command line will just give a visualization of a random jacobian and
-    # its coloring.
-    rand_jac()
+    import argparse
+    import pickle
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-e", "--eisenstat",
+                        help="Build an Eisenstat's example matrix of size n+1 x n.",
+                        action="store", type=int, default=-1, dest="eisenstat")
+    parser.add_argument("-m", "--mode", type=str, dest="mode",
+                        help="Direction of coloring (default is auto). Only used with -e.", 
+                        default="auto")
+    parser.add_argument('-s', '--save', dest="save", default=None, 
+                        help="Output file for jacobian so it can be reloaded and colored using"
+                        " various methods for comparison.")
+    parser.add_argument('-l', '--load', dest="load", default=None, 
+                        help="Input file for jacobian so it can be reloaded and colored using"
+                        " various methods for comparison.")
+
+    options = parser.parse_args()
+
+    if options.load is not None:
+        with open(options.load, "rb") as f:
+            builder = pickle.load(f)
+    elif options.eisenstat > -1:
+        builder = TotJacBuilder.eisenstat(options.eisenstat)
+    else:  # just do a random matrix
+        builder = rand_jac()
+ 
+    builder.color(options.mode)
+    builder.show()
+
+    if options.save is not None:
+        with open(options.save, "wb") as f:
+            pickle.dump(builder, f)

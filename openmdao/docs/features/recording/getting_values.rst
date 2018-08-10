@@ -77,8 +77,11 @@ If we had not promoted `pz.z`, we would use:
 
 Getting Variables and Values
 ----------------------------
-Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`,
-and :code:`get_responses()` which, as their names imply, will return the corresponding set of variables and their values on that case.
+Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects 
+there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`,
+and :code:`get_responses()` which, as their names imply, will return the corresponding variables and their
+values for that case.  Note that you can use either the promoted or absolute names when accessing the
+returned variables.
 
 Here's an example that shows how to use these methods to see what variables were recorded on the first driver iteration and get their values.
 
