@@ -163,28 +163,24 @@ class _TotalJacInfo(object):
         else:
             constraints = driver._cons
 
-            skip_coloring = False
             for name in of:
                 if name in constraints and constraints[name]['linear']:
                     has_lin_cons = True
+                    self.simul_coloring = None
                     break
             else:
                 has_lin_cons = False
+                self.simul_coloring = driver._simul_coloring_info
 
                 # if we don't get wrt and of from driver, turn off coloring
-                skip_coloring = wrt != driver_wrt or of != driver_of
-                if skip_coloring:
+                if self.simul_coloring is not None and (wrt != driver_wrt or of != driver_of):
                     msg = ("compute_totals called using a different list of design vars and/or "
                            "responses than those used to define coloring, so coloring will "
                            "be turned off.\ncoloring design vars: %s, current design vars: "
                            "%s\ncoloring responses: %s, current responses: %s." %
                            (driver_wrt, wrt, driver_of, of))
                     warnings.warn(msg)
-
-            if has_lin_cons or skip_coloring:
-                self.simul_coloring = None
-            else:
-                self.simul_coloring = driver._simul_coloring_info
+                    self.simul_coloring = None
 
             if self.simul_coloring is None:
                 modes = [self.mode]
