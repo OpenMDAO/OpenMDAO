@@ -121,6 +121,8 @@ class _TotalJacInfo(object):
         self.responses = responses = driver._responses
         self.debug_print = debug_print
         self.par_deriv = {}
+        self.remote_dvs = driver._remote_dvs
+        self.remote_responses = driver._remote_responses
 
         driver_wrt = list(design_vars)
         driver_of = driver._get_ordered_nl_responses()
@@ -200,10 +202,10 @@ class _TotalJacInfo(object):
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode] = \
                     self._create_in_idx_map(has_lin_cons, mode)
 
-                if mode == 'fwd':
-                    self.out_meta[mode], out_size[mode] = self.of_meta, self.of_size
-                else:
-                    self.out_meta[mode], out_size[mode] = self.wrt_meta, self.wrt_size
+            if 'fwd' in modes:
+                self.out_meta['fwd'], out_size['fwd'] = self.of_meta, self.of_size
+            if 'rev' in modes:
+                self.out_meta['rev'], out_size['rev'] = self.wrt_meta, self.wrt_size
 
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name = {}
@@ -1068,9 +1070,9 @@ class _TotalJacInfo(object):
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
         for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_const(0.0)
-            vec_doutput[vec_name].set_const(0.0)
-            vec_dresid[vec_name].set_const(0.0)
+            vec_dinput[vec_name]._data[:] = 0.0
+            vec_doutput[vec_name]._data[:] = 0.0
+            vec_dresid[vec_name]._data[:] = 0.0
 
         # Linearize Model
         model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
@@ -1079,15 +1081,15 @@ class _TotalJacInfo(object):
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for iter_mode in self.idx_iter_dict:
             for key, meta in iteritems(self.idx_iter_dict[iter_mode]):
-                _, _, idxs, idx_iter = meta
-                for inds, input_setter, jac_setter, mode in idx_iter(idxs):
+                _, _, idx_info, idx_iter = meta
+                for inds, input_setter, jac_setter, mode in idx_iter(idx_info):
                     # this sets dinputs for the current par_deriv_color to 0
                     # dinputs is dresids in fwd, doutouts in rev
-                    vec_doutput['linear'].set_const(0.0)
+                    vec_doutput['linear']._data[:] = 0.0
                     if mode == 'fwd':
-                        vec_dresid['linear'].set_const(0.0)
+                        vec_dresid['linear']._data[:] = 0.0
                     else:  # rev
-                        vec_dinput['linear'].set_const(0.0)
+                        vec_dinput['linear']._data[:] = 0.0
 
                     rel_systems, vec_names, cache_key = input_setter(inds, mode)
 
