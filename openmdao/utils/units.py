@@ -1004,6 +1004,12 @@ def convert_units(val, old_units, new_units=None):
     float
         value in new units.
     """
+    print('convert_units()', val,
+          'old:', old_units, type(old_units),
+          'new:', new_units, type(new_units))
+    from pprint import pprint
+    pprint(_UNIT_CACHE)
+
     if not old_units or not new_units:  # one side has no units
         return val
 

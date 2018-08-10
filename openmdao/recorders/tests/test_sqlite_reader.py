@@ -554,8 +554,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(len(outputs), 7)
         for o in outputs:
-            vals = o[1]
             name = o[0]
+            vals = o[1]
             expected = expected_outputs[name]
             self.assertEqual(vals['lower'], expected['lower'])
             self.assertEqual(vals['ref'], expected['ref'])
@@ -787,7 +787,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = prob.model
         model.add_subsystem('c1', comp)
         model.add_subsystem('c2', SpeedComp())
-        model.add_subsystem('c3', ExecComp('f=speed', speed={'units': 'm/s'}))
+        model.add_subsystem('c3', ExecComp('f=speed', speed={'units': 'm/s'}, f={'units': 'm/s'}))
         model.connect('c1.distance', 'c2.distance')
         model.connect('c1.time', 'c2.time')
         model.connect('c2.speed', 'c3.speed')
@@ -796,6 +796,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
+
+        print('speed', prob['c2.speed'], 'km/h', prob['c3.f'], 'm/s')
 
         cr = CaseReader(self.filename)
         case = cr.system_cases.get_case(0)
@@ -809,6 +811,36 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Now load in the case we recorded
         prob.load_case(case)
+        prob.run_model()
+        print('speed', prob['c2.speed'], 'km/h', prob['c3.f'], 'm/s')
+
+        from openmdao.utils.units import convert_units
+        print('100 km/h =', convert_units(100, 'km/h', 'm/s'), 'm/s')
+
+        outputs = cr.list_outputs(case=case, explicit=True, implicit=True, values=True,
+                                  units=True, shape=True, out_stream=None)
+        from pprint import pprint
+        pprint(outputs)
+
+        meta = {}
+        for o in outputs:
+            name = o[0]
+            vals = o[1]
+            print(vals)
+            for val in vals:
+                print(val, 'str?', isinstance(vals[val], str),
+                      'unicode?', isinstance(vals[val], unicode))
+                # if isinstance(vals[val], unicode):
+                #     vals[val] = vals[val].encode('ascii')
+            meta[name] = vals
+        pprint(meta)
+
+        print(prob['c2.speed'], meta['c2.speed']['units'], '=',
+              prob['c3.f'], meta['c3.f']['units'])
+
+        from_units = meta['c2.speed']['units']
+        to_units = meta['c3.f']['units']
+        print('100', from_units, '=', convert_units(100, from_units, to_units), to_units)
 
         _assert_model_matches_case(case, model)
 
