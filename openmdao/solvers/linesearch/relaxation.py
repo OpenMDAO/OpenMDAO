@@ -69,10 +69,10 @@ class RelaxationLS(LineSearch):
         # Main control parameters.
         opt.declare('initial_relaxation', default=0.25,
                     desc="Initial value of relaxation parameter (i.e., far from solution.)")
-        opt.declare('norm_far', default=1e-1,
+        opt.declare('relax_far', default=1e-1,
                     desc='Value of absolute residual norm above which the initial relaxation is '
                     'used.')
-        opt.declare('norm_near', default=1e-3,
+        opt.declare('relax_near', default=1e-3,
                     desc='Value of absolute residual norm below which the no relaxation is used. '
                     '(i.e., relaxation parameter = 1.0')
 
@@ -98,8 +98,8 @@ class RelaxationLS(LineSearch):
 
         opts = self.options
 
-        if opts['norm_far'] < opts['norm_near']:
-            msg = "In options, norm_far must be greater than or equal to norm_near."
+        if opts['relax_far'] < opts['relax_near']:
+            msg = "In options, relax_far must be greater than or equal to relax_near."
             raise ValueError(msg)
 
     def _run_iterator(self):
@@ -128,16 +128,18 @@ class RelaxationLS(LineSearch):
             norm0 = 1.0
         self._norm0 = norm0
 
-        norm_far = self.options['norm_far']
-        norm_near = self.options['norm_near']
+        relax_far = self.options['relax_far']
+        relax_near = self.options['relax_near']
         alpha_far = self.options['initial_relaxation']
 
         # Determine relaxation parameter and apply it.
-        if norm0 >= norm_far:
+        if norm0 >= relax_far:
             u.add_scal_vec(alpha_far, du)
 
-        elif norm0 > norm_near:
-            alpha = alpha_far + (1.0 - alpha_far) * (norm0 - norm_near) / (norm_far - norm_near)
+        elif norm0 > relax_near:
+            log_relax_near = np.log10(relax_near)
+            alpha = alpha_far + (1.0 - alpha_far) * (np.log10(norm0) - log_relax_near) / \
+                    (np.log10(relax_far) - log_relax_near)
             u.add_scal_vec(alpha, du)
 
         else:

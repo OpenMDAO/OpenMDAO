@@ -276,7 +276,7 @@ class TestCircuit(unittest.TestCase):
         # you can change the NewtonSolver settings in circuit after setup is called
         newton = p.model.circuit.nonlinear_solver
         newton.options['iprint'] = 2
-        newton.options['maxiter'] = 10
+        newton.options['maxiter'] = 15
         newton.options['solve_subsystems'] = True
         newton.linesearch = ArmijoGoldsteinLS()
         newton.linesearch.options['maxiter'] = 10

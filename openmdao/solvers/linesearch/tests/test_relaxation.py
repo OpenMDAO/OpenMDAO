@@ -26,14 +26,14 @@ class TestRelaxationLS(unittest.TestCase):
 
         newton = p.model.circuit.nonlinear_solver
         newton.linesearch = RelaxationLS()
-        newton.linesearch.options['norm_far'] = 1.0
-        newton.linesearch.options['norm_near'] = 2.0
+        newton.linesearch.options['relax_far'] = 1.0
+        newton.linesearch.options['relax_near'] = 2.0
 
         with self.assertRaises(Exception) as raises_cm:
             p.final_setup()
 
         exception = raises_cm.exception
-        msg = "In options, norm_far must be greater than or equal to norm_near."
+        msg = "In options, relax_far must be greater than or equal to relax_near."
 
         self.assertEqual(exception.args[0], msg)
 
@@ -57,8 +57,8 @@ class TestRelaxationLS(unittest.TestCase):
         newton.options['solve_subsystems'] = True
         newton.linesearch = RelaxationLS()
         newton.linesearch.options['initial_relaxation'] = 0.019
-        newton.linesearch.options['norm_far'] = 1.15e-3
-        newton.linesearch.options['norm_near'] = 1.13e-3
+        newton.linesearch.options['relax_far'] = 1.15e-3
+        newton.linesearch.options['relax_near'] = 1.13e-3
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
@@ -185,14 +185,14 @@ class TestFeatureRelaxationLS(unittest.TestCase):
         # you can change the NewtonSolver settings in circuit after setup is called
         newton = p.model.circuit.nonlinear_solver
         newton.options['iprint'] = 2
-        newton.options['maxiter'] = 15
+        newton.options['maxiter'] = 1500
         newton.options['solve_subsystems'] = True
 
         # Carefully tailored the relaxation settings so that
         newton.linesearch = RelaxationLS()
-        newton.linesearch.options['initial_relaxation'] = 0.019
-        newton.linesearch.options['norm_far'] = 1.15e-3
-        newton.linesearch.options['norm_near'] = 1.13e-3
+        newton.linesearch.options['initial_relaxation'] = 0.025
+        newton.linesearch.options['relax_far'] = 1.e-3
+        newton.linesearch.options['relax_near'] = 1.e-5
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
