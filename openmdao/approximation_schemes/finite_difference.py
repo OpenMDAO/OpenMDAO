@@ -171,9 +171,9 @@ class FiniteDifference(ApproximationScheme):
             raise ValueError('deriv_type must be one of "total" or "partial"')
 
         result = system._outputs._clone(True)
-        result_array = result.get_data()
-        out_tmp = current_vec.get_data()
-        in_tmp = system._inputs.get_data()
+        result_array = result._data.copy()
+        out_tmp = current_vec._data.copy()
+        in_tmp = system._inputs._data.copy()
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -213,7 +213,7 @@ class FiniteDifference(ApproximationScheme):
                 in_size = system._var_allprocs_abs2meta[wrt]['size']
                 in_idx = range(in_size)
 
-            result.set_vec(system._outputs)
+            result._data[:] = system._outputs._data
 
             outputs = []
 
@@ -231,20 +231,19 @@ class FiniteDifference(ApproximationScheme):
 
             for i_count, idx in enumerate(in_idx):
                 if current_coeff:
-                    result.set_vec(current_vec)
-                    result *= current_coeff
+                    result._data[:] = current_vec._data
+                    result._data *= current_coeff
                 else:
-                    result.set_const(0.)
+                    result._data[:] = 0.
 
                 # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
                     self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
                     result_array *= coeff
-                    result.iadd_data(result_array)
+                    result._data += result_array
 
                 for of, subjac in outputs:
-
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
                         subjac[:, i_count] = result._views_flat[of][out_idx]
@@ -255,6 +254,7 @@ class FiniteDifference(ApproximationScheme):
                 rel_key = abs_key2rel_key(system, (of, wrt))
                 if uses_src_indices:
                     jac._override_checks = True
-                jac[rel_key] = subjac
-                if uses_src_indices:
+                    jac[rel_key] = subjac
                     jac._override_checks = False
+                else:
+                    jac[rel_key] = subjac

@@ -107,7 +107,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                              desc='Number of levels of fidelity.')
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', var_set=0):
+                  units=None, desc=''):
         """
         Add an input variable to the component.
 
@@ -135,14 +135,11 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             during execution. Default is None, which means it is unitless.
         desc : str
             description of the variable
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for
-            reconfigurability. Default is 0.
         """
         item = MultiFiMetaModelUnStructuredComp
         metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
                                                flat_src_indices=flat_src_indices, units=units,
-                                               desc=desc, var_set=var_set)
+                                               desc=desc)
         if self.options['vec_size'] > 1:
             input_size = metadata['value'][0].size
         else:
@@ -159,7 +156,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 self._input_sizes[fi] += input_size
 
     def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
-                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
         """
         Add an output variable to the component.
 
@@ -201,16 +198,12 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
         """
         super(MultiFiMetaModelUnStructuredComp, self).add_output(name, val, shape=shape,
                                                                  units=units, res_units=res_units,
                                                                  desc=desc, lower=lower,
                                                                  upper=upper, ref=ref,
                                                                  ref0=ref0, res_ref=res_ref,
-                                                                 var_set=var_set,
                                                                  surrogate=surrogate)
         self._training_output[name] = self._nfi * [np.empty(0)]
 

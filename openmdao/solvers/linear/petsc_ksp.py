@@ -293,7 +293,7 @@ class PETScKrylov(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         # set value of x vector to KSP provided value
-        x_vec.set_data(_get_petsc_vec_array(in_vec))
+        x_vec._data[:] = _get_petsc_vec_array(in_vec)
 
         # apply linear
         scope_out, scope_in = system._get_scope()
@@ -301,7 +301,7 @@ class PETScKrylov(LinearSolver):
                              scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
-        b_vec.get_data(result.array)
+        result.array[:] = b_vec._data
 
     def _linearize_children(self):
         """
@@ -370,8 +370,8 @@ class PETScKrylov(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # create numpy arrays to interface with PETSc
-            sol_array = x_vec.get_data()
-            rhs_array = b_vec.get_data()
+            sol_array = x_vec._data.copy()
+            rhs_array = b_vec._data.copy()
 
             # create PETSc vectors from numpy arrays
             sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
@@ -384,7 +384,7 @@ class PETScKrylov(LinearSolver):
             ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
             # stuff the result into the x vector
-            x_vec.set_data(sol_array)
+            x_vec._data[:] = sol_array
 
             sol_petsc_vec = rhs_petsc_vec = None
 
@@ -420,7 +420,7 @@ class PETScKrylov(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # set value of b vector to KSP provided value
-            b_vec.set_data(_get_petsc_vec_array(in_vec))
+            b_vec._data[:] = _get_petsc_vec_array(in_vec)
 
             # call the preconditioner
             self._solver_info.append_precon()
@@ -428,7 +428,7 @@ class PETScKrylov(LinearSolver):
             self._solver_info.pop()
 
             # stuff resulting value of x vector into result for KSP
-            x_vec.get_data(result.array)
+            result.array[:] = x_vec._data
         else:
             # no preconditioner, just pass back the incoming vector
             result.array[:] = _get_petsc_vec_array(in_vec)

@@ -77,8 +77,6 @@ class Vector(object):
     _data : {}
         Dict of the actual allocated data (depends on implementation), keyed
         by varset name.
-    _indices : list
-        List of indices mapping the varset-grouped data to the global vector.
     _vector_info : <VectorInfo>
         Object to store some global info, such as complex step state.
     _imag_views : dict
@@ -157,13 +155,12 @@ class Vector(object):
         self._names = self._views
 
         self._root_vector = None
-        self._data = {}
-        self._indices = {}
+        self._data = None
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
         if alloc_complex:
-            self._imag_data = {}
+            self._imag_data = None
             self._imag_views = {}
             self._complex_view_cache = {}
             self._imag_views_flat = {}
@@ -189,7 +186,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
+        self._length = np.sum(self._system._var_sizes[name][self._typ][self._iproc, :])
 
         self.read_only = False
 
@@ -203,7 +200,7 @@ class Vector(object):
             String rep of this object.
         """
         try:
-            return str(self.get_data())
+            return str(self._data)
         except Exception as err:
             return "<error during call to Vector.__str__>: %s" % err
 
@@ -238,53 +235,6 @@ class Vector(object):
         if initialize_views:
             vec._initialize_views()
         return vec
-
-    def get_data(self, new_array=None):
-        """
-        Get the array combining the data of all the varsets.
-
-        Parameters
-        ----------
-        new_array : ndarray or None
-            Array to fill in with the values; otherwise new array created.
-
-        Returns
-        -------
-        ndarray
-            Array combining the data of all the varsets.
-        """
-        if new_array is None:
-            ncol = self._ncol
-            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
-
-        for set_name, data in iteritems(self._data):
-            new_array[self._indices[set_name]] = data
-
-        return new_array
-
-    def set_data(self, array):
-        """
-        Set the incoming array combining the data of all the varsets.
-
-        Parameters
-        ----------
-        array : ndarray
-            Array to set to the data for all the varsets.
-        """
-        for set_name, data in iteritems(self._data):
-            data[:] = array[self._indices[set_name]]
-
-    def iadd_data(self, array):
-        """
-        In-place add the incoming combined array.
-
-        Parameters
-        ----------
-        array : ndarray
-            Array to set to the data for all the varsets.
-        """
-        for set_name, data in iteritems(self._data):
-            data += array[self._indices[set_name]]
 
     def _contains_abs(self, abs_name):
         """
@@ -534,15 +484,13 @@ class Vector(object):
         """
         scaling = self._scaling[scale_to]
         if self._ncol == 1:
-            for set_name, data in iteritems(self._data):
-                data *= scaling[set_name][1]
-                if scaling[set_name][0] is not None:  # nonlinear only
-                    data += scaling[set_name][0]
+            self._data *= scaling[1]
+            if scaling[0] is not None:  # nonlinear only
+                self._data += scaling[0]
         else:
-            for set_name, data in iteritems(self._data):
-                data *= scaling[set_name][1][:, np.newaxis]
-                if scaling[set_name][0] is not None:  # nonlinear only
-                    data += scaling[set_name][0]
+            self._data *= scaling[1][:, np.newaxis]
+            if scaling[0] is not None:  # nonlinear only
+                self._data += scaling[0]
 
     def set_vec(self, vec):
         """
