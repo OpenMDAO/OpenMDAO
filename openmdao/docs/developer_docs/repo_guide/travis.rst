@@ -15,6 +15,87 @@ When you run your doc-build on CI, and you happen to be embedding any code from 
 executed to generate output for the documentation. That code will not execute up on the CI platform unless you have first installed
 everything that OpenMDAO needs to run. So installing just what your project needs will not be enough.
 
+You can use the .travis.yml file in our template repository to get started, which looks like this:
+
+.. code-block::
+
+    sudo: false
+
+    os:
+      - linux
+
+    env:
+      - PY=2.7
+      - PY=3.6 UPLOAD_DOCS=1
+
+    language: generic
+
+    addons:
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - gfortran
+        - libblas-dev
+        - liblapack-dev
+        - libopenmpi-dev
+        - openmpi-bin
+
+    before_install:
+    - if [ "$PY" = "2.7" ];  then wget "https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh" -O miniconda.sh; fi
+    - if [ "$PY" = "3.6" ];  then wget "https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh" -O miniconda.sh; fi
+    - chmod +x miniconda.sh;
+    - ./miniconda.sh -b  -p /home/travis/miniconda;
+    - export PATH=/home/travis/miniconda/bin:$PATH;
+    - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/dymos" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+        MASTER_BUILD=1;
+      fi
+
+    install:
+    - conda install --yes python=$PY numpy scipy nose sphinx mock swig pip;
+    - pip install --upgrade pip
+    - sudo apt-get install gfortran
+    - pip install numpy==1.14.1
+    - pip install scipy==1.0.0
+    - pip install mpi4py
+    - pip install matplotlib
+    - pip install nose
+    - pip install networkx
+    - pip install testflo
+    - pip install pyyaml
+    - pip install coveralls
+    - pip install --user travis-sphinx;
+
+    # install pyoptsparse
+    - git clone https://github.com/OpenMDAO/pyoptsparse.git;
+    - cd pyoptsparse;
+    - python setup.py install;
+    - cd ..;
+
+    # install MBI
+    - git clone https://github.com/OpenMDAO/MBI.git;
+    - cd MBI;
+    - python setup.py build install;
+    - cd ..;
+
+    # install OpenMDAO in developer mode so we have access to its sphinx extensions
+    - git clone https://github.com/OpenMDAO/OpenMDAO.git;
+    - cd OpenMDAO;
+    - pip install -e .;
+    - cd ..;
+
+    # install your project itself in developer mode.
+    - pip install -e .;
+
+    script:
+    - testflo -n 1 your_project --pre_announce --coverage --coverpkg dymos;
+    - travis-sphinx build --source=your_project/docs;
+
+    after_success:
+    - if [ "$MASTER_BUILD" ] && [ "$UPLOAD_DOCS" ]; then
+        travis-sphinx deploy;
+      fi
+    - coveralls;
 
 Coverage
 --------
@@ -42,4 +123,71 @@ Caching
 
 The concept of build caching on Travis CI is intended to speed up the build, and therefore the entire build/test cycle on Travis CI.
 By caching the builds of dependencies/requirements that rarely change, we can get right to of various dependencies to speed up the build and the docbuild.
-This topic probably requires a document of its own, coming soon.
+
+Certain commonly-used things can be easily cached, using code near the top of your .travis.yml file that looks like this:
+
+.. code-block::
+    cache:
+      apt: true
+      directories:
+        - $HOME/.cache/pip
+        - $HOME/pyoptsparse
+        - $HOME/miniconda
+        - $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse
+
+Later in your .travis.yml file, you need to check for a cached version before you installed. Read the comments for some
+not-so-intuitive news on what caching does the first time through.
+
+.. code-block::
+
+    before_install:
+
+    # Check for existence of files to determine if cache exists
+    # If the dir doesn't exist, but is slated to be cached later,
+    # Travis unhelpfully creates it, which then causes "dir already exists"
+    # errors when you go to actually install the thing, so we must non-intuitively
+    # delete the file before re-creating it later.
+    - if [ -f $HOME/miniconda/bin/python$PY ]; then
+        echo "cached miniconda found -- nothing to do";
+      else
+        NOT_CACHED_CONDA=1;
+        rm -rf $HOME/miniconda;
+      fi
+
+Finally, a last thing to cache might be something private, like in OpenMDAO's case, the code for SNOPT, to be used inside
+our pyoptsparse install. To do this, we need to keep our private code in a private location, then do the following:
+
+    #. Set up passwordless entrance to the location of the secure location with the SNOPT source.
+    #. Copy the source into the proper directory so it can be built and subsequently cached.
+
+In fulfillment of #1, let's get key decrypted, placed, chmodded, and added for passwordless access to WebFaction:
+(for full instructions, see (link to advanced operations)
+
+.. code-block::
+    - if [ "$MASTER_BUILD" ]; then
+        openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+        eval "$(ssh-agent -s)";
+        chmod 600 /tmp/travis_deploy_rsa;
+        ssh-add /tmp/travis_deploy_rsa;
+        echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+      fi
+
+In fulfillment of #2, set $SNOPT_LOCATION to be an encrypted variable in your Travis CI settings that contains the
+secret location of the private code.
+Then we will check, and if the cache doesn't exist, we will copy it in from the secret location, and
+then it will get cached.
+
+.. code-block::
+    - if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
+        git clone https://github.com/OpenMDAO/pyoptsparse.git;
+        cd pyoptsparse;
+
+        if [ "$MASTER_BUILD" ]; then
+          cd pyoptsparse/pySNOPT/source;
+          scp -r "$SNOPT_LOCATION" .;
+          cd ../../..;
+        fi
+
+        python setup.py install;
+        cd ..;
+      fi
