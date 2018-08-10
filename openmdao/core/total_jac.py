@@ -621,8 +621,12 @@ class _TotalJacInfo(object):
             for color, ilist in enumerate(coloring_info[mode][0]):
                 if color == 0:
                     # do all uncolored indices individually (one linear solve per index)
-                    for i in ilist:
-                        yield [i], input_setter, jac_setter, mode
+                    if len(modes) == 1:
+                        for i in ilist:
+                            yield i, self.single_input_setter, self.single_jac_setter, mode
+                    else:
+                        for i in ilist:
+                            yield [i], input_setter, jac_setter, mode
                 else:
                     # yield all indices for a color at once
                     yield ilist, input_setter, jac_setter, mode
