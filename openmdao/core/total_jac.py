@@ -160,7 +160,7 @@ class _TotalJacInfo(object):
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
 
         if approx:
-            self._initialize_approx(self.output_meta[self.mode])
+            self._initialize_approx()
         else:
             constraints = driver._cons
 
@@ -218,51 +218,37 @@ class _TotalJacInfo(object):
 
             self.has_lin_cons = has_lin_cons
 
-            # always allocate a 2D dense array and we can assign views to dict keys later if
-            # return format is 'dict' or 'flat_dict'.
-            self.J = J = np.zeros((self.of_size, self.wrt_size))
+        # always allocate a 2D dense array and we can assign views to dict keys later if
+        # return format is 'dict' or 'flat_dict'.
+        self.J = J = np.zeros((self.of_size, self.wrt_size))
 
-            # for dict type return formats, map var names to views of the Jacobian array.
-            if return_format == 'array':
-                self.J_final = J
-                if self.has_scaling:
-                    # for array return format, create a 'dict' view for scaling only, since
-                    # our scaling data is by variable.
-                    self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                                   self.wrt_meta, self.of_meta, 'dict')
-                else:
-                    self.J_dict = None
+        # for dict type return formats, map var names to views of the Jacobian array.
+        if return_format == 'array':
+            self.J_final = J
+            if self.has_scaling or approx:
+                # for array return format, create a 'dict' view for scaling or FD, since
+                # our scaling and FD data is by variable.
+                self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
+                                               self.wrt_meta, self.of_meta, 'dict')
             else:
-                self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                                              self.wrt_meta, self.of_meta,
-                                                              return_format)
+                self.J_dict = None
+        else:
+            self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
+                                                          self.wrt_meta, self.of_meta,
+                                                          return_format)
 
         if self.has_scaling:
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
-    def _initialize_approx(self, output_meta):
+    def _initialize_approx(self):
         """
         Set up internal data structures needed for computing approx totals.
-
-        Parameters
-        ----------
-        output_meta : dict
-            Mapping of output name to response metadata (fwd) or design var metadata (rev).
         """
-        model = self.model
-        abs2meta = model._var_allprocs_abs2meta
-
-        if self.return_format == 'array':
-            self.J = J = np.zeros((self.of_size, self.wrt_size))
-
-            # for array return format, create a 'dict' view so we can map partial subjacs into
-            # the proper locations (and also do by-variable scaling if needed).
-            self.J_dict = self._get_dict_J(J, self.wrt, self.prom_wrt, self.of, self.prom_of,
-                                           self.wrt_meta, self.of_meta, 'dict')
-
         of_set = frozenset(self.of)
         wrt_set = frozenset(self.wrt)
+
+        model = self.model
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != of_set \
@@ -790,7 +776,7 @@ class _TotalJacInfo(object):
         all_rel_systems = set()
         vec_names = []
 
-        for count, i in enumerate(inds):
+        for i in inds:
             rel_systems, vnames, _ = self.single_input_setter(i, mode)
             _update_rel_systems(all_rel_systems, rel_systems)
             if vnames is not None:
