@@ -150,7 +150,6 @@ class _TotalJacInfo(object):
         self.input_list = {'fwd': wrt, 'rev': of}
         self.output_list = {'fwd': of, 'rev': wrt}
         self.input_meta = {'fwd': design_vars, 'rev': responses}
-        self.output_meta = {'fwd': responses, 'rev': design_vars}
         self.input_vec = {'fwd': model._vectors['residual'], 'rev': model._vectors['output']}
         self.output_vec = {'fwd': model._vectors['output'], 'rev': model._vectors['residual']}
 
@@ -210,9 +209,10 @@ class _TotalJacInfo(object):
             if not has_lin_cons and self.simul_coloring is not None:
                 self.idx2name = {}
                 self.idx2local = {}
+                output_voi_meta = {'fwd': responses, 'rev': design_vars}
                 for mode in modes:
                     self.idx2name[mode], self.idx2local[mode] = self._create_idx_maps(
-                        self.output_list[mode], self.output_meta[mode], out_size[mode])
+                        self.output_list[mode], output_voi_meta[mode], out_size[mode])
             else:
                 self.idx2name = self.idx2local = self.simul_coloring = None
 
