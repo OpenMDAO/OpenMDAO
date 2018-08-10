@@ -2,11 +2,53 @@
 
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, ScipyKrylov, NewtonSolver
+import numpy as np
+
+from openmdao.api import Problem, IndepVarComp, ScipyKrylov, NewtonSolver, ImplicitComponent, \
+     DirectSolver
 from openmdao.solvers.linesearch.relaxation import RelaxationLS
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 from openmdao.utils.assert_utils import assert_rel_error
+
+
+class Watson2(ImplicitComponent):
+    """
+    Implements a problem from Prof L. T. Watson.
+
+    f_k(x) - exp(cos(k * summation_i (x_i)))
+    """
+    def initialize(self):
+        self.options.declare('size', types=int, default=3,
+                             desc='Size of the Watson2 problem.')
+
+    def setup(self):
+        n = self.options['size']
+
+        self.add_output('x', val=1.0*np.ones((n, )))
+
+        self.declare_partials(of='x', wrt='x')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x = outputs['x']
+        n = self.options['size']
+
+        sum_x = np.sum(x)
+        k = np.arange(n) + 1
+
+        residuals['x'] = np.exp(np.cos(k * sum_x))
+
+    def linearize(self, inputs, outputs, jacobian):
+        x = outputs['x']
+        n = self.options['size']
+
+        sum_x = np.sum(x)
+        k = np.arange(n) + 1
+        fact = k * sum_x
+        fact2 = -k * np.sin(fact) * np.exp(np.cos(fact))
+
+        jacobian['x', 'x'] = np.tile(fact2, n).reshape((n, n)).T
+        print(jacobian['x', 'x'], x)
 
 
 class TestRelaxationLS(unittest.TestCase):
@@ -37,6 +79,26 @@ class TestRelaxationLS(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_watson2(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('comp', Watson2(size=3))
+
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 25
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver.linesearch = RelaxationLS()
+        model.nonlinear_solver.linesearch.options['initial_relaxation'] = 0.1
+        model.nonlinear_solver.linesearch.options['relax_far'] = 1e-1
+        model.nonlinear_solver.linesearch.options['relax_near'] = 1e-4
+
+        p.setup()
+        p.set_solver_print(level=2)
+
+        p.run_model()
+
+        assert_rel_error(self, p['comp.x'], np.array([1, 1, 1]), 1e-6)
+
     def test_circuit_advanced_newton(self):
         p = Problem()
         model = p.model
@@ -65,15 +127,6 @@ class TestRelaxationLS(unittest.TestCase):
         p['circuit.n2.V'] = 1e-3
 
         p.run_model()
-
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
-
-        # sanity check: should sum to .1 Amps
-        assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_linesearch_bounds_vector(self):
         top = Problem()
