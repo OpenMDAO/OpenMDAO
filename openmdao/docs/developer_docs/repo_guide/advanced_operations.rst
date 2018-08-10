@@ -1,5 +1,5 @@
-Automating Doc Build and Deployment from Travis CI
-==================================================
+Automating Doc Build and Custom Deployment from Travis CI
+=========================================================
 
 The following process is a one-time setup for the owner of a project to complete.  Once it is finished, it will become
 transparent to other developers and users. The process outlined here is to get a project's docs to build on Travis CI, and then
