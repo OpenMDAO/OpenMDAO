@@ -768,9 +768,7 @@ class LinearSolver(Solver):
 
         self._rhs_vecs = {}
         for vec_name in self._system._rel_vec_names:
-            self._rhs_vecs[vec_name] = rhs = {}
-            for varset, data in iteritems(b_vecs[vec_name]._data):
-                rhs[varset] = data.copy()
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
 
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
@@ -822,9 +820,7 @@ class LinearSolver(Solver):
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            rhs = self._rhs_vecs[vec_name]
-            for varset, data in iteritems(b_vecs[vec_name]._data):
-                rhs[varset][:] = data
+            self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
 
         if self.options['maxiter'] > 1:
             self._run_apply()
@@ -867,12 +863,9 @@ class LinearSolver(Solver):
 
         norm = 0
         for vec_name in self._vec_names:
-            rhs = self._rhs_vecs[vec_name]
             if vec_name in system._rel_vec_names:
-                b_vec = b_vecs[vec_name]
-                for varset, data in iteritems(rhs):
-                    b_vec._data[varset] -= data
-                norm += b_vec.get_norm()**2
+                b_vecs[vec_name]._data -= self._rhs_vecs[vec_name]
+                norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5
 

@@ -50,34 +50,31 @@ class PETScVector(DefaultVector):
 
         self._petsc = {}
         self._imag_petsc = {}
-        for set_name, data in iteritems(self._data):
-            if self._ncol == 1:
-                self._petsc[set_name] = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+        data = self._data
+        if self._ncol == 1:
+            self._petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+        else:
+            # for now the petsc array is only the size of one column and we do separate
+            # transfers for each column.   Later we'll do it all at once and the petsc
+            # array will be the full size of the data array (and use the same memory).
+            if data.size == 0:
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
             else:
-                # for now the petsc array is only the size of one column and we do separate
-                # transfers for each column.   Later we'll do it all at once and the petsc
-                # array will be the full size of the data array (and use the same memory).
-                if data.size == 0:
-                    self._petsc[set_name] = PETSc.Vec().createWithArray(data.copy(),
-                                                                        comm=self._system.comm)
-                else:
-                    self._petsc[set_name] = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                                        comm=self._system.comm)
+                self._petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
+                                                          comm=self._system.comm)
 
-            # Allocate imaginary for complex step
-            if self._alloc_complex:
-                for set_name, data in iteritems(self._imag_data):
-                    if self._ncol == 1:
-                        self._imag_petsc[set_name] = \
-                            PETSc.Vec().createWithArray(data, comm=self._system.comm)
-                    else:
-                        if data.size == 0:
-                            self._imag_petsc[set_name] = \
-                                PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
-                        else:
-                            self._imag_petsc[set_name] = \
-                                PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                            comm=self._system.comm)
+        # Allocate imaginary for complex step
+        if self._alloc_complex:
+            data = self._imag_data
+            if self._ncol == 1:
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+            else:
+                if data.size == 0:
+                    self._imag_petsc = PETSc.Vec().createWithArray(data.copy(),
+                                                                   comm=self._system.comm)
+                else:
+                    self._imag_petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
+                                                                   comm=self._system.comm)
 
     def get_norm(self):
         """
@@ -88,7 +85,4 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        global_sum = 0.
-        for data in itervalues(self._data):
-            global_sum += np.sum(data**2)
-        return self._system.comm.allreduce(global_sum) ** 0.5
+        return self._system.comm.allreduce(np.sum(self._data**2)) ** 0.5

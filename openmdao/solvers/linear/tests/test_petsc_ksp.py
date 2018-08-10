@@ -61,8 +61,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -70,13 +69,12 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
     def test_solve_linear_ksp_gmres(self):
         """Solve implicit system with PETScKrylov using 'gmres' method."""
 
-        group = TestImplicitGroup(lnSolverClass=PETScKrylov, use_varsets=False)
+        group = TestImplicitGroup(lnSolverClass=PETScKrylov)
         group.linear_solver.options['ksp_type'] = 'gmres'
 
         p = Problem(group)
@@ -94,7 +92,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -102,7 +100,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[0], group.expected_solution[0], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
         """Verify that PETScKrylov abides by the 'maxiter' option."""
@@ -154,8 +152,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         self.assertTrue(precon._iter_count > 0)
 
@@ -165,8 +162,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, group.expected_solution, 3e-15)
 
         self.assertTrue(precon._iter_count > 0)
 
@@ -186,8 +182,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -196,8 +191,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, group.expected_solution, 3e-15)
 
     def test_solve_linear_ksp_precon_left(self):
         """Solve implicit system with PETScKrylov using a preconditioner."""
@@ -223,8 +217,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -233,8 +226,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, group.expected_solution, 3e-15)
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = DirectSolver()
@@ -255,8 +247,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
@@ -265,8 +256,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, group.expected_solution, 3e-15)
 
     def test_preconditioner_deprecation(self):
 
@@ -317,10 +307,7 @@ class TestPETScKrylov(unittest.TestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        # The empty first entry in _data is due to the dummy
-        #     variable being in a different variable set not owned by g1
-        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -331,8 +318,7 @@ class TestPETScKrylov(unittest.TestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, g1.expected_solution, 3e-15)
 
     def test_linear_solution_cache(self):
         # Test derivatives across a converged Sellar model. When caching
