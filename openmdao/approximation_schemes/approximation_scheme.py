@@ -93,9 +93,9 @@ class ApproximationScheme(object):
 
         run_model()
 
-        results_vec.get_data(result_array)
-        results_vec.set_data(out_tmp)
-        inputs.set_data(in_tmp)
+        result_array[:] = results_vec._data
+        results_vec._data[:] = out_tmp
+        inputs._data[:] = in_tmp
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
         if results_vec is not outputs:
