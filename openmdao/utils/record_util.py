@@ -3,11 +3,15 @@ Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
 from six.moves import map, zip
-from six import iteritems
+from six import iteritems, PY2, PY3
 import os
 import json
-
 import numpy as np
+
+if PY2:
+    import cPickle as pickle
+if PY3:
+    import pickle
 
 
 def create_local_meta(name):
@@ -136,7 +140,7 @@ def check_path(path, includes, excludes, include_all_path=False):
     return False
 
 
-def json_to_np_array(vals):
+def json_to_np_array(vals, abs2meta):
     """
     Convert from a JSON string to a numpy named array.
 
@@ -144,6 +148,8 @@ def json_to_np_array(vals):
     ----------
     vals : string
         json string of data
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
 
     Returns
     -------
@@ -155,12 +161,12 @@ def json_to_np_array(vals):
         return None
 
     for var in json_vals:
-        json_vals[var] = convert_to_np_array(json_vals[var])
+        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta)
 
     return values_to_array(json_vals)
 
 
-def convert_to_np_array(val):
+def convert_to_np_array(val, varname, abs2meta):
     """
     Convert list to numpy array.
 
@@ -168,6 +174,10 @@ def convert_to_np_array(val):
     ----------
     val : list
         the list to be converted to an np.array
+    varname : str
+        name of variable to be converted
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
 
     Returns
     -------
@@ -175,7 +185,10 @@ def convert_to_np_array(val):
         The converted array.
     """
     if isinstance(val, list):
-        return np.array(val)
+        array = np.array(val)
+        shape = abs2meta[varname]['shape']
+        array = np.resize(array, shape)
+        return array
     return val
 
 
