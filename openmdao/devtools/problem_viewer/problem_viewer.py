@@ -7,6 +7,7 @@ import networkx as nx
 import shutil
 from collections import OrderedDict
 import base64
+import io 
 
 try:
     import h5py
@@ -222,7 +223,7 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     style_dir = os.path.join(vis_dir, "style")
 
     #grab the libraries
-    with open(os.path.join(libs_dir, "awesomplete.js"), "r") as f:
+    with io.open(os.path.join(libs_dir, "awesomplete.js"), "r", encoding="utf8") as f:
         awesomplete = f.read()
     with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
         d3 = f.read()
