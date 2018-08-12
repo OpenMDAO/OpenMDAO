@@ -105,6 +105,17 @@ display of the values by setting the optional argument, :code:`values`, to `Fals
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_for_docs_list_no_values
     :layout: interleave
 
+*List Names and Promoted Name*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want the names of the variables and their promoted name within the model,
+you can enable the display of promoted names by setting the optional argument,
+:code:`prom_name`, to `True`.
+
+.. embed-code::
+    openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_prom_names
+    :layout: interleave
+
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
