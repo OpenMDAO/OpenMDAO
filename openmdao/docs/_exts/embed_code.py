@@ -151,16 +151,14 @@ class EmbedCodeDirective(Directive):
                 skipped, failed, run_outputs = \
                     run_code(code_to_run, path, module=module, cls=class_)
 
-        if failed or skipped:
+        if failed:
             # Failed cases raised as a Directive warning (level 2 in docutils).
             # This way, the sphinx build does not terminate if, for example, you are building on
             # an environment where mpi or pyoptsparse are missing.
             raise self.directive_error(2, run_outputs)
 
-        # We no longer support skipping tests.
-        #elif skipped:
-        #    io_nodes = [get_skip_output_node(run_outputs)]
-
+        elif skipped:
+            io_nodes = [get_skip_output_node(run_outputs)]
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
