@@ -3,15 +3,10 @@ Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
 from six.moves import map, zip
-from six import iteritems, PY2, PY3
+from six import iteritems
 import os
 import json
 import numpy as np
-
-if PY2:
-    import cPickle as pickle
-if PY3:
-    import pickle
 
 
 def create_local_meta(name):
