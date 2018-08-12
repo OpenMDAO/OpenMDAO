@@ -227,8 +227,8 @@ class ImplicitCompTestCase(unittest.TestCase):
                                               out_stream=stream)
 
         text = stream.getvalue()
-        self.assertEqual(text.count('    x    [3.]   [0.]    comp2.x'), 1)
-        self.assertEqual(text.count('    x    [3.]   [0.]    comp3.x'), 1)
+        self.assertEqual(text.count('comp2.x'), 1)
+        self.assertEqual(text.count('comp3.x'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 9)
 
