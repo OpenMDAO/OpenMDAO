@@ -97,7 +97,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    if f_version == 3:
+                    if f_version >= 3:
                         test.assertIsNone(actual)
                     if f_version in (1, 2):
                         test.assertEqual(actual, np.array(None, dtype=object))
@@ -209,7 +209,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    if f_version == 3:
+                    if f_version >= 3:
                         test.assertIsNone(actual)
                     if f_version in (1, 2):
                         test.assertEqual(actual, np.array(None, dtype=object))
@@ -274,7 +274,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    if f_version == 3:
+                    if f_version >= 3:
                         test.assertIsNone(actual)
                     if f_version in (1, 2):
                         test.assertEqual(actual, np.array(None, dtype=object))

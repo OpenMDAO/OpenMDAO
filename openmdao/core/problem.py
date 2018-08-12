@@ -375,9 +375,9 @@ class Problem(object):
         if self._setup_status == 1:
             self._initial_condition_cache[name] = value
         else:
-            if name in self.model._outputs:
+            if self.model._outputs and name in self.model._outputs:
                 self.model._outputs[name] = value
-            elif name in self.model._inputs:
+            elif self.model._inputs and name in self.model._inputs:
                 self.model._inputs[name] = value
             else:
                 msg = 'Variable name "{}" not found.'
