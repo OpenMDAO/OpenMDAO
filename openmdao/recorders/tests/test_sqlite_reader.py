@@ -1058,8 +1058,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # the following were randomly generated using np.random.random(10)*2-1 to randomly
         # disperse them within a unit circle centered at the origin.
+        # Also converted this array to > 1D array to test that capability of case recording
         x_vals = np.array([0.55994437, -0.95923447, 0.21798656, -0.02158783, 0.62183717,
-                           # 0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886])
                            0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886]).reshape(
             (-1, 1))
 

@@ -1100,7 +1100,6 @@ class SystemCases(BaseCases):
         """
         with sqlite3.connect(self.filename) as con:
             cur = con.cursor()
-
             cur.execute("SELECT * FROM system_iterations")
             rows = cur.fetchall()
             for row in rows:
