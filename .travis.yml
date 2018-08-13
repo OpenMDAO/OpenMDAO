@@ -100,7 +100,7 @@ install:
     ./miniconda.sh -b  -p $HOME/miniconda;
     export PATH=$HOME/miniconda/bin:$PATH;
     conda install --yes python=$PY;
-    conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
+    conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
   else
     export PATH=$HOME/miniconda/bin:$PATH;
     if [ "$UPLOAD_DOCS" ]; then
