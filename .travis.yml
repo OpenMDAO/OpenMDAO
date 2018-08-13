@@ -19,7 +19,7 @@ env:
     - PY=2.7 NUMPY=1.12 PETSc=3.8.1
     - PY=2.7 NUMPY=1.12 PETSc=3.9.1
     - PY=3.6 NUMPY=1.12
-    - PY=3.6 NUMPY=1.12 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.15 PETSc=3.8.1 UPLOAD_DOCS=1
     - PY=3.6 NUMPY=1.14 PETSc=3.9.1
 
 git:
@@ -103,7 +103,9 @@ install:
     conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
   else
     export PATH=$HOME/miniconda/bin:$PATH;
-    conda install --yes scipy=1.0.1;
+    if [ "$UPLOAD_DOCS" ]; then
+      conda install --yes scipy=1.0.1;
+    fi
   fi
 
 - if [ "$NOT_CACHED_PIP" ]; then
