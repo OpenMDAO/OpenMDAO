@@ -19,7 +19,7 @@ env:
     - PY=2.7 NUMPY=1.12 PETSc=3.8.1
     - PY=2.7 NUMPY=1.12 PETSc=3.9.1
     - PY=3.6 NUMPY=1.12
-    - PY=3.6 NUMPY=1.15 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.14 PETSc=3.8.1 UPLOAD_DOCS=1
     - PY=3.6 NUMPY=1.14 PETSc=3.9.1
 
 git:
@@ -65,7 +65,7 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ] && ["$UPLOAD_DOCS" = "false"]; then
+- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
     echo "cached pyoptsparse found -- nothing to do";
   else
     NOT_CACHED_PYOPTSPARSE=1;
