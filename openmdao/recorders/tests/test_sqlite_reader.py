@@ -812,37 +812,24 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         prob.load_case(case)
         prob.run_model()
-        print('speed', prob['c2.speed'], 'km/h', prob['c3.f'], 'm/s')
 
+        _assert_model_matches_case(case, model)
+
+        # make sure the loaded unit strings are compatible with `convert_units`
         from openmdao.utils.units import convert_units
-        print('100 km/h =', convert_units(100, 'km/h', 'm/s'), 'm/s')
-
         outputs = cr.list_outputs(case=case, explicit=True, implicit=True, values=True,
                                   units=True, shape=True, out_stream=None)
-        from pprint import pprint
-        pprint(outputs)
-
         meta = {}
-        for o in outputs:
-            name = o[0]
-            vals = o[1]
-            print(vals)
-            for val in vals:
-                print(val, 'str?', isinstance(vals[val], str),
-                      'unicode?', isinstance(vals[val], unicode))
-                # if isinstance(vals[val], unicode):
-                #     vals[val] = vals[val].encode('ascii')
+        for name, vals in outputs:
             meta[name] = vals
-        pprint(meta)
-
-        print(prob['c2.speed'], meta['c2.speed']['units'], '=',
-              prob['c3.f'], meta['c3.f']['units'])
 
         from_units = meta['c2.speed']['units']
         to_units = meta['c3.f']['units']
-        print('100', from_units, '=', convert_units(100, from_units, to_units), to_units)
 
-        _assert_model_matches_case(case, model)
+        self.assertEqual(from_units, 'km/h')
+        self.assertEqual(to_units, 'm/s')
+
+        self.assertEqual(convert_units(10., from_units, to_units), 10000./3600.)
 
     def test_optimization_load_system_cases(self):
         prob = SellarProblem(SellarDerivativesGrouped)
