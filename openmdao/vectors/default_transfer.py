@@ -18,7 +18,7 @@ class DefaultTransfer(Transfer):
     """
 
     @staticmethod
-    def _get_var_offsets(group, size_range):
+    def _get_var_offsets(group, local=False):
         """
         Compute offsets for variables.
 
@@ -26,8 +26,8 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        size_range : slice
-            Proc range of sizes array to use to compute global offsets.
+        local : bool
+            If True, offsets for each proc will be relative to only that proc.
 
         Returns
         -------
@@ -39,7 +39,7 @@ class DefaultTransfer(Transfer):
             for vec_name in group._lin_rel_vec_name_list:
                 offsets[vec_name] = off_vn = {}
                 for type_ in ['input', 'output']:
-                    vsizes = group._var_sizes[vec_name][type_][size_range]
+                    vsizes = group._var_sizes[vec_name][type_]
                     if vsizes.size > 0:
                         csum = np.cumsum(vsizes)
                         # shift the cumsum forward by one and set first entry to 0 to get
@@ -47,6 +47,9 @@ class DefaultTransfer(Transfer):
                         csum[1:] = csum[:-1]
                         csum[0] = 0
                         off_vn[type_] = csum.reshape(vsizes.shape)
+                        if local:
+                            # adjust offsets to be local in each process
+                            off_vn[type_] -= off_vn[type_][:, 0].reshape((vsizes.shape[0], 1))
                     else:
                         off_vn[type_] = [np.zeros(0, dtype=int)]
             offsets['nonlinear'] = offsets['linear']
@@ -91,8 +94,7 @@ class DefaultTransfer(Transfer):
 
         transfers = group._transfers
         vectors = group._vectors
-        size_range = slice(group.comm.rank, group.comm.rank + 1)
-        offsets = DefaultTransfer._get_var_offsets(group, size_range)
+        offsets = DefaultTransfer._get_var_offsets(group, local=True)
 
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
@@ -112,8 +114,8 @@ class DefaultTransfer(Transfer):
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
             sizes_out = group._var_sizes[vec_name]['output']
-            offsets_in = offsets[vec_name]['input'][0]
-            offsets_out = offsets[vec_name]['output'][0]
+            offsets_in = offsets[vec_name]['input']
+            offsets_out = offsets[vec_name]['output']
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
@@ -153,15 +155,15 @@ class DefaultTransfer(Transfer):
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
 
                     # 1. Compute the output indices
-                    offset = offsets_out[idx_out]
+                    offset = offsets_out[iproc, idx_out]
                     if src_indices is None:
                         output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                     else:
                         output_inds = src_indices + offset
 
                     # 2. Compute the input indices
-                    input_inds = np.arange(offsets_in[idx_in],
-                                           offsets_in[idx_in] +
+                    input_inds = np.arange(offsets_in[iproc, idx_in],
+                                           offsets_in[iproc, idx_in] +
                                            sizes_in[iproc, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
