@@ -65,7 +65,7 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
+- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ] && ["$UPLOAD_DOCS" = "false"]; then
     echo "cached pyoptsparse found -- nothing to do";
   else
     NOT_CACHED_PYOPTSPARSE=1;
