@@ -797,8 +797,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        print('speed', prob['c2.speed'], 'km/h', prob['c3.f'], 'm/s')
-
         cr = CaseReader(self.filename)
         case = cr.system_cases.get_case(0)
 
@@ -811,9 +809,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Now load in the case we recorded
         prob.load_case(case)
-        prob.run_model()
 
         _assert_model_matches_case(case, model)
+
+        # make sure it still runs with loaded values
+        prob.run_model()
 
         # make sure the loaded unit strings are compatible with `convert_units`
         from openmdao.utils.units import convert_units
