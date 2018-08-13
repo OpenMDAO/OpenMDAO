@@ -104,6 +104,7 @@ install:
       conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
     else
       conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+    fi
   else
     export PATH=$HOME/miniconda/bin:$PATH;
   fi
