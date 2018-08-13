@@ -208,7 +208,7 @@ class TestBetzLimit(unittest.TestCase):
             assert_rel_error(self, prob['Area'], 1.0, 1e-4)
         else:
             msg = "Outdated version of Scipy (%s) detected; this problem does not solve properly." % str(scipy.__version__)
-            raise unittest.SkipTest(msg)
+            raise RuntimeError(msg)
 
     def test_betz_derivatives(self):
         from openmdao.api import Problem, IndepVarComp
