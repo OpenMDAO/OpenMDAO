@@ -1145,8 +1145,9 @@ class TestComponentComplexStep(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             model.resetup(setup_mode='reconf')
 
-        msg = 'In order to activate complex step during reconfiguration, you need to set ' + \
-              '"force_alloc_complex" to True during setup.'
+        msg = "In order to activate complex step during reconfiguration, " \
+              "you need to set 'force_alloc_complex' to True during setup. " \
+              "e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(context.exception), msg)
 
         # This time, allocate complex in setup.
