@@ -218,6 +218,20 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(1, text.count('value'))
         self.assertEqual(1, text.count('resids'))
 
+    def test_list_outputs_prom_name(self):
+        self.prob.run_model()
+
+        stream = cStringIO()
+        states = self.prob.model.list_outputs(explicit=False, residuals=True,
+                                              prom_name=True, hierarchical=True,
+                                              out_stream=stream)
+
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp2.x'), 1)
+        self.assertEqual(text.count('comp3.x'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 9)
+
     def test_list_residuals(self):
         self.prob.run_model()
 
@@ -974,6 +988,9 @@ class ListFeatureTestCase(unittest.TestCase):
 
     def test_list_residuals(self):
         prob.model.list_outputs(residuals=True)
+
+    def test_list_prom_names(self):
+        prob.model.list_outputs(prom_name=True)
 
     def test_list_return_value(self):
         inputs = prob.model.list_inputs(out_stream=None)

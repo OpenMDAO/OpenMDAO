@@ -29,13 +29,38 @@ def database_cursor(filename):
     con.close()
 
 
+def get_format_version_abs2meta(db_cur):
+    """
+        Return the format version and abs2meta dict from metadata table in the case recorder file.
+    """
+    db_cur.execute("SELECT format_version, abs2meta FROM metadata")
+    row = db_cur.fetchone()
+
+    f_version = row[0]
+
+    # Need to also get abs2meta so that we can pass it to json_to_np_array
+    if f_version >= 3:
+        abs2meta = json.loads(row[1])
+    elif f_version in (1, 2):
+        if PY2:
+            abs2meta = pickle.loads(str(row[1])) if row[1] is not None else None
+
+        if PY3:
+            try:
+                abs2meta = pickle.loads(row[1]) if row[1] is not None else None
+            except TypeError:
+                # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+                abs2meta = pickle.loads(row[1].encode()) if row[1] is not \
+                                                            None else None
+
+    return f_version, abs2meta
+
 def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     """
     Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        db_cur.execute("SELECT format_version FROM metadata")
-        f_version = db_cur.fetchone()[0]
+        f_version, abs2meta = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for coord, (t0, t1), outputs_expected, inputs_expected in expected:
@@ -54,8 +79,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                 inputs_text, outputs_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = json_to_np_array(inputs_text)
-                outputs_actual = json_to_np_array(outputs_text)
+                inputs_actual = json_to_np_array(inputs_text, abs2meta)
+                outputs_actual = json_to_np_array(outputs_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -72,7 +97,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    if f_version == 3:
+                    if f_version >= 3:
                         test.assertIsNone(actual)
                     if f_version in (1, 2):
                         test.assertEqual(actual, np.array(None, dtype=object))
@@ -145,8 +170,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        db_cur.execute("SELECT format_version FROM metadata")
-        f_version = db_cur.fetchone()[0]
+        f_version, abs2meta = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for coord, (t0, t1), inputs_expected, outputs_expected, residuals_expected in expected:
@@ -164,9 +188,9 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                 outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = json_to_np_array(inputs_text)
-                outputs_actual = json_to_np_array(outputs_text)
-                residuals_actual = json_to_np_array(residuals_text)
+                inputs_actual = json_to_np_array(inputs_text, abs2meta)
+                outputs_actual = json_to_np_array(outputs_text, abs2meta)
+                residuals_actual = json_to_np_array(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -185,7 +209,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    if f_version == 3:
+                    if f_version >= 3:
                         test.assertIsNone(actual)
                     if f_version in (1, 2):
                         test.assertEqual(actual, np.array(None, dtype=object))
@@ -206,8 +230,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
         Expected can be from multiple cases.
     """
     with database_cursor(test.filename) as db_cur:
-        db_cur.execute("SELECT format_version FROM metadata")
-        f_version = db_cur.fetchone()[0]
+        f_version, abs2meta = get_format_version_abs2meta(db_cur)
 
         # iterate through the cases
         for coord, (t0, t1), expected_abs_error, expected_rel_error, expected_output, \
@@ -226,8 +249,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 input_blob, output_text, residuals_text = row_actual
 
             if f_version >= 3:
-                output_actual = json_to_np_array(output_text)
-                residuals_actual = json_to_np_array(residuals_text)
+                output_actual = json_to_np_array(output_text, abs2meta)
+                residuals_actual = json_to_np_array(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 output_actual = blob_to_array(output_text)
                 residuals_actual = blob_to_array(residuals_text)
@@ -251,7 +274,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             ):
 
                 if expected is None:
-                    if f_version == 3:
+                    if f_version >= 3:
                         test.assertIsNone(actual)
                     if f_version in (1, 2):
                         test.assertEqual(actual, np.array(None, dtype=object))

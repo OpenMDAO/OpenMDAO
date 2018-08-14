@@ -80,7 +80,7 @@ setup(
         'openmdao.recorders': ['tests/legacy_sql/*.sql'],
         'openmdao.utils': ['unit_library.ini'],
         'openmdao.test_suite': [
-            '*.py', 
+            '*.py',
             '*/*.py',
             'matrices/*.npz'
         ],
@@ -96,6 +96,7 @@ setup(
         'testflo',
         'parameterized',
         'pyparsing',
+        'pyyaml',
         'networkx>=2.0',
         'sphinx',
         'redbaron',

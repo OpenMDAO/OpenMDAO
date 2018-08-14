@@ -1611,8 +1611,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         t0, t1 = run_driver(prob)
 
-        prob.run_model()
-
         prob.cleanup()
 
         # coordinate = rank0:._solve_nonlinear | 0

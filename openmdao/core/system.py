@@ -2295,6 +2295,7 @@ class System(object):
     def list_outputs(self,
                      explicit=True, implicit=True,
                      values=True,
+                     prom_name=False,
                      residuals=False,
                      residuals_tol=None,
                      units=False,
@@ -2319,6 +2320,9 @@ class System(object):
             include outputs from implicit components. Default is True.
         values : bool, optional
             When True, display/return output values. Default is True.
+        prom_name : bool, optional
+            When True, display/return the promoted name of the variable.
+            Default is False.
         residuals : bool, optional
             When True, display/return residual values. Default is False.
         residuals_tol : float, optional
@@ -2367,6 +2371,8 @@ class System(object):
             outs = {}
             if values:
                 outs['value'] = val
+            if prom_name:
+                outs['prom_name'] = self._var_abs2prom['output'][name]
             if residuals:
                 outs['resids'] = self._residuals._views[name]
             if units:
