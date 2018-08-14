@@ -590,9 +590,11 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, ExecComp
 
         prob = Problem()
-        prob.model.add_subsystem('comp', ExecComp('y=x-25.', x={'value': 77.0, 'units': 'degF'},
+        prob.model.add_subsystem('comp', ExecComp('y=x-25.',
+                                                  x={'value': 77.0, 'units': 'degF'},
                                                   y={'units': 'degC'}))
-        prob.model.add_subsystem('prom', ExecComp('yy=xx-25.', xx={'value': 77.0, 'units': 'degF'},
+        prob.model.add_subsystem('prom', ExecComp('yy=xx-25.',
+                                                  xx={'value': 77.0, 'units': 'degF'},
                                                   yy={'units': 'degC'}),
                                  promotes=['xx', 'yy'])
         prob.model.add_subsystem('acomp', ExecComp('y=x-25.',
@@ -956,7 +958,7 @@ class TestProblem(unittest.TestCase):
                          "'root' has been deprecated, please use 'model'.")
 
         with warnings.catch_warnings(record=True) as w:
-            prob = Problem(root=Group)
+            prob = Problem(root=Group())
 
         self.assertEqual(str(w[0].message), "The 'root' argument provides backwards "
                          "compatibility with OpenMDAO <= 1.x ; use 'model' instead.")
