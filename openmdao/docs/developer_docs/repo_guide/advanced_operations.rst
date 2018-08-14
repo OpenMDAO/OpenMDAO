@@ -1,5 +1,11 @@
+.. _`advanced_operations_automation`:
+
 Automating Doc Build and Custom Deployment from Travis CI
 =========================================================
+
+.. note::
+    The current recommended procedure for new repos is to use github-pages as outlined :ref:`earlier <github_pages>`. This page exists to explain how OpenMDAO's docs work for now. If you are
+    starting a new project, go follow the :ref:`github-pages instructions <github_pages>` instructions, as they are much simpler.
 
 The following process is a one-time setup for the owner of a project to complete.  Once it is finished, it will become
 transparent to other developers and users. The process outlined here is to get a project's docs to build on Travis CI, and then
@@ -9,9 +15,6 @@ customize the installation of your project.  Certain advanced items in OpenMDAO 
 Having a full install means that the docs will be more complete, because embedded tests that rely on, for instance, MPI, will actually work on Travis CI,
 whereas they currently do not on readthedocs.org.
 
-.. note::
-    The new recommended procedure is to use github-pages as outlined in a previous document. This page exists to explain how OpenMDAO's docs work for now. If you are
-    starting a new project, go follow those instructions, as they are much simpler.
 
 Getting Started and General Concept
 -----------------------------------

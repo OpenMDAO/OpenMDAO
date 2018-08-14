@@ -1,6 +1,8 @@
+.. _`release_process`:
+
+
 Release Process to Make Your Project Pip-Installable
 ====================================================
-
 
 git
 ---

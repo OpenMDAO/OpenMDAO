@@ -1,3 +1,5 @@
+.. _`documentation_standardization`:
+
 Documentation
 =============
 
@@ -17,6 +19,7 @@ Importing Tools from OpenMDAO
 -----------------------------
 
 During this process, to get your docs to build properly, you may need access to a couple of things from within OpenMDAO:
+
 `openmdao.docs.utils` will get you things like our sourcedoc-building script, `generate_docs`, which will be called from conf.py,
 to create an organized set of source documentation.
 
@@ -49,7 +52,7 @@ Here's how you might bring in an OpenMDAO extension, by importing it, and then a
 General Docs Settings
 ~~~~~~~~~~~~~~~~~~~~~
 
-Your Sphinx documentation will need its own docs/conf.py, theme directory, and style.css so that you may customize the docs
+Your Sphinx documentation will need its own `docs/conf.py`, theme directory, and style.css so that you may customize the docs
 into something that will make them their own. You can use OpenMDAO's `docs/conf.py`, `docs/_theme/theme.conf` and
 `docs/_theme/static/style.css` as a starting point.
 
@@ -67,9 +70,9 @@ Then simply calling the :code:`do_monkeypatch()` from within your conf.py would 
 OpenMDAO docs Makefile
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The OpenMDAO `docs/Makefile` can be used as a template for making Sphinx documentation, and can accomplish several things that
-the default Makefile falls short of (e.g. only building files that have recently changed, rather than the whole project; e.g. rebuilding
-an .rst file whose embed-code dependency has changed, though the .rst file hasn't) Here are the commands from OpenMDAO's Makefile:
+The OpenMDAO `docs/Makefile` can't be imported, per se, but can be used as a template for your own Sphinx docs Makefile, and can accomplish several things that
+the default Sphinx Makefile falls short of (e.g. our Makefile can build only files that have recently changed, rather than the whole project; e.g. our makefile
+can rebuild an .rst file whose embed-code dependency has changed, though the .rst file hasn't) Here are the commands from OpenMDAO's Makefile:
 
 .. code-block:: makefile
 
@@ -106,7 +109,7 @@ subpackage.  To import this tool:
 
 :code:`from openmdao.docs.utils.generate_sourcedocs import generate_docs`
 
-then, from your `docs/conf.py`, invoke it with arguments of:
+Then, from your `docs/conf.py`, invoke it with arguments of:
     #. where to find packages (relative to where it's being called)
     #. root of the project (relative to where it's being called)
     #. which packages to include--omit things like "test" that don't make sense to doc.
@@ -125,7 +128,7 @@ then, from your `docs/conf.py`, invoke it with arguments of:
 OpenMDAO Tagging Tool
 ~~~~~~~~~~~~~~~~~~~~~
 
-OpenMDAO's docs have a custom script that preprocesses all the .rst files found within a set of Sphinx documentation, and creates
+OpenMDAO's docs have a custom script that pre-processes all the .rst files found within a set of Sphinx documentation, and creates
 a custom blog-like tagging system that helps organize and cross-reference docs.
 
 The script finds occurrences of the .. tags:: directive and sets up the structure of the tags directory.  One file
@@ -139,4 +142,4 @@ Getting Docs For Your Plugin Transferred to github-pages
 --------------------------------------------------------
 
 Once you have your documents organized and building locally, and building without errors on Travis CI, then we can explore transferring those
-built docs from Travis to github-pages. This is discussed in detail in the next doc.
+built docs from Travis to github-pages. This is discussed in detail in the next doc on :ref:`github-pages setup <github_pages>`.

@@ -1,3 +1,5 @@
+.. _`github_pages`:
+
 github-pages Repository Setup
 =============================
 
@@ -47,7 +49,7 @@ travis-sphinx Usage
 `travis-sphinx` is a standalone script for automated building and deploying of sphinx docs to github-pages
 via TravisCI.
 
-Once your personal access token is set up, you can begin using travis-sphinx within your Sphinx configuration file. (docs/conf.py)
+Once your personal access token is set up, you can begin using travis-sphinx within your Sphinx configuration file. (`docs/conf.py`)
 The two calls that should be used are, in their respective doc sections:
 
 .. code-block:: python
