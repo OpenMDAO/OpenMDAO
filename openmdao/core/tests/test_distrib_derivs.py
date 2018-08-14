@@ -22,7 +22,7 @@ else:
 class DistribExecComp(ExecComp):
     """
     An ExecComp that uses N procs and takes input var slices.  Unlike a normal
-    ExecComp, if only supports a single expression per proc.  If you give it
+    ExecComp, it only supports a single expression per proc.  If you give it
     multiple expressions, it will use a different one in each proc, repeating
     the last one in any remaining procs.
     """

@@ -58,7 +58,7 @@ class PETScTransfer(DefaultTransfer):
 
         transfers = group._transfers
         vectors = group._vectors
-        offsets = PETScTransfer._get_var_offsets(group, local=False)
+        offsets = group._get_var_offsets()
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
 

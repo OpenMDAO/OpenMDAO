@@ -7,7 +7,7 @@ from six import iteritems, itervalues
 import numpy as np
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, _global2local_offsets
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -16,45 +16,6 @@ class DefaultTransfer(Transfer):
     """
     Default NumPy transfer.
     """
-
-    @staticmethod
-    def _get_var_offsets(group, local=False):
-        """
-        Compute offsets for variables.
-
-        Parameters
-        ----------
-        group : <Group>
-            Parent group.
-        local : bool
-            If True, offsets for each proc will be relative to only that proc.
-
-        Returns
-        -------
-        dict
-            Arrays of offsets keyed by vec_name and deriv direction.
-        """
-        if group._var_offsets is None:
-            offsets = group._var_offsets = {}
-            for vec_name in group._lin_rel_vec_name_list:
-                offsets[vec_name] = off_vn = {}
-                for type_ in ['input', 'output']:
-                    vsizes = group._var_sizes[vec_name][type_]
-                    if vsizes.size > 0:
-                        csum = np.cumsum(vsizes)
-                        # shift the cumsum forward by one and set first entry to 0 to get
-                        # the correct offset.
-                        csum[1:] = csum[:-1]
-                        csum[0] = 0
-                        off_vn[type_] = csum.reshape(vsizes.shape)
-                        if local:
-                            # adjust offsets to be local in each process
-                            off_vn[type_] -= off_vn[type_][:, 0].reshape((vsizes.shape[0], 1))
-                    else:
-                        off_vn[type_] = [np.zeros(0, dtype=int)]
-            offsets['nonlinear'] = offsets['linear']
-
-        return group._var_offsets
 
     @staticmethod
     def _setup_transfers(group, recurse=True):
@@ -94,7 +55,7 @@ class DefaultTransfer(Transfer):
 
         transfers = group._transfers
         vectors = group._vectors
-        offsets = DefaultTransfer._get_var_offsets(group, local=True)
+        offsets = _global2local_offsets(group._get_var_offsets())
 
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']

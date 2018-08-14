@@ -47,12 +47,6 @@ class Group(System):
     _local_system_set : set or None
         Set of pathnames of all fully local (not remote or distributed)
         direct or indirect subsystems.
-    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
-        Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
-        of size nproc x num_var where nproc is the number of processors
-        in this Group's communicator and num_var is the number of allprocs variables
-        in the given group.  This is only defined if the Group owns one or more interprocess
-        connections.
     _subgroups_myproc : list
         List of local subgroups.
     _manual_connections : dict
@@ -87,7 +81,6 @@ class Group(System):
         super(Group, self).__init__(**kwargs)
 
         self._local_system_set = None
-        self._var_offsets = None
         self._subgroups_myproc = None
         self._manual_connections = {}
         self._static_manual_connections = {}

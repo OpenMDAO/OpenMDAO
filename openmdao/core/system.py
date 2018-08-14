@@ -105,6 +105,13 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
+    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
+        Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
+        of size nproc x num_var where nproc is the number of processors
+        in this System's communicator and num_var is the number of allprocs variables
+        in the given system.  This is only defined in a Group that owns one or more interprocess
+        connections or a top level Group or System that is used to compute total derivatives
+        across multiple processes.
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_sizes : {'input': (int, int), 'output': (int, int)}
@@ -282,6 +289,7 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
+        self._var_offsets = None
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
@@ -1506,6 +1514,34 @@ class System(object):
         return (self._vectors['input'][vec_name],
                 self._vectors['output'][vec_name],
                 self._vectors['residual'][vec_name])
+
+    def _get_var_offsets(self):
+        """
+        Compute offsets for variables.
+
+        Returns
+        -------
+        dict
+            Arrays of global offsets keyed by vec_name and deriv direction.
+        """
+        if self._var_offsets is None:
+            offsets = self._var_offsets = {}
+            for vec_name in self._lin_rel_vec_name_list:
+                offsets[vec_name] = off_vn = {}
+                for type_ in ['input', 'output']:
+                    vsizes = self._var_sizes[vec_name][type_]
+                    if vsizes.size > 0:
+                        csum = np.cumsum(vsizes)
+                        # shift the cumsum forward by one and set first entry to 0 to get
+                        # the correct offset.
+                        csum[1:] = csum[:-1]
+                        csum[0] = 0
+                        off_vn[type_] = csum.reshape(vsizes.shape)
+                    else:
+                        off_vn[type_] = [np.zeros(0, dtype=int)]
+            offsets['nonlinear'] = offsets['linear']
+
+        return self._var_offsets
 
     @contextmanager
     def jacobian_context(self, jac):

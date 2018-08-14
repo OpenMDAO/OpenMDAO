@@ -254,8 +254,6 @@ class DecoupledTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        #import wingdbstub
-
         prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv')
         prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv')
         prob.model.add_constraint('Con1.y', upper=0.0)
@@ -404,7 +402,7 @@ class IndicesTestCase2(unittest.TestCase):
 
         root.linear_solver = LinearBlockGS()
 
-        G1 = root.add_subsystem('G1', Group())# ParallelGroup())
+        G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
         par1 = G1.add_subsystem('par1', Group())
@@ -434,7 +432,7 @@ class IndicesTestCase2(unittest.TestCase):
         root.connect('G1.par1.c2.y', 'G1.par1.c4.x')
         root.connect('G1.par2.c3.y', 'G1.par2.c5.x')
 
-        prob.setup(check=False)
+        prob.setup(check=False, mode=mode)
         prob.run_driver()
 
         return prob
@@ -457,6 +455,7 @@ class IndicesTestCase2(unittest.TestCase):
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
+
         J = prob.compute_totals(['G1.par1.c4.y', 'G1.par2.c5.y'],
                                 ['G1.par1.p.x', 'G1.par2.p.x'],
                                 return_format='flat_dict')
