@@ -473,7 +473,6 @@ class System(object):
             relevant = self._relevant
             vec_names = self._rel_vec_name_list
             vois = self._vois
-            iproc = self.comm.rank
             abs2idx = self._var_allprocs_abs2idx
 
             # Check for complex step to set vectors up appropriately.
@@ -590,9 +589,7 @@ class System(object):
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
-            initial = True
             recurse = True
-            resize = False
 
             self.pathname = ''
             self.comm = comm
@@ -601,14 +598,10 @@ class System(object):
             self._local_vector_class = local_vector_class
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
-            initial = False
             recurse = True
-            resize = True
         # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
         elif setup_mode == 'update':
-            initial = False
             recurse = False
-            resize = False
 
         self._mode = mode
 
@@ -787,7 +780,6 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_allprocs_abs2idx = abs2idx = {}
-        abs2meta = self._var_allprocs_abs2meta
 
         for vec_name in self._lin_rel_vec_name_list:
             abs2idx[vec_name] = abs2idx_t = {}
@@ -1015,8 +1007,9 @@ class System(object):
         # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
         # initially allocated as complex.
         if not alloc_complex and 'cs' in self._approx_schemes:
-            msg = 'In order to activate complex step during reconfiguration, you need to set ' + \
-                '"force_alloc_complex" to True during setup.'
+            msg = "In order to activate complex step during reconfiguration, " \
+                  "you need to set 'force_alloc_complex' to True during setup. " \
+                  "e.g. 'problem.setup(force_alloc_complex=True)'"
             raise RuntimeError(msg)
 
         vector_class = self._vector_class
