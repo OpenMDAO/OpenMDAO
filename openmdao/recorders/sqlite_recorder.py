@@ -3,19 +3,20 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
 from copy import deepcopy
-import io
+from io import BytesIO
+
 import os
 import sqlite3
 
 import warnings
 import json
 import numpy as np
-from six import iteritems
+
 from six.moves import cPickle as pickle
 
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.utils.mpi import MPI
-from openmdao.utils.record_util import values_to_array, check_path
+from openmdao.utils.record_util import values_to_array
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
@@ -61,7 +62,7 @@ def array_to_blob(array):
         The blob created from the array.
 
     """
-    out = io.BytesIO()
+    out = BytesIO()
     np.save(out, array)
     out.seek(0)
     return sqlite3.Binary(out.read())
@@ -83,7 +84,7 @@ def blob_to_array(blob):
     array :
         The array created from the blob.
     """
-    out = io.BytesIO(blob)
+    out = BytesIO(blob)
     out.seek(0)
     return np.load(out)
 

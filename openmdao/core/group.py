@@ -47,11 +47,11 @@ class Group(System):
     _local_system_set : set or None
         Set of pathnames of all fully local (not remote or distributed)
         direct or indirect subsystems.
-    _var_offsets_byset : {'input': dict of ndarray, 'output': dict of ndarray} or None
-        Dict of distributed offsets, keyed by var_set name.  Offsets are stored in an array
+    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
+        Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
         in this Group's communicator and num_var is the number of allprocs variables
-        in the given var_set.  This is only defined if the Group owns one or more interprocess
+        in the given group.  This is only defined if the Group owns one or more interprocess
         connections.
     _subgroups_myproc : list
         List of local subgroups.
@@ -87,7 +87,7 @@ class Group(System):
         super(Group, self).__init__(**kwargs)
 
         self._local_system_set = None
-        self._var_offsets_byset = None
+        self._var_offsets = None
         self._subgroups_myproc = None
         self._manual_connections = {}
         self._static_manual_connections = {}
@@ -327,7 +327,6 @@ class Group(System):
         self._static_mode = True
 
         if MPI:
-            self._var_offsets_byset = None
             proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
             # Call the load balancing algorithm
@@ -447,7 +446,7 @@ class Group(System):
 
     def _setup_vars(self, recurse=True):
         """
-        Count variables, total and by var_set.
+        Count total variables.
 
         Parameters
         ----------
@@ -456,126 +455,88 @@ class Group(System):
         """
         super(Group, self)._setup_vars()
         num_var = self._num_var
-        num_var_byset = self._num_var_byset
 
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_vars(recurse)
 
-        # Compute num_var, num_var_byset, at least locally
+        # Compute num_var, at least locally
         for vec_name in self._lin_rel_vec_name_list:
             num_var[vec_name] = {}
-            num_var_byset[vec_name] = {}
             for type_ in ['input', 'output']:
                 num_var[vec_name][type_] = np.sum(
                     [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
                      if vec_name in subsys._rel_vec_names], dtype=INT_DTYPE)
 
-                num_var_byset[vec_name][type_] = vbyset = {}
-                for subsys in self._subsystems_myproc:
-                    if vec_name not in subsys._rel_vec_names:
-                        continue
-                    for set_name, num in iteritems(subsys._num_var_byset[vec_name][type_]):
-                        if set_name not in vbyset:
-                            vbyset[set_name] = 0
-                        vbyset[set_name] += num
-
         # If running in parallel, allgather
         if self.comm.size > 1:
             # Perform a single allgather
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = (num_var, num_var_byset)
+                raw = num_var
             else:
-                raw = (None, None)
+                raw = None
             gathered = self.comm.allgather(raw)
 
             for vec_name in self._lin_rel_vec_name_list:
                 num_var = self._num_var[vec_name]
-                num_var_byset = self._num_var_byset[vec_name]
 
                 # Empty the dictionaries
                 for type_ in ['input', 'output']:
                     num_var[type_] = 0
-                    num_var_byset[type_] = {}
 
                 # Process the gathered data and update the dictionaries
-                for myproc_num_var, myproc_num_var_byset in gathered:
+                for myproc_num_var in gathered:
                     if myproc_num_var is None:
                         continue
                     for type_ in ['input', 'output']:
                         num_var[type_] += myproc_num_var[vec_name][type_]
-                        for set_name, num in iteritems(myproc_num_var_byset[vec_name][type_]):
-                            if set_name not in num_var_byset[type_]:
-                                num_var_byset[type_][set_name] = 0
-                            num_var_byset[type_][set_name] += num
 
         self._num_var['nonlinear'] = self._num_var['linear']
-        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
 
-    def _setup_var_index_ranges(self, set2iset, recurse=True):
+    def _setup_var_index_ranges(self, recurse=True):
         """
-        Compute the division of variables by subsystem and pass down the set_name-to-iset maps.
+        Compute the division of variables by subsystem.
 
         Parameters
         ----------
-        set2iset : {'input': dict, 'output': dict}
-            Dictionary mapping the var_set name to the var_set index.
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_var_index_ranges(set2iset)
+        super(Group, self)._setup_var_index_ranges()
 
         nsub_allprocs = len(self._subsystems_allprocs)
 
         subsystems_var_range = self._subsystems_var_range = {}
-        subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
         for vec_name in self._lin_rel_vec_name_list:
 
-            # Here, we count the number of variables (total and by varset) in each subsystem.
+            # Here, we count the number of variables in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
             allprocs_counters = {
                 type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
-            allprocs_counters_byset = {
-                type_: np.zeros((nsub_allprocs, len(set2iset[type_])), INT_DTYPE)
-                for type_ in ['input', 'output']}
 
             for type_ in ['input', 'output']:
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     if subsys.comm.rank == 0 and vec_name in subsys._rel_vec_names:
                         allprocs_counters[type_][isub] = subsys._num_var[vec_name][type_]
-                        for set_name in subsys._num_var_byset[vec_name][type_]:
-                            iset = set2iset[type_][set_name]
-                            allprocs_counters_byset[type_][isub, iset] = \
-                                subsys._num_var_byset[vec_name][type_][set_name]
 
             # If running in parallel, allgather
             if self.comm.size > 1:
-                raw = (allprocs_counters, allprocs_counters_byset)
-                gathered = self.comm.allgather(raw)
+                gathered = self.comm.allgather(allprocs_counters)
 
                 allprocs_counters = {
                     type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
-                allprocs_counters_byset = {
-                    type_: np.zeros((nsub_allprocs, len(set2iset[type_])), INT_DTYPE)
-                    for type_ in ['input', 'output']
-                }
-                for myproc_counters, myproc_counters_byset in gathered:
+                for myproc_counters in gathered:
                     for type_ in ['input', 'output']:
                         allprocs_counters[type_] += myproc_counters[type_]
-                        allprocs_counters_byset[type_] += myproc_counters_byset[type_]
 
-            # Compute _subsystems_var_range, _subsystems_var_range_byset
+            # Compute _subsystems_var_range
             subsystems_var_range[vec_name] = {}
-            subsystems_var_range_byset[vec_name] = {}
 
             for type_ in ['input', 'output']:
                 subsystems_var_range[vec_name][type_] = {}
-                subsystems_var_range_byset[vec_name][type_] = {
-                    set_name: {} for set_name in set2iset[type_]
-                }
 
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     if vec_name not in subsys._rel_vec_names:
@@ -583,19 +544,13 @@ class Group(System):
                     subsystems_var_range[vec_name][type_][subsys.name] = (
                         np.sum(allprocs_counters[type_][:isub]),
                         np.sum(allprocs_counters[type_][:isub + 1]))
-                    for set_name, rng in iteritems(subsystems_var_range_byset[vec_name][type_]):
-                        iset = set2iset[type_][set_name]
-                        start = np.sum(allprocs_counters_byset[type_][:isub, iset])
-                        rng[subsys.name] = (start,
-                                            start + allprocs_counters_byset[type_][isub, iset])
 
         subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
-        subsystems_var_range_byset['nonlinear'] = subsystems_var_range_byset['linear']
 
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_ranges(set2iset, recurse)
+                subsys._setup_var_index_ranges(recurse)
 
     def _setup_var_data(self, recurse=True):
         """
@@ -713,22 +668,15 @@ class Group(System):
                 subsys._setup_var_sizes(recurse)
 
         sizes = self._var_sizes
-        sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
         for vec_name in self._lin_rel_vec_name_list:
             sizes[vec_name] = {}
-            sizes_byset[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
-            subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
 
             for type_ in ['input', 'output']:
                 sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]),
                                                   INT_DTYPE)
-
-                sizes_byset[vec_name][type_] = {}
-                for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
-                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
                     if vec_name not in subsys._rel_vec_names:
@@ -738,19 +686,12 @@ class Group(System):
                     sizes[vec_name][type_][proc_slice, var_slice] = \
                         subsys._var_sizes[vec_name][type_]
 
-                    for set_name, subsizes in iteritems(subsys._var_sizes_byset[vec_name][type_]):
-                        var_slice = slice(*subsystems_var_range_byset[type_][set_name][subsys.name])
-                        sizes_byset[vec_name][type_][set_name][proc_slice, var_slice] = subsizes
-
         # If parallel, all gather
         if self.comm.size > 1:
             for vec_name in self._lin_rel_vec_name_list:
                 sizes = self._var_sizes[vec_name]
-                sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                    for set_name, vsizes in iteritems(sizes_byset[type_]):
-                        self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
 
             # compute owning ranks
             owns = self._owning_rank
@@ -763,7 +704,6 @@ class Group(System):
                             break
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
-        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -1150,33 +1090,32 @@ class Group(System):
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
 
-    def _get_varset_offsets(self):
+    def _get_var_offsets(self):
         """
-        Compute distributed offsets for variables in var sets.
+        Compute distributed offsets for variables.
 
         Only PETScTransfer currently requests these.
 
         Returns
         -------
         dict
-            Arrays of offsets keyed by vec_name, deriv direction, and var_set.
+            Arrays of offsets keyed by vec_name and deriv direction.
         """
-        if self._var_offsets_byset is None:
-            offsets = self._var_offsets_byset = {}
+        if self._var_offsets is None:
+            offsets = self._var_offsets = {}
             for vec_name in self._lin_rel_vec_name_list:
                 offsets[vec_name] = off_vn = {}
                 for type_ in ['input', 'output']:
-                    off_vn[type_] = off_t = {}
-                    for vset, vsizes in iteritems(self._var_sizes_byset[vec_name][type_]):
-                        csum = np.cumsum(vsizes)
-                        # shift the cumsum forward by one and set first entry to 0 to get
-                        # the correct offset.
-                        csum[1:] = csum[:-1]
-                        csum[0] = 0
-                        off_t[vset] = csum.reshape(vsizes.shape)
+                    vsizes = self._var_sizes[vec_name][type_]
+                    csum = np.cumsum(vsizes)
+                    # shift the cumsum forward by one and set first entry to 0 to get
+                    # the correct offset.
+                    csum[1:] = csum[:-1]
+                    csum[0] = 0
+                    off_vn[type_] = csum.reshape(vsizes.shape)
             offsets['nonlinear'] = offsets['linear']
 
-        return self._var_offsets_byset
+        return self._var_offsets
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1217,7 +1156,7 @@ class Group(System):
                                                                self._vectors['output'][vec_name],
                                                                mode)
 
-    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+    def _setup_global(self, ext_num_vars, ext_sizes):
         """
         Compute total number and total size of variables in systems before / after this system.
 
@@ -1225,34 +1164,23 @@ class Group(System):
         ----------
         ext_num_vars : {'input': (int, int), 'output': (int, int)}
             Total number of allprocs variables in system before/after this one.
-        ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         ext_sizes : {'input': (int, int), 'output': (int, int)}
             Total size of allprocs variables in system before/after this one.
-        ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         """
-        super(Group, self)._setup_global(
-            ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
+        super(Group, self)._setup_global(ext_num_vars, ext_sizes)
 
         iproc = self.comm.rank
 
         for subsys in self._subsystems_myproc:
             sub_ext_num_vars = {}
             sub_ext_sizes = {}
-            sub_ext_num_vars_byset = {}
-            sub_ext_sizes_byset = {}
 
             for vec_name in subsys._lin_rel_vec_name_list:
                 subsystems_var_range = self._subsystems_var_range[vec_name]
-                subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
                 sizes = self._var_sizes[vec_name]
-                sizes_byset = self._var_sizes_byset[vec_name]
 
                 sub_ext_num_vars[vec_name] = {}
                 sub_ext_sizes[vec_name] = {}
-                sub_ext_num_vars_byset[vec_name] = {}
-                sub_ext_sizes_byset[vec_name] = {}
 
                 for type_ in ['input', 'output']:
                     num = self._num_var[vec_name][type_]
@@ -1269,31 +1197,10 @@ class Group(System):
                         ext_sizes[vec_name][type_][1] + size2,
                     )
 
-                    sub_ext_sizes_byset[vec_name][type_] = {}
-                    sub_ext_num_vars_byset[vec_name][type_] = {}
-                    for set_name, num in iteritems(self._num_var_byset[vec_name][type_]):
-                        idx1, idx2 = subsystems_var_range_byset[type_][set_name][subsys.name]
-                        size1 = np.sum(sizes_byset[type_][set_name][iproc, :idx1])
-                        size2 = np.sum(sizes_byset[type_][set_name][iproc, idx2:])
-
-                        sub_ext_num_vars_byset[vec_name][type_][set_name] = (
-                            ext_num_vars_byset[vec_name][type_][set_name][0] + idx1,
-                            ext_num_vars_byset[vec_name][type_][set_name][1] + num - idx2,
-                        )
-                        sub_ext_sizes_byset[vec_name][type_][set_name] = (
-                            ext_sizes_byset[vec_name][type_][set_name][0] + size1,
-                            ext_sizes_byset[vec_name][type_][set_name][1] + size2,
-                        )
-
             sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
             sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
-            sub_ext_num_vars_byset['nonlinear'] = sub_ext_num_vars_byset['linear']
-            sub_ext_sizes_byset['nonlinear'] = sub_ext_sizes_byset['linear']
 
-            subsys._setup_global(
-                sub_ext_num_vars, sub_ext_num_vars_byset,
-                sub_ext_sizes, sub_ext_sizes_byset
-            )
+            subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
 
     def _setup_transfers(self, recurse=True):
         """

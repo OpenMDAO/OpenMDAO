@@ -379,15 +379,15 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = -model.p1._residuals.get_data()[0]
-        out1 = model.p1._outputs.get_data()[0]
-        out2 = model.p2._outputs.get_data()[0]
+        res1 = -model.p1._residuals._data[0]
+        out1 = model.p1._outputs._data[0]
+        out2 = model.p2._outputs._data[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
         with model._scaled_context_all():
-            res1 = -model.p1._residuals.get_data()[0]
-            out1 = model.p1._outputs.get_data()[0]
-            out2 = model.p2._outputs.get_data()[0]
+            res1 = -model.p1._residuals._data[0]
+            out1 = model.p1._outputs._data[0]
+            out2 = model.p2._outputs._data[0]
 
             self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
 
@@ -417,13 +417,13 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = -model.p1._residuals.get_data()[0]
-        out1 = model.p1._outputs.get_data()[0]
-        out2 = model.p2._outputs.get_data()[0]
+        res1 = -model.p1._residuals._data[0]
+        out1 = model.p1._outputs._data[0]
+        out2 = model.p2._outputs._data[0]
 
         self.assertEqual(res1, (out1 - 2.0*(out2 + 1.0)))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals.get_data()[0]
+            res1a = -model.p1._residuals._data[0]
 
             self.assertEqual(res1a, (res1)/(ref))
 
@@ -451,13 +451,13 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = -model.p1._residuals.get_data()[0]
-        out1 = model.p1._outputs.get_data()[0]
-        out2 = model.p2._outputs.get_data()[0]
+        res1 = -model.p1._residuals._data[0]
+        out1 = model.p1._outputs._data[0]
+        out2 = model.p2._outputs._data[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals.get_data()[0]
+            res1a = -model.p1._residuals._data[0]
 
             self.assertEqual(res1a, res1/res_ref)
 
@@ -487,13 +487,13 @@ class TestScaling(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        res1 = -model.p1._residuals.get_data()[0]
-        out1 = model.p1._outputs.get_data()[0]
-        out2 = model.p2._outputs.get_data()[0]
+        res1 = -model.p1._residuals._data[0]
+        out1 = model.p1._outputs._data[0]
+        out2 = model.p2._outputs._data[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals.get_data()[0]
+            res1a = -model.p1._residuals._data[0]
 
             self.assertEqual(res1a, (res1)/(res_ref))
 

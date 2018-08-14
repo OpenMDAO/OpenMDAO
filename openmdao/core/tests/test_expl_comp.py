@@ -509,6 +509,18 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(8, num_non_empty_lines)
 
+        # Promoted names - no print arrays
+        stream = cStringIO()
+        prob.model.list_outputs(values=True,
+                                prom_name=True,
+                                print_arrays=False,
+                                out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('    x       |10.0|   x'), 1)
+        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 11)
+
         # Hierarchical - no print arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,

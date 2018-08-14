@@ -1223,8 +1223,7 @@ class _TotalJacInfo(object):
             for i, vec_name in enumerate(vec_names):
                 save_vec = lin_sol[i]
                 doutputs = self.output_vec[mode][vec_name]
-                for vs in doutputs._data:
-                    doutputs._data[vs][:] = save_vec[vs]
+                doutputs._data[:] = save_vec
         else:
             lin_sol_cache[key] = lin_sol = []
             for vec_name in vec_names:
@@ -1247,8 +1246,7 @@ class _TotalJacInfo(object):
         for i, vec_name in enumerate(vec_names):
             save_vec = lin_sol[i]
             doutputs = self.output_vec[mode][vec_name]
-            for vs, data in iteritems(doutputs._data):
-                save_vec[vs][:] = data
+            save_vec[:] = doutputs._data
 
     def _do_scaling(self, J):
         """
