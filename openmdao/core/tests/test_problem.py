@@ -705,7 +705,8 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, ExecComp
 
         prob = Problem()
-        prob.model.add_subsystem('comp', ExecComp('y=x+1.', x={'value': 100.0, 'units': 'cm'},
+        prob.model.add_subsystem('comp', ExecComp('y=x+1.',
+                                                  x={'value': 100.0, 'units': 'cm'},
                                                   y={'units': 'm'}))
         prob.model.add_subsystem('no_unit', ExecComp('y=x+1.', x={'value': 100.0}))
 
