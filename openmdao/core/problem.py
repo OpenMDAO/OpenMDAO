@@ -115,7 +115,9 @@ class Problem(object):
         Parameters
         ----------
         model : <System> or None
-            Pointer to the top-level <System> object (root node in the tree).
+            The top-level <System>. If not specified, an empty <Group> will be created.
+        driver : <Driver> or None
+            The driver for the problem. If not specified, a simple "Run Once" driver will be used.
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         use_ref_vector : bool
