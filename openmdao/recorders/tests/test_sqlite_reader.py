@@ -19,6 +19,7 @@ from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.core.tests.test_units import SpeedComp
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
@@ -1068,8 +1069,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['disp'] = False
 
-        recorder = SqliteRecorder(self.filename)
-        driver.add_recorder(recorder)
+        prob.driver.add_recorder(self.recorder)
         driver.recording_options['includes'] = ['*']
 
         model = prob.model
@@ -1077,10 +1077,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # the following were randomly generated using np.random.random(10)*2-1 to randomly
         # disperse them within a unit circle centered at the origin.
-        indeps.add_output('x', np.array([
-            0.55994437, -0.95923447, 0.21798656, -0.02158783, 0.62183717,
-            0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886
-        ]))
+        # Also converted this array to > 1D array to test that capability of case recording
+        x_vals = np.array([0.55994437, -0.95923447, 0.21798656, -0.02158783, 0.62183717,
+                           0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886]).reshape(
+            (-1, 1))
+        indeps.add_output('x', x_vals)
         indeps.add_output('y', np.array([
             0.52577864, 0.30894559, 0.8420792, 0.35039912, -0.67290778,
             -0.86236787, -0.97500023, 0.47739414, 0.51174103, 0.10052582
@@ -1143,6 +1144,42 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
         case = cr.driver_cases.get_case(0)
         prob.load_case(case)
+
+        _assert_model_matches_case(case, model)
+
+    def test_multidimensional_arrays(self):
+        prob = Problem()
+        model = prob.model
+
+        comp = TestExplCompArray(thickness=1.) #  has 2D arrays as inputs and outputs
+        model.add_subsystem('comp', comp, promotes=['*'])
+        # just to add a connection, otherwise an exception is thrown in recording viewer data.
+        # must be a bug
+        model.add_subsystem('double_area', ExecComp('double_area = 2 * areas',
+                            areas=np.zeros((2,2)),
+                            double_area=np.zeros((2,2))),
+                            promotes=['*'])
+
+        prob.driver.add_recorder(self.recorder)
+        prob.driver.recording_options['includes'] = ['*']
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # Add one to all the inputs just to change the model
+        #   so we can see if loading the case values really changes the model
+        for name in prob.model._inputs:
+            model._inputs[name] += 1.0
+        for name in prob.model._outputs:
+            model._outputs[name] += 1.0
+
+        # Now load in the case we recorded
+        cr = CaseReader(self.filename)
+        case = cr.driver_cases.get_case(0)
+        prob.load_case(case)
+
+        _assert_model_matches_case(case, model)
 
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):

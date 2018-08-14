@@ -114,10 +114,10 @@ class SqliteCaseReader(BaseCaseReader):
                 for name in self._abs2meta:
                     if 'lower' in self._abs2meta[name]:
                         self._abs2meta[name]['lower'] =\
-                            convert_to_np_array(self._abs2meta[name]['lower'])
+                            convert_to_np_array(self._abs2meta[name]['lower'], name, self._abs2meta)
                     if 'upper' in self._abs2meta[name]:
                         self._abs2meta[name]['upper'] =\
-                            convert_to_np_array(self._abs2meta[name]['upper'])
+                            convert_to_np_array(self._abs2meta[name]['upper'], name, self._abs2meta)
             elif self.format_version in (1, 2):
                 if PY2:
                     self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
@@ -838,8 +838,8 @@ class DriverCases(BaseCases):
             outputs_text, = row
 
         if self.format_version >= 3:
-            inputs_array = json_to_np_array(inputs_text)
-            outputs_array = json_to_np_array(outputs_text)
+            inputs_array = json_to_np_array(inputs_text, self._abs2meta)
+            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
         elif self.format_version in (1, 2):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
@@ -1004,7 +1004,7 @@ class ProblemCases(BaseCases):
             outputs_text, = row
 
         if self.format_version >= 3:
-            outputs_array = json_to_np_array(outputs_text)
+            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
         elif self.format_version in (1, 2):
             outputs_array = blob_to_array(outputs_text)
 
@@ -1082,9 +1082,9 @@ class SystemCases(BaseCases):
             outputs_text, residuals_text = row
 
         if self.format_version >= 3:
-            inputs_array = json_to_np_array(inputs_text)
-            outputs_array = json_to_np_array(outputs_text)
-            residuals_array = json_to_np_array(residuals_text)
+            inputs_array = json_to_np_array(inputs_text, self._abs2meta)
+            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
+            residuals_array = json_to_np_array(residuals_text, self._abs2meta)
         elif self.format_version in (1, 2):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
@@ -1166,9 +1166,9 @@ class SolverCases(BaseCases):
             input_text, output_text, residuals_text = row
 
         if self.format_version >= 3:
-            input_array = json_to_np_array(input_text)
-            output_array = json_to_np_array(output_text)
-            residuals_array = json_to_np_array(residuals_text)
+            input_array = json_to_np_array(input_text, self._abs2meta)
+            output_array = json_to_np_array(output_text, self._abs2meta)
+            residuals_array = json_to_np_array(residuals_text, self._abs2meta)
         elif self.format_version in (1, 2):
             input_array = blob_to_array(input_text)
             output_array = blob_to_array(output_text)
