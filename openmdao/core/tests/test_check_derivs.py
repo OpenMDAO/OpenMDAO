@@ -250,7 +250,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['y', 'x1'] = np.array([3.0])
                 self.lin_count += 1
 
-
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
@@ -693,8 +692,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(len(w), 1)
 
         msg = "The following components requested complex step, but force_alloc_complex " + \
-            "has not been set to True, so finite difference was used: ['comp']"
-
+              "has not been set to True, so finite difference was used: ['comp']\n" + \
+              "To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+              "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(w[0].message), msg)
 
         # Derivative still calculated, but with fd instead.
@@ -2132,7 +2132,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Try again with a direct solver and sparse assembled hierarchy.
 
         p = Problem()
-        sub = p.model.add_subsystem('sub', GaussLobattoPhase())
+        p.model.add_subsystem('sub', GaussLobattoPhase())
 
         p.model.sub.add_objective('time', index=-1)
 
