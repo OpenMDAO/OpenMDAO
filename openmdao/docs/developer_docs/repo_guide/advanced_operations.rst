@@ -9,6 +9,10 @@ customize the installation of your project.  Certain advanced items in OpenMDAO 
 Having a full install means that the docs will be more complete, because embedded tests that rely on, for instance, MPI, will actually work on Travis CI,
 whereas they currently do not on readthedocs.org.
 
+.. note::
+    The new recommended procedure is to use github-pages as outlined in a previous document. This page exists to explain how OpenMDAO's docs work for now. If you are
+    starting a new project, go follow those instructions, as they are much simpler.
+
 Getting Started and General Concept
 -----------------------------------
 

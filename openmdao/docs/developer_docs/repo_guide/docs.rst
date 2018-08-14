@@ -4,10 +4,10 @@ Documentation
 Project Documentation Structure
 -------------------------------
 
-First, to make things run smoothly, set up your project structure so that your documentation lies in the root directory in a directory named `/docs`.
-For instance, "openmdao/docs" or "openaerostruct/docs".  The reasons for this location:
+First, to make things run smoothly, set up your project structure so that your documentation lies in the top-level project directory
+in a directory named `/docs`. For instance, "openmdao/docs" or "openaerostruct/docs".  The reasons for this location:
 
-    #. This is where openmdao's sourcedoc-generating script, will be looking for docs.
+    #. This is where openmdao's sourcedoc-generating script, `generate_docs` will be looking for docs.
     #. This is where the github-pages publishing package `travis-sphinx` will be looking for docs.
 
 If you must put docs elsewhere for some reason, just be aware that it will require modifications to things in the above list.
@@ -20,7 +20,7 @@ During this process, to get your docs to build properly, you may need access to 
 `openmdao.docs.utils` will get you things like our sourcedoc-building script, `generate_docs`, which will be called from conf.py,
 to create an organized set of source documentation.
 
-`openmdao.docs.exts` will get you access to our powerful custom extensions, like our Sphinx embedding library, including `embed_code`,
+`openmdao.docs.exts` will get you access to our powerful custom extensions, such as our Sphinx embedding library, including `embed_code`,
 and `embed_options`.  Our code-embedding tool will help you to include things into your documentation that will stay dynamically updated
 with the code in your project and/or in the OpenMDAO project.  To get access to these items, both in your local install
 and on CI, you can just import them from `openmdao.docs.exts` or `openmdao.docs.utils`.
@@ -50,66 +50,52 @@ General Docs Settings
 ~~~~~~~~~~~~~~~~~~~~~
 
 Your Sphinx documentation will need its own docs/conf.py, theme directory, and style.css so that you may customize the docs
-into something that will make them their own. You can use OpenMDAO's docs/conf.py, docs/_theme/theme.conf and
-docs/_theme/static/style.css as a starting point.
+into something that will make them their own. You can use OpenMDAO's `docs/conf.py`, `docs/_theme/theme.conf` and
+`docs/_theme/static/style.css` as a starting point.
 
 OpenMDAO numpydoc monkeypatch
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 OpenMDAO uses a monkeypatch to the numpydoc standard that allows extra fields in docstrings such as `Options` and `Parameters`.
-It also removes private Attributes (those beginning with an underscore) from the autodocumentation.
+It also removes private Attributes (those beginning with an underscore) from the auto-documentation pages. To import this:
 
 :code:`from openmdao.docs.utils.patch import do_monkeypatch`
 
-Then simply calling the :code:`do_monkeypatch()` from your conf.py would set your docstrings up to behave similarly to OpenMDAO's.
+Then simply calling the :code:`do_monkeypatch()` from within your conf.py would set your docstrings up to behave similarly to OpenMDAO's.
 
 
 OpenMDAO docs Makefile
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The OpenMDAO docs/Makefile can be used as a template for making Sphinx documentation, and can accomplish several things that
-the default Makefile falls short of (e.g. just building a file that has changed rather than the whole project):
+The OpenMDAO `docs/Makefile` can be used as a template for making Sphinx documentation, and can accomplish several things that
+the default Makefile falls short of (e.g. only building files that have recently changed, rather than the whole project; e.g. rebuilding
+an .rst file whose embed-code dependency has changed, though the .rst file hasn't) Here are the commands from OpenMDAO's Makefile:
 
 .. code-block:: makefile
 
     ###################################
-    # RULES (that comprise the commands)
+    # COMMANDS
 
-    build:
-        $(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
-        @echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+    # to remake only recently-changed files, not the entire document base.
+    #  note - first item in makefile is default action of "make"
+    html-update: mock redbaron matplotlib build
 
-    buildall:
-        $(SPHINXBUILD) -a -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
-        @echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+    # to force the rebuild a file when its dependecy (e.g. code-embed) changes, not its rst file
+    single: mock redbaron matplotlib touch build
 
-    touch:
-        touch $$file
+    # build it all over again (note: make all == make html)
+    all html: make_srcdocs mock redbaron matplotlib tagg buildall post_remove
 
-    # source doc build indicator, to trigger conf.py
-    make_srcdocs:
-        touch make_sourcedocs
+    # build it all on CI machines; all warnings are raised as errors.
+    travis: make_srcdocs mock redbaron matplotlib tagg buildalltravis post_remove
 
-    #clean up the sourcedocs indicator
-    post_remove:
+    clean:
+        rm -rf $(BUILDDIR)/*
+        rm -rf _srcdocs/*
+        rm -rf tags
+        rm -rf tmp
         rm -rf make_sourcedocs
-
-    # installation testers
-    mock:
-        @(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
-        is required to build the docs. Install with:\n pip install mock"; exit 1)
-
-    redbaron:
-        @(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
-        is required to build the docs. Install with:\n pip install redbaron"; exit 1)
-
-    matplotlib:
-        @(python -c "import matplotlib" >/dev/null 2>&1) || (echo "The 'matplotlib' package \
-        is required to build the docs. Install with:\n pip install matplotlib"; exit 1)
-
-    # run the tagging preprocessors
-    tagg:
-        python utils/preprocess_tags.py
+        rm -rf doc_plot_*.png
 
 
 OpenMDAO Auto-documentation Generator
@@ -120,7 +106,7 @@ subpackage.  To import this tool:
 
 :code:`from openmdao.docs.utils.generate_sourcedocs import generate_docs`
 
-then, from your `conf.py`, invoke it with arguments of:
+then, from your `docs/conf.py`, invoke it with arguments of:
     #. where to find packages (relative to where it's being called)
     #. root of the project (relative to where it's being called)
     #. which packages to include--omit things like "test" that don't make sense to doc.
