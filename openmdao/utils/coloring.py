@@ -722,10 +722,11 @@ def _write_coloring(modes, color_info, stream):
         stream.write("],\n[\n")
         last_idx = len(nonzero_entries) - 1
         for i, nonzeros in enumerate(nonzero_entries):
-            if nonzeros is None:
+            if isinstance(nonzeros, np.ndarray):
+                # convert to list to make json serializable
+                stream.write("   %s" % list(nonzeros))
+            else:  # a full slice
                 stream.write("   %s" % none)
-            else:
-                stream.write("   %s" % nonzeros)
 
             if i < last_idx:
                 stream.write(",")
@@ -744,6 +745,31 @@ def _write_coloring(modes, color_info, stream):
         stream.write(',\n"sparsity": %s' % none)
 
     stream.write("\n}")
+
+
+def _json2coloring(coloring):
+    """
+    Convert all of the None entries in rowcol_map to full slices.
+
+    Parameters
+    ----------
+    coloring : dict
+        Dict of coloring metadata.
+
+    Returns
+    -------
+    dict
+        Dict of coloring metadata.
+    """
+    full_slice = slice(None)
+    for mode in ('fwd', 'rev'):
+        if mode in coloring:
+            rcmap = coloring[mode][1]
+            for i, entry in enumerate(rcmap):
+                if entry is None:
+                    rcmap[i] = full_slice
+
+    return coloring
 
 
 def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
@@ -944,11 +970,11 @@ def _compute_coloring(J, mode):
         J = J.T
     col_groups = _split_groups(_get_full_disjoint_cols(J))
 
-    col2rows = [None] * J.shape[1]  # will contain list of nonzero rows for each column
+    full_slice = slice(None)
+    col2rows = [full_slice] * J.shape[1]  # will contain list of nonzero rows for each column
     for lst in col_groups:
         for col in lst:
-            # ndarrays are converted to lists to be json serializable
-            col2rows[col] = list(np.nonzero(J[:, col])[0])
+            col2rows[col] = np.nonzero(J[:, col])[0]
 
     return {mode: [col_groups, col2rows]}
 

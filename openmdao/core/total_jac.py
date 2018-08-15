@@ -1071,28 +1071,23 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         row_col_map = self.simul_coloring[mode][1]
-        outvecs = self.output_vec[mode]
-        in_idx_map = self.in_idx_map[mode]
         fwd = mode == 'fwd'
 
         J = self.J
+        deriv_idxs, _ = self.solvec_map[mode]
 
-        for i in inds:
-            _, vecname, _, _ = in_idx_map[i]
-            deriv_val = outvecs[vecname]._data
-            deriv_idxs, jac_idxs = self.solvec_map[mode]
+        # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
+        # deriv coloring, vecname will always be 'linear', and we don't need to check
+        # vecname for each index.
+        deriv_val = self.output_vec[mode]['linear']._data
+        reduced_derivs = deriv_val[deriv_idxs['linear']]
 
-            rcmap = row_col_map[i]
-            if rcmap is None:
-                if fwd:
-                    J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
-                else:  # rev
-                    J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
-            else:
-                if fwd:
-                    J[rcmap, i] = deriv_val[deriv_idxs[vecname][rcmap]]
-                else:
-                    J[i, rcmap] = deriv_val[deriv_idxs[vecname][rcmap]]
+        if fwd:
+            for i in inds:
+                J[row_col_map[i], i] = reduced_derivs[row_col_map[i]]
+        else:
+            for i in inds:
+                J[i, row_col_map[i]] = reduced_derivs[row_col_map[i]]
 
     def matmat_jac_setter(self, inds, mode):
         """

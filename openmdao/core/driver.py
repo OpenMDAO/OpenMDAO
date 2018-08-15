@@ -998,7 +998,7 @@ class Driver(object):
 
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
-                self._simul_coloring_info = json.load(f)
+                self._simul_coloring_info = coloring_mod._json2coloring(json.load(f))
 
         if 'rev' in self._simul_coloring_info and self._problem._orig_mode not in ('rev', 'auto'):
             revcol = self._simul_coloring_info['rev'][0][0]
