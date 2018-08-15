@@ -60,7 +60,7 @@ define either :code:`compute_jacvec_product` or :code:`compute_multi_jacvec_prod
 Here, we show how to set the method. In this case, we use complex step on TrickyParaboloid because the finite difference is
 less accurate.
 
-**Note**: You need to set `force_alloc_complex` to True during setup to utilize complex Step during a check.
+**Note**: You need to set `force_alloc_complex` to True during setup to utilize complex step during a check.
 
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_set_method_on_comp

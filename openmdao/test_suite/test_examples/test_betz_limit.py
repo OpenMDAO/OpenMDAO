@@ -17,7 +17,7 @@ class ActuatorDisc(ExplicitComponent):
         # Inputs
         self.add_input('a', 0.5, desc="Induced Velocity Factor")
         self.add_input('Area', 10.0, units="m**2", desc="Rotor disc area")
-        self.add_input('rho', 1.225, units="kg/m**3", desc="air density")
+        self.add_input('rho', 1.225, units="kg/m**3", desc="Air density")
         self.add_input('Vu', 10.0, units="m/s", desc="Freestream air velocity, upstream of rotor")
 
         # Outputs
