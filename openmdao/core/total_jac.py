@@ -487,8 +487,7 @@ class _TotalJacInfo(object):
                 if owner == iproc:
                     irange += gstart
                 else:
-                    owner_start = np.sum(sizes[:owner, in_var_idx])
-                    irange += owner_start
+                    irange += np.sum(sizes[:owner, in_var_idx])
 
             # all local idxs that correspond to vars from other procs will be -1
             # so each entry of loc_i will either contain a valid local index,
@@ -586,6 +585,7 @@ class _TotalJacInfo(object):
         owners = model._owning_rank
         fwd = mode == 'fwd'
         missing = False
+        full_slice = slice(None)
 
         for vecname in self.model._lin_vec_names:
             inds = []
@@ -616,7 +616,6 @@ class _TotalJacInfo(object):
                         else:
                             iproc = owners[name]
 
-                        # print("name", name, "myproc", myproc, "owner", owners[name])
                         offset = offsets[iproc, var_idx]
                         idx_array = np.arange(offset, offset + sizes[iproc, var_idx],
                                               dtype=INT_DTYPE)
@@ -643,7 +642,7 @@ class _TotalJacInfo(object):
                 jac_idxs[vecname] = np.hstack([np.arange(start, end, dtype=INT_DTYPE)
                                                for start, end in jac_inds])
             else:
-                jac_idxs[vecname] = slice(None)
+                jac_idxs[vecname] = full_slice
 
         return idxs, jac_idxs
 
@@ -1081,6 +1080,8 @@ class _TotalJacInfo(object):
         # vecname for each index.
         deriv_val = self.output_vec[mode]['linear']._data
         reduced_derivs = deriv_val[deriv_idxs['linear']]
+
+        # TODO: add code here to handle running under MPI
 
         if fwd:
             for i in inds:
