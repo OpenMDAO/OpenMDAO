@@ -322,6 +322,7 @@ class MatMatParDevTestCase(unittest.TestCase):
 
     def test_size_1_matmat(self):
         p = Problem()
+
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
         indeps.add_output('y', 1.0)
         par = p.model.add_subsystem('par', ParallelGroup())

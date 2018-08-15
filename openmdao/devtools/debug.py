@@ -63,8 +63,6 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
                 iwid = max(iwid, len(data[-1][1]))
                 total += sz
 
-            # insert a blank line to visually sparate sets
-            data.append(('', '', '', ''))
         return data, nwid, iwid
 
     def _dump(g, stream):
@@ -76,8 +74,8 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
         for u, p in zip_longest(udata, pdata, fillvalue=('', '')):
             data.append((u[0], u[1], p[1], p[0]))
 
+        template = "{0:<{wid0}} {1:>{wid1}}     {2:>{wid2}} {3:<{wid3}}\n"
         for d in data[::-1]:
-            template = "{0:<{wid0}} {1:>{wid1}}     {2:>{wid2}} {3:<{wid3}}\n"
             stream.write(template.format(d[0], d[1], d[2], d[3],
                                          wid0=unwid, wid1=uiwid,
                                          wid2=piwid, wid3=pnwid))

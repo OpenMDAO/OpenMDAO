@@ -274,7 +274,7 @@ class DecoupledTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        #import wingdbstub
+        # import wingdbstub
 
         prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv', vectorize_derivs=True)

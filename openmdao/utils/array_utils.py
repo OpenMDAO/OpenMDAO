@@ -255,8 +255,8 @@ def _global2local_offsets(global_offsets):
         for type_ in global_offsets[vec_name]:
             goff = global_offsets[vec_name][type_]
             off_vn[type_] = goff.copy()
-            # adjust offsets to be local in each process
-            off_vn[type_] -= off_vn[type_][:, 0].reshape((goff.shape[0], 1))
+            if goff[0].size > 0:
+                # adjust offsets to be local in each process
+                off_vn[type_] -= off_vn[type_][:, 0].reshape((goff.shape[0], 1))
 
     return offsets
-

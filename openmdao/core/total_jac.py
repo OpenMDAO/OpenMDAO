@@ -232,26 +232,35 @@ class _TotalJacInfo(object):
             rank = self.comm.rank
             if 'fwd' in modes:
                 self.jac_scatters['fwd'] = jac_scatters = {}
-                if PETSc is not None and (isinstance(self.output_vec['fwd']['linear'], PETScVector) or has_remote_vars['fwd']):
+                if PETSc is not None and (isinstance(self.output_vec['fwd']['linear'], PETScVector)
+                                          or has_remote_vars['fwd']):
                     tgt_vec = PETSc.Vec().createWithArray(np.zeros(J.shape[0], dtype=float),
                                                           comm=self.comm)
                     self.jac_petsc['fwd'] = tgt_vec
                     self.soln_petsc['fwd'] = {}
+                    sol_idxs, jac_idxs = self.solvec_map['fwd']
                     for vecname in model._lin_vec_names:
-                        sol_idxs, jac_idxs = self.solvec_map['fwd']
+                        src_arr = self.output_vec['fwd'][vecname]._data
                         if isinstance(self.output_vec['fwd'][vecname], PETScVector):
                             src_vec = self.output_vec['fwd'][vecname]._petsc
                         else:
-                            src_vec = PETSc.Vec().createWithArray(self.output_vec['fwd'][vecname]._data, comm=self.comm)
-                        self.soln_petsc['fwd'][vecname] = src_vec
+                            outvec = self.output_vec['fwd'][vecname]
+                            if outvec._ncol == 1:
+                                src_vec = PETSc.Vec().createWithArray(src_arr, comm=self.comm)
+                            else:
+                                src_vec = PETSc.Vec().createWithArray(
+                                    self.output_vec['fwd'][vecname]._data[:, 0].copy(),
+                                    comm=self.comm)
+                        self.soln_petsc['fwd'][vecname] = (src_vec, src_arr)
 
-                        if vecname == 'linear':
-                            offset = J.shape[0] * rank
-                            jac_idxs = {vecname: np.arange(offset, offset + J.shape[0],
-                                                           dtype=INT_DTYPE)}
-                            # print("jac_idxs", jac_idxs[vecname])
+                        offset = J.shape[0] * rank
+                        jac_inds = jac_idxs[vecname]
+                        if isinstance(jac_idxs[vecname], slice):
+                            jac_inds = np.arange(offset, offset + J.shape[0], dtype=INT_DTYPE)
+                        else:
+                            jac_inds += offset
                         src_indexset = PETSc.IS().createGeneral(sol_idxs[vecname], comm=self.comm)
-                        tgt_indexset = PETSc.IS().createGeneral(jac_idxs[vecname], comm=self.comm)
+                        tgt_indexset = PETSc.IS().createGeneral(jac_inds, comm=self.comm)
                         jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
                                                                        tgt_vec, tgt_indexset)
                 else:
@@ -260,24 +269,34 @@ class _TotalJacInfo(object):
 
             if 'rev' in modes:
                 self.jac_scatters['rev'] = jac_scatters = {}
-                if PETSc is not None and (isinstance(self.output_vec['rev']['linear'], PETScVector) or has_remote_vars['rev']):
+                if PETSc is not None and (isinstance(self.output_vec['rev']['linear'], PETScVector)
+                                          or has_remote_vars['rev']):
                     tgt_vec = PETSc.Vec().createWithArray(np.zeros(J.shape[1], dtype=float),
                                                           comm=self.comm)
                     self.jac_petsc['rev'] = tgt_vec
                     self.soln_petsc['rev'] = {}
+                    sol_idxs, jac_idxs = self.solvec_map['rev']
                     for vecname in model._lin_vec_names:
+                        src_arr = self.output_vec['rev'][vecname]._data
                         if isinstance(self.output_vec['rev'][vecname], PETScVector):
                             src_vec = self.output_vec['rev'][vecname]._petsc
                         else:
-                            src_vec = PETSc.Vec().createWithArray(self.output_vec['rev'][vecname]._data, comm=self.comm)
-                        self.soln_petsc['rev'][vecname] = src_vec
-                        sol_idxs, jac_idxs = self.solvec_map['rev']
-                        if vecname == 'linear':
-                            offset = J.shape[1] * rank
-                            jac_idxs = {vecname: np.arange(offset, offset + J.shape[1],
-                                                           dtype=INT_DTYPE)}
+                            outvec = self.output_vec['rev'][vecname]
+                            if outvec._ncol == 1:
+                                src_vec = PETSc.Vec().createWithArray(src_arr, comm=self.comm)
+                            else:
+                                src_vec = PETSc.Vec().createWithArray(
+                                    self.output_vec['rev'][vecname]._data[:, 0].copy(),
+                                    comm=self.comm)
+                        self.soln_petsc['rev'][vecname] = (src_vec, src_arr)
+                        offset = J.shape[1] * rank
+                        jac_inds = jac_idxs[vecname]
+                        if isinstance(jac_idxs[vecname], slice):
+                            jac_inds = np.arange(offset, offset + J.shape[1], dtype=INT_DTYPE)
+                        else:
+                            jac_inds += offset
                         src_indexset = PETSc.IS().createGeneral(sol_idxs[vecname], comm=self.comm)
-                        tgt_indexset = PETSc.IS().createGeneral(jac_idxs[vecname], comm=self.comm)
+                        tgt_indexset = PETSc.IS().createGeneral(jac_inds, comm=self.comm)
                         jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
                                                                        tgt_vec, tgt_indexset)
                 else:
@@ -545,8 +564,8 @@ class _TotalJacInfo(object):
         """
         Create a dict mapping vecname and direction to an index array into the solution vector.
 
-        Using the index array to pull values from the solution vector will give a vector that
-        maps directly to a row or column of the total jacobian.
+        Using the index array to pull values from the solution vector will give the values
+        in the order needed by the jacobian.
 
         Parameters
         ----------
@@ -570,6 +589,7 @@ class _TotalJacInfo(object):
         myproc = model.comm.rank
         owners = model._owning_rank
         fwd = mode == 'fwd'
+        missing = False
 
         for vecname in self.model._lin_vec_names:
             inds = []
@@ -577,15 +597,14 @@ class _TotalJacInfo(object):
             sizes = model._var_sizes[vecname]['output']
             offsets = model._var_offsets[vecname]['output']
             abs2idx = model._var_allprocs_abs2idx[vecname]
-            if mode == 'fwd':
-                start = end = self.J.shape[0] * myproc
-            else:
-                start = end = self.J.shape[1] * myproc
+            start = end = 0
 
             for name in names:
+                indices = vois[name]['indices'] if name in vois else None
+                meta = abs2meta[name]
+
                 if name in abs2idx:
                     var_idx = abs2idx[name]
-                    meta = abs2meta[name]
                     if meta['distributed']:
                         # if var is distributed, we need all of its parts from all procs
                         dist_idxs = []
@@ -605,16 +624,16 @@ class _TotalJacInfo(object):
                         offset = offsets[iproc, var_idx]
                         idx_array = np.arange(offset, offset + sizes[iproc, var_idx],
                                               dtype=INT_DTYPE)
+                        if indices is not None:
+                            idx_array = idx_array[indices]
+
                     sz = idx_array.size
                 else:
+                    missing = True
                     sz = meta['global_size']
 
-                if name in vois:
-                    indices = vois[name]['indices']
-                    if indices is not None:
-                        if name in abs2idx:
-                            idx_array = idx_array[indices]
-                        sz = len(indices)
+                if indices is not None:
+                    sz = len(indices)
 
                 end += sz
                 if name in abs2idx:
@@ -624,11 +643,11 @@ class _TotalJacInfo(object):
                 start = end
 
             idxs[vecname] = np.hstack(inds)
-            if vecname == 'linear':
-                jac_idxs[vecname] = slice(None)
-            else:
+            if missing:
                 jac_idxs[vecname] = np.hstack([np.arange(start, end, dtype=INT_DTYPE)
                                                for start, end in jac_inds])
+            else:
+                jac_idxs[vecname] = slice(None)
 
         return idxs, jac_idxs
 
@@ -1060,7 +1079,7 @@ class _TotalJacInfo(object):
                 self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
         else:
             self.jac_petsc[mode].array[:] = 0.
-            scatter.scatter(self.soln_petsc[mode][vecname],
+            scatter.scatter(self.soln_petsc[mode][vecname][0],
                             self.jac_petsc[mode], addv=False, mode=False)
             if mode == 'fwd':
                 self.J[:, i] = self.jac_petsc[mode].array
@@ -1070,34 +1089,8 @@ class _TotalJacInfo(object):
             # print("i=", i, "mode=", mode)
             # print("rank", self.model.comm.rank)
             # print("solvec map", self.solvec_map[mode])
-            # print(self.soln_petsc[mode][vecname].array)
+            # print(self.soln_petsc[mode][vecname][0].array)
             # print(self.J)
-
-        # out_views = self.output_vec[mode][vecname]._views_flat
-        # relevant = self.relevant
-        # fwd = mode == 'fwd'
-        # J = self.J
-        # nproc = self.comm.size
-        # out_meta = self.out_meta[mode]
-
-        # for output_name in self.output_list[mode]:
-        #     if input_name not in relevant or output_name in relevant[input_name]:
-        #         slc, indices, distrib = out_meta[output_name]
-        #         deriv_val = None
-        #         if output_name in out_views:
-        #             deriv_val = out_views[output_name]
-        #             if indices is not None:
-        #                 deriv_val = deriv_val[indices]
-
-        #         if nproc > 1 and not distrib:
-        #             if deriv_val is None:
-        #                 deriv_val = np.empty(slc.stop - slc.start)
-        #             self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
-
-        #         if fwd:
-        #             J[slc, i] = deriv_val
-        #         else:
-        #             J[i, slc] = deriv_val
 
     def par_deriv_jac_setter(self, inds, mode):
         """
@@ -1161,7 +1154,7 @@ class _TotalJacInfo(object):
         """
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
-        input_name, vecname, _, _ = self.in_idx_map[mode][inds[0]]
+        _, vecname, _, _ = self.in_idx_map[mode][inds[0]]
         out_views = self.output_vec[mode][vecname]._views_flat
         ncol = self.output_vec[mode][vecname]._ncol
         relevant = self.relevant
@@ -1170,24 +1163,31 @@ class _TotalJacInfo(object):
         J = self.J
         out_meta = self.out_meta[mode]
 
-        for output_name in self.output_list[mode]:
-            slc, indices, distrib = out_meta[output_name]
-            deriv_val = out_idxs = None
-            if input_name not in relevant or output_name in relevant[input_name]:
-                if output_name in out_views:
-                    deriv_val = out_views[output_name]
-                    if indices is not None:
-                        deriv_val = deriv_val[indices]
-
-                if nproc > 1 and not distrib:
-                    if deriv_val is None:
-                        deriv_val = np.empty((slc.stop - slc.start, ncol))
-                    self.comm.Bcast(deriv_val, root=self.owning_ranks[output_name])
-
-                if fwd:
-                    J[slc, inds] = deriv_val
+        deriv_val = self.output_vec[mode][vecname]._data
+        deriv_idxs, jac_idxs = self.solvec_map[mode]
+        scatter = self.jac_scatters[mode][vecname]
+        jac_inds = jac_idxs[vecname]
+        if scatter is None:
+            if mode == 'fwd':
+                for col, i in enumerate(inds):
+                    self.J[jac_inds, i] = deriv_val[deriv_idxs[vecname], col]
+            else:  # rev
+                for col, i in enumerate(inds):
+                    self.J[i, jac_inds] = deriv_val[deriv_idxs[vecname], col]
+        else:
+            solution = self.soln_petsc[mode][vecname]
+            for col, i in enumerate(inds):
+                self.jac_petsc[mode].array[:] = 0.
+                if ncol > 1:
+                    solution[0].array = solution[1][:, col]
                 else:
-                    J[inds, slc] = deriv_val.T
+                    solution[0].array = solution[1]
+                scatter.scatter(self.soln_petsc[mode][vecname][0],
+                                self.jac_petsc[mode], addv=False, mode=False)
+                if mode == 'fwd':
+                    self.J[:, i] = self.jac_petsc[mode].array
+                else:
+                    self.J[i] = self.jac_petsc[mode].array
 
     def par_deriv_matmat_jac_setter(self, inds, mode):
         """
