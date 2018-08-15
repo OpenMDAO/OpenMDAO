@@ -194,7 +194,7 @@ class _TotalJacInfo(object):
 
             for mode in modes:
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode] = \
-                    self._create_in_idx_map(has_lin_cons, mode)
+                    self._create_in_idx_map(mode)
 
             has_remote_vars = {'fwd': False, 'rev': False}
             zeros = model._var_sizes['linear']['output'] == 0
@@ -214,7 +214,6 @@ class _TotalJacInfo(object):
         self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta)
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
         self.out_meta = {'fwd': self.of_meta, 'rev': self.wrt_meta}
-        self.out_size = {'fwd': self.of_size, 'rev': self.wrt_size}
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -400,14 +399,12 @@ class _TotalJacInfo(object):
 
         return J_dict
 
-    def _create_in_idx_map(self, has_lin_constraints, mode):
+    def _create_in_idx_map(self, mode):
         """
         Create a list that maps a global index to a name, col/row range, and other data.
 
         Parameters
         ----------
-        has_lin_constraints : bool
-            If True, there are linear constraints used to compute the total jacobian.
         mode : str
             Derivative solution direction.
 
@@ -434,7 +431,6 @@ class _TotalJacInfo(object):
         vois = self.input_meta[mode]
         input_list = self.input_list[mode]
 
-        idx_tups = [None] * len(input_list)
         loc_idxs = []
         idx_map = []
         start = 0
@@ -1112,7 +1108,6 @@ class _TotalJacInfo(object):
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
         _, vecname, _, _ = self.in_idx_map[mode][inds[0]]
-        out_views = self.output_vec[mode][vecname]._views_flat
         ncol = self.output_vec[mode][vecname]._ncol
         relevant = self.relevant
         nproc = self.comm.size

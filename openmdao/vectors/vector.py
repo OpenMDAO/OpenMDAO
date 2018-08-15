@@ -542,19 +542,6 @@ class Vector(object):
         """
         pass
 
-    def change_scaling_state(self, c0, c1):
-        """
-        Change the scaling state.
-
-        Parameters
-        ----------
-        c0 : int ndarray[nvar_myproc]
-            0th order coefficients for scaling/unscaling.
-        c1 : int ndarray[nvar_myproc]
-            1st order coefficients for scaling/unscaling.
-        """
-        pass
-
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
         Enforce lower/upper bounds, backtracking the entire vector together.
