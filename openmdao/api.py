@@ -94,12 +94,12 @@ from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.recorders.case_reader import CaseReader
 
 # Doc Utils and Extensions (meant for use by OpenMDAO-dependent repos, e.g. dymos, openaerostruct)
-from openmdao.docs.utils import generate_sourcedocs
-from openmdao.docs.utils import preprocess_tags
-from openmdao.docs.utils import patch
 from openmdao.docs.exts import embed_code
 from openmdao.docs.exts import embed_options
 from openmdao.docs.exts import embed_compare
+from openmdao.docs.utils.generate_sourcedocs import generate_docs
+from openmdao.docs.utils.preprocess_tags import tag
+from openmdao.docs.utils.patch import do_monkeypatch
 
 # set up tracing or memory profiling if env vars are set.
 import os
