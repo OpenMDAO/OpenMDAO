@@ -93,7 +93,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.recorders.case_reader import CaseReader
 
-# Doc Utils and Extensions (meant for use in OpenMDAO plugins, e.g. openaerostruct)
+# Doc Utils and Extensions (meant for use by OpenMDAO-dependent repos, e.g. dymos, openaerostruct)
 from openmdao.docs.utils import generate_sourcedocs
 from openmdao.docs.utils import preprocess_tags
 from openmdao.docs.utils import patch
