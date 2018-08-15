@@ -10,7 +10,7 @@ from numpydoc.docscrape import NumpyDocString, Reader
 from mock import Mock
 
 from openmdao.docs.config_params import MOCK_MODULES
-from openmdao.docs.utils.patch import do_monkeypatch
+from openmdao.docs._utils.patch import do_monkeypatch
 
 # Only mock the ones that don't import.
 for mod_name in MOCK_MODULES:
@@ -135,7 +135,7 @@ packages = [
     'core',
 ]
 
-from openmdao.docs.utils.generate_sourcedocs import generate_docs
+from openmdao.docs._utils.generate_sourcedocs import generate_docs
 generate_docs("experimental_source", ".", packages)
 
 # The name of the Pygments (syntax highlighting) style to use.

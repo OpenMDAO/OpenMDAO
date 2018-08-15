@@ -4,7 +4,7 @@ from docutils import nodes
 
 import sphinx
 from docutils.parsers.rst import Directive
-from openmdao.docs.utils.docutil import get_source_code
+from openmdao.docs._utils.docutil import get_source_code
 
 
 class ContentContainerDirective(Directive):

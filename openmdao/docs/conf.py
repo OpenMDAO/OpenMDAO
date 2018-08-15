@@ -10,8 +10,8 @@ from numpydoc.docscrape import NumpyDocString, Reader
 from mock import Mock
 
 from openmdao.docs.config_params import MOCK_MODULES
-from openmdao.docs.utils.patch import do_monkeypatch
-from openmdao.docs.utils.upload_doc_version import get_doc_version
+from openmdao.docs._utils.patch import do_monkeypatch
+from openmdao.docs._utils.upload_doc_version import get_doc_version
 
 # Only mock the ones that don't import.
 for mod_name in MOCK_MODULES:
@@ -29,7 +29,7 @@ do_monkeypatch()
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('./exts'))
+sys.path.insert(0, os.path.abspath('./_exts'))
 
 # -- General configuration ------------------------------------------------
 
@@ -136,7 +136,7 @@ packages = [
 ]
 
 if os.path.isfile("make_sourcedocs"):
-    from openmdao.docs.utils.generate_sourcedocs import generate_docs
+    from openmdao.docs._utils.generate_sourcedocs import generate_docs
     generate_docs("..", "../..", packages)
 
 # The name of the Pygments (syntax highlighting) style to use.

@@ -20,19 +20,14 @@ Importing Tools from OpenMDAO
 
 During this process, to get your docs to build properly, you may need access to a couple of things from within OpenMDAO:
 
-`openmdao.docs.utils` will get you things like our sourcedoc-building script, `generate_docs`, which will be called from conf.py,
-to create an organized set of source documentation.
-
-`openmdao.docs.exts` will get you access to our powerful custom extensions, such as our Sphinx embedding library, including `embed_code`,
-and `embed_options`.  Our code-embedding tool will help you to include things into your documentation that will stay dynamically updated
-with the code in your project and/or in the OpenMDAO project.  To get access to these items, both in your local install
-and on CI, you can just import them from `openmdao.docs.exts` or `openmdao.docs.utils`.
+`openmdao.docutils` will get you things like our sourcedoc-building script, `generate_docs`, which will be called from conf.py, to create an organized set of source documentation. This package will also get you access to our powerful custom extensions, such as our Sphinx embedding library, including `embed_code`, and `embed_options`.  Our code-embedding tool will help you to include things into your documentation that will stay dynamically updated with the code in your project and/or in the OpenMDAO project.  To get access to these items, both in your local install
+and on CI, you can just import them from `openmdao.docutils`.
 
 Here's how you might bring in an OpenMDAO extension, by importing it, and then adding it to your other extensions in conf.py:
 
 .. code-block:: python
 
-    from openmdao.docs.exts import embed_code, embed_options
+    from openmdao.docutils import embed_code, embed_options
 
     extensions = [
         'sphinx.ext.autodoc',
@@ -62,7 +57,7 @@ OpenMDAO numpydoc monkeypatch
 OpenMDAO uses a monkeypatch to the numpydoc standard that allows extra fields in docstrings such as `Options` and `Parameters`.
 It also removes private Attributes (those beginning with an underscore) from the auto-documentation pages. To import this:
 
-:code:`from openmdao.docs.utils.patch import do_monkeypatch`
+:code:`from openmdao.docutils import do_monkeypatch`
 
 Then simply calling the :code:`do_monkeypatch()` from within your conf.py would set your docstrings up to behave similarly to OpenMDAO's.
 
@@ -107,7 +102,7 @@ OpenMDAO Auto-documentation Generator
 OpenMDAO's docs have a custom script, `generate_sourcedocs`, that creates an organized subdirectory of source documentation that is sorted by
 subpackage.  To import this tool:
 
-:code:`from openmdao.docs.utils.generate_sourcedocs import generate_docs`
+:code:`from openmdao.docutils import generate_docs`
 
 Then, from your `docs/conf.py`, invoke it with arguments of:
     #. where to find packages (relative to where it's being called)
@@ -121,7 +116,7 @@ Then, from your `docs/conf.py`, invoke it with arguments of:
     'subpackage2',
     ]
 
-    from openmdao.docs.utils.generate_sourcedocs import generate_docs
+    from openmdao.docutils import generate_docs
     generate_docs("..", "../..", packages)
 
 
@@ -134,7 +129,7 @@ a custom blog-like tagging system that helps organize and cross-reference docs.
 The script finds occurrences of the .. tags:: directive and sets up the structure of the tags directory.  One file
 is created for each subject tag, and that file contains links to each instance of the tag throughout the docs.
 
-:code:`from openmdao.docs.utils import preprocess_tags.py`
+:code:`from openmdao.docutils import preprocess_tags`
 
 
 
