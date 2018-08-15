@@ -693,43 +693,6 @@ class _TotalJacInfo(object):
 
         return idx_map, end  # after the loop, end is the total size
 
-    # def _create_idx_maps(self, names, vois, size):
-    #     """
-    #     Create a list that maps jacobian row or column index to var name.
-
-    #     Parameters
-    #     ----------
-    #     names : iter of str
-    #         Names of the variables making up the rows or columns of the jacobian.
-    #     vois : dict
-    #         Mapping of variable of interest (desvar or response) name to its metadata.
-    #     size : int
-    #         Total number of rows or columns.
-
-    #     Returns
-    #     -------
-    #     list
-    #         List that maps row/col index to variable name.
-    #     ndarray
-    #         Array that maps row/col index to local variable index
-    #     """
-    #     idx2name = [None] * size
-    #     idx2local = np.empty(size, dtype=int)
-    #     abs2meta = self.model._var_allprocs_abs2meta
-
-    #     start = end = 0
-    #     for name in names:
-    #         if name in vois:
-    #             end += vois[name]['size']
-    #         else:
-    #             end += abs2meta[name]['global_size']
-
-    #         idx2name[start:end] = [name] * (end - start)
-    #         idx2local[start:end] = np.arange(0, end - start, dtype=int)
-    #         start = end
-
-    #     return idx2name, idx2local
-
     #
     # outer loop iteration functions
     #
@@ -1085,12 +1048,6 @@ class _TotalJacInfo(object):
                 self.J[:, i] = self.jac_petsc[mode].array
             else:
                 self.J[i] = self.jac_petsc[mode].array
-
-            # print("i=", i, "mode=", mode)
-            # print("rank", self.model.comm.rank)
-            # print("solvec map", self.solvec_map[mode])
-            # print(self.soln_petsc[mode][vecname][0].array)
-            # print(self.J)
 
     def par_deriv_jac_setter(self, inds, mode):
         """
