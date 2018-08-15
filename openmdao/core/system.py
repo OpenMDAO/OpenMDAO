@@ -1531,7 +1531,7 @@ class System(object):
                         csum[0] = 0
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
-                        off_vn[type_] = [np.zeros(0, dtype=int)]
+                        off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
             offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
