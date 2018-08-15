@@ -21,6 +21,7 @@ from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
+from openmdao.core.group import System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
@@ -107,14 +108,16 @@ class Problem(object):
 
     _post_setup_func = None
 
-    def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
+    def __init__(self, model=None, driver=None, comm=None, use_ref_vector=True, root=None):
         """
         Initialize attributes.
 
         Parameters
         ----------
         model : <System> or None
-            Pointer to the top-level <System> object (root node in the tree).
+            The top-level <System>. If not specified, an empty <Group> will be created.
+        driver : <Driver> or None
+            The driver for the problem. If not specified, a simple "Run Once" driver will be used.
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         use_ref_vector : bool
@@ -133,8 +136,8 @@ class Problem(object):
 
         if root is not None:
             if model is not None:
-                raise ValueError("cannot specify both `root` and `model`. `root` has been "
-                                 "deprecated, please use model")
+                raise ValueError("Cannot specify both 'root' and 'model'. "
+                                 "'root' has been deprecated, please use 'model'.")
 
             warn_deprecation("The 'root' argument provides backwards compatibility "
                              "with OpenMDAO <= 1.x ; use 'model' instead.")
@@ -142,11 +145,20 @@ class Problem(object):
             model = root
 
         if model is None:
-            model = Group()
+            self.model = Group()
+        elif isinstance(model, System):
+            self.model = model
+        else:
+            raise TypeError("The value provided for 'model' is not a valid System.")
 
-        self.model = model
+        if driver is None:
+            self.driver = Driver()
+        elif isinstance(driver, Driver):
+            self.driver = driver
+        else:
+            raise TypeError("The value provided for 'driver' is not a valid Driver.")
+
         self.comm = comm
-        self.driver = Driver()
 
         self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
