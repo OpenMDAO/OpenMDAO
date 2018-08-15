@@ -1,3 +1,5 @@
+"""Key OpenMDAO docutil tools can be imported from here."""
+
 # Doc Utils and Extensions (meant for use by OpenMDAO-dependent repos, e.g. dymos, openaerostruct)
 from openmdao.docs._exts import embed_code
 from openmdao.docs._exts import embed_options
