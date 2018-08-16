@@ -3,7 +3,6 @@
 import unittest
 import os
 import json
-import re
 
 import errno
 from shutil import rmtree
@@ -19,11 +18,6 @@ from openmdao.recorders.sqlite_recorder import SqliteRecorder
 DEBUG = False
 
 
-def clean(json_str):
-    """ clean spaces and newlines from json string. """
-    return re.sub('[ \n]', '', json_str)
-
-
 class TestViewModelData(unittest.TestCase):
 
     def setUp(self):
@@ -37,9 +31,9 @@ class TestViewModelData(unittest.TestCase):
         self.sqlite_html_filename = os.path.join(self.dir, "sqlite_n2.html")
         self.problem_html_filename = os.path.join(self.dir, "problem_n2.html")
 
-        self.expected_tree_json = '{"name": "root", "type": "root", "subsystem_type": "group", "children": [{"name": "px", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "x", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "pz", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "z", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "sub", "type": "subsystem", "subsystem_type": "group", "children": [{"name": "state_eq_group", "type": "subsystem", "subsystem_type": "group", "children": [{"name": "state_eq", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "y2_actual", "type": "param", "dtype": "ndarray"}, {"name": "y2_command", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}]}, {"name": "d1", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "x", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "d2", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}, {"name": "obj_cmp", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "x", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "obj", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "con_cmp1", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "con1", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "con_cmp2", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "con2", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}'
-        self.expected_conns_json = '[{"src": "sub.d1.y1", "tgt": "con_cmp1.y1"}, {"src": "sub.d2.y2", "tgt": "con_cmp2.y2"}, {"src": "px.x", "tgt": "obj_cmp.x"}, {"src": "sub.d1.y1", "tgt": "obj_cmp.y1"}, {"src": "sub.d2.y2", "tgt": "obj_cmp.y2"}, {"src": "pz.z", "tgt": "obj_cmp.z"}, {"src": "px.x", "tgt": "sub.d1.x"}, {"src": "sub.state_eq_group.state_eq.y2_command", "tgt": "sub.d1.y2"}, {"src": "pz.z", "tgt": "sub.d1.z"}, {"src": "sub.d1.y1", "tgt": "sub.d2.y1"}, {"src": "pz.z", "tgt": "sub.d2.z"}, {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": ["sub.d1 sub.d2", "sub.state_eq_group.state_eq sub.d1"]}]'
-        self.expected_abs2prom = """
+        self.expected_tree = json.loads('{"name": "root", "type": "root", "subsystem_type": "group", "children": [{"name": "px", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "x", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "pz", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "z", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "sub", "type": "subsystem", "subsystem_type": "group", "children": [{"name": "state_eq_group", "type": "subsystem", "subsystem_type": "group", "children": [{"name": "state_eq", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "y2_actual", "type": "param", "dtype": "ndarray"}, {"name": "y2_command", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}]}, {"name": "d1", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "x", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "d2", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}, {"name": "obj_cmp", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "x", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "obj", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "con_cmp1", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "con1", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "con_cmp2", "type": "subsystem", "subsystem_type": "component", "children": [{"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "con2", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}')
+        self.expected_conns = json.loads('[{"src": "sub.d1.y1", "tgt": "con_cmp1.y1"}, {"src": "sub.d2.y2", "tgt": "con_cmp2.y2"}, {"src": "px.x", "tgt": "obj_cmp.x"}, {"src": "sub.d1.y1", "tgt": "obj_cmp.y1"}, {"src": "sub.d2.y2", "tgt": "obj_cmp.y2"}, {"src": "pz.z", "tgt": "obj_cmp.z"}, {"src": "px.x", "tgt": "sub.d1.x"}, {"src": "sub.state_eq_group.state_eq.y2_command", "tgt": "sub.d1.y2"}, {"src": "pz.z", "tgt": "sub.d1.z"}, {"src": "sub.d1.y1", "tgt": "sub.d2.y1"}, {"src": "pz.z", "tgt": "sub.d2.z"}, {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": ["sub.d1 sub.d2", "sub.state_eq_group.state_eq sub.d1"]}]')
+        self.expected_abs2prom = json.loads("""
             {
                 "input": {
                     "sub.state_eq_group.state_eq.y2_actual": "state_eq.y2_actual",
@@ -66,7 +60,7 @@ class TestViewModelData(unittest.TestCase):
                     "con_cmp2.con2": "con2"
                 }
             }
-        """
+        """)
 
     def tearDown(self):
         if not DEBUG:
@@ -86,13 +80,10 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         p.setup(check=False)
         model_viewer_data = _get_viewer_data(p)
-        tree_json = json.dumps(model_viewer_data['tree'])
-        conns_json = json.dumps(model_viewer_data['connections_list'])
-        abs2prom_json = json.dumps(model_viewer_data['abs2prom'])
 
-        self.assertEqual(self.expected_tree_json, tree_json)
-        self.assertEqual(self.expected_conns_json, conns_json)
-        self.assertEqual(clean(self.expected_abs2prom), clean(abs2prom_json))
+        self.assertDictEqual(model_viewer_data['tree'], self.expected_tree)
+        self.assertListEqual(model_viewer_data['connections_list'], self.expected_conns)
+        self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
 
     def test_model_viewer_has_correct_data_from_sqlite(self):
         """
@@ -110,13 +101,9 @@ class TestViewModelData(unittest.TestCase):
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
 
-        expected_tree = json.loads(self.expected_tree_json)
-        expected_conns = json.loads(self.expected_conns_json)
-        expected_abs2prom = json.loads(self.expected_abs2prom)
-
-        self.assertDictEqual(expected_tree, model_viewer_data['tree'])
-        self.assertEqual(expected_conns, model_viewer_data['connections_list'])
-        self.assertEqual(expected_abs2prom, model_viewer_data['abs2prom'])
+        self.assertDictEqual(model_viewer_data['tree'], self.expected_tree)
+        self.assertListEqual(model_viewer_data['connections_list'], self.expected_conns)
+        self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
 
     def test_view_model_from_problem(self):
         """
