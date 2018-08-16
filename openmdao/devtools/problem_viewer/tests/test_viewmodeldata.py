@@ -15,6 +15,7 @@ from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data, vi
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 
 
+# set DEBUG to True if you want to view the generated HTML file(s)
 DEBUG = False
 
 
