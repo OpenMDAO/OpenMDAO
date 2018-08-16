@@ -118,8 +118,13 @@ of the equation is taken care of in your .travis.yml file, as I will show here u
     after_success:
         coveralls
 
-The point of the above example is to use testflo to run things, and set the `coverpkg` to your project, and the `cover-omit` dirs to exclude from coverage, use coveralls
-to collect the data, and then send the results to coveralls.io.
+The point of the above example is to:
+    #. Use testflo to run the test suite,
+    #. Use testflo to set the `coverpkg` to your project, (collect coverage data on that package)
+    #. Use tesflo to `cover-omit` directories you'd like to exclude from coverage, and
+    #. Use coveralls to send coverage data to coveralls.io
+
+For more information on testflo, please see `testflo on pypi <https://pypi.org/project/testflo>`_
 
 Caching
 -------

@@ -107,7 +107,7 @@ subpackage.  To import this tool:
 Then, from your `docs/conf.py`, invoke it with arguments of:
     #. where to find packages (relative to where it's being called)
     #. root of the project (relative to where it's being called)
-    #. which packages to include--omit things like "test" that don't make sense to doc.
+    #. which packages to include--omit things like "test" that don't make sense to document.
 
 .. code-block:: python
 

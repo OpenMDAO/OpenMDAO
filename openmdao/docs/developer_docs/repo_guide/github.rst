@@ -3,8 +3,12 @@
 github-pages Repository Setup
 =============================
 
-If you want to publish to github-pages, from your docs built on Travis CI, make sure your Github repository is set up to be public,
-otherwise some of the instructions in this document may not work for you.
+This document is meant to help a repo owner get their docs built on Travis CI and then transfer those built docs to a github-pages
+branch for public viewing by a project's users.
+
+.. warning::
+    If you want to publish to github-pages from your docs built on Travis CI, make sure your Github repository is set up to be public,
+    otherwise the instructions in this document will not work for you.
 
 Personal Access Token
 ---------------------
@@ -14,7 +18,7 @@ with a certain amount of permission.  Once you create a Personal Access Token, i
 one viewing, and you must copy it then use it immediately before you lose it (and then you have to make another one).
 
 To create a Personal Access Token:
-Log in to githb.com.  Go to Github *account* Settings (**not** Repo Settings)->Dev Settings->Personal Access Token
+Log in to github.com.  Go to Github *account* Settings (**not** Repo Settings)->Dev Settings->Personal Access Token
 The menu will look like this:
 
 .. image::
@@ -27,7 +31,7 @@ Give the access token the name GH_TOKEN, and the permission "repo access," as pi
 
 You'll need this token to allow the transfer of your documents to github-pages, once they are built on Travis CI.
 
-Then on Travis CI, you'll need to go to your Environment Variables section, and create a new env var, as shown here:
+Then on Travis CI, you'll need to go to your Environment Variables section, and create a new variable, as shown here:
 
 .. image::
     images/TravisEnv.png
@@ -50,7 +54,7 @@ travis-sphinx Usage
 via TravisCI.
 
 Once your personal access token is set up, you can begin using travis-sphinx within your Sphinx configuration file. (`docs/conf.py`)
-The two calls that should be used are, in their respective doc sections:
+The two calls that should be used are, in their respective sections:
 
 .. code-block:: python
 

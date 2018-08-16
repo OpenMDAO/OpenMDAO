@@ -37,11 +37,11 @@ password-less transfer of the docs from Travis to our private server (in our cas
 
     ::
 
-	1. Generate a dedicated SSH key for this job (it is easier to later isolate and to revoke it, if we ever must).
-	2. Encrypt the private key to make it readable only by Travis CI .
-	3. Copy the public key file into the remote SSH host’s allowed_hosts file.
-	4. Modify the yaml further.
-	5. Commit the modified .travis.yaml and encrypted key file into Git.
+	#. Generate a dedicated SSH key for this job (it is easier to later isolate and to revoke it, if we ever must).
+	#. Encrypt the private key to make it readable only by Travis CI .
+	#. Copy the public key file into the remote SSH host’s allowed_hosts file.
+	#. Modify the yaml further.
+	#. Commit the modified .travis.yaml and encrypted key file into Git.
 
 
 
@@ -71,10 +71,10 @@ The commands to do the above look something like this:
 
     ::
 
-        travis encrypt-file travis_deploy_rsa --add -—debug --org
+        travis encrypt-file travis_deploy_rsa --add --debug --org
 
-        —-add adds the decryption command to the .travis.yml file automatically.
-        —-debug shows all the available output of the command.
+        --add adds the decryption command to the .travis.yml file automatically.
+        --debug shows all the available output of the command.
         --org creates a key for the org side, not the paid side
 
     So, what does this command do?
@@ -155,15 +155,15 @@ The commands to do the above look something like this:
 
     A. Need to create a web server application on Webfaction (for local NASA users).
 
-     1. Go to panel.webfaction.com,
-     2. Click Domains/Websites,
-     3. Choose the Applications tab.
-     4. Click the Add New Application button.
-     5. Give your new app an appropriate name, for our example, I chose “openmdaodocs.”
-     6. Make the app as type “Static Only (no .htaccess)."
-     7. Click on Websites, choose openmdao_org,
-     8. Choose, “reuse an existing application” and then pick your newapp and give it a url.
-     9. After a moment, a folder will appear on webXXX, under ~/webapps/<name>, that is accessible at openmdao.org/<url>. Keep in mind that webXXX.webfaction.com:webapps/<name> will be your path to copy your docs to.
+     #. Go to panel.webfaction.com,
+     #. Click Domains/Websites,
+     #. Choose the Applications tab.
+     #. Click the Add New Application button.
+     #. Give your new app an appropriate name, for our example, I chose “openmdaodocs.”
+     #. Make the app as type “Static Only (no .htaccess)."
+     #. Click on Websites, choose openmdao_org,
+     #. Choose, “reuse an existing application” and then pick your newapp and give it a url.
+     #. After a moment, a folder will appear on webXXX, under ~/webapps/<name>, that is accessible at openmdao.org/<url>. Keep in mind that webXXX.webfaction.com:webapps/<name> will be your path to copy your docs to.
 
     B. Need to copy the public key generated above to our Webfaction server to allow passwordless entrance.
 
@@ -173,7 +173,7 @@ The commands to do the above look something like this:
 **4. Modify the YAML Further**
 
    A. Late in the `before_install` section add this line:
-        `- echo -e "Host <server address>\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config`
+        :code:`- echo -e "Host <server address>\\n\\tStrictHostKeyChecking no\\n" >> ~/.ssh/config`
         (This will turn off a human-prompt by Travis machine “are you willing to accept <server address> as a host (yes/no)”)
 
    B. Create a new subhead in your `addons`->`apt` called `ssh_known_hosts`, like this:

@@ -8,7 +8,7 @@ git
 ---
 
 Make sure everything you want for the release is merged in on Github and has tested successfully on your CI.
-Get your local git repo’s master clean and up to date with username/projectname@master; run tests locally.
+Get your local git repo’s master clean and up to date with `username/projectname@master`; run tests locally.
 If you pass, great, move on.
 
 Create a local branch named <release number>  (e.g. `1.0.0`), and switch to that branch:
@@ -47,7 +47,7 @@ For minor changes to the code, we will increment the third digit, e.g. 1.0.1
 For API changes to the code, we will increment the second digit, e.g. 1.1.0
 
 Now we need to get that tag up to master:  (Assuming you’re a repository owner for your project, and that `origin` is set to projectname/repo.)
-:code:`git push origin —-tags`
+:code:`git push origin --tags`
 When you do this, you should see the tags upload to the intended repository.
 
 You can also go to github.com website and look at OpenMDAO repo…in the same dropdown as branches, there’s a tab for tags also.  Make sure your new tag is there.
@@ -55,9 +55,12 @@ You can also go to github.com website and look at OpenMDAO repo…in the same dr
 pypi
 ----
 
-First, go sign up for an account at pypi.org.  Here you can set all the settings that pertain to your account.
+pypi is the `Python Package Index <http:pypi.org>`_, a repository of software for the Python programming language.
+Package authors make their projects pip-installable by using PyPI to distribute their software.
 
-To be able to do any of the following commands on pypi, you need to create on your local machine, a  ~/.pypirc file that
+To make your project pip-installable, go sign up for an account at pypi.org.  Set up your account with information about your project.
+
+To be able to do any of the following commands on pypi, you'll need to create, on your local machine, a  ~/.pypirc file that
 looks like this: (your username will obviously be different)
 
 .. code::
@@ -74,16 +77,18 @@ looks like this: (your username will obviously be different)
 
 OK, so how do we USE this to make a release?
 
-First, we need to build a source distribution, so from the top level, where setup.py lives.:
+First, we need to build a source distribution, so from the top level, where setup.py lives:
 
 :code:`python setup.py sdist`
 
-This will create a dist directory, in which lies `projectname-1.0.0.tar.gz`
+This will create a `dist/` directory, in which lies a file, `projectname-1.0.0.tar.gz`.
 
-Finally, we upload this file up to pypi using `twine`:
+Finally, you will upload this file to pypi using `twine <https://pypi.org/project/twine>`_
+(you may need to `pip install twine` if you don't have it in your current environment). Here's an example upload command:
 
 :code:`twine upload dist/projectname-1.0.0.tar.gz`
 
-You should be able to watch the dist upload. Then, go to your page at pypi.org and make sure the new release is visible there.
+You should be able to watch the progress as the dist file uploads. Once the upload completes, go to your page at pypi.org,
+and make sure the new release is visible there.
 
 Finally, tell the team and users that your release is done.  Wait for everything to fall apart.
