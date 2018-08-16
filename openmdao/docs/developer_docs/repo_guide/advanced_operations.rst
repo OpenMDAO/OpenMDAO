@@ -173,7 +173,7 @@ The commands to do the above look something like this:
 **4. Modify the YAML Further**
 
    A. Late in the `before_install` section add this line:
-        :code:`- echo -e "Host <server address>\\n\\tStrictHostKeyChecking no\\n" >> ~/.ssh/config`
+        :code:`- echo -e "Host <server address>\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config`
         (This will turn off a human-prompt by Travis machine “are you willing to accept <server address> as a host (yes/no)”)
 
    B. Create a new subhead in your `addons`->`apt` called `ssh_known_hosts`, like this:
