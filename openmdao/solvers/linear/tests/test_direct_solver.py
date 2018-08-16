@@ -63,6 +63,20 @@ class NanComp2(ExplicitComponent):
         J['y', 'x'] = np.NaN
         J['y2', 'x'] = 2.0
 
+class DupPartialsComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('c', np.zeros(19))
+        self.add_output('x', np.zeros(11))
+
+        rows = [0, 1, 4, 10, 7, 9, 10]
+        cols = [0, 18, 11, 2, 5, 9, 2]
+        self.declare_partials(of='x', wrt='c', rows=rows, cols=cols)
+
+    def compute(self, inputs, outputs):
+        pass
+
+    def compute_partials(self, inputs, partials):
+        pass
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
@@ -190,6 +204,23 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_raise_error_on_dup_partials(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('des_vars', IndepVarComp('x', 1.0), promotes=['*'])
+        model.add_subsystem('dupcomp', DupPartialsComp())
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
+            prob.final_setup()
+
+        expected_msg = "CSC matrix data contains the following duplicate row/col entries: [(('dupcomp.x', 'dupcomp.c'), [(10, 2)])]\nThis would break internal indexing."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
