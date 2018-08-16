@@ -242,10 +242,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         awesomplete = f.read()
     with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
         d3 = f.read()
-    # with open(os.path.join(libs_dir, "http.js"), "r") as f:
-    #     http = f.read()
-    # with open(os.path.join(libs_dir, "jquery-3.2.1.min.js"), "r") as f:
-    #     jquery = f.read()
     with open(os.path.join(libs_dir, "vkBeautify.js"), "r") as f:
         vk_beautify = f.read()
 

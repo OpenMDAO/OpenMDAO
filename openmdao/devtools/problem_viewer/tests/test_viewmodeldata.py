@@ -16,7 +16,7 @@ from openmdao.recorders.sqlite_recorder import SqliteRecorder
 
 
 # set DEBUG to True if you want to view the generated HTML file(s)
-DEBUG = False
+DEBUG = True
 
 
 def clean(json_str):
