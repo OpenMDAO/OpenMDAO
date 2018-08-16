@@ -131,6 +131,9 @@ is created for each subject tag, and that file contains links to each instance o
 
 :code:`from openmdao.docutils import preprocess_tags`
 
+In OpenMDAO, we run preprocess_tags.py, (which calls the `tag()` function) from our `docs/Makefile`, prior to the building of the docs, so that all the proper
+files and links can be set up in advance of the actual Sphinx docbuild. Your project could benefit from a similar procedure. Use of tags is
+a completely optional step, your docs will work with or without tags.
 
 
 Getting Docs For Your Plugin Transferred to github-pages
