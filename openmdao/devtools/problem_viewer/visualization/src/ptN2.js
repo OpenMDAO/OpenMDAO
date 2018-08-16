@@ -337,11 +337,15 @@ function PtN2Diagram(parentDiv, modelData) {
                 }
             })
             .on("mouseleave", function (d) {
-                return tooltip.style("visibility", "hidden");
+                if (abs2prom != undefined) {
+                    return tooltip.style("visibility", "hidden");
+                }
             })
             .on("mousemove", function(){
-                return tooltip.style("top", (d3.event.pageY-30)+"px")
-                              .style("left",(d3.event.pageX+5)+"px");
+                if (abs2prom != undefined) {
+                    return tooltip.style("top", (d3.event.pageY-30)+"px")
+                                  .style("left",(d3.event.pageX+5)+"px");
+                }
             });
 
         nodeEnter.append("svg:rect")
