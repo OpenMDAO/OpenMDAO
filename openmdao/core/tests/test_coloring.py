@@ -911,7 +911,7 @@ class BidirectionalTestCase(unittest.TestCase):
             tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
             self.assertEqual(tot_colors, 3)
 
-    @unittest.skipIf(LooseVersion(scipy.__version__) < LooseVersion("1.0"), "scipy version too old")
+    @unittest.skipIf(LooseVersion(scipy.__version__) < LooseVersion("0.19.1"), "scipy version too old")
     def test_can_715(self):
         # this test is just to show the superiority of bicoloring vs. single coloring in
         # either direction.  Bicoloring gives only 21 colors in this case vs. 105 for either

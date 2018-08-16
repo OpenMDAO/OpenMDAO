@@ -520,9 +520,24 @@ class _TotalJacInfo(object):
         if has_par_deriv_color:
             _fix_pdc_lengths(idx_iter_dict)
 
-        if simul_coloring:
+        if simul_coloring and mode in simul_coloring:
             imeta = defaultdict(bool)
-            imeta["coloring"] = self.simul_coloring
+            imeta["coloring"] = simul_coloring
+            all_rel_systems = set()
+            cache = False
+            imeta['itermeta'] = itermeta = []
+            for color, ilist in enumerate(simul_coloring[mode][0]):
+                for i in ilist:
+                    _, _, rel_systems, cache_lin_sol = idx_map[i]
+                    _update_rel_systems(all_rel_systems, rel_systems)
+                    cache |= cache_lin_sol
+
+                iterdict = defaultdict(bool)
+                iterdict['relevant'] = all_rel_systems
+                if cache:
+                    iterdict['cache_lin_solve'] = (('linear',), (ilist[0], mode))
+                itermeta.append(iterdict)
+
             idx_iter_dict['@simul_coloring'] = (imeta, self.simul_coloring_iter)
 
         return idx_map, np.hstack(loc_idxs), idx_iter_dict
@@ -663,7 +678,7 @@ class _TotalJacInfo(object):
     #
     # outer loop iteration functions
     #
-    def single_index_iter(self, imeta):
+    def single_index_iter(self, imeta, mode):
         """
         Iterate over single indices for a single variable.
 
@@ -671,6 +686,8 @@ class _TotalJacInfo(object):
         ----------
         imeta : dict
             Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
 
         Yields
         ------
@@ -682,9 +699,9 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         for i in imeta['idx_list']:
-            yield i, self.single_input_setter, self.single_jac_setter, self.mode
+            yield i, self.single_input_setter, self.single_jac_setter, None
 
-    def simul_coloring_iter(self, imeta):
+    def simul_coloring_iter(self, imeta, mode):
         """
         Iterate over index lists for the simul coloring case.
 
@@ -692,6 +709,8 @@ class _TotalJacInfo(object):
         ----------
         imeta : dict
             Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
 
         Yields
         ------
@@ -703,25 +722,26 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         coloring_info = imeta['coloring']
-        modes = [k for k in ('fwd', 'rev') if k in coloring_info]
+        # modes = [k for k in ('fwd', 'rev') if k in coloring_info]
+        both = 'fwd' in coloring_info and 'rev' in coloring_info
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
-        for mode in modes:
-            for color, ilist in enumerate(coloring_info[mode][0]):
-                if color == 0:
-                    # do all uncolored indices individually (one linear solve per index)
-                    if len(modes) == 1:
-                        for i in ilist:
-                            yield i, self.single_input_setter, self.single_jac_setter, mode
-                    else:
-                        for i in ilist:
-                            yield [i], input_setter, jac_setter, mode
+        # for mode in modes:
+        for color, ilist in enumerate(coloring_info[mode][0]):
+            if color == 0:
+                # do all uncolored indices individually (one linear solve per index)
+                if both:
+                    for i in ilist:
+                        yield [i], input_setter, jac_setter, None
                 else:
-                    # yield all indices for a color at once
-                    yield ilist, input_setter, jac_setter, mode
+                    for i in ilist:
+                        yield i, self.single_input_setter, self.single_jac_setter, None
+            else:
+                # yield all indices for a color at once
+                yield ilist, input_setter, jac_setter, imeta['itermeta'][color]
 
-    def par_deriv_iter(self, imeta):
+    def par_deriv_iter(self, imeta, mode):
         """
         Iterate over index lists for the parallel deriv case.
 
@@ -729,6 +749,8 @@ class _TotalJacInfo(object):
         ----------
         imeta : dict
             Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
 
         Yields
         ------
@@ -741,9 +763,9 @@ class _TotalJacInfo(object):
         """
         idxs = imeta['idx_list']
         for tup in zip(*idxs):
-            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, self.mode
+            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, None
 
-    def matmat_iter(self, imeta):
+    def matmat_iter(self, imeta, mode):
         """
         Iterate over index lists for the matrix matrix case.
 
@@ -751,6 +773,8 @@ class _TotalJacInfo(object):
         ----------
         imeta : dict
             Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
 
         Yields
         ------
@@ -762,9 +786,9 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         for idx_list in imeta['idx_list']:
-            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter, self.mode
+            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter, None
 
-    def par_deriv_matmat_iter(self, imeta):
+    def par_deriv_matmat_iter(self, imeta, mode):
         """
         Iterate over index lists for the combined parallel deriv matrix matrix case.
 
@@ -772,6 +796,8 @@ class _TotalJacInfo(object):
         ----------
         imeta : dict
             Dictionary of iteration metadata.
+        mode : str
+            Direction of derivative solution.
 
         Yields
         ------
@@ -786,7 +812,7 @@ class _TotalJacInfo(object):
         # variable, and the entries in each array are all of the indices corresponding
         # to that variable's rows or columns in the total jacobian.
         idxs = imeta['idx_list']
-        yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, self.mode
+        yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, None
 
     #
     # input setter functions
@@ -826,7 +852,7 @@ class _TotalJacInfo(object):
         else:
             return rel_systems, None, None
 
-    def simul_coloring_input_setter(self, inds, imeta, mode):
+    def simul_coloring_input_setter(self, inds, itermeta, mode):
         """
         Set 1's into the input vector in the simul coloring case.
 
@@ -834,7 +860,7 @@ class _TotalJacInfo(object):
         ----------
         inds : list of int
             Total jacobian row or column indices.
-        imeta : dict
+        itermeta : dict
             Dictionary of iteration metadata.
         mode : str
             Direction of derivative solution.
@@ -848,18 +874,17 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        all_rel_systems = set()
-        cache = False
-
         for i in inds:
-            rel_systems, vec_names, _ = self.single_input_setter(i, imeta, mode)
-            _update_rel_systems(all_rel_systems, rel_systems)
-            cache |= vec_names is not None
+            relevant, _, cache = self.single_input_setter(i, itermeta, mode)
+
+        if itermeta is not None:
+            relevant = itermeta['relevant']
+            cache = itermeta['cache_lin_solve']
 
         if cache:
-            return all_rel_systems, ('linear',), (inds[0], mode)
+            return relevant, ('linear',), (inds[0], mode)
         else:
-            return all_rel_systems, None, None
+            return relevant, None, None
 
     def par_deriv_input_setter(self, inds, imeta, mode):
         """
@@ -1166,10 +1191,10 @@ class _TotalJacInfo(object):
         model._linear_solver._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for iter_mode in self.idx_iter_dict:
-            for key, idx_info in iteritems(self.idx_iter_dict[iter_mode]):
+        for mode in self.idx_iter_dict:
+            for key, idx_info in iteritems(self.idx_iter_dict[mode]):
                 imeta, idx_iter = idx_info
-                for inds, input_setter, jac_setter, mode in idx_iter(imeta):
+                for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                     # this sets dinputs for the current par_deriv_color to 0
                     # dinputs is dresids in fwd, doutouts in rev
                     vec_doutput['linear']._data[:] = 0.0
@@ -1178,7 +1203,7 @@ class _TotalJacInfo(object):
                     else:  # rev
                         vec_dinput['linear']._data[:] = 0.0
 
-                    rel_systems, vec_names, cache_key = input_setter(inds, imeta, mode)
+                    rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
                         if par_deriv and key in par_deriv:
