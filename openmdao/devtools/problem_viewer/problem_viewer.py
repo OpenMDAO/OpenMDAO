@@ -71,19 +71,31 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     return tree_dict
 
 
-def _get_viewer_data(problem_or_rootgroup_or_filename):
-    """Get the data needed by the N2 viewer as a dictionary."""
-    if isinstance(problem_or_rootgroup_or_filename, Problem):
-        root_group = problem_or_rootgroup_or_filename.model
-    elif isinstance(problem_or_rootgroup_or_filename, Group):
-        if not problem_or_rootgroup_or_filename.pathname:  # root group
-            root_group = problem_or_rootgroup_or_filename
+def _get_viewer_data(data_source):
+    """
+    Get the data needed by the N2 viewer as a dictionary.
+
+    Parameters
+    ----------
+    data_source : <Problem> or <Group> or str
+        A Problem or Group or case recorder file name containing the model or model data.
+
+    Returns
+    -------
+    dict
+        A dictionary containing information about the model for use by the viewer.
+    """
+    if isinstance(data_source, Problem):
+        root_group = data_source.model
+    elif isinstance(data_source, Group):
+        if not data_source.pathname:  # root group
+            root_group = data_source
         else:
             # this function only makes sense when it is at the root
             return {}
-    elif is_valid_sqlite3_db(problem_or_rootgroup_or_filename):
+    elif is_valid_sqlite3_db(data_source):
         import sqlite3
-        con = sqlite3.connect(problem_or_rootgroup_or_filename,
+        con = sqlite3.connect(data_source,
                               detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         cur.execute("SELECT format_version FROM metadata")
@@ -92,6 +104,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
 
         cur.execute("SELECT model_viewer_data FROM driver_metadata;")
         model_text = cur.fetchone()
+
         from six import PY2, PY3
         if row is not None:
             if format_version >= 3:
@@ -113,6 +126,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
                                        component_execution_idx)
 
     connections_list = []
+
     # sort to make deterministic for testing
     sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
     root_group._conn_global_abs_in2out = sorted_abs_input2src
@@ -157,6 +171,8 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
 
     data_dict['connections_list'] = connections_list
 
+    data_dict['abs2prom'] = root_group._var_abs2prom
+
     return data_dict
 
 
@@ -168,18 +184,17 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embeddable=False,
+def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                draw_potential_connections=True):
     """
-    Generates an HTML file containing a tree viewer. Optionally pops up a web browser to
-    view the file.
+    Generates an HTML file containing a tree viewer.
+
+    Optionally opens a web browser to view the file.
 
     Parameters
     ----------
-    problem_or_filename : Either a Problem() or a string
-        Problem() : The Problem (after problem.setup()) for the desired tree.
-        string : The filename of the case recorder file containing the data required to
-         build the tree.
+    data_source : <Problem> or str
+        The Problem or case recorder database containing the model or model data.
 
     outfile : str, optional
         The name of the final output file
@@ -197,7 +212,8 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
         in the model. Defaults to True.
     """
     # grab the model viewer data
-    model_viewer_data = 'var modelData = %s' % json.dumps(_get_viewer_data(problem_or_filename))
+    model_viewer_data = _get_viewer_data(data_source)
+    model_viewer_data = 'var modelData = %s' % json.dumps(model_viewer_data)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
