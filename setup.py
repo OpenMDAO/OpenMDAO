@@ -42,6 +42,8 @@ setup(
         'openmdao.devtools.problem_viewer',
         'openmdao.devtools.iprofile_app',
         'openmdao.docs',
+        'openmdao.docs._exts',
+        'openmdao.docs._utils',
         'openmdao.drivers',
         'openmdao.error_checking',
         'openmdao.jacobians',

@@ -56,14 +56,14 @@ Source Docs
     if not os.path.isdir(packages_dir):
         os.mkdir(packages_dir)
 
-    # look for directories in the openmdao level, one up from docs
-    # those directories will be the openmdao packages
-    # auto-generate the top-level index.rst file for _srcdocs, based on
-    # openmdao packages:
+    # look for directories in the top level, one up from docs
+    # those directories will be the packages that
+    # auto-generate at the top-level index.rst file for _srcdocs, based on
+    # the packages that are passed in, which are set in conf.py.
 
-    # to improve the order that the user sees in the source docs, put
-    # the important packages in this list explicitly. Any new ones that
-    # get added will show up at the end.
+    # to improve the order in which the user sees the source docs,
+    # order the packages in this list explicitly. Any new ones that
+    # are detected will show up at the end of the list.
 
     # everything in openmdao dir that isn't discarded is appended as a source package.
     for listing in os.listdir(os.path.join(top)):
