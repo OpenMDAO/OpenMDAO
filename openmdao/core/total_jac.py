@@ -515,9 +515,9 @@ class _TotalJacInfo(object):
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if name in relevant:
-                tup = (name, rhsname, relevant[name]['@all'][1], cache_lin_sol)
+                tup = (rhsname, relevant[name]['@all'][1], cache_lin_sol)
             else:
-                tup = (name, rhsname, _contains_all, cache_lin_sol)
+                tup = (rhsname, _contains_all, cache_lin_sol)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -536,7 +536,7 @@ class _TotalJacInfo(object):
             locs = None
             for color, ilist in enumerate(simul_coloring[mode][0]):
                 for i in ilist:
-                    _, _, rel_systems, cache_lin_sol = idx_map[i]
+                    _, rel_systems, cache_lin_sol = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
                     cache |= cache_lin_sol
 
@@ -851,7 +851,7 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        _, vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
+        vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
@@ -963,7 +963,7 @@ class _TotalJacInfo(object):
         in_idx_map = self.in_idx_map[mode]
         in_loc_idxs = self.in_loc_idxs[mode]
 
-        input_name, vec_name, rel_systems, cache_lin_sol = in_idx_map[inds[0]]
+        vec_name, rel_systems, cache_lin_sol = in_idx_map[inds[0]]
 
         dinputs = input_vec[vec_name]
 
@@ -1010,7 +1010,7 @@ class _TotalJacInfo(object):
 
         vec_names = []
         for matmat_idxs in inds:
-            input_name, vec_name, rel_systems, cache_lin_sol = in_idx_map[matmat_idxs[0]]
+            vec_name, rel_systems, cache_lin_sol = in_idx_map[matmat_idxs[0]]
             if cache_lin_sol:
                 vec_names.append(vec_name)
             cache |= cache_lin_sol
@@ -1049,7 +1049,7 @@ class _TotalJacInfo(object):
         mode : str
             Direction of derivative solution.
         """
-        _, vecname, _, _ = self.in_idx_map[mode][i]
+        vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs = self.solvec_map[mode]
 
         scatter = self.jac_scatters[mode][vecname]
@@ -1127,7 +1127,7 @@ class _TotalJacInfo(object):
         """
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
-        _, vecname, _, _ = self.in_idx_map[mode][inds[0]]
+        vecname, _, _ = self.in_idx_map[mode][inds[0]]
         ncol = self.output_vec[mode][vecname]._ncol
         nproc = self.comm.size
         fwd = self.mode == 'fwd'
