@@ -22,6 +22,7 @@ from scipy.sparse import coo_matrix
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
+from openmdao.utils.mpi import MPI
 
 # If this is True, then IF simul coloring/sparsity is specified, use it.
 # If False, don't use it regardless.
@@ -1147,6 +1148,10 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
     show_jac : bool
         If True, display a visualization of the colored jacobian.
     """
+    # for now, raise an exception when MPI is used with simul_coloring
+    if MPI:
+        raise RuntimeError("simul coloring currently does not work under MPI.")
+
     problem = driver._problem
     driver._total_jac = None
 

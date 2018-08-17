@@ -24,6 +24,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.mpi import MPI
 
 
 _contains_all = ContainsAll()
@@ -183,6 +184,9 @@ class _TotalJacInfo(object):
             if self.simul_coloring is None:
                 modes = [self.mode]
             else:
+                # for now, raise an exception when MPI is used with simul_coloring
+                if MPI:
+                    raise RuntimeError("simul coloring currently does not work under MPI.")
                 modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
 
             self.in_idx_map = {}
