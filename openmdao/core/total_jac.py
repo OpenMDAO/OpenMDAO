@@ -925,16 +925,16 @@ class _TotalJacInfo(object):
             key used for storage of cached linear solve (if active, else None).
         """
         all_rel_systems = set()
-        vec_names = []
+        vec_names = set()
 
         for i in inds:
             rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
             _update_rel_systems(all_rel_systems, rel_systems)
             if vnames is not None:
-                vec_names.append(vnames[0])
+                vec_names.add(vnames[0])
 
         if vec_names:
-            return all_rel_systems, vec_names, (inds[0], mode)
+            return all_rel_systems, sorted(vec_names), (inds[0], mode)
         else:
             return all_rel_systems, None, None
 
@@ -1009,11 +1009,11 @@ class _TotalJacInfo(object):
         all_rel_systems = set()
         cache = False
 
-        vec_names = []
+        vec_names = set()
         for matmat_idxs in inds:
             vec_name, rel_systems, cache_lin_sol = in_idx_map[matmat_idxs[0]]
             if cache_lin_sol:
-                vec_names.append(vec_name)
+                vec_names.add(vec_name)
             cache |= cache_lin_sol
             _update_rel_systems(all_rel_systems, rel_systems)
 
@@ -1032,7 +1032,7 @@ class _TotalJacInfo(object):
                         dinputs._data[loc_idx] = -1.0
 
         if cache:
-            return all_rel_systems, vec_names, (inds[0][0], mode)
+            return all_rel_systems, sorted(vec_names), (inds[0][0], mode)
         else:
             return all_rel_systems, None, None
 
@@ -1140,12 +1140,13 @@ class _TotalJacInfo(object):
         scatter = self.jac_scatters[mode][vecname]
         jac_inds = jac_idxs[vecname]
         if scatter is None:
+            deriv_val = deriv_val[deriv_idxs[vecname], :]
             if mode == 'fwd':
                 for col, i in enumerate(inds):
-                    self.J[jac_inds, i] = deriv_val[deriv_idxs[vecname], col]
+                    self.J[jac_inds, i] = deriv_val[:, col]
             else:  # rev
                 for col, i in enumerate(inds):
-                    self.J[i, jac_inds] = deriv_val[deriv_idxs[vecname], col]
+                    self.J[i, jac_inds] = deriv_val[:, col]
         else:
             solution = self.soln_petsc[mode][vecname]
             for col, i in enumerate(inds):
