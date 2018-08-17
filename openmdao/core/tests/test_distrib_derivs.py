@@ -242,7 +242,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
         prob.model = root = Group()
-
+        
         root.add_subsystem('P1', IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add_subsystem('P2', IndepVarComp('x', numpy.ones(size, dtype=float)))
         sub = root.add_subsystem('sub', ParallelGroup())

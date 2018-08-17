@@ -390,6 +390,7 @@ class _TotalJacInfo(object):
         has_par_deriv_color = False
         abs2meta = self.model._var_allprocs_abs2meta
         var_sizes = self.model._var_sizes
+        var_offsets = self.model._var_offsets
         abs2idx = self.model._var_allprocs_abs2idx
         idx_iter_dict = OrderedDict()  # a dict of index iterators
 
@@ -444,6 +445,7 @@ class _TotalJacInfo(object):
 
             in_var_idx = abs2idx[rhsname][name]
             sizes = var_sizes[rhsname]['output']
+            offsets = var_offsets[rhsname]['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
 
@@ -473,6 +475,9 @@ class _TotalJacInfo(object):
                     loc_i[loc] = irange[loc]
                     if not in_var_meta['distributed']:
                         loc_i[loc] -= gstart
+
+                loc_offset = offsets[iproc, in_var_idx] - offsets[iproc, 0]
+                loc_i[loc] += loc_offset
 
             loc_idxs.append(loc_i)
 
@@ -625,6 +630,7 @@ class _TotalJacInfo(object):
                 start = end
 
             idxs[vecname] = np.hstack(inds)
+
             if missing:
                 jac_idxs[vecname] = np.hstack([np.arange(start, end, dtype=INT_DTYPE)
                                                for start, end in jac_inds])
@@ -722,7 +728,6 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         coloring_info = imeta['coloring']
-        # modes = [k for k in ('fwd', 'rev') if k in coloring_info]
         both = 'fwd' in coloring_info and 'rev' in coloring_info
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
@@ -819,7 +824,7 @@ class _TotalJacInfo(object):
     #
     def single_input_setter(self, idx, imeta, mode):
         """
-        Set 1's into the input vector in the single index case.
+        Set -1's into the input vector in the single index case.
 
         Parameters
         ----------
@@ -839,13 +844,13 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        input_name, vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
+        _, vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
 
         loc_idx = self.in_loc_idxs[mode][idx]
-        if loc_idx != -1:
+        if loc_idx >= 0:
             # We apply a -1 here because the derivative of the output is minus the derivative of
             # the residual in openmdao.
-            self.input_vec[mode][vecname]._views_flat[input_name][loc_idx] = -1.0
+            self.input_vec[mode][vecname]._data[loc_idx] = -1.0
 
         if cache_lin_sol:
             return rel_systems, (vecname,), (idx, mode)
@@ -854,7 +859,7 @@ class _TotalJacInfo(object):
 
     def simul_coloring_input_setter(self, inds, itermeta, mode):
         """
-        Set 1's into the input vector in the simul coloring case.
+        Set -1's into the input vector in the simul coloring case.
 
         Parameters
         ----------
@@ -888,7 +893,7 @@ class _TotalJacInfo(object):
 
     def par_deriv_input_setter(self, inds, imeta, mode):
         """
-        Set 1's into the input vector in the parallel derivative case.
+        Set -1's into the input vector in the parallel derivative case.
 
         Parameters
         ----------
@@ -924,7 +929,7 @@ class _TotalJacInfo(object):
 
     def matmat_input_setter(self, inds, imeta, mode):
         """
-        Set 1's into the input vector in the matrix-matrix case.
+        Set -1's into the input vector in the matrix-matrix case.
 
         Parameters
         ----------
@@ -955,10 +960,9 @@ class _TotalJacInfo(object):
         for col, i in enumerate(inds):
             loc_idx = in_loc_idxs[i]
             if loc_idx != -1:
-
                 # We apply a -1 here because the derivative of the output is minus the derivative
                 # of the residual in openmdao.
-                dinputs._views_flat[input_name][loc_idx, col] = -1.0
+                dinputs._data[loc_idx, col] = -1.0
 
         if cache_lin_sol:
             return rel_systems, (vec_name,), (inds[0], mode)
@@ -967,7 +971,7 @@ class _TotalJacInfo(object):
 
     def par_deriv_matmat_input_setter(self, inds, imeta, mode):
         """
-        Set 1's into the input vector in the matrix matrix with parallel deriv case.
+        Set -1's into the input vector in the matrix matrix with parallel deriv case.
 
         Parameters
         ----------
@@ -1012,9 +1016,9 @@ class _TotalJacInfo(object):
                     # We apply a -1 here because the derivative of the output is minus the
                     # derivative of the residual in openmdao.
                     if ncol > 1:
-                        dinputs._views_flat[input_name][loc_idx, col] = -1.0
+                        dinputs._data[loc_idx, col] = -1.0
                     else:
-                        dinputs._views_flat[input_name][loc_idx] = -1.0
+                        dinputs._data[loc_idx] = -1.0
 
         if cache:
             return all_rel_systems, vec_names, (inds[0][0], mode)
