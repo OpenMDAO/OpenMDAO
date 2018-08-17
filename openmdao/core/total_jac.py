@@ -547,8 +547,7 @@ class _TotalJacInfo(object):
                     iterdict['local_in_idxs'] = locs[locs != -1.0]
 
                 iterdict['relevant'] = all_rel_systems
-                if cache:
-                    iterdict['cache_lin_solve'] = (('linear',), (ilist[0], mode))
+                iterdict['cache_lin_solve'] = cache
                 itermeta.append(iterdict)
 
             idx_iter_dict['@simul_coloring'] = (imeta, self.simul_coloring_iter)
