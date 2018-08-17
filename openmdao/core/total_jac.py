@@ -525,12 +525,15 @@ class _TotalJacInfo(object):
         if has_par_deriv_color:
             _fix_pdc_lengths(idx_iter_dict)
 
+        loc_idxs = np.hstack(loc_idxs)
+
         if simul_coloring and mode in simul_coloring:
             imeta = defaultdict(bool)
             imeta["coloring"] = simul_coloring
             all_rel_systems = set()
             cache = False
             imeta['itermeta'] = itermeta = []
+            locs = None
             for color, ilist in enumerate(simul_coloring[mode][0]):
                 for i in ilist:
                     _, _, rel_systems, cache_lin_sol = idx_map[i]
@@ -538,6 +541,11 @@ class _TotalJacInfo(object):
                     cache |= cache_lin_sol
 
                 iterdict = defaultdict(bool)
+
+                if color != 0:
+                    locs = loc_idxs[ilist]
+                    iterdict['local_in_idxs'] = locs[locs != -1.0]
+
                 iterdict['relevant'] = all_rel_systems
                 if cache:
                     iterdict['cache_lin_solve'] = (('linear',), (ilist[0], mode))
@@ -545,7 +553,7 @@ class _TotalJacInfo(object):
 
             idx_iter_dict['@simul_coloring'] = (imeta, self.simul_coloring_iter)
 
-        return idx_map, np.hstack(loc_idxs), idx_iter_dict
+        return idx_map, loc_idxs, idx_iter_dict
 
     def _get_solvec_map(self, names, vois, abs2meta, mode):
         """
@@ -879,12 +887,15 @@ class _TotalJacInfo(object):
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        for i in inds:
-            relevant, _, cache = self.single_input_setter(i, itermeta, mode)
-
-        if itermeta is not None:
+        if itermeta is None:
+            return self.single_input_setter(inds[0], None, mode)
+        else:
             relevant = itermeta['relevant']
             cache = itermeta['cache_lin_solve']
+            idxs = itermeta['local_in_idxs']
+            # We apply a -1 here because the derivative of the output is minus the derivative of
+            # the residual in openmdao.
+            self.input_vec[mode]['linear']._data[idxs] = -1.0
 
         if cache:
             return relevant, ('linear',), (inds[0], mode)
