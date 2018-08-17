@@ -205,7 +205,6 @@ class DecoupledTestCase(unittest.TestCase):
     def setup_model(self):
         asize = self.asize
         prob = Problem()
-        #import wingdbstub
         root = prob.model
         root.linear_solver = LinearBlockGS()
 
@@ -273,8 +272,6 @@ class DecoupledTestCase(unittest.TestCase):
     def test_parallel_fwd_multi(self):
         asize = self.asize
         prob = self.setup_model()
-
-        # import wingdbstub
 
         prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv', vectorize_derivs=True)
@@ -455,7 +452,6 @@ class IndicesTestCase2(unittest.TestCase):
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
-
         J = prob.compute_totals(['G1.par1.c4.y', 'G1.par2.c5.y'],
                                 ['G1.par1.p.x', 'G1.par2.p.x'],
                                 return_format='flat_dict')

@@ -50,9 +50,6 @@ class MatMatTestCase(unittest.TestCase):
         indep_var_comp.add_output('twist', 0., shape=8-1)
 
         prob = Problem()
-        
-        #import wingdbstub
-        
         prob.model.add_subsystem('indep_var_comp', indep_var_comp, promotes=['*'])
         prob.model.add_subsystem('adflow_comp', ADFLOWComp(), promotes=['*'])
 
