@@ -888,18 +888,15 @@ class _TotalJacInfo(object):
         """
         if itermeta is None:
             return self.single_input_setter(inds[0], None, mode)
-        else:
-            relevant = itermeta['relevant']
-            cache = itermeta['cache_lin_solve']
-            idxs = itermeta['local_in_idxs']
-            # We apply a -1 here because the derivative of the output is minus the derivative of
-            # the residual in openmdao.
-            self.input_vec[mode]['linear']._data[idxs] = -1.0
 
-        if cache:
-            return relevant, ('linear',), (inds[0], mode)
+        # We apply a -1 here because the derivative of the output is minus the derivative of
+        # the residual in openmdao.
+        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = -1.0
+
+        if itermeta['cache_lin_solve']:
+            return itermeta['relevant'], ('linear',), (inds[0], mode)
         else:
-            return relevant, None, None
+            return itermeta['relevant'], None, None
 
     def par_deriv_input_setter(self, inds, imeta, mode):
         """
