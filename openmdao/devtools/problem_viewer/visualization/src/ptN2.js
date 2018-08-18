@@ -326,7 +326,7 @@ function PtN2Diagram(parentDiv, modelData) {
             .on("contextmenu", function (d) { RightClick(d, this); })
             .on("mouseover", function (d) {
                 if (abs2prom != undefined) {
-                    if (d.type == "param") {
+                    if (d.type == "param" || d.type == "unconnected_param") {
                         return tooltip.text(abs2prom.input[d.absPathName])
                                       .style("visibility", "visible");
                     }
