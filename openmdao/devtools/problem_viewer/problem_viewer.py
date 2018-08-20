@@ -1,10 +1,7 @@
-from six.moves import range
-import numpy as np
 import os
 import json
 from six import iteritems
 import networkx as nx
-import shutil
 from collections import OrderedDict
 import base64
 
@@ -73,19 +70,32 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     return tree_dict
 
-def _get_viewer_data(problem_or_rootgroup_or_filename):
-    """Get the data needed by the N2 viewer as a dictionary."""
-    if isinstance(problem_or_rootgroup_or_filename, Problem):
-        root_group = problem_or_rootgroup_or_filename.model
-    elif isinstance(problem_or_rootgroup_or_filename, Group):
-        if not problem_or_rootgroup_or_filename.pathname: # root group
-            root_group = problem_or_rootgroup_or_filename
+
+def _get_viewer_data(data_source):
+    """
+    Get the data needed by the N2 viewer as a dictionary.
+
+    Parameters
+    ----------
+    data_source : <Problem> or <Group> or str
+        A Problem or Group or case recorder file name containing the model or model data.
+
+    Returns
+    -------
+    dict
+        A dictionary containing information about the model for use by the viewer.
+    """
+    if isinstance(data_source, Problem):
+        root_group = data_source.model
+    elif isinstance(data_source, Group):
+        if not data_source.pathname:  # root group
+            root_group = data_source
         else:
             # this function only makes sense when it is at the root
             return {}
-    elif is_valid_sqlite3_db(problem_or_rootgroup_or_filename):
+    elif is_valid_sqlite3_db(data_source):
         import sqlite3
-        con = sqlite3.connect(problem_or_rootgroup_or_filename,
+        con = sqlite3.connect(data_source,
                               detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         cur.execute("SELECT format_version FROM metadata")
@@ -94,6 +104,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
 
         cur.execute("SELECT model_viewer_data FROM driver_metadata;")
         model_text = cur.fetchone()
+
         from six import PY2, PY3
         if row is not None:
             if format_version >= 3:
@@ -115,6 +126,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
                                        component_execution_idx)
 
     connections_list = []
+
     # sort to make deterministic for testing
     sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
     root_group._conn_global_abs_in2out = sorted_abs_input2src
@@ -136,8 +148,8 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
 
                 exe_tgt = component_execution_orders[tgt_subsystem]
                 exe_src = component_execution_orders[src_subsystem]
-                exe_low = min(exe_tgt,exe_src)
-                exe_high = max(exe_tgt,exe_src)
+                exe_low = min(exe_tgt, exe_src)
+                exe_high = max(exe_tgt, exe_src)
                 subg = G.subgraph(li).copy()
                 for n in list(subg.nodes()):
                     exe_order = component_execution_orders[n]
@@ -159,7 +171,10 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
 
     data_dict['connections_list'] = connections_list
 
+    data_dict['abs2prom'] = root_group._var_abs2prom
+
     return data_dict
+
 
 def view_tree(*args, **kwargs):
     """
@@ -169,17 +184,17 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embeddable=False, draw_potential_connections=True):
+def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+               draw_potential_connections=True):
     """
-    Generates an HTML file containing a tree viewer. Optionally pops up a web browser to
-    view the file.
+    Generates an HTML file containing a tree viewer.
+
+    Optionally opens a web browser to view the file.
 
     Parameters
     ----------
-    problem_or_filename : Either a Problem() or a string
-        Problem() : The Problem (after problem.setup()) for the desired tree.
-        string : The filename of the case recorder file containing the data required to
-         build the tree.
+    data_source : <Problem> or str
+        The Problem or case recorder database containing the model or model data.
 
     outfile : str, optional
         The name of the final output file
@@ -196,8 +211,9 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
         If true, allows connections to be drawn on the N2 that do not currently exist
         in the model. Defaults to True.
     """
-    #grab the model viewer data
-    model_viewer_data = 'var modelData = %s' % json.dumps(_get_viewer_data(problem_or_filename))
+    # grab the model viewer data
+    model_viewer_data = _get_viewer_data(data_source)
+    model_viewer_data = 'var modelData = %s' % json.dumps(model_viewer_data)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
@@ -221,19 +237,15 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     src_dir = os.path.join(vis_dir, "src")
     style_dir = os.path.join(vis_dir, "style")
 
-    #grab the libraries
+    # grab the libraries
     with open(os.path.join(libs_dir, "awesomplete.js"), "r") as f:
         awesomplete = f.read()
     with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
         d3 = f.read()
-    with open(os.path.join(libs_dir, "http.js"), "r") as f:
-        http = f.read()
-    with open(os.path.join(libs_dir, "jquery-3.2.1.min.js"), "r") as f:
-        jquery = f.read()
     with open(os.path.join(libs_dir, "vkBeautify.js"), "r") as f:
         vk_beautify = f.read()
 
-    #grab the src
+    # grab the src
     with open(os.path.join(src_dir, "constants.js"), "r") as f:
         constants = f.read()
     with open(os.path.join(src_dir, "draw.js"), "r") as f:
@@ -249,7 +261,7 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     with open(os.path.join(src_dir, "svg.js"), "r") as f:
         svg = f.read()
 
-    #grab the style
+    # grab the style
     with open(os.path.join(style_dir, "awesomplete.css"), "r") as f:
         awesomplete_style = f.read()
     with open(os.path.join(style_dir, "partition_tree.css"), "r") as f:
@@ -257,15 +269,15 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
-    #grab the index.html
+    # grab the index.html
     with open(os.path.join(vis_dir, "index.html"), "r") as f:
         index = f.read()
 
-    #add the necessary HTML tags if we aren't embedding
+    # add the necessary HTML tags if we aren't embedding
     if not embeddable:
         index = html_begin_tags + index + html_end_tags
 
-    #put all style and JS into index
+    # put all style and JS into index
     index = index.replace('{{awesomplete_style}}', awesomplete_style)
     index = index.replace('{{partition_tree_style}}', partition_tree_style)
     index = index.replace('{{fontello}}', encoded_font)
@@ -288,7 +300,7 @@ def view_model(problem_or_filename, outfile='n2.html', show_browser=True, embedd
     with open(outfile, 'w') as f:
         f.write(index)
 
-    #open it up in the browser
+    # open it up in the browser
     if show_browser:
         from openmdao.devtools.webview import webview
         webview(outfile)

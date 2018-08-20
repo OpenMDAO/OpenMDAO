@@ -42,6 +42,7 @@ class ParaboloidProblem(Problem):
     """
     Paraboloid problem with Constraint.
     """
+
     def __init__(self):
         super(ParaboloidProblem, self).__init__()
 
@@ -439,6 +440,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'connections_list_length': 11,
             'tree_length': 4,
             'tree_children_length': 7,
+            'abs2prom': abs2prom,
         }
         assertDriverMetadataRecorded(self, expected_driver_metadata)
 
@@ -1617,8 +1619,8 @@ class TestSqliteRecorder(unittest.TestCase):
         coordinate = [0, 'Driver', (0,), '._solve_nonlinear', (0,)]
 
         expected_inputs = {
-            'lengths': [[3.,  3.], [3., 3.]],
-            'widths': [[2.,  2.], [2., 2.]],
+            'lengths': [[3., 3.], [3., 3.]],
+            'widths': [[2., 2.], [2., 2.]],
         }
 
         expected_outputs = {

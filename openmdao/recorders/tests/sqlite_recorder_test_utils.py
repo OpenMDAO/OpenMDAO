@@ -1,10 +1,5 @@
 from six import iteritems, PY2, PY3
 
-if PY2:
-    import cPickle as pickle
-if PY3:
-    import pickle
-
 import sqlite3
 import numpy as np
 import json
@@ -14,6 +9,11 @@ from contextlib import contextmanager
 from openmdao.utils.record_util import format_iteration_coordinate, json_to_np_array
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
+
+if PY2:
+    import cPickle as pickle
+else:
+    import pickle
 
 
 @contextmanager
@@ -50,10 +50,10 @@ def get_format_version_abs2meta(db_cur):
                 abs2meta = pickle.loads(row[1]) if row[1] is not None else None
             except TypeError:
                 # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                abs2meta = pickle.loads(row[1].encode()) if row[1] is not \
-                                                            None else None
+                abs2meta = pickle.loads(row[1].encode()) if row[1] is not None else None
 
     return f_version, abs2meta
+
 
 def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
     """
@@ -141,6 +141,7 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
                 totals_blob = row_actual
             abs2meta = json.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
+            test.assertTrue(isinstance(abs2meta, dict))
 
             totals_actual = blob_to_array(totals_blob)
 
@@ -239,14 +240,15 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
             iter_coord = format_iteration_coordinate(coord, prefix=prefix)
 
             # from the database, get the actual data recorded
-            db_cur.execute("SELECT * FROM solver_iterations WHERE iteration_coordinate=:iteration_coordinate",
+            db_cur.execute("SELECT * FROM solver_iterations "
+                           "WHERE iteration_coordinate=:iteration_coordinate",
                            {"iteration_coordinate": iter_coord})
             row_actual = db_cur.fetchone()
             test.assertTrue(row_actual, 'Solver iterations table does not contain the requested '
                                         'iteration coordinate: "{}"'.format(iter_coord))
 
-            counter, global_counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
-                input_blob, output_text, residuals_text = row_actual
+            counter, global_counter, iteration_coordinate, timestamp, success, msg, \
+                abs_err, rel_err, input_blob, output_text, residuals_text = row_actual
 
             if f_version >= 3:
                 output_actual = json_to_np_array(output_text, abs2meta)
@@ -256,8 +258,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 residuals_actual = blob_to_array(residuals_text)
 
             # Does the timestamp make sense?
-            test.assertTrue(t0 <= timestamp and timestamp <= t1, 'timestamp should be between when the model '
-                                                                 'started and stopped')
+            test.assertTrue(t0 <= timestamp and timestamp <= t1,
+                            'timestamp should be between when the model started and stopped')
 
             test.assertEqual(success, 1)
             test.assertEqual(msg, '')
@@ -283,8 +285,9 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                     test.assertEqual(len(actual[0]), len(expected))
                     for key, value in iteritems(expected):
                         # Check to see if the keys in the actual and expected match
-                        test.assertTrue(key in actual[0].dtype.names, '{} variable not found in actual '
-                                                                      'data from recorder'.format(key))
+                        test.assertTrue(key in actual[0].dtype.names,
+                                        '{} variable not found in actual data '
+                                        'from recorder'.format(key))
                         # Check to see if the values in actual and expected match
                         assert_rel_error(test, actual[0][key], expected[key], tolerance)
 
@@ -324,6 +327,7 @@ def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
     with database_cursor(test.filename) as db_cur:
         db_cur.execute("SELECT format_version FROM metadata")
         f_version = db_cur.fetchone()[0]
+        test.assertTrue(isinstance(f_version, int))
 
         db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = db_cur.fetchone()
@@ -340,7 +344,7 @@ def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
 
         test.assertTrue(isinstance(model_viewer_data, dict))
 
-        test.assertEqual(2, len(model_viewer_data))
+        test.assertEqual(3, len(model_viewer_data))
 
         test.assertTrue(isinstance(model_viewer_data['connections_list'], list))
 
@@ -350,12 +354,19 @@ def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
         test.assertEqual(expected['tree_length'], len(model_viewer_data['tree']))
 
         tr = model_viewer_data['tree']
-        test.assertEqual(set(['name', 'type', 'subsystem_type', 'children']), set(tr.keys()))
-        test.assertEqual(expected['tree_children_length'], len(model_viewer_data['tree']['children']))
+        test.assertEqual(set(['name', 'type', 'subsystem_type', 'children']),
+                         set(tr.keys()))
+        test.assertEqual(expected['tree_children_length'],
+                         len(model_viewer_data['tree']['children']))
 
         cl = model_viewer_data['connections_list']
         for c in cl:
             test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
+
+        abs2prom = model_viewer_data['abs2prom']
+        for io in ['input', 'output']:
+            for var in expected['abs2prom'][io]:
+                test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
 
 def assertSystemMetadataIdsRecorded(test, ids):
