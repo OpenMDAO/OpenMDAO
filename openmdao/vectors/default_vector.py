@@ -101,12 +101,7 @@ class DefaultVector(Vector):
 
         # Extract view for complex storage too.
         if self._alloc_complex:
-            if root_vec._alloc_complex:
-                cplx_data = root_vec._cplx_data[ind1:ind2]
-            else:
-                shape = root_vec._data[ind1:ind2].shape
-                # TODO : what is this?
-                cplx_data = np.zeros(shape)
+            cplx_data = root_vec._cplx_data[ind1:ind2]
 
         if self._do_scaling:
             for typ in ('phys', 'norm'):
@@ -170,6 +165,7 @@ class DefaultVector(Vector):
         kind = self._kind
         iproc = self._iproc
         ncol = self._ncol
+
         do_scaling = self._do_scaling
         if do_scaling:
             factors = system._scale_factors
