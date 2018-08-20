@@ -37,10 +37,6 @@ class PETScVector(DefaultVector):
         """
         Internally allocate vectors.
 
-        Sets the following attributes:
-
-        - _data
-
         Parameters
         ----------
         root_vector : Vector or None
@@ -55,8 +51,7 @@ class PETScVector(DefaultVector):
             self._petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
         else:
             # for now the petsc array is only the size of one column and we do separate
-            # transfers for each column.   Later we'll do it all at once and the petsc
-            # array will be the full size of the data array (and use the same memory).
+            # transfers for each column.
             if data.size == 0:
                 self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
             else:

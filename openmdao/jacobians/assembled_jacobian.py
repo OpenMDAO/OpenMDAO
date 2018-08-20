@@ -291,7 +291,7 @@ class AssembledJacobian(Jacobian):
             iters_in_ext = []
 
             for abs_key in subjacs:
-                ofname, wrtname = abs_key
+                _, wrtname = abs_key
                 if wrtname in output_names:
                     if abs_key in int_mtx._submats:
                         iters.append((abs_key, abs_key, False))
@@ -334,11 +334,11 @@ class AssembledJacobian(Jacobian):
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
-        for key1, key2, do_add in iters:
+        for _, key, do_add in iters:
             if do_add:
-                int_mtx._update_add_submat(key2, subjacs[key2]['value'])
+                int_mtx._update_add_submat(key, subjacs[key]['value'])
             else:
-                int_mtx._update_submat(key2, subjacs[key2]['value'])
+                int_mtx._update_submat(key, subjacs[key]['value'])
 
         for key in iters_in_ext:
             ext_mtx._update_submat(key, subjacs[key]['value'])

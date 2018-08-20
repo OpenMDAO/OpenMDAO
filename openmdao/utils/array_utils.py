@@ -233,3 +233,30 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     cols = np.tile(cols, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * ncol
 
     return data, rows, cols
+
+
+def _global2local_offsets(global_offsets):
+    """
+    Given existing global offsets, return a copy with offsets localized to each process.
+
+    Parameters
+    ----------
+    global_offsets : dict
+        Arrays of global offsets keyed by vec_name and deriv direction.
+
+    Returns
+    -------
+    dict
+        Arrays of local offsets keyed by vec_name and deriv direction.
+    """
+    offsets = {}
+    for vec_name in global_offsets:
+        offsets[vec_name] = off_vn = {}
+        for type_ in global_offsets[vec_name]:
+            goff = global_offsets[vec_name][type_]
+            off_vn[type_] = goff.copy()
+            if goff[0].size > 0:
+                # adjust offsets to be local in each process
+                off_vn[type_] -= off_vn[type_][:, 0].reshape((goff.shape[0], 1))
+
+    return offsets
