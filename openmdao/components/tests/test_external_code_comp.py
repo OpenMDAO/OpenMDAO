@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import os
+import sys
 import shutil
 import tempfile
 import unittest
@@ -47,6 +48,9 @@ class TestExternalCodeComp(unittest.TestCase):
         shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
                     os.path.join(self.tempdir, 'extcode_example.py'))
 
+        shutil.copy(os.path.join(DIRECTORY, 'extcode.bat'),
+                    os.path.join(self.tempdir, 'extcode.bat'))
+
         self.prob = Problem()
 
         self.extcode = self.prob.model.add_subsystem('extcode', ExternalCodeComp())
@@ -66,9 +70,26 @@ class TestExternalCodeComp(unittest.TestCase):
         self.extcode.options['external_input_files'] = ['extcode_example.py',]
         self.extcode.options['external_output_files'] = ['extcode.out',]
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         self.prob.run_model()
+
+        with open('extcode.out', 'r') as f:
+            self.assertEqual(f.read(), 'test data\n')
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows-specific test.')
+    def test_normal_bat(self):
+        self.extcode.options['command'] = [
+            'extcode.bat', 'extcode.out'
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode.bat',]
+        self.extcode.options['external_output_files'] = ['extcode.out',]
+
+        self.prob.setup(check=True)
+        self.prob.run_model()
+
+        with open('extcode.out', 'r') as f:
+            self.assertEqual(f.read(), 'test data\n')
 
     def test_timeout_raise(self):
         self.extcode.options['command'] = [

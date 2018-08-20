@@ -79,11 +79,16 @@ class ExternalCodeDelegate(object):
             logger.error("The command cannot be empty")
         else:
             program_to_execute = comp.options['command'][0]
-            command_full_path = find_executable(program_to_execute)
-
-            if not command_full_path:
-                logger.error("The command to be executed, '%s', "
-                             "cannot be found" % program_to_execute)
+            if sys.platform == 'win32':
+                if not find_executable(program_to_execute):
+                    missing = self._check_for_files([program_to_execute])
+                    if missing:
+                        logger.error("The command to be executed, '%s', "
+                                    "cannot be found" % program_to_execute)
+            else:
+                if not find_executable(program_to_execute):
+                    logger.error("The command to be executed, '%s', "
+                                 "cannot be found" % program_to_execute)
 
         # Check for missing input files. This just generates a warning during
         # setup, since these files may be generated later during execution.
@@ -196,14 +201,18 @@ class ExternalCodeDelegate(object):
         # Suppress message from find_executable function, we'll handle it
         numpy.distutils.log.set_verbosity(-1)
 
-        command_full_path = find_executable(program_to_execute)
-        if not command_full_path:
-            msg = "The command to be executed, '%s', cannot be found" % program_to_execute
-            raise ValueError(msg)
-
-        command_for_shell_proc = command
         if sys.platform == 'win32':
-            command_for_shell_proc = ['cmd.exe', '/c'] + command_for_shell_proc
+            if not find_executable(program_to_execute):
+                missing = self._check_for_files([program_to_execute])
+                if missing:
+                    raise ValueError("The command to be executed, '%s', "
+                                    "cannot be found" % program_to_execute)
+            command_for_shell_proc = ['cmd.exe', '/c'] + command
+        else:
+            if not find_executable(program_to_execute):
+                raise ValueError("The command to be executed, '%s', "
+                                 "cannot be found" % program_to_execute)
+            command_for_shell_proc = command
 
         comp._process = \
             ShellProc(command_for_shell_proc, comp.stdin,
