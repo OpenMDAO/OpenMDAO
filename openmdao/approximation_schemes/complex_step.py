@@ -109,16 +109,20 @@ class ComplexStep(ApproximationScheme):
             current_vec = system._outputs
         elif deriv_type == 'partial':
             current_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
+
+        # Create a scratch array
+        data_cache = current_vec._data.copy()
+
+        # Clean vector for results
+        results_clone = current_vec._clone(True)
 
         # Turn on complex step.
         system._inputs._vector_info._under_complex_step = True
-
-        # create a scratch array
-        data_cache = current_vec._data.copy()
-        results_clone = current_vec._clone(True)
-        current_vec._data += 0.0
+        for sub in system.system_iter(include_self=True, recurse=True):
+            sub._inputs.set_complex_step_mode(True)
+            sub._outputs.set_complex_step_mode(True)
+            sub._residuals.set_complex_step_mode(True)
+        results_clone.set_complex_step_mode(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -132,6 +136,7 @@ class ComplexStep(ApproximationScheme):
             if form == 'reverse':
                 delta *= -1.0
             fact = 1.0 / delta
+            delta *= 1j
 
             if wrt in system._owns_approx_wrt_idx:
                 in_idx = system._owns_approx_wrt_idx[wrt]
@@ -166,9 +171,9 @@ class ComplexStep(ApproximationScheme):
                 for of, subjac in outputs:
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = result._imag_views_flat[of][out_idx] * fact
+                        subjac[:, i_count] = (result._views_flat[of][out_idx] * fact).imag
                     else:
-                        subjac[:, i_count] = result._imag_views_flat[of] * fact
+                        subjac[:, i_count] = (result._views_flat[of] * fact).imag
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
@@ -180,7 +185,11 @@ class ComplexStep(ApproximationScheme):
 
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
-        #current_vec._remove_complex_views()
+        for sub in system.system_iter(include_self=True, recurse=True):
+            sub._inputs.set_complex_step_mode(False)
+            sub._outputs.set_complex_step_mode(False)
+            sub._residuals.set_complex_step_mode(False)
+
         #current_vec._data[:] = data_cache
 
     def _run_point_complex(self, system, input_deltas, data_cache, result_clone,
@@ -220,21 +229,20 @@ class ComplexStep(ApproximationScheme):
             results_vec = system._residuals
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._imag_views_flat:
-                outputs._imag_views_flat[in_name][idxs] += delta
+            if in_name in outputs._views_flat:
+                outputs._views_flat[in_name][idxs] += delta
             else:
-                inputs._imag_views_flat[in_name][idxs] += delta
+                inputs._views_flat[in_name][idxs] += delta
 
         run_model()
 
         # TODO: Grab only results of interest
         result_clone.set_vec(results_vec)
-        results_vec._data[:] = data_cache
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._imag_views_flat:
-                outputs._imag_views_flat[in_name][idxs] -= delta
+            if in_name in outputs._views_flat:
+                outputs._views_flat[in_name][idxs] -= delta
             else:
-                inputs._imag_views_flat[in_name][idxs] -= delta
+                inputs._views_flat[in_name][idxs] -= delta
 
         return result_clone

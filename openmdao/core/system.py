@@ -1351,18 +1351,10 @@ class System(object):
 
         for vec in outputs:
 
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
-
             if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
-
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
 
             if self._has_resid_scaling:
                 vec.scale('norm')

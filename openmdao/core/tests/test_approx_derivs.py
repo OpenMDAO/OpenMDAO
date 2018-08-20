@@ -940,6 +940,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.linear_solver = DirectSolver()
 
         # Had to make this step larger so that solver would reconverge adequately.
         model.approx_totals(method='cs', step=1.0e-1)
@@ -1224,7 +1225,7 @@ class TestComponentComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.linear_solver = DirectSolver()
 
         prob.setup(check=False)
@@ -1240,6 +1241,10 @@ class TestComponentComplexStep(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+        outs = prob.model.list_outputs(residuals=True, out_stream=None)
+        self.assertLess(outs[1][1]['resids'], 1e-6, msg="Check if CS cleans up after itself.")
+        self.assertLess(outs[5][1]['resids'], 1e-6, msg="Check if CS cleans up after itself.")
 
 
 class ApproxTotalsFeature(unittest.TestCase):

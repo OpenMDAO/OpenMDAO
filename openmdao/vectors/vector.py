@@ -78,15 +78,13 @@ class Vector(object):
         Actual allocated data.
     _vector_info : <VectorInfo>
         Object to store some global info, such as complex step state.
-    _imag_views : dict
-        Dictionary mapping absolute variable names to the ndarray views for the imaginary part.
-    _imag_views_flat : dict
-        Dictionary mapping absolute variable names to the flattened ndarray views for the imaginary
-        part.
-    _imag_data : ndarray
-        Actual allocated data for the imaginary part.
-    _complex_view_cache : {}
-        Temporary storage of complex views used by in-place numpy operations.
+    _cplx_data : ndarray
+        Actual allocated data under complex step.
+    _cplx_views : dict
+        Dictionary mapping absolute variable names to the ndarray views under complex step.
+    _cplx_views_flat : dict
+        Dictionary mapping absolute variable names to the flattened ndarray views under complex
+        step.
     _ncol : int
         Number of columns for multi-vectors.
     _icol : int or None
@@ -157,11 +155,9 @@ class Vector(object):
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
-        if alloc_complex:
-            self._imag_data = None
-            self._imag_views = {}
-            self._complex_view_cache = {}
-            self._imag_views_flat = {}
+        self._cplx_data = None
+        self._cplx_views = {}
+        self._cplx_views_flat = {}
 
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or
@@ -307,25 +303,6 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            if self._vector_info._under_complex_step:
-                if self._typ == 'input':
-                    if self._icol is None:
-                        return self._views[abs_name] + 1j * self._imag_views[abs_name]
-                    else:
-                        return self._views[abs_name][:, self._icol] + \
-                            1j * self._imag_views[abs_name][:, self._icol]
-                else:
-                    if abs_name not in self._complex_view_cache:
-                        if self._icol is None:
-                            self._complex_view_cache[abs_name] = self._views[abs_name] + \
-                                1j * self._imag_views[abs_name]
-                        else:
-                            self._complex_view_cache[abs_name][:, self._icol] = \
-                                self._views[abs_name][:, self._icol] + \
-                                1j * self._imag_views[abs_name][:, self._icol]
-                            return self._complex_view_cache[abs_name][:, self._icol]
-                    return self._complex_view_cache[abs_name]
-
             if self._icol is None:
                 return self._views[abs_name]
             else:
@@ -363,18 +340,9 @@ class Vector(object):
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %
                                  (name, oldval.shape, value.shape))
-            if self._vector_info._under_complex_step:
 
-                # setitem overwrites anything you may have done with numpy indexing
-                try:
-                    del self._complex_view_cache[abs_name]
-                except KeyError:
-                    pass
+            self._views[abs_name][slc] = value
 
-                self._views[abs_name][slc] = value.real
-                self._imag_views[abs_name][slc] = value.imag
-            else:
-                self._views[abs_name][slc] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -599,15 +567,6 @@ class Vector(object):
         """
         pass
 
-    def _remove_complex_views(self):
-        """
-        Remove temporary complex view and migrate its values into real and imaginary views.
-        """
-        for abs_name, value in iteritems(self._complex_view_cache):
-            self._views[abs_name][:] = value.real
-            self._imag_views[abs_name][:] = value.imag
-        self._complex_view_cache = {}
-
     def print_variables(self):
         """
         Print the names and values of all variables in this vector, one per line.
@@ -620,3 +579,25 @@ class Vector(object):
             print(' ' * 3, prom_name, view)
         print('-' * 35)
         print()
+
+    def set_complex_step_mode(self, flag):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the defaul real ndarray is replaced with a complex ndarray and all
+        pointers are updated to point to it.
+
+        Parameters
+        ----------
+        flag : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if flag == True:
+            self._cplx_data[:] = self._data
+        else:
+            self._data[:] = self._cplx_data.real
+
+        self._data, self._cplx_data = self._cplx_data, self._data
+        self._views, self._cplx_views = self._cplx_views, self._views
+        self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
+
