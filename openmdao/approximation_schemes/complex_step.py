@@ -180,9 +180,8 @@ class ComplexStep(ApproximationScheme):
 
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
-        current_vec._remove_complex_views()
-        current_vec._data[:] = data_cache
-        system._residuals['tail_coll_pts_vel_mtx']
+        #current_vec._remove_complex_views()
+        #current_vec._data[:] = data_cache
 
     def _run_point_complex(self, system, input_deltas, data_cache, result_clone,
                            deriv_type='partial'):
