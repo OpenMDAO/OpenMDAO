@@ -252,7 +252,7 @@ class pyOptSparseDriver(Driver):
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
             to_remove = []
-            for oname, jacdct in iteritems(_lin_jacs):
+            for jacdct in itervalues(_lin_jacs):
                 for n, subjac in iteritems(jacdct):
                     if isinstance(subjac, np.ndarray):
                         # we can safely use coo_matrix to automatically convert the ndarray

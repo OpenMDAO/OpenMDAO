@@ -58,6 +58,7 @@ class PETScTransfer(DefaultTransfer):
 
         transfers = group._transfers
         vectors = group._vectors
+        offsets = group._get_var_offsets()
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
 
@@ -74,7 +75,6 @@ class PETScTransfer(DefaultTransfer):
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
             sizes_out = group._var_sizes[vec_name]['output']
-            offsets = group._get_var_offsets()
             offsets_in = offsets[vec_name]['input']
             offsets_out = offsets[vec_name]['output']
 
@@ -90,7 +90,6 @@ class PETScTransfer(DefaultTransfer):
                     meta_in = abs2meta[abs_in]
                     meta_out = allprocs_abs2meta[abs_out]
 
-                    # Get varset info
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
 

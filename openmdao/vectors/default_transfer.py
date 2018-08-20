@@ -7,7 +7,7 @@ from six import iteritems, itervalues
 import numpy as np
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, _global2local_offsets
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -55,6 +55,8 @@ class DefaultTransfer(Transfer):
 
         transfers = group._transfers
         vectors = group._vectors
+        offsets = _global2local_offsets(group._get_var_offsets())
+
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
             relvars_in = relvars['input']
@@ -73,6 +75,8 @@ class DefaultTransfer(Transfer):
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
             sizes_out = group._var_sizes[vec_name]['output']
+            offsets_in = offsets[vec_name]['input']
+            offsets_out = offsets[vec_name]['output']
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
@@ -112,16 +116,16 @@ class DefaultTransfer(Transfer):
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
 
                     # 1. Compute the output indices
+                    offset = offsets_out[iproc, idx_out]
                     if src_indices is None:
-                        offset = np.sum(sizes_out[iproc, :idx_out])
                         output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                     else:
-                        output_inds = src_indices + np.sum(sizes_out[iproc, :idx_out])
+                        output_inds = src_indices + offset
 
                     # 2. Compute the input indices
-                    ind1 = np.sum(sizes_in[iproc, :idx_in])
-                    ind2 = ind1 + sizes_in[iproc, idx_in]
-                    input_inds = np.arange(ind1, ind2, dtype=INT_DTYPE)
+                    input_inds = np.arange(offsets_in[iproc, idx_in],
+                                           offsets_in[iproc, idx_in] +
+                                           sizes_in[iproc, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
                     xfer_in.append(input_inds)
