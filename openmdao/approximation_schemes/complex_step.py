@@ -193,7 +193,7 @@ class ComplexStep(ApproximationScheme):
             sub._outputs.set_complex_step_mode(False)
             sub._residuals.set_complex_step_mode(False)
 
-        #current_vec._data[:] = data_cache
+        current_vec._data[:] = data_cache
 
     def _run_point_complex(self, system, input_deltas, data_cache, result_clone,
                            deriv_type='partial'):
