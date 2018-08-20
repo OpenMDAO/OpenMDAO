@@ -79,8 +79,6 @@ class ApproximationScheme(object):
         elif deriv_type == 'partial':
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._views_flat:

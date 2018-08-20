@@ -167,8 +167,6 @@ class FiniteDifference(ApproximationScheme):
             current_vec = system._outputs
         elif deriv_type == 'partial':
             current_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
 
         result = system._outputs._clone(True)
         result_array = result._data.copy()
@@ -258,3 +256,4 @@ class FiniteDifference(ApproximationScheme):
                     jac._override_checks = False
                 else:
                     jac[rel_key] = subjac
+

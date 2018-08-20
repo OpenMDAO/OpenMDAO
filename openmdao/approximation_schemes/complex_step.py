@@ -116,8 +116,9 @@ class ComplexStep(ApproximationScheme):
         system._inputs._vector_info._under_complex_step = True
 
         # create a scratch array
-        out_tmp = system._outputs._data.copy()
+        data_cache = current_vec._data.copy()
         results_clone = current_vec._clone(True)
+        current_vec._data += 0.0
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -159,7 +160,7 @@ class ComplexStep(ApproximationScheme):
             for i_count, idx in enumerate(in_idx):
                 # Run the Finite Difference
                 input_delta = [(wrt, idx, delta)]
-                result = self._run_point_complex(system, input_delta, out_tmp, results_clone,
+                result = self._run_point_complex(system, input_delta, data_cache, results_clone,
                                                  deriv_type)
 
                 for of, subjac in outputs:
@@ -179,8 +180,12 @@ class ComplexStep(ApproximationScheme):
 
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
+        current_vec._remove_complex_views()
+        current_vec._data[:] = data_cache
+        system._residuals['tail_coll_pts_vel_mtx']
 
-    def _run_point_complex(self, system, input_deltas, out_tmp, result_clone, deriv_type='partial'):
+    def _run_point_complex(self, system, input_deltas, data_cache, result_clone,
+                           deriv_type='partial'):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -190,7 +195,7 @@ class ComplexStep(ApproximationScheme):
             The system having its derivs approximated.
         input_deltas : list
             List of (input name, indices, delta) tuples, where input name is an absolute name.
-        out_tmp : ndarray
+        data_cache : ndarray
             An array the same size as the system outputs that is used for temporary storage.
         result_clone : Vector
             A vector cloned from the outputs vector. Used to store the results.
@@ -214,8 +219,6 @@ class ComplexStep(ApproximationScheme):
         elif deriv_type == 'partial':
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._imag_views_flat:
@@ -223,12 +226,11 @@ class ComplexStep(ApproximationScheme):
             else:
                 inputs._imag_views_flat[in_name][idxs] += delta
 
-        out_tmp = results_vec._data.copy()
         run_model()
 
         # TODO: Grab only results of interest
         result_clone.set_vec(results_vec)
-        results_vec._data[:] = out_tmp
+        results_vec._data[:] = data_cache
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._imag_views_flat:
