@@ -2,26 +2,33 @@
 
 from __future__ import print_function
 
+from six.moves import cStringIO as StringIO
+import sys
 import unittest
-import numpy as np
 import time
 import random
+from distutils.version import LooseVersion
 
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, DefaultVector, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyIterativeSolver, NonlinearBlockGS
+import numpy as np
+
+from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, \
+    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
 from openmdao.utils.mpi import MPI
-from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar import SellarDerivatives, \
+    SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.recorders.recording_iteration_stack import recording_iteration
+
 
 if MPI:
-    from openmdao.api import PETScVector
-    vector_class = PETScVector
-else:
-    vector_class = DefaultVector
+    try:
+        from openmdao.vectors.petsc_vector import PETScVector
+    except ImportError:
+        PETScVector = None
 
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class ParDerivTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -31,13 +38,13 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
         prob.model.add_objective('c3.y')
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         indep_list = ['iv.x1', 'iv.x2']
@@ -52,13 +59,13 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
         prob.model.add_objective('c3.y')
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         indep_list = ['iv.x1', 'iv.x2']
@@ -73,13 +80,13 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
         prob.model.add_constraint('c3.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         unknown_list = ['c2.y', 'c3.y']
@@ -94,13 +101,13 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
         prob.model.add_constraint('c3.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         unknown_list = ['c3.y','c2.y'] #['c2.y', 'c3.y']
@@ -115,14 +122,14 @@ class ParDerivTestCase(unittest.TestCase):
         prob = Problem()
         prob.model = FanInGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x3')
         prob.model.add_objective('c3.y')
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         indep_list = ['iv.x1', 'iv.x2']
@@ -132,18 +139,54 @@ class ParDerivTestCase(unittest.TestCase):
         assert_rel_error(self, J['c3.y', 'iv.x1'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x2'][0][0], 35.0, 1e-6)
 
+    def test_debug_print_option_totals_color(self):
+
+        prob = Problem()
+        prob.model = FanInGrouped()
+        prob.model.linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
+
+        prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
+        prob.model.add_design_var('iv.x3')
+        prob.model.add_objective('c3.y')
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_driver()
+
+        indep_list = ['iv.x1', 'iv.x2', 'iv.x3']
+        unknown_list = ['c3.y']
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            _ = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict',
+                                    debug_print=not prob.comm.rank)
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue()
+
+        if not prob.comm.rank:
+            self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
+            self.assertTrue('Solving variable: iv.x3' in output)
+
     def test_fan_out_parallel_sets_rev(self):
 
         prob = Problem()
         prob.model = FanOutGrouped()
         prob.model.linear_solver = LinearBlockGS()
-        prob.model.get_subsystem('sub').linear_solver = LinearBlockGS()
+        prob.model.sub.linear_solver = LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0, parallel_deriv_color='par_resp')
         prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par_resp')
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         unknown_list = ['c2.y', 'c3.y']
@@ -154,7 +197,7 @@ class ParDerivTestCase(unittest.TestCase):
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class DecoupledTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -162,7 +205,6 @@ class DecoupledTestCase(unittest.TestCase):
     def setup_model(self):
         asize = self.asize
         prob = Problem()
-        #import wingdbstub
         root = prob.model
         root.linear_solver = LinearBlockGS()
 
@@ -196,7 +238,7 @@ class DecoupledTestCase(unittest.TestCase):
         prob.model.add_constraint('Con1.y', upper=0.0)
         prob.model.add_constraint('Con2.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
@@ -211,14 +253,12 @@ class DecoupledTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        #import wingdbstub
-
         prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv')
         prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv')
         prob.model.add_constraint('Con1.y', upper=0.0)
         prob.model.add_constraint('Con2.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
@@ -233,14 +273,12 @@ class DecoupledTestCase(unittest.TestCase):
         asize = self.asize
         prob = self.setup_model()
 
-        #import wingdbstub
-
         prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_constraint('Con1.y', upper=0.0)
         prob.model.add_constraint('Con2.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
@@ -260,7 +298,7 @@ class DecoupledTestCase(unittest.TestCase):
         prob.model.add_constraint('Con1.y', upper=0.0)
         prob.model.add_constraint('Con2.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
@@ -273,6 +311,7 @@ class DecoupledTestCase(unittest.TestCase):
 
     def test_parallel_rev(self):
         asize = self.asize
+
         prob = self.setup_model()
 
         prob.model.add_design_var('Indep1.x')
@@ -280,7 +319,7 @@ class DecoupledTestCase(unittest.TestCase):
         prob.model.add_constraint('Con1.y', upper=0.0, parallel_deriv_color='parc')
         prob.model.add_constraint('Con2.y', upper=0.0, parallel_deriv_color='parc')
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
@@ -292,7 +331,7 @@ class DecoupledTestCase(unittest.TestCase):
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class IndicesTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -325,7 +364,7 @@ class IndicesTestCase(unittest.TestCase):
         root.connect('G1.c2.y', 'c4.x')
         root.connect('G1.c3.y', 'c5.x')
 
-        prob.setup(vector_class=vector_class, check=False, mode=mode)
+        prob.setup(check=False, mode=mode)
         prob.run_driver()
 
         return prob
@@ -348,7 +387,7 @@ class IndicesTestCase(unittest.TestCase):
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class IndicesTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -360,7 +399,7 @@ class IndicesTestCase2(unittest.TestCase):
 
         root.linear_solver = LinearBlockGS()
 
-        G1 = root.add_subsystem('G1', Group())# ParallelGroup())
+        G1 = root.add_subsystem('G1', ParallelGroup())
         G1.linear_solver = LinearBlockGS()
 
         par1 = G1.add_subsystem('par1', Group())
@@ -390,7 +429,7 @@ class IndicesTestCase2(unittest.TestCase):
         root.connect('G1.par1.c2.y', 'G1.par1.c4.x')
         root.connect('G1.par2.c3.y', 'G1.par2.c5.x')
 
-        prob.setup(vector_class=vector_class, check=False)
+        prob.setup(check=False, mode=mode)
         prob.run_driver()
 
         return prob
@@ -421,7 +460,7 @@ class IndicesTestCase2(unittest.TestCase):
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -462,7 +501,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
@@ -481,7 +520,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_constraint('c3.y', upper=0.0)
         prob.model.add_constraint('c4.y', upper=0.0)
 
-        prob.setup(vector_class=vector_class, check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
@@ -500,7 +539,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par')
         prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par')
 
-        prob.setup(vector_class=vector_class, check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
@@ -519,7 +558,7 @@ class MatMatTestCase(unittest.TestCase):
         prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
         prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
 
-        prob.setup(vector_class=vector_class,  check=False, mode='rev')
+        prob.setup(check=False, mode='rev')
         prob.run_driver()
 
         J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
@@ -571,9 +610,9 @@ class SlowComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
-    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super(SlowComp, self)._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
+        super(SlowComp, self)._apply_linear(jac, vec_names, rel_systems, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(Group):
@@ -603,16 +642,19 @@ class PartialDependGroup(Group):
         self.add_constraint('ParallelGroup1.Con2.y', upper=0.0, parallel_deriv_color=color)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+# This one hangs on Travis for numpy 1.12 and we can't reproduce the error anywhere where we can
+# debug it, so we're skipping it for numpy 1.12.
+@unittest.skipUnless(MPI and PETScVector and LooseVersion(np.__version__) >= LooseVersion("1.13"),
+                     "MPI, PETSc, and numpy >= 1.13 are required.")
 class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
-    def test_fwd_vs_rev(self):
+    def test_feature_rev(self):
         import time
 
         import numpy as np
 
-        from openmdao.api import Problem, PETScVector
+        from openmdao.api import Problem
         from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
         size = 4
@@ -622,7 +664,31 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         # run first in fwd mode
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, check=False, mode='fwd')
+        p.setup(mode='rev')
+        p.run_model()
+
+        J = p.compute_totals(of, wrt, return_format='dict')
+
+        assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
+        assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
+
+    def test_fwd_vs_rev(self):
+        import time
+
+        import numpy as np
+
+        from openmdao.api import Problem
+        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+
+        recording_iteration.stack = []
+        size = 4
+
+        of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
+        wrt = ['Indep1.x']
+
+        # run first in fwd mode
+        p = Problem(model=PartialDependGroup())
+        p.setup(mode='fwd')
         p.run_model()
 
         elapsed_fwd = time.time()
@@ -632,9 +698,12 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
+        recording_iteration.stack = []
+
         # now run in rev mode and compare times for deriv calculation
         p = Problem(model=PartialDependGroup())
-        p.setup(vector_class=PETScVector, check=False, mode='rev')
+        p.setup(check=False, mode='rev')
+
         p.run_model()
 
         elapsed_rev = time.time()

@@ -11,13 +11,10 @@ import warnings
 import numpy as np
 from parameterized import parameterized
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, NonLinearRunOnce
-from openmdao.devtools.testutil import assert_rel_error
-from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
+    NonlinearRunOnce, NonLinearRunOnce
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.test_suite.components.sellar import SellarDis2
 
 
 class SimpleGroup(Group):
@@ -72,6 +69,16 @@ class ReportOrderComp(ExplicitComponent):
 
 class TestGroup(unittest.TestCase):
 
+    def test_add_subsystem_class(self):
+        p = Problem()
+        try:
+            p.model.add_subsystem('comp', IndepVarComp)
+        except TypeError as err:
+            self.assertEqual(str(err), "Subsystem 'comp' should be an instance, "
+                                       "but a class object was found.")
+        else:
+            self.fail('Exception expected.')
+
     def test_same_sys_name(self):
         """Test error checking for the case where we add two subsystems with the same name."""
         p = Problem()
@@ -85,6 +92,18 @@ class TestGroup(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
+    def test_deprecated_runonce(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', 5.0))
+        p.model.add_subsystem('comp', ExecComp('b=2*a'))
+        with warnings.catch_warnings(record=True) as w:
+            p.model.nonlinear_solver = NonLinearRunOnce()
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message),
+                         "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead.")
+
     def test_group_simple(self):
         from openmdao.api import ExecComp, Problem
 
@@ -97,7 +116,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.b'], 6.0)
 
     def test_group_add(self):
-        model=Group()
+        model = Group()
         ecomp = ExecComp('b=2.0*a', a=3.0, b=6.0)
 
         with warnings.catch_warnings(record=True) as w:
@@ -176,8 +195,8 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(err.exception),
                          "'_bad_name' is not a valid system name.")
 
-        # 'name', 'pathname', 'comm' and 'metadata' are reserved names
-        for reserved in ['name', 'pathname', 'comm', 'metadata']:
+        # 'name', 'pathname', 'comm' and 'options' are reserved names
+        for reserved in ['name', 'pathname', 'comm', 'options']:
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, Group())
             self.assertEqual(str(err.exception),
@@ -206,22 +225,11 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=BranchGroup())
         p.setup()
 
-        c1 = p.model.get_subsystem('Branch1.G1.G2.comp1')
+        c1 = p.model.Branch1.G1.G2.comp1
         self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
-        c2 = p.model.get_subsystem('Branch2.G3.comp2')
+        c2 = p.model.Branch2.G3.comp2
         self.assertEqual(c2.pathname, 'Branch2.G3.comp2')
-
-    def test_group_getsystem_middle(self):
-        from openmdao.api import Problem
-        from openmdao.core.tests.test_group import BranchGroup
-
-        p = Problem(model=BranchGroup())
-        p.setup()
-
-        grp = p.model.get_subsystem('Branch1.G1')
-        c1 = grp.get_subsystem('G2.comp1')
-        self.assertEqual(c1.pathname, 'Branch1.G1.G2.comp1')
 
     def test_group_nested_promoted1(self):
         from openmdao.api import Problem, Group, ExecComp
@@ -272,11 +280,8 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes(self):
         """Promoting a single variable."""
         p = Problem()
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['x'])
+        p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
+                              promotes_outputs=['x'])
         p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
@@ -333,12 +338,10 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = Problem()
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['a', 'x'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
+        p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
+                              promotes_outputs=['a', 'x'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'),
+                              promotes_inputs=['x'])
         p.setup()
 
         p.set_solver_print(level=0)
@@ -351,12 +354,10 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_all(self):
         """Promoting all variables with asterisk."""
         p = Problem()
-        p.model.add_subsystem('comp1', IndepVarComp([
-                ('a', 2.0),
-                ('x', 5.0),
-            ]),
-            promotes_outputs=['*'])
-        p.model.add_subsystem('comp2', ExecComp('y=2*x'), promotes_inputs=['x'])
+        p.model.add_subsystem('comp1', IndepVarComp([('a', 2.0), ('x', 5.0)]),
+                              promotes_outputs=['*'])
+        p.model.add_subsystem('comp2', ExecComp('y=2*x'),
+                              promotes_inputs=['x'])
         p.setup()
 
         p.set_solver_print(level=0)
@@ -404,25 +405,25 @@ class TestGroup(unittest.TestCase):
         p = Problem(model=model)
         p.setup()
 
-        c1_1 = p.model.get_subsystem('group1.comp1')
-        c1_2 = p.model.get_subsystem('group1.comp2')
-        c2_1 = p.model.get_subsystem('group2.comp1')
-        c2_2 = p.model.get_subsystem('group2.comp2')
+        c1_1 = p.model.group1.comp1
+        c1_2 = p.model.group1.comp2
+        c2_1 = p.model.group2.comp1
+        c2_2 = p.model.group2.comp2
         self.assertEqual(c1_1.name, 'comp1')
         self.assertEqual(c1_2.name, 'comp2')
         self.assertEqual(c2_1.name, 'comp1')
         self.assertEqual(c2_2.name, 'comp2')
 
-        c1_1 = p.model.get_subsystem('group1').get_subsystem('comp1')
-        c1_2 = p.model.get_subsystem('group1').get_subsystem('comp2')
-        c2_1 = p.model.get_subsystem('group2').get_subsystem('comp1')
-        c2_2 = p.model.get_subsystem('group2').get_subsystem('comp2')
+        c1_1 = p.model.group1.comp1
+        c1_2 = p.model.group1.comp2
+        c2_1 = p.model.group2.comp1
+        c2_2 = p.model.group2.comp2
         self.assertEqual(c1_1.name, 'comp1')
         self.assertEqual(c1_2.name, 'comp2')
         self.assertEqual(c2_1.name, 'comp1')
         self.assertEqual(c2_2.name, 'comp2')
 
-        s = p.model.get_subsystem('')
+        s = p.model._get_subsystem('')
         self.assertEqual(s, None)
 
         p.set_solver_print(level=0)
@@ -520,6 +521,7 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'], np.ones(3))
         assert_rel_error(self, p['C1.y'], 6.)
         assert_rel_error(self, p['C2.x'], np.ones(2))
@@ -645,6 +647,7 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'], np.ones(3))
         assert_rel_error(self, p['C1.y'], 6.)
         assert_rel_error(self, p['C2.x'], np.ones(2))
@@ -680,11 +683,13 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep',
                               IndepVarComp('x', np.arange(12).reshape((4,3))),
                               promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+        p.model.add_subsystem('C1', MyComp(),
+                              promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'],
                          np.array([[0., 10.],
                                    [7., 4.]]))
@@ -784,14 +789,23 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 21.)
 
     def test_set_order_feature(self):
-        from openmdao.api import Problem, IndepVarComp, NonLinearRunOnce
-        from openmdao.core.tests.test_group import ReportOrderComp
+        from openmdao.api import Problem, IndepVarComp, NonlinearRunOnce
+
+        class ReportOrderComp(ExplicitComponent):
+            """Adds name to list."""
+            def __init__(self, order_list):
+                super(ReportOrderComp, self).__init__()
+                self._order_list = order_list
+
+            def compute(self, inputs, outputs):
+                self._order_list.append(self.pathname)
 
         # this list will record the execution order of our C1, C2, and C3 components
         order_list = []
+
         prob = Problem()
         model = prob.model
-        model.nonlinear_solver = NonLinearRunOnce()
+
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -799,13 +813,10 @@ class TestGroup(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
-                         [s.name for s in model._static_subsystems_allprocs])
-
         prob.setup(check=False)
         prob.run_model()
 
-        self.assertEqual(['C1', 'C2', 'C3'], order_list)
+        self.assertEqual(order_list, ['C1', 'C2', 'C3'])
 
         # reset the shared order list
         order_list[:] = []
@@ -816,14 +827,14 @@ class TestGroup(unittest.TestCase):
         # after changing the order, we must call setup again
         prob.setup(check=False)
         prob.run_model()
-        self.assertEqual(['C2', 'C1', 'C3'], order_list)
+        self.assertEqual(order_list, ['C2', 'C1', 'C3'])
 
     def test_set_order(self):
 
         order_list = []
         prob = Problem()
         model = prob.model
-        model.nonlinear_solver = NonLinearRunOnce()
+        model.nonlinear_solver = NonlinearRunOnce()
         model.add_subsystem('indeps', IndepVarComp('x', 1.))
         model.add_subsystem('C1', ReportOrderComp(order_list))
         model.add_subsystem('C2', ReportOrderComp(order_list))
@@ -889,6 +900,7 @@ class TestGroup(unittest.TestCase):
 
         # this test passes if it doesn't raise an exception
 
+
 class MyComp(ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
         super(MyComp, self).__init__()
@@ -908,7 +920,8 @@ class MyComp(ExplicitComponent):
 def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=False,
                       promotes=None):
     prob = Problem()
-    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape), promotes=promotes)
+    prob.model.add_subsystem('indeps', IndepVarComp('x', shape=src_shape),
+                             promotes=promotes)
     prob.model.add_subsystem('C1', MyComp(tgt_shape,
                                           src_indices=src_indices if promotes else None,
                                           flat_src_indices=flat_src_indices),

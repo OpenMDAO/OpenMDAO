@@ -1,23 +1,20 @@
 from __future__ import print_function
 
 import os
-import pstats
 import sys
-import traceback
 import time
 import webbrowser
-import fnmatch
 import threading
-import argparse
 import json
-from six import StringIO, iteritems, itervalues
+from six import iteritems, itervalues
 import tornado.ioloop
 import tornado.web
 from collections import defaultdict, deque
 from itertools import groupby
 
-from openmdao.devtools.iprofile import _process_profile, _profile_py_file
-from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods
+from openmdao.devtools.iprofile import _process_profile, _iprof_py_file
+from openmdao.devtools.iprof_utils import func_group, _setup_func_group
+from openmdao.utils.mpi import MPI
 
 
 def _launch_browser(port):
@@ -26,6 +23,7 @@ def _launch_browser(port):
     """
     time.sleep(1)
     webbrowser.get().open('http://localhost:%s' % port)
+
 
 def _startThread(fn):
     """
@@ -36,14 +34,16 @@ def _startThread(fn):
     thread.start()
     return thread
 
+
 def _parent_key(d):
     """
     Return the function path of the parent of function specified by 'id' in the given dict.
     """
-    parts = d['id'].rsplit('-', 1)
+    parts = d['id'].rsplit('|', 1)
     if len(parts) == 1:
         return ''
     return parts[0]
+
 
 def _stratify(call_data, sortby='time'):
     """
@@ -90,7 +90,7 @@ def _stratify(call_data, sortby='time'):
 
 class _Application(tornado.web.Application):
     def __init__(self, options):
-        self.call_data, _ = _process_profile(options.files)
+        self.call_data, _ = _process_profile(options.file)
         self.depth_groups, self.node_list = _stratify(self.call_data)
         self.options = options
 
@@ -100,7 +100,7 @@ class _Application(tornado.web.Application):
         self.call_tree = tree = defaultdict(lambda : [None, {}])
         for path, data in iteritems(self.call_data):
             data['id'] = path
-            parts = path.rsplit('-', 1)
+            parts = path.rsplit('|', 1)
             # add our node to our parent
             if len(parts) > 1:
                 tree[parts[0]][1][path] = data
@@ -165,21 +165,19 @@ class _Function(tornado.web.RequestHandler):
         self.write(dump)
 
 
-def _prof_view():
-    """
-    Called from a command line to instance based profile data in a web page.
-    """
+def _iprof_setup_parser(parser):
+    if not func_group:
+        _setup_func_group()
 
-    parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--port', action='store', dest='port',
                         default=8009, type=int,
                         help='port used for web server')
-    parser.add_argument('--noshow', action='store_true', dest='noshow',
+    parser.add_argument('--no_browser', action='store_true', dest='noshow',
                         help="Don't pop up a browser to view the data.")
     parser.add_argument('-t', '--title', action='store', dest='title',
                         default='Profile of Method Calls by Instance',
                         help='Title to be displayed above profiling view.')
-    parser.add_argument('-g', '--group', action='store', dest='group',
+    parser.add_argument('-g', '--group', action='store', dest='methods',
                         default='openmdao',
                         help='Determines which group of methods will be tracked. Current '
                              'options are: %s and "openmdao" is the default' %
@@ -187,29 +185,32 @@ def _prof_view():
     parser.add_argument('-m', '--maxcalls', action='store', dest='maxcalls',
                         default=15000, type=int,
                         help='Maximum number of calls displayed at one time.  Default=15000.')
-    parser.add_argument('files', metavar='file', nargs='+',
+    parser.add_argument('file', metavar='file', nargs='+',
                         help='Raw profile data files or a python file.')
 
-    options = parser.parse_args()
 
-    if options.files[0].endswith('.py'):
-        if len(options.files) > 1:
+def _iprof_exec(options):
+    """
+    Called from a command line to instance based profile data in a web page.
+    """
+    if options.file[0].endswith('.py'):
+        if len(options.file) > 1:
             print("iprofview can only process a single python file.", file=sys.stderr)
             sys.exit(-1)
-        _profile_py_file(options.files[0], methods=func_group[options.group])
-        options.files = ['iprof.0']
+        _iprof_py_file(options)
+        if MPI:
+            options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
+        else:
+            options.file = ['iprof.0']
 
-    app = _Application(options)
-    app.listen(options.port)
+    if not options.noshow and (not MPI or MPI.COMM_WORLD.rank == 0):
+        app = _Application(options)
+        app.listen(options.port)
 
-    print("starting server on port %d" % options.port)
+        print("starting server on port %d" % options.port)
 
-    serve_thread  = _startThread(tornado.ioloop.IOLoop.current().start)
-    launch_thread = _startThread(lambda: _launch_browser(options.port))
+        serve_thread = _startThread(tornado.ioloop.IOLoop.current().start)
+        launch_thread = _startThread(lambda: _launch_browser(options.port))
 
-    while serve_thread.isAlive():
-        serve_thread.join(timeout=1)
-
-
-if __name__ == '__main__':
-    cmd_view_pstats()
+        while serve_thread.isAlive():
+            serve_thread.join(timeout=1)

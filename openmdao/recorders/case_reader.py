@@ -16,11 +16,8 @@ def CaseReader(filename):
 
     Returns
     -------
-    An instance of SqliteCaseReader.
+    reader : BaseCaseReader
+        An instance of a SqliteCaseReader that is reading filename.
     """
-    try:
-        reader = SqliteCaseReader(filename)
-        return reader
-    except IOError:
-        # filename not a valid Sqlite database file
-        raise IOError('Unable to load cases from file {0}'.format(filename))
+    reader = SqliteCaseReader(filename)
+    return reader

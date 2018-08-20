@@ -4,20 +4,16 @@ To test more than one option, pass in an Iterable of requested options.
 All Parametric Groups
 ---------------------
 'group_type': Controls which type of ParametricGroups to test. Will test all groups if not specified
-'vector_class': One of ['default', 'petsc'], which vector class to use for the problem. ('default')
+'local_vector_class': One of ['default', 'petsc'], which local vector class to use for the problem. ('default')
 'assembled_jac': bool. If an assembled jacobian should be used. (True)
-'jacobian_type': One of ['matvec', 'dense', 'sparse-coo', 'sparse-csr', 'sparse-csc']. How the Jacobians are used.
+'jacobian_type': One of ['matvec', 'dense', 'sparse-csc']. How the Jacobians are used.
                  Controls the type of AssembledJacobian. ('matvec')
                     - 'matvec': Uses compute_jacvec_product.
                     - 'dense': Uses an ndarray.
-                    - 'sparse-coo': Uses a COOrdinate format sparse matrix.
-                    - 'sparse-csr': Uses a Compressed Sparse Row sparse format.
                     - 'sparse-csc': Uses a Compressed Sparse Col sparse format.
 
 CycleGroup ('group_type': 'cycle')
 ----------------------------------
-'component_class': One of ['explicit', 'deprecated']. Controls the class of Component to use to
-                   build the group. ('explicit')
 'connection_type': One of ['implicit', 'explicit']. If connections are done explicitly or through
                    promotions ('implicit').
 'partial_type': One of ['array', 'sparse', 'aij']. How the component partial derivatives are
@@ -35,7 +31,7 @@ import unittest
 from six import iterkeys
 
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class ParameterizedTestCases(unittest.TestCase):
@@ -53,7 +49,7 @@ class ParameterizedTestCases(unittest.TestCase):
             actual = {key: problem[key] for key in iterkeys(expected_values)}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
-        error_bound = 1e-4 if root.metadata['finite_difference'] else 1e-8
+        error_bound = 1e-4 if root.options['finite_difference'] else 1e-8
 
         expected_totals = root.expected_totals
         if expected_totals:
@@ -72,8 +68,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
     @parametric_suite(jacobian_type='*',
                       num_comp=[2, 5, 10],
                       partial_type='aij',
-                      run_by_default=True,
-                      component_class='*')
+                      run_by_default=True)
     def test_subset(self, param_instance):
         param_instance.setup()
         problem = param_instance.problem
@@ -86,6 +81,10 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
 
         expected_totals = model.expected_totals
         if expected_totals:
+            # Reverse Derivatives Check
+            totals = param_instance.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-8)
+
             # Forward Derivatives Check
             totals = param_instance.compute_totals('fwd')
             assert_rel_error(self, totals, expected_totals, 1e-8)

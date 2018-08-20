@@ -55,8 +55,8 @@ def array_idx(i, var_size):
 class ExplicitCycleComp(ExplicitComponent):
 
     def _inputs_to_vector(self, inputs):
-        var_shape = self.metadata['var_shape']
-        num_var = self.metadata['num_var']
+        var_shape = self.options['var_shape']
+        num_var = self.options['num_var']
         size = np.prod(var_shape)
         x = np.zeros(num_var * size)
         for i in range(num_var):
@@ -66,8 +66,8 @@ class ExplicitCycleComp(ExplicitComponent):
         return x
 
     def _vector_to_outputs(self, vec, outputs):
-        var_shape = self.metadata['var_shape']
-        num_var = self.metadata['num_var']
+        var_shape = self.options['var_shape']
+        num_var = self.options['num_var']
         size = np.prod(var_shape)
         for i in range(num_var):
             y_i = vec[size * i:size * (i + 1)].reshape(var_shape)
@@ -77,26 +77,25 @@ class ExplicitCycleComp(ExplicitComponent):
         return 'Explicit Cycle Component'
 
     def initialize(self):
-        self.metadata.declare('jacobian_type', default='matvec',
-                              values=['matvec', 'dense', 'sparse-coo', 'sparse-csr',
-                                      'sparse-csc'],
+        self.options.declare('jacobian_type', default='matvec',
+                              values=['matvec', 'dense', 'sparse-csc'],
                               desc='method of assembling derivatives')
-        self.metadata.declare('partial_type', default='array',
+        self.options.declare('partial_type', default='array',
                               values=['array', 'sparse', 'aij'],
                               desc='type of partial derivatives')
-        self.metadata.declare('num_var', type_=int, default=1,
+        self.options.declare('num_var', types=int, default=1,
                               desc='Number of variables per component')
-        self.metadata.declare('var_shape', type_=tuple, default=(3,),
+        self.options.declare('var_shape', types=tuple, default=(3,),
                               desc='Shape of each variable')
-        self.metadata.declare('index', type_=int,
+        self.options.declare('index', types=int,
                               desc='Index of the component. Used for testing implicit connections')
-        self.metadata.declare('connection_type', type_=str, default='explicit',
+        self.options.declare('connection_type', default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
-        self.metadata.declare('finite_difference', default=False,
-                              type_=bool,
+        self.options.declare('finite_difference', default=False,
+                              types=bool,
                               desc='If the derivatives should be finite differenced.')
-        self.metadata.declare('num_comp', type_=int, default=2,
+        self.options.declare('num_comp', types=int, default=2,
                               desc='Total number of components')
 
         self.angle_param = 'theta'
@@ -104,20 +103,20 @@ class ExplicitCycleComp(ExplicitComponent):
         self._cycle_names = {}
 
     def _init_parameterized(self):
-        self.num_var = self.metadata['num_var']
-        self.var_shape = self.metadata['var_shape']
+        self.num_var = self.options['num_var']
+        self.var_shape = self.options['var_shape']
         self.size = self.num_var * np.prod(self.var_shape)
 
-        if self.metadata['jacobian_type'] == 'matvec':
+        if self.options['jacobian_type'] == 'matvec':
             self.compute_jacvec_product = self.jacvec_product
 
-        if self.metadata['connection_type'] == 'implicit':
-            idx = self.metadata['index']
+        if self.options['connection_type'] == 'implicit':
+            idx = self.options['index']
             self._cycle_names['x'] = 'x_{}_{{}}'.format(idx)
             self._cycle_names['y'] = 'x_{}_{{}}'.format(idx + 1)
             self._cycle_names['theta'] = 'theta_{}'.format(idx)
             self._cycle_names['theta_out'] = 'theta_{}'.format(idx + 1)
-            num_var = self.metadata['num_var']
+            num_var = self.options['num_var']
             self._cycle_promotes_in = [self._cycle_names['x'].format(i) for i in range(num_var)]
             self._cycle_promotes_out = [self._cycle_names['y'].format(i) for i in range(num_var)]
             self._cycle_promotes_in.append(self._cycle_names['theta'])
@@ -139,16 +138,16 @@ class ExplicitCycleComp(ExplicitComponent):
 
         # Setup partials
 
-        pd_type = self.metadata['partial_type']
+        pd_type = self.options['partial_type']
 
-        if self.metadata['finite_difference']:
-            if self.metadata['jacobian_type'] == 'matvec':
+        if self.options['finite_difference']:
+            if self.options['jacobian_type'] == 'matvec':
                 raise unittest.SkipTest('not testing FD and matvec')
             if pd_type != 'array':
                 raise unittest.SkipTest('only dense FD supported')
             self.declare_partials('*', '*', method='fd')
 
-        elif self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
+        elif self.options['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
             var_shape = self.var_shape
             var_size = np.prod(var_shape)
@@ -195,9 +194,9 @@ class ExplicitCycleComp(ExplicitComponent):
         A = _compute_A(self.size, angle)
         dA = _compute_dA(self.size, angle)
 
-        var_shape = self.metadata['var_shape']
+        var_shape = self.options['var_shape']
         var_size = np.prod(var_shape)
-        num_var = self.metadata['num_var']
+        num_var = self.options['num_var']
         x_name = self._cycle_names['x']
         y_name = self._cycle_names['y']
         theta_name = self._cycle_names['theta']
@@ -278,7 +277,7 @@ class ExplicitCycleComp(ExplicitComponent):
             return {'val': jac}
 
     def compute_partials(self, inputs, partials):
-        if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
+        if self.options['jacobian_type'] != 'matvec' and not self.options['finite_difference']:
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
             num_var = self.num_var
@@ -289,7 +288,7 @@ class ExplicitCycleComp(ExplicitComponent):
             A = _compute_A(size, angle)
             dA = _compute_dA(size, angle)
             dA_x = np.atleast_2d(dA.dot(x)).T
-            pd_type = self.metadata['partial_type']
+            pd_type = self.options['partial_type']
             dtheta = np.array([[1.]])
 
             y_name = self._cycle_names['y']
@@ -343,10 +342,10 @@ class ExplicitLastComp(ExplicitFirstComp):
 
         # Setup partials
 
-        pd_type = self.metadata['partial_type']
-        if self.metadata['jacobian_type'] != 'matvec' and pd_type != 'array':
+        pd_type = self.options['partial_type']
+        if self.options['jacobian_type'] != 'matvec' and pd_type != 'array':
             x = np.ones(self.var_shape)
-            for i in range(self.metadata['num_var']):
+            for i in range(self.options['num_var']):
                 in_var = self._cycle_names['x'].format(i)
                 self.declare_partials('x_norm2', in_var,
                                       **self._array2kwargs(x.flatten(), pd_type))
@@ -357,7 +356,7 @@ class ExplicitLastComp(ExplicitFirstComp):
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
         psi = inputs[self._cycle_names['psi']]
-        k = self.metadata['num_comp']
+        k = self.options['num_comp']
         x = self._inputs_to_vector(inputs)
 
         outputs['x_norm2'] = 0.5*np.dot(x,x)
@@ -366,14 +365,14 @@ class ExplicitLastComp(ExplicitFirstComp):
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
     def compute_partials(self, inputs, partials):
-        if self.metadata['jacobian_type'] != 'matvec' and not self.metadata['finite_difference']:
-            pd_type = self.metadata['partial_type']
-            for i in range(self.metadata['num_var']):
+        if self.options['jacobian_type'] != 'matvec' and not self.options['finite_difference']:
+            pd_type = self.options['partial_type']
+            for i in range(self.options['num_var']):
                 in_var = self._cycle_names['x'].format(i)
                 partials['x_norm2', in_var] = self.make_jacobian_entry(inputs[in_var].flat[:],
                                                                        pd_type)
 
-            k = self.metadata['num_comp']
+            k = self.options['num_comp']
             theta_out = self._cycle_names['theta_out']
             theta = self._cycle_names['theta']
             partials[theta_out, theta] = self.make_jacobian_entry(np.array([.5]), pd_type)
@@ -381,9 +380,9 @@ class ExplicitLastComp(ExplicitFirstComp):
                 self.make_jacobian_entry(np.array([-1/(2*k-2)]), pd_type)
 
     def jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-        if self.metadata['jacobian_type'] == 'matvec':
-            k = self.metadata['num_comp']
-            num_var = self.metadata['num_var']
+        if self.options['jacobian_type'] == 'matvec':
+            k = self.options['num_comp']
+            num_var = self.options['num_var']
             theta_out = self._cycle_names['theta_out']
             theta = self._cycle_names['theta']
             psi = self._cycle_names['psi']

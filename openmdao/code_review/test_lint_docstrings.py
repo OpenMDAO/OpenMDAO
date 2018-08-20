@@ -5,21 +5,32 @@ import unittest
 import os.path
 import importlib
 import inspect
-import re
 import textwrap
+import collections
+import re
 from six import PY3
 
 from numpydoc.docscrape import NumpyDocString
 
-directories = [
-    'core',
-    'jacobians',
-    'matrices',
-    'proc_allocators',
-    'solvers',
-    'utils',
-    'vectors',
+# directories in which we do not wish to lint for docstrings/parameters.
+exclude = [
+    'code_review',
+    'devtools',
+    'docs',
+    'test_suite',
+    'tests',
+    'test',
 ]
+
+# we will build a list of dirs in which to do linting.
+directories = []
+
+top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+for root, dirs, files in os.walk(top, topdown=True):
+    dirs[:] = [d for d in dirs if d not in exclude]
+    for di in dirs:
+        directories.append(os.path.join(root, di))
 
 
 def _is_context_manager(func):
@@ -38,7 +49,7 @@ def _is_context_manager(func):
         otherwise False.
 
     """
-    src = inspect.getsource(func)
+    src = inspect.getsource(func).lstrip()
     return 'return GeneratorContextManager' in src or src.startswith('@contextmanager')
 
 
@@ -87,7 +98,7 @@ class ReturnFinder(ast.NodeVisitor):
             if node.value is not None:
                 self.has_return = True
 
-        if hasattr(node, 'body'):
+        if hasattr(node, 'body') and isinstance(node.body, collections.Iterable):
             # If the top level function does nothing but pass, note it.
             if is_func_def and self._depth == 2 and len(node.body) <= 2 \
                      and isinstance(node.body[-1], ast.Pass):
@@ -173,7 +184,8 @@ class LintTestCase(unittest.TestCase):
 
         # Check that summary is present
         if not summary:
-            new_failures.append('is missing a summary.')
+            return ['is missing a summary.']
+
         # Summary should be a single line.
         if len(summary) > 1:
             new_failures.append('summary should be only one line.')
@@ -460,15 +472,13 @@ class LintTestCase(unittest.TestCase):
                 failures[key] = new_failures
 
     def test_docstrings(self):
-        topdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
         print_info = False
 
         failures = {}
 
         # Loop over directories
         for dir_name in directories:
-            dirpath = os.path.join(topdir, dir_name)
+            dirpath = dir_name
             if print_info:
                 print('-'*len(dir_name))
                 print(dir_name)
@@ -476,11 +486,19 @@ class LintTestCase(unittest.TestCase):
 
             # Loop over files
             for file_name in os.listdir(dirpath):
-                if file_name != '__init__.py' and file_name[-3:] == '.py':
+                if file_name != '__init__.py' and file_name[-3:] == '.py' and not os.path.isdir(file_name):
                     if print_info:
                         print(file_name)
 
-                    module_name = 'openmdao.%s.%s' % (dir_name, file_name[:-3])
+                    # to construct module name, remove part of abs path that
+                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
+                    mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace('/', '.')
+
+                    # then, get rid of the '.py' to get final part of module name.
+                    mod2 = file_name[:-3]
+
+                    module_name = '{}.{}'.format(mod1, mod2)
+
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError as err:
@@ -508,7 +526,7 @@ class LintTestCase(unittest.TestCase):
 
                         # Loop over methods
                         methods = [x for x in dir(clss)
-                                   if inspect.ismethod(getattr(clss, x)) and
+                                   if (inspect.ismethod(getattr(clss, x)) or inspect.isfunction(getattr(clss, x))) and
                                    x in clss.__dict__]
                         for method_name in methods:
                             if print_info:

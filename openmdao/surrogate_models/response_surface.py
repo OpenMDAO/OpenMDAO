@@ -12,6 +12,15 @@ from six.moves import range
 class ResponseSurface(SurrogateModel):
     """
     Surrogate Model based on second order response surface equations.
+
+    Attributes
+    ----------
+    betas : ndarray
+        Vector of response surface equation coefficients.
+    m : int
+        Number of training points.
+    n : int
+        Number of independent variables.
     """
 
     def __init__(self):
@@ -33,7 +42,6 @@ class ResponseSurface(SurrogateModel):
         ----------
         x : array-like
             Training input locations
-
         y : array-like
             Model responses at given inputs.
         """
@@ -73,6 +81,11 @@ class ResponseSurface(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate is evaluated.
+
+        Returns
+        -------
+        float
+            Predicted response.
         """
         super(ResponseSurface, self).predict(x)
 
@@ -105,6 +118,11 @@ class ResponseSurface(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
+
+        Returns
+        -------
+        ndarray
+            Jacobian of surrogate output wrt inputs.
         """
         n = self.n
         betas = self.betas

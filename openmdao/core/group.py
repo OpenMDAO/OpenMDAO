@@ -3,7 +3,9 @@ from __future__ import division
 
 from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
+from numbers import Number
 import warnings
+import inspect
 
 from six import iteritems, string_types, itervalues
 from six.moves import range
@@ -11,19 +13,21 @@ from six.moves import range
 import numpy as np
 import networkx as nx
 
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
+from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component
-from openmdao.proc_allocators.default_allocator import DefaultAllocator
+from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.solvers.nonlinear.nonlinear_runonce import NonLinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, array_connection_compatible
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
-from openmdao.utils.units import is_compatible
-from openmdao.utils.graph_utils import all_connected_edges
+from openmdao.utils.units import is_compatible, get_conversion
+from openmdao.utils.mpi import MPI
+from openmdao.utils.graph_utils import all_connected_nodes
 
 # regex to check for valid names.
 import re
@@ -38,8 +42,27 @@ class Group(System):
     ----------
     _mpi_proc_allocator : ProcAllocator
         Object used to allocate MPI processes to subsystems.
-    proc_weights : list of float
-        Weights used to determine MPI process allocation to subsystems.
+    _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
+        Information used to determine MPI process allocation to subsystems.
+    _local_system_set : set or None
+        Set of pathnames of all fully local (not remote or distributed)
+        direct or indirect subsystems.
+    _subgroups_myproc : list
+        List of local subgroups.
+    _manual_connections : dict
+        Dictionary of input_name: (output_name, src_indices) connections.
+    _static_manual_connections : dict
+        Dictionary that stores all explicit connections added outside of setup.
+    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned by this system
+        or any descendant system. The data is the same across all processors.
+    _conn_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned
+        by this system only. The data is the same across all processors.
+    _transfers : dict of dict of Transfers
+        First key is the vec_name, second key is (mode, isub) where
+        mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
+        or isub can be None for the full, simultaneous transfer.
     """
 
     def __init__(self, **kwargs):
@@ -52,23 +75,35 @@ class Group(System):
             dict of arguments available here and in all descendants of this
             Group.
         """
+        self._mpi_proc_allocator = DefaultAllocator()
+        self._proc_info = {}
+
         super(Group, self).__init__(**kwargs)
+
+        self._local_system_set = None
+        self._subgroups_myproc = None
+        self._manual_connections = {}
+        self._static_manual_connections = {}
+        self._conn_global_abs_in2out = {}
+        self._conn_abs_in2out = {}
+        self._transfers = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
         # called nonlinear_solver and linear_solver without documenting them.
         if not self._nonlinear_solver:
-            self._nonlinear_solver = NonLinearRunOnce()
+            self._nonlinear_solver = NonlinearRunOnce()
         if not self._linear_solver:
             self._linear_solver = LinearRunOnce()
-        self._mpi_proc_allocator = DefaultAllocator()
-        self.proc_weights = None
 
     def setup(self):
         """
         Build this group.
 
-        This method should be overidden by your Group's method.
+        This method should be overidden by your Group's method. The reason for using this
+        method to add subsystem is to save memory and setup time when using your Group
+        while running under MPI.  This avoids the creation of systems that will not be
+        used in the current process.
 
         You may call 'add_subsystem' to add systems to this group. You may also issue connections,
         and set the linear and nonlinear solvers for this group level. You cannot safely change
@@ -78,7 +113,7 @@ class Group(System):
             name
             pathname
             comm
-            metadata
+            options
         """
         pass
 
@@ -98,10 +133,138 @@ class Group(System):
             name
             pathname
             comm
-            metadata
+            options
             system hieararchy with attribute access
         """
         pass
+
+    def _get_scope(self, excl_sub=None):
+        """
+        Find the input and output variables that are needed for a particular matvec product.
+
+        Parameters
+        ----------
+        excl_sub : <System>
+            A subsystem whose variables should be excluded from the matvec product.
+
+        Returns
+        -------
+        (set, set)
+            Sets of output and input variables.
+        """
+        try:
+            return self._scope_cache[excl_sub]
+        except KeyError:
+            pass
+
+        if excl_sub is None:
+            # All myproc outputs
+            scope_out = frozenset(self._var_abs_names['output'])
+
+            # All myproc inputs connected to an output in this system
+            scope_in = frozenset(self._conn_global_abs_in2out).intersection(
+                self._var_abs_names['input'])
+
+        else:
+            # All myproc outputs not in excl_sub
+            scope_out = frozenset(self._var_abs_names['output']).difference(
+                excl_sub._var_abs_names['output'])
+
+            # All myproc inputs connected to an output in this system but not in excl_sub
+            scope_in = set()
+            for abs_in in self._var_abs_names['input']:
+                if abs_in in self._conn_global_abs_in2out:
+                    abs_out = self._conn_global_abs_in2out[abs_in]
+
+                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
+                        scope_in.add(abs_in)
+            scope_in = frozenset(scope_in)
+
+        self._scope_cache[excl_sub] = (scope_out, scope_in)
+        return scope_out, scope_in
+
+    def _compute_root_scale_factors(self):
+        """
+        Compute scale factors for all variables.
+
+        Returns
+        -------
+        dict
+            Mapping of each absolute var name to its corresponding scaling factor tuple.
+        """
+        scale_factors = super(Group, self)._compute_root_scale_factors()
+
+        if self._has_input_scaling:
+            abs2meta_in = self._var_abs2meta
+            allprocs_meta_out = self._var_allprocs_abs2meta
+            for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
+                meta_out = allprocs_meta_out[abs_out]
+                if abs_in not in abs2meta_in:
+                    # we only perform scaling on local arrays, so skip
+                    continue
+
+                meta_in = abs2meta_in[abs_in]
+
+                ref = meta_out['ref']
+                ref0 = meta_out['ref0']
+
+                src_indices = meta_in['src_indices']
+
+                if src_indices is not None:
+                    if not (np.isscalar(ref) and np.isscalar(ref0)):
+                        # TODO: if either ref or ref0 are not scalar and the output is
+                        # distributed, we need to do a scatter
+                        # to obtain the values needed due to global src_indices
+                        if meta_out['distributed']:
+                            raise RuntimeError("vector scalers with distrib vars "
+                                               "not supported yet.")
+
+                        global_shape_out = meta_out['global_shape']
+                        if src_indices.ndim != 1:
+                            shape_in = meta_in['shape']
+                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
+                                src_indices = src_indices.flatten()
+                                src_indices = convert_neg(src_indices, src_indices.size)
+                            else:
+                                entries = [list(range(x)) for x in shape_in]
+                                cols = np.vstack(src_indices[i] for i in product(*entries))
+                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
+                                           for i in range(cols.shape[1])]
+                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+
+                        ref = ref[src_indices]
+                        ref0 = ref0[src_indices]
+
+                # Compute scaling arrays for inputs using a0 and a1
+                # Example:
+                #   Let x, x_src, x_tgt be the dimensionless variable,
+                #   variable in source units, and variable in target units, resp.
+                #   x_src = a0 + a1 x
+                #   x_tgt = b0 + b1 x
+                #   x_tgt = g(x_src) = d0 + d1 x_src
+                #   b0 + b1 x = d0 + d1 a0 + d1 a1 x
+                #   b0 = d0 + d1 a0
+                #   b0 = g(a0)
+                #   b1 = d0 + d1 a1 - d0
+                #   b1 = g(a1) - g(0)
+
+                units_in = meta_in['units']
+                units_out = meta_out['units']
+
+                if units_in is None or units_out is None or units_in == units_out:
+                    a0 = ref0
+                    a1 = ref - ref0
+                else:
+                    factor, offset = get_conversion(units_out, units_in)
+                    a0 = (ref0 + offset) * factor
+                    a1 = (ref - ref0) * factor
+
+                scale_factors[abs_in] = {
+                    ('input', 'phys'): (a0, a1),
+                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
+                }
+
+        return scale_factors
 
     def _configure(self):
         """
@@ -114,12 +277,17 @@ class Group(System):
 
             if subsys._has_guess:
                 self._has_guess = True
+            if subsys.matrix_free:
+                self.matrix_free = True
 
         self.configure()
 
-    def _setup_procs(self, pathname, comm):
+    def _setup_procs(self, pathname, comm, mode):
         """
-        Distribute processors and assign pathnames.
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the group. This method recurses
+        downward through the model.
 
         Parameters
         ----------
@@ -127,51 +295,151 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
+        mode : string
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
         self.comm = comm
-        self._subsystems_proc_range = subsystems_proc_range = []
+        self._mode = mode
 
         self._subsystems_allprocs = []
         self._manual_connections = {}
-        self._design_vars = {}
-        self._responses = {}
+        self._design_vars = OrderedDict()
+        self._responses = OrderedDict()
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
         self._manual_connections.update(self._static_manual_connections)
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
+
+        # Call setup function for this group.
         self.setup()
+
         self._static_mode = True
 
-        # Call the load balancing algorithm
-        sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
-            self.proc_weights,
-            len(self._subsystems_allprocs),
-            comm)
+        if MPI:
+            proc_info = [self._proc_info[s.name] for s in self._subsystems_allprocs]
 
-        # Define local subsystems
-        self._subsystems_myproc = [self._subsystems_allprocs[ind]
-                                   for ind in sub_inds]
-        self._subsystems_myproc_inds = sub_inds
+            # Call the load balancing algorithm
+            try:
+                sub_inds, sub_comm, sub_proc_range = self._mpi_proc_allocator(
+                    proc_info, len(self._subsystems_allprocs), comm)
+            except ProcAllocationError as err:
+                subs = self._subsystems_allprocs
+                if err.sub_inds is None:
+                    raise RuntimeError("%s: %s" % (self.pathname, err.msg))
+                else:
+                    raise RuntimeError("%s: MPI process allocation failed: %s for the following "
+                                       "subsystems: %s" % (self.pathname, err.msg,
+                                                           [subs[i].name for i in err.sub_inds]))
+
+            self._subsystems_myproc = [self._subsystems_allprocs[ind] for ind in sub_inds]
+
+            # Define local subsystems
+            if np.sum([minp for minp, _, _ in proc_info]) <= comm.size:
+                self._subsystems_myproc_inds = sub_inds
+            else:
+                # reorder the subsystems_allprocs based on which procs they live on. If we don't
+                # do this, we can get ordering mismatches in some of our data structures.
+                new_allsubs = []
+                seen = set()
+                gathered = self.comm.allgather(sub_inds)
+                for rank, inds in enumerate(gathered):
+                    for ind in inds:
+                        if ind not in seen:
+                            new_allsubs.append(self._subsystems_allprocs[ind])
+                            seen.add(ind)
+                self._subsystems_allprocs = new_allsubs
+                sub_idxs = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
+
+                # since the subsystems_allprocs order changed, we also have to update
+                # subsystems_myproc_inds
+                self._subsystems_myproc_inds = [sub_idxs[s.name] for s in self._subsystems_myproc]
+        else:
+            sub_comm = comm
+            self._subsystems_myproc = self._subsystems_allprocs
+            self._subsystems_myproc_inds = list(range(len(self._subsystems_myproc)))
+            sub_proc_range = (0, 1)
 
         # Compute _subsystems_proc_range
-        for subsys in self._subsystems_myproc:
-            subsystems_proc_range.append(sub_proc_range)
+        self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
+
+        self._local_system_set = set()
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            if self.pathname:
-                sub_pathname = '.'.join((self.pathname, subsys.name))
-            else:
-                sub_pathname = subsys.name
+            subsys._local_vector_class = self._local_vector_class
+            subsys._distributed_vector_class = self._distributed_vector_class
 
-            subsys._setup_procs(sub_pathname, sub_comm)
+            if self.pathname:
+                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
+            else:
+                subsys._setup_procs(subsys.name, sub_comm, mode)
+
+        # build a list of local subgroups to speed up later loops
+        self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
+
+    def _check_reconf_update(self):
+        """
+        Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+        """
+        # See if any local subsystem has reconfigured
+        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+
+        # See if any subsystem on this or any other processor has configured
+        if self.comm.size > 1:
+            reconf = self.comm.allreduce(reconf) > 0
+
+        if reconf:
+            # Perform an update setup
+            with self._unscaled_context_all():
+                self.resetup('update')
+
+            # Reset the _reconfigured attribute to False
+            for subsys in self._subsystems_myproc:
+                subsys._reconfigured = False
+
+            self._reconfigured = True
+
+    def _list_states(self):
+        """
+        Return list of all local states at and below this system.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        states = []
+        for subsys in self._subsystems_myproc:
+            states.extend(subsys._list_states())
+
+        return sorted(states)
+
+    def _list_states_allprocs(self):
+        """
+        Return list of all states at and below this system across all procs.
+
+        Returns
+        -------
+        list
+            List of all states.
+        """
+        if MPI:
+            all_states = set()
+            byproc = self.comm.allgather(self._list_states())
+            for proc_states in byproc:
+                all_states.update(proc_states)
+        else:
+            all_states = self._list_states()
+
+        return sorted(all_states)
 
     def _setup_vars(self, recurse=True):
         """
-        Call setup in components and count variables, total and by var_set.
+        Count total variables.
 
         Parameters
         ----------
@@ -180,126 +448,88 @@ class Group(System):
         """
         super(Group, self)._setup_vars()
         num_var = self._num_var
-        num_var_byset = self._num_var_byset
 
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_vars(recurse)
 
-        # Compute num_var, num_var_byset, at least locally
+        # Compute num_var, at least locally
         for vec_name in self._lin_rel_vec_name_list:
             num_var[vec_name] = {}
-            num_var_byset[vec_name] = {}
             for type_ in ['input', 'output']:
                 num_var[vec_name][type_] = np.sum(
                     [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
-                     if vec_name in subsys._rel_vec_names], dtype=int)
-
-                num_var_byset[vec_name][type_] = vbyset = {}
-                for subsys in self._subsystems_myproc:
-                    if vec_name not in subsys._rel_vec_names:
-                        continue
-                    for set_name, num in iteritems(subsys._num_var_byset[vec_name][type_]):
-                        if set_name not in vbyset:
-                            vbyset[set_name] = 0
-                        vbyset[set_name] += num
+                     if vec_name in subsys._rel_vec_names], dtype=INT_DTYPE)
 
         # If running in parallel, allgather
         if self.comm.size > 1:
             # Perform a single allgather
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = (num_var, num_var_byset)
+                raw = num_var
             else:
-                raw = (None, None)
+                raw = None
             gathered = self.comm.allgather(raw)
 
             for vec_name in self._lin_rel_vec_name_list:
                 num_var = self._num_var[vec_name]
-                num_var_byset = self._num_var_byset[vec_name]
 
                 # Empty the dictionaries
                 for type_ in ['input', 'output']:
                     num_var[type_] = 0
-                    num_var_byset[type_] = {}
 
                 # Process the gathered data and update the dictionaries
-                for myproc_num_var, myproc_num_var_byset in gathered:
+                for myproc_num_var in gathered:
                     if myproc_num_var is None:
                         continue
                     for type_ in ['input', 'output']:
                         num_var[type_] += myproc_num_var[vec_name][type_]
-                        for set_name, num in iteritems(myproc_num_var_byset[vec_name][type_]):
-                            if set_name not in num_var_byset[type_]:
-                                num_var_byset[type_][set_name] = 0
-                            num_var_byset[type_][set_name] += num
 
         self._num_var['nonlinear'] = self._num_var['linear']
-        self._num_var_byset['nonlinear'] = self._num_var_byset['linear']
 
-    def _setup_var_index_ranges(self, set2iset, recurse=True):
+    def _setup_var_index_ranges(self, recurse=True):
         """
-        Compute the division of variables by subsystem and pass down the set_name-to-iset maps.
+        Compute the division of variables by subsystem.
 
         Parameters
         ----------
-        set2iset : {'input': dict, 'output': dict}
-            Dictionary mapping the var_set name to the var_set index.
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_var_index_ranges(set2iset)
+        super(Group, self)._setup_var_index_ranges()
 
         nsub_allprocs = len(self._subsystems_allprocs)
 
         subsystems_var_range = self._subsystems_var_range = {}
-        subsystems_var_range_byset = self._subsystems_var_range_byset = {}
 
         # First compute these on one processor for each subsystem
         for vec_name in self._lin_rel_vec_name_list:
 
-            # Here, we count the number of variables (total and by varset) in each subsystem.
+            # Here, we count the number of variables in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
             allprocs_counters = {
-                type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
-            allprocs_counters_byset = {
-                type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
-                for type_ in ['input', 'output']}
+                type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
 
             for type_ in ['input', 'output']:
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     if subsys.comm.rank == 0 and vec_name in subsys._rel_vec_names:
                         allprocs_counters[type_][isub] = subsys._num_var[vec_name][type_]
-                        for set_name in subsys._num_var_byset[vec_name][type_]:
-                            iset = set2iset[type_][set_name]
-                            allprocs_counters_byset[type_][isub, iset] = \
-                                subsys._num_var_byset[vec_name][type_][set_name]
 
             # If running in parallel, allgather
             if self.comm.size > 1:
-                raw = (allprocs_counters, allprocs_counters_byset)
-                gathered = self.comm.allgather(raw)
+                gathered = self.comm.allgather(allprocs_counters)
 
                 allprocs_counters = {
-                    type_: np.zeros(nsub_allprocs, int) for type_ in ['input', 'output']}
-                allprocs_counters_byset = {
-                    type_: np.zeros((nsub_allprocs, len(set2iset[type_])), int)
-                    for type_ in ['input', 'output']
-                }
-                for myproc_counters, myproc_counters_byset in gathered:
+                    type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
+                for myproc_counters in gathered:
                     for type_ in ['input', 'output']:
                         allprocs_counters[type_] += myproc_counters[type_]
-                        allprocs_counters_byset[type_] += myproc_counters_byset[type_]
 
-            # Compute _subsystems_var_range, _subsystems_var_range_byset
+            # Compute _subsystems_var_range
             subsystems_var_range[vec_name] = {}
-            subsystems_var_range_byset[vec_name] = {}
 
             for type_ in ['input', 'output']:
                 subsystems_var_range[vec_name][type_] = {}
-                subsystems_var_range_byset[vec_name][type_] = {
-                    set_name: {} for set_name in set2iset[type_]
-                }
 
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     if vec_name not in subsys._rel_vec_names:
@@ -307,19 +537,13 @@ class Group(System):
                     subsystems_var_range[vec_name][type_][subsys.name] = (
                         np.sum(allprocs_counters[type_][:isub]),
                         np.sum(allprocs_counters[type_][:isub + 1]))
-                    for set_name, rng in iteritems(subsystems_var_range_byset[vec_name][type_]):
-                        iset = set2iset[type_][set_name]
-                        rng[subsys.name] = (np.sum(allprocs_counters_byset[type_][:isub, iset]),
-                                            np.sum(allprocs_counters_byset[type_][:isub + 1,
-                                                                                  iset]))
 
         subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
-        subsystems_var_range_byset['nonlinear'] = subsystems_var_range_byset['linear']
 
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
-                subsys._setup_var_index_ranges(set2iset, recurse)
+                subsys._setup_var_index_ranges(recurse)
 
     def _setup_var_data(self, recurse=True):
         """
@@ -348,15 +572,15 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
 
+            # Assemble allprocs_abs2meta and abs2meta
+            allprocs_abs2meta.update(subsys._var_allprocs_abs2meta)
+            abs2meta.update(subsys._var_abs2meta)
+
             for type_ in ['input', 'output']:
 
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(subsys._var_allprocs_abs_names[type_])
                 abs_names[type_].extend(subsys._var_abs_names[type_])
-
-                # Assemble allprocs_abs2meta and abs2meta
-                allprocs_abs2meta[type_].update(subsys._var_allprocs_abs2meta[type_])
-                abs2meta[type_].update(subsys._var_abs2meta[type_])
 
                 # Assemble abs2prom
                 for abs_name in subsys._var_abs_names[type_]:
@@ -395,22 +619,24 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
-                allprocs_prom2abs_list[type_] = defaultdict(list)
+                allprocs_prom2abs_list[type_] = OrderedDict()
 
             for myproc_abs_names, myproc_prom2abs_list, myproc_abs2meta, oscale, rscale in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
+
+                # Assemble in parallel allprocs_abs2meta
+                allprocs_abs2meta.update(myproc_abs2meta)
 
                 for type_ in ['input', 'output']:
 
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
 
-                    # Assemble in parallel allprocs_abs2meta
-                    allprocs_abs2meta[type_].update(myproc_abs2meta[type_])
-
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
+                        if prom_name not in allprocs_prom2abs_list[type_]:
+                            allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
     def _setup_var_sizes(self, recurse=True):
@@ -424,6 +650,8 @@ class Group(System):
         """
         super(Group, self)._setup_var_sizes()
 
+        self._var_offsets = None
+
         iproc = self.comm.rank
         nproc = self.comm.size
 
@@ -435,21 +663,15 @@ class Group(System):
                 subsys._setup_var_sizes(recurse)
 
         sizes = self._var_sizes
-        sizes_byset = self._var_sizes_byset
 
         # Compute _var_sizes
         for vec_name in self._lin_rel_vec_name_list:
             sizes[vec_name] = {}
-            sizes_byset[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
-            subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
 
             for type_ in ['input', 'output']:
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
-
-                sizes_byset[vec_name][type_] = {}
-                for set_name, nvars in iteritems(self._num_var_byset[vec_name][type_]):
-                    sizes_byset[vec_name][type_][set_name] = np.zeros((nproc, nvars), int)
+                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]),
+                                                  INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
                     if vec_name not in subsys._rel_vec_names:
@@ -459,23 +681,16 @@ class Group(System):
                     sizes[vec_name][type_][proc_slice, var_slice] = \
                         subsys._var_sizes[vec_name][type_]
 
-                    for set_name, subsizes in iteritems(subsys._var_sizes_byset[vec_name][type_]):
-                        var_slice = slice(*subsystems_var_range_byset[type_][set_name][subsys.name])
-                        sizes_byset[vec_name][type_][set_name][proc_slice, var_slice] = subsizes
-
         # If parallel, all gather
         if self.comm.size > 1:
             for vec_name in self._lin_rel_vec_name_list:
                 sizes = self._var_sizes[vec_name]
-                sizes_byset = self._var_sizes_byset[vec_name]
                 for type_ in ['input', 'output']:
                     self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                    for set_name, vsizes in iteritems(sizes_byset[type_]):
-                        self.comm.Allgather(sizes_byset[type_][set_name][iproc, :], vsizes)
 
             # compute owning ranks
+            owns = self._owning_rank
             for type_ in ('input', 'output'):
-                self._owning_rank[type_] = owns = {}
                 sizes = self._var_sizes['linear'][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
@@ -484,7 +699,6 @@ class Group(System):
                             break
 
         self._var_sizes['nonlinear'] = self._var_sizes['linear']
-        self._var_sizes_byset['nonlinear'] = self._var_sizes_byset['linear']
 
         self._setup_global_shapes()
 
@@ -511,8 +725,7 @@ class Group(System):
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
+        abs2meta = self._var_abs2meta
         pathname = self.pathname
 
         abs_in2out = {}
@@ -580,8 +793,8 @@ class Group(System):
                                        "for connection in '%s' from '%s' to '%s'." %
                                        (self.pathname, prom_out, prom_in))
 
-                if src_indices is not None and abs_in in abs2meta_in:
-                    meta = abs2meta_in[abs_in]
+                if src_indices is not None and abs_in in abs2meta:
+                    meta = abs2meta[abs_in]
                     if meta['src_indices'] is not None:
                         raise RuntimeError("%s: src_indices has been defined "
                                            "in both connect('%s', '%s') "
@@ -591,6 +804,10 @@ class Group(System):
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
 
+                if abs_in in abs_in2out:
+                    raise RuntimeError("Input '%s' cannot be connected to '%s' because it's already"
+                                       " connected to '%s'" % (abs_in, abs_out, abs_in2out[abs_in]))
+
                 abs_in2out[abs_in] = abs_out
 
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.
@@ -599,7 +816,7 @@ class Group(System):
 
         # Recursion
         if recurse:
-            for subsys in self._subsystems_myproc:
+            for subsys in self._subgroups_myproc:
                 if subsys.name in new_conns:
                     subsys._setup_global_connections(recurse=recurse,
                                                      conns=new_conns[subsys.name])
@@ -608,10 +825,26 @@ class Group(System):
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
+        conn_list = list(iteritems(global_abs_in2out))
+        conn_list.extend(iteritems(abs_in2out))
         global_abs_in2out.update(abs_in2out)
 
-        for subsys in self._subsystems_myproc:
+        for subsys in self._subgroups_myproc:
             global_abs_in2out.update(subsys._conn_global_abs_in2out)
+            conn_list.extend(iteritems(subsys._conn_global_abs_in2out))
+
+        if len(conn_list) > len(global_abs_in2out):
+            dupes = [n for n, val in iteritems(Counter(tgt for tgt, src in conn_list)) if val > 1]
+            dup_info = defaultdict(set)
+            for tgt, src in conn_list:
+                for dup in dupes:
+                    if tgt == dup:
+                        dup_info[tgt].add(src)
+            dup_info = [(n, srcs) for n, srcs in iteritems(dup_info) if len(srcs) > 1]
+            if dup_info:
+                msg = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+                raise RuntimeError("The following inputs have multiple connections: %s" %
+                                   ", ".join(msg))
 
         # If running in parallel, allgather
         if self.comm.size > 1:
@@ -640,8 +873,7 @@ class Group(System):
         """
         desvars = self.get_design_vars(recurse=True, get_sizes=False)
         responses = self.get_responses(recurse=True, get_sizes=False)
-        sys_graph = self.compute_sys_graph(comps_only=True)
-        return get_relevant_vars(sys_graph, desvars, responses, mode)
+        return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
 
     def _setup_connections(self, recurse=True):
         """
@@ -652,9 +884,7 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_connections()
-        abs_in2out = self._conn_abs_in2out
-
+        abs_in2out = self._conn_abs_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
 
@@ -663,13 +893,25 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._setup_connections(recurse)
 
+        if MPI:
+            # collect set of local (not remote, not distributed) subsystems so we can
+            # identify cross-process connections, which require the use of distributed
+            # instead of purely local vector and transfer objects.
+            self._local_system_set = set()
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    self._local_system_set.update(s._local_system_set)
+                elif not s.distributed:
+                    self._local_system_set.add(s.pathname)
+
         if pathname == '':
             path_len = 0
         else:
             path_len = len(pathname) + 1
 
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        allprocs_abs2meta = self._var_allprocs_abs2meta
+
+        self._vector_class = None
 
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
@@ -683,17 +925,28 @@ class Group(System):
                 if out_subsys != in_subsys:
                     abs_in2out[abs_in] = abs_out
 
+                    if MPI and self._vector_class is None:
+                        # check for any cross-process data transfer.  If found, use
+                        # self._distributed_vector_class as our vector class.
+                        in_path = abs_in.rsplit('.', 1)[0]
+                        if in_path not in self._local_system_set:
+                            self._vector_class = self._distributed_vector_class
+                        else:
+                            out_path = abs_out.rsplit('.', 1)[0]
+                            if out_path not in self._local_system_set:
+                                self._vector_class = self._distributed_vector_class
+
             # if connected output has scaling then we need input scaling
             if not self._has_input_scaling:
-                out_units = allprocs_abs2meta_out[abs_out]['units']
-                in_units = allprocs_abs2meta_in[abs_in]['units']
+                out_units = allprocs_abs2meta[abs_out]['units']
+                in_units = allprocs_abs2meta[abs_in]['units']
 
                 # if units are defined and different, we need input scaling.
                 needs_input_scaling = (in_units and out_units and in_units != out_units)
 
                 # we also need it if a connected output has any scaling.
                 if not needs_input_scaling:
-                    out_meta = allprocs_abs2meta_out[abs_out]
+                    out_meta = allprocs_abs2meta[abs_out]
 
                     ref = out_meta['ref']
                     if np.isscalar(ref):
@@ -717,17 +970,20 @@ class Group(System):
 
                 self._has_input_scaling = needs_input_scaling
 
+        if self._vector_class is None:
+            # our vectors are just local vectors.
+            self._vector_class = self._local_vector_class
+
         # Now that both implicit & explicit connections have been added,
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
         # This way, we don't repeat the error checking in multiple groups.
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
+        abs2meta = self._var_abs2meta
 
         for abs_in, abs_out in iteritems(abs_in2out):
             # check unit compatibility
-            out_units = allprocs_abs2meta_out[abs_out]['units']
-            in_units = allprocs_abs2meta_in[abs_in]['units']
+            out_units = allprocs_abs2meta[abs_out]['units']
+            in_units = allprocs_abs2meta[abs_in]['units']
 
             if out_units:
                 if not in_units:
@@ -745,21 +1001,20 @@ class Group(System):
                               "no units." % (abs_in, in_units, abs_out))
 
             # check shape compatibility
-            if abs_in in abs2meta_in and abs_out in abs2meta_out:
+            if abs_in in abs2meta and abs_out in abs2meta:
                 # get output shape from allprocs meta dict, since it may
                 # be distributed (we want global shape)
-                out_shape = allprocs_abs2meta_out[abs_out]['global_shape']
+                out_shape = allprocs_abs2meta[abs_out]['global_shape']
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
-                in_shape = abs2meta_in[abs_in]['shape']
-                src_indices = abs2meta_in[abs_in]['src_indices']
-                flat = abs2meta_in[abs_in]['flat_src_indices']
+                in_shape = abs2meta[abs_in]['shape']
+                src_indices = abs2meta[abs_in]['src_indices']
+                flat = abs2meta[abs_in]['flat_src_indices']
 
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
-                    if not (np.prod(out_shape) == abs2meta_in[abs_in]['size']
-                            == np.max(out_shape) == np.max(in_shape)):
+                    if not array_connection_compatible(in_shape, out_shape):
                         msg = ("The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
                         raise ValueError(msg % (abs_out, abs_in,
@@ -814,8 +1069,8 @@ class Group(System):
                             raise ValueError(msg % (abs_out, abs_in,
                                              bad_idx, out_size))
                         if src_indices.ndim > 1:
-                            abs2meta_in[abs_in]['src_indices'] = \
-                                abs2meta_in[abs_in]['src_indices'].flatten()
+                            abs2meta[abs_in]['src_indices'] = \
+                                abs2meta[abs_in]['src_indices'].flatten()
                     else:
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
@@ -830,7 +1085,46 @@ class Group(System):
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
 
-    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+    def _transfer(self, vec_name, mode, isub=None):
+        """
+        Perform a vector transfer.
+
+        Parameters
+        ----------
+        vec_name : str
+            Name of the vector RHS on which to perform a transfer.
+        mode : str
+            Either 'fwd' or 'rev'
+        isub : None or int
+            If None, perform a full transfer.
+            If int, perform a partial transfer for linear Gauss--Seidel.
+        """
+        vec_inputs = self._vectors['input'][vec_name]
+
+        if mode == 'fwd':
+            if self._has_input_scaling:
+                vec_inputs.scale('norm')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                vec_inputs.scale('phys')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+        else:  # rev
+            if self._has_input_scaling:
+                vec_inputs.scale('phys')
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+                vec_inputs.scale('norm')
+            else:
+                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
+                                                               self._vectors['output'][vec_name],
+                                                               mode)
+
+    def _setup_global(self, ext_num_vars, ext_sizes):
         """
         Compute total number and total size of variables in systems before / after this system.
 
@@ -838,34 +1132,23 @@ class Group(System):
         ----------
         ext_num_vars : {'input': (int, int), 'output': (int, int)}
             Total number of allprocs variables in system before/after this one.
-        ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         ext_sizes : {'input': (int, int), 'output': (int, int)}
             Total size of allprocs variables in system before/after this one.
-        ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         """
-        super(Group, self)._setup_global(
-            ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
+        super(Group, self)._setup_global(ext_num_vars, ext_sizes)
 
         iproc = self.comm.rank
 
         for subsys in self._subsystems_myproc:
             sub_ext_num_vars = {}
             sub_ext_sizes = {}
-            sub_ext_num_vars_byset = {}
-            sub_ext_sizes_byset = {}
 
             for vec_name in subsys._lin_rel_vec_name_list:
                 subsystems_var_range = self._subsystems_var_range[vec_name]
-                subsystems_var_range_byset = self._subsystems_var_range_byset[vec_name]
                 sizes = self._var_sizes[vec_name]
-                sizes_byset = self._var_sizes_byset[vec_name]
 
                 sub_ext_num_vars[vec_name] = {}
                 sub_ext_sizes[vec_name] = {}
-                sub_ext_num_vars_byset[vec_name] = {}
-                sub_ext_sizes_byset[vec_name] = {}
 
                 for type_ in ['input', 'output']:
                     num = self._num_var[vec_name][type_]
@@ -882,31 +1165,10 @@ class Group(System):
                         ext_sizes[vec_name][type_][1] + size2,
                     )
 
-                    sub_ext_sizes_byset[vec_name][type_] = {}
-                    sub_ext_num_vars_byset[vec_name][type_] = {}
-                    for set_name, num in iteritems(self._num_var_byset[vec_name][type_]):
-                        idx1, idx2 = subsystems_var_range_byset[type_][set_name][subsys.name]
-                        size1 = np.sum(sizes_byset[type_][set_name][iproc, :idx1])
-                        size2 = np.sum(sizes_byset[type_][set_name][iproc, idx2:])
-
-                        sub_ext_num_vars_byset[vec_name][type_][set_name] = (
-                            ext_num_vars_byset[vec_name][type_][set_name][0] + idx1,
-                            ext_num_vars_byset[vec_name][type_][set_name][1] + num - idx2,
-                        )
-                        sub_ext_sizes_byset[vec_name][type_][set_name] = (
-                            ext_sizes_byset[vec_name][type_][set_name][0] + size1,
-                            ext_sizes_byset[vec_name][type_][set_name][1] + size2,
-                        )
-
             sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
             sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
-            sub_ext_num_vars_byset['nonlinear'] = sub_ext_num_vars_byset['linear']
-            sub_ext_sizes_byset['nonlinear'] = sub_ext_sizes_byset['linear']
 
-            subsys._setup_global(
-                sub_ext_num_vars, sub_ext_num_vars_byset,
-                sub_ext_sizes, sub_ext_sizes_byset
-            )
+            subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
 
     def _setup_transfers(self, recurse=True):
         """
@@ -917,174 +1179,7 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_transfers()
-
-        def merge(indices_list):
-            if len(indices_list) > 0:
-                return np.concatenate(indices_list)
-            else:
-                return np.array([], int)
-
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_transfers(recurse)
-
-        # Pre-compute map from abs_names to the index of the containing subsystem
-        abs2isub = {'input': {}, 'output': {}}
-        for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
-            for type_ in ['input', 'output']:
-                for abs_name in subsys._var_allprocs_abs_names[type_]:
-                    abs2isub[type_][abs_name] = isub
-
-        abs2meta_in = self._var_abs2meta['input']
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-
-        transfers = self._transfers
-        vectors = self._vectors
-        for vec_name in self._lin_rel_vec_name_list:
-            relvars, _ = self._relevant[vec_name]['@all']
-
-            # Initialize empty lists for the transfer indices
-            nsub_allprocs = len(self._subsystems_allprocs)
-            xfer_in = {}
-            xfer_out = {}
-            fwd_xfer_in = [{} for i in range(nsub_allprocs)]
-            fwd_xfer_out = [{} for i in range(nsub_allprocs)]
-            rev_xfer_in = [{} for i in range(nsub_allprocs)]
-            rev_xfer_out = [{} for i in range(nsub_allprocs)]
-            for set_name_in in self._num_var_byset[vec_name]['input']:
-                for set_name_out in self._num_var_byset[vec_name]['output']:
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key] = []
-                    xfer_out[key] = []
-                    for isub in range(nsub_allprocs):
-                        fwd_xfer_in[isub][key] = []
-                        fwd_xfer_out[isub][key] = []
-                        rev_xfer_in[isub][key] = []
-                        rev_xfer_out[isub][key] = []
-
-            allprocs_abs2idx_byset_in = self._var_allprocs_abs2idx_byset[vec_name]['input']
-            allprocs_abs2idx_byset_out = self._var_allprocs_abs2idx_byset[vec_name]['output']
-            sizes_byset_in = self._var_sizes_byset[vec_name]['input']
-            sizes_byset_out = self._var_sizes_byset[vec_name]['output']
-
-            # Loop through all explicit / implicit connections owned by this system
-            for abs_in, abs_out in iteritems(self._conn_abs_in2out):
-                if abs_out not in relvars['output']:
-                    continue
-
-                # Only continue if the input exists on this processor
-                if abs_in in abs2meta_in and abs_in in relvars['input']:
-
-                    # Get meta
-                    meta_in = abs2meta_in[abs_in]
-                    meta_out = allprocs_abs2meta_out[abs_out]
-
-                    # Get varset info
-                    set_name_in = meta_in['var_set']
-                    set_name_out = meta_out['var_set']
-                    idx_byset_in = allprocs_abs2idx_byset_in[abs_in]
-                    idx_byset_out = allprocs_abs2idx_byset_out[abs_out]
-
-                    # Get the sizes (byset) array
-                    sizes_in = sizes_byset_in[set_name_in]
-                    sizes_out = sizes_byset_out[set_name_out]
-
-                    # Read in and process src_indices
-                    shape_in = meta_in['shape']
-                    shape_out = meta_out['shape']
-                    global_shape_out = meta_out['global_shape']
-                    global_size_out = meta_out['global_size']
-                    src_indices = meta_in['src_indices']
-                    if src_indices is None:
-                        src_indices = np.arange(meta_in['size'], dtype=int)
-                    elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, global_size_out)
-                    else:
-                        if len(shape_out) == 1 or shape_in == src_indices.shape:
-                            src_indices = src_indices.flatten()
-                            src_indices = convert_neg(src_indices, global_size_out)
-                        else:
-                            # TODO: this duplicates code found
-                            # in System._setup_scaling.
-                            entries = [list(range(x)) for x in shape_in]
-                            cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                       for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
-
-                    # 1. Compute the output indices
-                    output_inds = np.zeros(src_indices.shape[0], int)
-                    ind1 = ind2 = 0
-                    for iproc in range(self.comm.size):
-                        ind2 += sizes_out[iproc, idx_byset_out]
-
-                        # The part of src on iproc
-                        on_iproc = np.logical_and(ind1 <= src_indices, src_indices < ind2)
-
-                        # This converts from iproc-then-ivar to ivar-then-iproc ordering
-                        # Subtract off part of previous procs
-                        # Then add all variables on previous procs
-                        # Then all previous variables on this proc
-                        # - np.sum(out_sizes[:iproc, idx_byset_out])
-                        # + np.sum(out_sizes[:iproc, :])
-                        # + np.sum(out_sizes[iproc, :idx_byset_out])
-                        # + inds
-                        offset = -ind1
-                        offset += np.sum(sizes_out[:iproc, :])
-                        offset += np.sum(sizes_out[iproc, :idx_byset_out])
-                        output_inds[on_iproc] = src_indices[on_iproc] + offset
-
-                        ind1 += sizes_out[iproc, idx_byset_out]
-
-                    # 2. Compute the input indices
-                    iproc = self.comm.rank
-                    ind1 = ind2 = np.sum(sizes_in[:iproc, :])
-                    ind1 += np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind2 += np.sum(sizes_in[iproc, :idx_byset_in + 1])
-                    input_inds = np.arange(ind1, ind2)
-
-                    # Now the indices are ready - input_inds, output_inds
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key].append(input_inds)
-                    xfer_out[key].append(output_inds)
-
-                    isub = abs2isub['input'][abs_in]
-                    fwd_xfer_in[isub][key].append(input_inds)
-                    fwd_xfer_out[isub][key].append(output_inds)
-                    if abs_out in abs2isub['output']:
-                        isub = abs2isub['output'][abs_out]
-                        rev_xfer_in[isub][key].append(input_inds)
-                        rev_xfer_out[isub][key].append(output_inds)
-
-            for set_name_in in self._num_var_byset[vec_name]['input']:
-                for set_name_out in self._num_var_byset[vec_name]['output']:
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key] = merge(xfer_in[key])
-                    xfer_out[key] = merge(xfer_out[key])
-                    for isub in range(nsub_allprocs):
-                        fwd_xfer_in[isub][key] = merge(fwd_xfer_in[isub][key])
-                        fwd_xfer_out[isub][key] = merge(fwd_xfer_out[isub][key])
-                        rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
-                        rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
-
-            out_vec = vectors['output'][vec_name]
-            transfer_class = out_vec.TRANSFER
-
-            transfers[vec_name] = {}
-            xfer_all = transfer_class(vectors['input'][vec_name], out_vec,
-                                      xfer_in, xfer_out, self.comm)
-            transfers[vec_name]['fwd', None] = xfer_all
-            transfers[vec_name]['rev', None] = xfer_all
-            for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    fwd_xfer_in[isub], fwd_xfer_out[isub], self.comm)
-                transfers[vec_name]['rev', isub] = transfer_class(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    rev_xfer_in[isub], rev_xfer_out[isub], self.comm)
-
-        transfers['nonlinear'] = transfers['linear']
+        self._vector_class.TRANSFER._setup_transfers(self, recurse=recurse)
 
     def add(self, name, subsys, promotes=None):
         """
@@ -1112,7 +1207,8 @@ class Group(System):
         return self.add_subsystem(name, subsys, promotes=promotes)
 
     def add_subsystem(self, name, subsys, promotes=None,
-                      promotes_inputs=None, promotes_outputs=None):
+                      promotes_inputs=None, promotes_outputs=None,
+                      min_procs=1, max_procs=None, proc_weight=1.0):
         """
         Add a subsystem.
 
@@ -1137,6 +1233,14 @@ class Group(System):
             variables to 'promote' up to this group. If an entry is a tuple of
             the form (old_name, new_name), this will rename the variable in
             the parent group.
+        min_procs : int
+            Minimum number of MPI processes usable by the subsystem. Defaults to 1.
+        max_procs : int or None
+            Maximum number of MPI processes usable by the subsystem.  A value
+            of None (the default) indicates there is no maximum limit.
+        proc_weight : float
+            Weight given to the subsystem when allocating available MPI processes
+            to all subsystems.  Default is 1.0.
 
         Returns
         -------
@@ -1145,6 +1249,10 @@ class Group(System):
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
+        if inspect.isclass(subsys):
+            raise TypeError("Subsystem '%s' should be an instance, "
+                            "but a class object was found." % name)
+
         for sub in chain(self._subsystems_allprocs,
                          self._static_subsystems_allprocs):
             if name == sub.name:
@@ -1160,7 +1268,7 @@ class Group(System):
         if match is None or match.group() != name:
             raise NameError("'%s' is not a valid system name." % name)
 
-        subsys.name = name
+        subsys.name = subsys.pathname = name
 
         if isinstance(promotes, string_types) or \
            isinstance(promotes_inputs, string_types) or \
@@ -1181,6 +1289,18 @@ class Group(System):
             subsystems_allprocs = self._subsystems_allprocs
 
         subsystems_allprocs.append(subsys)
+
+        if not isinstance(min_procs, int) or min_procs < 1:
+            raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
+                            (self.name, min_procs))
+        if max_procs is not None and (not isinstance(max_procs, int) or max_procs < min_procs):
+            raise TypeError("%s: max_procs must be None or an int >= min_procs but (%s) was given."
+                            % (self.name, max_procs))
+        if isinstance(proc_weight, Number) and proc_weight < 0:
+            raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
+                            (self.name, proc_weight))
+
+        self._proc_info[name] = (min_procs, max_procs, proc_weight)
 
         setattr(self, name, subsys)
 
@@ -1289,7 +1409,7 @@ class Group(System):
 
         subsystems[:] = [olddict[name] for name in new_order]
 
-    def get_subsystem(self, name):
+    def _get_subsystem(self, name):
         """
         Return the system called 'name' in the current namespace.
 
@@ -1358,12 +1478,14 @@ class Group(System):
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
 
-    def _apply_linear(self, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
         vec_names : [str, ...]
             list of names of the right-hand-side vectors.
         rel_systems : set of str
@@ -1382,41 +1504,41 @@ class Group(System):
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
         with Recording(name + '._apply_linear', self.iter_count, self):
-            with self.jacobian_context() as J:
-                # Use global Jacobian
-                if self._owns_assembled_jac or self._views_assembled_jac or self._owns_approx_jac:
+            if self._owns_approx_jac:
+                jac = self._jacobian
+            elif jac is None and self._assembled_jac is not None:
+                jac = self._assembled_jac
+            if jac is not None:
+                with self.jacobian_context(jac):
                     for vec_name in vec_names:
                         with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
                             d_inputs, d_outputs, d_residuals = vecs
-                            J._apply(d_inputs, d_outputs, d_residuals, mode)
-                # Apply recursion
-                else:
+                            jac._apply(d_inputs, d_outputs, d_residuals, mode)
+            # Apply recursion
+            else:
+                if rel_systems is not None:
+                    irrelevant_subs = [s for s in self._subsystems_myproc
+                                       if s.pathname not in rel_systems]
+                if mode == 'fwd':
+                    for vec_name in vec_names:
+                        self._transfer(vec_name, mode)
                     if rel_systems is not None:
-                        irrelevant_subs = [s for s in self._subsystems_myproc
-                                           if s.pathname not in rel_systems]
-                    if mode == 'fwd':
-                        for vec_name in vec_names:
-                            self._transfer(vec_name, mode)
+                        for s in irrelevant_subs:
+                            # zero out dvecs of irrelevant subsystems
+                            s._vectors['residual']['linear'].set_const(0.0)
+
+                for subsys in self._subsystems_myproc:
+                    if rel_systems is None or subsys.pathname in rel_systems:
+                        subsys._apply_linear(jac, vec_names, rel_systems, mode,
+                                             scope_out, scope_in)
+
+                if mode == 'rev':
+                    for vec_name in vec_names:
+                        self._transfer(vec_name, mode)
                         if rel_systems is not None:
                             for s in irrelevant_subs:
                                 # zero out dvecs of irrelevant subsystems
-                                # TODO: it's not completely clear that this is
-                                #       necessary in fwd mode.  I wasn't able to
-                                #       produce convergence failures during testing
-                                #       in fwd mode.
-                                s._vectors['residual']['linear'].set_const(0.0)
-
-                    for subsys in self._subsystems_myproc:
-                        if rel_systems is None or subsys.pathname in rel_systems:
-                            subsys._apply_linear(vec_names, rel_systems, mode, scope_out, scope_in)
-
-                    if mode == 'rev':
-                        for vec_name in vec_names:
-                            self._transfer(vec_name, mode)
-                            if rel_systems is not None:
-                                for s in irrelevant_subs:
-                                    # zero out dvecs of irrelevant subsystems
-                                    s._vectors['output']['linear'].set_const(0.0)
+                                s._vectors['output']['linear'].set_const(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -1449,46 +1571,44 @@ class Group(System):
 
         return result
 
-    def _linearize(self, do_nl=True, do_ln=True):
+    def _linearize(self, jac, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
-        with self.jacobian_context() as J:
-
-            sub_do_nl = (self._nonlinear_solver is not None) and \
-                        (self._nonlinear_solver._linearize_children())
-            sub_do_ln = (self._linear_solver is not None) and \
-                        (self._linear_solver._linearize_children())
-
-            for subsys in self._subsystems_myproc:
-                subsys._linearize(do_nl=sub_do_nl, do_ln=sub_do_ln)
-
-            # Group finite difference
-            if self._owns_approx_jac:
+        # Group finite difference
+        if self._owns_approx_jac:
+            jac = self._jacobian
+            with self.jacobian_context(jac):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
-                        approximation.compute_approximations(self, jac=J, deriv_type='total')
+                        approximation.compute_approximations(self, jac=jac, deriv_type='total')
+        else:
+            if self._assembled_jac is not None:
+                jac = self._assembled_jac
 
-                J._update()
+            # Only linearize subsystems if we aren't approximating the derivs at this level.
+            for subsys in self._subsystems_myproc:
+                do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                       subsys._linear_solver._linearize_children())
+                subsys._linearize(jac, sub_do_ln=do_ln)
 
             # Update jacobian
-            elif self._owns_assembled_jac or self._views_assembled_jac:
-                J._update()
+            if self._assembled_jac is not None:
+                self._assembled_jac._update(self)
 
-        if self._nonlinear_solver is not None and do_nl:
-            self._nonlinear_solver._linearize()
+            if sub_do_ln:
+                for subsys in self._subsystems_myproc:
+                    if subsys._linear_solver is not None:
+                        subsys._linear_solver._linearize()
 
-        if self._linear_solver is not None and do_ln:
-            self._linear_solver._linearize()
-
-    def approx_totals(self, method='fd', **kwargs):
+    def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
         Approximate derivatives for a Group using the specified approximation method.
 
@@ -1497,24 +1617,67 @@ class Group(System):
         method : str
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
-        **kwargs : dict
-            Keyword arguments for controlling the behavior of the approximation.
+        step : float
+            Step size for approximation. Defaults to None, in which case, the approximation
+            method provides its default value.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
+            None, in which case, the approximation method provides its default value.
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. Defaults to None, in which case, the approximation method
+            provides its default value.
         """
         self._approx_schemes = OrderedDict()
-        supported_methods = {'fd': FiniteDifference,
-                             'cs': ComplexStep}
+        supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
+                             'cs': (ComplexStep, DEFAULT_CS_OPTIONS)}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, supported_methods.keys()))
 
         if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
+            self._approx_schemes[method] = supported_methods[method][0]()
+
+        default_opts = supported_methods[method][1]
+
+        kwargs = {}
+        if step:
+            if 'step' in default_opts:
+                kwargs['step'] = step
+            else:
+                raise RuntimeError("'step' is not a valid option for '%s'" % method)
+        if form:
+            if 'form' in default_opts:
+                kwargs['form'] = form
+            else:
+                raise RuntimeError("'form' is not a valid option for '%s'" % method)
+        if step_calc:
+            if 'step_calc' in default_opts:
+                kwargs['step_calc'] = step_calc
+            else:
+                raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
 
         self._owns_approx_jac = True
-        self._owns_approx_jac_meta = dict(kwargs)
+        self._owns_approx_jac_meta = kwargs
 
-    def _setup_jacobians(self, jacobian=None, recurse=True):
+    def _setup_partials(self, recurse=True):
+        """
+        Call setup_partials in components.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        self._subjacs_info = info = {}
+
+        if recurse:
+            for subsys in self._subsystems_myproc:
+                subsys._setup_partials(recurse)
+                info.update(subsys._subjacs_info)
+
+    def _setup_jacobians(self, recurse=True):
         """
         Set and populate jacobians down through the system tree.
 
@@ -1523,19 +1686,18 @@ class Group(System):
 
         Parameters
         ----------
-        jacobian : <AssembledJacobian> or None
-            The global jacobian to populate for this system.
         recurse : bool
-            Whether to call this method in subsystems.
+            If True, setup jacobians in all descendants.
         """
-        self._jacobian_changed = False
-
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
+            self._jacobian = J = DictionaryJacobian(system=self)
+
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]
             pro2abs = self._var_allprocs_prom2abs_list
+            abs2meta = self._var_allprocs_abs2meta
 
             if self._owns_approx_of:
                 of = self._owns_approx_of
@@ -1549,53 +1711,42 @@ class Group(System):
 
             from openmdao.core.indepvarcomp import IndepVarComp
             wrt = set()
-            ivc = []
+            ivc = set()
             for var in candidate_wrt:
-                src = self._conn_abs_in2out.get(var)
-
-                if src is None:
-                    wrt.add(var)
 
                 # Weed out inputs connected to anything inside our system unless the source is an
                 # indepvarcomp.
-                else:
+                if var in self._conn_abs_in2out:
+                    src = self._conn_abs_in2out[var]
                     compname = src.rsplit('.', 1)[0]
-                    comp = self.get_subsystem(compname)
+                    comp = self._get_subsystem(compname)
                     if isinstance(comp, IndepVarComp):
                         wrt.add(src)
-                        ivc.append(src)
+                        ivc.add(src)
+                else:
+                    wrt.add(var)
 
-            with self.jacobian_context() as J:
+            with self.jacobian_context(J):
                 for key in product(of, wrt.union(of)):
-                    meta_changes = {
-                        'method': method,
-                    }
-                    if key[0] == key[1]:
-                        size = self._outputs._views_flat[key[0]].shape[0]
-                        meta_changes['rows'] = np.arange(size)
-                        meta_changes['cols'] = np.arange(size)
-                        meta_changes['value'] = np.ones(size)
+                    if key in self._subjacs_info:
+                        meta = self._subjacs_info[key]
+                    else:
+                        meta = SUBJAC_META_DEFAULTS.copy()
+                        if key[0] == key[1]:
+                            size = self._var_allprocs_abs2meta[key[0]]['size']
+                            meta['rows'] = meta['cols'] = np.arange(size)
+                            # All group approximations are treated as explicit components, so we
+                            # have a -1 on the diagonal.
+                            meta['value'] = np.full(size, -1.0)
 
-                    # This suppports desvar and constraint indices.
-                    if key[0] in self._owns_approx_of_idx:
-                        meta_changes['idx_of'] = self._owns_approx_of_idx[key[0]]
-
-                    if key[1] in self._owns_approx_wrt_idx:
-                        meta_changes['idx_wrt'] = self._owns_approx_wrt_idx[key[1]]
-
-                    meta = self._subjacs_info.get(key, SUBJAC_META_DEFAULTS.copy())
+                    meta['method'] = method
 
                     # A group under approximation needs all keys from below, so set dependent to
                     # True.
                     # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
                     meta['dependent'] = True
 
-                    meta.update(meta_changes)
                     meta.update(self._owns_approx_jac_meta)
-                    self._subjacs_info[key] = meta
-
-                    # Create Jacobian stub for every key pair
-                    J._set_partials_meta(key, meta)
 
                     # Create approximations, but only for the ones we need.
                     if meta['dependent']:
@@ -1613,12 +1764,16 @@ class Group(System):
 
                         approx.add_approximation(key, meta)
 
+                    if meta['value'] is None:
+                        shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
+                        meta['shape'] = shape
+                        meta['value'] = np.zeros(shape)
+
+                    self._subjacs_info[key] = meta
+
             approx._init_approximations()
 
-            self._jacobian._system = self
-            self._jacobian._initialize()
-
-        super(Group, self)._setup_jacobians(jacobian, recurse)
+        super(Group, self)._setup_jacobians(recurse=recurse)
 
     def compute_sys_graph(self, comps_only=False):
         """
@@ -1674,7 +1829,7 @@ class Group(System):
         return graph
 
 
-def get_relevant_vars(graph, desvars, responses, mode):
+def get_relevant_vars(connections, desvars, responses, mode):
     """
     Find all relevant vars between desvars and responses.
 
@@ -1682,8 +1837,8 @@ def get_relevant_vars(graph, desvars, responses, mode):
 
     Parameters
     ----------
-    graph : networkx.DiGraph
-        System graph with var connection info on the edges.
+    connections : dict
+        Mapping of inputs and their connected sources.
     desvars : list of str
         Names of design variables.
     responses : list of str
@@ -1698,78 +1853,116 @@ def get_relevant_vars(graph, desvars, responses, mode):
         keyed by design vars and responses.
     """
     relevant = defaultdict(dict)
-    edge_cache = {}
-    fwd = mode == 'fwd'
+    cache = {}
 
-    grev = graph.reverse()
+    # Create a hybrid graph with components and all connected vars.  If a var is connected,
+    # also connect it to its corresponding component.
+    graph = nx.DiGraph()
+    for tgt, src in iteritems(connections):
+        if src not in graph:
+            graph.add_node(src, type_='out')
+        graph.add_node(tgt, type_='in')
+
+        src_sys = src.rsplit('.', 1)[0]
+        graph.add_edge(src_sys, src)
+
+        tgt_sys = tgt.rsplit('.', 1)[0]
+        graph.add_edge(tgt, tgt_sys)
+
+        graph.add_edge(src, tgt)
+
+    for dv in desvars:
+        if dv not in graph:
+            graph.add_node(dv, type_='out')
+            system = dv.rsplit('.', 1)[0]
+            graph.add_edge(system, dv)
+
+    for res in responses:
+        if res not in graph:
+            graph.add_node(res, type_='out')
+            system = res.rsplit('.', 1)[0]
+            graph.add_edge(system, res)
+
+    nodes = graph.nodes
+    grev = graph.reverse(copy=False)
 
     for desvar in desvars:
-        start_sys = (desvar.rsplit('.', 1)[0], 'dv')
-        if start_sys not in edge_cache:
-            edge_cache[start_sys] = set(all_connected_edges(graph, start_sys[0]))
-        start_edges = edge_cache[start_sys]
+        dv = (desvar, 'dv')
+        if dv not in cache:
+            cache[dv] = set(all_connected_nodes(graph, desvar))
 
         for response in responses:
-            end_sys = (response.rsplit('.', 1)[0], 'r')
-            if end_sys not in edge_cache:
-                edge_cache[end_sys] = set((v, u) for u, v in
-                                          all_connected_edges(grev, end_sys[0]))
-            end_edges = edge_cache[end_sys]
+            res = (response, 'r')
+            if res not in cache:
+                cache[res] = set(all_connected_nodes(grev, response))
 
-            common_edges = start_edges.intersection(end_edges)
+            common = cache[dv].intersection(cache[res])
 
-            if common_edges:
+            if common:
                 input_deps = set()
                 output_deps = set()
                 sys_deps = set()
-                for edge in common_edges:
-                    sys_deps.update(all_ancestors(edge[0]))
-                    sys_deps.update(all_ancestors(edge[1]))
-                    conns = graph[edge[0]][edge[1]]['conns']
-                    output_deps.update(conns)
-                    for inputs in conns.values():
-                        input_deps.update(inputs)
+                for node in common:
+                    if 'type_' in nodes[node]:
+                        typ = nodes[node]['type_']
+                        if typ == 'in':  # input var
+                            input_deps.add(node)
+                            system = node.rsplit('.', 1)[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
+                        else:  # output var
+                            output_deps.add(node)
+                            system = node.rsplit('.', 1)[0]
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
 
-                output_deps.update((desvar, response))
             elif desvar == response:
                 input_deps = set()
                 output_deps = set([response])
-                sys_deps = set(all_ancestors(start_sys[0]))
+                sys_deps = set(all_ancestors(desvar.rsplit('.', 1)[0]))
 
-            if common_edges or desvar == response:
-                if fwd:
+            if common or desvar == response:
+                if mode == 'fwd' or mode == 'auto':
                     relevant[desvar][response] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)
-                else:  # rev
+                if mode == 'rev' or mode == 'auto':
                     relevant[response][desvar] = ({'input': input_deps,
                                                    'output': output_deps}, sys_deps)
 
                 sys_deps.add('')  # top level Group is always relevant
 
-    if fwd:
-        inputs, outputs = desvars, responses
-    else:
-        inputs, outputs = responses, desvars
+    voi_lists = []
+    if mode == 'fwd' or mode == 'auto':
+        voi_lists.append((desvars, responses))
+    if mode == 'rev' or mode == 'auto':
+        voi_lists.append((responses, desvars))
 
     # now calculate dependencies between each VOI and all other VOIs of the
     # other type, e.g for each input VOI wrt all output VOIs.  This is only
-    # done for design vars in fwd mode or responses in rev mode.
-    for inp in inputs:
-        relinp = relevant[inp]
-        if relinp:
-            total_inps = set()
-            total_outs = set()
-            total_systems = set()
-            for out in outputs:
-                if out in relinp:
-                    dct, systems = relinp[out]
-                    total_inps.update(dct['input'])
-                    total_outs.update(dct['output'])
-                    total_systems.update(systems)
-            relinp['@all'] = ({'input': total_inps, 'output': total_outs},
-                              total_systems)
-        else:
-            relinp['@all'] = ({'input': set(), 'output': set()}, set())
+    # done for design vars in fwd mode or responses in rev mode. In auto mode,
+    # we combine the results for fwd and rev modes.
+    for inputs, outputs in voi_lists:
+        for inp in inputs:
+            relinp = relevant[inp]
+            if relinp:
+                if '@all' in relinp:
+                    dct, total_systems = relinp['@all']
+                    total_inps = dct['input']
+                    total_outs = dct['output']
+                else:
+                    total_inps = set()
+                    total_outs = set()
+                    total_systems = set()
+                for out in outputs:
+                    if out in relinp:
+                        dct, systems = relinp[out]
+                        total_inps.update(dct['input'])
+                        total_outs.update(dct['output'])
+                        total_systems.update(systems)
+                relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                                  total_systems)
+            else:
+                relinp['@all'] = ({'input': set(), 'output': set()}, set())
 
     relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
                                    ContainsAll())}

@@ -8,31 +8,16 @@ from openmdao.api import LinearBlockGS, NonlinearBlockGS
 
 class Comp(ImplicitComponent):
 
-    def __init__(self, use_varsets=True):
-        super(Comp, self).__init__()
-        self._use_var_sets = use_varsets
-
     def setup(self):
-        if self._use_var_sets:
-            self.add_input('a', var_set=1)
-            self.add_input('b', var_set=0)
-            self.add_input('c', var_set=1)
-            self.add_input('d', var_set=2)
+        self.add_input('a')
+        self.add_input('b')
+        self.add_input('c')
+        self.add_input('d')
 
-            self.add_output('w', var_set=5)
-            self.add_output('x', var_set=1)
-            self.add_output('y', var_set=1)
-            self.add_output('z', var_set=5)
-        else:
-            self.add_input('a')
-            self.add_input('b')
-            self.add_input('c')
-            self.add_input('d')
-
-            self.add_output('w')
-            self.add_output('x')
-            self.add_output('y')
-            self.add_output('z')
+        self.add_output('w')
+        self.add_output('x')
+        self.add_output('y')
+        self.add_output('z')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['w'] = outputs['w'] + 2 * inputs['a']
@@ -95,13 +80,12 @@ class TestImplicitGroup(Group):
     """
 
     def __init__(self, lnSolverClass=LinearBlockGS,
-                       nlSolverClass=NonlinearBlockGS,
-                       use_varsets=True):
+                       nlSolverClass=NonlinearBlockGS):
 
         super(TestImplicitGroup, self).__init__()
 
-        self.add_subsystem("C1", Comp(use_varsets))
-        self.add_subsystem("C2", Comp(use_varsets))
+        self.add_subsystem("C1", Comp())
+        self.add_subsystem("C2", Comp())
 
         self.connect("C1.w", "C2.a")
         self.connect("C1.x", "C2.b")
@@ -116,13 +100,4 @@ class TestImplicitGroup(Group):
         self.linear_solver = lnSolverClass()
         self.nonlinear_solver = nlSolverClass()
 
-        if use_varsets:
-            self.expected_solution = [
-                [1./4., 1./5., 1./4., 1./5.],
-                [1./3., 1./6., 1./3., 1./6.]
-            ]
-        else:
-            self.expected_solution = [
-                [1./3., 1./4., 1./5., 1./6.,
-                 1./3., 1./4., 1./5., 1./6.]
-            ]
+        self.expected_solution = [1./3., 1./4., 1./5., 1./6., 1./3., 1./4., 1./5., 1./6.]

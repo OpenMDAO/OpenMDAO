@@ -2,13 +2,9 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, DefaultVector
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, PETScVector
+from openmdao.utils.assert_utils import assert_rel_error
 
-try:
-    from openmdao.parallel_api import PETScVector
-except ImportError:
-    PETScVector = None
 
 #      (A) -> x
 # x -> (B) -> f
@@ -43,7 +39,7 @@ class Test(unittest.TestCase):
     def setUp(self):
         group = GroupG()
         group.add_subsystems()
-        self.p = Problem(group).setup(DefaultVector)
+        self.p = Problem(group).setup()
         self.p.set_solver_print(level=0)
         self.p.final_setup()
 
@@ -55,13 +51,12 @@ class Test(unittest.TestCase):
 
     def test_prom_names(self):
         root = self.p.model
-        compA = root.get_subsystem('A')
-        self.assertEqual(list(compA._var_allprocs_prom2abs_list['output'].keys()), ['x'])
+        self.assertEqual(list(root.A._var_allprocs_prom2abs_list['output'].keys()), ['x'])
 
     def test_var_indices(self):
         def get_inds(p, sname, type_):
-            system = p.model.get_subsystem(sname) if sname else p.model
-            idxs = p.model._var_allprocs_abs2idx['linear'][type_]
+            system = p.model._get_subsystem(sname) if sname else p.model
+            idxs = p.model._var_allprocs_abs2idx['linear']
             return np.array([
                 idxs[name] for name in system._var_abs_names[type_]
             ])
@@ -88,8 +83,8 @@ class Test(unittest.TestCase):
         root = self.p.model
 
         if root.comm.size == 1:
-            compA = root.get_subsystem('A')
-            compB = root.get_subsystem('B')
+            compA = root.A
+            compB = root.B
 
             if root.comm.rank == 0:
                 assert_rel_error(self, root._outputs['A.x'], 0)
@@ -115,7 +110,7 @@ class TestPETScVec(Test):
     def setUp(self):
         group = GroupG()
         group.add_subsystems()
-        self.p = Problem(group).setup(PETScVector)
+        self.p = Problem(group).setup(local_vector_class=PETScVector)
         self.p.set_solver_print(level=0)
         self.p.final_setup()
 

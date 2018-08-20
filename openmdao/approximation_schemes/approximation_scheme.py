@@ -1,8 +1,6 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
-from openmdao.utils.options_dictionary import OptionsDictionary
-
 
 class ApproximationScheme(object):
     """
@@ -87,14 +85,17 @@ class ApproximationScheme(object):
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._views_flat:
                 outputs._views_flat[in_name][idxs] += delta
-            else:
+            elif in_name in inputs._views_flat:
                 inputs._views_flat[in_name][idxs] += delta
+            else:
+                # If we make it here, this variable is remote, so don't increment by any delta.
+                pass
 
         run_model()
 
-        results_vec.get_data(result_array)
-        results_vec.set_data(out_tmp)
-        inputs.set_data(in_tmp)
+        result_array[:] = results_vec._data
+        results_vec._data[:] = out_tmp
+        inputs._data[:] = in_tmp
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
         if results_vec is not outputs:

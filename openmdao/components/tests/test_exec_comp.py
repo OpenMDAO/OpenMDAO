@@ -12,7 +12,7 @@ from parameterized import parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 from openmdao.components.exec_comp import _expr_dict
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 _ufunc_test_data = {'abs': {'str': 'f=abs(x)',
                             'check_func': np.abs,
@@ -443,7 +443,7 @@ class TestExecComp(unittest.TestCase):
 
         C1._linearize()
 
-        assert_rel_error(self, C1.jacobian[('y','x')], [[-2.0]], 0.00001)
+        assert_rel_error(self, C1._jacobian[('y','x')], [[2.0]], 0.00001)
 
     def test_complex_step2(self):
         prob = Problem(Group())
@@ -474,18 +474,18 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
-        # any negative C1.x should give a 2.0 derivative for dy/dx
-        C1._inputs['x'] = -1.0e-10
+        # any positive C1.x should give a 2.0 derivative for dy/dx
+        C1._inputs['x'] = 1.0e-10
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], [[2.0]], 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], [[2.0]], 0.00001)
 
-        C1._inputs['x'] = 3.0
+        C1._inputs['x'] = -3.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], [[-2.0]], 0.00001)
 
         C1._inputs['x'] = 0.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], [[-2.0]], 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], [[2.0]], 0.00001)
 
     def test_abs_array_complex_step(self):
         prob = Problem(model=Group())
@@ -498,27 +498,27 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], np.ones(3)*4.0, 0.00001)
 
-        # any negative C1.x should give a 2.0 derivative for dy/dx
-        C1._inputs['x'] = np.ones(3)*-1.0e-10
+        # any positive C1.x should give a 2.0 derivative for dy/dx
+        C1._inputs['x'] = np.ones(3)*1.0e-10
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], np.eye(3)*2.0, 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], np.eye(3)*2.0, 0.00001)
 
-        C1._inputs['x'] = np.ones(3)*3.0
+        C1._inputs['x'] = np.ones(3)*-3.0
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
 
         C1._inputs['x'] = np.zeros(3)
         C1._linearize()
-        assert_rel_error(self, C1.jacobian['y','x'], np.eye(3)*-2.0, 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], np.eye(3)*2.0, 0.00001)
 
         C1._inputs['x'] = np.array([1.5, -0.6, 2.4])
         C1._linearize()
         expect = np.zeros((3,3))
-        expect[0,0] = -2.0
-        expect[1,1] = 2.0
-        expect[2,2] = -2.0
+        expect[0,0] = 2.0
+        expect[1,1] = -2.0
+        expect[2,2] = 2.0
 
-        assert_rel_error(self, C1.jacobian['y','x'], expect, 0.00001)
+        assert_rel_error(self, C1._jacobian['y','x'], expect, 0.00001)
 
     def test_feature_simple(self):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
@@ -537,6 +537,25 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
+
+    def test_feature_multi_output(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', 2.0))
+        model.add_subsystem('comp', ExecComp(['y1=x+1.', 'y2=x-1.']))
+
+        model.connect('p.x', 'comp.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y1'], 3.0, 0.00001)
+        assert_rel_error(self, prob['comp.y2'], 1.0, 0.00001)
 
     def test_feature_array(self):
         import numpy as np

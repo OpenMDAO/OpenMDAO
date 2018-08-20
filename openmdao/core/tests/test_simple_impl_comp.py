@@ -5,7 +5,7 @@ import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import LinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class CompA(ImplicitComponent):
@@ -100,12 +100,12 @@ class Test(unittest.TestCase):
 
         d_outputs.set_const(1.0)
         root.run_apply_linear(['linear'], 'fwd')
-        output = d_residuals._data[0]
+        output = d_residuals._data
         assert_rel_error(self, output, [7, 3])
 
         d_residuals.set_const(1.0)
         root.run_apply_linear(['linear'], 'rev')
-        output = d_outputs._data[0]
+        output = d_outputs._data
         assert_rel_error(self, output, [7, 3])
 
     def test_solve_linear(self):
@@ -117,13 +117,13 @@ class Test(unittest.TestCase):
         d_residuals.set_const(11.0)
         d_outputs.set_const(0.0)
         root.run_solve_linear(['linear'], 'fwd')
-        output = d_outputs._data[0]
+        output = d_outputs._data
         assert_rel_error(self, output, [1, 5], 1e-10)
 
         d_outputs.set_const(11.0)
         d_residuals.set_const(0.0)
         root.run_solve_linear(['linear'], 'rev')
-        output = d_residuals._data[0]
+        output = d_residuals._data
         assert_rel_error(self, output, [1, 5], 1e-10)
 
 

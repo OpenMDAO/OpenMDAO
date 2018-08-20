@@ -13,67 +13,78 @@ class LinearSystemComp(ImplicitComponent):
     """
     Component that solves a linear system, Ax=b.
 
-    Designed to handle small and dense linear systems that can be
-    efficiently solved with lu-decomposition
+    Designed to handle small, dense linear systems (Ax=B) that can be efficiently solved with
+    lu-decomposition. It can be vectorized to either solve for multiple right hand sides,
+    or to solve multiple linear systems.
 
     Attributes
     ----------
-    _lup : object
-        matrix factorization returned from scipy.linag.lu_factor
+    _lup : None or list(object)
+        matrix factorizations returned from scipy.linag.lu_factor for each A matrix
     """
+
+    def __init__(self, **kwargs):
+        """
+        Intialize the LinearSystemComp component.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
+        """
+        super(LinearSystemComp, self).__init__(**kwargs)
+        self._lup = None
 
     def initialize(self):
         """
-        Declare metadata.
+        Declare options.
         """
-        self.metadata.declare('size', default=1, type_=int, desc='the size of the linear system')
-        self.metadata.declare('partial_type', default='dense',
-                              values=['dense', 'sparse', 'matrix_free'],
-                              desc='the way the derivatives are defined')
+        self.options.declare('size', default=1, types=int, desc='The size of the linear system.')
+        self.options.declare('vec_size', types=int, default=1,
+                             desc='Number of linear systems to solve.')
+        self.options.declare('vectorize_A', default=False, types=bool,
+                             desc='Set to True to vectorize the A matrix.')
 
     def setup(self):
         """
         Matrix and RHS are inputs, solution vector is the output.
         """
-        size = self.metadata['size']
+        vec_size = self.options['vec_size']
+        vec_size_A = self.vec_size_A = vec_size if self.options['vectorize_A'] else 1
+        size = self.options['size']
+        mat_size = size * size
+        full_size = size * vec_size
 
-        self._lup = None
+        self._lup = []
+        shape = (vec_size, size) if vec_size > 1 else (size, )
+        shape_A = (vec_size_A, size, size) if vec_size_A > 1 else (size, size)
 
-        if self.metadata['partial_type'] == "matrix_free":
-            self.apply_linear = self._mat_vec_prod
+        init_A = np.eye(size)
+        if vec_size_A > 1:
+            init_A = np.repeat(init_A.reshape(1, size, size), vec_size_A, axis=0)
 
-        self.add_input("A", val=np.eye(size))
-        self.add_input("b", val=np.ones(size))
-        self.add_output("x", shape=size, val=.1)
+        self.add_input("A", val=init_A)
+        self.add_input("b", val=np.ones(shape))
+        self.add_output("x", shape=shape, val=.1)
 
-        # Set up the derivatives according to the user specified mode.
+        # Set up the derivatives.
+        row_col = np.arange(full_size, dtype="int")
 
-        partial_type = self.metadata['partial_type']
+        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
 
-        size = self.metadata['size']
-        row_col = np.arange(size, dtype="int")
+        rows = np.repeat(np.arange(full_size), size)
 
-        if partial_type == 'sparse':
-            self.declare_partials('x', 'b', val=-np.ones(size), rows=row_col, cols=row_col)
-            # self.declare_partials('x', 'b', val=-1, rows=row_col, cols=row_col)
+        if vec_size_A > 1:
+            cols = np.arange(mat_size * vec_size)
+        else:
+            cols = np.tile(np.arange(mat_size), vec_size)
 
-            rows = []
-            cols = []
-            for i in range(size):
-                for j in range(size):
-                    rows.append(i)
-                    cols.append(i * size + j)
+        self.declare_partials('x', 'A', rows=rows, cols=cols)
 
-            self.dx_da_rows = rows
-            self.dx_da_cols = cols
+        cols = np.tile(np.arange(size), size)
+        cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), mat_size) * size
 
-            self.declare_partials('x', 'A', val=np.ones(size**2), rows=rows, cols=cols)
-
-        elif partial_type == "dense":
-            self.declare_partials(of='x', wrt='b', val=-np.eye(size))
-            self.declare_partials(of='x', wrt='A')
-
-        self.declare_partials(of='x', wrt='x')
+        self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -88,7 +99,14 @@ class LinearSystemComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
+        if self.options['vec_size'] > 1:
+            if self.vec_size_A > 1:
+                residuals['x'] = np.einsum('ijk,ik->ij', inputs['A'], outputs['x']) - inputs['b']
+            else:
+                residuals['x'] = np.einsum('jk,ik->ij', inputs['A'], outputs['x']) - inputs['b']
+
+        else:
+            residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
 
     def solve_nonlinear(self, inputs, outputs):
         """
@@ -101,47 +119,26 @@ class LinearSystemComp(ImplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
+        vec_size = self.options['vec_size']
+        vec_size_A = self.vec_size_A
+
         # lu factorization for use with solve_linear
-        self._lup = linalg.lu_factor(inputs['A'])
-        outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
+        self._lup = []
+        if vec_size > 1:
+            for j in range(vec_size_A):
+                lhs = inputs['A'][j] if vec_size_A > 1 else inputs['A']
+                self._lup.append(linalg.lu_factor(lhs))
+
+            for j in range(vec_size):
+                idx = j if vec_size_A > 1 else 0
+                outputs['x'][j] = linalg.lu_solve(self._lup[idx], inputs['b'][j])
+        else:
+            self._lup = linalg.lu_factor(inputs['A'])
+            outputs['x'] = linalg.lu_solve(self._lup, inputs['b'])
 
     def linearize(self, inputs, outputs, J):
         """
         Compute the non-constant partial derivatives.
-        """
-        partial_type = self.metadata['partial_type']
-        if partial_type == "matrix_free":
-            return
-
-        x = outputs['x']
-        size = self.metadata['size']
-        if partial_type == "dense":
-            dx_dA = np.zeros((size, size**2))
-            for i in range(size):
-                dx_dA[i, i * size:(i + 1) * size] = x
-            J['x', 'A'] = dx_dA
-
-            J['x', 'x'] = inputs['A']
-
-            # constant, defined int setup
-            # J['x', 'b'] = -np.eye()
-
-        elif partial_type == "sparse":
-
-            J['x', 'A'] = np.tile(x, size)
-            # J['x', 'A'].set_data(np.tile(x, size))
-            J['x', 'x'] = inputs['A']
-
-            # constant, defined int setup
-            # J['x', 'b'] = -np.ones(size)
-
-    def _mat_vec_prod(self, inputs, outputs, d_inputs, d_outputs,
-                      d_residuals, mode):
-        """
-        Compute jac-vector product.
-
-        linear operator for the partial derivative jacobian, only used if the 'partial_type'
-        metadata is set to 'matrix_free'.
 
         Parameters
         ----------
@@ -149,32 +146,18 @@ class LinearSystemComp(ImplicitComponent):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        d_inputs : Vector
-            see inputs; product must be computed only if var_name in d_inputs
-        d_outputs : Vector
-            see outputs; product must be computed only if var_name in d_outputs
-        d_residuals : Vector
-            see outputs
-        mode : str
-            either 'fwd' or 'rev'
+        J : Jacobian
+            sub-jac components written to jacobian[output_name, input_name]
         """
-        if mode == 'fwd':
+        x = outputs['x']
+        size = self.options['size']
+        vec_size = self.options['vec_size']
 
-            if 'x' in d_outputs:
-                d_residuals['x'] += inputs['A'].dot(d_outputs['x'])
-            if 'A' in d_inputs:
-                d_residuals['x'] += d_inputs['A'].dot(outputs['x'])
-            if 'b' in d_inputs:
-                d_residuals['x'] -= d_inputs['b']
-
-        elif mode == 'rev':
-
-            if 'x' in d_outputs:
-                d_outputs['x'] += inputs['A'].T.dot(d_residuals['x'])
-            if 'A' in d_inputs:
-                d_inputs['A'] += np.outer(outputs['x'], d_residuals['x']).T
-            if 'b' in d_inputs:
-                d_inputs['b'] -= d_residuals['x']
+        J['x', 'A'] = np.tile(x, size).flat
+        if self.vec_size_A > 1:
+            J['x', 'x'] = inputs['A'].flat
+        else:
+            J['x', 'x'] = np.tile(inputs['A'].flat, vec_size)
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""
@@ -194,12 +177,23 @@ class LinearSystemComp(ImplicitComponent):
         mode : str
             either 'fwd' or 'rev'
         """
-        if mode == 'fwd':
-            sol_vec, rhs_vec = d_outputs, d_residuals
-            t = 0
-        else:
-            sol_vec, rhs_vec = d_residuals, d_outputs
-            t = 1
+        vec_size = self.options['vec_size']
+        vec_size_A = self.vec_size_A
 
-        # print("foobar", rhs_vec['x'])
-        sol_vec['x'] = linalg.lu_solve(self._lup, rhs_vec['x'], trans=t)
+        if mode == 'fwd':
+            if vec_size > 1:
+                for j in range(vec_size):
+                    idx = j if vec_size_A > 1 else 0
+                    d_outputs['x'][j] = linalg.lu_solve(self._lup[idx], d_residuals['x'][j],
+                                                        trans=0)
+            else:
+                d_outputs['x'] = linalg.lu_solve(self._lup, d_residuals['x'], trans=0)
+
+        else:  # rev
+            if vec_size > 1:
+                for j in range(vec_size):
+                    idx = j if vec_size_A > 1 else 0
+                    d_residuals['x'][j] = linalg.lu_solve(self._lup[idx], d_outputs['x'][j],
+                                                          trans=1)
+            else:
+                d_residuals['x'] = linalg.lu_solve(self._lup, d_outputs['x'], trans=1)

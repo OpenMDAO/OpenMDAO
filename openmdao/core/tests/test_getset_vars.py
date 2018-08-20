@@ -3,8 +3,8 @@
 import unittest
 from six import assertRaisesRegex
 
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestGetSetVariables(unittest.TestCase):
@@ -103,15 +103,13 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        c = ExecComp('y=2*x')
+        g = Group(assembled_jac_type='dense')
+        g.linear_solver = DirectSolver(assemble_jac=True)
+        c = g.add_subsystem('c', ExecComp('y=2*x'))
 
-        g = Group()
-        g.add_subsystem('c', c)
-
-        model = Group()
+        p = Problem()
+        model = p.model
         model.add_subsystem('g', g)
-
-        p = Problem(model)
         p.setup(check=False)
 
         # -------------------------------------------------------------------
@@ -125,7 +123,7 @@ class TestGetSetVariables(unittest.TestCase):
         p._initial_condition_cache = {}
 
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            self.assertEqual(p['x'], 5.0)
+            x = p['x']
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
@@ -134,7 +132,7 @@ class TestGetSetVariables(unittest.TestCase):
         p._initial_condition_cache = {}
 
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            self.assertEqual(p['y'], 5.0)
+            y = p['y']
 
         msg = 'Variable name "{}" not found.'
         inputs, outputs, residuals = g.get_nonlinear_vectors()
@@ -143,44 +141,46 @@ class TestGetSetVariables(unittest.TestCase):
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             inputs['x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            self.assertEqual(inputs['x'], 5.0)
+            x = inputs['x']
         with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
             inputs['g.c.x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-            self.assertEqual(inputs['g.c.x'], 5.0)
+            gcx = inputs['g.c.x']
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             outputs['y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            self.assertEqual(outputs['y'], 5.0)
+            y = outputs['y']
         with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
             outputs['g.c.y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-            self.assertEqual(outputs['g.c.y'], 5.0)
+            out = outputs['g.c.y']
 
         msg = 'Variable name pair \("{}", "{}"\) not found.'
-        with g.jacobian_context() as jac:
+        jac = g.linear_solver._assembled_jac
 
-            # d(output)/d(input)
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-                jac['y', 'x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-                self.assertEqual(jac['y', 'x'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-                jac['g.c.y', 'g.c.x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-                self.assertEqual(jac['g.c.y', 'g.c.x'], 5.0)
+        # d(output)/d(input)
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+            jac['y', 'x'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+            dydx = jac['y', 'x']
+        # allow absolute keys now
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+            #jac['g.c.y', 'g.c.x'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+            #deriv = jac['g.c.y', 'g.c.x']
 
-            # d(output)/d(output)
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-                jac['y', 'y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-                self.assertEqual(jac['y', 'y'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-                jac['g.c.y', 'g.c.y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-                self.assertEqual(jac['g.c.y', 'g.c.y'], 5.0)
+        # d(output)/d(output)
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
+            jac['y', 'y'] = 5.0
+        with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
+            dydy = jac['y', 'y']
+        # allow absoute keys now
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+            #jac['g.c.y', 'g.c.y'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+            #deriv = jac['g.c.y', 'g.c.y']
 
     def test_with_promotion_errors(self):
         """
@@ -190,10 +190,11 @@ class TestGetSetVariables(unittest.TestCase):
         c2 = ExecComp('y=2*x')
         c3 = ExecComp('z=3*x')
 
-        g = Group()
+        g = Group(assembled_jac_type='dense')
         g.add_subsystem('c1', c1, promotes=['*'])
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
+        g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
         model.add_subsystem('g', g, promotes=['*'])
@@ -207,15 +208,18 @@ class TestGetSetVariables(unittest.TestCase):
         # -------------------------------------------------------------------
 
         msg1 = 'Variable name "{}" not found.'
-        msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
-                'Access the value from the connected output variable "{}" instead.')
+        msg2 = "The promoted name x is invalid because it refers to multiple inputs: [g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
+
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
-        with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
+        with self.assertRaises(Exception) as context:
             inputs['x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
+        self.assertEqual(str(context.exception), msg2)
+        with self.assertRaises(Exception) as context:
             self.assertEqual(inputs['x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
+
         with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
             inputs['g.c2.x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg1.format('g.c2.x')):
@@ -228,23 +232,29 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(outputs['g.c2.y'], 5.0)
 
         msg1 = 'Variable name pair \("{}", "{}"\) not found.'
-        with g.jacobian_context() as jac:
 
-            # d(outputs)/d(inputs)
-            with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
-                jac['y', 'x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg2.format('x', 'x')):
-                self.assertEqual(jac['y', 'x'], 5.0)
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-                jac['g.c2.y', 'g.c2.x'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-                self.assertEqual(jac['g.c2.y', 'g.c2.x'], 5.0)
+        jac = g.linear_solver._assembled_jac
 
-            # d(outputs)/d(outputs)
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-                jac['g.c2.y', 'g.c2.y'] = 5.0
-            with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-                self.assertEqual(jac['g.c2.y', 'g.c2.y'], 5.0)
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
+
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
+
+        # absolute keys now allowed
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+            #jac['g.c2.y', 'g.c2.x'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+            #deriv = jac['g.c2.y', 'g.c2.x']
+
+        # d(outputs)/d(outputs)
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+            #jac['g.c2.y', 'g.c2.y'] = 5.0
+        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+            #deriv = jac['g.c2.y', 'g.c2.y']
 
 
     def test_nested_promotion_errors(self):
@@ -255,9 +265,10 @@ class TestGetSetVariables(unittest.TestCase):
         c2 = ExecComp('y=2*x')
         c3 = ExecComp('z=3*x')
 
-        g = Group()
+        g = Group(assembled_jac_type='dense')
         g.add_subsystem('c2', c2, promotes=['*'])
         g.add_subsystem('c3', c3, promotes=['*'])
+        g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
         model.add_subsystem('c1', c1, promotes=['*'])
@@ -268,13 +279,15 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = ('The promoted name "{}" is invalid because it is non-unique. '
-                'Access the value from the connected output variable instead.')
+        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: [g.c2.x, g.c3.x] that are not connected to an output variable."
 
         # inputs (g.x is not connected)
-        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+        #with assertRaisesRegex(self, RuntimeError, msg1.format('g.x')):
+        with self.assertRaises(Exception) as context:
             p['g.x'] = 5.0
             p.final_setup()
+
+        self.assertEqual(str(context.exception), msg1)
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
@@ -283,29 +296,31 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = ('The promoted name "{}" is invalid because it is non-unique. '
-                'Access the value from the connected output variable instead.')
-
         # inputs (g.x is not connected)
-        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+        with self.assertRaises(Exception) as context:
             p['g.x'] = 5.0
             p.final_setup()
+        self.assertEqual(str(context.exception), msg1)
 
         # Start from a clean state again
         p = Problem(model)
         p.setup(check=False)
 
-        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+        with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
+        self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        msg2 = "The promoted name x is invalid because it refers to multiple inputs: [g.c2.x, g.c3.x] that are not connected to an output variable."
 
-            # d(outputs)/d(inputs)
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                jac['y', 'x'] = 5.0
+        jac = g.linear_solver._assembled_jac
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                self.assertEqual(jac['y', 'x'], 5.0)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
         # -------------------------------------------------------------------
 
@@ -314,19 +329,22 @@ class TestGetSetVariables(unittest.TestCase):
         p.setup(check=False)
         p.final_setup()
 
-        with assertRaisesRegex(self, KeyError, msg1.format('g.x')):
+        with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
+        self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                jac['y', 'x'] = 5.0
-
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                self.assertEqual(jac['y', 'x'], 5.0)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
         # -------------------------------------------------------------------
+
+        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: [g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
         # From here, 'g.x' has a valid source.
         model.connect('x', 'g.x')
@@ -334,58 +352,56 @@ class TestGetSetVariables(unittest.TestCase):
         p = Problem(model)
         p.setup(check=False)
 
-        msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
-                'Access the value from the connected output variable "{}" instead.')
-
         # inputs (g.x is connected to x)
         p['g.x'] = 5.0
-        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+        with self.assertRaises(Exception) as context:
             p.final_setup()
+        self.assertEqual(str(context.exception), msg1)
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
         p.setup(check=False)
         p.final_setup()
 
-        msg2 = ('The promoted name "{}" is invalid because it is non-unique. '
-                'Access the value from the connected output variable "{}" instead.')
-
         # inputs (g.x is connected to x)
-        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+        with self.assertRaises(Exception) as context:
             p['g.x'] = 5.0
+        self.assertEqual(str(context.exception), msg1)
 
         # Final test, the getitem
         p = Problem(model)
         p.setup(check=False)
 
-        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+        with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
+        self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                jac['y', 'x'] = 5.0
-
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                self.assertEqual(jac['y', 'x'], 5.0)        # Start from a clean state again
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)        # Start from a clean state again
+        self.assertEqual(str(context.exception), msg2)
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
         p.setup(check=False)
         p.final_setup()
 
-        with assertRaisesRegex(self, KeyError, msg2.format('g.x', 'x')):
+        with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
+        self.assertEqual(str(context.exception), msg1)
 
-        with g.jacobian_context() as jac:
+        # d(outputs)/d(inputs)
+        with self.assertRaises(Exception) as context:
+            jac['y', 'x'] = 5.0
+        self.assertEqual(str(context.exception), msg2)
 
-            # d(outputs)/d(inputs)
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                jac['y', 'x'] = 5.0
-
-            with assertRaisesRegex(self, KeyError, msg1.format('x')):
-                self.assertEqual(jac['y', 'x'], 5.0)
+        with self.assertRaises(Exception) as context:
+            self.assertEqual(jac['y', 'x'], 5.0)
+        self.assertEqual(str(context.exception), msg2)
 
 
 if __name__ == '__main__':

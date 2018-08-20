@@ -12,7 +12,6 @@ from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
-    vector_class = PETScVector
 else:
     PETScVector = None
 
@@ -25,8 +24,9 @@ if OPTIMIZER:
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
     Group, ParallelGroup, IndepVarComp, SqliteRecorder
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from sqlite_recorder_test_utils import _assertDriverIterationDataRecorded
-from recorder_test_utils import run_driver
+from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterDataRecorded
+from openmdao.recorders.tests.recorder_test_utils import run_driver
+
 
 class DistributedAdder(ExplicitComponent):
     """
@@ -89,7 +89,6 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-
 class Mygroup(Group):
 
     def setup(self):
@@ -101,15 +100,7 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-
-
-
-
-
-
-@unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
-                 "PETSc is required." if PETScVector is None
-                 else "Unreliable on Travis CI.")
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
 class DistributedRecorderTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -127,12 +118,6 @@ class DistributedRecorderTest(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
-
-    def assertDriverIterationDataRecorded(self, expected, tolerance):
-        con = sqlite3.connect(self.filename)
-        cur = con.cursor()
-        _assertDriverIterationDataRecorded(self, cur, expected, tolerance)
-        con.close()
 
     def test_distrib_record_system(self):
         prob = Problem()
@@ -157,23 +142,23 @@ class DistributedRecorderTest(unittest.TestCase):
 
     def test_distrib_record_driver(self):
         size = 100  # how many items in the array
-
         prob = Problem()
         prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
         prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['includes'] = []
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')
         prob.model.add_objective('sum')
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         prob['x'] = np.ones(size)
 
@@ -191,13 +176,15 @@ class DistributedRecorderTest(unittest.TestCase):
                 "summer.sum": prob['summer.sum'],
             }
 
-            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                                     expected_objectives, None, None),), self.eps)
+            expected_outputs = expected_desvars
+            expected_outputs.update(expected_objectives)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed" )
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP" )
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_recording_remote_voi(self):
-
         prob = Problem()
 
         prob.model.add_subsystem('par', ParallelGroup())
@@ -215,15 +202,15 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
-        self.recorder.options['record_desvars'] = True
-        self.recorder.options['record_responses'] = True
-        self.recorder.options['record_objectives'] = True
-        self.recorder.options['record_constraints'] = True
-        self.recorder.options['system_includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_responses'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
 
         prob.driver.add_recorder(self.recorder)
 
-        prob.setup(vector_class=PETScVector)
+        prob.setup()
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
@@ -231,24 +218,24 @@ class DistributedRecorderTest(unittest.TestCase):
         #   current values in the problem. This next section is about getting those values
 
         # These involve collective gathers so all ranks need to run this
-        expected_desvars = prob.driver.get_design_var_values()
-        expected_objectives = prob.driver.get_objective_values()
-        expected_constraints = prob.driver.get_constraint_values()
+        expected_outputs = prob.driver.get_design_var_values()
+        expected_outputs.update(prob.driver.get_objective_values())
+        expected_outputs.update(prob.driver.get_constraint_values())
 
         # Determine the expected values for the sysincludes
         # this gets all of the outputs but just locally
         rrank = prob.comm.rank  # root ( aka model ) rank.
-        rowned = prob.model._owning_rank['output']
+        rowned = prob.model._owning_rank
         # names of sysincl vars on this rank
-        local_sysinclnames = [n for n in self.recorder.options['system_includes'] if rrank == rowned[n]]
+        local_inclnames = [n for n in prob.driver.recording_options['includes'] if rrank == rowned[n]]
         # Get values for vars on this rank
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
         #   Potential local sysvars are in this
-        sysvars = outputs._names
+        sysvars = outputs._views
         # Just get the values for the sysincl vars on this rank
-        local_sysvars = {c: sysvars[c] for c in local_sysinclnames}
+        local_vars = {c: sysvars[c] for c in local_inclnames}
         # Gather up the values for all the sysincl vars on all ranks
-        all_vars = prob.model.comm.gather(local_sysvars, root=0)
+        all_vars = prob.model.comm.gather(local_vars, root=0)
 
         if prob.comm.rank == 0:
             # Only on rank 0 do we have all the values and only on rank 0
@@ -258,17 +245,17 @@ class DistributedRecorderTest(unittest.TestCase):
             for d in all_vars[:-1]:
                 dct.update(d)
 
-            expected_sysincludes = {
+            expected_includes = {
                 'par.G1.Cy.y': dct['par.G1.Cy.y'],
                 'par.G2.Cy.y': dct['par.G2.Cy.y'],
             }
 
+            expected_outputs.update(expected_includes)
 
-        if prob.comm.rank == 0:
-            coordinate = [0, 'SLSQP', (49,)]
-            self.assertDriverIterationDataRecorded(((coordinate, (t0, t1), expected_desvars, None,
-                                                     expected_objectives, expected_constraints,
-                                                     expected_sysincludes),), self.eps)
+            coordinate = [0, 'SLSQP', (48,)]
+
+            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
+            assertDriverIterDataRecorded(self, expected_data, self.eps)
 
 
 if __name__ == "__main__":

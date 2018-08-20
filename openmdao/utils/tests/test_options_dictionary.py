@@ -1,6 +1,9 @@
 from openmdao.api import OptionsDictionary
 import unittest
+import warnings
 from six import PY3, assertRegex
+
+from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class TestOptionsDict(unittest.TestCase):
@@ -8,8 +11,59 @@ class TestOptionsDict(unittest.TestCase):
     def setUp(self):
         self.dict = OptionsDictionary()
 
+    def test_reprs(self):
+        class MyComp(ExplicitComponent):
+            pass
+
+        my_comp = MyComp()
+
+        self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
+        self.dict.declare('flag', default=False, types=bool)
+        self.dict.declare('comp', default=my_comp, types=ExplicitComponent)
+        self.dict.declare('long_desc', types=str,
+                          desc='This description is long and verbose, so it '
+                               'takes up multiple lines in the options table.')
+
+        self.assertEqual(repr(self.dict), repr(self.dict._dict))
+
+        self.assertEqual(self.dict.__str__(width=83), '\n'.join([
+            "========= ============ ================= ===================== ====================",
+            "Option    Default      Acceptable Values Acceptable Types      Description         ",
+            "========= ============ ================= ===================== ====================",
+            "comp      MyComp       N/A               ['ExplicitComponent']                     ",
+            "flag      False        N/A               ['bool']                                  ",
+            "long_desc **Required** N/A               ['str']               This description is ",
+            "                                                               long and verbose, so",
+            "                                                                it takes up multipl",
+            "                                                               e lines in the optio",
+            "                                                               ns table.",
+            "test      **Required** ['a', 'b']        N/A                   Test integer value  ",
+            "========= ============ ================= ===================== ====================",
+        ]))
+
+        # if the table can't be represented in specified width, then we get the full width version
+        self.assertEqual(self.dict.__str__(width=40), '\n'.join([
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+            "Option    Default      Acceptable Values Acceptable Types      Description          "
+            "                                                                     ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+            "comp      MyComp       N/A               ['ExplicitComponent']                      "
+            "                                                                     ",
+            "flag      False        N/A               ['bool']                                   "
+            "                                                                     ",
+            "long_desc **Required** N/A               ['str']               This description is l"
+            "ong and verbose, so it takes up multiple lines in the options table. ",
+            "test      **Required** ['a', 'b']        N/A                   Test integer value   "
+            "                                                                     ",
+            "========= ============ ================= ===================== ====================="
+            "==================================================================== ",
+        ]))
+
+
     def test_type_checking(self):
-        self.dict.declare('test', type_=int, desc='Test integer value')
+        self.dict.declare('test', types=int, desc='Test integer value')
 
         self.dict['test'] = 1
         self.assertEqual(self.dict['test'], 1)
@@ -18,18 +72,23 @@ class TestOptionsDict(unittest.TestCase):
             self.dict['test'] = ''
 
         class_or_type = 'class' if PY3 else 'type'
-        expected_msg = "Entry 'test' has the wrong type (<{} 'int'>)".format(class_or_type)
+        expected_msg = "Value ('') of option 'test' has type of (<{} 'str'>), but expected type (<{} 'int'>).".format(class_or_type, class_or_type)
         self.assertEqual(expected_msg, str(context.exception))
 
         # make sure bools work
-        self.dict.declare('flag', default=False, type_=bool)
+        self.dict.declare('flag', default=False, types=bool)
         self.assertEqual(self.dict['flag'], False)
         self.dict['flag'] = True
         self.assertEqual(self.dict['flag'], True)
 
+    def test_allow_none(self):
+        self.dict.declare('test', types=int, allow_none=True, desc='Test integer value')
+        self.dict['test'] = None
+        self.assertEqual(self.dict['test'], None)
+
     def test_type_and_values(self):
         # Test with only type_
-        self.dict.declare('test1', type_=int)
+        self.dict.declare('test1', types=int)
         self.dict['test1'] = 1
         self.assertEqual(self.dict['test1'], 1)
 
@@ -39,21 +98,37 @@ class TestOptionsDict(unittest.TestCase):
         self.assertEqual(self.dict['test2'], 'a')
 
         # Test with both type_ and values
-        self.dict.declare('test3', type_=int, values=['a', 'b'])
-        self.dict['test3'] = 1
-        self.assertEqual(self.dict['test3'], 1)
-        self.dict['test3'] = 'a'
-        self.assertEqual(self.dict['test3'], 'a')
+        with self.assertRaises(Exception) as context:
+            self.dict.declare('test3', types=int, values=['a', 'b'])
+        self.assertEqual(str(context.exception),
+                         "'types' and 'values' were both specified for option 'test3'.")
 
     def test_isvalid(self):
-        self.dict.declare('even_test', type_=int, is_valid=lambda x: x%2 == 0)
+        self.dict.declare('even_test', types=int, is_valid=lambda x: x % 2 == 0)
         self.dict['even_test'] = 2
         self.dict['even_test'] = 4
 
         with self.assertRaises(ValueError) as context:
             self.dict['even_test'] = 3
 
-        expected_msg = "Function is_valid returns False for {}.".format('even_test')
+        expected_msg = "Function is_valid(3) returns False for option 'even_test'."
+        self.assertEqual(expected_msg, str(context.exception))
+
+    def test_isvalid_deprecated_type(self):
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            self.dict.declare('even_test', type_=int, is_valid=lambda x: x % 2 == 0)
+            self.assertEqual(len(w), 1)
+            self.assertEqual(str(w[-1].message), "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead.")
+
+        self.dict['even_test'] = 2
+        self.dict['even_test'] = 4
+
+        with self.assertRaises(ValueError) as context:
+            self.dict['even_test'] = 3
+
+        expected_msg = "Function is_valid(3) returns False for option 'even_test'."
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_unnamed_args(self):
@@ -74,7 +149,7 @@ class TestOptionsDict(unittest.TestCase):
         self.assertTrue(contains)
 
     def test_update(self):
-        self.dict.declare('test', default='Test value', type_=object)
+        self.dict.declare('test', default='Test value', types=object)
 
         obj = object()
         self.dict.update({'test': obj})
@@ -92,14 +167,14 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             self.dict['missing']
 
-        expected_msg = "\"Entry 'missing' cannot be found\""
+        expected_msg = "\"Option 'missing' cannot be found\""
         self.assertEqual(expected_msg, str(context.exception))
 
     def test_get_default(self):
         obj_def = object()
         obj_new = object()
 
-        self.dict.declare('test', default=obj_def, type_=object)
+        self.dict.declare('test', default=obj_def, types=object)
 
         self.assertIs(self.dict['test'], obj_def)
 
@@ -117,8 +192,8 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['test'] = object()
 
-        expected_msg = ("Entry 'test''s value is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
-                        " <object object at 0x[0-9A-Fa-f]+>\]")
+        expected_msg = ("Value \(<object object at 0x[0-9A-Fa-f]+>\) of option 'test' is not one of \[<object object at 0x[0-9A-Fa-f]+>,"
+                        " <object object at 0x[0-9A-Fa-f]+>\].")
         assertRegex(self, str(context.exception), expected_msg)
 
     def test_read_only(self):
@@ -137,14 +212,32 @@ class TestOptionsDict(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = 3.0
 
-        expected_msg = ("Value of 3.0 exceeds maximum of 2.0 for entry 'x'")
-        assertRegex(self, str(context.exception), expected_msg)
+        expected_msg = "Value (3.0) of option 'x' exceeds maximum allowed value of 2.0."
+        self.assertEqual(str(context.exception), expected_msg)
 
         with self.assertRaises(ValueError) as context:
             self.dict['x'] = -3.0
 
-        expected_msg = ("Value of -3.0 exceeds minimum of 0.0 for entry 'x'")
-        assertRegex(self, str(context.exception), expected_msg)
+        expected_msg = "Value (-3.0) of option 'x' exceeds minimum allowed value of 2.0."
+        self.assertEqual(str(context.exception), expected_msg)
+
+    def test_undeclare(self):
+        # create an entry in the dict
+        self.dict.declare('test', types=int)
+        self.dict['test'] = 1
+
+        # prove it's in the dict
+        self.assertEqual(self.dict['test'], 1)
+
+        # remove entry from the dict
+        self.dict.undeclare("test")
+
+        # prove it is no longer in the dict
+        with self.assertRaises(KeyError) as context:
+            self.dict['test']
+
+        expected_msg = "\"Option 'test' cannot be found\""
+        self.assertEqual(expected_msg, str(context.exception))
 
 
 if __name__ == "__main__":

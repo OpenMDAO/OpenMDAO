@@ -5,6 +5,7 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
+from six.moves import range
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 
@@ -160,10 +161,10 @@ class LGLFit(ExplicitComponent):
     an approximation of arclength.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', type_=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.x_lgl, self.w_lgl = lgl(n)
 
@@ -189,10 +190,10 @@ class LGLFit(ExplicitComponent):
 class DefectComp(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', type_=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.add_input('y_truth', val=np.zeros(n-1), desc='actual values at midpoint nodes')
         self.add_input('y_approx', val=np.zeros(n-1), desc='interpolated values at midpoint nodes')
@@ -209,10 +210,10 @@ class DefectComp(ExplicitComponent):
 class ArcLengthFunction(ExplicitComponent):
 
     def initialize(self):
-        self.metadata.declare(name='num_nodes', type_=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.add_input('yp_lgl', val=np.zeros(n), desc='approximated derivative at LGL nodes')
         self.add_output('f_arclength', val=np.zeros(n), desc='The integrand of the arclength function')
@@ -233,10 +234,10 @@ class ArcLengthQuadrature(ExplicitComponent):
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
     def initialize(self):
-        self.metadata.declare(name='num_nodes', type_=int)
+        self.options.declare(name='num_nodes', types=int)
 
     def setup(self):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         self.add_input('f_arclength', val=np.zeros(n), desc='The integrand of the arclength function')
         self.add_output('arclength', val=0.0, desc='The integrated arclength')
@@ -253,7 +254,7 @@ class ArcLengthQuadrature(ExplicitComponent):
         self.declare_partials(of='arclength', wrt='f_arclength', dependent=True, val=da_df)
 
     def compute(self, inputs, outputs):
-        n = self.metadata['num_nodes']
+        n = self.options['num_nodes']
 
         f = inputs['f_arclength']
 

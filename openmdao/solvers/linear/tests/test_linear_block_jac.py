@@ -6,9 +6,9 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, AssembledJacobian, \
+from openmdao.api import Group, IndepVarComp, Problem, LinearBlockJac, \
     ExecComp, NonlinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -20,30 +20,19 @@ class TestLinearBlockJacSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_globaljac_err(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = Group(assembled_jac_type='dense')
         model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                             promotes=['length'])
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = LinearBlockJac()
-        prob.set_solver_print(level=0)
-
-        prob.model.jacobian = AssembledJacobian()
-        prob.setup(check=False, mode='fwd')
-
-        prob['width'] = 2.0
-        prob.run_model()
-
-        of = ['area']
-        wrt = ['length']
+        model.linear_solver = LinearBlockJac(assemble_jac=True)
+        prob.setup(check=False)
 
         with self.assertRaises(RuntimeError) as context:
-            prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-
+            prob.run_model()
             self.assertEqual(str(context.exception),
-                             "A block linear solver 'LN: LNBJ' is being used with"
-                             " an AssembledJacobian in system ''")
+                             "Linear solver 'LN: LNBJ' doesn't support assembled jacobians.")
 
 
 class TestBJacSolverFeature(unittest.TestCase):
@@ -147,7 +136,7 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.linear_solver = LinearBlockJac()
         model.linear_solver.options['atol'] = 1.0e-3
 
-        prob.setup()
+        prob.setup(mode='rev')
         prob.run_model()
 
         wrt = ['z']
@@ -184,7 +173,7 @@ class TestBJacSolverFeature(unittest.TestCase):
         model.linear_solver = LinearBlockJac()
         model.linear_solver.options['rtol'] = 1.0e-3
 
-        prob.setup()
+        prob.setup(mode='rev')
         prob.run_model()
 
         wrt = ['z']

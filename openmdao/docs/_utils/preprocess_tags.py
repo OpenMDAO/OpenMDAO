@@ -52,6 +52,7 @@ def make_tagfiles(docdirs, tagdir):
 
                         # If the tagfile doesn't exist, let's put in a header
                         if not os.path.exists(filepath):
+                            tagfilelabel = ".. _" + tag + ": \n"
                             tagfileheader = """
 =========================
 %s
@@ -59,8 +60,10 @@ def make_tagfiles(docdirs, tagdir):
   .. toctree::
 """ % tag
 
+
                             # Write the header for this tag's file.
                             with open(filepath, 'a') as tagfile:
+                                tagfile.write(tagfilelabel)
                                 tagfile.write(tagfileheader)
                         # Write a link into an existing tagfile.
                         with open(filepath, 'a') as tagfile:
@@ -71,9 +74,8 @@ def make_tagindex(tagdir):
     # Once all the files exist, create a simple index.rst file
     indexfile = tagdir + "/index.rst"
 
-    for filepath, dirnames, filenames in os.walk(tagdir):
-        with open(indexfile, 'a') as index:
-            index.write("""
+    with open(indexfile, 'a') as index:
+        index.write("""
 :orphan:
 
 ================
@@ -89,7 +91,8 @@ Tags in OpenMDAO
 
 def tag():
     # Set the directories in which to find tags
-    docdirs = ['examples', 'getting_started', 'features', 'style_guide', 'theory_manual', 'user_guide']
+    # Let's make tags for dirs in this dr that don't start with an underscore.
+    docdirs = [x for x in os.listdir('.') if os.path.isdir(x) and not x.startswith('_')]
     tagdir = make_tagdir()
     make_tagfiles(docdirs, tagdir)
     make_tagindex(tagdir)

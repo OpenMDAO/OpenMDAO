@@ -109,3 +109,7 @@ class LintTestCase(unittest.TestCase):
                                                       ignore=ignores['pep257'])]
         if failures:
             self.fail('{} PEP 257 Failure(s):\n'.format(len(failures)) + '\n'.join(failures))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -8,10 +8,16 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
-     SellarDis2withDerivatives, ExecComp, ScipyIterativeSolver
+     SellarDis2withDerivatives, ExecComp, ScipyKrylov
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestDesVarsResponses(unittest.TestCase):
@@ -186,21 +192,21 @@ class TestDesVarsResponses(unittest.TestCase):
         model.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
         model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
-        px = prob.model.get_subsystem('px')
+        px = prob.model.px
         px.add_design_var('x', lower=-100, upper=100)
 
-        pz = prob.model.get_subsystem('pz')
+        pz = prob.model.pz
         pz.add_design_var('z', lower=-100, upper=100)
 
-        obj = prob.model.get_subsystem('obj_cmp')
+        obj = prob.model.obj_cmp
         obj.add_objective('obj')
 
-        con_comp1 = prob.model.get_subsystem('con_cmp1')
+        con_comp1 = prob.model.con_cmp1
         con_comp1.add_constraint('con1')
 
-        con_comp2 = prob.model.get_subsystem('con_cmp2')
+        con_comp2 = prob.model.con_cmp2
         con_comp2.add_constraint('con2')
 
         prob.setup(check=False)
@@ -512,6 +518,41 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                           indices=range(2))
 
+    def test_error_eq_ineq_con(self):
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        with self.assertRaises(ValueError) as context:
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
+                                      indices='foo')
+
+        msg = "Constraint 'con1' cannot be both equality and inequality."
+        self.assertEqual(str(context.exception), msg)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc is required.")
+class TestAddConstraintMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_add_bad_con(self):
+        # From a bug, this message didn't work in mpi.
+        prob = Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('sub', SellarDerivatives())
+        sub.nonlinear_solver = NonlinearBlockGS()
+
+        sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.setup(mode='rev')
+
+        msg = "Output not found for response 'd1.junk' in system 'sub'."
+        self.assertEqual(str(context.exception), msg)
+
 
 class TestObjectiveOnModel(unittest.TestCase):
 
@@ -597,6 +638,48 @@ class TestObjectiveOnModel(unittest.TestCase):
                                 places=12)
         self.assertAlmostEqual( obj_scaler*(obj_ref + obj_adder), 1.0,
                                 places=12)
+
+    def test_desvar_size_err(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        for name in ['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0']:
+            args = {name: -np.ones(2)*100}
+            with self.assertRaises(Exception) as context:
+                prob.model.add_design_var('z', indices=[1], **args)
+            self.assertEqual(str(context.exception),
+                             "'': When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+
+    def test_constraint_size_err(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        for name in ['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0']:
+            args = {name: -np.ones(2)*100}
+            with self.assertRaises(Exception) as context:
+                prob.model.add_constraint('z', indices=[1], **args)
+            self.assertEqual(str(context.exception),
+                             "'': When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+
+    def test_objective_size_err(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        for name in ['adder', 'scaler', 'ref', 'ref0']:
+            args = {name: -np.ones(2)*100}
+            with self.assertRaises(Exception) as context:
+                prob.model.add_objective('z', index=1, **args)
+            self.assertEqual(str(context.exception),
+                             "'': When adding objective 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_invalid_name(self):
 

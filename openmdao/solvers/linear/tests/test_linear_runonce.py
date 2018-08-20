@@ -3,7 +3,7 @@
 import unittest
 
 from openmdao.api import Problem, Group, IndepVarComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
@@ -14,18 +14,14 @@ class TestLinearRunOnceSolver(unittest.TestCase):
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
         prob = Problem()
-        prob.model = ConvergeDivergeGroups()
+        model = prob.model = ConvergeDivergeGroups()
 
-        prob.model.linear_solver = LinearRunOnce()
+        model.linear_solver = LinearRunOnce()
+        model.g1.linear_solver = LinearRunOnce()
+        model.g1.g2.linear_solver = LinearRunOnce()
+        model.g3.linear_solver = LinearRunOnce()
+
         prob.set_solver_print(level=0)
-
-        g1 = prob.model.get_subsystem('g1')
-        g2 = g1.get_subsystem('g2')
-        g3 = prob.model.get_subsystem('g3')
-        g1.linear_solver = LinearRunOnce()
-        g2.linear_solver = LinearRunOnce()
-        g3.linear_solver = LinearRunOnce()
-
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
@@ -44,12 +40,25 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['c7.y1', 'iv.x'][0][0], -40.75, 1e-6)
 
+    def test_undeclared_options(self):
+        # Test that using options that should not exist in class cause an error
+        solver = LinearRunOnce()
+
+        msg = "\"Key '%s' cannot be set because it has not been declared.\""
+
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+            with self.assertRaises(KeyError) as context:
+                solver.options[option] = 1
+
+            self.assertEqual(str(context.exception), msg % option)
+
+
     def test_feature_solver(self):
         from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
@@ -67,6 +76,7 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

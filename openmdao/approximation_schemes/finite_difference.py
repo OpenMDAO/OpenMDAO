@@ -3,7 +3,7 @@ from __future__ import division, print_function
 
 from collections import namedtuple
 from itertools import groupby
-from six.moves import range
+from six.moves import range, zip
 
 import numpy as np
 
@@ -104,8 +104,15 @@ class FiniteDifference(ApproximationScheme):
         of, wrt = abs_key
         fd_options = DEFAULT_FD_OPTIONS.copy()
         fd_options.update(kwargs)
+
         if fd_options['order'] is None:
-            fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
+            form = fd_options['form']
+            if form in DEFAULT_ORDER:
+                fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
+            else:
+                msg = "'{}' is not a valid form of finite difference; must be one of {}"
+                raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
+
         self._exec_list.append((of, wrt, fd_options))
 
     @staticmethod
@@ -146,11 +153,9 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are
             being approximated.
@@ -166,9 +171,14 @@ class FiniteDifference(ApproximationScheme):
             raise ValueError('deriv_type must be one of "total" or "partial"')
 
         result = system._outputs._clone(True)
-        result_array = result.get_data()
-        out_tmp = current_vec.get_data()
-        in_tmp = system._inputs.get_data()
+        result_array = result._data.copy()
+        out_tmp = current_vec._data.copy()
+        in_tmp = system._inputs._data.copy()
+
+        # To support driver src_indices, we need to override some checks in Jacobian, but do it
+        # selectively.
+        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
+            not isinstance(jac, dict)
 
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
@@ -200,14 +210,10 @@ class FiniteDifference(ApproximationScheme):
                 in_idx = system._owns_approx_wrt_idx[wrt]
                 in_size = len(in_idx)
             else:
-                if wrt in system._var_abs2meta['input']:
-                    in_size = system._var_abs2meta['input'][wrt]['size']
-                elif wrt in system._var_abs2meta['output']:
-                    in_size = system._var_abs2meta['output'][wrt]['size']
-
+                in_size = system._var_allprocs_abs2meta[wrt]['size']
                 in_idx = range(in_size)
 
-            result.set_vec(system._outputs)
+            result._data[:] = system._outputs._data
 
             outputs = []
 
@@ -220,32 +226,24 @@ class FiniteDifference(ApproximationScheme):
                     out_idx = system._owns_approx_of_idx[of]
                     out_size = len(out_idx)
                 else:
-                    out_size = system._var_abs2meta['output'][of]['size']
+                    out_size = system._var_allprocs_abs2meta[of]['size']
                 outputs.append((of, np.zeros((out_size, in_size))))
 
             for i_count, idx in enumerate(in_idx):
                 if current_coeff:
-                    result.set_vec(current_vec)
-                    result *= current_coeff
+                    result._data[:] = current_vec._data
+                    result._data *= current_coeff
                 else:
-                    result.set_const(0.)
+                    result._data[:] = 0.
 
                 # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
                     self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
                     result_array *= coeff
-                    result.iadd_data(result_array)
-
-                if deriv_type == 'total':
-                    # Sign difference between output and resids. This arises from the definitions
-                    # in the unified derivatives equations.
-                    # For ExplicitComponent: resid = output(n-1) - output(n)
-                    # so dresid/d* = - doutput/d*
-                    result *= -1.0
+                    result._data += result_array
 
                 for of, subjac in outputs:
-
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
                         subjac[:, i_count] = result._views_flat[of][out_idx]
@@ -254,4 +252,9 @@ class FiniteDifference(ApproximationScheme):
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
-                jac[rel_key] = subjac
+                if uses_src_indices:
+                    jac._override_checks = True
+                    jac[rel_key] = subjac
+                    jac._override_checks = False
+                else:
+                    jac[rel_key] = subjac

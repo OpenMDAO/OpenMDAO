@@ -16,6 +16,39 @@ class KrigingSurrogate(SurrogateModel):
 
     Predictions are returned as a tuple of mean and RMSE. Based on Gaussian Processes
     for Machine Learning (GPML) by Rasmussen and Williams. (see also: scikit-learn).
+
+    Attributes
+    ----------
+    alpha : ndarray
+        Reduced likelyhood parameter: alpha
+    eval_rmse : bool
+        When true, calculate the root mean square prediction error.
+    L : ndarray
+        Reduced likelyhood parameter: L
+    n_dims : int
+        Number of independents in the surrogate
+    n_samples : int
+        Number of training points.
+    nugget : double or ndarray, optional
+        Nugget smoothing parameter for smoothing noisy data. Represents the variance
+        of the input values. If nugget is an ndarray, it must be of the same length
+        as the number of training points. Default: 10. * Machine Epsilon
+    sigma2 : ndarray
+        Reduced likelyhood parameter: sigma squared
+    thetas : ndarray
+        Kriging hyperparameters.
+    X : ndarray
+        Training input values, normalized.
+    X_mean : ndarray
+        Mean of training input values, normalized.
+    X_std : ndarray
+        Standard deviation of training input values, normalized.
+    Y : ndarray
+        Training model response values, normalized.
+    Y_mean : ndarray
+        Mean of training model response values, normalized.
+    Y_std : ndarray
+        Standard deviation of training model response values, normalized.
     """
 
     def __init__(self, nugget=10. * MACHINE_EPSILON, eval_rmse=False):
@@ -64,7 +97,6 @@ class KrigingSurrogate(SurrogateModel):
         ----------
         x : array-like
             Training input locations
-
         y : array-like
             Model responses at given inputs.
         """
@@ -126,6 +158,13 @@ class KrigingSurrogate(SurrogateModel):
         thetas : ndarray, optional
             Given input correlation coefficients. If none given, uses self.thetas
             from training.
+
+        Returns
+        -------
+        ndarray
+            Calculated reduced_likelihood
+        dict
+            Dictionary containing the parameters.
         """
         if thetas is None:
             thetas = self.thetas
@@ -174,6 +213,13 @@ class KrigingSurrogate(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate is evaluated.
+
+        Returns
+        -------
+        ndarray
+            Kriging prediction.
+        ndarray, optional (if eval_rmse is True)
+            Root mean square of the prediction error.
         """
         super(KrigingSurrogate, self).predict(x)
 
@@ -214,6 +260,11 @@ class KrigingSurrogate(SurrogateModel):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
+
+        Returns
+        -------
+        ndarray
+            Jacobian of surrogate output wrt inputs.
         """
         thetas = self.thetas
 
@@ -224,7 +275,7 @@ class KrigingSurrogate(SurrogateModel):
 
         # Z = einsum('i,ij->ij', X, Y) is equivalent to, but much faster and
         # memory efficient than, diag(X).dot(Y) for vector X and 2D array Y.
-        # I.e. Z[i,j] = X[i]*Y[i,j]
+        # i.e., Z[i,j] = X[i]*Y[i,j]
         gradr = r * -2 * np.einsum('i,ij->ij', thetas, (x_n - self.X).T)
         jac = np.einsum('i,j,ij->ij', self.Y_std, 1. /
                         self.X_std, gradr.dot(self.alpha).T)
@@ -246,6 +297,11 @@ class FloatKrigingSurrogate(KrigingSurrogate):
         ----------
         x : array-like
             Point at which the surrogate is evaluated.
+
+        Returns
+        -------
+        float
+            Mean value of kriging prediction.
         """
         dist = super(FloatKrigingSurrogate, self).predict(x)
         return dist[0]  # mean value

@@ -5,9 +5,12 @@ from openmdao.docs.config_params import IGNORE_LIST
 # of our source docs, as well as writing out each individual rst file.
 
 
-def generate_docs():
+def generate_docs(dir, top, packages, project_name='openmdao'):
     """
     generate_docs
+
+    Can supply a project name other than `openmdao` to use this function
+    with other projects.
     """
     index_top = """:orphan:
 
@@ -39,7 +42,7 @@ Source Docs
    :maxdepth: 1
 """
 
-    docs_dir = os.path.dirname("..")
+    docs_dir = os.path.dirname(dir)
 
     doc_dir = os.path.join(docs_dir, "_srcdocs")
     if os.path.isdir(doc_dir):
@@ -53,34 +56,17 @@ Source Docs
     if not os.path.isdir(packages_dir):
         os.mkdir(packages_dir)
 
-    # look for directories in the openmdao level, one up from docs
-    # those directories will be the openmdao packages
-    # auto-generate the top-level index.rst file for _srcdocs, based on
-    # openmdao packages:
+    # look for directories in the top level, one up from docs
+    # those directories will be the packages that
+    # auto-generate at the top-level index.rst file for _srcdocs, based on
+    # the packages that are passed in, which are set in conf.py.
 
-    # to improve the order that the user sees in the source docs, put
-    # the important packages in this list explicitly. Any new ones that
-    # get added will show up at the end.
-    packages = [
-        'approximation_schemes',
-        'core',
-        'components',
-        'drivers',
-        'error_checking',
-        'jacobians',
-        'matrices',
-        'proc_allocators',
-        'recorders',
-        'solvers',
-        'surrogate_models',
-        'solvers.linear',
-        'solvers.nonlinear',
-        'solvers.linesearch',
-        'vectors',
-    ]
+    # to improve the order in which the user sees the source docs,
+    # order the packages in this list explicitly. Any new ones that
+    # are detected will show up at the end of the list.
 
     # everything in openmdao dir that isn't discarded is appended as a source package.
-    for listing in os.listdir(os.path.join(docs_dir, "..")):
+    for listing in os.listdir(os.path.join(top)):
         if os.path.isdir(os.path.join("..", listing)):
             if listing not in IGNORE_LIST and listing not in packages:
                 packages.append(listing)
@@ -96,11 +82,11 @@ Source Docs
         # a sub_package, is a src file, e.g. openmdao.core.component
         sub_packages = []
         package_filename = os.path.join(packages_dir,
-                                        "openmdao." + package + ".rst")
-        package_name = "openmdao." + package
+                                        project_name + "." + package + ".rst")
+        package_name = project_name + "." + package
 
         # the sub_listing is going into each package dir and listing what's in it
-        for sub_listing in sorted(os.listdir(os.path.join("..", package.replace('.','/')))):
+        for sub_listing in sorted(os.listdir(os.path.join(dir, package.replace('.','/')))):
             # don't want to catalog files twice, nor use init files nor test dir
             if (os.path.isdir(sub_listing) and sub_listing != "tests") or \
                (sub_listing.endswith(".py") and not sub_listing.startswith('_')):
@@ -114,7 +100,7 @@ Source Docs
 
             # specifically don't use os.path.join here.  Even windows wants the
             # stuff in the file to have fwd slashes.
-            index.write("   packages/openmdao." + package + "\n")
+            index.write("   packages/" + project_name + "." + package + "\n")
 
             # make subpkg directory (e.g. _srcdocs/packages/core) for ref sheets
             package_dir = os.path.join(packages_dir, package)

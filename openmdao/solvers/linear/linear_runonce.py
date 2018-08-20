@@ -1,6 +1,9 @@
 """Define the LinearRunOnce class."""
+from six import iteritems
+
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
 class LinearRunOnce(LinearBlockGS):
@@ -22,6 +25,8 @@ class LinearRunOnce(LinearBlockGS):
             List of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
+        rel_systems : set of str
+            Names of systems relevant to the current solve.
 
         Returns
         -------
@@ -36,7 +41,6 @@ class LinearRunOnce(LinearBlockGS):
         system = self._system
 
         # Pre-processing
-        self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
         else:  # rev
@@ -44,7 +48,7 @@ class LinearRunOnce(LinearBlockGS):
 
         for vec_name in self._vec_names:
             if vec_name in system._rel_vec_names:
-                self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+                self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
 
         with Recording('LinearRunOnce', 0, self) as rec:
             # Single iteration of GS
@@ -54,3 +58,18 @@ class LinearRunOnce(LinearBlockGS):
             rec.rel = 0.0
 
         return False, 0.0, 0.0
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(LinearRunOnce, self)._declare_options()
+
+        # Remove unused options from base options here, so that users
+        # attempting to set them will get KeyErrors.
+        self.options.undeclare("atol")
+        self.options.undeclare("rtol")
+
+        # this solver does not iterate
+        self.options.undeclare("maxiter")
+        self.options.undeclare("err_on_maxiter")

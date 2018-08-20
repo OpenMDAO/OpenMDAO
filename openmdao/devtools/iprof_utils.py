@@ -4,17 +4,21 @@ import os
 import sys
 import ast
 
-from inspect import getmembers
+from inspect import getmembers, iscode
 from fnmatch import fnmatchcase
 from collections import defaultdict
+from six import string_types
 
-from openmdao.core.system import System
-from openmdao.core.problem import Problem
-from openmdao.core.driver import Driver
-from openmdao.solvers.solver import Solver
-from openmdao.jacobians.jacobian import Jacobian
-from openmdao.matrices.matrix import Matrix
-from openmdao.vectors.vector import Vector, Transfer
+
+class _Options(object):
+    """
+    A fake options class for use when there is no parser.
+    """
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __getattr__(self, name):
+        return None
 
 
 class FunctionFinder(ast.NodeVisitor):
@@ -87,40 +91,115 @@ def find_qualified_name(filename, line, cache, full=True):
 
 # This maps a simple identifier to a group of classes and corresponding
 # glob patterns for each class.
-func_group = {
-    'openmdao': [
-        ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
-    ],
-    'openmdao_all': [
-        ("*", (System, Vector, Transfer, Jacobian, Matrix, Solver, Driver, Problem)),
-    ],
-    'setup': [
-        ("*setup*", (System, Solver, Driver, Problem)),
-    ],
-    'dataflow': [
-        ('*compute*', (System,)),
-        ('*linear*', (System,)),
-        ('*', (Transfer,)),
-    ],
-    'linear': [
-        ('*linear*', (System,)),
-        ('*solve*', (Solver,)),
-    ]
-}
+func_group = {}
 
-try:
-    from mpi4py import MPI
-    from petsc4py import PETSc
-    from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
+base_classes = {}
 
-    #TODO: this needs work.  Still lots of MPI calls not covered here...
-    func_group['mpi'] = [
-        ('*', (PETScTransfer,)),
-        ('get_norm', (PETScVector,)),
-        ('_initialize_data', (PETScVector,))
-    ]
-except ImportError:
-    pass
+
+def _setup_func_group():
+    global func_group, base_classes
+
+    from openmdao.core.system import System
+    from openmdao.core.explicitcomponent import ExplicitComponent
+    from openmdao.core.problem import Problem
+    from openmdao.core.driver import Driver
+    from openmdao.core.total_jac import _TotalJacInfo
+    from openmdao.solvers.solver import Solver, LinearSolver
+    from openmdao.solvers.nonlinear.newton import NewtonSolver
+    from openmdao.solvers.linear.direct import DirectSolver
+    from openmdao.jacobians.jacobian import Jacobian
+    from openmdao.matrices.matrix import Matrix
+    from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+
+    for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
+                   NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer]:
+        base_classes[class_.__name__] = class_
+
+    func_group.update({
+        'openmdao': [
+            ("*", (System, Jacobian, Matrix, Solver, Driver, Problem)),
+        ],
+        'openmdao_all': [
+            ("*", (System, DefaultVector, DefaultTransfer, Jacobian, Matrix, Solver, Driver,
+                   Problem, _TotalJacInfo)),
+        ],
+        'setup': [
+            ("__init__", (System, Solver, Driver, Problem, Jacobian, DefaultVector, _TotalJacInfo,
+                          Matrix)),
+            ("*setup*", (System, Solver, Driver, Problem, Jacobian, DefaultVector, _TotalJacInfo,
+                         Matrix)),
+            ('_configure', (System,)),
+            ('set_initial_values', (System,)),
+            ('_set_initial_conditions', (Problem,)),
+            ('_build', (Matrix,)),
+            ('_add_submat', (Matrix,)),
+            ('_get_maps', (System,)),
+            ('_set_partials_meta', (System,)),
+            ('_init_relevance', (System,)),
+            ('_get_initial_*', (System,)),
+            ('_initialize_*', (DefaultVector,)),
+            ('_create_*', (DefaultVector,)),
+            ('_extract_data', (DefaultVector,)),
+        ],
+        'dataflow': [
+            ('*compute*', (System,)),
+            ('*linear*', (System,)),
+            ('_transfer', (System,)),
+            ('*', (DefaultTransfer,)),
+        ],
+        'linear': [
+            ('_apply_linear', (System,)),
+            ('_setup_jacobians', (System, Solver)),
+            ('_solve_linear', (System,)),
+            ('apply_linear', (System,)),
+            ('solve_linear', (System,)),
+            ('_set_partials_meta', (System, Jacobian)),
+            ('jacobian_context', (System,)),
+            ('_linearize', (System, Solver)),
+            # include NewtonSolver to provide some context
+            ('solve', (LinearSolver, NewtonSolver)),
+            ('_update', (Jacobian,)),
+            ('_apply', (Jacobian,)),
+            ('_initialize', (Jacobian,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('compute_jacvec_product', (System,)),
+        ],
+        'jac': [
+            ('_linearize', (System, DirectSolver)),
+            ('_setup_jacobians', (System,)),
+            ('compute_totals', (_TotalJacInfo, Problem, Driver)),
+            ('compute_totals_approx', (_TotalJacInfo,)),
+            ('_apply_linear', (System,)),
+            ('solve', (LinearSolver, NewtonSolver)),
+            ('_update', (Jacobian,)),
+            ('_initialize', (Jacobian,)),
+        ],
+        'solver': [
+            ('*', (Solver,))
+        ],
+        'driver': [
+            ('*', (Driver,))
+        ],
+        'transfer': [
+            ('*', (DefaultTransfer,)),
+            ('_transfer', (System,))
+        ]
+    })
+
+    try:
+        from mpi4py import MPI
+        from petsc4py import PETSc
+        from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
+
+        #TODO: this needs work.  Still lots of MPI calls not covered here...
+        func_group['mpi'] = [
+            ('*', (PETScTransfer,)),
+            ('get_norm', (PETScVector,)),
+            ('_initialize_data', (PETScVector,))
+        ]
+    except ImportError:
+        pass
 
 
 def _collect_methods(method_patterns):
@@ -155,27 +234,57 @@ def _collect_methods(method_patterns):
         if len(lst) == 1:
             matches[name] = lst[0]
         else:
-            matches[name] = tuple(matches[name])
+            matches[name] = tuple(lst)
 
     return matches
 
 
-def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=None):
+def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=None, filters=None):
     """
     The wrapped function returned from here handles identification of matching calls when called
     as a setprofile callback.
     """
+    if filters:
+        newfilts = []
+        for s in filters:
+            class_name, filt = s.split(' ', 1)
+            class_ = base_classes[class_name]
+            newfilts.append((class_, compile(filt, mode='eval', filename=filt)))
+        filters = newfilts
+
     def _wrapped(frame, event, arg):
         if event == 'call':
             if 'self' in frame.f_locals and frame.f_code.co_name in matches and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
-                stack.append(frame)
-                if do_call is not None:
-                   return do_call(frame, arg, stack, context)
+                pred = True
+                if filters:
+                    inst = frame.f_locals['self']
+                    for class_, filt in filters:
+                        if isinstance(inst, class_):
+                            pred = eval(filt, globals(), frame.f_locals)
+                            break
+                if pred:
+                    stack.append(id(frame))
+                    if do_call is not None:
+                       return do_call(frame, arg, stack, context)
         elif event == 'return' and stack:
-            if frame is stack[-1]:
+            if id(frame) == stack[-1]:
+                stack.pop()
                 if do_ret is not None:
                     do_ret(frame, arg, stack, context)
-                stack.pop()
 
     return _wrapped
+
+
+def _get_methods(options, default):
+    if options.methods is None:
+        methods = func_group[default]
+    elif isinstance(options.methods, string_types):
+        try:
+            methods = func_group[options.methods]
+        except KeyError:
+            raise KeyError("Unknown function group '%s'." % options.methods)
+    else:
+        methods = options.methods
+
+    return methods

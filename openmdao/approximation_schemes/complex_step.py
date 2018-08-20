@@ -1,7 +1,6 @@
 """Complex Step derivative approximations."""
 from __future__ import division, print_function
 
-from collections import namedtuple
 from itertools import groupby
 from six.moves import range
 
@@ -96,11 +95,9 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-
         deriv_type : str
             One of 'total' or 'partial', indicating if total or partial derivatives are
             being approximated.
@@ -119,8 +116,13 @@ class ComplexStep(ApproximationScheme):
         system._inputs._vector_info._under_complex_step = True
 
         # create a scratch array
-        out_tmp = system._outputs.get_data()
+        out_tmp = system._outputs._data.copy()
         results_clone = current_vec._clone(True)
+
+        # To support driver src_indices, we need to override some checks in Jacobian, but do it
+        # selectively.
+        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
+            not isinstance(jac, dict)
 
         for key, approximations in groupby(self._exec_list, self._key_fun):
             # groupby (along with this key function) will group all 'of's that have the same wrt and
@@ -129,18 +131,13 @@ class ComplexStep(ApproximationScheme):
             if form == 'reverse':
                 delta *= -1.0
             fact = 1.0 / delta
-            if deriv_type == 'total':
-                # Sign difference between output and resids
-                fact = -fact
 
             if wrt in system._owns_approx_wrt_idx:
                 in_idx = system._owns_approx_wrt_idx[wrt]
                 in_size = len(in_idx)
             else:
-                if wrt in system._var_abs2meta['input']:
-                    in_size = system._var_abs2meta['input'][wrt]['size']
-                elif wrt in system._var_abs2meta['output']:
-                    in_size = system._var_abs2meta['output'][wrt]['size']
+                if wrt in system._var_abs2meta:
+                    in_size = system._var_abs2meta[wrt]['size']
 
                 in_idx = range(in_size)
 
@@ -155,7 +152,7 @@ class ComplexStep(ApproximationScheme):
                     out_idx = system._owns_approx_of_idx[of]
                     out_size = len(out_idx)
                 else:
-                    out_size = system._var_abs2meta['output'][of]['size']
+                    out_size = system._var_abs2meta[of]['size']
 
                 outputs.append((of, np.zeros((out_size, in_size))))
 
@@ -174,7 +171,11 @@ class ComplexStep(ApproximationScheme):
 
             for of, subjac in outputs:
                 rel_key = abs_key2rel_key(system, (of, wrt))
+                if uses_src_indices:
+                    jac._override_checks = True
                 jac[rel_key] = subjac
+                if uses_src_indices:
+                    jac._override_checks = False
 
         # Turn off complex step.
         system._inputs._vector_info._under_complex_step = False
@@ -222,12 +223,12 @@ class ComplexStep(ApproximationScheme):
             else:
                 inputs._imag_views_flat[in_name][idxs] += delta
 
-        results_vec.get_data(out_tmp)
+        out_tmp = results_vec._data.copy()
         run_model()
 
         # TODO: Grab only results of interest
         result_clone.set_vec(results_vec)
-        results_vec.set_data(out_tmp)
+        results_vec._data[:] = out_tmp
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._imag_views_flat:

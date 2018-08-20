@@ -8,10 +8,8 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 from __future__ import print_function
 
 import sys
-from math import isnan
-from six import iteritems, reraise
-
 import numpy as np
+from six import iteritems, reraise
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
@@ -24,11 +22,11 @@ def _print_violations(unknowns, lower, upper):
 
     Parameters
     ----------
-    unknowns : <Vector>
+    unknowns : Vector
         Vector containing the unknowns.
-    lower : <Vector>
+    lower : Vector
         Vector containing the lower bounds.
-    upper : <Vector>
+    upper : Vector
         Vector containing the upper bounds.
     """
     for name, val in iteritems(unknowns._views_flat):
@@ -79,15 +77,23 @@ class BoundsEnforceLS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(BoundsEnforceLS, self)._declare_options()
         opt = self.options
         opt.declare(
             'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', then the the output vector is backtracked to the "
+            desc="If this is set to 'vector', then the output vector is backtracked to the "
             "first point where violation occured. If it is set to 'scalar' or 'wall', then only "
             "the violated variables are backtracked to their point of violation.")
         opt.declare('print_bound_enforce', default=False,
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
+
+        # Remove unused options from base options here, so that users
+        # attempting to set them will get KeyErrors.
+        opt.undeclare("atol")
+        opt.undeclare("rtol")
+        opt.undeclare("maxiter")
+        opt.undeclare("err_on_maxiter")
 
     def _run_iterator(self):
         """
@@ -113,7 +119,7 @@ class BoundsEnforceLS(NonlinearSolver):
         norm0 = self._iter_get_norm()
         if norm0 == 0.0:
             norm0 = 1.0
-
+        self._norm0 = norm0
         u += du
 
         if self.options['print_bound_enforce']:
@@ -317,6 +323,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
+        self._norm0 = norm0
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # Further backtracking if needed.
@@ -355,7 +362,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         reraise(*exc)
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
-            self._iter_count += 1
 
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))

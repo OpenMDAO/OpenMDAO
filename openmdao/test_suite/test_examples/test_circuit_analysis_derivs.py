@@ -1,11 +1,12 @@
 import unittest
 
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 import numpy as np
 
 from openmdao.api import ExplicitComponent, ImplicitComponent, NewtonSolver, DirectSolver, ArmijoGoldsteinLS
 from openmdao.api import IndepVarComp, Problem, Group
+
 
 class TestNonlinearCircuit(unittest.TestCase):
 
@@ -16,8 +17,10 @@ class TestNonlinearCircuit(unittest.TestCase):
         from openmdao.api import IndepVarComp, Problem, Group
 
         class Resistor(ExplicitComponent):
+            """Computes current across a resistor using Ohm's law."""
+
             def initialize(self):
-                self.metadata.declare('R', default=1., desc='Resistance in Ohms')
+                self.options.declare('R', default=1., desc='Resistance in Ohms')
 
             def setup(self):
                 self.add_input('V_in', units='V')
@@ -25,19 +28,20 @@ class TestNonlinearCircuit(unittest.TestCase):
                 self.add_output('I', units='A')
 
                 # partial derivs are constant, so we can assign their values in setup
-                R = self.metadata['R']
-                self.declare_partials('I', 'V_in', val=1/R)
-                self.declare_partials('I', 'V_out', val=-1/R)
+                R = self.options['R']
+                self.declare_partials('I', 'V_in', val=1 / R)
+                self.declare_partials('I', 'V_out', val=-1 / R)
 
-            def compute(self, i, o):
-                deltaV = i['V_in'] - i['V_out']
-                o['I'] = deltaV / self.metadata['R']
-
+            def compute(self, inputs, outputs):
+                deltaV = inputs['V_in'] - inputs['V_out']
+                outputs['I'] = deltaV / self.options['R']
 
         class Diode(ExplicitComponent):
+            """Computes current across a diode using the Shockley diode equation."""
+
             def initialize(self):
-                self.metadata.declare('Is', default=1e-15, desc='Saturation current in Amps')
-                self.metadata.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
+                self.options.declare('Is', default=1e-15, desc='Saturation current in Amps')
+                self.options.declare('Vt', default=.025875, desc='Thermal voltage in Volts')
 
             def setup(self):
                 self.add_input('V_in', units='V')
@@ -48,48 +52,50 @@ class TestNonlinearCircuit(unittest.TestCase):
                 self.declare_partials('I', 'V_in')
                 self.declare_partials('I', 'V_out')
 
-            def compute(self, i, o):
-                deltaV = i['V_in'] - i['V_out']
-                Is = self.metadata['Is']
-                Vt = self.metadata['Vt']
-                o['I'] = Is * np.exp(deltaV / Vt - 1)
+            def compute(self, inputs, outputs):
+                deltaV = inputs['V_in'] - inputs['V_out']
+                Is = self.options['Is']
+                Vt = self.options['Vt']
+                outputs['I'] = Is * np.exp(deltaV / Vt - 1)
 
-            def compute_partials(self, i, J):
-                deltaV = i['V_in'] - i['V_out']
-                Is = self.metadata['Is']
-                Vt = self.metadata['Vt']
+            def compute_partials(self, inputs, J):
+                deltaV = inputs['V_in'] - inputs['V_out']
+                Is = self.options['Is']
+                Vt = self.options['Vt']
                 I = Is*np.exp(deltaV/Vt-1)
 
                 J['I', 'V_in'] = I/Vt
                 J['I', 'V_out'] = -I/Vt
 
         class Node(ImplicitComponent):
+            """Computes voltage residual across a node based on incoming and outgoing current."""
+
             def initialize(self):
-                self.metadata.declare('n_in', default=1, type_=int, desc='number of connections with + assumed in')
-                self.metadata.declare('n_out', default=1, type_=int, desc='number of current connections + assumed out')
+                self.options.declare('n_in', default=1, types=int, desc='number of connections with + assumed in')
+                self.options.declare('n_out', default=1, types=int, desc='number of current connections + assumed out')
 
             def setup(self):
                 self.add_output('V', val=5., units='V')
 
-                for i in range(self.metadata['n_in']):
+                for i in range(self.options['n_in']):
                     i_name = 'I_in:{}'.format(i)
                     self.add_input(i_name, units='A')
                     self.declare_partials('V', i_name, val=1)
 
-                for i in range(self.metadata['n_out']):
+                for i in range(self.options['n_out']):
                     i_name = 'I_out:{}'.format(i)
                     self.add_input(i_name, units='A')
                     self.declare_partials('V', i_name, val=-1)
 
-                #note: we don't declare any partials wrt `V` here,
-                #      because the residual doesn't directly depend on it
+                    # note: we don't declare any partials wrt `V` here,
+                    #      because the residual doesn't directly depend on it
 
-            def apply_nonlinear(self, i, o, r):
-                r['V'] = 0.
-                for i_conn in range(self.metadata['n_in']):
-                    r['V'] += i['I_in:{}'.format(i_conn)]
-                for i_conn in range(self.metadata['n_out']):
-                    r['V'] -= i['I_out:{}'.format(i_conn)]
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['V'] = 0.
+                for i_conn in range(self.options['n_in']):
+                    residuals['V'] += inputs['I_in:{}'.format(i_conn)]
+                for i_conn in range(self.options['n_out']):
+                    residuals['V'] -= inputs['I_out:{}'.format(i_conn)]
 
         class Circuit(Group):
 
@@ -143,7 +149,8 @@ class TestNonlinearCircuit(unittest.TestCase):
         assert_rel_error(self, p['circuit.R1.I'], 0.09908303, 1e-5)
         assert_rel_error(self, p['circuit.R2.I'], 0.00091697, 1e-5)
         assert_rel_error(self, p['circuit.D1.I'], 0.00091697, 1e-5)
-        # 'Sanity check: shoudl sum to .1 Amps
+
+        # sanity check: should sum to .1 Amps
         assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
 

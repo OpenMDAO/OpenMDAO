@@ -1,11 +1,15 @@
 """A bunch of MPI utilities."""
 
+from contextlib import contextmanager
+import io
 import os
 import sys
-import io
+import traceback
 import unittest
 
 from six import PY3
+
+from openmdao.core.analysis_error import AnalysisError
 
 
 def _redirect_streams(to_fd):
@@ -44,7 +48,13 @@ def use_proc_files():
     Cause stdout/err from each MPI process to be written to [rank].out.
     """
     if MPI is not None:
-        ofile = open("%d.out" % MPI.COMM_WORLD.rank, 'wb')
+        working_dir = os.environ.get('PROC_FILES_DIR')
+        if not working_dir:
+            ofile = open("%d.out" % MPI.COMM_WORLD.rank, 'wb')
+        else:
+            if not os.path.isdir(working_dir):
+                raise RuntimeError("directory '%s' does not exist." % working_dir)
+            ofile = open(os.path.join(working_dir, "%d.out" % MPI.COMM_WORLD.rank), 'wb')
         _redirect_streams(ofile.fileno())
 
 
@@ -123,6 +133,38 @@ class FakeComm(object):
         self.size = 1
 
 
+@contextmanager
+def multi_proc_fail_check(comm):
+    """
+    Raise an AnalysisError on all procs if it is raised on one.
+
+    Wrap this around code that you want to globally fail if it fails
+    on any MPI process in comm.  If not running under MPI, don't
+    handle any exceptions.
+
+    Parameters
+    ----------
+    comm : MPI communicator or None
+        Communicator from the ParallelGroup that owns the calling solver.
+    """
+    if MPI is None:
+        yield
+    else:
+        try:
+            yield
+        except AnalysisError:
+            msg = traceback.format_exc()
+        else:
+            msg = ''
+
+        fails = comm.allgather(msg)
+
+        for i, f in enumerate(fails):
+            if f:
+                raise AnalysisError("AnalysisError raised in rank %d: traceback follows\n%s"
+                                    % (i, f))
+
+
 if MPI:
     def mpirun_tests():
         """
@@ -159,5 +201,5 @@ else:
     mpirun_tests = unittest.main
 
 
-if os.environ.get('USE_PROC_FILES'):
+if os.environ.get('USE_PROC_FILES') or os.environ.get('PROC_FILES_DIR'):
     use_proc_files()

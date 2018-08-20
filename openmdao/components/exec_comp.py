@@ -1,7 +1,5 @@
 """Define the ExecComp class, a component that evaluates an expression."""
-import math
 import re
-from collections import OrderedDict
 from itertools import product
 
 import numpy as np
@@ -16,7 +14,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
-_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc', 'var_set',
+_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
                  'flat_src_indices'}
 
@@ -37,6 +35,17 @@ def array_idx_iter(shape):
 class ExecComp(ExplicitComponent):
     """
     A component defined by an expression string.
+
+    Attributes
+    ----------
+    _kwargs : dict of named args
+        Initial values of variables.
+    _exprs : list
+        List of expressions.
+    _codes : list
+        List of code objects.
+    complex_stepsize : double
+        Step size used for complex step which is used for derivatives.
     """
 
     def __init__(self, exprs, **kwargs):
@@ -111,7 +120,7 @@ class ExecComp(ExplicitComponent):
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
-        \*\*kwargs : dict of named args
+        **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
             to contain metadata.  To set the initial value in addition to
@@ -127,7 +136,7 @@ class ExecComp(ExplicitComponent):
         ExecComp that takes an array 'x' as input and outputs a float variable
         'y' which is the sum of the entries in 'x'.
 
-        ::
+        .. code-block:: python
 
             import numpy
             from openmdao.api import ExecComp
@@ -140,12 +149,11 @@ class ExecComp(ExplicitComponent):
         If you want to assign certain metadata for 'x' in addition to its
         initial value, you can do it as follows:
 
-        ::
+        .. code-block:: python
 
             excomp = ExecComp('y=sum(x)',
                               x={'value': numpy.ones(10,dtype=float),
-                                 'units': 'ft',
-                                 'var_set': 3})
+                                 'units': 'ft'})
         """
         super(ExecComp, self).__init__()
 
@@ -251,6 +259,11 @@ class ExecComp(ExplicitComponent):
     def __getstate__(self):
         """
         Return state as a dict.
+
+        Returns
+        -------
+        dict
+            State to get.
         """
         state = self.__dict__.copy()
         del state['_codes']
@@ -259,6 +272,11 @@ class ExecComp(ExplicitComponent):
     def __setstate__(self, state):
         """
         Restore state from `state`.
+
+        Parameters
+        ----------
+        state : dict
+            State to restore.
         """
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
@@ -346,6 +364,15 @@ class _TmpDict(object):
     __setitem__.  After values have been modified they are managed
     thereafter by the wrapper.  This protects the inner dict from
     modification.
+
+    Attributes
+    ----------
+    _inner : dict-like
+        The dictionary to be wrapped.
+    _changed : dict-like
+        The key names for the values that were changed.
+    _complex : bool
+        If True, return a complex version of values from __getitem__.
     """
 
     def __init__(self, inner, return_complex=False):
@@ -356,7 +383,6 @@ class _TmpDict(object):
         ----------
         inner : dict-like
             The dictionary to be wrapped.
-
         return_complex : bool, optional
             If True, return a complex version of values from __getitem__
         """
@@ -393,6 +419,13 @@ class _IODict(object):
 
     Items are first looked for in the outputs
     and then the inputs.
+
+    Attributes
+    ----------
+    _inputs : dict-like
+        The inputs object to be wrapped.
+    _outputs : dict-like
+        The outputs object to be wrapped.
     """
 
     def __init__(self, outputs, inputs):
@@ -434,9 +467,10 @@ def _import_functs(mod, dct, names=None):
 
     Parameters
     ----------
+    mod : object
+        Module to check.
     dct : dict
         Dictionary that will contain the mapping
-
     names : iter of str, optional
         If supplied, only map attrs that match the given names
     """

@@ -13,13 +13,19 @@ class WeightedInterpolator(NNBase):
     @staticmethod
     def _get_weights(ndist, dist_eff):
         """
-        Get weights.
+        Compute the weights based on the distance and distance effect.
 
         Parameters
         ----------
-        ndist :
+        ndist : ndarray
+            Distances from point to nearest neighbors.
+        dist_eff : float
+            Exponent used for the distance weighting.
 
-        dist_eff :
+        Returns
+        -------
+        ndarray
+            Weights for each neighbor based on distance.
         """
         # Find the weighted neighbors per defined formula for distance effect
         dist = np.power(ndist, dist_eff)
@@ -36,22 +42,29 @@ class WeightedInterpolator(NNBase):
 
         return weights
 
-    def __call__(self, prediction_points, n=5, dist_eff=0):
+    def __call__(self, prediction_points, num_neighbors=5, dist_eff=0):
         """
         Do interpolation.
 
         Parameters
         ----------
-        prediction_points : array
+        prediction_points : ndarray
+            Points at which interpolation is done.
+        num_neighbors :  int
+            Number of neighbors to use.
+        dist_eff : float
+            Exponent used for the distance weighting. Using dist_eff=0 will default to
+            `self._indep_dims + 1`.
 
-        n :  int
-
-        dist_eff : int
+        Returns
+        -------
+        ndarray
+            Interpolated values at the prediction points.
         """
-        if self._ntpts < n:
+        if self._ntpts < num_neighbors:
             raise ValueError('WeightedInterpolant does not have sufficient '
-                             'training data to use n={0}, only {1} points'
-                             ' available.'.format(n, self._ntpts))
+                             'training data to use num_neighbors={0}, only {1} points'
+                             ' available.'.format(num_neighbors, self._ntpts))
 
         if dist_eff == 0:
             # If default, use #dims + 1
@@ -66,7 +79,7 @@ class WeightedInterpolator(NNBase):
         # Find them neigbors
         # KData query takes (data, #ofneighbors) to determine closest
         # training points to predicted data
-        ndist, nloc = self._KData.query(normalized_pts.real, n)
+        ndist, nloc = self._KData.query(normalized_pts.real, num_neighbors)
 
         # Setup problem
 
@@ -86,29 +99,36 @@ class WeightedInterpolator(NNBase):
 
         return predz
 
-    def gradient(self, prediction_points, n=5, dist_eff=0):
+    def gradient(self, prediction_points, num_neighbors=5, dist_eff=0):
         """
         Find the gradient at each location of a set of supplied predicted points.
 
         Parameters
         ----------
-        prediction_points : array
+        prediction_points : ndarray
+            Points at which interpolation is done.
+        num_neighbors :  int
+            Number of neighbors to use.
+        dist_eff : float
+            Exponent used for the distance weighting. Using dist_eff=0 will default to
+            `self._indep_dims + 1`.
 
-        n: int
-
-        dist_eff : int
+        Returns
+        -------
+        ndarray
+            Gradient values at the prediction points.
         """
-        if self._ntpts < n:
+        if self._ntpts < num_neighbors:
             raise ValueError('WeightedInterpolant does not have sufficient '
-                             'training data to use n={0}, only {1} points'
-                             ' available.'.format(n, self._ntpts))
+                             'training data to use num_neighbors={0}, only {1} points'
+                             ' available.'.format(num_neighbors, self._ntpts))
 
         if dist_eff == 0:
             # If default, use #dims + 1
             dist_eff = self._indep_dims + 1
 
         if len(prediction_points.shape) == 1:
-            # Reshape vector to n x 1 array
+            # Reshape vector to num_neighbors x 1 array
             prediction_points.shape = (1, prediction_points.shape[0])
 
         normalized_pts = (prediction_points - self._tpm) / self._tpr
@@ -117,7 +137,7 @@ class WeightedInterpolator(NNBase):
                 np.allclose(self._pt_cache[0], normalized_pts):
             ndist, nloc = self._pt_cache[1:]
         else:
-            ndist, nloc = self._KData.query(normalized_pts, n)
+            ndist, nloc = self._KData.query(normalized_pts, num_neighbors)
 
         # Reshape ndist for 1D problems.
         if len(ndist.shape) == 1:

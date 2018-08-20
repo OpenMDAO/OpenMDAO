@@ -1,39 +1,56 @@
-"""Test the ScipyIterativeSolver linear solver class."""
+"""Test the ScipyKrylov linear solver class."""
 
 from __future__ import division, print_function
 
+from six import iteritems
 import unittest
 import warnings
 
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
-from openmdao.solvers.linear.scipy_iter_solver import ScipyIterativeSolver, gmres
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
+from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
 
-class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
+# use this to fake out the TestImplicitGroup so it'll use the solver we want.
+def krylov_factory(solver):
+    def f(junk=None):
+        return ScipyKrylov(solver=solver)
+    return f
 
-    linear_solver_class = ScipyIterativeSolver
+
+class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
+
+    linear_solver_name = 'gmres'
+    linear_solver_class = krylov_factory('gmres')
 
     def test_options(self):
         """Verify that the SciPy solver specific options are declared."""
 
         group = Group()
-        group.linear_solver = ScipyIterativeSolver()
+        group.linear_solver = self.linear_solver_class()
 
-        assert(group.linear_solver.options['solver'] == gmres)
+        self.assertEqual(group.linear_solver.options['solver'], self.linear_solver_name)
 
     def test_solve_linear_scipy(self):
-        """Solve implicit system with ScipyIterativeSolver."""
+        """Solve implicit system with ScipyKrylov."""
 
-        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver)
+        # use ScipyIterativeSolver here to check for deprecation warning and verify that the deprecated
+        # class still gets the right answer without duplicating this test.
+        with warnings.catch_warnings(record=True) as w:
+            group = TestImplicitGroup(lnSolverClass=lambda : ScipyIterativeSolver(solver=self.linear_solver_name))
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead.")
 
         p = Problem(group)
         p.setup(check=False)
@@ -49,21 +66,19 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_const(0.0)
         group.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         group.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
-        """Verify that ScipyIterativeSolver abides by the 'maxiter' option."""
+        """Verify that ScipyKrylov abides by the 'maxiter' option."""
 
-        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver)
+        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
@@ -98,9 +113,9 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
 
-        g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=ScipyIterativeSolver))
+        grp = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
+        g1 = model.add_subsystem('g1', grp)
 
-        p.model.linear_solver.options['maxiter'] = 1
         p.setup(check=False)
 
         p.set_solver_print(level=0)
@@ -116,10 +131,7 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        # The empty first entry in _data is due to the dummy
-        #     variable being in a different variable set not owned by g1
-        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -130,12 +142,11 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, g1.expected_solution, 3e-15)
 
     def test_preconditioner_deprecation(self):
 
-        group = TestImplicitGroup(lnSolverClass=ScipyIterativeSolver)
+        group = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
 
         msg = "The 'preconditioner' property provides backwards compatibility " \
             + "with OpenMDAO <= 1.x ; use 'precon' instead."
@@ -156,24 +167,95 @@ class TestScipyIterativeSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         self.assertEqual(str(w[0].message), msg)
 
+    def test_linear_solution_cache(self):
+        # Test derivatives across a converged Sellar model. When caching
+        # is performed, the second solve takes less iterations than the
+        # first one.
 
-class TestScipyIterativeSolverFeature(unittest.TestCase):
+        # Forward mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = ScipyKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
+
+        # Reverse mode
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('d1', Comp4LinearCacheTest(), promotes=['x', 'y'])
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.linear_solver = ScipyKrylov()
+
+        model.add_design_var('x', cache_linear_solution=True)
+        model.add_objective('y', cache_linear_solution=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        icount1 = prob.model.linear_solver._iter_count
+        J = prob.driver._compute_totals(of=['y'], wrt=['x'], global_names=False, return_format='flat_dict')
+        icount2 = prob.model.linear_solver._iter_count
+
+        # Should take less iterations when starting from previous solution.
+        self.assertTrue(icount2 < icount1)
+
+
+# class TestScipyKrylovBICG(TestScipyKrylov):
+#     # This will run all of the gmres tests with the bicg solver.
+#
+#     linear_solver_name = 'bicg'
+#     linear_solver_class = krylov_factory('bicg')
+#
+#
+# class TestScipyKrylovBICGSTAB(TestScipyKrylov):
+#     # This will run all of the gmres tests with the bicgstab solver.
+#
+#     linear_solver_name = 'bicgstab'
+#     linear_solver_class = krylov_factory('bicgstab')
+
+
+class TestScipyKrylovFeature(unittest.TestCase):
 
     def test_feature_simple(self):
         """Tests feature for adding a Scipy GMRES solver and calculating the
         derivatives."""
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov
         from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 
         # Tests derivatives on a simple comp that defines compute_jacvec.
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                             promotes=['length'])
         model.add_subsystem('mycomp', TestExplCompSimpleDense(),
                             promotes=['length', 'width', 'area'])
 
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -189,13 +271,13 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
     def test_specify_solver(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, \
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, \
              NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -212,7 +294,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup()
         prob.run_model()
@@ -227,11 +309,11 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
     def test_feature_maxiter(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NonlinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -248,7 +330,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.options['maxiter'] = 3
 
         prob.setup()
@@ -264,11 +346,11 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
     def test_feature_atol(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NonlinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NonlinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -285,7 +367,7 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
 
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.linear_solver.options['atol'] = 1.0e-20
 
         prob.setup()
@@ -301,13 +383,13 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
     def test_specify_precon(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyIterativeSolver, NewtonSolver, \
+        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NewtonSolver, \
              LinearBlockGS, ExecComp
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -322,11 +404,11 @@ class TestScipyIterativeSolverFeature(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = ScipyIterativeSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
 
-        prob.model.linear_solver.precon = LinearBlockGS()
-        prob.model.linear_solver.precon.options['maxiter'] = 2
+        model.linear_solver.precon = LinearBlockGS()
+        model.linear_solver.precon.options['maxiter'] = 2
 
         prob.setup()
         prob.run_model()

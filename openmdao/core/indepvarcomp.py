@@ -89,11 +89,12 @@ class IndepVarComp(ExplicitComponent):
 
         if len(self._indep) == 0 and len(self._indep_external) == 0:
             raise RuntimeError("No outputs (independent variables) have been declared for "
-                               "this component. They must either be declared during "
-                               "instantiation or by calling add_output afterwards.")
+                               "component '{}'. They must either be declared during "
+                               "instantiation or by calling "
+                               "add_output afterwards.".format(self.pathname))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, var_set=0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
         """
         Add an independent variable to this component.
 
@@ -133,25 +134,22 @@ class IndepVarComp(ExplicitComponent):
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        var_set : hashable object
-            For advanced users only. ID or color for this variable, relevant for reconfigurability.
-            Default is 0.
         """
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref, 'var_set': var_set}
+                  'res_ref': res_ref}
         self._indep_external.append((name, val, kwargs))
 
-    def _linearize(self, do_nl=False, do_ln=False):
+    def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        do_nl : boolean
-            Flag indicating if the nonlinear solver should be linearized.
-        do_ln : boolean
-            Flag indicating if the linear solver should be linearized.
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
         """
         # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         pass

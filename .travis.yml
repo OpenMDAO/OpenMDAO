@@ -2,7 +2,9 @@ branches:
   only:
   - master
 
-sudo: false
+group: deprecated-2017Q4
+
+filter_secrets: false
 
 os:
 - linux
@@ -10,14 +12,22 @@ os:
 language: generic
 
 env:
-- PY=2.7 MPI=1
-- PY=3.4 MPI=1
-- PY=2.7 MPI=
-- PY=3.4 MPI=
-- PY=3.6 MPI=
+  global:
+    - secure: Rx/uHnF0j1Cp/Ume9lQE5Wu2oM6aA41oFI22+oXmw798vmyeqHAocL6hqva0navjqx9FWLdPHn1LTAjLsHop+tavpMR1Qzu3P/5FEcvr/qDi68osWZq3oCs2WRJLo0BFaG8jQvmMd+RxkczVxWj+D2K+ywgkNb1KABP5Xv6lnTtwfTH0lteCMkFcnTnC4jcan1VGdvLyxewzMbdbuvTNVukAdrVxbwZMJrDyPPf7aEZ+t50C/pkRYSVf/2/YyFq5hgywqZZe2RInO7UeyHWhP+giyQsVkL0nWpA5zcgKjvYKnZbAt95uzTmwabs4e6BpipvbcX2M7aMyqMaz6OD36cDScMeOFn/FIQC3UalkvwEH0yvzI3CDncTjWy4xkxnfort7XKeQbrSqrX0AcDu462ke95JHZsIfL402lgtcW4aLcPUPs2MPrin1ENLBK29Jm+5LIM+22ISWd4anhpjE70SgOhsXrHrzL4n4kfxb4rsm483aeXEszlxWu56QNQ5EYCHpLY+aF9XOkFdAMM/FBRwlxhTySscPOANfd4GiZxSPxDOEHoEHKoy/CPo4jkUlFrqZIe+VnHmNPgGH/eU2nCNMhVeH/zJ5kOx7wns0SdorUSuQIywg07BBJtizzSUtzofd8kYRdVMyH4RTAfoBeGPUeFV45N5i07N6ucagL3s=
+  matrix:
+    - PY=2.7 NUMPY=1.12
+    - PY=2.7 NUMPY=1.12 PETSc=3.8.1
+    - PY=2.7 NUMPY=1.12 PETSc=3.9.1
+    - PY=3.6 NUMPY=1.12
+    - PY=3.6 NUMPY=1.14 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.14 PETSc=3.9.1
+
+git:
+  depth: 99999
 
 addons:
   apt:
+    update: true
     sources:
     - ubuntu-toolchain-r-test
     packages:
@@ -29,74 +39,145 @@ addons:
     ssh_known_hosts:
     - web543.webfaction.com
 
+cache:
+  apt: true
+  directories:
+    - $HOME/.cache/pip
+    - $HOME/pyoptsparse
+    - $HOME/miniconda
+    - $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse
+
 notifications:
   slack:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    openssl aes-256-cbc -K $encrypted_67e08862e114_key -iv $encrypted_67e08862e114_iv -in deploy.rsa.enc -out /tmp/deploy.rsa -d;
+
+# Check for existence of files to determine if cache exists
+# If the dir doesn't exist, but is slated to be cached later,
+# Travis unhelpfully creates it, which then causes "dir already exists"
+# errors when you go to actually install the thing, so we must non-intuitively
+# delete the file before re-creating it later.
+- if [ -f $HOME/miniconda/bin/python$PY ]; then
+    echo "cached miniconda found -- nothing to do";
+  else
+    NOT_CACHED_CONDA=1;
+    rm -rf $HOME/miniconda;
   fi
-- OS=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "MacOSX"; else echo "Linux"; fi)
-- if [ "$OS" = "MacOSX" ] && [ "$MPI" ]; then
-    brew install openmpi;
+
+- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
+    echo "cached pyoptsparse found -- nothing to do";
+  else
+    NOT_CACHED_PYOPTSPARSE=1;
+    rm -rf $HOME/pyoptsparse
+    rm -rf $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse;
   fi
-- wget "https://repo.continuum.io/miniconda/Miniconda-latest-$OS-x86_64.sh" -O miniconda.sh
-- chmod +x miniconda.sh
-- if [ "$OS" = "Linux" ]; then ./miniconda.sh -b  -p /home/travis/miniconda; fi
-- if [ "$OS" = "MacOSX" ]; then ./miniconda.sh -b  -p /Users/travis/miniconda; fi
-- PATHPREFIX=$(if [[ "$TRAVIS_OS_NAME" = "osx" ]]; then echo "/Users/travis/miniconda/bin";
-  else echo "/home/travis/miniconda/bin"; fi)
-- export PATH=$PATHPREFIX:$PATH
-- export OPENMDAO_TEST_DOCS=1
-- if [[ "$TRAVIS_PULL_REQUEST" = "false" ]]; then
-    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+
+- if [ -f $HOME/.cache/pip ]; then
+    echo "cached pip found -- nothing to do";
+  else
+    NOT_CACHED_PIP=1;
+    rm -rf $HOME/.cache/pip;
+  fi
+
+- if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+    MASTER_BUILD=1;
   fi
 
 install:
-- conda install --yes python=$PY numpy==1.11.2 scipy nose sphinx mock swig
-- if [ "$OS" = "Linux" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp27-none-linux_x86_64.whl;
-  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py3-none-linux_x86_64.whl;
-  fi fi
-- if [ "$OS" = "MacOSX" ]; then if [ "$PY" = "2.7" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-py2-none-macosx_10_5_x86_64.whl;
-  elif [ "$PY" = "3.4" ]; then pip install https://openmdao.org/dists/pyoptsparse-1.0.0-cp34-none-macosx_10_5_x86_64.whl;
-  fi fi
-- if [ "$MPI" ]; then pip install mpi4py; pip install git+https://bitbucket.org/petsc/petsc4py@3.7.0;
+# get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
+- if [ "$MASTER_BUILD" ]; then
+    openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+    eval "$(ssh-agent -s)";
+    chmod 600 /tmp/travis_deploy_rsa;
+    ssh-add /tmp/travis_deploy_rsa;
+    echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
-- pip install redbaron
-- pip install git+https://github.com/OpenMDAO/testflo.git
-- pip install coverage
-- pip install coveralls
-- pip install -e .
+
+- if [ "$NOT_CACHED_CONDA" ]; then
+    wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p $HOME/miniconda;
+    export PATH=$HOME/miniconda/bin:$PATH;
+    conda install --yes python=$PY;
+    if [ "$UPLOAD_DOCS" ]; then
+      conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
+    else
+      conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+    fi
+  else
+    export PATH=$HOME/miniconda/bin:$PATH;
+  fi
+
+- if [ "$NOT_CACHED_PIP" ]; then
+    pip install --upgrade pip;
+
+    if [ "$PETSc" ]; then
+      pip install mpi4py;
+      pip install petsc4py==$PETSc;
+    fi
+
+    pip install redbaron;
+    pip install git+https://github.com/OpenMDAO/testflo.git;
+    pip install coverage;
+    pip install git+https://github.com/swryan/coveralls-python@work;
+  fi
+
+- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
+    git clone https://github.com/OpenMDAO/pyoptsparse.git;
+    cd pyoptsparse;
+
+    if [ "$MASTER_BUILD" ]; then
+      cd pyoptsparse/pySNOPT/source;
+      scp -r "$SNOPT_LOCATION" .;
+      cd ../../..;
+    fi
+
+    python setup.py install;
+    cd ..;
+  fi
+
+# do this after petsc install to avoid weird petsc install failure
+- if [ "$NOT_CACHED_CONDA" ]; then
+    conda install --yes matplotlib;
+  fi
+
+# finally, install OpenMDAO
+- pip install .;  # Not using -e on purpose here, to catch pkging errors
+
+# display summary of installed packages and their versions
+- pip list
 
 script:
 # make docs first
 - cd openmdao/docs;
-- make all
-- cd ../..
-# run all openmdao tests
-- testflo -n 1 -m "ptest*"
-- testflo -n 1 --coverage --coverpkg openmdao
+- if [ "$PETSc" ]; then
+    make travis;
+  fi
+
+# run the tests from down here to see if it can work without being at top level
+# only do coverage on the upload machine.
+- if [ "$UPLOAD_DOCS" ]; then
+    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\*;
+  else
+    testflo -n 1 --timeout=120 openmdao;
+  fi
 
 after_success:
-- coveralls
-
-before_deploy:
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    eval "$(ssh-agent -s)";
-    chmod 600 /tmp/deploy.rsa;
-    ssh-add /tmp/deploy.rsa;
+# again, only run coverage operations on the upload machine after success.
+- if [ "$UPLOAD_DOCS" ]; then
+    coveralls --rcfile=../../.coveragerc --output=coveralls.json;
+    sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    coveralls --upload=coveralls-upd.json;
   fi
 
 deploy:
   provider: script
   skip_cleanup: true
   script:
-  - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-      if [ "$MPI" ] && [ "$PY" = "3.4" ]; then
-        cd openmdao/docs;
-        rsync -r --delete-after -v _build/html/* openmdao@web543.webfaction.com:webapps/bluedocs;
-      fi
+  # only deploy docs in a build after a PR or merge is accepted
+  - if [ "$MASTER_BUILD" ] && [ "$UPLOAD_DOCS" ]; then
+      python _utils/upload_doc_version.py;
     fi
   on:
     branch: master

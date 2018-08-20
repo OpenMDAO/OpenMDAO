@@ -1,37 +1,24 @@
 """ Unit test for the solver printing behavior. """
 
-from six.moves import cStringIO as StringIO
-
-import sys, os
+import os
+import sys
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver, Group, PETScVector, \
-                         IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
+from openmdao.api import Problem, NewtonSolver, ScipyKrylov, Group, PETScVector, \
+    IndepVarComp, NonlinearBlockGS, NonlinearBlockJac, LinearBlockGS
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
+
+from openmdao.utils.general_utils import run_model
 from openmdao.utils.mpi import MPI
-
-
-def run_model(prob):
-    """Call `run_model` on problem and capture output."""
-    stdout = sys.stdout
-    strout = StringIO()
-
-    sys.stdout = strout
-    try:
-        prob.run_model()
-    finally:
-        sys.stdout = stdout
-
-    return strout.getvalue()
 
 
 class TestSolverPrint(unittest.TestCase):
 
     def test_feature_iprint_neg1(self):
-        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
@@ -40,7 +27,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.setup()
 
         newton = prob.model.nonlinear_solver = NewtonSolver()
-        scipy = prob.model.linear_solver = ScipyIterativeSolver()
+        scipy = prob.model.linear_solver = ScipyKrylov()
 
         newton.options['maxiter'] = 2
 
@@ -53,7 +40,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
     def test_feature_iprint_0(self):
-        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
@@ -62,7 +49,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.setup()
 
         newton = prob.model.nonlinear_solver = NewtonSolver()
-        scipy = prob.model.linear_solver = ScipyIterativeSolver()
+        scipy = prob.model.linear_solver = ScipyKrylov()
 
         newton.options['maxiter'] = 1
 
@@ -75,7 +62,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
     def test_feature_iprint_1(self):
-        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
@@ -84,7 +71,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.setup()
 
         newton = prob.model.nonlinear_solver = NewtonSolver()
-        scipy = prob.model.linear_solver = ScipyIterativeSolver()
+        scipy = prob.model.linear_solver = ScipyKrylov()
 
         newton.options['maxiter'] = 20
 
@@ -96,7 +83,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
     def test_feature_iprint_2(self):
-        from openmdao.api import Problem, NewtonSolver, ScipyIterativeSolver
+        from openmdao.api import Problem, NewtonSolver, ScipyKrylov
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem()
@@ -105,7 +92,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.setup()
 
         newton = prob.model.nonlinear_solver = NewtonSolver()
-        scipy = prob.model.linear_solver = ScipyIterativeSolver()
+        scipy = prob.model.linear_solver = ScipyKrylov()
 
         newton.options['maxiter'] = 20
 
@@ -133,7 +120,7 @@ class TestSolverPrint(unittest.TestCase):
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
@@ -141,7 +128,7 @@ class TestSolverPrint(unittest.TestCase):
         g1.linear_solver = LinearBlockGS()
 
         g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyIterativeSolver()
+        g2.linear_solver = ScipyKrylov()
         g2.linear_solver.precon = LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
@@ -211,7 +198,7 @@ class TestSolverPrint(unittest.TestCase):
     def test_feature_set_solver_print1(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, LinearBlockGS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -229,7 +216,7 @@ class TestSolverPrint(unittest.TestCase):
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
@@ -237,7 +224,7 @@ class TestSolverPrint(unittest.TestCase):
         g1.linear_solver = LinearBlockGS()
 
         g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyIterativeSolver()
+        g2.linear_solver = ScipyKrylov()
         g2.linear_solver.precon = LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
@@ -249,7 +236,7 @@ class TestSolverPrint(unittest.TestCase):
     def test_feature_set_solver_print2(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, LinearBlockGS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -267,7 +254,7 @@ class TestSolverPrint(unittest.TestCase):
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
@@ -275,7 +262,7 @@ class TestSolverPrint(unittest.TestCase):
         g1.linear_solver = LinearBlockGS()
 
         g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyIterativeSolver()
+        g2.linear_solver = ScipyKrylov()
         g2.linear_solver.precon = LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
@@ -288,7 +275,7 @@ class TestSolverPrint(unittest.TestCase):
     def test_feature_set_solver_print3(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyIterativeSolver, LinearBlockGS
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
         from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = Problem()
@@ -306,7 +293,7 @@ class TestSolverPrint(unittest.TestCase):
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
@@ -314,7 +301,7 @@ class TestSolverPrint(unittest.TestCase):
         g1.linear_solver = LinearBlockGS()
 
         g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyIterativeSolver()
+        g2.linear_solver = ScipyKrylov()
         g2.linear_solver.precon = LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
@@ -347,7 +334,7 @@ class MPITests(unittest.TestCase):
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
         model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyIterativeSolver()
+        model.linear_solver = ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
@@ -355,13 +342,13 @@ class MPITests(unittest.TestCase):
         g1.linear_solver = LinearBlockGS()
 
         g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyIterativeSolver()
+        g2.linear_solver = ScipyKrylov()
         g2.linear_solver.precon = LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
         prob.set_solver_print(level=2)
 
-        prob.setup(vector_class=PETScVector, check=False)
+        prob.setup(check=False)
 
         # Conclude setup but don't run model.
         prob.final_setup()

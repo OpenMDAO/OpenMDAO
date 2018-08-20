@@ -24,9 +24,9 @@ def _set_handler(logger, stream, level, use_format):
     use_format : bool
         Set to True to use the openmdao format "Level: message".
     """
-    if stream is 'stdout':
+    if stream == 'stdout':
         stream = sys.stdout
-    elif stream is 'stderr':
+    elif stream == 'stderr':
         stream = sys.stderr
     handler = logging.StreamHandler(stream)
 
@@ -100,3 +100,103 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
         }
 
     return logger
+
+
+class TestLogger(object):
+    """
+    A logger replacement for testing that simplifies checking log output.
+
+    Attributes
+    ----------
+    _msgs : dict
+        Stores lists of messages under 'error', 'warning' and 'info' keys.
+    """
+
+    def __init__(self):
+        """
+        Initialize the message dict.
+        """
+        self._msgs = {'error': [], 'warning': [], 'info': []}
+
+    def error(self, msg):
+        """
+        Collect an error message.
+
+        Parameters
+        ----------
+        msg : str
+            An error message.
+        """
+        self._msgs['error'].append(msg)
+
+    def warning(self, msg):
+        """
+        Collect a warning message.
+
+        Parameters
+        ----------
+        msg : str
+            A warning message.
+        """
+        self._msgs['warning'].append(msg)
+
+    def info(self, msg):
+        """
+        Collect an informational message.
+
+        Parameters
+        ----------
+        msg : str
+            An informational message.
+        """
+        self._msgs['info'].append(msg)
+
+    def debug(self, msg):
+        """
+        Collect a debug message.
+
+        Parameters
+        ----------
+        msg : str
+            A debugging message.
+        """
+        self._msgs['debug'].append(msg)
+
+    def get(self, typ):
+        """
+        Return all stored messages of a specific type.
+
+        Parameters
+        ----------
+        typ : str
+            Type of messages ('error', 'warning', 'info') to be returned.
+
+        Returns
+        -------
+        list of str
+            Any messages of that type that have been written to the logger.
+        """
+        return self._msgs[typ]
+
+    def contains(self, typ, message):
+        """
+        Do any of the stored messages of a specific type equal the given message.
+
+        Parameters
+        ----------
+        typ : str
+            Type of messages ('error', 'warning', 'info') to be returned.
+
+        message : str
+            The message to match.
+
+        Returns
+        -------
+        bool
+            True if any of the lines of stored messages of a specific type equal the line.
+        """
+        for s in self._msgs[typ]:
+            if s == message:
+                return True
+
+        return False

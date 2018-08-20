@@ -6,7 +6,7 @@ This document outlines OpenMDAO-v2 documentation conventions regarding
 both content and formatting.
 
 
-General docstring conventions
+General Docstring Conventions
 -----------------------------
 
 General docstring rules:
@@ -121,13 +121,13 @@ Detailed docstring rules:
          description ending with a period.
      """
 
-4. Auto-hyper-linking a class or a method:
+4. Auto-hyper-linking a class or a method to its source docs:
 
   ::
 
     """Summary line.
 
-    To auto-link to a <Class>, simply put its name in angle brackets,
+    To auto-link to the source docs of a <Class>, simply put its name in angle brackets,
     and the link to that page will be generated in the resulting docs.
     To auto-link to a method's docs, use <Class.method_name>.
     """
@@ -136,7 +136,7 @@ Detailed docstring rules:
 Embedding Autodocumentation Snippets into Documentation
 -------------------------------------------------------
 
-Sometimes in a Feature Doc, you want to highlight a particular method or class or module
+Sometimes in a feature doc, you want to reproduce a particular method or class or module
 right there within the text.  The syntax to do this is provided by the `sphinx.ext.autodoc`
 module, in three commands, `automodule`, `autoclass`, and `automethod`.  The syntax of these
 is detailed in the following example code:
@@ -186,13 +186,13 @@ the user with an easy way to link to the autodoc for quick reference.
 
 We'll do this with a `:ref:` tag.  The basic syntax looks like this:
 
-  .. code-block:: python
+  .. code-block:: rst
 
     :ref:`LinkText <openmdao.path.to.file.py>`
 
 note the path to the file in which the class lives. Here's a specific, working example:
 
-  .. code-block:: python
+  .. code-block:: rst
 
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
@@ -201,97 +201,273 @@ which makes a link like this, that leads to the Direct solver's user docs:
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
-Feature Docs and their Custom Directives for Including Code in Documentation
-----------------------------------------------------------------------------
-
-show-unittest-examples
-++++++++++++++++++++++
-
-      `show-unittest-examples` is an OpenMDAO custom Sphinx directive that allows unit
-      test examples to be directly incorporated into a feature document.
-      An example usage within a feature document would look like this:
-
-      ::
-
-        .. show-unittest-examples::
-            indepvarcomp
-
-
-      What the above will do is replace the directive and its args with indepvarcomp unit tests
-      and their subsequent output, as shown here:
-
-
-      Define two independent variables at once.
-
-      ::
-
-        comp = IndepVarComp((
-            ('indep_var_1', 1.0),
-            ('indep_var_2', 2.0),
-
-        ))
-
-        prob = Problem(comp).setup(check=False)
-        print(prob['indep_var_1'])
-        print(prob['indep_var_2'])
-
-      ::
-
-        1.0
-        2.0
-
-
-      But how does the directive know which test to go get?  The test or tests that are
-      to be shown will have a "Features" header in their docstring, that says which feature
-      the test is trying out.  It should look like this:
-
-      ::
-
-        Features
-        --------
-        indepvarcomp
-
+Custom Directives for Embedding Items into OpenMDAO Documentation
+-----------------------------------------------------------------
 
 embed-code
 ++++++++++
 
-        `embed-code` is a custom directive that lets a developer drop a class or a
-        class method directly into a feature doc by including that class or method's
-        full, dotted python path.  The syntax for invoking the directive looks like this:
+        `embed-code` is a custom directive that takes one argument, which can be:
+            * A class, test, or method's full, dotted path (e.g. "openmdao.core.tests.test_expl_comp.RectangleComp").
+            * The path to a file (e.g. "experimental_guide/examples/bezier_plot.py").
 
-        .. code-block:: python
+        The syntax for invoking the directive within an .rst file looks like this:
+
+        .. code-block:: rst
 
             .. embed-code::
-              openmdao.core.tests.test_expl_comp.RectangleComp
+                openmdao.core.tests.test_expl_comp.RectangleComp
 
 
-        What the above will do is replace the directive and its arg with the class
-        definition for `openmdao.core.tests.test_expl_comp.RectangleComp` and will look like this:
+        What the above directive will do is replace the directive and its arg with the class
+        definition for `openmdao.core.tests.test_expl_comp.RectangleComp`.
+        The resulting output will look like this:
 
         .. embed-code::
-          openmdao.core.tests.test_expl_comp.RectangleComp
+            openmdao.core.tests.test_expl_comp.RectangleComp
 
-        This has the benefit of allowing you to drop entire code blocks into
-        a feature doc that illustrate a usage example.
+        Embedding in this fashion has the benefit of allowing you to drop entire code blocks into
+        a feature doc that may, for example, illustrate a usage example. Another great benefit of this
+        method is that now your embedded example changes along with the code, so the docs maintain themselves.
+
+        By default, docstrings will be kept in the embedded code. There is an option
+        to the directive to strip the docstrings:
+
+        .. code-block:: rst
+
+          .. embed-code::
+              openmdao.core.tests.test_expl_comp.RectangleComp
+              :strip-docstrings:
+
+        The resulting output without the docstring looks like this:
+
+        .. embed-code::
+            openmdao.core.tests.test_expl_comp.RectangleComp
+            :strip-docstrings:
 
 
-embed-test
-++++++++++
+Embedding More Than Just Code
+*****************************
 
-        `embed-test` is a custom directive that lets a developer drop a specific single test
-        directly into a feature doc by including that test's full, dotted python
-        path.  The syntax for invoking the directive looks like this:
+    Sometimes developers will want to embed code, code output, or even plots into a document.  `embed-code` provides
+    a :code:`layout` option for an author, which has several options to provide maximum flexibility in formatting.
 
-        .. code-block:: python
+    The options that can be given to :code:`layout` are **code**, **output**, **interleave**, and **plot**, as described here:
 
-          .. embed-test::
-            openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+    - **code**: A section of code, which will be just the code specified by the argument. This is the default layout if no layout is given.
 
-        The output from the above syntax should just look like a normal code block,
-        with the test code and the results of the test run (output) reported separately:
 
-        .. embed-test::
-          openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple
+    - **output**: The output of the script (or code, or test, etc.) given by the argument, all in one unified section by itself.
+
+
+    - **interleave**: The section of code specified by the argument, interleaved with its output, displayed together as one combined block.
+
+
+    - **plot**: A plot generated by running the code specified by the argument. (a matplotlib :code:`show()` command must be present).
+
+
+    These options should be specified in the left-to-right order in which each embedded element is desired to appear from top to bottom. (e.g. :layout: code, output)
+
+    Let's run through some examples of how the :code:`layout` option could be used:
+
+
+1. Embed just a piece of code, just to show it, without running it for output or plots.
+   In your .rst file, you'd insert this:
+
+
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+
+
+   Note that as mentioned above, the default value of :code:`layout` is just "code," so the
+   layout is not specified here. The resulting embed looks like this:
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+
+
+2. Embed a piece of code, run it, show a single block of output afterwards.
+   In your .rst file, you'd insert this:
+
+
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+           :layout: code, output
+
+
+   The resulting embed would look like this:
+
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+       :layout: code, output
+
+
+3. Embed a piece of code, run it, show a single block of output afterwards, then show a plot after that.
+   (Remember, that :code:`show()` function needs to be in there for this to work.)
+
+
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+           :layout: code, output, plot
+
+
+   The resulting embed would look like this:
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+       :layout: code, output, plot
+
+
+4. Embed a piece of code, run it, plot it. Show the plot first, then show the code with interleaved output, after that.
+   (Remember, that :code:`show()` function needs to be in the embedded code for a plot embed to work.)
+
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
+           :layout: plot, interleave
+
+
+   This should embed the plot, and then the code with its output nicely interleaved.
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/sin_plot.py
+       :layout: plot, interleave
+
+
+5.  The way our plot embedding works, if you're embedding a layout that includes a plot, you can also give your
+    `embed-code` directive any of the options that work with a Sphinx `image` or `figure` directive, since we inherit from those.
+    Some of those options available are:
+
+    **:width:** (in pixels),
+
+    **:height:** (in pixels),
+
+    **:scale:** (in percentage),
+
+    **:align:** (left, right, center),
+
+    And with a blank line after the options, you can put a line of text that will act as a caption.
+
+    Let's do an example of the previous plot, with a few other options set:
+
+    .. code-block:: rst
+
+        .. embed-code::
+            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+            :layout: plot
+            :scale: 50
+            :align: center
+
+            This is where you would put a caption, after a blank line.
+
+
+    This should embed the plot, scale it down by half, and align it center, with a caption.
+
+
+    .. embed-code::
+        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+        :layout: plot
+        :scale: 50
+        :align: center
+
+        This is where you would put a caption, after a blank line.
+
+
+6.  Use this directive to embed a test. Just use a dotted python path, as shown here:
+
+
+    .. code-block:: rst
+
+        .. embed-code::
+            openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
+            :layout: interleave
+
+
+    This should embed the test with its output nicely interleaved.
+
+
+    .. embed-code::
+        openmdao.core.tests.test_problem.TestProblem.test_feature_simple_run_once_input_input
+        :layout: interleave
+
+
+There are many permutations of these four layout values that can help you customize the look of your code embedding to fit
+your specific purposes.  While doing :code:`:layout: output` might not really make any sense to do, you have the power
+to make nonsensical layouts, so use that power wisely.
+
+
+embed-options
++++++++++++++
+
+        `embed-options` is a custom directive that lets a developer display a set of options
+        directly into a feature doc by including the module, classname, and the options dictionary name.
+        The syntax for invoking the directive looks like this:
+
+        .. code-block:: rst
+
+            .. embed-options::
+                openmdao.solvers.linear.linear_block_jac
+                LinearBlockJac
+                options
+
+        The output from the above syntax should result in a neatly-formatted table of options like this:
+
+
+        .. embed-options::
+            openmdao.solvers.linear.linear_block_jac
+            LinearBlockJac
+            options
+
+
+embed-shell-cmd
++++++++++++++++
+
+    `embed-shell-cmd` is a custom directive that lets a developer insert a shell command and
+    its corresponding console output into a doc.  The developer must supply the shell command
+    and optionally the directory where the command will run.  Also, setting the `show_cmd`
+    option to `false` will hide the shell command and show only the output resulting from it.
+
+    .. code-block:: rst
+
+        .. embed-shell-cmd::
+            :cmd: openmdao tree circuit.py
+            :dir: ../test_suite/scripts
+
+    The output from the above syntax should look like this:
+
+    .. embed-shell-cmd::
+        :cmd: openmdao tree circuit.py
+        :dir: ../test_suite/scripts
+
+
+embed-bibtex
+++++++++++++
+
+    `embed-bibtex` is a custom directive that lets a developer insert a citation for a
+    particular class into a doc.  The arguments are the module path and the name of the
+    class (or the name of a function that returns an instance of the desired class when
+    called with no arguments).
+
+    .. code-block:: rst
+
+        .. embed-bibtex::
+            openmdao.drivers.scipy_optimizer
+            ScipyOptimizeDriver
+
+
+    The output from the above syntax should look like this:
+
+    .. embed-bibtex::
+        openmdao.drivers.scipy_optimizer
+        ScipyOptimizeDriver
 
 
 Tagging
@@ -302,8 +478,8 @@ associate words or terms with a document, with the aim of grouping like document
 When a user clicks on a tag hyperlink, it takes her to a page that contains links to other documents that have been tagged
 similarly. This makes it easier for users to find supplementary materials on a topic.
 
-If you are writing a document, and you have a set of tags that you want to apply to a document, the syntax is easy,
-once in the document, you just need to invoke the `tags` directive, and then list any categories in which you'd
+If you are writing a document, and you have a set of tags that you want to apply to a document, the syntax is easy.
+One time, at the bottom of a document, you just need to invoke the `tags` directive, and then list any categories in which you'd
 like the current document to be included.
 
 ::

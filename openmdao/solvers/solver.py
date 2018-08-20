@@ -2,18 +2,27 @@
 
 from __future__ import division, print_function
 
+from six import iteritems
+from collections import OrderedDict
 import os
+import pprint
+import re
+import sys
 
 import numpy as np
 
+from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
+from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.record_util import create_local_meta
+from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.recorders.recording_iteration_stack import recording_iteration
+
+_emptyset = set()
 
 
 class SolverInfo(object):
@@ -120,13 +129,20 @@ class Solver(object):
         object that manages all recorders added to this solver
     _solver_info : <SolverInfo>
         Object to store some formatting for iprint that is shared across all solvers.
+    cite : str
+        Listing of relevant citations that should be referenced when
+        publishing work that uses this class.
     options : <OptionsDictionary>
         Options dictionary.
-    metadata : dict
-        Dictionary holding data about this solver.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
 
     SOLVER = 'base_solver'
@@ -138,8 +154,8 @@ class Solver(object):
 
         Parameters
         ----------
-        **kwargs : dict
-            options dictionary.
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Solver options.
         """
         self._system = None
         self._depth = 0
@@ -147,27 +163,62 @@ class Solver(object):
         self._mode = 'fwd'
         self._iter_count = 0
 
+        # Solver options
         self.options = OptionsDictionary()
-        self.options.declare('maxiter', type_=int, default=10,
+        self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
                              desc='absolute error tolerance')
         self.options.declare('rtol', default=1e-10,
                              desc='relative error tolerance')
-        self.options.declare('iprint', type_=int, default=1,
+        self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', type_=bool, default=False,
-                             desc="When True, AnlysisError will be raised if we don't convege.")
+        self.options.declare('err_on_maxiter', types=bool, default=False,
+                             desc="When True, AnalysisError will be raised if we don't converge.")
+
+        # Case recording options
+        self.recording_options = OptionsDictionary()
+        self.recording_options.declare('record_abs_error', types=bool, default=True,
+                                       desc='Set to True to record absolute error at the \
+                                       solver level')
+        self.recording_options.declare('record_rel_error', types=bool, default=True,
+                                       desc='Set to True to record relative error at the \
+                                       solver level')
+        self.recording_options.declare('record_inputs', types=bool, default=True,
+                                       desc='Set to True to record inputs at the solver level')
+        self.recording_options.declare('record_outputs', types=bool, default=True,
+                                       desc='Set to True to record outputs at the solver level')
+        self.recording_options.declare('record_solver_residuals', types=bool, default=False,
+                                       desc='Set to True to record residuals at the solver level')
+        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+                                       default=True)
+        self.recording_options.declare('includes', types=list, default=['*'],
+                                       desc='Patterns for variables to include in recording')
+        self.recording_options.declare('excludes', types=list, default=[],
+                                       desc='Patterns for vars to exclude in recording '
+                                            '(processed post-includes)')
+        # Case recording related
+        self._filtered_vars_to_record = {}
+        self._norm0 = 0.0
 
         # What the solver supports.
         self.supports = OptionsDictionary()
-        self.supports.declare('gradients', type_=bool, default=False)
+        self.supports.declare('gradients', types=bool, default=False)
+        self.supports.declare('implicit_components', types=bool, default=False)
 
         self._declare_options()
         self.options.update(kwargs)
 
-        self.metadata = {}
         self._rec_mgr = RecordingManager()
+
+        self.cite = ""
+
+    def _assembled_jac_solver_iter(self):
+        """
+        Return an empty generator of lin solvers using assembled jacs.
+        """
+        for i in ():
+            yield
 
     def add_recorder(self, recorder):
         """
@@ -206,6 +257,40 @@ class Solver(object):
         self._depth = depth
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
+
+        myoutputs = myresiduals = myinputs = set()
+        incl = self.recording_options['includes']
+        excl = self.recording_options['excludes']
+
+        if self.recording_options['record_solver_residuals']:
+            if isinstance(self, NonlinearSolver):
+                residuals = self._system._residuals
+            else:  # it's a LinearSolver
+                residuals = self._system._vectors['residual']['linear']
+
+            myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
+
+        if self.recording_options['record_outputs']:
+            if isinstance(self, NonlinearSolver):
+                outputs = self._system._outputs
+            else:  # it's a LinearSolver
+                outputs = self._system._vectors['output']['linear']
+
+            myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
+
+        if self.recording_options['record_inputs']:
+            if isinstance(self, NonlinearSolver):
+                inputs = self._system._inputs
+            else:
+                inputs = self._system._vectors['input']['linear']
+
+            myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
+
+        self._filtered_vars_to_record = {
+            'in': myinputs,
+            'out': myoutputs,
+            'res': myresiduals
+        }
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -275,6 +360,9 @@ class Solver(object):
 
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         while self._iter_count < maxiter and \
@@ -360,7 +448,7 @@ class Solver(object):
 
     def _linearize_children(self):
         """
-        Return a flag that is True when we need to call linearize on our subsystems' solvers.t.
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
         Returns
         -------
@@ -404,14 +492,138 @@ class Solver(object):
         **kwargs : dict
             Keyword arguments (used for abs and rel error).
         """
+        if not self._rec_mgr._recorders:
+            return
+
         metadata = create_local_meta(self.SOLVER)
-        self._rec_mgr.record_iteration(self, metadata, **kwargs)
+
+        # Get the data
+        data = {}
+        # if self.options['record_abs_error'] or self.options['record_rel_error']:
+        #     norm = self._iter_get_norm()
+
+        if self.recording_options['record_abs_error']:
+            # data['abs'] = norm
+            data['abs'] = kwargs.get('abs')
+        else:
+            data['abs'] = None
+
+        if self.recording_options['record_rel_error']:
+            # data['rel'] = norm / self._norm0
+            data['rel'] = kwargs.get('rel')
+        else:
+            data['rel'] = None
+
+        if isinstance(self, NonlinearSolver):
+            outputs = self._system._outputs
+            inputs = self._system._inputs
+            residuals = self._system._residuals
+        else:  # it's a LinearSolver
+            outputs = self._system._vectors['output']['linear']
+            inputs = self._system._vectors['input']['linear']
+            residuals = self._system._vectors['residual']['linear']
+
+        if self.recording_options['record_outputs']:
+            data['o'] = {}
+            if 'out' in self._filtered_vars_to_record:
+                for out in self._filtered_vars_to_record['out']:
+                    if out in outputs._names:
+                        data['o'][out] = outputs._views[out]
+            else:
+                data['o'] = outputs
+        else:
+            data['o'] = None
+
+        if self.recording_options['record_inputs']:
+            data['i'] = {}
+            if 'in' in self._filtered_vars_to_record:
+                for inp in self._filtered_vars_to_record['in']:
+                    if inp in inputs._names:
+                        data['i'][inp] = inputs._views[inp]
+            else:
+                data['i'] = inputs
+        else:
+            data['i'] = None
+
+        if self.recording_options['record_solver_residuals']:
+            data['r'] = {}
+            if 'res' in self._filtered_vars_to_record:
+                for res in self._filtered_vars_to_record['res']:
+                    if res in residuals._names:
+                        data['r'][res] = residuals._views[res]
+            else:
+                data['r'] = residuals
+        else:
+            data['r'] = None
+
+        self._rec_mgr.record_iteration(self, data, metadata)
+
+    def cleanup(self):
+        """
+        Clean up resources prior to exit.
+        """
+        # shut down all recorders
+        self._rec_mgr.shutdown()
 
 
 class NonlinearSolver(Solver):
     """
     Base class for nonlinear solvers.
+
+    Attributes
+    ----------
+    _system : <System>
+        Pointer to the owning system.
+    _depth : int
+        How many subsolvers deep this solver is (0 means not a subsolver).
+    _vec_names : [str, ...]
+        List of right-hand-side (RHS) vector names.
+    _mode : str
+        'fwd' or 'rev', applicable to linear solvers only.
+    _iter_count : int
+        Number of iterations for the current invocation of the solver.
+    _rec_mgr : <RecordingManager>
+        object that manages all recorders added to this solver
+    _solver_info : <SolverInfo>
+        Object to store some formatting for iprint that is shared across all solvers.
+    _err_cache : dict
+        Dictionary holding input and output vectors at start of iteration, if requested.
+    cite : str
+        Listing of relevant citations that should be referenced when
+        publishing work that uses this class.
+    options : <OptionsDictionary>
+        Options dictionary.
+    recording_options : <OptionsDictionary>
+        Recording options dictionary.
+    supports : <OptionsDictionary>
+        Options dictionary describing what features are supported by this
+        solver.
+    _filtered_vars_to_record: Dict
+        Dict of list of var names to record
+    _norm0: float
+        Normalization factor
     """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super(NonlinearSolver, self).__init__(**kwargs)
+        self._err_cache = OrderedDict()
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('debug_print', types=bool, default=False,
+                             desc='If true, the values of input and output variables at '
+                                  'the start of iteration are printed and written to a file '
+                                  'after a failure to converge.')
 
     def solve(self):
         """
@@ -426,7 +638,29 @@ class NonlinearSolver(Solver):
         float
             relative error.
         """
-        return self._run_iterator()
+        fail, abs_err, rel_err = self._run_iterator()
+
+        if fail and self.options['debug_print']:
+            coord = recording_iteration.get_formatted_iteration_coordinate()
+
+            out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+            for vec_type, vec in iteritems(self._err_cache):
+                out_str += '\n'
+                out_str += '# %s %ss\n' % (vec._name, vec._typ)
+                out_str += pprint.pformat(vec._views)
+                out_str += '\n'
+
+            print(out_str)
+
+            filename = coord.replace('._solve_nonlinear', '')
+            filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
+            with open(filename, 'w') as f:
+                f.write(out_str)
+                print("Inputs and outputs at start of iteration have been "
+                      "saved to '%s'." % filename)
+                sys.stdout.flush()
+
+        return fail, abs_err, rel_err
 
     def _iter_initialize(self):
         """
@@ -439,6 +673,10 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = deepcopy(self._system._inputs)
+            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+
         if self.options['maxiter'] > 0:
             self._run_apply()
             norm = self._iter_get_norm()
@@ -449,11 +687,13 @@ class NonlinearSolver(Solver):
 
     def _run_apply(self):
         """
-        Run the the apply_nonlinear method on the system.
+        Run the apply_nonlinear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
-        self._system._apply_nonlinear()
-        recording_iteration.stack.pop()
+        try:
+            self._system._apply_nonlinear()
+        finally:
+            recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -475,6 +715,8 @@ class LinearSolver(Solver):
     ----------
     _rel_systems : set of str
         Names of systems relevant to the current solve.
+    _assembled_jac : AssembledJacobian or None
+        If not None, the AssembledJacobian instance used by this solver.
     """
 
     def __init__(self, **kwargs):
@@ -486,8 +728,51 @@ class LinearSolver(Solver):
         **kwargs : dict
             options dictionary.
         """
-        super(LinearSolver, self).__init__(**kwargs)
         self._rel_systems = None
+        self._assembled_jac = None
+        super(LinearSolver, self).__init__(**kwargs)
+
+    def _assembled_jac_solver_iter(self):
+        """
+        Return a generator of linear solvers using assembled jacs.
+        """
+        if self.options['assemble_jac']:
+            yield self
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('assemble_jac', default=False, types=bool,
+                             desc='Activates use of assembled jacobian by this solver.')
+
+        self.supports.declare('assembled_jac', types=bool, default=True)
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(LinearSolver, self)._setup_solvers(system, depth)
+
+        if self._mode == 'fwd':
+            b_vecs = self._system._vectors['residual']
+        else:  # rev
+            b_vecs = self._system._vectors['output']
+
+        self._rhs_vecs = {}
+        for vec_name in self._system._rel_vec_names:
+            self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
+
+        if self.options['assemble_jac'] and not self.supports['assembled_jac']:
+            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
+                               "jacobians." % (self.SOLVER, self._system.pathname))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
@@ -529,14 +814,13 @@ class LinearSolver(Solver):
         """
         system = self._system
 
-        self._rhs_vecs = {}
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
         else:  # rev
             b_vecs = system._vectors['output']
 
         for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._clone()
+            self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
 
         if self.options['maxiter'] > 1:
             self._run_apply()
@@ -548,15 +832,18 @@ class LinearSolver(Solver):
 
     def _run_apply(self):
         """
-        Run the the apply_linear method on the system.
+        Run the apply_linear method on the system.
         """
         recording_iteration.stack.append(('_run_apply', 0))
 
         system = self._system
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._vec_names, self._rel_systems, self._mode, scope_out, scope_in)
 
-        recording_iteration.stack.pop()
+        try:
+            system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
+                                 self._mode, scope_out, scope_in)
+        finally:
+            recording_iteration.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -577,9 +864,8 @@ class LinearSolver(Solver):
         norm = 0
         for vec_name in self._vec_names:
             if vec_name in system._rel_vec_names:
-                b_vec = b_vecs[vec_name]
-                b_vec -= self._rhs_vecs[vec_name]
-                norm += b_vec.get_norm()**2
+                b_vecs[vec_name]._data -= self._rhs_vecs[vec_name]
+                norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5
 
@@ -589,19 +875,9 @@ class BlockLinearSolver(LinearSolver):
     A base class for LinearBlockGS and LinearBlockJac.
     """
 
-    def _iter_initialize(self):
+    def _declare_options(self):
         """
-        Perform any necessary pre-processing operations.
-
-        Returns
-        -------
-        float
-            initial error.
-        float
-            error at the first iteration.
+        Declare options before kwargs are processed in the init method.
         """
-        if isinstance(self._system._jacobian, AssembledJacobian):
-            raise RuntimeError("A block linear solver '%s' is being used with "
-                               "an AssembledJacobian in system '%s'" %
-                               (self.SOLVER, self._system.pathname))
-        return super(BlockLinearSolver, self)._iter_initialize()
+        super(BlockLinearSolver, self)._declare_options()
+        self.supports['assembled_jac'] = False

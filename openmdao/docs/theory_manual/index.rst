@@ -13,4 +13,15 @@ It provides information in a more theoretical and mathematical manner to help us
    :maxdepth: 1
 
    implicit_transformation_of_vars.rst
-   parallel_color.rst
+   setup_stack.rst
+
+
+Total Derivatives Theory
+-------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   total_derivs/total_derivs_theory.rst
+   total_derivs/setup_linear_solvers.rst
+   total_derivs/advanced_algorithms.rst

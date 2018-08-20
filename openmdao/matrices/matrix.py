@@ -3,6 +3,8 @@ from __future__ import division
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
+from collections import OrderedDict
+
 # scipy sparse types allowed to be subjacs
 sparse_types = (csr_matrix, csc_matrix, coo_matrix)
 
@@ -20,7 +22,7 @@ class Matrix(object):
     _matrix : object
         implementation-specific representation of the actual matrix.
     _submats : dict
-        dictionary of sub-jacobian data keyed by (out_ind, in_ind).
+        dictionary of sub-jacobian data keyed by (out_name, in_name).
     _metadata : dict
         implementation-specific data for the sub-jacobians.
     """
@@ -36,8 +38,8 @@ class Matrix(object):
         """
         self._comm = comm
         self._matrix = None
-        self._submats = {}
-        self._metadata = {}
+        self._submats = OrderedDict()
+        self._metadata = OrderedDict()
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """
@@ -45,8 +47,8 @@ class Matrix(object):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            Tuple of the form (output_var_name, input_var_name).
         info : dict
             sub-jacobian metadata.
         irow : int
@@ -61,9 +63,9 @@ class Matrix(object):
         factor : float or None
             Unit conversion factor.
         """
-        self._submats[key] = (info, irow, icol, src_indices, shape, factor)
+        self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
 
-    def _build(self, num_rows, num_cols):
+    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
         """
         Allocate the matrix.
 
@@ -73,6 +75,10 @@ class Matrix(object):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
+        in_ranges : dict
+            Maps input var name to column range.
+        out_ranges : dict
+            Maps output var name to row range.
         """
         pass
 
@@ -82,8 +88,8 @@ class Matrix(object):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            the global output and input variable names.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """

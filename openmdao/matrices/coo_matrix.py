@@ -1,11 +1,15 @@
 """Define the COOmatrix class."""
-from __future__ import division
+from __future__ import division, print_function
 
+from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix
 
 from six import iteritems
+from six.moves import range
+
+from collections import OrderedDict
 
 from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 
@@ -13,7 +17,25 @@ from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
 class COOMatrix(Matrix):
     """
     Sparse matrix in Coordinate list format.
+
+    Attributes
+    ----------
+    _mat_range_cache : dict
+        Dictionary of cached CSC matrices needed for solving on a sub-range of the
+        parent CSC matrix.
     """
+
+    def __init__(self, comm):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm>
+            communicator of the top-level system that owns the <Jacobian>.
+        """
+        super(COOMatrix, self).__init__(comm)
+        self._mat_range_cache = {}
 
     def _build_sparse(self, num_rows, num_cols):
         """
@@ -35,37 +57,54 @@ class COOMatrix(Matrix):
 
         submats = self._submats
         metadata = self._metadata
-        pre_metadata = {}
-        for key, (info, irow, icol, src_indices, shape, factor) in iteritems(submats):
-            if not info['dependent']:
-                continue
+        pre_metadata = self._key_ranges = OrderedDict()
+        locations = {}
+
+        for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
             val = info['value']
             rows = info['rows']
-            dense = (rows is None and (val is None or
-                     isinstance(val, ndarray)))
-            ind1 = counter
+            dense = (rows is None and (val is None or isinstance(val, ndarray)))
+
+            full_size = np.prod(shape)
             if dense:
-                counter += np.prod(shape)
-            elif rows is None:
-                counter += val.data.size
+                if src_indices is None:
+                    delta = full_size
+                else:
+                    delta = shape[0] * len(src_indices)
+            elif rows is None:  # sparse matrix
+                delta = val.data.size
+            else:  # list sparse format
+                delta = len(rows)
+
+            if loc in locations:
+                ind1, ind2, otherkey = locations[loc]
+                if not (src_indices is None and (ind2 - ind1) == delta == full_size):
+                    raise RuntimeError("Keys %s map to the same sub-jacobian of a CSC or "
+                                       "CSR partial jacobian and at least one of them is either "
+                                       "not dense or uses src_indices.  This can occur when "
+                                       "multiple inputs on the same "
+                                       "component are connected to the same output." %
+                                       sorted((key, otherkey)))
             else:
-                counter += len(rows)
-            ind2 = counter
-            pre_metadata[key] = (ind1, ind2, None)
+                ind1 = counter
+                counter += delta
+                ind2 = counter
+                locations[loc] = (ind1, ind2, key)
+
+            pre_metadata[key] = (ind1, ind2, dense, rows)
 
         data = np.zeros(counter)
-        rows = -np.ones(counter, int)
-        cols = -np.ones(counter, int)
+        rows = np.empty(counter, dtype=int)
+        cols = np.empty(counter, dtype=int)
 
-        for key, (ind1, ind2, idxs) in iteritems(pre_metadata):
-            info, irow, icol, src_indices, shape, factor = submats[key]
+        for key, (ind1, ind2, dense, jrows) in iteritems(pre_metadata):
+            info, loc, src_indices, shape, factor = submats[key]
+            irow, icol = loc
             val = info['value']
-            dense = (info['rows'] is None and (val is None or
-                     isinstance(val, ndarray)))
+            idxs = None
 
             if dense:
                 jac_type = ndarray
-                rowrange = np.arange(shape[0], dtype=int)
 
                 if src_indices is None:
                     colrange = np.arange(shape[1], dtype=int)
@@ -76,22 +115,21 @@ class COOMatrix(Matrix):
                 subrows = rows[ind1:ind2]
                 subcols = cols[ind1:ind2]
 
-                for i, row in enumerate(rowrange):
-                    subrows[i * ncols: (i + 1) * ncols] = row
+                for i in range(shape[0]):
+                    subrows[i * ncols: (i + 1) * ncols] = i
                     subcols[i * ncols: (i + 1) * ncols] = colrange
 
-                rows[ind1:ind2] += irow
-                cols[ind1:ind2] += icol
+                subrows += irow
+                subcols += icol
 
             else:  # sparse
-                if isinstance(val, sparse_types):
+                if jrows is None:
                     jac_type = type(val)
                     jac = val.tocoo()
                     jrows = jac.row
                     jcols = jac.col
                 else:
                     jac_type = list
-                    jrows = info['rows']
                     jcols = info['cols']
 
                 if src_indices is None:
@@ -108,7 +146,7 @@ class COOMatrix(Matrix):
 
         return data, rows, cols
 
-    def _build(self, num_rows, num_cols):
+    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
         """
         Allocate the matrix.
 
@@ -118,6 +156,10 @@ class COOMatrix(Matrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
+        in_ranges : dict
+            Maps input var name to column range.
+        out_ranges : dict
+            Maps output var name to row range.
         """
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
@@ -139,28 +181,53 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        key : (int, int)
-            the global output and input variable indices.
+        key : (str, str)
+            the global output and input variable names.
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
         idxs, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type):
+        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
             self._matrix.data[idxs] = jac.flat
-        elif isinstance(jac, sparse_types):
+        else:  # sparse
             self._matrix.data[idxs] = jac.data
-        elif isinstance(jac, list):
-            self._matrix.data[idxs] = jac[0]
 
         if factor is not None:
             self._matrix.data[idxs] *= factor
 
-    def _prod(self, in_vec, mode, ranges):
+    def _update_add_submat(self, key, jac):
+        """
+        Add the subjac values to an existing sub-jacobian.
+
+        Parameters
+        ----------
+        key : (str, str)
+            the global output and input variable names.
+        jac : ndarray or scipy.sparse or tuple
+            the sub-jacobian, the same format with which it was declared.
+        """
+        idxs, jac_type, factor = self._metadata[key]
+        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
+            raise TypeError("Jacobian entry for %s is of different type (%s) than "
+                            "the type (%s) used at init time." % (key,
+                                                                  type(jac).__name__,
+                                                                  jac_type.__name__))
+        if isinstance(jac, ndarray):
+            val = jac.flatten()
+        else:  # sparse
+            val = jac.data
+
+        if factor is not None:
+            self._matrix.data[idxs] += val * factor
+        else:
+            self._matrix.data[idxs] += val
+
+    def _prod(self, in_vec, mode, ranges, mask=None):
         """
         Perform a matrix vector product.
 
@@ -172,13 +239,116 @@ class COOMatrix(Matrix):
             'fwd' or 'rev'.
         ranges : (int, int, int, int)
             Min row, max row, min col, max col for the current system.
+        mask : ndarray of type bool, or None
+            Array used to zero out part of the matrix data.
 
         Returns
         -------
         ndarray[:]
             vector resulting from the product.
         """
+        # when we have a derivative based solver at a level below the
+        # group that owns the AssembledJacobian, we need to use only
+        # the part of the matrix that is relevant to the lower level
+        # system.
+        mat = self._matrix
+        if ranges is not None:
+            rstart, rend, cstart, cend = ranges
+            if rstart != 0 or cstart != 0 or rend != mat.shape[0] or cend != mat.shape[1]:
+                if ranges in self._mat_range_cache:
+                    mat, idxs = self._mat_range_cache[ranges]
+
+                    # update the data array of our smaller cached matrix with current data from
+                    # self._matrix
+                    mat.data[:] = self._matrix.data[idxs]
+                else:
+                    rstart, rend, cstart, cend = ranges
+                    rmat = mat.tocoo()
+                    # find all row and col indices that are within the desired range
+                    ridxs = np.nonzero(np.logical_and(rmat.row >= rstart, rmat.row < rend))[0]
+                    cidxs = np.nonzero(np.logical_and(rmat.col >= cstart, rmat.col < cend))[0]
+
+                    # take the intersection since both rows and cols must be within range
+                    idxs = np.intersect1d(ridxs, cidxs, assume_unique=True)
+
+                    # create a new smaller csc matrix using only the parts of self._matrix that
+                    # are within range
+                    mat = coo_matrix((rmat.data[idxs], (rmat.row[idxs] - rstart,
+                                                        rmat.col[idxs] - cstart)),
+                                     shape=(rend - rstart, cend - cstart))
+                    mat = mat.tocsc()
+                    self._mat_range_cache[ranges] = mat, idxs
+
+        # NOTE: both mask and ranges will never be defined at the same time.  ranges applies only
+        #       to int_mtx and mask applies only to ext_mtx.
+
         if mode == 'fwd':
-            return self._matrix.dot(in_vec)
-        elif mode == 'rev':
-            return self._matrix.T.dot(in_vec)
+            if mask is None:
+                return mat.dot(in_vec)
+            else:
+                save = mat.data[mask]
+                mat.data[mask] = 0.0
+                val = mat.dot(in_vec)
+                mat.data[mask] = save
+                return val
+        else:  # rev
+            if mask is None:
+                return mat.T.dot(in_vec)
+            else:
+                save = mat.data[mask]
+                mat.data[mask] = 0.0
+                val = mat.T.dot(in_vec)
+                mat.data[mask] = save
+                return val
+
+    def _create_mask_cache(self, d_inputs):
+        """
+        Create masking array for this matrix.
+
+        Note: this only applies when this Matrix is an 'ext_mtx' inside of a
+        Jacobian object.
+
+        Parameters
+        ----------
+        d_inputs : Vector
+            The inputs linear vector.
+
+        Returns
+        -------
+        ndarray or None
+            The mask array or None.
+        """
+        if len(d_inputs._views) > len(d_inputs._names):
+            input_names = d_inputs._names
+            mask = np.ones(self._matrix.data.size, dtype=np.bool)
+            for key, val in iteritems(self._key_ranges):
+                if key[1] in input_names:
+                    ind1, ind2, _, _ = val
+                    mask[ind1:ind2] = False
+
+            return mask
+
+
+def _get_dup_partials(rows, cols, in_ranges, out_ranges):
+    counts = Counter((rows[i], cols[i]) for i in range(len(rows)))
+    dups = []
+    for entry, count in counts.most_common():
+        if count > 1:
+            dups.append(entry)
+        else:
+            break
+
+    entries = defaultdict(list)
+
+    for row, col in dups:
+        for in_name in in_ranges:
+            cstart, cend = in_ranges[in_name]
+            if cstart <= col < cend:
+                break
+        for out_name in out_ranges:
+            rstart, rend = out_ranges[out_name]
+            if rstart <= row < rend:
+                break
+        entries[(out_name, in_name)].append((row - rstart, col - cstart))
+
+    return entries

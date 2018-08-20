@@ -4,10 +4,18 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, LinearBlockGS, ExplicitComponent, \
+     AnalysisError, ParallelGroup, ExecComp
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
+from openmdao.test_suite.components.ae_tests import AEComp, AEDriver
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestNLBlockJacobi(unittest.TestCase):
@@ -145,6 +153,40 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 25.5886171567, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class TestNonlinearBlockJacobiMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    @unittest.skipUnless(MPI, "MPI is not active.")
+    def test_reraise_analylsis_error(self):
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 0.5))
+        model.add_subsystem('p2', IndepVarComp('x', 3.0))
+        sub = model.add_subsystem('sub', ParallelGroup())
+
+        sub.add_subsystem('c1', AEComp())
+        sub.add_subsystem('c2', AEComp())
+        sub.nonlinear_solver = NonlinearBlockJac()
+
+        model.add_subsystem('obj', ExecComp(['val = x1 + x2']))
+
+        model.connect('p1.x', 'sub.c1.x')
+        model.connect('p2.x', 'sub.c2.x')
+        model.connect('sub.c1.y', 'obj.x1')
+        model.connect('sub.c2.y', 'obj.x2')
+
+        prob.driver = AEDriver()
+
+        prob.setup(check=False)
+
+        handled = prob.run_driver()
+        self.assertTrue(handled)
+
 
 if __name__ == "__main__":
     unittest.main()

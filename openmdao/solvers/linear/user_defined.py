@@ -9,6 +9,12 @@ class LinearUserDefined(LinearSolver):
     LinearUserDefined solver.
 
     This is a solver that wraps a user-written linear solve function.
+
+    Attributes
+    ----------
+    solve_function : function
+        Custom function containing the solve_linear function. The default is None, which means
+        the name defaults to "solve_linear".
     """
 
     SOLVER = 'LN: USER'

@@ -1,4 +1,6 @@
 """Define the LinearBlockJac class."""
+from six import iteritems
+
 from openmdao.solvers.solver import BlockLinearSolver
 
 
@@ -26,13 +28,13 @@ class LinearBlockJac(BlockLinearSolver):
 
             for subsys in subs:
                 scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(vec_names, self._rel_systems, mode,
+                subsys._apply_linear(None, vec_names, self._rel_systems, mode,
                                      scope_out, scope_in)
 
             for vec_name in vec_names:
                 b_vec = system._vectors['residual'][vec_name]
                 b_vec *= -1.0
-                b_vec += self._rhs_vecs[vec_name]
+                b_vec._data += self._rhs_vecs[vec_name]
 
             for subsys in subs:
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
@@ -40,7 +42,7 @@ class LinearBlockJac(BlockLinearSolver):
         else:  # rev
             for subsys in subs:
                 scope_out, scope_in = system._get_scope(subsys)
-                subsys._apply_linear(vec_names, self._rel_systems, mode,
+                subsys._apply_linear(None, vec_names, self._rel_systems, mode,
                                      scope_out, scope_in)
 
             for vec_name in vec_names:
@@ -48,7 +50,7 @@ class LinearBlockJac(BlockLinearSolver):
 
                 b_vec = system._vectors['output'][vec_name]
                 b_vec *= -1.0
-                b_vec += self._rhs_vecs[vec_name]
+                b_vec._data += self._rhs_vecs[vec_name]
 
             for subsys in subs:
                 subsys._solve_linear(vec_names, mode, self._rel_systems)

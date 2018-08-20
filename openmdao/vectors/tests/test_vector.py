@@ -10,8 +10,21 @@ except ImportError:
 
 class TestVector(unittest.TestCase):
 
-    def test_iter(self):
+    def test_keys(self):
+        p = Problem()
+        comp = IndepVarComp()
+        comp.add_output('v1', val=1.0)
+        comp.add_output('v2', val=2.0)
+        p.model.add_subsystem('des_vars', comp, promotes=['*'])
+        p.setup()
+        p.final_setup()
 
+        keys = sorted(p.model._outputs.keys())
+        expected = ['des_vars.v1', 'des_vars.v2']
+
+        self.assertListEqual(keys, expected, msg='keys() is not returning the expected names')
+
+    def test_iter(self):
         p = Problem()
         comp = IndepVarComp()
         comp.add_output('v1', val=1.0)
@@ -48,7 +61,7 @@ class TestVector(unittest.TestCase):
         comp.add_output('v1', val=1.0)
         comp.add_output('v2', val=2.0)
         p.model.add_subsystem('des_vars', comp, promotes=['*'])
-        p.setup(vector_class=PETScVector)
+        p.setup()
         p.final_setup()
 
         new_vec = p.model._outputs._clone()
@@ -56,6 +69,6 @@ class TestVector(unittest.TestCase):
 
         self.assertEqual(new_vec.dot(p.model._outputs), 9.)
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     unittest.main()

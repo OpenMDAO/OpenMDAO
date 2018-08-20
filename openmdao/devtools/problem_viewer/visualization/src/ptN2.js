@@ -1,7 +1,8 @@
-function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
-    var parentDiv = paramParentDiv;
-    var root = paramRootJson;
-    var conns = paramConnsJson;
+function PtN2Diagram(parentDiv, modelData) {
+    var root = modelData.tree;
+    var conns = modelData.connections_list;
+    var abs2prom = modelData.hasOwnProperty("abs2prom") ? modelData.abs2prom : undefined;
+
     var FONT_SIZE_PX = 11;
     var svgStyleElement = document.createElement("style");
     var outputNamingType = "Absolute";
@@ -17,8 +18,13 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
     var backButtonHistory = [], forwardButtonHistory = [];
     var chosenCollapseDepth = -1;
     var updateRecomputesAutoComplete = true; //default
+
     var katexInputDivElement = document.getElementById("katexInputDiv");
     var katexInputElement = document.getElementById("katexInput");
+
+    var tooltip = d3.select("body").append("div").attr("class", "tool-tip")
+        .style("position", "absolute")
+        .style("visibility", "hidden");
 
     mouseOverOnDiagN2 = MouseoverOnDiagN2;
     mouseOverOffDiagN2 = MouseoverOffDiagN2;
@@ -83,7 +89,7 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
         return false;
     }
-    
+
     function hasOutputConnection(target) {
         for (i = 0; i < conns.length; ++i) {
             if (conns[i].src === target) {
@@ -110,7 +116,12 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
             text += "<br />self.connect(\"" + unknownName + "\", \"" + paramName + "\")";
         }
-        parentDiv.querySelector("#connectionId").innerHTML = text;
+        if({{draw_potential_connections}}) {
+             parentDiv.querySelector("#connectionId").innerHTML = text;
+        }
+        else {
+            parentDiv.querySelector("#connectionId").innerHTML = "";
+        }
     }
     var n2BackgroundRect = n2Group.append("rect")
         .attr("class", "background")
@@ -173,7 +184,7 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
             var param = d3RightTextNodesArrayZoomed[c],
                 unknown = d3RightTextNodesArrayZoomed[r];
             if (param.type !== "param" && unknown.type !== "unknown") return;
-            if (r > c) { //bottom left
+            if (r > c && {{draw_potential_connections}}) { //bottom left
                 DrawPathTwoLines(
                     n2Dx * r, //x1
                     n2Dy * r + n2Dy * .5, //y1
@@ -183,7 +194,7 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                     n2Dy * c + n2Dy - 1e-2, //up y3
                     "blue", lineWidth, true);
             }
-            else if (r < c) { //top right
+            else if (r < c && {{draw_potential_connections}}) { //top right
                 DrawPathTwoLines(
                     n2Dx * r + n2Dx, //x1
                     n2Dy * r + n2Dy * .5, //y1
@@ -208,7 +219,9 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                     "<b>" + zoomedElement.promotions[unknown.absPathName] + "</b>" :
                     ((zoomedElement === root) ? unknown.absPathName : unknown.absPathName.slice(zoomedElement.absPathName.length + 1));
 
-                parentDiv.querySelector("#connectionId").innerHTML += "<br /><i style=\"color:red;\">self.connect(\"" + unknownName + "\", \"" + paramName + "\")</i>";
+                if({{draw_potential_connections}}) {
+                    parentDiv.querySelector("#connectionId").innerHTML += "<br /><i style=\"color:red;\">self.connect(\"" + unknownName + "\", \"" + paramName + "\")</i>";
+                }
             }
         });
 
@@ -232,7 +245,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         option.innerHTML = "" + i + "";
         var f = function (idx) {
             return function () {
-                toggleMenuOff();
                 CollapseToDepthSelectChange(idx);
             };
         }(i);
@@ -279,9 +291,9 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
             //Update svg dimensions before ComputeLayout() changes widthPTreePx
             svgDiv.style("width", (widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + 2 * SVG_MARGIN) + "px")
-                .style("height", (HEIGHT_PX + 2 * SVG_MARGIN) + "px");
+                  .style("height", (HEIGHT_PX + 2 * SVG_MARGIN) + "px");
             svg.attr("width", widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + 2 * SVG_MARGIN)
-                .attr("height", HEIGHT_PX + 2 * SVG_MARGIN);
+               .attr("height", HEIGHT_PX + 2 * SVG_MARGIN);
             n2Group.attr("transform", "translate(" + (widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
             pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
         }
@@ -311,14 +323,30 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                 return "translate(" + xScalerPTree0(d.x0) + "," + yScalerPTree0(d.y0) + ")";
             })
             .on("click", function (d) { LeftClick(d, this); })
-            .on("contextmenu", function (d) { RightClick(d, this); });
-
-        var collapseButton = document.getElementById("collapseButton");
-        var texButton = document.getElementById("texButton");
-        collapseButton.addEventListener("click", collapse);
-        texButton.addEventListener("click", addTex);
-
-        document.addEventListener("click", function () { toggleMenuOff(); });
+            .on("contextmenu", function (d) { RightClick(d, this); })
+            .on("mouseover", function (d) {
+                if (abs2prom != undefined) {
+                    if (d.type == "param" || d.type == "unconnected_param") {
+                        return tooltip.text(abs2prom.input[d.absPathName])
+                                      .style("visibility", "visible");
+                    }
+                    if (d.type == "unknown") {
+                        return tooltip.text(abs2prom.output[d.absPathName])
+                                      .style("visibility", "visible");
+                    }
+                }
+            })
+            .on("mouseleave", function (d) {
+                if (abs2prom != undefined) {
+                    return tooltip.style("visibility", "hidden");
+                }
+            })
+            .on("mousemove", function(){
+                if (abs2prom != undefined) {
+                    return tooltip.style("top", (d3.event.pageY-30)+"px")
+                                  .style("left",(d3.event.pageX+5)+"px");
+                }
+            });
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
@@ -738,81 +766,15 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         lastRightClickedObj = d;
         lastRightClickedEle = ele;
         e.preventDefault();
-        toggleMenuOn();
-        positionMenu(e);
+        collapse();
     }
 
     var menu = document.querySelector('#context-menu');
     var menuState = 0;
     var contextMenuActive = "context-menu--active";
 
-    function toggleMenuOn() {
-        if (menuState !== 1) {
-            menuState = 1;
-            menu.classList.add(contextMenuActive);
-        }
-    }
-
-    function toggleMenuOff() {
-        if (menuState !== 0) {
-            menuState = 0;
-            menu.classList.remove(contextMenuActive);
-        }
-    }
-
-    window.onkeyup = function (e) {
-        if (e.keyCode === 27) {
-            toggleMenuOff();
-        }
-    }
-
-    function getPosition(e) {
-        var posx = 0;
-        var posy = 0;
-
-        if (!e) var e = window.event;
-
-        if (e.pageX || e.pageY) {
-            posx = e.pageX;
-            posy = e.pageY;
-        } else if (e.clientX || e.clientY) {
-            posx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-            posy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-        }
-
-        return {
-            x: posx,
-            y: posy
-        }
-    }
-
-    function positionMenu(e) {
-        clickCoords = getPosition(e);
-        clickCoordsX = clickCoords.x;
-        clickCoordsY = clickCoords.y;
-
-        menuWidth = menu.offsetWidth + 4;
-        menuHeight = menu.offsetHeight + 4;
-
-        windowWidth = window.innerWidth;
-        windowHeight = window.innerHeight;
-
-        if ((windowWidth - clickCoordsX) < menuWidth) {
-            menu.style.left = windowWidth - menuWidth + "px";
-        } else {
-            menu.style.left = clickCoordsX + "px";
-        }
-
-        if ((windowHeight - clickCoordsY) < menuHeight) {
-            menu.style.top = windowHeight - menuHeight + "px";
-        } else {
-            menu.style.top = clickCoordsY + "px";
-        }
-    }
-
     function collapse() {
         var d = lastLeftClickedEle;
-        toggleMenuOff();
         if (!d.children) return;
         if (d.depth > zoomedElement.depth) { //dont allow minimizing on root node
             lastRightClickedElement = d;
@@ -822,34 +784,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
             Toggle(d);
             Update(d);
         }
-    }
-
-    function addTex() {
-        toggleMenuOff();
-
-        //Open up the input
-        katexInputDivElement.style.display = "inline";
-        katexInputElement.focus();
-        katexInputElement.addEventListener("keyup", katexEnterInput);
-
-        //Replace the rcEle innerHTML with stuff from KaTeX
-    }
-
-    function katexEnterInput(e) {
-        e.which = e.which || e.keyCode;
-        if (e.which == 13) {
-            setTex(katexInputElement.value);
-            katexInputDivElement.event
-            katexInputElement.removeEventListener("keyup", katexEnterInput);
-            katexInputDivElement.style.display = "none";
-            katexInputElement.value = '';
-        }
-    }
-
-    function setTex(input) {
-        console.log("setting name to: " + input);
-        lastRightClickedObj.name = input;
-        DrawMatrix();
     }
 
     function SetupLeftClick(d) {
@@ -868,7 +802,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
     //left click => navigate
     function LeftClick(d, ele) {
-        toggleMenuOff();
         if (!d.children) return;
         if (d3.event.button != 0) return;
         backButtonHistory.push({ "el": zoomedElement });
@@ -1479,7 +1412,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
     }
 
     function MouseClickN2(d) {
-        toggleMenuOff();
         var newClassName = "n2_hover_elements_" + d.r + "_" + d.c;
         var selection = n2Group.selectAll("." + newClassName);
         if (selection.size() > 0) {
@@ -1608,7 +1540,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         Update();
     }
 
-
     function ShowPathCheckboxChange() {
         showPath = !showPath;
         parentDiv.querySelector("#currentPathId").style.display = showPath ? "block" : "none";
@@ -1673,5 +1604,6 @@ var mouseOutN2;
 var mouseClickN2;
 var hasInputConn;
 var treeData, connectionList;
-var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData['tree'], modelData['connections_list']);
+modelData.tree.name = 'model'; //Change 'root' to 'model'
+var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData);
 

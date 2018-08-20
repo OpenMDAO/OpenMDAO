@@ -29,9 +29,9 @@ def run_test():
         parts = testspec.split(':')
 
     if len(sys.argv) != 2 or len(parts) != 2:
-        print('Usage: run_test my_file_path:my_test_case.test_func_name\n'
+        print('Usage: run_test my_mod_path:my_test_case.test_func_name\n'
               '            OR\n'
-              '       run_test my_file_path:test_func_name')
+              '       run_test my_mod_path:test_func_name')
         sys.exit(-1)
 
     modpath, funcpath = parts

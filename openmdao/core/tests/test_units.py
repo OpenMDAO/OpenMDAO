@@ -4,15 +4,12 @@ import unittest
 import warnings
 
 from six import iteritems
-from six.moves import cStringIO, range
 
-import numpy as np
-
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp, DenseJacobian, DirectSolver
+from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DirectSolver
 from openmdao.api import ExecComp
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
-     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
+    TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
 
 class SpeedComp(ExplicitComponent):
@@ -32,10 +29,10 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_dense_jac(self):
         """Test that output values and total derivatives are correct."""
-        prob = Problem(model=UnitConvGroup())
+        prob = Problem(model=UnitConvGroup(assembled_jac_type='dense'))
 
-        prob.model.jacobian = DenseJacobian()
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
+
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -163,7 +160,6 @@ class TestUnitConversion(unittest.TestCase):
                 else:
                     d_inputs['x1'] += d_outputs['x2']
 
-
         class TgtCompFa(ExplicitComponent):
             """Target expressed in degrees F."""
 
@@ -182,7 +178,6 @@ class TestUnitConversion(unittest.TestCase):
                     d_outputs['x3'] += d_inputs['x2']
                 else:
                     d_inputs['x2'] += d_outputs['x3']
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -422,7 +417,7 @@ class TestUnitConversion(unittest.TestCase):
 
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
         sub1 = prob.model.add_subsystem('sub1', Group(), promotes=['x2'])
-        sub1.add_subsystem('src', SrcComp(), promotes = ['x2'])
+        sub1.add_subsystem('src', SrcComp(), promotes=['x2'])
         root.add_subsystem('tgtF', TgtCompFMulti())
         root.add_subsystem('tgtC', TgtCompC())
         root.add_subsystem('tgtK', TgtCompK())
@@ -666,7 +661,7 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('sub.cc2.y', 'sub.cc1.x2')
 
         #root.nonlinear_solver = Newton()
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
 
         #sub.nonlinear_solver = Newton()
         #sub.linear_solver = DirectSolver()
@@ -683,7 +678,6 @@ class TestUnitConversion(unittest.TestCase):
 
         ## Make sure we can calculate a good derivative in the presence of pollution
 
-        #sub._jacobian_changed = True
         #sub.linear_solver.rel_inputs = ['sub.cc2.x', 'sub.cc1.x2']
         #rhs_buf = {None : np.array([3.5, 1.7])}
         #sol_buf = sub.linear_solver.solve(rhs_buf, sub, mode='fwd')[None]
@@ -714,7 +708,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
@@ -752,7 +746,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
         #root.linear_solver.options['mode'] = 'rev'
 
@@ -789,7 +783,6 @@ class TestUnitConversion(unittest.TestCase):
                 #self.dx2count = 0
 
             #def solve_nonlinear(self, inputs, outputs, resids):
-                #""" Doesn't do much. """
                 #x1 = inputs['x1']
                 #x2 = inputs['x2']
                 #outputs['y'] = 1.01*(x1 + x2)
@@ -832,7 +825,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
         #root.linear_solver.options['mode'] = 'rev'
 
@@ -873,11 +866,11 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = ScipyGMRES()
+        #sub.linear_solver = ScipyKrylov()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
@@ -915,11 +908,11 @@ class TestUnitConversion(unittest.TestCase):
 
         #root.nonlinear_solver = Newton()
         #root.nonlinear_solver.options['maxiter'] = 1
-        #root.linear_solver = ScipyGMRES()
+        #root.linear_solver = ScipyKrylov()
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = ScipyGMRES()
+        #sub.linear_solver = ScipyKrylov()
         #sub.linear_solver.precon = DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')

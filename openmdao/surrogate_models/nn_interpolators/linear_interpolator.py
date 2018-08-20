@@ -11,13 +11,21 @@ class LinearInterpolator(NNBase):
     Interpolate values by forming a hyperplane between the points closest to the prescribed inputs.
     """
 
-    def _find_hyperplane(self, nloc):
+    def _find_hyperplane(self, neighbor_idx):
         """
         Find hyperplane.
 
         Parameters
         ----------
-        nloc : number of locations
+        neighbor_idx : ndarray
+            Location indices for nearest neighbors.
+
+        Returns
+        -------
+        ndarray
+            Normal vector for the hyperplane.
+        ndarray
+            Constant of the hyperplane.
         """
         # Extra Inputs for Finding the normal are found below
         # Number of row vectors needed always dimensions - 1
@@ -25,20 +33,20 @@ class LinearInterpolator(NNBase):
         dep_dims = self._dep_dims
 
         # Number of Prediction Points
-        nppts = nloc.shape[0]
+        nppts = neighbor_idx.shape[0]
 
         # Preallocate storage
         pc = np.empty((nppts, dep_dims), dtype='float')
         normal = np.empty((nppts, indep_dims + 1, dep_dims), dtype='float')
         nvect = np.empty((nppts, indep_dims, indep_dims + 1), dtype='float')
-        trnd = np.concatenate((self._tp[nloc, :],
-                               self._tv[nloc, 0].reshape(nppts, indep_dims + 1, 1)),
+        trnd = np.concatenate((self._tp[neighbor_idx, :],
+                               self._tv[neighbor_idx, 0].reshape(nppts, indep_dims + 1, 1)),
                               axis=2)
         nvect[:, :, :-1] = trnd[:, 1:, :-1] - trnd[:, :-1, :-1]
 
         for i in range(dep_dims):
             # Planar vectors need both dep and ind dimensions
-            trnd[:, :, -1] = self._tv[nloc, i]
+            trnd[:, :, -1] = self._tv[neighbor_idx, i]
 
             # Go through each neighbor
             # Creates array[neighbor, dimension] from NN results
@@ -62,7 +70,13 @@ class LinearInterpolator(NNBase):
 
         Parameters
         ----------
-        prediction_points : array
+        prediction_points : ndarray
+            Points at which predictions are computed.
+
+        Returns
+        -------
+        ndarray
+            Predicted values at requested points.
         """
         if len(prediction_points.shape) == 1:
             # Reshape vector to n x 1 array
@@ -98,19 +112,25 @@ class LinearInterpolator(NNBase):
 
         return predictions
 
-    def gradient(self, PredPoints):
+    def gradient(self, prediciton_points):
         """
         Find the gradient at each location of a set of supplied predicted points.
 
         Parameters
         ----------
-        PredPoints : ndarray
-        """
-        if len(PredPoints.shape) == 1:
-            # Reshape vector to n x 1 array
-            PredPoints.shape = (1, PredPoints.shape[0])
+        prediciton_points : ndarray
+            Prediction points at which the gradient is calculated.
 
-        normPredPts = (PredPoints - self._tpm) / self._tpr
+        Returns
+        -------
+        ndarray
+            Gradient at the prediction points.
+        """
+        if len(prediciton_points.shape) == 1:
+            # Reshape vector to n x 1 array
+            prediciton_points.shape = (1, prediciton_points.shape[0])
+
+        normPredPts = (prediciton_points - self._tpm) / self._tpr
         nppts = normPredPts.shape[0]
         gradient = np.zeros((nppts, self._dep_dims, self._indep_dims), dtype="float")
 

@@ -6,7 +6,7 @@ import unittest, itertools
 from numpy import array, linspace, sin, cos, pi
 
 from openmdao.api import ResponseSurface
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 from six.moves import zip
 
 

@@ -2,8 +2,8 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, DefaultVector
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+from openmdao.utils.assert_utils import assert_rel_error
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -78,7 +78,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((2, 1)))
 
         # Now reconfigure from c2 and update in root; size of y = 3; the value of x is preserved
-        p.model.get_subsystem('c2').resetup('reconf')
+        p.model.c2.resetup('reconf')
         p.model.resetup('update')
         p.run_model()
         totals = p.compute_totals(wrt=['x'], of=['y'])
@@ -88,7 +88,7 @@ class Test(unittest.TestCase):
         assert_rel_error(self, totals['y', 'x'], 2.0 * np.ones((3, 1)))
 
         # Now reconfigure from c3 and update in root; size of y = 3; the value of x is preserved
-        p.model.get_subsystem('c3').resetup('reconf')
+        p.model.c3.resetup('reconf')
         p.model.resetup('update')
         p.run_model()
         totals = p.compute_totals(wrt=['x'], of=['y'])

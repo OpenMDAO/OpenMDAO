@@ -3,10 +3,8 @@
 from docutils import nodes
 
 import sphinx
-from sphinx.util.compat import Directive
-from sphinx.writers.html import HTMLTranslator
-
-from openmdao.docs._utils.docutil import get_source_code_of_class_or_method
+from docutils.parsers.rst import Directive
+from openmdao.docs._utils.docutil import get_source_code
 
 
 class ContentContainerDirective(Directive):
@@ -70,7 +68,7 @@ class EmbedCompareDirective(Directive):
         # for RIGHT side, get the code block, and reduce it if requested
         arg = self.arguments
         right_method = arg[0]
-        text = get_source_code_of_class_or_method(right_method, remove_docstring=False)
+        text, _, _, _ = get_source_code(right_method)
         if len(arg) == 3:
             start_txt = arg[1]
             end_txt = arg[2]

@@ -3,7 +3,7 @@
 import os
 import unittest
 
-# from openmdao.devtools.testutil import assert_rel_error
+# from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, add_unit, add_offset_unit
 
 

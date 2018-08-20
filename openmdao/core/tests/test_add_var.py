@@ -5,7 +5,7 @@ import numpy as np
 import unittest
 
 from openmdao.api import Problem, ExplicitComponent
-from openmdao.devtools.testutil import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class CompAddWithDefault(ExplicitComponent):
@@ -191,7 +191,6 @@ class TestAddVar(unittest.TestCase):
         assert_rel_error(self, p['y_c'], 2. * np.ones(6))
         assert_rel_error(self, p['y_d'], 2. * np.ones(6))
         assert_rel_error(self, p['y_e'], 2. * np.ones((3, 2)))
-
 
 if __name__ == '__main__':
     unittest.main()

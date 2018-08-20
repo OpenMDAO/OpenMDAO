@@ -11,8 +11,8 @@ class ExecComp4Test(ExecComp):
     """
     A version of ExecComp for benchmarking and testing.
 
-    Args
-    ----
+    Parameters
+    ----------
     exprs : str or list of str
         The expressions that determine the inputs and outputs of this component.
 
@@ -39,14 +39,14 @@ class ExecComp4Test(ExecComp):
         will be raised.
     """
     def __init__(self, exprs, nl_delay=0.01, lin_delay=0.01,
-                 req_procs=(1,1), fail_rank=0, fails=(),
+                 req_procs=(1,1), fail_rank=-1, fails=(),
                  fail_hard=False, **kwargs):
 
         super(ExecComp4Test, self).__init__(exprs, **kwargs)
         self.nl_delay = nl_delay
         self.lin_delay = lin_delay
         self.num_nl_solves = 0
-        self.num_apply_lins = 0
+        self.num_compute_partials = 0
         self.req_procs = req_procs
         self.fail_rank = fail_rank
         if isinstance(fail_rank, int):
@@ -67,7 +67,7 @@ class ExecComp4Test(ExecComp):
             `Vector` containing outputs.
         """
         try:
-            if myrank in self.fail_rank and self.num_nl_solves in self.fails:
+            if self.comm.rank in self.fail_rank and self.num_nl_solves in self.fails:
                 if self.fail_hard:
                     raise RuntimeError("OMG, a critical error!")
                 else:
@@ -83,12 +83,12 @@ class ExecComp4Test(ExecComp):
 
         Parameters
         ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing parameters. (p)
+        inputs : `Vector`
+            `Vector` containing parameters. (p)
 
         partials : `Jacobian`
             Contains sub-jacobians.
         """
         super(ExecComp4Test, self).compute_partials(inputs, partials)
         time.sleep(self.lin_delay)
-        self.num_apply_lins += 1
+        self.num_compute_partials += 1
