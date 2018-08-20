@@ -84,7 +84,7 @@ class ExternalCodeDelegate(object):
                     missing = self._check_for_files([program_to_execute])
                     if missing:
                         logger.error("The command to be executed, '%s', "
-                                    "cannot be found" % program_to_execute)
+                                     "cannot be found" % program_to_execute)
             else:
                 if not find_executable(program_to_execute):
                     logger.error("The command to be executed, '%s', "
@@ -206,7 +206,7 @@ class ExternalCodeDelegate(object):
                 missing = self._check_for_files([program_to_execute])
                 if missing:
                     raise ValueError("The command to be executed, '%s', "
-                                    "cannot be found" % program_to_execute)
+                                     "cannot be found" % program_to_execute)
             command_for_shell_proc = ['cmd.exe', '/c'] + command
         else:
             if not find_executable(program_to_execute):
