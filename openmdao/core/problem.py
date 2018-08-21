@@ -1207,9 +1207,7 @@ class Problem(object):
 
             approx_jac = {}
             for approximation in itervalues(approximations):
-                approximation._init_approximations()
-
-                # Peform the FD here.
+                # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
             for rel_key, partial in iteritems(approx_jac):

@@ -5,7 +5,23 @@ from __future__ import print_function, division
 class ApproximationScheme(object):
     """
     Base class used to define the interface for derivative approximation schemes.
+
+    Attributes
+    ----------
+    _approx_groups : list
+        A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
     """
+
+    def __init__(self):
+        """
+        Initialize the ApproximationScheme.
+        """
+        self._approx_groups = None
+
+    def _get_approx_groups(self):
+        if self._approx_groups is None:
+            self._init_approximations()
+        return self._approx_groups
 
     def add_approximation(self, abs_key, kwargs):
         """

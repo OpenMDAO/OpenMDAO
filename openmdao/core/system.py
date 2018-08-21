@@ -245,6 +245,10 @@ class System(object):
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
 
+        self.options.declare('num_par_fd', default=1, types=int,
+                             desc='Number of finite difference points that will be performed '
+                                  'concurrently, if FD is active.')
+
         # Case recording options
         self.recording_options = OptionsDictionary()
         self.recording_options.declare('record_inputs', types=bool, default=True,
@@ -633,6 +637,49 @@ class System(object):
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _setup_par_fd_procs(self, comm):
+        """
+        Split up the comm for use in parallel FD.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm>
+            MPI communicator object.
+        """
+        num_par_fd = self.options['num_par_fd']
+        if num_par_fd < 1:
+            raise ValueError("'%s': num_par_fd must be >= 1 but value is %s." %
+                             (self.pathname, self._num_par_fds))
+        if comm.size % num_par_fd != 0:
+            raise ValueError("'%s': num_par_fd must be a multiple of communicator size (%d)" %
+                             (self.pathmame, comm.size))
+
+        if not MPI:
+            self.options['num_par_fd'] = 1
+
+        self._full_comm = comm
+
+        if num_par_fd > 1:
+            sizes, offsets = evenly_distrib_idxs(num_par_fd, comm.size)
+
+            # a 'color' is assigned to each subsystem, with
+            # an entry for each processor it will be given
+            # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+            color = np.empty(comm.size, dtype=int)
+            for i in range(num_par_fd):
+                color[offsets[i]:offsets[i] + sizes[i]] = i
+
+            self._par_fd_id = color[comm.rank]
+
+            comm = self._full_comm.Split(self._par_fd_id)
+
+        return comm
 
     def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
@@ -1524,11 +1571,9 @@ class System(object):
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]
                     if vsizes.size > 0:
-                        csum = np.cumsum(vsizes)
-                        # shift the cumsum forward by one and set first entry to 0 to get
-                        # the correct offset.
-                        csum[1:] = csum[:-1]
+                        csum = np.empty(vsizes.size, dtype=int)
                         csum[0] = 0
+                        csum[1:] = np.cumsum(vsizes)[:-1]
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
                         off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))

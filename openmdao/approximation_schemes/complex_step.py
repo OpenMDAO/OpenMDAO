@@ -57,6 +57,7 @@ class ComplexStep(ApproximationScheme):
         options = DEFAULT_CS_OPTIONS.copy()
         options.update(kwargs)
         self._exec_list.append((of, wrt, options))
+        self._approx_groups = None
 
     @staticmethod
     def _key_fun(approx_tuple):
@@ -84,6 +85,13 @@ class ComplexStep(ApproximationScheme):
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
+
+        # groupby (along with this key function) will group all 'of's that have the same wrt and
+        # step size.
+        # Note: Since access to `approximations` is required multiple times, we need to
+        # throw it in a list. The groupby iterator only works once.
+        self._approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                              self._key_fun)]
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
@@ -124,7 +132,7 @@ class ComplexStep(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        for key, approximations in groupby(self._exec_list, self._key_fun):
+        for key, approximations in self._get_approx_groups():
             # groupby (along with this key function) will group all 'of's that have the same wrt and
             # step size.
             wrt, form, delta = key
@@ -165,11 +173,12 @@ class ComplexStep(ApproximationScheme):
                 for of, subjac in outputs:
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = result._imag_views_flat[of][out_idx] * fact
+                        subjac[:, i_count] = result._imag_views_flat[of][out_idx]
                     else:
-                        subjac[:, i_count] = result._imag_views_flat[of] * fact
+                        subjac[:, i_count] = result._imag_views_flat[of]
 
             for of, subjac in outputs:
+                subjac *= fact
                 rel_key = abs_key2rel_key(system, (of, wrt))
                 if uses_src_indices:
                     jac._override_checks = True

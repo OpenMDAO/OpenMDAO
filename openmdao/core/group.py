@@ -299,6 +299,9 @@ class Group(System):
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         """
+        if self.options['num_par_fd'] > 1:
+            comm = self._setup_par_fd_procs(comm)
+
         self.pathname = pathname
         self.comm = comm
         self._mode = mode
@@ -1770,8 +1773,6 @@ class Group(System):
                         meta['value'] = np.zeros(shape)
 
                     self._subjacs_info[key] = meta
-
-            approx._init_approximations()
 
         super(Group, self)._setup_jacobians(recurse=recurse)
 

@@ -141,6 +141,9 @@ class Component(System):
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         """
+        if self.options['num_par_fd'] > 1:
+            comm = self._setup_par_fd_procs(comm)
+
         self.pathname = pathname
         self.comm = comm
         self._mode = mode
@@ -989,9 +992,6 @@ class Component(System):
                 method = meta['method']
                 if method is not None and method in self._approx_schemes:
                     self._approx_schemes[method].add_approximation(key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def _guess_nonlinear(self):
         """

@@ -81,6 +81,8 @@ class FiniteDifference(ApproximationScheme):
         A list of which derivatives (in execution order) to compute.
         The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
         and fd_options is a dictionary.
+    _approx_groups : list
+        A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
     """
 
     def __init__(self):
@@ -114,6 +116,7 @@ class FiniteDifference(ApproximationScheme):
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
         self._exec_list.append((of, wrt, fd_options))
+        self._approx_groups = None
 
     @staticmethod
     def _key_fun(approx_tuple):
@@ -142,6 +145,13 @@ class FiniteDifference(ApproximationScheme):
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
+
+        # groupby (along with this key function) will group all 'of's that have the same wrt and
+        # step size.
+        # Note: Since access to `approximations` is required multiple times, we need to
+        # throw it in a list. The groupby iterator only works once.
+        self._approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                              self._key_fun)]
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
@@ -180,9 +190,7 @@ class FiniteDifference(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        for key, approximations in groupby(self._exec_list, self._key_fun):
-            # groupby (along with this key function) will group all 'of's that have the same wrt and
-            # step size.
+        for key, approximations in self._get_approx_groups():
             wrt, form, order, step, step_calc = key
 
             # FD forms are written as a collection of changes to inputs (deltas) and the associated
@@ -217,8 +225,6 @@ class FiniteDifference(ApproximationScheme):
 
             outputs = []
 
-            # Note: If access to `approximations` is required again in the future, we will need to
-            # throw it in a list first. The groupby iterator only works once.
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives

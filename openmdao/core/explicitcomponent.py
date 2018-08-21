@@ -162,9 +162,6 @@ class ExplicitComponent(Component):
                         not in self._outputs._views_flat):
                     self._approx_schemes[method].add_approximation(abs_key, meta)
 
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
-
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.
