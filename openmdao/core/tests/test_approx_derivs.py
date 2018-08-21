@@ -940,7 +940,6 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         prob.model.nonlinear_solver = NonlinearBlockGS()
-        prob.model.linear_solver = DirectSolver()
 
         # Had to make this step larger so that solver would reconverge adequately.
         model.approx_totals(method='cs', step=1.0e-1)

@@ -575,8 +575,7 @@ class TestProblem(unittest.TestCase):
 
         prob.run_model()
 
-        # check derivatives with complex step and a larger step size.
-        prob.check_totals(method='cs', step=1.0e-1)
+        prob.check_totals(method='cs')
 
     def test_feature_run_driver(self):
         import numpy as np
