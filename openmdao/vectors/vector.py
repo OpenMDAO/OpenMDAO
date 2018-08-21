@@ -594,8 +594,6 @@ class Vector(object):
         """
         if flag:
             self._cplx_data[:] = self._data
-        else:
-            self._data[:] = self._cplx_data.real
 
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views

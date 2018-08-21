@@ -147,7 +147,7 @@ class DefaultVector(Vector):
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
-                self._cplx_data = np.zeros(self._data.shape, np.complex)
+                self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
 
         else:
             self._data, self._cplx_data, self._scaling = self._extract_data()
