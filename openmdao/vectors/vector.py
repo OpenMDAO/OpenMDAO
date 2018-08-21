@@ -22,23 +22,6 @@ else:
     INT_DTYPE = np.dtype(np.int32)
 
 
-class VectorInfo(object):
-    """
-    Communal object for storing some global information in the vectors.
-
-    Attributes
-    ----------
-    _under_complex_step : bool
-        When this is True, the vectors operate with complex numbers.
-    """
-
-    def __init__(self):
-        """
-        Initialize.
-        """
-        self._under_complex_step = False
-
-
 class Vector(object):
     """
     Base Vector class.
@@ -76,8 +59,6 @@ class Vector(object):
         If True, then space for the imaginary part is also allocated.
     _data : ndarray
         Actual allocated data.
-    _vector_info : <VectorInfo>
-        Object to store some global info, such as complex step state.
     _cplx_data : ndarray
         Actual allocated data under complex step.
     _cplx_views : dict
@@ -85,6 +66,8 @@ class Vector(object):
     _cplx_views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views under complex
         step.
+    _under_complex_step : bool
+        When True, this vector is under complex step, and data is swapped with the complex data.
     _ncol : int
         Number of columns for multi-vectors.
     _icol : int or None
@@ -103,8 +86,6 @@ class Vector(object):
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     """
-
-    _vector_info = VectorInfo()
 
     cite = ""
 
@@ -158,6 +139,7 @@ class Vector(object):
         self._cplx_data = None
         self._cplx_views = {}
         self._cplx_views_flat = {}
+        self._under_complex_step = False
 
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or
@@ -598,3 +580,4 @@ class Vector(object):
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
+        self._under_complex_step = flag

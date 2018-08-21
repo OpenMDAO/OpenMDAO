@@ -221,7 +221,7 @@ class DefaultVector(Vector):
         """
         self._data = self._data.copy()
 
-        if self._vector_info._under_complex_step and self._cplx_data is not None:
+        if self._under_complex_step and self._cplx_data is not None:
             self._cplx_data = self._cplx_data.copy()
 
     def __iadd__(self, vec):

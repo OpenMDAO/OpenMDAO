@@ -11,7 +11,7 @@ from openmdao.utils.name_maps import abs_key2rel_key
 
 
 DEFAULT_CS_OPTIONS = {
-    'step': 1e-15,
+    'step': 1e-40,
     'form': 'forward',
 }
 
@@ -117,8 +117,8 @@ class ComplexStep(ApproximationScheme):
         results_clone = current_vec._clone(True)
 
         # Turn on complex step.
-        system._inputs._vector_info._under_complex_step = True
         for sub in system.system_iter(include_self=True, recurse=True):
+            sub.under_complex_step = True
             sub._inputs.set_complex_step_mode(True)
             sub._outputs.set_complex_step_mode(True)
             sub._residuals.set_complex_step_mode(True)
@@ -183,8 +183,8 @@ class ComplexStep(ApproximationScheme):
                     jac._override_checks = False
 
         # Turn off complex step.
-        system._inputs._vector_info._under_complex_step = False
         for sub in system.system_iter(include_self=True, recurse=True):
+            sub.under_complex_step = False
             sub._inputs.set_complex_step_mode(False)
             sub._outputs.set_complex_step_mode(False)
             sub._residuals.set_complex_step_mode(False)

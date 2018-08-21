@@ -711,7 +711,7 @@ class TestGroupComplexStep(unittest.TestCase):
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
         try:
-            self.prob.model._outputs._vector_info._under_complex_step = False
+            self.prob.model._outputs._under_complex_step = False
         except:
             pass
 
@@ -1083,7 +1083,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
-        self.prob.model._outputs._vector_info._under_complex_step = False
+        self.prob.model._outputs._under_complex_step = False
 
     def test_implicit_component(self):
 

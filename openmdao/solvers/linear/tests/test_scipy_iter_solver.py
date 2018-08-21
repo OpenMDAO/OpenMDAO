@@ -225,20 +225,6 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         self.assertTrue(icount2 < icount1)
 
 
-# class TestScipyKrylovBICG(TestScipyKrylov):
-#     # This will run all of the gmres tests with the bicg solver.
-#
-#     linear_solver_name = 'bicg'
-#     linear_solver_class = krylov_factory('bicg')
-#
-#
-# class TestScipyKrylovBICGSTAB(TestScipyKrylov):
-#     # This will run all of the gmres tests with the bicgstab solver.
-#
-#     linear_solver_name = 'bicgstab'
-#     linear_solver_class = krylov_factory('bicgstab')
-
-
 class TestScipyKrylovFeature(unittest.TestCase):
 
     def test_feature_simple(self):

@@ -770,6 +770,7 @@ class Problem(object):
             this enables the user to instantiate and setup in one line.
         """
         model = self.model
+        model.force_alloc_complex = force_alloc_complex
         comm = self.comm
 
         if vector_class is not None:
