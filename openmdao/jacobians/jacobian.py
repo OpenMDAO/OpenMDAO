@@ -2,7 +2,7 @@
 from __future__ import division
 import numpy as np
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
 
 from openmdao.utils.name_maps import key2abs_key
@@ -26,6 +26,8 @@ class Jacobian(object):
         If we are approximating a jacobian at the top level and we have specified indices on the
         functions or designvars, then we need to disable the size checking temporarily so that we
         can assign a jacobian with less rows or columns than the variable sizes.
+    _abs_keys : defaultdict
+        A cache dict for key to absolute key.
     """
 
     def __init__(self, system):
@@ -40,6 +42,13 @@ class Jacobian(object):
         self._system = system
         self._subjacs_info = system._subjacs_info
         self._override_checks = False
+        self._abs_keys = defaultdict(bool)
+
+    def _get_abs_key(self, key):
+        abskey = self._abs_keys[key]
+        if abskey is False:
+            self._abs_keys[key] = abskey = key2abs_key(self._system, key)
+        return abskey
 
     def _abs_key2shape(self, abs_key):
         """
@@ -74,7 +83,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        return key2abs_key(self._system, key) in self._subjacs_info
+        return self._get_abs_key(key) in self._subjacs_info
 
     def __getitem__(self, key):
         """
@@ -90,7 +99,7 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        abs_key = key2abs_key(self._system, key)
+        abs_key = self._get_abs_key(key)
         if abs_key in self._subjacs_info:
             return self._subjacs_info[abs_key]['value']
         else:
@@ -108,7 +117,7 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        abs_key = key2abs_key(self._system, key)
+        abs_key = self._get_abs_key(key)
         if abs_key is not None:
 
             # You can only set declared subjacobians.

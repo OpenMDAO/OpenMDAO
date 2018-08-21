@@ -224,7 +224,7 @@ class DefaultVector(Vector):
         """
         self._data = self._data.copy()
 
-        if self._vector_info._under_complex_step and self._imag_data is not None:
+        if Vector._under_complex_step and self._imag_data is not None:
             self._imag_data = self._imag_data.copy()
 
     def __iadd__(self, vec):
@@ -242,7 +242,7 @@ class DefaultVector(Vector):
             self + vec
         """
         self._data += vec._data
-        if vec._alloc_complex and self._vector_info._under_complex_step:
+        if vec._alloc_complex and Vector._under_complex_step:
             self._imag_data += vec._imag_data
         return self
 
@@ -261,7 +261,7 @@ class DefaultVector(Vector):
             self - vec
         """
         self._data -= vec._data
-        if vec._alloc_complex and self._vector_info._under_complex_step:
+        if vec._alloc_complex and Vector._under_complex_step:
             self._imag_data -= vec._imag_data
         return self
 
@@ -279,7 +279,7 @@ class DefaultVector(Vector):
         <Vector>
             self * val
         """
-        if self._vector_info._under_complex_step:
+        if Vector._under_complex_step:
             r_val = np.real(val)
             i_val = np.imag(val)
             self._data = r_val * self._data + i_val * self._imag_data
@@ -299,7 +299,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        if self._vector_info._under_complex_step:
+        if Vector._under_complex_step:
             r_val = np.real(val)
             i_val = np.imag(val)
             self._data += r_val * vec._data + i_val * vec._imag_data
@@ -317,7 +317,7 @@ class DefaultVector(Vector):
             the vector whose values self is set to.
         """
         self._data[:] = vec._data
-        if self._vector_info._under_complex_step:
+        if Vector._under_complex_step:
             self._imag_data[:] = vec._imag_data
 
     def set_const(self, val):

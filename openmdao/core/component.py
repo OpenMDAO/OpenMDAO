@@ -857,11 +857,9 @@ class Component(System):
 
                 if rows.size > 0:
                     if rows.min() < 0:
-                        # of, wrt = abs_key2rel_key(self, abs_key)
                         msg = '{}: d({})/d({}): row indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     if cols.min() < 0:
-                        # of, wrt = abs_key2rel_key(self, abs_key)
                         msg = '{}: d({})/d({}): col indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     rows_max = rows.max()

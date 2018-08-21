@@ -22,23 +22,6 @@ else:
     INT_DTYPE = np.dtype(np.int32)
 
 
-class VectorInfo(object):
-    """
-    Communal object for storing some global information in the vectors.
-
-    Attributes
-    ----------
-    _under_complex_step : bool
-        When this is True, the vectors operate with complex numbers.
-    """
-
-    def __init__(self):
-        """
-        Initialize.
-        """
-        self._under_complex_step = False
-
-
 class Vector(object):
     """
     Base Vector class.
@@ -76,8 +59,6 @@ class Vector(object):
         If True, then space for the imaginary part is also allocated.
     _data : ndarray
         Actual allocated data.
-    _vector_info : <VectorInfo>
-        Object to store some global info, such as complex step state.
     _imag_views : dict
         Dictionary mapping absolute variable names to the ndarray views for the imaginary part.
     _imag_views_flat : dict
@@ -104,9 +85,11 @@ class Vector(object):
         publishing work that uses this class.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
+    _under_complex_step : bool
+        A class attribute. When this is True, all vectors operate with complex numbers.
     """
 
-    _vector_info = VectorInfo()
+    _under_complex_step = False
 
     cite = ""
 
@@ -234,6 +217,15 @@ class Vector(object):
             vec._initialize_views()
         return vec
 
+    def _get_array_dict_view(self, arr):
+        dict_view = {}
+        start = end = 0
+        for name, view in iteritems(self._views_flat):
+            end += view.size
+            dict_view[name] = arr[star:end]
+            start = end
+        return dict_view
+
     def _contains_abs(self, abs_name):
         """
         Check if the variable is involved in the current mat-vec product.
@@ -307,7 +299,7 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            if self._vector_info._under_complex_step:
+            if Vector._under_complex_step:
                 if self._typ == 'input':
                     if self._icol is None:
                         return self._views[abs_name] + 1j * self._imag_views[abs_name]
@@ -363,7 +355,7 @@ class Vector(object):
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %
                                  (name, oldval.shape, value.shape))
-            if self._vector_info._under_complex_step:
+            if Vector._under_complex_step:
 
                 # setitem overwrites anything you may have done with numpy indexing
                 try:

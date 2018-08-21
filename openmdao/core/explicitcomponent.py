@@ -7,6 +7,7 @@ from six import itervalues, iteritems
 from six.moves import range
 
 from openmdao.core.component import Component
+from openmdao.vectors.vector import Vector
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 
@@ -182,7 +183,7 @@ class ExplicitComponent(Component):
                     self._inputs.read_only = False
 
                 # Restore any complex views if under complex step.
-                if outputs._vector_info._under_complex_step:
+                if Vector._under_complex_step:
                     outputs._remove_complex_views()
                     residuals._remove_complex_views()
 

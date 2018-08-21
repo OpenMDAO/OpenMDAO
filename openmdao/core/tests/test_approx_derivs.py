@@ -8,6 +8,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
     ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce
+from openmdao.vectors.vector import Vector
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
@@ -710,7 +711,7 @@ class TestGroupComplexStep(unittest.TestCase):
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
         try:
-            self.prob.model._outputs._vector_info._under_complex_step = False
+            Vector._under_complex_step = False
         except:
             pass
 
@@ -1081,7 +1082,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
-        self.prob.model._outputs._vector_info._under_complex_step = False
+        Vector._under_complex_step = False
 
     def test_implicit_component(self):
 

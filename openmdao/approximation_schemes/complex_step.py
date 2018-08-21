@@ -8,6 +8,7 @@ import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 from openmdao.utils.name_maps import abs_key2rel_key
+from openmdao.vectors.vector import Vector
 
 
 DEFAULT_CS_OPTIONS = {
@@ -121,7 +122,7 @@ class ComplexStep(ApproximationScheme):
             raise ValueError('deriv_type must be one of "total" or "partial"')
 
         # Turn on complex step.
-        system._inputs._vector_info._under_complex_step = True
+        Vector._under_complex_step = True
 
         # create a scratch array
         out_tmp = system._outputs._data.copy()
@@ -187,7 +188,7 @@ class ComplexStep(ApproximationScheme):
                     jac._override_checks = False
 
         # Turn off complex step.
-        system._inputs._vector_info._under_complex_step = False
+        Vector._under_complex_step = False
 
     def _run_point_complex(self, system, input_deltas, out_tmp, result_clone, deriv_type='partial'):
         """

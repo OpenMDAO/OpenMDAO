@@ -8,7 +8,7 @@ from itertools import product, chain
 
 from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import convert_neg
 
@@ -234,7 +234,7 @@ class PETScTransfer(DefaultTransfer):
 
             # Imaginary transfer
             # (for CS, so only need in fwd)
-            if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+            if Vector._under_complex_step and out_vec._alloc_complex:
                 self._transfer.scatter(out_vec._imag_petsc, in_vec._imag_petsc, addv=False,
                                        mode=False)
 
@@ -265,7 +265,7 @@ class PETScTransfer(DefaultTransfer):
 
             # Imaginary transfer
             # (for CS, so only need in fwd)
-            if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
+            if Vector._under_complex_step and out_vec._alloc_complex:
                 in_petsc = in_vec._imag_petsc
                 out_petsc = out_vec._imag_petsc
                 for i in range(in_vec._ncol):
