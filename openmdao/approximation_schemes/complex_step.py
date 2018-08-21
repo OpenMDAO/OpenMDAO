@@ -230,7 +230,6 @@ class ComplexStep(ApproximationScheme):
 
         run_model()
 
-        # TODO: Grab only results of interest
         result_clone.set_vec(results_vec)
 
         for in_name, idxs, delta in input_deltas:
