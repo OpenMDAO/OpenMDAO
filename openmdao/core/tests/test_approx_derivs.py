@@ -1081,10 +1081,6 @@ class TestGroupComplexStep(unittest.TestCase):
 
 class TestComponentComplexStep(unittest.TestCase):
 
-    def tearDown(self):
-        # Global stuff seems to not get cleaned up if test fails.
-        self.prob.model._outputs._under_complex_step = False
-
     def test_implicit_component(self):
 
         class TestImplCompArrayDense(TestImplCompArray):
@@ -1185,7 +1181,7 @@ class TestComponentComplexStep(unittest.TestCase):
                 outputs['y1'][1][0] -= 6.67
                 outputs['y1'][1][1] /= 2.34
 
-                pass  # outputs['y1'] *= 1.0
+                outputs['y1'] *= 1.0
 
         prob = self.prob = Problem()
         model = prob.model = Group()
@@ -1246,6 +1242,119 @@ class TestComponentComplexStep(unittest.TestCase):
         for j in range(len(outs)):
             val = np.linalg.norm(outs[j][1]['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
+
+    def test_stepsizes_under_complex_step(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+                self.count = 0
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+                if self.under_complex_step:
+
+                    # Local cs
+                    if self.count == 0 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for local CS"
+                        raise RuntimeError(msg)
+
+                    # Global cs with default setting.
+                    if self.count == 1 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for default global CS"
+                        raise RuntimeError(msg)
+
+                    # Global cs with user setting.
+                    if self.count == 3 and inputs['x'].imag != 1.0e-12:
+                        msg = "Wrong stepsize for user global CS"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with default setting forward.
+                    if self.count == 4 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for check partial default CS forward"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with default setting.
+                    if self.count == 5 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for check partial default CS"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with user setting forward.
+                    if self.count == 6 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for check partial user CS forward"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with user setting.
+                    if self.count == 7 and inputs['x'].imag != 1.0e-14:
+                        msg = "Wrong stepsize for check partial user CS"
+                        raise RuntimeError(msg)
+
+                    self.count += 1
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        prob.check_totals(method='cs', out_stream=None)
+
+        prob.check_totals(method='cs', step=1e-12, out_stream=None)
+
+        prob.check_partials(method='cs', out_stream=None)
+
+        prob.check_partials(method='cs', step=1e-14, out_stream=None)
+
+    def test_feature_under_complex_step(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+                if self.under_complex_step:
+                    print("Under complex step")
+                    print("x", inputs['x'])
+                    print("y", outputs['y'])
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        prob.compute_totals(of=['comp.y'], wrt=['px.x'])
 
 
 class ApproxTotalsFeature(unittest.TestCase):

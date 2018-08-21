@@ -234,7 +234,7 @@ class PETScTransfer(DefaultTransfer):
             in_petsc = in_vec._petsc
             out_petsc = out_vec._petsc
 
-            # For Complex Step, need to dissassemble real and imag parts, transfer them separately,
+            # For Complex Step, need to disassemble real and imag parts, transfer them separately,
             # then reassemble them.
             if in_vec._under_complex_step and out_vec._alloc_complex:
 
@@ -288,7 +288,7 @@ class PETScTransfer(DefaultTransfer):
             in_petsc = in_vec._petsc
             out_petsc = out_vec._petsc
 
-            # For Complex Step, need to dissassemble real and imag parts, transfer them separately,
+            # For Complex Step, need to disassemble real and imag parts, transfer them separately,
             # then reassemble them.
             if in_vec._under_complex_step and out_vec._alloc_complex:
                 in_petsc_imag = in_vec._imag_petsc

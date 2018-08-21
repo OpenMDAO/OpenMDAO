@@ -537,11 +537,11 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        prob.check_totals(method='cs', step=1.0e-1)
+        prob.check_totals(method='cs', out_stream=None)
         self.assertFalse(prob.model.under_complex_step,
                          msg="The under_complex_step flag should be reset.")
 
-    def test_feature_check_totals_user_detect(self):
+    def test_feature_check_totals_user_detect_forced(self):
         from openmdao.api import Problem, ExplicitComponent
 
         class SimpleComp(ExplicitComponent):
@@ -557,11 +557,6 @@ class TestProblem(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 3.0*inputs['x']
-
-                if self.under_complex_step:
-                    print("Under complex step.")
-                    print('x', inputs['x'])
-                    print('y', outputs['y'])
 
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
