@@ -584,7 +584,7 @@ class Vector(object):
         """
         Turn on or off complex stepping mode.
 
-        When turned on, the defaul real ndarray is replaced with a complex ndarray and all
+        When turned on, the default real ndarray is replaced with a complex ndarray and all
         pointers are updated to point to it.
 
         Parameters
@@ -592,7 +592,7 @@ class Vector(object):
         flag : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        if flag == True:
+        if flag:
             self._cplx_data[:] = self._data
         else:
             self._data[:] = self._cplx_data.real
@@ -600,4 +600,3 @@ class Vector(object):
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
-

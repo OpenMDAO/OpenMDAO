@@ -259,4 +259,3 @@ class FiniteDifference(ApproximationScheme):
                     jac._override_checks = False
                 else:
                     jac[rel_key] = subjac
-

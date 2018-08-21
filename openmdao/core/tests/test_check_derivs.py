@@ -1786,7 +1786,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         stream = cStringIO()
-        totals = prob.check_totals(method='cs', step=1.0e-2, out_stream=stream)
+        totals = prob.check_totals(method='cs', step=1.0e-1, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
 

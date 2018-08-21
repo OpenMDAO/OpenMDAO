@@ -1,5 +1,5 @@
 """ Testing for group finite differencing."""
-
+from six.moves import range
 import unittest
 import itertools
 from parameterized import parameterized
@@ -1243,8 +1243,9 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        self.assertLess(outs[1][1]['resids'], 1e-6, msg="Check if CS cleans up after itself.")
-        self.assertLess(outs[5][1]['resids'], 1e-6, msg="Check if CS cleans up after itself.")
+        for j in range(len(outs)):
+            val = np.linalg.norm(outs[j][1]['resids'])
+            self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
 
 class ApproxTotalsFeature(unittest.TestCase):
