@@ -158,6 +158,7 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
 
     data_dict['connections_list'] = connections_list
+    
     return data_dict
 
 def view_tree(*args, **kwargs):
