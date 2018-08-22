@@ -131,6 +131,33 @@ class TestProblem(unittest.TestCase):
 
         prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
 
+    def test_compute_totals_cleanup(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indeps1', IndepVarComp('x', np.ones(5)))
+        model.add_subsystem('indeps2', IndepVarComp('x', np.ones(3)))
+
+        model.add_subsystem('MP1', ExecComp('y=7*x', x=np.zeros(5), y=np.zeros(5)))
+        model.add_subsystem('MP2', ExecComp('y=-3*x', x=np.zeros(3), y=np.zeros(3)))
+
+        model.add_design_var('indeps1.x')
+        model.add_design_var('indeps2.x')
+
+        model.add_constraint('MP1.y')
+        model.add_constraint('MP2.y')
+
+        model.connect('indeps1.x', 'MP1.x')
+        model.connect('indeps2.x', 'MP2.x')
+
+        p.setup(mode='rev')
+        p.run_model()
+
+        J = p.compute_totals()
+        assert_rel_error(self, J[('MP1.y', 'indeps1.x')], np.eye(5)*7., 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3,5)), 1e-10)
+        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5,3)), 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
+
     def test_set_2d_array(self):
         import numpy as np
 
