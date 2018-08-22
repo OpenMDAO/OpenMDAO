@@ -52,3 +52,12 @@ Here is how to turn on complex step for all input/output pairs in the Sellar pro
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarDis2CS
+
+Sometimes you need to know when you are under a complex step so that your component can correctly handle complex inputs (e.g,
+in case you need to allocate intermediate arrays as complex.) All `Components` and `Groups` provide the attribute "under_complex_step"
+that you can use to tell if you are under a complex step. In the following example, we print out the incoming complex value when the
+"compute" method is called while computing this component's derivatives under complex step.
+
+.. embed-code::
+    openmdao.core.tests.test_approx_derivs.TestComponentComplexStep.test_feature_under_complex_step
+    :layout: code, output

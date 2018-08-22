@@ -160,6 +160,9 @@ class FiniteDifference(ApproximationScheme):
             One of 'total' or 'partial', indicating if total or partial derivatives are
             being approximated.
         """
+        if len(self._exec_list) == 0:
+            return
+
         if jac is None:
             jac = system._jacobian
 
@@ -167,8 +170,6 @@ class FiniteDifference(ApproximationScheme):
             current_vec = system._outputs
         elif deriv_type == 'partial':
             current_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
 
         result = system._outputs._clone(True)
         result_array = result._data.copy()

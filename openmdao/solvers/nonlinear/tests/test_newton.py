@@ -588,7 +588,7 @@ class TestNewton(unittest.TestCase):
             """ This version of Newton also counts how many times it linearizes"""
 
             def __init__(self, **kwargs):
-                super(DirectSolver, self).__init__(**kwargs)
+                super(CountDS, self).__init__(**kwargs)
                 self.lin_count = 0
 
             def _linearize(self):
