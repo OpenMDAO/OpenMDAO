@@ -124,10 +124,6 @@ class SimpleGADriver(Driver):
             msg = 'SimpleGADriver currently does not support multiple objectives.'
             raise RuntimeError(msg)
 
-        # if len(self._cons) > 0:
-        #     msg = 'SimpleGADriver currently does not support constraints.'
-        #     raise RuntimeError(msg)
-
         model_mpi = None
         comm = self._problem.comm
         if self._concurrent_pop_size > 0:
@@ -248,7 +244,7 @@ class SimpleGADriver(Driver):
         return False
 
     def objective_callback(self, x, icase):
-        """
+        r"""
         Evaluate problem objective at the requested point.
 
         Takes into account constraints with a penalty function.
@@ -260,7 +256,6 @@ class SimpleGADriver(Driver):
         .. math::
 
            g = [g_1, g_2  \dots g_N], g_i \in R^{N_{g_i}}
-
            h = [h_1, h_2  \dots h_N], h_i \in R^{N_{h_i}}
 
         The number of all constraints:
@@ -329,10 +324,8 @@ class SimpleGADriver(Driver):
             if penalty == 0:
                 fun = obj
             else:
-                constraint_vals = list()
                 constraint_violations = np.array([])
                 for name, val in iteritems(self.get_constraint_values()):
-                    constraint_vals.append(val)
                     con = self._cons[name]
                     # The not used fields will either None or a very large number
                     if (con['lower'] is not None) and np.isfinite(con['lower']):
@@ -344,11 +337,6 @@ class SimpleGADriver(Driver):
                     elif (con['equals'] is not None) and np.isfinite(con['equals']):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
-                    else:
-                        violation = np.array([])
-                        msg = ('Specify a number for one of '
-                               '"lower", "upper" or "equals" for constraint "{}"')
-                        ValueError(msg.format(name))
                     constraint_violations = np.hstack((constraint_violations, violation))
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
             # Record after getting obj to assure they have
