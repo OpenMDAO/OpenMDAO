@@ -182,11 +182,6 @@ class ExplicitComponent(Component):
                 finally:
                     self._inputs.read_only = False
 
-                # Restore any complex views if under complex step.
-                if Vector._under_complex_step:
-                    outputs._remove_complex_views()
-                    residuals._remove_complex_views()
-
                 residuals += outputs
                 outputs -= residuals
 

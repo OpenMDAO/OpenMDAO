@@ -12,7 +12,7 @@ from openmdao.vectors.vector import Vector
 
 
 DEFAULT_CS_OPTIONS = {
-    'step': 1e-15,
+    'step': 1e-40,
     'form': 'forward',
 }
 
@@ -111,22 +111,23 @@ class ComplexStep(ApproximationScheme):
             One of 'total' or 'partial', indicating if total or partial derivatives are
             being approximated.
         """
+        if len(self._exec_list) == 0:
+            return
+
         if jac is None:
             jac = system._jacobian
 
         if deriv_type == 'total':
             current_vec = system._outputs
-        elif deriv_type == 'partial':
-            current_vec = system._residuals
         else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
+            current_vec = system._residuals
+
+        # Clean vector for results
+        results_clone = current_vec._clone(True)
 
         # Turn on complex step.
-        Vector._under_complex_step = True
-
-        # create a scratch array
-        out_tmp = system._outputs._data.copy()
-        results_clone = current_vec._clone(True)
+        system._set_complex_step_mode(True)
+        results_clone.set_complex_step_mode(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -140,6 +141,7 @@ class ComplexStep(ApproximationScheme):
             if form == 'reverse':
                 delta *= -1.0
             fact = 1.0 / delta
+            delta *= 1j
 
             if wrt in system._owns_approx_wrt_idx:
                 in_idx = system._owns_approx_wrt_idx[wrt]
@@ -168,18 +170,16 @@ class ComplexStep(ApproximationScheme):
             for i_count, idx in enumerate(in_idx):
                 # Run the Finite Difference
                 input_delta = [(wrt, idx, delta)]
-                result = self._run_point_complex(system, input_delta, out_tmp, results_clone,
-                                                 deriv_type)
+                result = self._run_point_complex(system, input_delta, results_clone, deriv_type)
 
                 for of, subjac in outputs:
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = result._imag_views_flat[of][out_idx]
+                        subjac[:, i_count] = (result._views_flat[of][out_idx] * fact).imag
                     else:
-                        subjac[:, i_count] = result._imag_views_flat[of]
+                        subjac[:, i_count] = (result._views_flat[of] * fact).imag
 
             for of, subjac in outputs:
-                subjac *= fact
                 rel_key = abs_key2rel_key(system, (of, wrt))
                 if uses_src_indices:
                     jac._override_checks = True
@@ -188,9 +188,9 @@ class ComplexStep(ApproximationScheme):
                     jac._override_checks = False
 
         # Turn off complex step.
-        Vector._under_complex_step = False
+        system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, input_deltas, out_tmp, result_clone, deriv_type='partial'):
+    def _run_point_complex(self, system, input_deltas, result_clone, deriv_type='partial'):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -200,8 +200,6 @@ class ComplexStep(ApproximationScheme):
             The system having its derivs approximated.
         input_deltas : list
             List of (input name, indices, delta) tuples, where input name is an absolute name.
-        out_tmp : ndarray
-            An array the same size as the system outputs that is used for temporary storage.
         result_clone : Vector
             A vector cloned from the outputs vector. Used to store the results.
         deriv_type : str
@@ -221,29 +219,24 @@ class ComplexStep(ApproximationScheme):
         if deriv_type == 'total':
             run_model = system.run_solve_nonlinear
             results_vec = outputs
-        elif deriv_type == 'partial':
+        else:
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._imag_views_flat:
-                outputs._imag_views_flat[in_name][idxs] += delta
+            if in_name in outputs._views_flat:
+                outputs._views_flat[in_name][idxs] += delta
             else:
-                inputs._imag_views_flat[in_name][idxs] += delta
+                inputs._views_flat[in_name][idxs] += delta
 
-        out_tmp = results_vec._data.copy()
         run_model()
 
-        # TODO: Grab only results of interest
         result_clone.set_vec(results_vec)
-        results_vec._data[:] = out_tmp
 
         for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._imag_views_flat:
-                outputs._imag_views_flat[in_name][idxs] -= delta
+            if in_name in outputs._views_flat:
+                outputs._views_flat[in_name][idxs] -= delta
             else:
-                inputs._imag_views_flat[in_name][idxs] -= delta
+                inputs._views_flat[in_name][idxs] -= delta
 
         return result_clone

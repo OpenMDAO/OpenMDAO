@@ -1,5 +1,5 @@
 """ Testing for group finite differencing."""
-
+from six.moves import range
 import unittest
 import itertools
 from parameterized import parameterized
@@ -7,13 +7,13 @@ from parameterized import parameterized
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce
-from openmdao.vectors.vector import Vector
+    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives, \
+     SellarDis1CS, SellarDis2CS
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
@@ -711,7 +711,7 @@ class TestGroupComplexStep(unittest.TestCase):
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
         try:
-            Vector._under_complex_step = False
+            self.prob.model._outputs._under_complex_step = False
         except:
             pass
 
@@ -1080,10 +1080,6 @@ class TestGroupComplexStep(unittest.TestCase):
 
 class TestComponentComplexStep(unittest.TestCase):
 
-    def tearDown(self):
-        # Global stuff seems to not get cleaned up if test fails.
-        Vector._under_complex_step = False
-
     def test_implicit_component(self):
 
         class TestImplCompArrayDense(TestImplCompArray):
@@ -1184,7 +1180,7 @@ class TestComponentComplexStep(unittest.TestCase):
                 outputs['y1'][1][0] -= 6.67
                 outputs['y1'][1][1] /= 2.34
 
-                pass  # outputs['y1'] *= 1.0
+                outputs['y1'] *= 1.0
 
         prob = self.prob = Problem()
         model = prob.model = Group()
@@ -1204,6 +1200,160 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_rel_error(self, derivs['comp.y1', 'px.x'][1][1], 3.0, 1e-6)
         assert_rel_error(self, derivs['comp.y1', 'px.x'][2][2], 1.0, 1e-6)
         assert_rel_error(self, derivs['comp.y1', 'px.x'][3][3], 1.0/2.34, 1e-6)
+
+    def test_sellar_comp_cs(self):
+        # Basic sellar test.
+
+        prob = self.prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.linear_solver = DirectSolver()
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+        outs = prob.model.list_outputs(residuals=True, out_stream=None)
+        for j in range(len(outs)):
+            val = np.linalg.norm(outs[j][1]['resids'])
+            self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
+
+    def test_stepsizes_under_complex_step(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+                self.count = 0
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+                if self.under_complex_step:
+
+                    # Local cs
+                    if self.count == 0 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for local CS"
+                        raise RuntimeError(msg)
+
+                    # Global cs with default setting.
+                    if self.count == 1 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for default global CS"
+                        raise RuntimeError(msg)
+
+                    # Global cs with user setting.
+                    if self.count == 3 and inputs['x'].imag != 1.0e-12:
+                        msg = "Wrong stepsize for user global CS"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with default setting forward.
+                    if self.count == 4 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for check partial default CS forward"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with default setting.
+                    if self.count == 5 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for check partial default CS"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with user setting forward.
+                    if self.count == 6 and inputs['x'].imag != 1.0e-40:
+                        msg = "Wrong stepsize for check partial user CS forward"
+                        raise RuntimeError(msg)
+
+                    # Check partials cs with user setting.
+                    if self.count == 7 and inputs['x'].imag != 1.0e-14:
+                        msg = "Wrong stepsize for check partial user CS"
+                        raise RuntimeError(msg)
+
+                    self.count += 1
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        prob.check_totals(method='cs', out_stream=None)
+
+        prob.check_totals(method='cs', step=1e-12, out_stream=None)
+
+        prob.check_partials(method='cs', out_stream=None)
+
+        prob.check_partials(method='cs', step=1e-14, out_stream=None)
+
+    def test_feature_under_complex_step(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x', method='cs')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+                if self.under_complex_step:
+                    print("Under complex step")
+                    print("x", inputs['x'])
+                    print("y", outputs['y'])
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        prob.compute_totals(of=['comp.y'], wrt=['px.x'])
 
 
 class ApproxTotalsFeature(unittest.TestCase):
