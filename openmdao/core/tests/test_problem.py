@@ -154,9 +154,11 @@ class TestProblem(unittest.TestCase):
 
         J = p.compute_totals()
         assert_rel_error(self, J[('MP1.y', 'indeps1.x')], np.eye(5)*7., 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
+        # before the bug fix, the following two derivs contained nonzero values even
+        # though the variables involved were not dependent on each other.
         assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3,5)), 1e-10)
         assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5,3)), 1e-10)
-        assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
 
     def test_set_2d_array(self):
         import numpy as np
