@@ -175,11 +175,12 @@ class ComplexStep(ApproximationScheme):
                 for of, subjac in outputs:
                     if of in system._owns_approx_of_idx:
                         out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = (result._views_flat[of][out_idx] * fact).imag
+                        subjac[:, i_count] = result._views_flat[of][out_idx].imag
                     else:
-                        subjac[:, i_count] = (result._views_flat[of] * fact).imag
+                        subjac[:, i_count] = result._views_flat[of].imag
 
             for of, subjac in outputs:
+                subjac *= fact
                 rel_key = abs_key2rel_key(system, (of, wrt))
                 if uses_src_indices:
                     jac._override_checks = True
