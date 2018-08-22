@@ -263,8 +263,8 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         print('Volume', prob['Volume'])  # should be around 10
         self.assertTrue(driver.supports["equality_constraints"], True)
         self.assertTrue(driver.supports["inequality_constraints"], True)
-        self.assertAlmostEqual(prob['radius'], 0.5, 2)  # it is going to the unconstrained optimum
-        self.assertAlmostEqual(prob['height'], 0.5, 2)  # it is going to the unconstrained optimum
+        self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
+        self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
     def test_no_constraint(self):
 
@@ -313,8 +313,8 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         print('Volume', prob['Volume'])  # should be around 10
         self.assertTrue(driver.supports["equality_constraints"], True)
         self.assertTrue(driver.supports["inequality_constraints"], True)
-        self.assertAlmostEqual(prob['radius'], 0.5, 2)  # it is going to the unconstrained optimum
-        self.assertAlmostEqual(prob['height'], 0.5, 2)  # it is going to the unconstrained optimum
+        self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
+        self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

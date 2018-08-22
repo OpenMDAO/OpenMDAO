@@ -344,6 +344,7 @@ class SimpleGADriver(Driver):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
                     else:
+                        violation = np.array([])
                         msg = 'Specify a number for one of "lower", "upper" or "equals" for constraint "{}"'
                         ValueError(msg.format(name))
                     constraint_violations = np.hstack((constraint_violations, violation))
