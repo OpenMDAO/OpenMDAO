@@ -234,7 +234,7 @@ function DrawMatrix() {
                 }
                 alert("error: enter transform not found");
             });
-        drawFunctions[i](gEnter, u0, v0, (i < 3) ? GetOnDiagonalCellColor : (i === 7) ? CONNECTION_COLOR : "orange", false)  // Color here XXXXXXXXXXXXXXXXXXXx
+        drawFunctions[i](gEnter, u0, v0, (i < 3) ? GetOnDiagonalCellColor : CONNECTION_COLOR, false)
             .on("mouseover", (i < 3) ? mouseOverOnDiagN2 : mouseOverOffDiagN2)
             .on("mouseleave", mouseOutN2)
             .on("click", mouseClickN2);
