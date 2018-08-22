@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
-    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
+    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -499,6 +499,83 @@ class TestProblem(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         prob.check_totals(method='cs', step=1.0e-1)
+
+    def test_check_totals_user_detect(self):
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x')
+
+                if not self.force_alloc_complex:
+                    raise RuntimeError('force_alloc_complex not set in component.')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+                if np.iscomplex(inputs._data[0]) and not self.under_complex_step:
+                    raise RuntimeError('under_complex_step not set in component.')
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        prob.check_totals(method='cs', out_stream=None)
+        self.assertFalse(prob.model.under_complex_step,
+                         msg="The under_complex_step flag should be reset.")
+
+    def test_feature_check_totals_user_detect_forced(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x')
+
+                if self.force_alloc_complex:
+                    print("Vectors allocated for complex step.")
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        prob.check_totals(method='cs')
 
     def test_feature_run_driver(self):
         import numpy as np

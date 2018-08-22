@@ -4,7 +4,9 @@ from __future__ import division
 
 from itertools import product, chain
 from six import iteritems, itervalues
+
 import numpy as np
+
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import convert_neg, _global2local_offsets
@@ -200,15 +202,9 @@ class DefaultTransfer(Transfer):
         out_inds = self._out_inds
 
         if mode == 'fwd':
-            do_complex = in_vec._vector_info._under_complex_step and out_vec._alloc_complex
 
             # this works whether the vecs have multi columns or not due to broadcasting
             in_vec._data[in_inds] = out_vec._data[out_inds]
-
-            # Imaginary transfer
-            # (for CS, so only need in fwd)
-            if do_complex:
-                in_vec._imag_data[in_inds] = out_vec._imag_data[out_inds]
 
         else:  # rev
             np.add.at(out_vec._data, out_inds, in_vec._data[in_inds])

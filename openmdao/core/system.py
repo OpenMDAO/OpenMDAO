@@ -60,6 +60,10 @@ class System(object):
         options dictionary
     recording_options : OptionsDictionary
         Recording options dictionary
+    under_complex_step : bool
+        When True, this system is undergoing complex step.
+    force_alloc_complex : bool
+        When True, the vectors have been allocated for checking with complex step.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -317,6 +321,9 @@ class System(object):
         self._owns_approx_of = None
         self._owns_approx_wrt_idx = {}
         self._owns_approx_of_idx = {}
+
+        self.under_complex_step = False
+        self.force_alloc_complex = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -1351,18 +1358,10 @@ class System(object):
 
         for vec in outputs:
 
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
-
             if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
-
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
 
             if self._has_resid_scaling:
                 vec.scale('norm')
@@ -2842,6 +2841,23 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_complex_step = active
+            sub._inputs.set_complex_step_mode(active)
+            sub._outputs.set_complex_step_mode(active)
+            sub._residuals.set_complex_step_mode(active)
 
     def cleanup(self):
         """
