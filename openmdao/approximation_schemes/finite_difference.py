@@ -168,7 +168,7 @@ class FiniteDifference(ApproximationScheme):
 
         if deriv_type == 'total':
             current_vec = system._outputs
-        elif deriv_type == 'partial':
+        else:
             current_vec = system._residuals
 
         result = system._outputs._clone(True)

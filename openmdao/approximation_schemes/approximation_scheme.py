@@ -76,7 +76,7 @@ class ApproximationScheme(object):
         if deriv_type == 'total':
             run_model = system.run_solve_nonlinear
             results_vec = outputs
-        elif deriv_type == 'partial':
+        else:
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 

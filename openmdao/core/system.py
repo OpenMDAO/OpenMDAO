@@ -2842,6 +2842,23 @@ class System(object):
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
 
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_complex_step = active
+            sub._inputs.set_complex_step_mode(active)
+            sub._outputs.set_complex_step_mode(active)
+            sub._residuals.set_complex_step_mode(active)
+
     def cleanup(self):
         """
         Clean up resources prior to exit.

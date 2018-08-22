@@ -562,7 +562,7 @@ class Vector(object):
         print('-' * 35)
         print()
 
-    def set_complex_step_mode(self, flag):
+    def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
 
@@ -571,13 +571,13 @@ class Vector(object):
 
         Parameters
         ----------
-        flag : bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        if flag:
+        if active:
             self._cplx_data[:] = self._data
 
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
-        self._under_complex_step = flag
+        self._under_complex_step = active

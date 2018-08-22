@@ -110,18 +110,14 @@ class ComplexStep(ApproximationScheme):
 
         if deriv_type == 'total':
             current_vec = system._outputs
-        elif deriv_type == 'partial':
+        else:
             current_vec = system._residuals
 
         # Clean vector for results
         results_clone = current_vec._clone(True)
 
         # Turn on complex step.
-        for sub in system.system_iter(include_self=True, recurse=True):
-            sub.under_complex_step = True
-            sub._inputs.set_complex_step_mode(True)
-            sub._outputs.set_complex_step_mode(True)
-            sub._residuals.set_complex_step_mode(True)
+        system._set_complex_step_mode(True)
         results_clone.set_complex_step_mode(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
@@ -183,11 +179,7 @@ class ComplexStep(ApproximationScheme):
                     jac._override_checks = False
 
         # Turn off complex step.
-        for sub in system.system_iter(include_self=True, recurse=True):
-            sub.under_complex_step = False
-            sub._inputs.set_complex_step_mode(False)
-            sub._outputs.set_complex_step_mode(False)
-            sub._residuals.set_complex_step_mode(False)
+        system._set_complex_step_mode(False)
 
     def _run_point_complex(self, system, input_deltas, result_clone, deriv_type='partial'):
         """
@@ -218,7 +210,7 @@ class ComplexStep(ApproximationScheme):
         if deriv_type == 'total':
             run_model = system.run_solve_nonlinear
             results_vec = outputs
-        elif deriv_type == 'partial':
+        else:
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
