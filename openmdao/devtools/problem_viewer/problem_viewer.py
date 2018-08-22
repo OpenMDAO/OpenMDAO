@@ -154,11 +154,20 @@ def _get_viewer_data(problem_or_rootgroup_or_filename):
             edges_list.sort()  # make deterministic so same .html file will be produced each run
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
                                                  ('cycle_arrows', edges_list)]))
+            print 'EDGE LIST: XXXXXXXXXX', edges_list
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
 
     data_dict['connections_list'] = connections_list
+    for conn in connections_list:
+        print 'CONNECTION: XXXXXX', conn
+    for k, v in data_dict.iteritems():
+        print "DATADICT XXXX: ", k, v
+    for k, v in data_dict['tree'].iteritems():
+        print "TREE XXXX: ", k, v
 
+    print data_dict['tree']['children'][0]['children'][0]['name']
+    # data_dict['tree']['children'][0]['children'].pop(0)
     return data_dict
 
 def view_tree(*args, **kwargs):

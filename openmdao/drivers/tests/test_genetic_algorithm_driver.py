@@ -162,6 +162,161 @@ class TestSimpleGA(unittest.TestCase):
         #Material 3 can be anything
 
 
+class TestConstrainedSimpleGA(unittest.TestCase):
+
+    def test_constrained_with_penalty(self):
+
+        class Cylinder(ExplicitComponent):
+            """Main class"""
+
+            def setup(self):
+                self.add_input('radius', val=1.0)
+                self.add_input('height', val=1.0)
+
+                self.add_output('Area', val=1.0)
+                self.add_output('Volume', val=1.0)
+
+            def compute(self, inputs, outputs):
+                radius = inputs['radius']
+                height = inputs['height']
+
+                area = height * radius * 2 * 3.14 + 3.14 * radius ** 2 * 2
+                volume = 3.14 * radius ** 2 * height
+                outputs['Area'] = area
+                outputs['Volume'] = volume
+
+        prob = Problem()
+        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('radius', 2.)  # height
+        indeps.add_output('height', 3.)  # radius
+
+        # setup the optimization
+        driver = prob.driver = SimpleGADriver()
+        prob.driver.options['penalty_parameter'] = 3.
+        prob.driver.options['penalty_exponent'] = 1.
+        prob.driver.options['max_gen'] = 50
+        prob.driver.options['bits'] = {'radius': 8, 'height': 8}
+
+        prob.model.add_design_var('radius', lower=0.5, upper=5.)
+        prob.model.add_design_var('height', lower=0.5, upper=5.)
+        prob.model.add_objective('Area')
+        prob.model.add_constraint('Volume', lower=10.)
+
+        prob.setup()
+        prob.run_driver()
+        print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
+        print('height', prob['height'])  # exact solution is 2*radius
+        print('Area', prob['Area'])
+        print('Volume', prob['Volume'])  # should be around 10
+        self.assertTrue(driver.supports["equality_constraints"], True)
+        self.assertTrue(driver.supports["inequality_constraints"], True)
+        self.assertGreater(prob['radius'], 1.)  # check that it is not going to the unconstrained optimum
+        self.assertGreater(prob['height'], 1.)  # check that it is not going to the unconstrained optimum
+
+    def test_constrained_without_penalty(self):
+
+        class Cylinder(ExplicitComponent):
+            """Main class"""
+
+            def setup(self):
+                self.add_input('radius', val=1.0)
+                self.add_input('height', val=1.0)
+
+                self.add_output('Area', val=1.0)
+                self.add_output('Volume', val=1.0)
+
+            def compute(self, inputs, outputs):
+                radius = inputs['radius']
+                height = inputs['height']
+
+                area = height * radius * 2 * 3.14 + 3.14 * radius ** 2 * 2
+                volume = 3.14 * radius ** 2 * height
+                outputs['Area'] = area
+                outputs['Volume'] = volume
+
+        prob = Problem()
+        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('radius', 2.)  # height
+        indeps.add_output('height', 3.)  # radius
+
+        # setup the optimization
+        driver = prob.driver = SimpleGADriver()
+        prob.driver.options['penalty_parameter'] = 0.  # no penalty, same as unconstrained
+        prob.driver.options['penalty_exponent'] = 1.
+        prob.driver.options['max_gen'] = 50
+        prob.driver.options['bits'] = {'radius': 8, 'height': 8}
+
+        prob.model.add_design_var('radius', lower=0.5, upper=5.)
+        prob.model.add_design_var('height', lower=0.5, upper=5.)
+        prob.model.add_objective('Area')
+        prob.model.add_constraint('Volume', lower=10.)
+
+        prob.setup()
+        prob.run_driver()
+        print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
+        print('height', prob['height'])  # exact solution is 2*radius
+        print('Area', prob['Area'])
+        print('Volume', prob['Volume'])  # should be around 10
+        self.assertTrue(driver.supports["equality_constraints"], True)
+        self.assertTrue(driver.supports["inequality_constraints"], True)
+        self.assertAlmostEqual(prob['radius'], 0.5, 2)  # it is going to the unconstrained optimum
+        self.assertAlmostEqual(prob['height'], 0.5, 2)  # it is going to the unconstrained optimum
+
+    def test_no_constraint(self):
+
+        class Cylinder(ExplicitComponent):
+            """Main class"""
+
+            def setup(self):
+                self.add_input('radius', val=1.0)
+                self.add_input('height', val=1.0)
+
+                self.add_output('Area', val=1.0)
+                self.add_output('Volume', val=1.0)
+
+            def compute(self, inputs, outputs):
+                radius = inputs['radius']
+                height = inputs['height']
+
+                area = height * radius * 2 * 3.14 + 3.14 * radius ** 2 * 2
+                volume = 3.14 * radius ** 2 * height
+                outputs['Area'] = area
+                outputs['Volume'] = volume
+
+        prob = Problem()
+        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('radius', 2.)  # height
+        indeps.add_output('height', 3.)  # radius
+
+        # setup the optimization
+        driver = prob.driver = SimpleGADriver()
+        prob.driver.options['penalty_parameter'] = 10.  # will have no effect
+        prob.driver.options['penalty_exponent'] = 1.
+        prob.driver.options['max_gen'] = 50
+        prob.driver.options['bits'] = {'radius': 8, 'height': 8}
+
+        prob.model.add_design_var('radius', lower=0.5, upper=5.)
+        prob.model.add_design_var('height', lower=0.5, upper=5.)
+        prob.model.add_objective('Area')
+
+        prob.setup()
+        prob.run_driver()
+        print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
+        print('height', prob['height'])  # exact solution is 2*radius
+        print('Area', prob['Area'])
+        print('Volume', prob['Volume'])  # should be around 10
+        self.assertTrue(driver.supports["equality_constraints"], True)
+        self.assertTrue(driver.supports["inequality_constraints"], True)
+        self.assertAlmostEqual(prob['radius'], 0.5, 2)  # it is going to the unconstrained optimum
+        self.assertAlmostEqual(prob['height'], 0.5, 2)  # it is going to the unconstrained optimum
+
+
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITestSimpleGA(unittest.TestCase):
 

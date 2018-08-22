@@ -11,6 +11,9 @@ The following reference is only for the automatic population sizing:
 Williams E.A., Crossley W.A. (1998) Empirically-Derived Population Size and Mutation Rate
 Guidelines for a Genetic Algorithm with Uniform Crossover. In: Chawdhry P.K., Roy R., Pant R.K.
 (eds) Soft Computing in Engineering Design and Manufacturing. Springer, London.
+
+The following reference is only for the penalty function only:
+Smith, A. E., Coit, D. W. (1995) Penalty functions. In: Handbook of Evolutionary Computation, 97(1).
 """
 import copy
 
@@ -23,6 +26,7 @@ from pyDOE2 import lhs
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent import concurrent_eval
 from openmdao.utils.mpi import MPI
+from openmdao.core.analysis_error import AnalysisError
 
 
 class SimpleGADriver(Driver):
@@ -59,8 +63,8 @@ class SimpleGADriver(Driver):
         self.supports['integer_design_vars'] = True
 
         # What we don't support yet
-        self.supports['inequality_constraints'] = False
-        self.supports['equality_constraints'] = False
+        self.supports['inequality_constraints'] = True
+        self.supports['equality_constraints'] = True
         self.supports['multiple_objectives'] = False
         self.supports['two_sided_constraints'] = False
         self.supports['linear_constraints'] = False
@@ -98,6 +102,10 @@ class SimpleGADriver(Driver):
                              desc='Set to True to execute the points in a generation in parallel.')
         self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
+        self.options.declare('penalty_parameter', default=10., lower=0.,
+                             desc='Penalty function parameter.')
+        self.options.declare('penalty_exponent', default=1.,
+                             desc='Penalty function exponent.')
 
     def _setup_driver(self, problem):
         """
@@ -116,9 +124,9 @@ class SimpleGADriver(Driver):
             msg = 'SimpleGADriver currently does not support multiple objectives.'
             raise RuntimeError(msg)
 
-        if len(self._cons) > 0:
-            msg = 'SimpleGADriver currently does not support constraints.'
-            raise RuntimeError(msg)
+        # if len(self._cons) > 0:
+        #     msg = 'SimpleGADriver currently does not support constraints.'
+        #     raise RuntimeError(msg)
 
         model_mpi = None
         comm = self._problem.comm
@@ -243,6 +251,37 @@ class SimpleGADriver(Driver):
         """
         Evaluate problem objective at the requested point.
 
+        Takes into account constraints with a penalty function.
+
+        All constraints are converted to the form of :math:`g(x)_i \leq 0` for inequality constraints and
+        :math:`h(x)_i = 0` for equality constraints.
+        The constraint vector for inequality constraints is the following:
+
+        .. math::
+
+           g = [g_1, g_2  \dots g_N], g_i \in R^{N_{g_i}}
+
+           h = [h_1, h_2  \dots h_N], h_i \in R^{N_{h_i}}
+
+        The number of all constraints:
+
+        .. math::
+
+            N_g = \sum_{i=1}^N N_{g_i},  N_h = \sum_{i=1}^N N_{h_i}
+
+        The fitness function is constructed with the penalty parameter :math:`p` and the exponent :math:`\kappa`:
+
+        .. math::
+
+           \Phi(x) = f(x) + p \cdot \sum_{k=1}^{N^g}(\delta_k \cdot g_k^{\kappa})
+           + p \cdot \sum_{k=1}^{N^h}|h_k|^{\kappa}
+
+        where :math:`\delta_k = 0` if :math:`g_k` is satisfied, 1 otherwise
+
+        .. note::
+
+            The values of :math:`\kappa` and :math:`p` can be defined as driver options.
+
         Parameters
         ----------
         x : ndarray
@@ -261,6 +300,7 @@ class SimpleGADriver(Driver):
         """
         model = self._problem.model
         success = 1
+        # self._update_voi_meta(model)  # by O.P.  # FIXME test
 
         for name in self._designvars:
             i, j = self._desvar_idx[name]
@@ -281,6 +321,33 @@ class SimpleGADriver(Driver):
                 obj = val
                 break
 
+            # Parameters of the penalty method
+            penalty = self.options['penalty_parameter']
+            exponent = self.options['penalty_exponent']
+
+            if penalty == 0:
+                fun = obj
+            else:
+                constraint_vals = list()
+                constraint_violations = np.array([])
+                for name, val in iteritems(self.get_constraint_values()):
+                    constraint_vals.append(val)
+                    con = self._cons[name]
+                    # The not used fields will either None or a very large number
+                    if (con['lower'] is not None) and np.isfinite(con['lower']):
+                        diff = val - con['lower']
+                        violation = np.array([0. if d >= 0 else abs(d) for d in diff])
+                    elif (con['upper'] is not None) and np.isfinite(con['upper']):
+                        diff = val - con['upper']
+                        violation = np.array([0. if d <= 0 else abs(d) for d in diff])
+                    elif (con['equals'] is not None) and np.isfinite(con['equals']):
+                        diff = val - con['equals']
+                        violation = np.absolute(diff)
+                    else:
+                        msg = 'Specify a number for one of "lower", "upper" or "equals" for constraint "{}"'
+                        ValueError(msg.format(name))
+                    constraint_violations = np.hstack((constraint_violations, violation))
+                fun = obj + penalty * sum(np.power(constraint_violations, exponent))
             # Record after getting obj to assure they have
             # been gathered in MPI.
             rec.abs = 0.0
@@ -289,7 +356,7 @@ class SimpleGADriver(Driver):
         # print("Functions calculated")
         # print(x)
         # print(obj)
-        return obj, success, icase
+        return fun, success, icase
 
 
 class GeneticAlgorithm():
