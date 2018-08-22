@@ -833,8 +833,8 @@ class _TotalJacInfo(object):
     def _zero_vecs(self, vecnames, mode):
         vecs = self.model._vectors
 
+        # clean out vectors from last solve
         for vecname in vecnames:
-            # this sets dinputs for the current vecname to 0
             vecs['output'][vecname]._data[:] = 0.0
             vecs['residual'][vecname]._data[:] = 0.0
             if mode == 'rev':
