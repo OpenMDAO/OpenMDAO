@@ -253,8 +253,8 @@ class SimpleGADriver(Driver):
 
         Takes into account constraints with a penalty function.
 
-        All constraints are converted to the form of :math:`g(x)_i \leq 0` for inequality constraints and
-        :math:`h(x)_i = 0` for equality constraints.
+        All constraints are converted to the form of :math:`g(x)_i \leq 0` for
+        inequality constraints and :math:`h(x)_i = 0` for equality constraints.
         The constraint vector for inequality constraints is the following:
 
         .. math::
@@ -267,9 +267,10 @@ class SimpleGADriver(Driver):
 
         .. math::
 
-            N_g = \sum_{i=1}^N N_{g_i},  N_h = \sum_{i=1}^N N_{h_i}
+           N_g = \sum_{i=1}^N N_{g_i},  N_h = \sum_{i=1}^N N_{h_i}
 
-        The fitness function is constructed with the penalty parameter :math:`p` and the exponent :math:`\kappa`:
+        The fitness function is constructed with the penalty parameter :math:`p`
+        and the exponent :math:`\kappa`:
 
         .. math::
 
@@ -345,7 +346,8 @@ class SimpleGADriver(Driver):
                         violation = np.absolute(diff)
                     else:
                         violation = np.array([])
-                        msg = 'Specify a number for one of "lower", "upper" or "equals" for constraint "{}"'
+                        msg = ('Specify a number for one of '
+                               '"lower", "upper" or "equals" for constraint "{}"')
                         ValueError(msg.format(name))
                     constraint_violations = np.hstack((constraint_violations, violation))
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
