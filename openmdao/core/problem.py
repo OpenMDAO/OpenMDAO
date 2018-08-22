@@ -1332,7 +1332,7 @@ class Problem(object):
         data[''] = {}
         for key, val in iteritems(Jcalc):
             data[''][key] = {}
-            data[''][key]['J_fwd'] = Jcalc[key]
+            data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
