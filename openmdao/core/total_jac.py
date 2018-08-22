@@ -835,7 +835,6 @@ class _TotalJacInfo(object):
 
         for vecname in vecnames:
             # this sets dinputs for the current vecname to 0
-            # dinputs is dresids in fwd, doutouts in rev
             vecs['output'][vecname]._data[:] = 0.0
             vecs['residual'][vecname]._data[:] = 0.0
             if mode == 'rev':
