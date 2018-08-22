@@ -222,7 +222,7 @@ class Vector(object):
         start = end = 0
         for name, view in iteritems(self._views_flat):
             end += view.size
-            dict_view[name] = arr[star:end]
+            dict_view[name] = arr[start:end]
             start = end
         return dict_view
 
