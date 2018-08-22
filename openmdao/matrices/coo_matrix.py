@@ -1,6 +1,7 @@
 """Define the COOmatrix class."""
 from __future__ import division, print_function
 
+from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix
@@ -145,7 +146,7 @@ class COOMatrix(Matrix):
 
         return data, rows, cols
 
-    def _build(self, num_rows, num_cols):
+    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
         """
         Allocate the matrix.
 
@@ -155,6 +156,10 @@ class COOMatrix(Matrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
+        in_ranges : dict
+            Maps input var name to column range.
+        out_ranges : dict
+            Maps output var name to row range.
         """
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
@@ -322,3 +327,28 @@ class COOMatrix(Matrix):
                     mask[ind1:ind2] = False
 
             return mask
+
+
+def _get_dup_partials(rows, cols, in_ranges, out_ranges):
+    counts = Counter((rows[i], cols[i]) for i in range(len(rows)))
+    dups = []
+    for entry, count in counts.most_common():
+        if count > 1:
+            dups.append(entry)
+        else:
+            break
+
+    entries = defaultdict(list)
+
+    for row, col in dups:
+        for in_name in in_ranges:
+            cstart, cend = in_ranges[in_name]
+            if cstart <= col < cend:
+                break
+        for out_name in out_ranges:
+            rstart, rend = out_ranges[out_name]
+            if rstart <= row < rend:
+                break
+        entries[(out_name, in_name)].append((row - rstart, col - cstart))
+
+    return entries

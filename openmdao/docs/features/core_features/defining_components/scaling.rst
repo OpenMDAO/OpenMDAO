@@ -4,11 +4,12 @@
 Scaling Variables
 *****************
 
-As we saw in <Section declaring_variables>, we can specify scaling parameters for outputs and residuals.
+As we saw in :ref:`declaring-variables`, we can specify scaling parameters for outputs and residuals.
 Scaling can be important for the efficiency of some linear solvers and can have an impact on some gradient free
 nonlinear solvers such as Broyden. Knowing when and how to use scaling can be tricky, but in general, it is a good
 idea to scale outputs and residuals so that both have values that are :math:`\mathcal{O}(1)` and so that they have
 roughly the same range of variation in your design space.
+
 
 For example, consider a value that is expected to have a value around 2500. Then you might scale it by dividing
 by 1000. However, if the value was going to have an expected range between 2400 and 2500, then you might want to subtract out
@@ -94,8 +95,8 @@ Specifying a scaler on an output
 
 This example shows how to specify a scaler on outputs 'y1' and 'y2'. The scaling used here
 assures that the outputs (which are states in this implicit component) are in the same order
-of magnitude when the solver interacts with them.  Note that whenver a user function is called
-(like `apply_nonlinear` here), all outputs and residuals are reverted to unscaled dimensiional
+of magnitude when the solver interacts with them.  Note that whenever a user function is called
+(like `apply_nonlinear` here), all outputs and residuals are reverted to unscaled dimensional
 form.
 
   .. embed-code::

@@ -74,9 +74,8 @@ class Vector(object):
         Pointer to the vector owned by the root system.
     _alloc_complex : Bool
         If True, then space for the imaginary part is also allocated.
-    _data : {}
-        Dict of the actual allocated data (depends on implementation), keyed
-        by varset name.
+    _data : ndarray
+        Actual allocated data.
     _vector_info : <VectorInfo>
         Object to store some global info, such as complex step state.
     _imag_views : dict
@@ -84,9 +83,8 @@ class Vector(object):
     _imag_views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views for the imaginary
         part.
-    _imag_data : {}
-        Dict of the actual allocated data (depends on implementation) for the imaginary part, keyed
-        by varset name.
+    _imag_data : ndarray
+        Actual allocated data for the imaginary part.
     _complex_view_cache : {}
         Temporary storage of complex views used by in-place numpy operations.
     _ncol : int
@@ -541,19 +539,6 @@ class Vector(object):
         -------
         float
             norm of this vector.
-        """
-        pass
-
-    def change_scaling_state(self, c0, c1):
-        """
-        Change the scaling state.
-
-        Parameters
-        ----------
-        c0 : int ndarray[nvar_myproc]
-            0th order coefficients for scaling/unscaling.
-        c1 : int ndarray[nvar_myproc]
-            1st order coefficients for scaling/unscaling.
         """
         pass
 

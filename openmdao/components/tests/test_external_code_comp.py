@@ -2,18 +2,20 @@
 from __future__ import print_function
 
 import os
+import sys
 import shutil
 import tempfile
 import unittest
 
 from scipy.optimize import fsolve
 
-from openmdao.api import Problem, Group, ExternalCodeComp, AnalysisError
+from openmdao.api import Problem, ExternalCodeComp, AnalysisError
 from openmdao.components.external_code_comp import STDOUT
 
 from openmdao.utils.assert_utils import assert_rel_error
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
+
 
 # These next three functions are used by test_simple_external_code_implicit_comp_with_solver
 def area_ratio_explicit(Mach):
@@ -22,11 +24,13 @@ def area_ratio_explicit(Mach):
     gamma_p_1 = gamma + 1
     gamma_m_1 = gamma - 1
     exponent = gamma_p_1 / (2 * gamma_m_1)
-    return (gamma_p_1 / 2.) ** -exponent * (
-            (1 + gamma_m_1 / 2. * Mach ** 2) ** exponent) / Mach
+
+    return (gamma_p_1 / 2.) ** -exponent * ((1 + gamma_m_1 / 2. * Mach ** 2) ** exponent) / Mach
+
 
 def mach_residual(Mach, area_ratio_target):
     return area_ratio_target - area_ratio_explicit(Mach)
+
 
 def mach_solve(area_ratio, super_sonic=False):
     if super_sonic:
@@ -37,6 +41,7 @@ def mach_solve(area_ratio, super_sonic=False):
     mach = fsolve(func=mach_residual, x0=initial_guess, args=(area_ratio,))[0]
 
     return mach
+
 
 class TestExternalCodeComp(unittest.TestCase):
 
@@ -63,12 +68,43 @@ class TestExternalCodeComp(unittest.TestCase):
             'python', 'extcode_example.py', 'extcode.out'
         ]
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py',]
-        self.extcode.options['external_output_files'] = ['extcode.out',]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
+        self.extcode.options['external_output_files'] = ['extcode.out']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         self.prob.run_model()
+
+        with open('extcode.out', 'r') as f:
+            self.assertEqual(f.read(), 'test data\n')
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows-specific test.')
+    def test_normal_bat(self):
+        batch_script = '\n'.join([
+            "@echo off",
+            "rem usage: extcode.bat output_filename",
+            "rem",
+            "rem Just write 'test data' to the specified output file",
+            "",
+            "set DATA=test data",
+            "set OUT_FILE=%1",
+            "",
+            "echo %DATA%>>%OUT_FILE%"
+        ])
+        with open('extcode.bat', 'w') as f:
+            f.write(batch_script)
+
+        self.extcode.options['command'] = [
+            'extcode.bat', 'extcode.out'
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode.bat']
+        self.extcode.options['external_output_files'] = ['extcode.out']
+
+        self.prob.setup(check=True)
+        self.prob.run_model()
+
+        with open('extcode.out', 'r') as f:
+            self.assertEqual(f.read(), 'test data\n')
 
     def test_timeout_raise(self):
         self.extcode.options['command'] = [
@@ -76,9 +112,8 @@ class TestExternalCodeComp(unittest.TestCase):
         ]
         self.extcode.options['timeout'] = 1.0
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         try:
             self.prob.run_model()
@@ -93,9 +128,8 @@ class TestExternalCodeComp(unittest.TestCase):
         ]
         self.extcode.options['timeout'] = 1.0
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         try:
             self.prob.run_model()
@@ -113,9 +147,8 @@ class TestExternalCodeComp(unittest.TestCase):
         self.extcode.options['timeout'] = 1.0
         self.extcode.options['fail_hard'] = False
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         try:
             self.prob.run_model()
@@ -133,9 +166,8 @@ class TestExternalCodeComp(unittest.TestCase):
             'python', 'extcode_example.py', 'extcode.out', '--return_code', '4'
         ]
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         self.prob.run_model()
 
@@ -145,9 +177,8 @@ class TestExternalCodeComp(unittest.TestCase):
             'python', 'extcode_example.py', 'extcode.out', '--return_code', '7'
         ]
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py', ]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         try:
             self.prob.run_model()
@@ -159,7 +190,7 @@ class TestExternalCodeComp(unittest.TestCase):
 
     def test_badcmd(self):
         # Set command to nonexistant path.
-        self.extcode.options['command'] = ['no-such-command', ]
+        self.extcode.options['command'] = ['no-such-command']
 
         self.prob.setup(check=False)
         try:
@@ -192,7 +223,6 @@ class TestExternalCodeComp(unittest.TestCase):
             'python', 'extcode_example.py', 'extcode.out', '--write_test_env_var'
         ]
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         self.prob.run_model()
 
@@ -240,8 +270,8 @@ class ParaboloidExternalCodeComp(ExternalCodeComp):
 
         # providing these is optional; the component will verify that any input
         # files exist before execution and that the output files exist after.
-        self.options['external_input_files'] = [self.input_file,]
-        self.options['external_output_files'] = [self.output_file,]
+        self.options['external_input_files'] = [self.input_file]
+        self.options['external_output_files'] = [self.output_file]
 
         self.options['command'] = [
             'python', 'extcode_paraboloid.py', self.input_file, self.output_file
@@ -253,7 +283,7 @@ class ParaboloidExternalCodeComp(ExternalCodeComp):
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:
-            input_file.write('%.16f\n%.16f\n' % (x,y))
+            input_file.write('%.16f\n%.16f\n' % (x, y))
 
         # the parent compute function actually runs the external code
         super(ParaboloidExternalCodeComp, self).compute(inputs, outputs)
@@ -277,8 +307,8 @@ class ParaboloidExternalCodeCompFD(ExternalCodeComp):
 
         # providing these is optional; the component will verify that any input
         # files exist before execution and that the output files exist after.
-        self.options['external_input_files'] = [self.input_file,]
-        self.options['external_output_files'] = [self.output_file,]
+        self.options['external_input_files'] = [self.input_file]
+        self.options['external_output_files'] = [self.output_file]
 
         self.options['command'] = [
             'python', 'extcode_paraboloid.py', self.input_file, self.output_file
@@ -293,7 +323,7 @@ class ParaboloidExternalCodeCompFD(ExternalCodeComp):
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:
-            input_file.write('%.16f\n%.16f\n' % (x,y))
+            input_file.write('%.16f\n%.16f\n' % (x, y))
 
         # the parent compute function actually runs the external code
         super(ParaboloidExternalCodeCompFD, self).compute(inputs, outputs)
@@ -318,7 +348,7 @@ class ParaboloidExternalCodeCompDerivs(ExternalCodeComp):
 
         # providing these is optional; the component will verify that any input
         # files exist before execution and that the output files exist after.
-        self.options['external_input_files'] = [self.input_file,]
+        self.options['external_input_files'] = [self.input_file]
         self.options['external_output_files'] = [self.output_file, self.derivs_file]
 
         self.options['command'] = [
@@ -335,7 +365,7 @@ class ParaboloidExternalCodeCompDerivs(ExternalCodeComp):
 
         # generate the input file for the paraboloid external code
         with open(self.input_file, 'w') as input_file:
-            input_file.write('%.16f\n%.16f\n' % (x,y))
+            input_file.write('%.16f\n%.16f\n' % (x, y))
 
         # the parent compute function actually runs the external code
         super(ParaboloidExternalCodeCompDerivs, self).compute(inputs, outputs)
@@ -389,7 +419,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
             pass
 
     def test_main(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.api import Problem, IndepVarComp
         from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeComp
 
         prob = Problem()
@@ -411,7 +441,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         self.assertEqual(prob['p.f_xy'], -15.0)
 
     def test_optimize_fd(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.api import Problem, IndepVarComp
         from openmdao.api import ScipyOptimizeDriver
         from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompFD
 
@@ -446,7 +476,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
     def test_optimize_derivs(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        from openmdao.api import Problem, IndepVarComp
         from openmdao.api import ScipyOptimizeDriver
         from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompDerivs
 
@@ -480,6 +510,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         assert_rel_error(self, prob['p1.x'], 6.66666667, 1e-6)
         assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
+
 # ------------------------------------------------------
 # run same test as above, only with the deprecated component,
 # to ensure we get the warning and the correct answer.
@@ -507,7 +538,8 @@ class TestDeprecatedExternalCode(unittest.TestCase):
 
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'ExternalCode' has been deprecated. Use 'ExternalCodeComp' instead.")
+        msg = "'ExternalCode' has been deprecated. Use 'ExternalCodeComp' instead."
+        self.assertEqual(str(w[0].message), msg)
 
         self.prob = Problem()
 
@@ -525,12 +557,12 @@ class TestDeprecatedExternalCode(unittest.TestCase):
             'python', 'extcode_example.py', 'extcode.out'
         ]
 
-        self.extcode.options['external_input_files'] = ['extcode_example.py',]
-        self.extcode.options['external_output_files'] = ['extcode.out',]
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
+        self.extcode.options['external_output_files'] = ['extcode.out']
 
-        dev_null = open(os.devnull, 'w')
         self.prob.setup(check=True)
         self.prob.run_model()
+
 
 class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
@@ -581,8 +613,8 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
                 # providing these are optional; the component will verify that any input
                 # files exist before execution and that the output files exist after.
-                self.options['external_input_files'] = [self.input_file, ]
-                self.options['external_output_files'] = [self.output_file,]
+                self.options['external_input_files'] = [self.input_file]
+                self.options['external_output_files'] = [self.output_file]
 
                 self.options['command_apply'] = [
                     'python', 'extcode_mach.py', self.input_file, self.output_file,
@@ -643,9 +675,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
         assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
-
-
-
 
 
 if __name__ == "__main__":

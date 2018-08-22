@@ -442,7 +442,7 @@ class DefaultVector(Vector):
         # the initial step does not violate bounds. If it does, we modify
         # the step vector directly.
 
-        # Loop over varsets and enforce bounds on step in-place.
+        # enforce bounds on step in-place.
         u_data = u._data
 
         # If u > lower, we're just adding zero. Otherwise, we're adding
@@ -486,7 +486,7 @@ class DefaultVector(Vector):
         # the initial step does not violate bounds. If it does, we modify
         # the step vector directly.
 
-        # Loop over varsets and enforce bounds on step in-place.
+        # enforce bounds on step in-place.
         u_data = u._data
         du_data = du._data
 

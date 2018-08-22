@@ -680,11 +680,11 @@ class Driver(object):
             else:
                 objs[name] = data
 
-        response_size = np.sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
+        response_size = sum(resps[n]['size'] for n in self._get_ordered_nl_responses())
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True)
-        desvar_size = np.sum(data['size'] for data in itervalues(designvars))
+        desvar_size = sum(data['size'] for data in itervalues(designvars))
 
         return response_size, desvar_size
 
@@ -998,7 +998,7 @@ class Driver(object):
 
         if isinstance(self._simul_coloring_info, string_types):
             with open(self._simul_coloring_info, 'r') as f:
-                self._simul_coloring_info = json.load(f)
+                self._simul_coloring_info = coloring_mod._json2coloring(json.load(f))
 
         if 'rev' in self._simul_coloring_info and self._problem._orig_mode not in ('rev', 'auto'):
             revcol = self._simul_coloring_info['rev'][0][0]

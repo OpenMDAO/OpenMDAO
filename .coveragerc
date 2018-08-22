@@ -1,19 +1,1 @@
-[report]
-exclude_lines =
-    pragma: no cover
-    def __repr__
-    raise AssertionError
-    raise NotImplementedError
-    if __name__ == .__main__.:
 
-[run]
-include =
-    */openmdao/*
-
-omit =
-    */test/*
-    */tests/*
-    */test_suite/*
-    */code_review/*
-    */devtools/*
-    */docs/*
