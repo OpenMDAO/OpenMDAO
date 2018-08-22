@@ -9,6 +9,7 @@ RelaxationLS Also checks bounds and enforces them by one of three methods.
 
 """
 from __future__ import print_function
+from math import log10
 
 import numpy as np
 
@@ -73,7 +74,7 @@ class RelaxationLS(LineSearch):
                     desc='Value of absolute residual norm above which the initial relaxation is '
                     'used.')
         opt.declare('relax_near', default=1e-3,
-                    desc='Value of absolute residual norm below which the no relaxation is used. '
+                    desc='Value of absolute residual norm below which no relaxation is used. '
                     '(i.e., relaxation parameter = 1.0')
 
         # Remove unused options from base options here, so that users
@@ -137,9 +138,9 @@ class RelaxationLS(LineSearch):
             u.add_scal_vec(alpha_far, du)
 
         elif norm0 > relax_near:
-            log_relax_near = np.log10(relax_near)
-            alpha = alpha_far + (1.0 - alpha_far) * (np.log10(norm0) - log_relax_near) / \
-                    (np.log10(relax_far) - log_relax_near)
+            log_near = log10(relax_near)
+            alpha = alpha_far + (1.0 - alpha_far) * (log10(norm0) - log_near) / \
+                (log10(relax_far) - log_near)
             u.add_scal_vec(alpha, du)
 
         else:

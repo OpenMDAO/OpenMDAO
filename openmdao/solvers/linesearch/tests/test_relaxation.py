@@ -2,53 +2,11 @@
 
 import unittest
 
-import numpy as np
-
-from openmdao.api import Problem, IndepVarComp, ScipyKrylov, NewtonSolver, ImplicitComponent, \
-     DirectSolver
+from openmdao.api import Problem, IndepVarComp, ScipyKrylov, NewtonSolver
 from openmdao.solvers.linesearch.relaxation import RelaxationLS
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
 from openmdao.utils.assert_utils import assert_rel_error
-
-
-class Watson2(ImplicitComponent):
-    """
-    Implements a problem from Prof L. T. Watson.
-
-    f_k(x) - exp(cos(k * summation_i (x_i)))
-    """
-    def initialize(self):
-        self.options.declare('size', types=int, default=3,
-                             desc='Size of the Watson2 problem.')
-
-    def setup(self):
-        n = self.options['size']
-
-        self.add_output('x', val=1.0*np.ones((n, )))
-
-        self.declare_partials(of='x', wrt='x')
-
-    def apply_nonlinear(self, inputs, outputs, residuals):
-        x = outputs['x']
-        n = self.options['size']
-
-        sum_x = np.sum(x)
-        k = np.arange(n) + 1
-
-        residuals['x'] = np.exp(np.cos(k * sum_x))
-
-    def linearize(self, inputs, outputs, jacobian):
-        x = outputs['x']
-        n = self.options['size']
-
-        sum_x = np.sum(x)
-        k = np.arange(n) + 1
-        fact = k * sum_x
-        fact2 = -k * np.sin(fact) * np.exp(np.cos(fact))
-
-        jacobian['x', 'x'] = np.tile(fact2, n).reshape((n, n)).T
-        print(jacobian['x', 'x'], x)
 
 
 class TestRelaxationLS(unittest.TestCase):
@@ -78,26 +36,6 @@ class TestRelaxationLS(unittest.TestCase):
         msg = "In options, relax_far must be greater than or equal to relax_near."
 
         self.assertEqual(exception.args[0], msg)
-
-    def test_watson2(self):
-        p = Problem()
-        model = p.model
-        model.add_subsystem('comp', Watson2(size=3))
-
-        model.nonlinear_solver = NewtonSolver()
-        model.nonlinear_solver.options['maxiter'] = 25
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver.linesearch = RelaxationLS()
-        model.nonlinear_solver.linesearch.options['initial_relaxation'] = 0.1
-        model.nonlinear_solver.linesearch.options['relax_far'] = 1e-1
-        model.nonlinear_solver.linesearch.options['relax_near'] = 1e-4
-
-        p.setup()
-        p.set_solver_print(level=2)
-
-        p.run_model()
-
-        assert_rel_error(self, p['comp.x'], np.array([1, 1, 1]), 1e-6)
 
     def test_circuit_advanced_newton(self):
         p = Problem()
@@ -138,7 +76,7 @@ class TestRelaxationLS(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = RelaxationLS(bound_enforcement='vector')
+        top.model.nonlinear_solver.linesearch = RelaxationLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -167,7 +105,7 @@ class TestRelaxationLS(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = RelaxationLS(bound_enforcement='wall')
+        top.model.nonlinear_solver.linesearch = RelaxationLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -195,7 +133,7 @@ class TestRelaxationLS(unittest.TestCase):
         top.model.nonlinear_solver = NewtonSolver()
         top.model.linear_solver = ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = RelaxationLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = RelaxationLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
         top.setup(check=False)
@@ -235,13 +173,13 @@ class TestFeatureRelaxationLS(unittest.TestCase):
 
         p.setup()
 
-        # you can change the NewtonSolver settings in circuit after setup is called
+        # You can change the NewtonSolver settings in circuit after setup is called
         newton = p.model.circuit.nonlinear_solver
         newton.options['iprint'] = 2
-        newton.options['maxiter'] = 1500
+        newton.options['maxiter'] = 15
         newton.options['solve_subsystems'] = True
 
-        # Carefully tailored the relaxation settings so that
+        # Tailored the relaxation settings to give good convergence.
         newton.linesearch = RelaxationLS()
         newton.linesearch.options['initial_relaxation'] = 0.025
         newton.linesearch.options['relax_far'] = 1.e-3
