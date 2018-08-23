@@ -617,6 +617,55 @@ class TestFeatureSimpleGA(unittest.TestCase):
         print('p2.xI', prob['p2.xI'])
         print('p1.xC', prob['p1.xC'])
 
+    def test_constrained_with_penalty(self):
+        from openmdao.api import ExplicitComponent, Problem, IndepVarComp, SimpleGADriver
+
+        class Cylinder(ExplicitComponent):
+            """Main class"""
+
+            def setup(self):
+                self.add_input('radius', val=1.0)
+                self.add_input('height', val=1.0)
+
+                self.add_output('Area', val=1.0)
+                self.add_output('Volume', val=1.0)
+
+            def compute(self, inputs, outputs):
+                radius = inputs['radius']
+                height = inputs['height']
+
+                area = height * radius * 2 * 3.14 + 3.14 * radius ** 2 * 2
+                volume = 3.14 * radius ** 2 * height
+                outputs['Area'] = area
+                outputs['Volume'] = volume
+
+        prob = Problem()
+        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('radius', 2.)  # height
+        indeps.add_output('height', 3.)  # radius
+
+        # setup the optimization
+        driver = prob.driver = SimpleGADriver()
+        prob.driver.options['penalty_parameter'] = 3.
+        prob.driver.options['penalty_exponent'] = 1.
+        prob.driver.options['max_gen'] = 50
+        prob.driver.options['bits'] = {'radius': 8, 'height': 8}
+
+        prob.model.add_design_var('radius', lower=0.5, upper=5.)
+        prob.model.add_design_var('height', lower=0.5, upper=5.)
+        prob.model.add_objective('Area')
+        prob.model.add_constraint('Volume', lower=10.)
+
+        prob.setup()
+        prob.run_driver()
+
+        # These go to 0.5 for unconstrained problem. With constraint and penalty, they
+        # will be above 1.0 (actual values will vary.)
+        self.assertGreater(prob['radius'], 1.)
+        self.assertGreater(prob['height'], 1.)
+
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 @unittest.skipUnless(MPI, "MPI is required.")
