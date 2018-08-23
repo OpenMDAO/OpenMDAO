@@ -14,6 +14,11 @@ Guidelines for a Genetic Algorithm with Uniform Crossover. In: Chawdhry P.K., Ro
 
 The following reference is only for the penalty function:
 Smith, A. E., Coit, D. W. (1995) Penalty functions. In: Handbook of Evolutionary Computation, 97(1).
+
+The following reference is only for weighted sum multi-objective optimization:
+Sobieszczanski-Sobieski, J., Morris, A. J., van Tooren, M. J. L. (2015)
+Multidisciplinary Design Optimization Supported by Knowledge Based Engineering.
+John Wiley & Sons, Ltd.
 """
 import copy
 
@@ -111,8 +116,10 @@ class SimpleGADriver(Driver):
         self.options.declare('Pm',
                              desc='Mutation rate.', default=None, lower=0., upper=1.,
                              allow_none=True)
-        self.options.declare('objective_weights', default={}, types=(dict),
+        self.options.declare('multi_obj_weights', default={}, types=(dict),
                              desc='Weights of objectives for multi-objective optimization.')
+        self.options.declare('multi_obj_exponent', default=1., lower=0.,
+                             desc='Multi-objective weighting exponent.')
 
     def _setup_driver(self, problem):
         """
@@ -303,7 +310,8 @@ class SimpleGADriver(Driver):
         success = 1
         # self._update_voi_meta(model)  # by O.P.  # FIXME test
 
-        obj_weights = self.options['objective_weights']
+        obj_weights = self.options['multi_obj_weights']
+        obj_exponent = self.options['multi_obj_exponent']
 
         for name in self._designvars:
             i, j = self._desvar_idx[name]
@@ -320,12 +328,13 @@ class SimpleGADriver(Driver):
                 model._clear_iprint()
                 success = 0
 
+            sum_weights = sum(obj_weights.values())
             weighted_objectives = np.array([])
             for name, val in iteritems(self.get_objective_values()):
                 weighted_obj = val * obj_weights[name]  # element-wise multiplication with scalar
                 weighted_objectives = np.hstack((weighted_objectives, weighted_obj))
 
-            obj = sum(weighted_objectives)
+            obj = sum(weighted_objectives/sum_weights)**obj_exponent
 
             # Parameters of the penalty method
             penalty = self.options['penalty_parameter']
