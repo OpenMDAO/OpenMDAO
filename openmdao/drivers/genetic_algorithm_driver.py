@@ -64,7 +64,7 @@ class SimpleGADriver(Driver):
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
         self.supports['multiple_objectives'] = False
-        
+
         # What we don't support yet
         self.supports['two_sided_constraints'] = False
         self.supports['linear_constraints'] = False
@@ -111,8 +111,8 @@ class SimpleGADriver(Driver):
         self.options.declare('Pm',
                              desc='Mutation rate.', default=None, lower=0., upper=1.,
                              allow_none=True)
-        self.options.declare('bits', default={}, types=(dict),
-                             desc='Weights of objectives for multi-objective optimization.'
+        self.options.declare('objective_weights', default={}, types=(dict),
+                             desc='Weights of objectives for multi-objective optimization.')
 
     def _setup_driver(self, problem):
         """
