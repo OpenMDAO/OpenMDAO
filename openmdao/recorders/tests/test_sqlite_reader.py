@@ -914,6 +914,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
 
     def test_recording_option_precedence_driver_cases(self):
+        from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+            SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
         prob = Problem()
         model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
