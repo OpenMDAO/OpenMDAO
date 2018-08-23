@@ -426,7 +426,7 @@ class GeneticAlgorithm(object):
             Random state (or seed-number) which controls the seed and random draws.
         Pm : float or None
             Mutation rate
-        Pc: float
+        Pc : float
             Crossover rate
 
         Returns
