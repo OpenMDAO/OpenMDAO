@@ -948,7 +948,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # First case with record_desvars = True and includes = []
         cr = CaseReader(self.filename)
         case = cr.driver_cases.get_case(0)
-        self.assertEqual(list(case.outputs.keys()), ['x','f_xy', 'c'] )
+        self.assertEqual(sorted(case.outputs.keys()), ['c','f_xy', 'x'] )
 
         # Second case with record_desvars = False and includes = []
         self.recorder = SqliteRecorder(self.filename)
@@ -962,7 +962,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
         case = cr.driver_cases.get_case(-1)
-        self.assertEqual(list(case.outputs.keys()), ['f_xy', 'c'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
 
         # Third case with record_desvars = True and includes = ['*']
         self.recorder = SqliteRecorder(self.filename)
@@ -976,7 +976,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
         case = cr.driver_cases.get_case(-1)
-        self.assertEqual(list(case.outputs.keys()), ['x', 'f_xy', 'c'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
 
         # Fourth case with record_desvars = False and includes = ['*']
         self.recorder = SqliteRecorder(self.filename)
@@ -990,7 +990,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
         case = cr.driver_cases.get_case(-1)
-        self.assertEqual(list(case.outputs.keys()), ['f_xy', 'c'])
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
 
 
     def test_load_driver_cases(self):
