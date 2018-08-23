@@ -213,6 +213,7 @@ class SimpleGADriver(Driver):
         user_bits = self.options['bits']
         Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
         Pc = self.options['Pc']
+        print('rates in run: ', Pm, Pc, self.options['penalty_parameter'])
 
         # Bits of resolution
         bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
@@ -449,8 +450,10 @@ class GeneticAlgorithm(object):
         fitness = np.zeros((self.npop, ))
 
         # If mutation rate is not provided as input
+        print('Pm', Pm)
         if Pm is None:
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
+        print('rates:', Pc, Pm, max_gen)
         elite = self.elite
 
         # TODO: from an user-supplied intial population

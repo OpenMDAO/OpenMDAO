@@ -13,10 +13,10 @@ ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
 $(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don't have Sphinx installed, grab it from http://sphinx-doc.org/)
 endif
 
-SPHINX_VERSION := $(shell $(SPHINXBUILD) --version | grep -o -E "[0-9\.]+")
-ifeq ($(shell expr $(SPHINX_VERSION) \< 1.5), 1)
-$(error Version 1.5 or later of Sphinx is required, but $(SPHINX_VERSION) was found.  Upgrade via 'pip install --upgrade sphinx' or get the latest from http://sphinx-doc.org/)
-endif
+# SPHINX_VERSION := $(shell $(SPHINXBUILD) --version | grep -o -E "[0-9\.]+")
+# ifeq ($(shell expr $(SPHINX_VERSION) \< 1.5), 1)
+# $(error Version 1.5 or later of Sphinx is required, but $(SPHINX_VERSION) was found.  Upgrade via 'pip install --upgrade sphinx' or get the latest from http://sphinx-doc.org/)
+# endif
 
 # Internal variables.
 ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS) .
@@ -74,18 +74,18 @@ make_srcdocs:
 post_remove:
 	rm -rf make_sourcedocs
 
-# installation testers
-mock:
-	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
-	is required to build the docs. Install with:\n pip install mock"; exit 1)
+# # installation testers
+# mock:
+	# @(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
+	# is required to build the docs. Install with:\n pip install mock"; exit 1)
 
-redbaron:
-	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
-	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
+# redbaron:
+	# @(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
+	# is required to build the docs. Install with:\n pip install redbaron"; exit 1)
 
-matplotlib:
-	@(python -c "import matplotlib" >/dev/null 2>&1) || (echo "The 'matplotlib' package \
-	is required to build the docs. Install with:\n pip install matplotlib"; exit 1)
+# matplotlib:
+	# @(python -c "import matplotlib" >/dev/null 2>&1) || (echo "The 'matplotlib' package \
+	# is required to build the docs. Install with:\n pip install matplotlib"; exit 1)
 
 # run the tagging preprocessors
 tagg:
