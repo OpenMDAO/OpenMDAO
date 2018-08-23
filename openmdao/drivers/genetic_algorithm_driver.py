@@ -126,11 +126,7 @@ class SimpleGADriver(Driver):
             Pointer to the containing problem.
         """
         super(SimpleGADriver, self)._setup_driver(problem)
-
-        if len(self._objs) > 1:
-            msg = 'SimpleGADriver currently does not support multiple objectives.'
-            raise RuntimeError(msg)
-
+        
         model_mpi = None
         comm = self._problem.comm
         if self._concurrent_pop_size > 0:
