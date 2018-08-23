@@ -937,7 +937,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.driver.add_recorder(self.recorder)
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['includes'] = []  # the new default according to this story
+        prob.driver.recording_options['includes'] = []
         prob.driver.recording_options['excludes'] = ['p2.y']
 
         prob.set_solver_print(0)
@@ -954,7 +954,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.recorder = SqliteRecorder(self.filename)
         prob.driver.add_recorder(self.recorder)
         prob.driver.recording_options['record_desvars'] = False
-        prob.driver.recording_options['includes'] = []  # the new default according to this story
+        prob.driver.recording_options['includes'] = []
 
         prob.setup()
         prob.run_driver()
@@ -968,7 +968,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.recorder = SqliteRecorder(self.filename)
         prob.driver.add_recorder(self.recorder)
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['includes'] = ['*']  # the new default according to this story
+        prob.driver.recording_options['includes'] = ['*']
 
         prob.setup()
         prob.run_driver()
@@ -982,7 +982,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.recorder = SqliteRecorder(self.filename)
         prob.driver.add_recorder(self.recorder)
         prob.driver.recording_options['record_desvars'] = False
-        prob.driver.recording_options['includes'] = ['*']  # the new default according to this story
+        prob.driver.recording_options['includes'] = ['*']
 
         prob.setup()
         prob.run_driver()
