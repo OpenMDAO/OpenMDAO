@@ -310,7 +310,12 @@ class SimpleGADriver(Driver):
         success = 1
         # self._update_voi_meta(model)  # by O.P.  # FIXME test
 
-        obj_weights = self.options['multi_obj_weights']
+        if self.options['multi_obj_weights']:  # not empty
+            obj_weights = self.options['multi_obj_weights']
+        else:
+            # Same weight for all objectives, if not specified
+            obj_weights = {name: 1. for name in self.get_objective_values().keys()}
+
         obj_exponent = self.options['multi_obj_exponent']
 
         for name in self._designvars:
@@ -328,7 +333,7 @@ class SimpleGADriver(Driver):
                 model._clear_iprint()
                 success = 0
 
-            sum_weights = sum(obj_weights.values())
+            sum_weights = sum(obj_weights.values())  # TODO what if different lengths
             weighted_objectives = np.array([])
             for name, val in iteritems(self.get_objective_values()):
                 weighted_obj = val * obj_weights[name]  # element-wise multiplication with scalar
