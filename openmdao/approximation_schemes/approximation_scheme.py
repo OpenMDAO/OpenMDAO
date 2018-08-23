@@ -36,7 +36,7 @@ class ApproximationScheme(object):
         """
         raise NotImplementedError()
 
-    def compute_approximations(self, system, jac=None, deriv_type='partial'):
+    def compute_approximations(self, system, jac=None, total=False):
         """
         Execute the system to compute the approximate (sub)-Jacobians.
 
@@ -47,9 +47,8 @@ class ApproximationScheme(object):
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are being
-            approximated.
+        total : bool
+            If True total derivatives are being approximated, else partials.
         """
         raise NotImplementedError()
 
@@ -59,7 +58,7 @@ class ApproximationScheme(object):
         """
         pass
 
-    def _run_point(self, system, input_deltas, out_tmp, in_tmp, result_array, deriv_type='partial'):
+    def _run_point(self, system, input_deltas, out_tmp, in_tmp, result_array, total=False):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -75,9 +74,8 @@ class ApproximationScheme(object):
             A copy of the starting inputs array used to restore the inputs to original values.
         result_array : ndarray
             An array the same size as the system outputs. Used to store the results.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are being
-            approximated.
+        total : bool
+            If True total derivatives are being approximated, else partials.
 
         Returns
         -------
@@ -89,7 +87,7 @@ class ApproximationScheme(object):
         inputs = system._inputs
         outputs = system._outputs
 
-        if deriv_type == 'total':
+        if total:
             run_model = system.run_solve_nonlinear
             results_vec = outputs
         else:

@@ -155,7 +155,7 @@ class FiniteDifference(ApproximationScheme):
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
-    def compute_approximations(self, system, jac=None, deriv_type='partial'):
+    def compute_approximations(self, system, jac=None, total=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -166,9 +166,8 @@ class FiniteDifference(ApproximationScheme):
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are
-            being approximated.
+        total : bool
+            If True total derivatives are being approximated, else partials.
         """
         if len(self._exec_list) == 0:
             return
@@ -176,7 +175,7 @@ class FiniteDifference(ApproximationScheme):
         if jac is None:
             jac = system._jacobian
 
-        if deriv_type == 'total':
+        if total:
             current_vec = system._outputs
         else:
             current_vec = system._residuals
@@ -246,7 +245,7 @@ class FiniteDifference(ApproximationScheme):
                 # Run the Finite Difference
                 for delta, coeff in zip(deltas, coeffs):
                     input_delta = [(wrt, idx, delta)]
-                    self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
+                    self._run_point(system, input_delta, out_tmp, in_tmp, result_array, total)
                     result_array *= coeff
                     result._data += result_array
 

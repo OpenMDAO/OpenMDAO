@@ -1545,7 +1545,7 @@ class Group(System):
             with self.jacobian_context(jac):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
-                        approximation.compute_approximations(self, jac=jac, deriv_type='total')
+                        approximation.compute_approximations(self, jac=jac, total=True)
         else:
             if self._assembled_jac is not None:
                 jac = self._assembled_jac

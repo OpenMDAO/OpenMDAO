@@ -96,7 +96,7 @@ class ComplexStep(ApproximationScheme):
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
-    def compute_approximations(self, system, jac, deriv_type='partial'):
+    def compute_approximations(self, system, jac, total=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -107,14 +107,13 @@ class ComplexStep(ApproximationScheme):
         jac : dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are
-            being approximated.
+        total : bool
+            If True total derivatives are being approximated, else partials.
         """
         if len(self._exec_list) == 0:
             return
 
-        if deriv_type == 'total':
+        if total:
             current_vec = system._outputs
         else:
             current_vec = system._residuals
@@ -163,7 +162,7 @@ class ComplexStep(ApproximationScheme):
             for i_count, idx in enumerate(in_idx):
                 # Run the Finite Difference
                 input_delta = [(wrt, idx, delta)]
-                result = self._run_point_complex(system, input_delta, results_clone, deriv_type)
+                result = self._run_point_complex(system, input_delta, results_clone, total)
 
                 for of, subjac in outputs:
                     if of in system._owns_approx_of_idx:
@@ -184,7 +183,7 @@ class ComplexStep(ApproximationScheme):
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, input_deltas, result_clone, deriv_type='partial'):
+    def _run_point_complex(self, system, input_deltas, result_clone, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -196,9 +195,8 @@ class ComplexStep(ApproximationScheme):
             List of (input name, indices, delta) tuples, where input name is an absolute name.
         result_clone : Vector
             A vector cloned from the outputs vector. Used to store the results.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are being
-            approximated.
+        total : bool
+            If True total derivatives are being approximated, else partials.
 
         Returns
         -------
@@ -210,7 +208,7 @@ class ComplexStep(ApproximationScheme):
         inputs = system._inputs
         outputs = system._outputs
 
-        if deriv_type == 'total':
+        if total:
             run_model = system.run_solve_nonlinear
             results_vec = outputs
         else:
