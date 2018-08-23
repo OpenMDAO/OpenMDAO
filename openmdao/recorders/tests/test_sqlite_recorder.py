@@ -1466,11 +1466,6 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp2.con2": prob['con_cmp2.con2']
         }
 
-        expected_constraints = {
-            "con_cmp1.con1": prob['con_cmp1.con1'],
-            "con_cmp2.con2": prob['con_cmp2.con2']
-        }
-
         expected_outputs = expected_desvars
         expected_outputs.update(expected_objectives)
         expected_outputs.update(expected_constraints)
