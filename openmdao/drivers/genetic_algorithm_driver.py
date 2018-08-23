@@ -126,7 +126,7 @@ class SimpleGADriver(Driver):
             Pointer to the containing problem.
         """
         super(SimpleGADriver, self)._setup_driver(problem)
-        
+
         model_mpi = None
         comm = self._problem.comm
         if self._concurrent_pop_size > 0:
@@ -303,6 +303,8 @@ class SimpleGADriver(Driver):
         success = 1
         # self._update_voi_meta(model)  # by O.P.  # FIXME test
 
+        obj_weights = self.options['objective_weights']
+
         for name in self._designvars:
             i, j = self._desvar_idx[name]
             self.set_design_var(name, x[i:j])
@@ -318,9 +320,12 @@ class SimpleGADriver(Driver):
                 model._clear_iprint()
                 success = 0
 
+            weighted_objectives = np.array([])
             for name, val in iteritems(self.get_objective_values()):
-                obj = val
-                break
+                weighted_obj = val * obj_weights[name]  # element-wise multiplication with scalar
+                weighted_objectives = np.hstack((weighted_objectives, weighted_obj))
+
+            obj = sum(weighted_objectives)
 
             # Parameters of the penalty method
             penalty = self.options['penalty_parameter']
