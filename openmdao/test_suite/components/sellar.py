@@ -98,6 +98,16 @@ class SellarDis1withDerivatives(SellarDis1):
         partials['y1', 'x'] = 1.0
 
 
+class SellarDis1CS(SellarDis1):
+    """
+    Component containing Discipline 1 -- complex step version.
+    """
+
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*', method='cs')
+
+
 class SellarDis2(ExplicitComponent):
     """
     Component containing Discipline 2 -- no derivatives version.
@@ -175,6 +185,16 @@ class SellarDis2withDerivatives(SellarDis2):
 
         J['y2', 'y1'] = .5*y1**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
+
+
+class SellarDis2CS(SellarDis2):
+    """
+    Component containing Discipline 2 -- complex step version.
+    """
+
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*', method='cs')
 
 
 class SellarNoDerivatives(Group):

@@ -971,9 +971,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
-        self.assertEqual(str(cm.exception),
-                         "'foo' is not a valid form of finite difference; "
-                         "must be one of ['forward', 'backward', 'central']")
+        # The form options sometimes print out in different order.
+        msg = str(cm.exception)
+        self.assertTrue("'foo' is not a valid form of finite difference; "
+                         "must be one of [" in msg, 'error message not correct.')
+        self.assertTrue('forward' in msg, 'error message not correct.')
+        self.assertTrue('backward' in msg, 'error message not correct.')
+        self.assertTrue('central' in msg, 'error message not correct.')
 
         # check invalid step
         with self.assertRaises(ValueError) as cm:

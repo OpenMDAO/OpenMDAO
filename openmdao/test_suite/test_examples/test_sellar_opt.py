@@ -16,7 +16,6 @@ class TestSellarOpt(unittest.TestCase):
         prob = Problem()
         prob.model = SellarMDA()
 
-
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         # prob.driver.options['maxiter'] = 100

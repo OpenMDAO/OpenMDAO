@@ -372,6 +372,7 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._local_vector_class = self._local_vector_class
             subsys._distributed_vector_class = self._distributed_vector_class
+            subsys.force_alloc_complex = self.force_alloc_complex
 
             if self.pathname:
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)

@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
-    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov
+    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -130,6 +130,35 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['comp.f_xy'], -15.0)
 
         prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
+
+    def test_compute_totals_cleanup(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indeps1', IndepVarComp('x', np.ones(5)))
+        model.add_subsystem('indeps2', IndepVarComp('x', np.ones(3)))
+
+        model.add_subsystem('MP1', ExecComp('y=7*x', x=np.zeros(5), y=np.zeros(5)))
+        model.add_subsystem('MP2', ExecComp('y=-3*x', x=np.zeros(3), y=np.zeros(3)))
+
+        model.add_design_var('indeps1.x')
+        model.add_design_var('indeps2.x')
+
+        model.add_constraint('MP1.y')
+        model.add_constraint('MP2.y')
+
+        model.connect('indeps1.x', 'MP1.x')
+        model.connect('indeps2.x', 'MP2.x')
+
+        p.setup(mode='rev')
+        p.run_model()
+
+        J = p.compute_totals()
+        assert_rel_error(self, J[('MP1.y', 'indeps1.x')], np.eye(5)*7., 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
+        # before the bug fix, the following two derivs contained nonzero values even
+        # though the variables involved were not dependent on each other.
+        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3,5)), 1e-10)
+        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5,3)), 1e-10)
 
     def test_set_2d_array(self):
         import numpy as np
@@ -499,6 +528,83 @@ class TestProblem(unittest.TestCase):
 
         # check derivatives with complex step and a larger step size.
         prob.check_totals(method='cs', step=1.0e-1)
+
+    def test_check_totals_user_detect(self):
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x')
+
+                if not self.force_alloc_complex:
+                    raise RuntimeError('force_alloc_complex not set in component.')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+                if np.iscomplex(inputs._data[0]) and not self.under_complex_step:
+                    raise RuntimeError('under_complex_step not set in component.')
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        # check derivatives with complex step and a larger step size.
+        prob.check_totals(method='cs', out_stream=None)
+        self.assertFalse(prob.model.under_complex_step,
+                         msg="The under_complex_step flag should be reset.")
+
+    def test_feature_check_totals_user_detect_forced(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class SimpleComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+                self.declare_partials(of='y', wrt='x')
+
+                if self.force_alloc_complex:
+                    print("Vectors allocated for complex step.")
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.
+
+
+        prob = Problem()
+        prob.model = Group()
+        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob.model.add_subsystem('comp', SimpleComp())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.add_design_var('px.x', lower=-100, upper=100)
+        prob.model.add_objective('comp.y')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        prob.check_totals(method='cs')
 
     def test_feature_run_driver(self):
         import numpy as np

@@ -47,8 +47,12 @@ class PETScVector(DefaultVector):
         self._petsc = {}
         self._imag_petsc = {}
         data = self._data
+
         if self._ncol == 1:
-            self._petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
+            if self._alloc_complex:
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
+            else:
+                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
         else:
             # for now the petsc array is only the size of one column and we do separate
             # transfers for each column.
@@ -60,7 +64,7 @@ class PETScVector(DefaultVector):
 
         # Allocate imaginary for complex step
         if self._alloc_complex:
-            data = self._imag_data
+            data = self._cplx_data.imag
             if self._ncol == 1:
                 self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
             else:
@@ -80,4 +84,4 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        return self._system.comm.allreduce(np.sum(self._data**2)) ** 0.5
+        return self._system.comm.allreduce(np.sum(self._data.real**2)) ** 0.5
