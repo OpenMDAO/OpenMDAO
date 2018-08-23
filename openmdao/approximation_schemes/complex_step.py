@@ -135,8 +135,6 @@ class ComplexStep(ApproximationScheme):
             not isinstance(jac, dict)
 
         for key, approximations in self._get_approx_groups():
-            # groupby (along with this key function) will group all 'of's that have the same wrt and
-            # step size.
             wrt, form, delta = key
             if form == 'reverse':
                 delta *= -1.0
@@ -154,8 +152,6 @@ class ComplexStep(ApproximationScheme):
 
             outputs = []
 
-            # Note: If access to `approximations` is required again in the future, we will need to
-            # throw it in a list first. The groupby iterator only works once.
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives

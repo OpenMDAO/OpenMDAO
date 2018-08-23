@@ -441,56 +441,6 @@ class Group(System):
 
         return sorted(all_states)
 
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Group, self)._setup_vars()
-        num_var = self._num_var
-
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_vars(recurse)
-
-        # Compute num_var, at least locally
-        for vec_name in self._lin_rel_vec_name_list:
-            num_var[vec_name] = {}
-            for type_ in ['input', 'output']:
-                num_var[vec_name][type_] = np.sum(
-                    [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
-                     if vec_name in subsys._rel_vec_names], dtype=INT_DTYPE)
-
-        # If running in parallel, allgather
-        if self.comm.size > 1:
-            # Perform a single allgather
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = num_var
-            else:
-                raw = None
-            gathered = self.comm.allgather(raw)
-
-            for vec_name in self._lin_rel_vec_name_list:
-                num_var = self._num_var[vec_name]
-
-                # Empty the dictionaries
-                for type_ in ['input', 'output']:
-                    num_var[type_] = 0
-
-                # Process the gathered data and update the dictionaries
-                for myproc_num_var in gathered:
-                    if myproc_num_var is None:
-                        continue
-                    for type_ in ['input', 'output']:
-                        num_var[type_] += myproc_num_var[vec_name][type_]
-
-        self._num_var['nonlinear'] = self._num_var['linear']
-
     def _setup_var_index_ranges(self, recurse=True):
         """
         Compute the division of variables by subsystem.
@@ -517,7 +467,8 @@ class Group(System):
             for type_ in ['input', 'output']:
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     if subsys.comm.rank == 0 and vec_name in subsys._rel_vec_names:
-                        allprocs_counters[type_][isub] = subsys._num_var[vec_name][type_]
+                        allprocs_counters[type_][isub] = \
+                            len(subsys._var_allprocs_relevant_names[vec_name][type_])
 
             # If running in parallel, allgather
             if self.comm.size > 1:
@@ -667,6 +618,7 @@ class Group(System):
                 subsys._setup_var_sizes(recurse)
 
         sizes = self._var_sizes
+        relnames = self._var_allprocs_relevant_names
 
         # Compute _var_sizes
         for vec_name in self._lin_rel_vec_name_list:
@@ -674,7 +626,7 @@ class Group(System):
             subsystems_var_range = self._subsystems_var_range[vec_name]
 
             for type_ in ['input', 'output']:
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]),
+                sizes[vec_name][type_] = np.zeros((nproc, len(relnames[vec_name][type_])),
                                                   INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
@@ -1142,6 +1094,7 @@ class Group(System):
         super(Group, self)._setup_global(ext_num_vars, ext_sizes)
 
         iproc = self.comm.rank
+        relnames = self._var_allprocs_relevant_names
 
         for subsys in self._subsystems_myproc:
             sub_ext_num_vars = {}
@@ -1155,7 +1108,7 @@ class Group(System):
                 sub_ext_sizes[vec_name] = {}
 
                 for type_ in ['input', 'output']:
-                    num = self._num_var[vec_name][type_]
+                    num = len(relnames[vec_name][type_])
                     idx1, idx2 = subsystems_var_range[type_][subsys.name]
                     size1 = np.sum(sizes[type_][iproc, :idx1])
                     size2 = np.sum(sizes[type_][iproc, idx2:])

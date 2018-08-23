@@ -169,27 +169,6 @@ class Component(System):
         else:
             self._vector_class = self._local_vector_class
 
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Component, self)._setup_vars()
-        num_var = self._num_var
-
-        for vec_name in self._lin_rel_vec_name_list:
-            num_var[vec_name] = {}
-            # Compute num_var
-            for type_ in ['input', 'output']:
-                relnames = self._var_allprocs_relevant_names[vec_name][type_]
-                num_var[vec_name][type_] = len(relnames)
-
-        self._num_var['nonlinear'] = self._num_var['linear']
-
     def _setup_var_data(self, recurse=True):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
@@ -252,19 +231,18 @@ class Component(System):
         vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
+        relnames = self._var_allprocs_relevant_names
+        abs2meta = self._var_abs2meta
 
         # Initialize empty arrays
         for vec_name in vec_names:
             sizes[vec_name] = {}
 
             for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
+                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[vec_name][type_])), int)
 
-            # Compute _var_sizes
-            abs2meta = self._var_abs2meta
-            for type_ in ('input', 'output'):
-                sz = sizes[vec_name][type_]
-                for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                # Compute _var_sizes
+                for idx, abs_name in enumerate(relnames[vec_name][type_]):
                     sz[iproc, idx] = abs2meta[abs_name]['size']
 
         if self.comm.size > 1:

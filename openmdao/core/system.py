@@ -81,8 +81,6 @@ class System(object):
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
-    _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
-        Number of allprocs variables owned by this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -283,8 +281,6 @@ class System(object):
         self._subsystems_myproc = []
         self._subsystems_myproc_inds = []
         self._subsystems_proc_range = []
-
-        self._num_var = {'input': 0, 'output': 0}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
@@ -639,7 +635,6 @@ class System(object):
         self._setup_vec_names(mode, self._vec_names, self._vois)
         self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
-        self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
@@ -793,17 +788,6 @@ class System(object):
         if self.recording_options['record_model_metadata']:
             for sub in self.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
-
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        self._num_var = {}
 
     def _setup_var_index_ranges(self, recurse=True):
         """
