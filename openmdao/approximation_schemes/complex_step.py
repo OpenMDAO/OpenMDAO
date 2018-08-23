@@ -96,7 +96,7 @@ class ComplexStep(ApproximationScheme):
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
-    def compute_approximations(self, system, jac=None, deriv_type='partial'):
+    def compute_approximations(self, system, jac, deriv_type='partial'):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -104,7 +104,7 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
+        jac : dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
         deriv_type : str
@@ -113,9 +113,6 @@ class ComplexStep(ApproximationScheme):
         """
         if len(self._exec_list) == 0:
             return
-
-        if jac is None:
-            jac = system._jacobian
 
         if deriv_type == 'total':
             current_vec = system._outputs
