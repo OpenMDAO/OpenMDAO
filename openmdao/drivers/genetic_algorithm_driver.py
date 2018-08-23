@@ -12,7 +12,7 @@ Williams E.A., Crossley W.A. (1998) Empirically-Derived Population Size and Muta
 Guidelines for a Genetic Algorithm with Uniform Crossover. In: Chawdhry P.K., Roy R., Pant R.K.
 (eds) Soft Computing in Engineering Design and Manufacturing. Springer, London.
 
-The following reference is only for the penalty function only:
+The following reference is only for the penalty function:
 Smith, A. E., Coit, D. W. (1995) Penalty functions. In: Handbook of Evolutionary Computation, 97(1).
 """
 import copy
@@ -106,6 +106,11 @@ class SimpleGADriver(Driver):
                              desc='Penalty function parameter.')
         self.options.declare('penalty_exponent', default=1.,
                              desc='Penalty function exponent.')
+        self.options.declare('Pc', default=0.5, lower=0., upper=1.,
+                             desc='Crossover rate.')
+        self.options.declare('Pm',
+                             desc='Mutation rate.', default=None, lower=0., upper=1.,
+                             allow_none=True)
 
     def _setup_driver(self, problem):
         """
@@ -206,6 +211,8 @@ class SimpleGADriver(Driver):
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
         user_bits = self.options['bits']
+        Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
+        Pc = self.options['Pc']
 
         # Bits of resolution
         bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
@@ -226,7 +233,7 @@ class SimpleGADriver(Driver):
 
         desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound,
                                               bits, pop_size, max_gen,
-                                              self._randomstate)
+                                              self._randomstate, Pm, Pc)
 
         # Pull optimal parameters back into framework and re-run, so that
         # framework is left in the right final state
@@ -350,7 +357,7 @@ class SimpleGADriver(Driver):
         return fun, success, icase
 
 
-class GeneticAlgorithm():
+class GeneticAlgorithm(object):
     """
     Simple Genetic Algorithm.
 
@@ -399,7 +406,7 @@ class GeneticAlgorithm():
         self.elite = True
         self.model_mpi = model_mpi
 
-    def execute_ga(self, vlb, vub, bits, pop_size, max_gen, random_state):
+    def execute_ga(self, vlb, vub, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
         """
         Perform the genetic algorithm.
 
@@ -416,7 +423,11 @@ class GeneticAlgorithm():
         max_gen : int
             Number of generations to run the GA.
         random_state : np.random.RandomState, int
-             Random state (or seed-number) which controls the seed and random draws.
+            Random state (or seed-number) which controls the seed and random draws.
+        Pm : float or None
+            Mutation rate
+        Pc: float
+            Crossover rate
 
         Returns
         -------
@@ -437,8 +448,9 @@ class GeneticAlgorithm():
         self.npop = int(pop_size)
         fitness = np.zeros((self.npop, ))
 
-        Pc = 0.5
-        Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
+        # If mutation rate is not provided as input
+        if Pm is None:
+            Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
         # TODO: from an user-supplied intial population
