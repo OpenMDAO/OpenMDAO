@@ -21,6 +21,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.array_utils import evenly_distrib_idxs
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -662,9 +663,9 @@ class System(object):
         if num_par_fd < 1:
             raise ValueError("'%s': num_par_fd must be >= 1 but value is %s." %
                              (self.pathname, self._num_par_fds))
-        if comm.size % num_par_fd != 0:
-            raise ValueError("'%s': num_par_fd must be a multiple of communicator size (%d)" %
-                             (self.pathmame, comm.size))
+        if comm.size < num_par_fd:
+            raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
+                             (self.pathname, comm.size))
 
         if not MPI:
             self.options['num_par_fd'] = 1

@@ -55,6 +55,11 @@ class ApproximationScheme(object):
     def _init_approximations(self, system):
         """
         Perform any necessary setup for the approximation scheme.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
         """
         pass
 

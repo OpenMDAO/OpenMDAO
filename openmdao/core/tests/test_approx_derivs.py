@@ -697,6 +697,46 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestGroupCSMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_indepvarcomp_under_par_sys_par_cs(self):
+        prob = Problem()
+        prob.model = FanInSubbedIDVC()
+        prob.model.options['num_par_fd'] = 2
+
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
+        prob.model.approx_totals(method='cs')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(wrt=['sub.sub1.p1.x', 'sub.sub2.p2.x'], of=['sum.y'])
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
+
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestGroupFDMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_indepvarcomp_under_par_sys_par_fd(self):
+        prob = Problem()
+        prob.model = FanInSubbedIDVC()
+        prob.model.options['num_par_fd'] = 2
+
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
+        prob.model.approx_totals(method='fd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(wrt=['sub.sub1.p1.x', 'sub.sub2.p2.x'], of=['sum.y'])
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
+
+
 def title(txt):
     """ Provide nice title for parameterized testing."""
     return str(txt).split('.')[-1].replace("'", '').replace('>', '')

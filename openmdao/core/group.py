@@ -299,10 +299,11 @@ class Group(System):
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         """
+        self.pathname = pathname
+
         if self.options['num_par_fd'] > 1:
             comm = self._setup_par_fd_procs(comm)
 
-        self.pathname = pathname
         self.comm = comm
         self._mode = mode
 

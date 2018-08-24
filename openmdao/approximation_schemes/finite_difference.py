@@ -1,7 +1,7 @@
 """Finite difference derivative approximations."""
 from __future__ import division, print_function
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from itertools import groupby
 from six.moves import range, zip
 
@@ -37,6 +37,8 @@ FD_COEFFS = {
                            coeffs=np.array([0.5, -0.5]),
                            current_coeff=0.),
 }
+
+_full_slice = slice(None)
 
 
 def _generate_fd_coeff(form, order):
@@ -141,6 +143,11 @@ class FiniteDifference(ApproximationScheme):
     def _init_approximations(self, system):
         """
         Prepare for later approximations.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
         """
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
@@ -150,19 +157,56 @@ class FiniteDifference(ApproximationScheme):
         # step size.
         # Note: Since access to `approximations` is required multiple times, we need to
         # throw it in a list. The groupby iterator only works once.
-        self._approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
-                                                                              self._key_fun)]
+        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                        self._key_fun)]
 
-        tot_size = 0
-        if system.options['num_par_fd'] > 1:
-            for key, approx in self._approx_groups:
-                wrt = key[0]
-                if wrt in system._owns_approx_wrt_idx:
-                    tot_size += len(system._owns_approx_wrt_idx[wrt])
+        self._approx_groups = [None] * len(approx_groups)
+        for i, (key, approximations) in enumerate(approx_groups):
+            wrt, form, order, step, step_calc = key
+
+            # FD forms are written as a collection of changes to inputs (deltas) and the associated
+            # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
+            # coefficient is stored seperately (current_coeff). For example,
+            # f'(x) = (f(x+h) - f(x))/h + O(h) = 1/h * f(x+h) + (-1/h) * f(x) + O(h)
+            # would be stored as deltas = [h], coeffs = [1/h], and current_coeff = -1/h.
+            # A central second order accurate approximation for the first derivative would be stored
+            # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
+            # current_coeff = 0.
+            fd_form = _generate_fd_coeff(form, order)
+
+            if step_calc == 'rel':
+                if wrt in system._outputs._views_flat:
+                    scale = np.linalg.norm(system._outputs._views_flat[wrt])
                 else:
-                    tot_size += system._var_allprocs_abs2meta[wrt]['size']
+                    scale = np.linalg.norm(system._inputs._views_flat[wrt])
+                step *= scale
 
-        self._total_wrt_size = tot_size
+            deltas = fd_form.deltas * step
+            coeffs = fd_form.coeffs / step
+            current_coeff = fd_form.current_coeff / step
+
+            if wrt in system._owns_approx_wrt_idx:
+                in_idx = system._owns_approx_wrt_idx[wrt]
+                in_size = len(in_idx)
+            else:
+                in_size = system._var_allprocs_abs2meta[wrt]['size']
+                in_idx = range(in_size)
+
+            outputs = []
+
+            for approx_tuple in approximations:
+                of = approx_tuple[0]
+                # TODO: Sparse derivatives
+                if of in system._owns_approx_of_idx:
+                    out_idx = system._owns_approx_of_idx[of]
+                    out_size = len(out_idx)
+                else:
+                    out_size = system._var_allprocs_abs2meta[of]['size']
+                    out_idx = _full_slice
+
+                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
+
+            self._approx_groups[i] = (wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs)
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
@@ -201,74 +245,55 @@ class FiniteDifference(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        for key, approximations in self._get_approx_groups(system):
-            wrt, form, order, step, step_calc = key
+        num_par_fd = system.options['num_par_fd']
+        use_parallel_fd = num_par_fd > 1 and system._full_comm.size > 1
 
-            # FD forms are written as a collection of changes to inputs (deltas) and the associated
-            # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
-            # coefficient is stored seperately (current_coeff). For example,
-            # f'(x) = (f(x+h) - f(x))/h + O(h) = 1/h * f(x+h) + (-1/h) * f(x) + O(h)
-            # would be stored as deltas = [h], coeffs = [1/h], and current_coeff = -1/h.
-            # A central second order accurate approximation for the first derivative would be stored
-            # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
-            # current_coeff = 0.
-            fd_form = _generate_fd_coeff(form, order)
+        results = defaultdict(list)
+        iproc = system.comm.rank
 
-            if step_calc == 'rel':
-                if wrt in system._outputs._views_flat:
-                    scale = np.linalg.norm(system._outputs._views_flat[wrt])
-                else:
-                    scale = np.linalg.norm(system._inputs._views_flat[wrt])
-                step *= scale
-
-            deltas = fd_form.deltas * step
-            coeffs = fd_form.coeffs / step
-            current_coeff = fd_form.current_coeff / step
-
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = range(in_size)
+        tot_idx = 0
+        approx_groups = self._get_approx_groups(system)
+        for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
 
             result._data[:] = system._outputs._data
 
-            outputs = []
-
-            for approx_tuple in approximations:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
-                else:
-                    out_size = system._var_allprocs_abs2meta[of]['size']
-                outputs.append((of, np.zeros((out_size, in_size))))
-
             for i_count, idx in enumerate(in_idx):
-                if current_coeff:
-                    result._data[:] = current_vec._data
-                    result._data *= current_coeff
-                else:
-                    result._data[:] = 0.
-
-                # Run the Finite Difference
-                for delta, coeff in zip(deltas, coeffs):
-                    input_delta = [(wrt, idx, delta)]
-                    self._run_point(system, input_delta, out_tmp, in_tmp, result_array, total)
-                    result_array *= coeff
-                    result._data += result_array
-
-                for of, subjac in outputs:
-                    if of in system._owns_approx_of_idx:
-                        out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = result._views_flat[of][out_idx]
+                if tot_idx % system._par_fd_id == 0:
+                    if current_coeff:
+                        result._data[:] = current_vec._data
+                        result._data *= current_coeff
                     else:
-                        subjac[:, i_count] = result._views_flat[of]
+                        result._data[:] = 0.
 
-            for of, subjac in outputs:
-                rel_key = abs_key2rel_key(system, (of, wrt))
+                    # Run the Finite Difference
+                    for delta, coeff in zip(deltas, coeffs):
+                        input_delta = [(wrt, idx, delta)]
+                        self._run_point(system, input_delta, out_tmp, in_tmp, result_array, total)
+                        result_array *= coeff
+                        result._data += result_array
+
+                    if iproc == 0 or not use_parallel_fd:
+                        for of, subjac, out_idx in outputs:
+                            results[(of, wrt)].append((i_count,
+                                                       result._views_flat[of][out_idx].copy()))
+
+        if use_parallel_fd:
+            myproc = system._full_comm.rank
+            # create full results list
+            all_results = system._full_comm.allgather(results)
+            for rank, proc_results in enumerate(all_results):
+                if rank != myproc or iproc != 0:
+                    for key in proc_results:
+                        results[key].extend(proc_results[key])
+
+        for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
+            for of, subjac, _ in outputs:
+                key = (of, wrt)
+                for i, result in results[key]:
+                    subjac[:, i] = result
+
+                rel_key = abs_key2rel_key(system, key)
+
                 if uses_src_indices:
                     jac._override_checks = True
                     jac[rel_key] = subjac

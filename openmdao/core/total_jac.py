@@ -1308,23 +1308,14 @@ class _TotalJacInfo(object):
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
 
+        totals = self.J_dict
         if return_format == 'flat_dict':
-            totals = OrderedDict()
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name],
-                                                            prom_out, prom_in, of_idx, wrt_idx)
+                    totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
+                                                               prom_out, prom_in, of_idx, wrt_idx)
 
-        elif return_format == 'dict':
-            totals = OrderedDict()
-            for prom_out, output_name in zip(self.prom_of, of):
-                totals[prom_out] = tot = OrderedDict()
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name],
-                                               prom_out, prom_in, of_idx, wrt_idx)
-
-        elif return_format == 'array':
-            totals = self.J_dict  # J_dict has views into the array jacobian
+        elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
