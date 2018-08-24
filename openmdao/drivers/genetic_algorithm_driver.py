@@ -45,7 +45,7 @@ class SimpleGADriver(Driver):
     _concurrent_color : int
         Color of current rank when running a parallel model.
     _desvar_idx : dict
-        Keeps track of the indices for each desvar, since GeneticAlgorithm seess an array of
+        Keeps track of the indices for each desvar, since GeneticAlgorithm sees an array of
         design variables.
     _ga : <GeneticAlgorithm>
         Main genetic algorithm lies here.
