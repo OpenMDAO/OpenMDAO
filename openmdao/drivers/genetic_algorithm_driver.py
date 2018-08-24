@@ -261,13 +261,14 @@ class SimpleGADriver(Driver):
 
         Takes into account constraints with a penalty function.
 
-        All constraints are converted to the form of :math:`g(x)_i \leq 0` for
-        inequality constraints and :math:`h(x)_i = 0` for equality constraints.
+        All constraints are converted to the form of :math:`g_i(x) \leq 0` for
+        inequality constraints and :math:`h_i(x) = 0` for equality constraints.
         The constraint vector for inequality constraints is the following:
 
         .. math::
 
            g = [g_1, g_2  \dots g_N], g_i \in R^{N_{g_i}}
+
            h = [h_1, h_2  \dots h_N], h_i \in R^{N_{h_i}}
 
         The number of all constraints:
@@ -281,7 +282,7 @@ class SimpleGADriver(Driver):
 
         .. math::
 
-           \Phi(x) = f(x) + p \cdot \sum_{k=1}^{N^g}(\delta_k \cdot g_k^{\kappa})
+           \Phi(x) = f(x) + p \cdot \sum_{k=1}^{N^g}(\delta_k \cdot g_k)^{\kappa}
            + p \cdot \sum_{k=1}^{N^h}|h_k|^{\kappa}
 
         where :math:`\delta_k = 0` if :math:`g_k` is satisfied, 1 otherwise

@@ -72,6 +72,7 @@ class TestSimpleGA(unittest.TestCase):
     def test_mixed_integer_branin(self):
         np.random.seed(1)
 
+
         prob = Problem()
         model = prob.model = Group()
 
@@ -122,7 +123,6 @@ class TestSimpleGA(unittest.TestCase):
 
                 outputs['weighted'] = obj + pen
 
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -153,8 +153,8 @@ class TestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
-        # Note, GA doesn't do so well with the continunous vars, naturally, so we reduce the space
-        # as much as we can. Objective is stll rather random, but it is close. GA does a great job
+        # Note, GA doesn't do so well with the continuous vars, naturally, so we reduce the space
+        # as much as we can. Objective is still rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
         self.assertLess(prob['mass'], 6.0)
         assert_rel_error(self, prob['mat1'], 3, 1e-5)
@@ -165,7 +165,7 @@ class TestSimpleGA(unittest.TestCase):
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
     def test_driver_options(self):
-        "Tests if Pm and Pc options can be set."
+        """Tests if Pm and Pc options can be set."""
         prob = Problem()
         model = prob.model
         indeps = model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
