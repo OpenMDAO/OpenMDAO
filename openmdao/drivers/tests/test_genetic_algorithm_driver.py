@@ -190,6 +190,28 @@ class TestSimpleGA(unittest.TestCase):
         self.assertRaises(ValueError, prob.run_driver)
 
 
+class TestDriverOptionsSimpleGA(unittest.TestCase):
+
+    def test_driver_options(self):
+        "Tests if Pm and Pc options can be set."
+        prob = Problem()
+        model = prob.model
+        indeps = model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', 1.)
+        model.add_subsystem('model', ExecComp('y=x**2'), promotes=['*'])
+        driver = prob.driver = SimpleGADriver()
+        driver.options['Pm'] = 0.1
+        driver.options['Pc'] = 0.01
+        driver.options['max_gen'] = 5
+        driver.options['bits'] = {'x': 8}
+        prob.model.add_design_var('x', lower=-10., upper=10.)
+        prob.model.add_objective('y')
+        prob.setup(check=False)
+        prob.run_driver()
+        self.assertEqual(driver.options['Pm'], 0.1)
+        self.assertEqual(driver.options['Pc'], 0.01)
+
+
 class TestConstrainedSimpleGA(unittest.TestCase):
 
     def test_constrained_with_penalty(self):
