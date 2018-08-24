@@ -187,55 +187,106 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
     def test_multi_obj(self):
-        from math import sqrt, pi
 
-        class Cone(ExplicitComponent):
+        class Box(ExplicitComponent):
 
             def setup(self):
-                self.add_input('radius', val=1.)
+                self.add_input('length', val=1.)
+                self.add_input('width', val=1.)
                 self.add_input('height', val=1.)
 
-                self.add_output('base_area', val=1.0)
-                self.add_output('lateral_surf_area', val=1.0)
+                self.add_output('front_area', val=1.0)
+                self.add_output('top_area', val=1.0)
                 self.add_output('area', val=1.0)
                 self.add_output('volume', val=1.)
 
             def compute(self, inputs, outputs):
-                r = inputs['radius']
-                h = inputs['height']
-                s = sqrt(r**2 + h**2)
+                length = inputs['length']
+                width = inputs['width']
+                height = inputs['height']
 
-                outputs['base_area'] = base_area = pi * r**2
-                outputs['lateral_surf_area'] = lateral_area = pi * r * s
-                outputs['area'] = base_area + lateral_area
-                outputs['volume'] = base_area * h / 3.
+                outputs['top_area'] = length * width
+                outputs['front_area'] = length * height
+                outputs['area'] = 2*length*height + 2*length*width + 2*height*width
+                outputs['volume'] = length*height*width
 
         prob = Problem()
-        cone = prob.model.add_subsystem('cone', Cone(), promotes=['*'])
+        prob.model.add_subsystem('box', Box(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
-        indeps.add_output('radius', 2.)  # height
-        indeps.add_output('height', 3.)  # radius
+        indeps.add_output('length', 1.5)
+        indeps.add_output('width', 1.5)
+        indeps.add_output('height', 1.5)
 
         # setup the optimization
-        driver = prob.driver = SimpleGADriver()
+        prob.driver = SimpleGADriver()
         prob.driver.options['max_gen'] = 100
-        prob.driver.options['bits'] = {'radius': 8, 'height': 8}
-        # prob.driver.options['multi_obj_exponent'] = 1.
-        prob.driver.options['multi_obj_weights'] = {'cone.base_area': 0.5,
-                                                    'cone.lateral_surf_area': 0.5}
+        prob.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob.driver.options['multi_obj_exponent'] = 1.
+        prob.driver.options['penalty_parameter'] = 10.
+        prob.driver.options['multi_obj_weights'] = {'box.front_area': 0.1,
+                                                    'box.top_area': 0.9}
         prob.driver.options['multi_obj_exponent'] = 1
 
-        prob.model.add_design_var('radius', lower=5., upper=15.)
-        prob.model.add_design_var('height', lower=1., upper=15.)
-        prob.model.add_objective('base_area')
-        prob.model.add_objective('lateral_surf_area')
-        prob.model.add_constraint('volume', equals=200)
+        prob.model.add_design_var('length', lower=0.1, upper=2.)
+        prob.model.add_design_var('width', lower=0.1, upper=2.)
+        prob.model.add_design_var('height', lower=0.1, upper=2.)
+        prob.model.add_objective('front_area', scaler=-1)  # maximize
+        prob.model.add_objective('top_area', scaler=-1)  # maximize
+        prob.model.add_constraint('volume', upper=1.)
 
+        # run #1
         prob.setup()
         prob.run_driver()
-        print('Areas: ', prob['base_area'], prob['lateral_surf_area'])
-        print('Volume: ', prob['volume'])  #
+        front = prob['front_area']
+        top = prob['top_area']
+        l1 = prob['length']
+        w1 = prob['width']
+        h1 = prob['height']
+        print('Box dims: ', l1, w1, h1)
+        print('Front and top area: ', front, top)
+        print('Volume: ', prob['volume'])  # should be around 1
+
+        # run #2
+        # weights changed
+        prob2 = Problem()
+        prob2.model.add_subsystem('box', Box(), promotes=['*'])
+
+        indeps2 = prob2.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps2.add_output('length', 1.5)
+        indeps2.add_output('width', 1.5)
+        indeps2.add_output('height', 1.5)
+
+        # setup the optimization
+        prob2.driver = SimpleGADriver()
+        prob2.driver.options['max_gen'] = 100
+        prob2.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob2.driver.options['multi_obj_exponent'] = 1.
+        prob2.driver.options['penalty_parameter'] = 10.
+        prob2.driver.options['multi_obj_weights'] = {'box.front_area': 0.9,
+                                                     'box.top_area': 0.1}
+        prob2.driver.options['multi_obj_exponent'] = 1
+
+        prob2.model.add_design_var('length', lower=0.1, upper=2.)
+        prob2.model.add_design_var('width', lower=0.1, upper=2.)
+        prob2.model.add_design_var('height', lower=0.1, upper=2.)
+        prob2.model.add_objective('front_area', scaler=-1)  # maximize
+        prob2.model.add_objective('top_area', scaler=-1)  # maximize
+        prob2.model.add_constraint('volume', upper=1.)
+
+        # run #1
+        prob2.setup()
+        prob2.run_driver()
+        front2 = prob2['front_area']
+        top2 = prob2['top_area']
+        l2 = prob2['length']
+        w2 = prob2['width']
+        h2 = prob2['height']
+        print('Box dims: ', l2, w2, h2)
+        print('Front and top area: ', front2, top2)
+        print('Volume: ', prob['volume'])  # should be around 1
+        self.assertGreater(w1, w2)  # front area does not depend on width
+        self.assertGreater(h2, h1)  # top area does not depend on height
 
 
 class TestConstrainedSimpleGA(unittest.TestCase):

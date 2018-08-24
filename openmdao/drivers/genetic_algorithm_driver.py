@@ -401,10 +401,7 @@ class SimpleGADriver(Driver):
                     elif (con['equals'] is not None) and (abs(con['equals']) < almost_inf):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
-                    else:
-                        print "something went wrong"
                     constraint_violations = np.hstack((constraint_violations, violation))
-                    print 'con viol', constraint_violations
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
             # Record after getting obj to assure they have
             # been gathered in MPI.
