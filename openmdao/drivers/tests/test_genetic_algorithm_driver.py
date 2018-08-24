@@ -184,6 +184,60 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
         self.assertEqual(driver.options['Pc'], 0.01)
 
 
+class TestMultiObjectiveSimpleGA(unittest.TestCase):
+
+    def test_multi_obj(self):
+        from math import sqrt, pi
+
+        class Cone(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('radius', val=1.)
+                self.add_input('height', val=1.)
+
+                self.add_output('base_area', val=1.0)
+                self.add_output('lateral_surf_area', val=1.0)
+                self.add_output('area', val=1.0)
+                self.add_output('volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                r = inputs['radius']
+                h = inputs['height']
+                s = sqrt(r**2 + h**2)
+
+                outputs['base_area'] = base_area = pi * r**2
+                outputs['lateral_surf_area'] = lateral_area = pi * r * s
+                outputs['area'] = base_area + lateral_area
+                outputs['volume'] = base_area * h / 3.
+
+        prob = Problem()
+        cone = prob.model.add_subsystem('cone', Cone(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('radius', 2.)  # height
+        indeps.add_output('height', 3.)  # radius
+
+        # setup the optimization
+        driver = prob.driver = SimpleGADriver()
+        prob.driver.options['max_gen'] = 100
+        prob.driver.options['bits'] = {'radius': 8, 'height': 8}
+        # prob.driver.options['multi_obj_exponent'] = 1.
+        prob.driver.options['multi_obj_weights'] = {'cone.base_area': 0.5,
+                                                    'cone.lateral_surf_area': 0.5}
+        prob.driver.options['multi_obj_exponent'] = 1
+
+        prob.model.add_design_var('radius', lower=5., upper=15.)
+        prob.model.add_design_var('height', lower=1., upper=15.)
+        prob.model.add_objective('base_area')
+        prob.model.add_objective('lateral_surf_area')
+        prob.model.add_constraint('volume', equals=200)
+
+        prob.setup()
+        prob.run_driver()
+        print('Areas: ', prob['base_area'], prob['lateral_surf_area'])
+        print('Volume: ', prob['volume'])  #
+
+
 class TestConstrainedSimpleGA(unittest.TestCase):
 
     def test_constrained_with_penalty(self):
