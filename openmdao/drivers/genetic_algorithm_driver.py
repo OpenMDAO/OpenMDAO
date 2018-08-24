@@ -379,7 +379,7 @@ class SimpleGADriver(Driver):
                         raise KeyError(msg.format(name))
                     weighted_objectives = np.hstack((weighted_objectives, weighted_obj))
 
-                obj = sum(weighted_objectives/sum_weights)**obj_exponent
+                obj = sum(weighted_objectives / sum_weights)**obj_exponent
 
             # Parameters of the penalty method
             penalty = self.options['penalty_parameter']
