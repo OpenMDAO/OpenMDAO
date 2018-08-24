@@ -26,6 +26,8 @@ class Jacobian(object):
         If we are approximating a jacobian at the top level and we have specified indices on the
         functions or designvars, then we need to disable the size checking temporarily so that we
         can assign a jacobian with less rows or columns than the variable sizes.
+    _under_complex_step : bool
+        When True, this Jacobian is under complex step, using a complex jacobian.
     """
 
     def __init__(self, system):
@@ -40,6 +42,7 @@ class Jacobian(object):
         self._system = system
         self._subjacs_info = system._subjacs_info
         self._override_checks = False
+        self._under_complex_step = False
 
     def _abs_key2shape(self, abs_key):
         """
