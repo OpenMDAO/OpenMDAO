@@ -72,7 +72,6 @@ class TestSimpleGA(unittest.TestCase):
     def test_mixed_integer_branin(self):
         np.random.seed(1)
 
-
         prob = Problem()
         model = prob.model = Group()
 
@@ -122,6 +121,7 @@ class TestSimpleGA(unittest.TestCase):
                         pen += 10.0*(stress[j] - 1.0)**2
 
                 outputs['weighted'] = obj + pen
+
 
         prob = Problem()
         model = prob.model = Group()
