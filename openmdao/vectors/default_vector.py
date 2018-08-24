@@ -87,7 +87,7 @@ class DefaultVector(Vector):
         iproc = self._iproc
         root_vec = self._root_vector
 
-        imag_data = None
+        cplx_data = None
         scaling = {}
         if self._do_scaling:
             scaling['phys'] = {}
@@ -99,13 +99,9 @@ class DefaultVector(Vector):
 
         data = root_vec._data[ind1:ind2]
 
-        # Extract view for imaginary part too
+        # Extract view for complex storage too.
         if self._alloc_complex:
-            if root_vec._alloc_complex:
-                imag_data = root_vec._imag_data[ind1:ind2]
-            else:
-                shape = root_vec._data[ind1:ind2].shape
-                imag_data = np.zeros(shape)
+            cplx_data = root_vec._cplx_data[ind1:ind2]
 
         if self._do_scaling:
             for typ in ('phys', 'norm'):
@@ -116,7 +112,7 @@ class DefaultVector(Vector):
                 else:
                     scaling[typ] = (rs0[ind1:ind2], root_scale[1][ind1:ind2])
 
-        return data, imag_data, scaling
+        return data, cplx_data, scaling
 
     def _initialize_data(self, root_vector):
         """
@@ -151,10 +147,10 @@ class DefaultVector(Vector):
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
-                self._imag_data = deepcopy(self._data)
+                self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
 
         else:
-            self._data, self._imag_data, self._scaling = self._extract_data()
+            self._data, self._cplx_data, self._scaling = self._extract_data()
 
     def _initialize_views(self):
         """
@@ -169,6 +165,7 @@ class DefaultVector(Vector):
         kind = self._kind
         iproc = self._iproc
         ncol = self._ncol
+
         do_scaling = self._do_scaling
         if do_scaling:
             factors = system._scale_factors
@@ -178,8 +175,8 @@ class DefaultVector(Vector):
         self._views_flat = views_flat = {}
 
         alloc_complex = self._alloc_complex
-        self._imag_views = imag_views = {}
-        self._imag_views_flat = imag_views_flat = {}
+        self._cplx_views = cplx_views = {}
+        self._cplx_views_flat = cplx_views_flat = {}
 
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
         sizes_t = system._var_sizes[self._name][type_]
@@ -202,11 +199,11 @@ class DefaultVector(Vector):
             views[abs_name] = v
 
             if alloc_complex:
-                imag_views_flat[abs_name] = v = self._imag_data[ind1:ind2]
+                cplx_views_flat[abs_name] = v = self._cplx_data[ind1:ind2]
                 if shape != v.shape:
                     v = v.view()
                     v.shape = shape
-                imag_views[abs_name] = v
+                cplx_views[abs_name] = v
 
             if do_scaling:
                 for scaleto in ('phys', 'norm'):
@@ -224,8 +221,8 @@ class DefaultVector(Vector):
         """
         self._data = self._data.copy()
 
-        if self._vector_info._under_complex_step and self._imag_data is not None:
-            self._imag_data = self._imag_data.copy()
+        if self._under_complex_step and self._cplx_data is not None:
+            self._cplx_data = self._cplx_data.copy()
 
     def __iadd__(self, vec):
         """
@@ -242,8 +239,6 @@ class DefaultVector(Vector):
             self + vec
         """
         self._data += vec._data
-        if vec._alloc_complex and self._vector_info._under_complex_step:
-            self._imag_data += vec._imag_data
         return self
 
     def __isub__(self, vec):
@@ -261,8 +256,6 @@ class DefaultVector(Vector):
             self - vec
         """
         self._data -= vec._data
-        if vec._alloc_complex and self._vector_info._under_complex_step:
-            self._imag_data -= vec._imag_data
         return self
 
     def __imul__(self, val):
@@ -279,13 +272,7 @@ class DefaultVector(Vector):
         <Vector>
             self * val
         """
-        if self._vector_info._under_complex_step:
-            r_val = np.real(val)
-            i_val = np.imag(val)
-            self._data = r_val * self._data + i_val * self._imag_data
-            self._imag_data = r_val * self._imag_data + i_val * self._data
-        else:
-            self._data *= val
+        self._data *= val
         return self
 
     def add_scal_vec(self, val, vec):
@@ -299,13 +286,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        if self._vector_info._under_complex_step:
-            r_val = np.real(val)
-            i_val = np.imag(val)
-            self._data += r_val * vec._data + i_val * vec._imag_data
-            self._imag_data += i_val * vec._data + r_val * vec._imag_data
-        else:
-            self._data += val * vec._data
+        self._data += val * vec._data
 
     def set_vec(self, vec):
         """
@@ -317,8 +298,6 @@ class DefaultVector(Vector):
             the vector whose values self is set to.
         """
         self._data[:] = vec._data
-        if self._vector_info._under_complex_step:
-            self._imag_data[:] = vec._imag_data
 
     def set_const(self, val):
         """
@@ -356,7 +335,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.sum(self._data**2) ** 0.5
+        return np.sum(self._data.real**2) ** 0.5
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
@@ -442,7 +421,7 @@ class DefaultVector(Vector):
         # the initial step does not violate bounds. If it does, we modify
         # the step vector directly.
 
-        # Loop over varsets and enforce bounds on step in-place.
+        # enforce bounds on step in-place.
         u_data = u._data
 
         # If u > lower, we're just adding zero. Otherwise, we're adding
@@ -486,7 +465,7 @@ class DefaultVector(Vector):
         # the initial step does not violate bounds. If it does, we modify
         # the step vector directly.
 
-        # Loop over varsets and enforce bounds on step in-place.
+        # enforce bounds on step in-place.
         u_data = u._data
         du_data = du._data
 

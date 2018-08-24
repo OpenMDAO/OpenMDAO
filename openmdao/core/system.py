@@ -60,6 +60,10 @@ class System(object):
         options dictionary
     recording_options : OptionsDictionary
         Recording options dictionary
+    under_complex_step : bool
+        When True, this system is undergoing complex step.
+    force_alloc_complex : bool
+        When True, the vectors have been allocated for checking with complex step.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -105,6 +109,13 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
+    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
+        Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
+        of size nproc x num_var where nproc is the number of processors
+        in this System's communicator and num_var is the number of allprocs variables
+        in the given system.  This is only defined in a Group that owns one or more interprocess
+        connections or a top level Group or System that is used to compute total derivatives
+        across multiple processes.
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_sizes : {'input': (int, int), 'output': (int, int)}
@@ -282,6 +293,7 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
+        self._var_offsets = None
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
@@ -309,6 +321,9 @@ class System(object):
         self._owns_approx_of = None
         self._owns_approx_wrt_idx = {}
         self._owns_approx_of_idx = {}
+
+        self.under_complex_step = False
+        self.force_alloc_complex = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -1343,18 +1358,10 @@ class System(object):
 
         for vec in outputs:
 
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
-
             if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
-
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
 
             if self._has_resid_scaling:
                 vec.scale('norm')
@@ -1499,6 +1506,34 @@ class System(object):
         return (self._vectors['input'][vec_name],
                 self._vectors['output'][vec_name],
                 self._vectors['residual'][vec_name])
+
+    def _get_var_offsets(self):
+        """
+        Compute offsets for variables.
+
+        Returns
+        -------
+        dict
+            Arrays of global offsets keyed by vec_name and deriv direction.
+        """
+        if self._var_offsets is None:
+            offsets = self._var_offsets = {}
+            for vec_name in self._lin_rel_vec_name_list:
+                offsets[vec_name] = off_vn = {}
+                for type_ in ['input', 'output']:
+                    vsizes = self._var_sizes[vec_name][type_]
+                    if vsizes.size > 0:
+                        csum = np.cumsum(vsizes)
+                        # shift the cumsum forward by one and set first entry to 0 to get
+                        # the correct offset.
+                        csum[1:] = csum[:-1]
+                        csum[0] = 0
+                        off_vn[type_] = csum.reshape(vsizes.shape)
+                    else:
+                        off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
+            offsets['nonlinear'] = offsets['linear']
+
+        return self._var_offsets
 
     @contextmanager
     def jacobian_context(self, jac):
@@ -2604,7 +2639,7 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, var_inds=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -2618,9 +2653,12 @@ class System(object):
             Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         raise NotImplementedError("_apply_linear has not been overridden")
 
@@ -2803,6 +2841,23 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_complex_step = active
+            sub._inputs.set_complex_step_mode(active)
+            sub._outputs.set_complex_step_mode(active)
+            sub._residuals.set_complex_step_mode(active)
 
     def cleanup(self):
         """

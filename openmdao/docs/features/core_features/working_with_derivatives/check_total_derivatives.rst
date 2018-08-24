@@ -59,6 +59,15 @@ step size to trigger the nonlinear Gauss-Seidel solver to try to converge after 
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_cs
     :layout: interleave
 
+Note that you need to set the argument "force_alloc_complex" to True when you call setup. This
+makes sure that the vectors allocate space to pass complex numbers. All systems also have an
+attribute "force_alloc_complex" that can be queried during `setup` in case you need to set up your
+`Component` or `Group` differently to accomodate complex step.
+
+.. embed-code::
+    openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_user_detect_forced
+    :layout: code, output
+
 ----
 
 Turn off standard output and just view the derivatives in the return:

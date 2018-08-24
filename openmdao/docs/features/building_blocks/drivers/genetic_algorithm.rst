@@ -14,6 +14,8 @@ want between the min and max value.  A higher value means more accuracy for this
 the number of generations (and hence total evaluations) that will be required to find the minimum. If you do not
 specify a value for bits for a continuous variable, then the variable is assumed to be integer, and encoded as such.
 
+The SimpleGADriver supports both constrained and unconstrained optimization.
+
 The examples below show a mixed-integer problem to illustrate usage of this driver with both integer and
 discrete design variables.
 
@@ -42,6 +44,45 @@ bits for all variables encoded.
 .. embed-code::
     openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_option_pop_size
     :layout: interleave
+
+Constrained Optimization
+------------------------
+
+The SimpleGADriver supports both constrained and unconstrained optimization. If you have constraints,
+the constraints are added to the objective after they have been weighted using a user-tunable
+penalty mutiplier and exponent.
+
+        All constraints are converted to the form of :math:`g(x)_i \leq 0` for
+        inequality constraints and :math:`h(x)_i = 0` for equality constraints.
+        The constraint vector for inequality constraints is the following:
+
+        .. math::
+
+           g = [g_1, g_2  \dots g_N], g_i \in R^{N_{g_i}}
+           h = [h_1, h_2  \dots h_N], h_i \in R^{N_{h_i}}
+
+        The number of all constraints:
+
+        .. math::
+
+           N_g = \sum_{i=1}^N N_{g_i},  N_h = \sum_{i=1}^N N_{h_i}
+
+        The fitness function is constructed with the penalty parameter :math:`p`
+        and the exponent :math:`\kappa`:
+
+        .. math::
+
+           \Phi(x) = f(x) + p \cdot \sum_{k=1}^{N^g}(\delta_k \cdot g_k^{\kappa})
+           + p \cdot \sum_{k=1}^{N^h}|h_k|^{\kappa}
+
+        where :math:`\delta_k = 0` if :math:`g_k` is satisfied, 1 otherwise
+
+The following example shows how to set the penalty parameter :math:`p` and the exponent :math:`\kappa`:
+
+.. embed-code::
+    openmdao.drivers.tests.test_genetic_algorithm_driver.TestFeatureSimpleGA.test_constrained_with_penalty
+    :layout: code, output
+
 
 Running a GA in Parallel
 ------------------------

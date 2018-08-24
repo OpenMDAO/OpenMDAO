@@ -132,12 +132,12 @@ class ScipyKrylov(LinearSolver):
         Parameters
         ----------
         in_arr : ndarray
-            the incoming array (combines all varsets).
+            the incoming array.
 
         Returns
         -------
         ndarray
-            the outgoing array after the product (combines all varsets).
+            the outgoing array after the product.
         """
         vec_name = self._vec_name
         system = self._system

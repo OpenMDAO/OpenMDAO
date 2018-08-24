@@ -58,6 +58,7 @@ class PETScTransfer(DefaultTransfer):
 
         transfers = group._transfers
         vectors = group._vectors
+        offsets = group._get_var_offsets()
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
 
@@ -74,7 +75,6 @@ class PETScTransfer(DefaultTransfer):
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
             sizes_out = group._var_sizes[vec_name]['output']
-            offsets = group._get_var_offsets()
             offsets_in = offsets[vec_name]['input']
             offsets_out = offsets[vec_name]['output']
 
@@ -90,7 +90,6 @@ class PETScTransfer(DefaultTransfer):
                     meta_in = abs2meta[abs_in]
                     meta_out = allprocs_abs2meta[abs_out]
 
-                    # Get varset info
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
 
@@ -231,13 +230,43 @@ class PETScTransfer(DefaultTransfer):
             'fwd' or 'rev'.
         """
         if mode == 'fwd':
-            self._transfer.scatter(out_vec._petsc, in_vec._petsc, addv=False, mode=False)
 
-            # Imaginary transfer
-            # (for CS, so only need in fwd)
-            if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
-                self._transfer.scatter(out_vec._imag_petsc, in_vec._imag_petsc, addv=False,
-                                       mode=False)
+            in_petsc = in_vec._petsc
+            out_petsc = out_vec._petsc
+
+            # For Complex Step, need to disassemble real and imag parts, transfer them separately,
+            # then reassemble them.
+            if in_vec._under_complex_step and out_vec._alloc_complex:
+
+                # Real
+                in_petsc.array = in_vec._data.real
+                out_petsc.array = out_vec._data.real
+                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+
+                # Imaginary
+                in_petsc_imag = in_vec._imag_petsc
+                out_petsc_imag = out_vec._imag_petsc
+                in_petsc_imag.array = in_vec._data.imag
+                out_petsc_imag.array = out_vec._data.imag
+                self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=False, mode=False)
+
+                in_vec._data[:] = in_petsc.array + in_petsc_imag.array * 1j
+
+            else:
+
+                # Anything that has been allocated complex requires an additional step because
+                # the petsc vector does not directly reference the _data.
+
+                if in_vec._alloc_complex:
+                    in_petsc.array = in_vec._data
+
+                if out_vec._alloc_complex:
+                    out_petsc.array = out_vec._data
+
+                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+
+                if in_vec._alloc_complex:
+                    in_vec._data[:] = in_petsc.array
 
         else:  # rev
             self._transfer.scatter(in_vec._petsc, out_vec._petsc, addv=True, mode=True)
@@ -258,22 +287,32 @@ class PETScTransfer(DefaultTransfer):
         if mode == 'fwd':
             in_petsc = in_vec._petsc
             out_petsc = out_vec._petsc
-            for i in range(in_vec._ncol):
-                in_petsc.array = in_vec._data[:, i]
-                out_petsc.array = out_vec._data[:, i]
-                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
-                in_vec._data[:, i] = in_petsc.array
 
-            # Imaginary transfer
-            # (for CS, so only need in fwd)
-            if in_vec._vector_info._under_complex_step and out_vec._alloc_complex:
-                in_petsc = in_vec._imag_petsc
-                out_petsc = out_vec._imag_petsc
+            # For Complex Step, need to disassemble real and imag parts, transfer them separately,
+            # then reassemble them.
+            if in_vec._under_complex_step and out_vec._alloc_complex:
+                in_petsc_imag = in_vec._imag_petsc
+                out_petsc_imag = out_vec._imag_petsc
                 for i in range(in_vec._ncol):
-                    in_petsc.array = in_vec._imag_data[:, i]
-                    out_petsc.array = out_vec._imag_data[:, i]
+
+                    # Real
+                    in_petsc.array = in_vec._data[:, i].real
+                    out_petsc.array = out_vec._data[:, i].real
                     self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
-                    in_vec._imag_data[:, i] = in_petsc.array
+
+                    # Imaginary
+                    in_petsc_imag.array = in_vec._data[:, i].imag
+                    out_petsc_imag.array = out_vec._data[:, i].imag
+                    self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=False, mode=False)
+
+                    in_vec._data[:, i] = in_petsc.array + in_petsc_imag.array * 1j
+
+            else:
+                for i in range(in_vec._ncol):
+                    in_petsc.array = in_vec._data[:, i]
+                    out_petsc.array = out_vec._data[:, i]
+                    self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+                    in_vec._data[:, i] = in_petsc.array
 
         elif mode == 'rev':
             in_petsc = in_vec._petsc

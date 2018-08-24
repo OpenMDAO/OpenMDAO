@@ -47,12 +47,6 @@ class Group(System):
     _local_system_set : set or None
         Set of pathnames of all fully local (not remote or distributed)
         direct or indirect subsystems.
-    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
-        Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
-        of size nproc x num_var where nproc is the number of processors
-        in this Group's communicator and num_var is the number of allprocs variables
-        in the given group.  This is only defined if the Group owns one or more interprocess
-        connections.
     _subgroups_myproc : list
         List of local subgroups.
     _manual_connections : dict
@@ -87,7 +81,6 @@ class Group(System):
         super(Group, self).__init__(**kwargs)
 
         self._local_system_set = None
-        self._var_offsets = None
         self._subgroups_myproc = None
         self._manual_connections = {}
         self._static_manual_connections = {}
@@ -379,6 +372,7 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._local_vector_class = self._local_vector_class
             subsys._distributed_vector_class = self._distributed_vector_class
+            subsys.force_alloc_complex = self.force_alloc_complex
 
             if self.pathname:
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
@@ -656,6 +650,8 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_sizes()
+
+        self._var_offsets = None
 
         iproc = self.comm.rank
         nproc = self.comm.size
@@ -1089,33 +1085,6 @@ class Group(System):
                                            "dimension of size %d.")
                                     raise ValueError(msg % (abs_out, abs_in,
                                                      i, d_size))
-
-    def _get_var_offsets(self):
-        """
-        Compute distributed offsets for variables.
-
-        Only PETScTransfer currently requests these.
-
-        Returns
-        -------
-        dict
-            Arrays of offsets keyed by vec_name and deriv direction.
-        """
-        if self._var_offsets is None:
-            offsets = self._var_offsets = {}
-            for vec_name in self._lin_rel_vec_name_list:
-                offsets[vec_name] = off_vn = {}
-                for type_ in ['input', 'output']:
-                    vsizes = self._var_sizes[vec_name][type_]
-                    csum = np.cumsum(vsizes)
-                    # shift the cumsum forward by one and set first entry to 0 to get
-                    # the correct offset.
-                    csum[1:] = csum[:-1]
-                    csum[0] = 0
-                    off_vn[type_] = csum.reshape(vsizes.shape)
-            offsets['nonlinear'] = offsets['linear']
-
-        return self._var_offsets
 
     def _transfer(self, vec_name, mode, isub=None):
         """

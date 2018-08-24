@@ -770,6 +770,7 @@ class Problem(object):
             this enables the user to instantiate and setup in one line.
         """
         model = self.model
+        model.force_alloc_complex = force_alloc_complex
         comm = self.comm
 
         if vector_class is not None:
@@ -873,9 +874,7 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=DEFAULT_FD_OPTIONS['step'],
-                       form=DEFAULT_FD_OPTIONS['form'],
-                       step_calc=DEFAULT_FD_OPTIONS['step_calc'],
+                       method='fd', step=None, form='forward', step_calc='abs',
                        force_dense=True, show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
@@ -903,13 +902,14 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is the default value of step for the 'fd' method.
+            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+            'cs'.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
-            is the default value of step for the 'fd' method.
+            'forward'.
         step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Default is the default value of step for the 'fd' method.
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+            Default is 'abs'.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
@@ -1239,7 +1239,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=1e-6, form='forward', step_calc='abs'):
+                     method='fd', step=None, form='forward', step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1269,7 +1269,8 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'
         step : float
-            Step size for approximation. Default is 1e-6.
+            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+            'cs'.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             'forward'.
@@ -1300,6 +1301,12 @@ class Problem(object):
                                        driver_scaling=driver_scaling)
             Jcalc = total_info.compute_totals()
 
+            if step is None:
+                if method == 'cs':
+                    step = DEFAULT_CS_OPTIONS['step']
+                else:
+                    step = DEFAULT_FD_OPTIONS['step']
+
             # Approximate FD
             fd_args = {
                 'step': step,
@@ -1325,7 +1332,7 @@ class Problem(object):
         data[''] = {}
         for key, val in iteritems(Jcalc):
             data[''][key] = {}
-            data[''][key]['J_fwd'] = Jcalc[key]
+            data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
