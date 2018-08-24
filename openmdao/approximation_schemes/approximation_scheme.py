@@ -18,9 +18,9 @@ class ApproximationScheme(object):
         """
         self._approx_groups = None
 
-    def _get_approx_groups(self):
+    def _get_approx_groups(self, system):
         if self._approx_groups is None:
-            self._init_approximations()
+            self._init_approximations(system)
         return self._approx_groups
 
     def add_approximation(self, abs_key, kwargs):
@@ -52,7 +52,7 @@ class ApproximationScheme(object):
         """
         raise NotImplementedError()
 
-    def _init_approximations(self):
+    def _init_approximations(self, system):
         """
         Perform any necessary setup for the approximation scheme.
         """

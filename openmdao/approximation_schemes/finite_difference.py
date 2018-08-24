@@ -138,7 +138,7 @@ class FiniteDifference(ApproximationScheme):
         return (approx_tuple[1], fd_options['form'], fd_options['order'],
                 fd_options['step'], fd_options['step_calc'])
 
-    def _init_approximations(self):
+    def _init_approximations(self, system):
         """
         Prepare for later approximations.
         """
@@ -152,6 +152,17 @@ class FiniteDifference(ApproximationScheme):
         # throw it in a list. The groupby iterator only works once.
         self._approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
                                                                               self._key_fun)]
+
+        tot_size = 0
+        if system.options['num_par_fd'] > 1:
+            for key, approx in self._approx_groups:
+                wrt = key[0]
+                if wrt in system._owns_approx_wrt_idx:
+                    tot_size += len(system._owns_approx_wrt_idx[wrt])
+                else:
+                    tot_size += system._var_allprocs_abs2meta[wrt]['size']
+
+        self._total_wrt_size = tot_size
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
@@ -190,7 +201,7 @@ class FiniteDifference(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        for key, approximations in self._get_approx_groups():
+        for key, approximations in self._get_approx_groups(system):
             wrt, form, order, step, step_calc = key
 
             # FD forms are written as a collection of changes to inputs (deltas) and the associated

@@ -3,6 +3,7 @@ from __future__ import division, print_function
 
 from itertools import groupby
 from six.moves import range
+from collections import defaultdict
 
 import numpy as np
 
@@ -15,6 +16,8 @@ DEFAULT_CS_OPTIONS = {
     'step': 1e-40,
     'form': 'forward',
 }
+
+_full_slice = slice(None)
 
 
 class ComplexStep(ApproximationScheme):
@@ -79,7 +82,7 @@ class ComplexStep(ApproximationScheme):
         options = approx_tuple[2]
         return (approx_tuple[1], options['form'], options['step'])
 
-    def _init_approximations(self):
+    def _init_approximations(self, system):
         """
         Prepare for later approximations.
         """
@@ -91,8 +94,42 @@ class ComplexStep(ApproximationScheme):
         # step size.
         # Note: Since access to `approximations` is required multiple times, we need to
         # throw it in a list. The groupby iterator only works once.
-        self._approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
-                                                                              self._key_fun)]
+        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                        self._key_fun)]
+
+        tot_size = 0
+        self._approx_groups = [None] * len(approx_groups)
+        for i, (key, approx) in enumerate(approx_groups):
+            wrt, form, delta = key
+            if form == 'reverse':
+                delta *= -1.0
+            fact = 1.0 / delta
+            delta *= 1j
+
+            if wrt in system._owns_approx_wrt_idx:
+                in_idx = system._owns_approx_wrt_idx[wrt]
+                in_size = len(in_idx)
+            else:
+                in_size = system._var_abs2meta[wrt]['size']
+                in_idx = range(in_size)
+
+            outputs = []
+
+            for approx_tuple in approx:
+                of = approx_tuple[0]
+                # TODO: Sparse derivatives
+                if of in system._owns_approx_of_idx:
+                    out_idx = system._owns_approx_of_idx[of]
+                    out_size = len(out_idx)
+                else:
+                    out_size = system._var_abs2meta[of]['size']
+                    out_idx = _full_slice
+
+                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
+
+            self._approx_groups[i] = (wrt, form, delta, fact, in_idx, in_size, outputs)
+
+        self._total_wrt_size = tot_size
 
         # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
@@ -130,50 +167,47 @@ class ComplexStep(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        for key, approximations in self._get_approx_groups():
-            wrt, form, delta = key
-            if form == 'reverse':
-                delta *= -1.0
-            fact = 1.0 / delta
-            delta *= 1j
+        num_par_fd = system.options['num_par_fd']
+        use_parallel_fd = num_par_fd > 1 and system._full_comm.size > 1
 
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                if wrt in system._var_abs2meta:
-                    in_size = system._var_abs2meta[wrt]['size']
+        results = defaultdict(list)
+        iproc = system.comm.rank
 
-                in_idx = range(in_size)
-
-            outputs = []
-
-            for approx_tuple in approximations:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
-                else:
-                    out_size = system._var_abs2meta[of]['size']
-
-                outputs.append((of, np.zeros((out_size, in_size))))
-
+        tot_idx = 0
+        approx_groups = self._get_approx_groups(system)
+        for tup in approx_groups:
+            wrt, form, delta, fact, in_idx, in_size, outputs = tup
             for i_count, idx in enumerate(in_idx):
+                if tot_idx % system._par_fd_id > 0:
+                    continue
+
                 # Run the Finite Difference
                 input_delta = [(wrt, idx, delta)]
                 result = self._run_point_complex(system, input_delta, results_clone, total)
 
-                for of, subjac in outputs:
-                    if of in system._owns_approx_of_idx:
-                        out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = result._views_flat[of][out_idx].imag
-                    else:
-                        subjac[:, i_count] = result._views_flat[of].imag
+                if iproc == 0:
+                    for of, _, out_idx in outputs:
+                        results[(of, wrt)].append((i_count,
+                                                   result._views_flat[of][out_idx].imag.copy()))
 
-            for of, subjac in outputs:
+        if use_parallel_fd:
+            myproc = system._full_comm.rank
+            # create full results list
+            all_results = system._full_comm.allgather(results)
+            for rank, proc_results in enumerate(all_results):
+                if rank != myproc or iproc != 0:
+                    for key in proc_results:
+                        results.extend(proc_results[key])
+
+        for tup in approx_groups:
+            wrt, _, _, fact, in_idx, in_size, outputs = tup
+            for of, subjac, _ in outputs:
+                key = (of, wrt)
+                for i, result in results[key]:
+                    subjac[:, i] = result
+
                 subjac *= fact
-                rel_key = abs_key2rel_key(system, (of, wrt))
+                rel_key = abs_key2rel_key(system, key)
                 if uses_src_indices:
                     jac._override_checks = True
                 jac[rel_key] = subjac

@@ -225,6 +225,8 @@ class System(object):
         Class to use for local data vectors.
     _assembled_jac : AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
+    _par_fd_id : int
+        ID used to determine columns in the jacobian will be solved for when using parallel FD.
     """
 
     def __init__(self, **kwargs):
@@ -358,6 +360,8 @@ class System(object):
         self._distributed_vector_class = None
 
         self._assembled_jac = None
+
+        self._par_fd_id = 1
 
     def _declare_options(self):
         """
@@ -677,7 +681,8 @@ class System(object):
             for i in range(num_par_fd):
                 color[offsets[i]:offsets[i] + sizes[i]] = i
 
-            self._par_fd_id = color[comm.rank]
+            # since we use _par_fd_id for modulo arithmetic, prevent zero value by adding 1.
+            self._par_fd_id = color[comm.rank] + 1
 
             comm = self._full_comm.Split(self._par_fd_id)
 
