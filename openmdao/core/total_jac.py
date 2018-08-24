@@ -1071,13 +1071,22 @@ class _TotalJacInfo(object):
         deriv_idxs, jac_idxs = self.solvec_map[mode]
 
         scatter = self.jac_scatters[mode][vecname]
+
+        # DefaultVector
         if scatter is None:
             deriv_val = self.output_vec[mode][vecname]._data
             if mode == 'fwd':
                 self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
             else:  # rev
                 self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+
+        # PETScVector
         else:
+
+            if self.output_vec[mode][vecname]._alloc_complex:
+                solution = self.soln_petsc[mode][vecname]
+                solution[0].array = solution[1]
+
             self.jac_petsc[mode].array[:] = 0.
             scatter.scatter(self.soln_petsc[mode][vecname][0],
                             self.jac_petsc[mode], addv=False, mode=False)

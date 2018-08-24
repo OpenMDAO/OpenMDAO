@@ -229,47 +229,47 @@ class PETScTransfer(DefaultTransfer):
         mode : str
             'fwd' or 'rev'.
         """
-        if mode == 'fwd':
+        flag = False
+        if mode == 'rev':
+            flag = True
+            in_vec, out_vec = out_vec, in_vec
 
-            in_petsc = in_vec._petsc
-            out_petsc = out_vec._petsc
+        in_petsc = in_vec._petsc
+        out_petsc = out_vec._petsc
 
-            # For Complex Step, need to disassemble real and imag parts, transfer them separately,
-            # then reassemble them.
-            if in_vec._under_complex_step and out_vec._alloc_complex:
+        # For Complex Step, need to disassemble real and imag parts, transfer them separately,
+        # then reassemble them.
+        if in_vec._under_complex_step and out_vec._alloc_complex:
 
-                # Real
-                in_petsc.array = in_vec._data.real
-                out_petsc.array = out_vec._data.real
-                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+            # Real
+            in_petsc.array = in_vec._data.real
+            out_petsc.array = out_vec._data.real
+            self._transfer.scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
-                # Imaginary
-                in_petsc_imag = in_vec._imag_petsc
-                out_petsc_imag = out_vec._imag_petsc
-                in_petsc_imag.array = in_vec._data.imag
-                out_petsc_imag.array = out_vec._data.imag
-                self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=False, mode=False)
+            # Imaginary
+            in_petsc_imag = in_vec._imag_petsc
+            out_petsc_imag = out_vec._imag_petsc
+            in_petsc_imag.array = in_vec._data.imag
+            out_petsc_imag.array = out_vec._data.imag
+            self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=flag, mode=flag)
 
-                in_vec._data[:] = in_petsc.array + in_petsc_imag.array * 1j
+            in_vec._data[:] = in_petsc.array + in_petsc_imag.array * 1j
 
-            else:
+        else:
 
-                # Anything that has been allocated complex requires an additional step because
-                # the petsc vector does not directly reference the _data.
+            # Anything that has been allocated complex requires an additional step because
+            # the petsc vector does not directly reference the _data.
 
-                if in_vec._alloc_complex:
-                    in_petsc.array = in_vec._data
+            if in_vec._alloc_complex:
+                in_petsc.array = in_vec._data
 
-                if out_vec._alloc_complex:
-                    out_petsc.array = out_vec._data
+            if out_vec._alloc_complex:
+                out_petsc.array = out_vec._data
 
-                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+            self._transfer.scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
-                if in_vec._alloc_complex:
-                    in_vec._data[:] = in_petsc.array
-
-        else:  # rev
-            self._transfer.scatter(in_vec._petsc, out_vec._petsc, addv=True, mode=True)
+            if in_vec._alloc_complex:
+                in_vec._data[:] = in_petsc.array
 
     def multi_transfer(self, in_vec, out_vec, mode='fwd'):
         """
