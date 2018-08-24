@@ -498,6 +498,9 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
+            # TODO - Check for nl solvers that require linear solve.
+            ln_alloc_complex = nl_alloc_complex
+
             if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
                 self._scale_factors = self._compute_root_scale_factors()
             else:
@@ -512,7 +515,7 @@ class System(object):
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                 else:
-                    alloc_complex = force_alloc_complex
+                    alloc_complex = ln_alloc_complex
 
                     if vec_name != 'linear':
                         voi = vois[vec_name]
@@ -1034,7 +1037,7 @@ class System(object):
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, resize=resize,
-                    alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
+                    alloc_complex=alloc_complex, ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
