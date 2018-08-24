@@ -181,10 +181,10 @@ class AssembledJacobian(Jacobian):
         iproc = system.comm.rank
         out_size = np.sum(out_sizes[iproc, :])
 
-        int_mtx._build(out_size, out_size)
+        int_mtx._build(out_size, out_size, in_ranges, out_ranges)
         if ext_mtx._submats:
             in_size = np.sum(in_sizes[iproc, :])
-            ext_mtx._build(out_size, in_size)
+            ext_mtx._build(out_size, in_size, in_ranges, out_ranges)
         else:
             ext_mtx = None
 
@@ -255,7 +255,7 @@ class AssembledJacobian(Jacobian):
             iproc = system.comm.rank
             out_size = np.sum(sizes['nonlinear']['output'][iproc, :])
             in_size = np.sum(sizes['nonlinear']['input'][iproc, :])
-            ext_mtx._build(out_size, in_size)
+            ext_mtx._build(out_size, in_size, in_ranges, out_ranges)
         else:
             ext_mtx = None
 
@@ -291,7 +291,7 @@ class AssembledJacobian(Jacobian):
             iters_in_ext = []
 
             for abs_key in subjacs:
-                ofname, wrtname = abs_key
+                _, wrtname = abs_key
                 if wrtname in output_names:
                     if abs_key in int_mtx._submats:
                         iters.append((abs_key, abs_key, False))
@@ -334,11 +334,11 @@ class AssembledJacobian(Jacobian):
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
-        for key1, key2, do_add in iters:
+        for _, key, do_add in iters:
             if do_add:
-                int_mtx._update_add_submat(key2, subjacs[key2]['value'])
+                int_mtx._update_add_submat(key, subjacs[key]['value'])
             else:
-                int_mtx._update_submat(key2, subjacs[key2]['value'])
+                int_mtx._update_submat(key, subjacs[key]['value'])
 
         for key in iters_in_ext:
             ext_mtx._update_submat(key, subjacs[key]['value'])
@@ -378,7 +378,7 @@ class AssembledJacobian(Jacobian):
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 if d_outputs._names and d_residuals._names:
-                    d_residuals.iadd_data(int_mtx._prod(d_outputs.get_data(), mode, int_ranges))
+                    d_residuals._data += int_mtx._prod(d_outputs._data, mode, int_ranges)
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
@@ -389,12 +389,12 @@ class AssembledJacobian(Jacobian):
                         mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
-                    d_residuals.iadd_data(ext_mtx._prod(d_inputs.get_data(), mode, None, mask=mask))
+                    d_residuals._data += ext_mtx._prod(d_inputs._data, mode, None, mask=mask)
 
             else:  # rev
-                dresids = d_residuals.get_data()
+                dresids = d_residuals._data
                 if d_outputs._names and d_residuals._names:
-                    d_outputs.iadd_data(int_mtx._prod(dresids, mode, int_ranges))
+                    d_outputs._data += int_mtx._prod(dresids, mode, int_ranges)
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
 
@@ -405,7 +405,7 @@ class AssembledJacobian(Jacobian):
                         mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
-                    d_inputs.iadd_data(ext_mtx._prod(dresids, mode, None, mask=mask))
+                    d_inputs._data += ext_mtx._prod(dresids, mode, None, mask=mask)
 
 
 class DenseJacobian(AssembledJacobian):

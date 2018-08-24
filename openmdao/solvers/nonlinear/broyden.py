@@ -176,7 +176,7 @@ class BroydenSolver(NonlinearSolver):
 
         else:
             self._full_inverse = True
-            n = len(outputs.get_data())
+            n = len(outputs._data)
 
         self.n = n
         self.Gm = np.empty((n, n))
@@ -320,8 +320,7 @@ class BroydenSolver(NonlinearSolver):
         fxm = self.get_residuals()
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            residuals = self._system._residuals
-            fxm = residuals.get_data()
+            fxm = self._system._residuals._data
         return np.sum(fxm**2) ** 0.5
 
     def _iter_execute(self):
@@ -444,8 +443,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system._outputs
 
         if self._full_inverse:
-            xm = outputs.get_data().copy()
-
+            xm = outputs._data.copy()
         else:
             states = self.options['state_vars']
             xm = self.xm.copy()
@@ -467,7 +465,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system._outputs
 
         if self._full_inverse:
-            outputs.set_data(new_val)
+            outputs._data[:] = new_val
 
         else:
             states = self.options['state_vars']
@@ -487,7 +485,7 @@ class BroydenSolver(NonlinearSolver):
         residuals = self._system._residuals
 
         if self._full_inverse:
-            fxm = self.fxm = residuals.get_data()
+            fxm = self.fxm = residuals._data.copy()
 
         else:
             states = self.options['state_vars']
@@ -509,7 +507,7 @@ class BroydenSolver(NonlinearSolver):
         """
         linear = self._system._vectors['output']['linear']
         if self._full_inverse:
-            linear.set_data(dx)
+            linear._data[:] = dx
 
         else:
             linear.set_const(0.0)

@@ -66,16 +66,14 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_const(0.0)
         group.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_const(1.0)
         d_residuals.set_const(0.0)
         group.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
-        assert_rel_error(self, output[1], group.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], group.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, group.expected_solution, 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
         """Verify that ScipyKrylov abides by the 'maxiter' option."""
@@ -133,10 +131,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        # The empty first entry in _data is due to the dummy
-        #     variable being in a different variable set not owned by g1
-        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -147,8 +142,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, g1.expected_solution, 3e-15)
 
     def test_preconditioner_deprecation(self):
 
@@ -229,20 +223,6 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
         # Should take less iterations when starting from previous solution.
         self.assertTrue(icount2 < icount1)
-
-
-# class TestScipyKrylovBICG(TestScipyKrylov):
-#     # This will run all of the gmres tests with the bicg solver.
-#
-#     linear_solver_name = 'bicg'
-#     linear_solver_class = krylov_factory('bicg')
-#
-#
-# class TestScipyKrylovBICGSTAB(TestScipyKrylov):
-#     # This will run all of the gmres tests with the bicgstab solver.
-#
-#     linear_solver_name = 'bicgstab'
-#     linear_solver_class = krylov_factory('bicgstab')
 
 
 class TestScipyKrylovFeature(unittest.TestCase):

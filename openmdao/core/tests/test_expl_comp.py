@@ -9,7 +9,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, NewtonSolver, ScipyKrylov, Group, \
-    IndepVarComp, LinearBlockGS
+    IndepVarComp, LinearBlockGS, AnalysisError
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
@@ -509,6 +509,18 @@ class ExplCompTestCase(unittest.TestCase):
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(8, num_non_empty_lines)
 
+        # Promoted names - no print arrays
+        stream = cStringIO()
+        prob.model.list_outputs(values=True,
+                                prom_name=True,
+                                print_arrays=False,
+                                out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('    x       |10.0|   x'), 1)
+        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 11)
+
         # Hierarchical - no print arrays
         stream = cStringIO()
         prob.model.list_outputs(values=True,
@@ -672,6 +684,20 @@ class ExplCompTestCase(unittest.TestCase):
                          "Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
+    def test_compute_inputs_read_only_reset(self):
+        class BadComp(TestExplCompSimple):
+            def compute(self, inputs, outputs):
+                super(BadComp, self).compute(inputs, outputs)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem(BadComp())
+        prob.setup()
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+        # verify read_only status is reset after AnalysisError
+        prob['length'] = 111.
+
     def test_compute_partials_inputs_read_only(self):
         class BadComp(TestExplCompSimpleDense):
             def compute_partials(self, inputs, partials):
@@ -689,6 +715,22 @@ class ExplCompTestCase(unittest.TestCase):
                          "Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
+    def test_compute_partials_inputs_read_only_reset(self):
+        class BadComp(TestExplCompSimpleDense):
+            def compute_partials(self, inputs, partials):
+                super(BadComp, self).compute_partials(inputs, partials)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem(BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(AnalysisError):
+            prob.check_partials()
+
+        # verify read_only status is reset after AnalysisError
+        prob['length'] = 111.
+
     def test_compute_jacvec_product_inputs_read_only(self):
         class BadComp(RectangleJacVec):
             def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
@@ -705,6 +747,22 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'length' in input vector "
                          "when it is read only.")
+
+    def test_compute_jacvec_product_inputs_read_only_reset(self):
+        class BadComp(RectangleJacVec):
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                super(BadComp, self).compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem(BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(AnalysisError):
+            prob.check_partials()
+
+        # verify read_only status is reset after AnalysisError
+        prob['length'] = 111.
 
 
 if __name__ == '__main__':

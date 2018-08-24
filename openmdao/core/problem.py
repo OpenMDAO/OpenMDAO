@@ -4,13 +4,12 @@ from __future__ import division, print_function
 
 import sys
 
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 import warnings
-import json
 
-from six import iteritems, iterkeys, itervalues, string_types
+from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
 
 import numpy as np
@@ -22,9 +21,9 @@ from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
+from openmdao.core.group import System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.vectors.transfer import Transfer
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
@@ -109,14 +108,16 @@ class Problem(object):
 
     _post_setup_func = None
 
-    def __init__(self, model=None, comm=None, use_ref_vector=True, root=None):
+    def __init__(self, model=None, driver=None, comm=None, use_ref_vector=True, root=None):
         """
         Initialize attributes.
 
         Parameters
         ----------
         model : <System> or None
-            Pointer to the top-level <System> object (root node in the tree).
+            The top-level <System>. If not specified, an empty <Group> will be created.
+        driver : <Driver> or None
+            The driver for the problem. If not specified, a simple "Run Once" driver will be used.
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
         use_ref_vector : bool
@@ -135,8 +136,8 @@ class Problem(object):
 
         if root is not None:
             if model is not None:
-                raise ValueError("cannot specify both `root` and `model`. `root` has been "
-                                 "deprecated, please use model")
+                raise ValueError("Cannot specify both 'root' and 'model'. "
+                                 "'root' has been deprecated, please use 'model'.")
 
             warn_deprecation("The 'root' argument provides backwards compatibility "
                              "with OpenMDAO <= 1.x ; use 'model' instead.")
@@ -144,11 +145,20 @@ class Problem(object):
             model = root
 
         if model is None:
-            model = Group()
+            self.model = Group()
+        elif isinstance(model, System):
+            self.model = model
+        else:
+            raise TypeError("The value provided for 'model' is not a valid System.")
 
-        self.model = model
+        if driver is None:
+            self.driver = Driver()
+        elif isinstance(driver, Driver):
+            self.driver = driver
+        else:
+            raise TypeError("The value provided for 'driver' is not a valid Driver.")
+
         self.comm = comm
-        self.driver = Driver()
 
         self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
@@ -377,9 +387,9 @@ class Problem(object):
         if self._setup_status == 1:
             self._initial_condition_cache[name] = value
         else:
-            if name in self.model._outputs:
+            if self.model._outputs and name in self.model._outputs:
                 self.model._outputs[name] = value
-            elif name in self.model._inputs:
+            elif self.model._inputs and name in self.model._inputs:
                 self.model._inputs[name] = value
             else:
                 msg = 'Variable name "{}" not found.'
@@ -574,7 +584,7 @@ class Problem(object):
         model = self.model
         driver = self.driver
 
-        mydesvars = myobjectives = myconstraints = myresponses = set()
+        mydesvars = myobjectives = myconstraints = set()
 
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
@@ -699,9 +709,6 @@ class Problem(object):
         obj_vars = {name: obj_vars[name] for name in filt['obj']}
         con_vars = {name: con_vars[name] for name in filt['con']}
 
-        names = model._outputs._names
-        views = model._outputs._views
-
         if MPI:
             des_vars = model._gather_vars(model, des_vars)
             obj_vars = model._gather_vars(model, obj_vars)
@@ -763,6 +770,7 @@ class Problem(object):
             this enables the user to instantiate and setup in one line.
         """
         model = self.model
+        model.force_alloc_complex = force_alloc_complex
         comm = self.comm
 
         if vector_class is not None:
@@ -809,8 +817,6 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        orig_mode = self._mode
-
         response_size, desvar_size = self.driver._update_voi_meta(self.model)
 
         # update mode if it's been set to 'auto'
@@ -832,7 +838,7 @@ class Problem(object):
             # than the full size
             if 'fwd' in coloring_info and 'rev' in coloring_info:
                 pass  # we're doing both!
-            else:
+            elif mode in coloring_info:
                 lists = coloring_info[mode][0]
                 if lists:
                     size = len(lists[0])  # lists[0] is the uncolored row/col indices
@@ -868,9 +874,7 @@ class Problem(object):
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                       method='fd', step=DEFAULT_FD_OPTIONS['step'],
-                       form=DEFAULT_FD_OPTIONS['form'],
-                       step_calc=DEFAULT_FD_OPTIONS['step_calc'],
+                       method='fd', step=None, form='forward', step_calc='abs',
                        force_dense=True, show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
@@ -898,13 +902,14 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
-            Step size for approximation. Default is the default value of step for the 'fd' method.
+            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+            'cs'.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
-            is the default value of step for the 'fd' method.
+            'forward'.
         step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Default is the default value of step for the 'fd' method.
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+            Default is 'abs'.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
@@ -986,7 +991,9 @@ class Problem(object):
 
             for comp in comps:
 
-                comp.run_linearize()
+                # Only really need to linearize once.
+                if mode == 'fwd':
+                    comp.run_linearize()
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
@@ -1217,8 +1224,10 @@ class Problem(object):
 
         if len(comps_could_not_cs) > 0:
             msg = "The following components requested complex step, but force_alloc_complex " + \
-                "has not been set to True, so finite difference was used: "
+                  "has not been set to True, so finite difference was used: "
             msg += str(list(comps_could_not_cs))
+            msg += "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
+                   "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
             warnings.warn(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
@@ -1230,7 +1239,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=1e-6, form='forward', step_calc='abs'):
+                     method='fd', step=None, form='forward', step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1260,7 +1269,8 @@ class Problem(object):
         method : str
             Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'
         step : float
-            Step size for approximation. Default is 1e-6.
+            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+            'cs'.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             'forward'.
@@ -1281,7 +1291,6 @@ class Problem(object):
                 forward - fd, adjoint - fd, forward - adjoint.
         """
         model = self.model
-        global_names = False
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -1291,6 +1300,12 @@ class Problem(object):
             total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
                                        driver_scaling=driver_scaling)
             Jcalc = total_info.compute_totals()
+
+            if step is None:
+                if method == 'cs':
+                    step = DEFAULT_CS_OPTIONS['step']
+                else:
+                    step = DEFAULT_FD_OPTIONS['step']
 
             # Approximate FD
             fd_args = {
@@ -1317,7 +1332,7 @@ class Problem(object):
         data[''] = {}
         for key, val in iteritems(Jcalc):
             data[''][key] = {}
-            data[''][key]['J_fwd'] = Jcalc[key]
+            data[''][key]['J_fwd'] = val
             data[''][key]['J_fd'] = Jfd[key]
         fd_args['method'] = 'fd'
 
@@ -1562,21 +1577,21 @@ class Problem(object):
         case : Case object
             A Case from a CaseRecorder file.
         """
-        inputs = case.inputs._values if case.inputs is not None else None
+        inputs = case.inputs if case.inputs is not None else None
         if inputs:
-            for name, val in zip(inputs.dtype.names, inputs):
+            for name in inputs.absolute_names():
                 if name not in self.model._var_abs_names['input']:
                     raise KeyError("Input variable, '{}', recorded in the case is not "
                                    "found in the model".format(name))
-                self[name] = val
+                self[name] = inputs[name]
 
-        outputs = case.outputs._values if case.outputs is not None else None
+        outputs = case.outputs if case.outputs is not None else None
         if outputs:
-            for name, val in zip(outputs.dtype.names, outputs):
+            for name in outputs.absolute_names():
                 if name not in self.model._var_abs_names['output']:
                     raise KeyError("Output variable, '{}', recorded in the case is not "
                                    "found in the model".format(name))
-                self[name] = val
+                self[name] = outputs[name]
 
         return
 

@@ -45,31 +45,24 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
     """
     def _get_data(g, type_):
 
-        set_IDs = g._var_set2iset
-        sizes = g._var_sizes_byset[vec_name]
+        sizes = g._var_sizes[vec_name]
         vnames = g._var_allprocs_abs_names
-        set_idxs = g._var_allprocs_abs2idx_byset[vec_name]
         abs2meta = g._var_allprocs_abs2meta
 
         idx = 0
         data = []
         nwid = 0
         iwid = 0
-        for sname in set_IDs[type_]:
-            set_total = 0
-            for rank in range(g.comm.size):
-                for ivar, vname in enumerate(vnames[type_]):
-                    vset = abs2meta[vname]['var_set']
-                    if vset == sname:
-                        sz = sizes[type_][vset][rank, set_idxs[vname]]
-                        if sz > 0:
-                            data.append((vname, str(set_total)))
-                        nwid = max(nwid, len(vname))
-                        iwid = max(iwid, len(data[-1][1]))
-                        set_total += sz
+        total = 0
+        for rank in range(g.comm.size):
+            for ivar, vname in enumerate(vnames[type_]):
+                sz = sizes[type_][rank, ivar]
+                if sz > 0:
+                    data.append((vname, str(total)))
+                nwid = max(nwid, len(vname))
+                iwid = max(iwid, len(data[-1][1]))
+                total += sz
 
-            # insert a blank line to visually sparate sets
-            data.append(('', '', '', ''))
         return data, nwid, iwid
 
     def _dump(g, stream):
@@ -81,8 +74,8 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
         for u, p in zip_longest(udata, pdata, fillvalue=('', '')):
             data.append((u[0], u[1], p[1], p[0]))
 
+        template = "{0:<{wid0}} {1:>{wid1}}     {2:>{wid2}} {3:<{wid3}}\n"
         for d in data[::-1]:
-            template = "{0:<{wid0}} {1:>{wid1}}     {2:>{wid2}} {3:<{wid3}}\n"
             stream.write(template.format(d[0], d[1], d[2], d[3],
                                          wid0=unwid, wid1=uiwid,
                                          wid2=piwid, wid3=pnwid))

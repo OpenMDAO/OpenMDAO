@@ -7,7 +7,7 @@ from six.moves import cStringIO
 import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
-    NewtonSolver, ScipyKrylov
+    NewtonSolver, ScipyKrylov, AnalysisError
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -217,6 +217,20 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(1, text.count('comp3.x'))
         self.assertEqual(1, text.count('value'))
         self.assertEqual(1, text.count('resids'))
+
+    def test_list_outputs_prom_name(self):
+        self.prob.run_model()
+
+        stream = cStringIO()
+        states = self.prob.model.list_outputs(explicit=False, residuals=True,
+                                              prom_name=True, hierarchical=True,
+                                              out_stream=stream)
+
+        text = stream.getvalue()
+        self.assertEqual(text.count('comp2.x'), 1)
+        self.assertEqual(text.count('comp3.x'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 9)
 
     def test_list_residuals(self):
         self.prob.run_model()
@@ -515,6 +529,37 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                          "Attempt to set value of 'x' in input vector "
                          "when it is read only.")
 
+    def test_guess_nonlinear_inputs_read_only_reset(self):
+        class ImpWithInitial(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 4.0)
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+                raise AnalysisError("It's just a scratch.")
+
+        group = Group()
+
+        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('comp1', ImpWithInitial())
+        group.add_subsystem('comp2', ImpWithInitial())
+        group.connect('px.x', 'comp1.x')
+        group.connect('comp1.y', 'comp2.x')
+
+        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver.options['maxiter'] = 1
+
+        prob = Problem(model=group)
+        prob.set_solver_print(level=0)
+        prob.setup(check=False)
+
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+        # verify read_only status is reset after AnalysisError
+        prob['comp1.x'] = 111.
+
     def test_guess_nonlinear_resids_read_only(self):
         class ImpWithInitial(ImplicitComponent):
 
@@ -589,6 +634,24 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                          "Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
+    def test_apply_nonlinear_read_only_reset(self):
+        class BadComp(QuadraticComp):
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(AnalysisError):
+            prob.model.run_apply_nonlinear()
+
+        # verify read_only status is reset after AnalysisError
+        prob['bad.a'] = 111.
+        prob['bad.x'] = 111.
+
     def test_solve_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
@@ -606,6 +669,22 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'a' in input vector "
                          "when it is read only.")
+
+    def test_solve_nonlinear_inputs_read_only_reset(self):
+        class BadComp(QuadraticComp):
+            def solve_nonlinear(self, inputs, outputs):
+                super(BadComp, self).solve_nonlinear(inputs, outputs)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+
+        with self.assertRaises(AnalysisError):
+            prob.run_model()
+
+        # verify read_only status is reset after AnalysisError
+        prob['bad.a'] = 111.
 
     def test_linearize_inputs_read_only(self):
         class BadComp(QuadraticLinearize):
@@ -644,6 +723,24 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in output vector "
                          "when it is read only.")
+
+    def test_linearize_read_only_reset(self):
+        class BadComp(QuadraticLinearize):
+            def linearize(self, inputs, outputs, partials):
+                super(BadComp, self).linearize(inputs, outputs, partials)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(AnalysisError):
+            prob.model.run_linearize()
+
+        # verify read_only status is reset after AnalysisError
+        prob['bad.a'] = 111.
+        prob['bad.x'] = 111.
 
     def test_apply_linear_inputs_read_only(self):
         class BadComp(QuadraticJacVec):
@@ -745,6 +842,26 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                          "Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
+    def test_apply_linear_read_only_reset(self):
+        class BadComp(QuadraticJacVec):
+            def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+                super(BadComp, self).apply_linear(inputs, outputs,
+                                                  d_inputs, d_outputs, d_residuals, mode)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+
+        with self.assertRaises(AnalysisError):
+            prob.model.run_apply_linear(['linear'], 'rev')
+
+        # verify read_only status is reset after AnalysisError
+        prob['bad.a'] = 111.
+        prob['bad.x'] = 111.
+        prob.model.bad._vectors['residual']['linear']['x'] = 111.
+
     def test_solve_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
@@ -784,6 +901,24 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
+
+    def test_solve_linear_read_only_reset(self):
+        class BadComp(QuadraticJacVec):
+            def solve_linear(self, d_outputs, d_residuals, mode):
+                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                raise AnalysisError("It's just a scratch.")
+
+        prob = Problem()
+        prob.model.add_subsystem('bad', BadComp())
+        prob.setup()
+        prob.run_model()
+        prob.model.run_linearize()
+
+        with self.assertRaises(AnalysisError):
+            prob.model.run_solve_linear(['linear'], 'fwd')
+
+        # verify read_only status is reset after AnalysisError
+        prob.model.bad._vectors['residual']['linear']['x'] = 111.
 
 
 class QuadGroup(Group):
@@ -853,6 +988,9 @@ class ListFeatureTestCase(unittest.TestCase):
 
     def test_list_residuals(self):
         prob.model.list_outputs(residuals=True)
+
+    def test_list_prom_names(self):
+        prob.model.list_outputs(prom_name=True)
 
     def test_list_return_value(self):
         inputs = prob.model.list_inputs(out_stream=None)

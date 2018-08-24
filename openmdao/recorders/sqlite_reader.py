@@ -13,7 +13,8 @@ from collections import OrderedDict
 from six import PY2, PY3, reraise
 from six.moves import range
 
-import json
+from yaml import safe_load
+
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
@@ -26,7 +27,7 @@ from openmdao.utils.write_outputs import write_outputs
 
 if PY2:
     import cPickle as pickle
-if PY3:
+elif PY3:
     import pickle
 
 _DEFAULT_OUT_STREAM = object()
@@ -103,20 +104,20 @@ class SqliteCaseReader(BaseCaseReader):
             self._var_settings = None
 
             if self.format_version >= 4:
-                self._var_settings = json.loads(row[4])
+                self._var_settings = safe_load(row[4])
 
             if self.format_version >= 3:
-                self._abs2prom = json.loads(row[1])
-                self._prom2abs = json.loads(row[2])
-                self._abs2meta = json.loads(row[3])
+                self._abs2prom = safe_load(row[1])
+                self._prom2abs = safe_load(row[2])
+                self._abs2meta = safe_load(row[3])
 
                 for name in self._abs2meta:
                     if 'lower' in self._abs2meta[name]:
                         self._abs2meta[name]['lower'] =\
-                            convert_to_np_array(self._abs2meta[name]['lower'])
+                            convert_to_np_array(self._abs2meta[name]['lower'], name, self._abs2meta)
                     if 'upper' in self._abs2meta[name]:
                         self._abs2meta[name]['upper'] =\
-                            convert_to_np_array(self._abs2meta[name]['upper'])
+                            convert_to_np_array(self._abs2meta[name]['upper'], name, self._abs2meta)
             elif self.format_version in (1, 2):
                 if PY2:
                     self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
@@ -130,12 +131,12 @@ class SqliteCaseReader(BaseCaseReader):
                         self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
                     except TypeError:
                         # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                        self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not\
-                            None else None
-                        self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not\
-                            None else None
-                        self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not\
-                            None else None
+                        self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not None \
+                            else None
+                        self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not None \
+                            else None
+                        self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not None \
+                            else None
 
         con.close()
 
@@ -187,8 +188,8 @@ class SqliteCaseReader(BaseCaseReader):
                     dcase._case_keys = [coord[0] for coord in rows]
                     dcase.num_cases = len(dcase._case_keys)
 
-                except sqlite3.OperationalError as err:
-                    # Cases recorded in version 1 won't have a derivatives table.
+                except sqlite3.OperationalError:
+                    # Cases recorded in version 1 won't have a 'derivatives' table.
                     if self.format_version >= 2:
                         reraise(*sys.exc_info())
 
@@ -208,9 +209,9 @@ class SqliteCaseReader(BaseCaseReader):
                     self.problem_cases._case_keys = [coord[0] for coord in rows]
                     self.problem_cases.num_cases = len(self.problem_cases._case_keys)
 
-                except sqlite3.OperationalError as err:
-                    # Cases recorded in some early iterations of version 1 won't have a problem
-                    # table.
+                except sqlite3.OperationalError:
+                    # Cases recorded in some early iterations of version 1 won't have
+                    # the 'problem_cases' table.
                     if self.format_version >= 2:
                         reraise(*sys.exc_info())
 
@@ -219,7 +220,7 @@ class SqliteCaseReader(BaseCaseReader):
                 row = cur.fetchone()
                 if row is not None:
                     if self.format_version >= 3:
-                        self.driver_metadata = json.loads(row[0])
+                        self.driver_metadata = safe_load(row[0])
                     elif self.format_version in (1, 2):
                         if PY2:
                             self.driver_metadata = pickle.loads(str(row[0]))
@@ -569,8 +570,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         if sys_vars is not None and len(sys_vars) > 0:
             for name in sys_vars:
-                if residuals_tol and residuals_vars is not None and\
-                   sys_vars[name]['residuals'] is not 'Not Recorded' and\
+                if residuals_tol and \
+                   sys_vars[name]['residuals'] is not 'Not Recorded' and \
                    np.linalg.norm(sys_vars[name]['residuals']) < residuals_tol:
                     continue
                 outs = {}
@@ -643,20 +644,17 @@ class SqliteCaseReader(BaseCaseReader):
         if get_outputs and case.outputs is None:
             return variables
 
-        outputs = case.outputs._values if case.outputs is not None else None
-        residuals = case.residuals._values if case.residuals is not None else None
-        inputs = case.inputs._values if case.inputs is not None else None
         if get_outputs:
-            for var_name in outputs.dtype.names:
-                variables[var_name] = {'value': outputs[var_name]}
-                if residuals is not None and var_name in residuals.dtype.names:
-                    variables[var_name]['residuals'] = residuals[var_name]
+            for abs_name in case.outputs.absolute_names():
+                variables[abs_name] = {'value': case.outputs[abs_name]}
+                if case.residuals and abs_name in case.residuals.absolute_names():
+                    variables[abs_name]['residuals'] = case.residuals[abs_name]
                 else:
-                    variables[var_name]['residuals'] = 'Not Recorded'
-        elif inputs is not None:
-            for var_name in inputs.dtype.names:
-                if var_name not in variables:
-                    variables[var_name] = {'value': inputs[var_name]}
+                    variables[abs_name]['residuals'] = 'Not Recorded'
+        elif case.inputs is not None:
+            for abs_name in case.inputs.absolute_names():
+                if abs_name not in variables:
+                    variables[abs_name] = {'value': case.inputs[abs_name]}
 
         return variables
 
@@ -709,21 +707,19 @@ class SqliteCaseReader(BaseCaseReader):
                     continue
                 if not get_outputs and case.inputs is None:
                     continue
-                outputs = case.outputs._values if case.outputs is not None else None
-                residuals = case.residuals._values if case.residuals is not None else None
-                inputs = case.inputs._values if case.inputs is not None else None
+
                 if get_outputs:
-                    for var_name in outputs.dtype.names:
-                        if var_name not in variables:
-                            variables[var_name] = {'value': outputs[var_name]}
-                            if residuals is not None and var_name in residuals.dtype.names:
-                                variables[var_name]['residuals'] = residuals[var_name]
+                    for abs_name in case.outputs.absolute_names():
+                        if abs_name not in variables:
+                            variables[abs_name] = {'value': case.outputs[abs_name]}
+                            if case.residuals and abs_name in case.residuals.absolute_names():
+                                variables[abs_name]['residuals'] = case.residuals[abs_name]
                             else:
-                                variables[var_name]['residuals'] = 'Not Recorded'
-                elif inputs is not None:
-                    for var_name in inputs.dtype.names:
-                        if var_name not in variables:
-                            variables[var_name] = {'value': inputs[var_name]}
+                                variables[abs_name]['residuals'] = 'Not Recorded'
+                elif case.inputs is not None:
+                    for abs_name in case.inputs.absolute_names():
+                        if abs_name not in variables:
+                            variables[abs_name] = {'value': case.inputs[abs_name]}
 
         return variables
 
@@ -777,9 +773,6 @@ class SqliteCaseReader(BaseCaseReader):
         """
         if out_stream is None:
             return
-
-        # Only local metadata but the most complete
-        meta = self._abs2meta
 
         # Make a dict of outputs. Makes it easier to work with in this method
         dict_of_outputs = OrderedDict()
@@ -845,8 +838,8 @@ class DriverCases(BaseCases):
             outputs_text, = row
 
         if self.format_version >= 3:
-            inputs_array = json_to_np_array(inputs_text)
-            outputs_array = json_to_np_array(outputs_text)
+            inputs_array = json_to_np_array(inputs_text, self._abs2meta)
+            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
         elif self.format_version in (1, 2):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
@@ -1011,7 +1004,7 @@ class ProblemCases(BaseCases):
             outputs_text, = row
 
         if self.format_version >= 3:
-            outputs_array = json_to_np_array(outputs_text)
+            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
         elif self.format_version in (1, 2):
             outputs_array = blob_to_array(outputs_text)
 
@@ -1089,9 +1082,9 @@ class SystemCases(BaseCases):
             outputs_text, residuals_text = row
 
         if self.format_version >= 3:
-            inputs_array = json_to_np_array(inputs_text)
-            outputs_array = json_to_np_array(outputs_text)
-            residuals_array = json_to_np_array(residuals_text)
+            inputs_array = json_to_np_array(inputs_text, self._abs2meta)
+            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
+            residuals_array = json_to_np_array(residuals_text, self._abs2meta)
         elif self.format_version in (1, 2):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
@@ -1173,9 +1166,9 @@ class SolverCases(BaseCases):
             input_text, output_text, residuals_text = row
 
         if self.format_version >= 3:
-            input_array = json_to_np_array(input_text)
-            output_array = json_to_np_array(output_text)
-            residuals_array = json_to_np_array(residuals_text)
+            input_array = json_to_np_array(input_text, self._abs2meta)
+            output_array = json_to_np_array(output_text, self._abs2meta)
+            residuals_array = json_to_np_array(residuals_text, self._abs2meta)
         elif self.format_version in (1, 2):
             input_array = blob_to_array(input_text)
             output_array = blob_to_array(output_text)

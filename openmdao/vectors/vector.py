@@ -22,23 +22,6 @@ else:
     INT_DTYPE = np.dtype(np.int32)
 
 
-class VectorInfo(object):
-    """
-    Communal object for storing some global information in the vectors.
-
-    Attributes
-    ----------
-    _under_complex_step : bool
-        When this is True, the vectors operate with complex numbers.
-    """
-
-    def __init__(self):
-        """
-        Initialize.
-        """
-        self._under_complex_step = False
-
-
 class Vector(object):
     """
     Base Vector class.
@@ -74,23 +57,17 @@ class Vector(object):
         Pointer to the vector owned by the root system.
     _alloc_complex : Bool
         If True, then space for the imaginary part is also allocated.
-    _data : {}
-        Dict of the actual allocated data (depends on implementation), keyed
-        by varset name.
-    _indices : list
-        List of indices mapping the varset-grouped data to the global vector.
-    _vector_info : <VectorInfo>
-        Object to store some global info, such as complex step state.
-    _imag_views : dict
-        Dictionary mapping absolute variable names to the ndarray views for the imaginary part.
-    _imag_views_flat : dict
-        Dictionary mapping absolute variable names to the flattened ndarray views for the imaginary
-        part.
-    _imag_data : {}
-        Dict of the actual allocated data (depends on implementation) for the imaginary part, keyed
-        by varset name.
-    _complex_view_cache : {}
-        Temporary storage of complex views used by in-place numpy operations.
+    _data : ndarray
+        Actual allocated data.
+    _cplx_data : ndarray
+        Actual allocated data under complex step.
+    _cplx_views : dict
+        Dictionary mapping absolute variable names to the ndarray views under complex step.
+    _cplx_views_flat : dict
+        Dictionary mapping absolute variable names to the flattened ndarray views under complex
+        step.
+    _under_complex_step : bool
+        When True, this vector is under complex step, and data is swapped with the complex data.
     _ncol : int
         Number of columns for multi-vectors.
     _icol : int or None
@@ -109,8 +86,6 @@ class Vector(object):
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     """
-
-    _vector_info = VectorInfo()
 
     cite = ""
 
@@ -157,16 +132,14 @@ class Vector(object):
         self._names = self._views
 
         self._root_vector = None
-        self._data = {}
-        self._indices = {}
+        self._data = None
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
-        if alloc_complex:
-            self._imag_data = {}
-            self._imag_views = {}
-            self._complex_view_cache = {}
-            self._imag_views_flat = {}
+        self._cplx_data = None
+        self._cplx_views = {}
+        self._cplx_views_flat = {}
+        self._under_complex_step = False
 
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or
@@ -189,7 +162,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
+        self._length = np.sum(self._system._var_sizes[name][self._typ][self._iproc, :])
 
         self.read_only = False
 
@@ -203,7 +176,7 @@ class Vector(object):
             String rep of this object.
         """
         try:
-            return str(self.get_data())
+            return str(self._data)
         except Exception as err:
             return "<error during call to Vector.__str__>: %s" % err
 
@@ -238,53 +211,6 @@ class Vector(object):
         if initialize_views:
             vec._initialize_views()
         return vec
-
-    def get_data(self, new_array=None):
-        """
-        Get the array combining the data of all the varsets.
-
-        Parameters
-        ----------
-        new_array : ndarray or None
-            Array to fill in with the values; otherwise new array created.
-
-        Returns
-        -------
-        ndarray
-            Array combining the data of all the varsets.
-        """
-        if new_array is None:
-            ncol = self._ncol
-            new_array = np.empty(self._length) if ncol == 1 else np.zeros((self._length, ncol))
-
-        for set_name, data in iteritems(self._data):
-            new_array[self._indices[set_name]] = data
-
-        return new_array
-
-    def set_data(self, array):
-        """
-        Set the incoming array combining the data of all the varsets.
-
-        Parameters
-        ----------
-        array : ndarray
-            Array to set to the data for all the varsets.
-        """
-        for set_name, data in iteritems(self._data):
-            data[:] = array[self._indices[set_name]]
-
-    def iadd_data(self, array):
-        """
-        In-place add the incoming combined array.
-
-        Parameters
-        ----------
-        array : ndarray
-            Array to set to the data for all the varsets.
-        """
-        for set_name, data in iteritems(self._data):
-            data += array[self._indices[set_name]]
 
     def _contains_abs(self, abs_name):
         """
@@ -359,25 +285,6 @@ class Vector(object):
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
-            if self._vector_info._under_complex_step:
-                if self._typ == 'input':
-                    if self._icol is None:
-                        return self._views[abs_name] + 1j * self._imag_views[abs_name]
-                    else:
-                        return self._views[abs_name][:, self._icol] + \
-                            1j * self._imag_views[abs_name][:, self._icol]
-                else:
-                    if abs_name not in self._complex_view_cache:
-                        if self._icol is None:
-                            self._complex_view_cache[abs_name] = self._views[abs_name] + \
-                                1j * self._imag_views[abs_name]
-                        else:
-                            self._complex_view_cache[abs_name][:, self._icol] = \
-                                self._views[abs_name][:, self._icol] + \
-                                1j * self._imag_views[abs_name][:, self._icol]
-                            return self._complex_view_cache[abs_name][:, self._icol]
-                    return self._complex_view_cache[abs_name]
-
             if self._icol is None:
                 return self._views[abs_name]
             else:
@@ -415,18 +322,9 @@ class Vector(object):
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %
                                  (name, oldval.shape, value.shape))
-            if self._vector_info._under_complex_step:
 
-                # setitem overwrites anything you may have done with numpy indexing
-                try:
-                    del self._complex_view_cache[abs_name]
-                except KeyError:
-                    pass
+            self._views[abs_name][slc] = value
 
-                self._views[abs_name][slc] = value.real
-                self._imag_views[abs_name][slc] = value.imag
-            else:
-                self._views[abs_name][slc] = value
         else:
             msg = 'Variable name "{}" not found.'
             raise KeyError(msg.format(name))
@@ -534,15 +432,13 @@ class Vector(object):
         """
         scaling = self._scaling[scale_to]
         if self._ncol == 1:
-            for set_name, data in iteritems(self._data):
-                data *= scaling[set_name][1]
-                if scaling[set_name][0] is not None:  # nonlinear only
-                    data += scaling[set_name][0]
+            self._data *= scaling[1]
+            if scaling[0] is not None:  # nonlinear only
+                self._data += scaling[0]
         else:
-            for set_name, data in iteritems(self._data):
-                data *= scaling[set_name][1][:, np.newaxis]
-                if scaling[set_name][0] is not None:  # nonlinear only
-                    data += scaling[set_name][0]
+            self._data *= scaling[1][:, np.newaxis]
+            if scaling[0] is not None:  # nonlinear only
+                self._data += scaling[0]
 
     def set_vec(self, vec):
         """
@@ -593,19 +489,6 @@ class Vector(object):
         -------
         float
             norm of this vector.
-        """
-        pass
-
-    def change_scaling_state(self, c0, c1):
-        """
-        Change the scaling state.
-
-        Parameters
-        ----------
-        c0 : int ndarray[nvar_myproc]
-            0th order coefficients for scaling/unscaling.
-        c1 : int ndarray[nvar_myproc]
-            1st order coefficients for scaling/unscaling.
         """
         pass
 
@@ -666,15 +549,6 @@ class Vector(object):
         """
         pass
 
-    def _remove_complex_views(self):
-        """
-        Remove temporary complex view and migrate its values into real and imaginary views.
-        """
-        for abs_name, value in iteritems(self._complex_view_cache):
-            self._views[abs_name][:] = value.real
-            self._imag_views[abs_name][:] = value.imag
-        self._complex_view_cache = {}
-
     def print_variables(self):
         """
         Print the names and values of all variables in this vector, one per line.
@@ -687,3 +561,23 @@ class Vector(object):
             print(' ' * 3, prom_name, view)
         print('-' * 35)
         print()
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the default real ndarray is replaced with a complex ndarray and all
+        pointers are updated to point to it.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if active:
+            self._cplx_data[:] = self._data
+
+        self._data, self._cplx_data = self._cplx_data, self._data
+        self._views, self._cplx_views = self._cplx_views, self._views
+        self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
+        self._under_complex_step = active

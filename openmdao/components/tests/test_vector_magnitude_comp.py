@@ -28,7 +28,7 @@ class TestVectorMagnitudeCompNx3(unittest.TestCase):
 
         self.p.setup()
 
-        self.p['a'] = np.random.rand(self.nn, 3)
+        self.p['a'] = 1.0 + np.random.rand(self.nn, 3)
 
         self.p.run_model()
 
@@ -72,7 +72,7 @@ class TestVectorMagnitudeCompNx4(unittest.TestCase):
 
         self.p.setup()
 
-        self.p['a'] = np.random.rand(self.nn, 4)
+        self.p['a'] = 1.0 + np.random.rand(self.nn, 4)
 
         self.p.run_model()
 
@@ -117,7 +117,7 @@ class TestUnits(unittest.TestCase):
 
         self.p.setup()
 
-        self.p['a'] = np.random.rand(self.nn, 3)
+        self.p['a'] = 1.0 + np.random.rand(self.nn, 3)
 
         self.p.run_model()
 
@@ -171,7 +171,7 @@ class TestForDocs(unittest.TestCase):
 
         p.setup()
 
-        p['pos'] = np.random.rand(n, 3)
+        p['pos'] = 1.0 + np.random.rand(n, 3)
 
         p.run_model()
 

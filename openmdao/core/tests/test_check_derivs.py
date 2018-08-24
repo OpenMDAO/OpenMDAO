@@ -239,6 +239,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.declare_partials(of='*', wrt='*')
 
+                self.lin_count = 0
+
             def compute(self, inputs, outputs):
                 outputs['y'] = 3.0*inputs['x1'] + 4.0*inputs['x2']
 
@@ -246,6 +248,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 """Intentionally left out derivative."""
                 J = partials
                 J['y', 'x1'] = np.array([3.0])
+                self.lin_count += 1
 
         prob = Problem()
         prob.model = Group()
@@ -262,6 +265,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
+
+        self.assertEqual(prob.model.comp.lin_count, 1)
 
         abs_error = data['comp']['y', 'x1']['abs error']
         rel_error = data['comp']['y', 'x1']['rel error']
@@ -687,8 +692,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(len(w), 1)
 
         msg = "The following components requested complex step, but force_alloc_complex " + \
-            "has not been set to True, so finite difference was used: ['comp']"
-
+              "has not been set to True, so finite difference was used: ['comp']\n" + \
+              "To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+              "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(w[0].message), msg)
 
         # Derivative still calculated, but with fd instead.
@@ -965,9 +971,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
-        self.assertEqual(str(cm.exception),
-                         "'foo' is not a valid form of finite difference; "
-                         "must be one of ['forward', 'backward', 'central']")
+        # The form options sometimes print out in different order.
+        msg = str(cm.exception)
+        self.assertTrue("'foo' is not a valid form of finite difference; "
+                         "must be one of [" in msg, 'error message not correct.')
+        self.assertTrue('forward' in msg, 'error message not correct.')
+        self.assertTrue('backward' in msg, 'error message not correct.')
+        self.assertTrue('central' in msg, 'error message not correct.')
 
         # check invalid step
         with self.assertRaises(ValueError) as cm:
@@ -2126,7 +2136,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Try again with a direct solver and sparse assembled hierarchy.
 
         p = Problem()
-        sub = p.model.add_subsystem('sub', GaussLobattoPhase())
+        p.model.add_subsystem('sub', GaussLobattoPhase())
 
         p.model.sub.add_objective('time', index=-1)
 

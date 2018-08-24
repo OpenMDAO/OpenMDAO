@@ -14,7 +14,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
-_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc', 'var_set',
+_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
                  'flat_src_indices'}
 
@@ -153,8 +153,7 @@ class ExecComp(ExplicitComponent):
 
             excomp = ExecComp('y=sum(x)',
                               x={'value': numpy.ones(10,dtype=float),
-                                 'units': 'ft',
-                                 'var_set': 3})
+                                 'units': 'ft'})
         """
         super(ExecComp, self).__init__()
 

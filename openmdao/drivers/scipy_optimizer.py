@@ -74,9 +74,6 @@ class ScipyOptimizeDriver(Driver):
     _grad_cache : OrderedDict
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _lincon_grad_cache : OrderedDict
-        Cached result of linear constraint derivatives because scipy asks for them in a separate
-        function.
     _objs : dict
         Contains all objective info.
     _exc_info : 3 item tuple
@@ -115,7 +112,6 @@ class ScipyOptimizeDriver(Driver):
         self.result = None
         self.fail = 0
         self._grad_cache = None
-        self._lincon_grad_cache = None
         self._con_cache = None
         self._con_idx = {}
         self._obj_and_nlcons = None
@@ -323,7 +319,7 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
-            coloring_mod.dynamic_simul_coloring(self)
+            coloring_mod.dynamic_simul_coloring(self, do_sparsity=False)
 
         # optimize
         try:

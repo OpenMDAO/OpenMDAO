@@ -1,7 +1,8 @@
-function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
-    var parentDiv = paramParentDiv;
-    var root = paramRootJson;
-    var conns = paramConnsJson;
+function PtN2Diagram(parentDiv, modelData) {
+    var root = modelData.tree;
+    var conns = modelData.connections_list;
+    var abs2prom = modelData.hasOwnProperty("abs2prom") ? modelData.abs2prom : undefined;
+
     var FONT_SIZE_PX = 11;
     var svgStyleElement = document.createElement("style");
     var outputNamingType = "Absolute";
@@ -17,8 +18,13 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
     var backButtonHistory = [], forwardButtonHistory = [];
     var chosenCollapseDepth = -1;
     var updateRecomputesAutoComplete = true; //default
+
     var katexInputDivElement = document.getElementById("katexInputDiv");
     var katexInputElement = document.getElementById("katexInput");
+
+    var tooltip = d3.select("body").append("div").attr("class", "tool-tip")
+        .style("position", "absolute")
+        .style("visibility", "hidden");
 
     mouseOverOnDiagN2 = MouseoverOnDiagN2;
     mouseOverOffDiagN2 = MouseoverOffDiagN2;
@@ -83,7 +89,7 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
         return false;
     }
-    
+
     function hasOutputConnection(target) {
         for (i = 0; i < conns.length; ++i) {
             if (conns[i].src === target) {
@@ -285,9 +291,9 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
 
             //Update svg dimensions before ComputeLayout() changes widthPTreePx
             svgDiv.style("width", (widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + 2 * SVG_MARGIN) + "px")
-                .style("height", (HEIGHT_PX + 2 * SVG_MARGIN) + "px");
+                  .style("height", (HEIGHT_PX + 2 * SVG_MARGIN) + "px");
             svg.attr("width", widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + 2 * SVG_MARGIN)
-                .attr("height", HEIGHT_PX + 2 * SVG_MARGIN);
+               .attr("height", HEIGHT_PX + 2 * SVG_MARGIN);
             n2Group.attr("transform", "translate(" + (widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
             pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
         }
@@ -317,7 +323,30 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
                 return "translate(" + xScalerPTree0(d.x0) + "," + yScalerPTree0(d.y0) + ")";
             })
             .on("click", function (d) { LeftClick(d, this); })
-            .on("contextmenu", function (d) { RightClick(d, this); });
+            .on("contextmenu", function (d) { RightClick(d, this); })
+            .on("mouseover", function (d) {
+                if (abs2prom != undefined) {
+                    if (d.type == "param" || d.type == "unconnected_param") {
+                        return tooltip.text(abs2prom.input[d.absPathName])
+                                      .style("visibility", "visible");
+                    }
+                    if (d.type == "unknown") {
+                        return tooltip.text(abs2prom.output[d.absPathName])
+                                      .style("visibility", "visible");
+                    }
+                }
+            })
+            .on("mouseleave", function (d) {
+                if (abs2prom != undefined) {
+                    return tooltip.style("visibility", "hidden");
+                }
+            })
+            .on("mousemove", function(){
+                if (abs2prom != undefined) {
+                    return tooltip.style("top", (d3.event.pageY-30)+"px")
+                                  .style("left",(d3.event.pageX+5)+"px");
+                }
+            });
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
@@ -1511,7 +1540,6 @@ function PtN2Diagram(paramParentDiv, paramRootJson, paramConnsJson) {
         Update();
     }
 
-
     function ShowPathCheckboxChange() {
         showPath = !showPath;
         parentDiv.querySelector("#currentPathId").style.display = showPath ? "block" : "none";
@@ -1577,5 +1605,5 @@ var mouseClickN2;
 var hasInputConn;
 var treeData, connectionList;
 modelData.tree.name = 'model'; //Change 'root' to 'model'
-var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData['tree'], modelData['connections_list']);
+var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData);
 

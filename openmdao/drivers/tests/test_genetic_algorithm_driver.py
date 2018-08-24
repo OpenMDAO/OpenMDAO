@@ -159,7 +159,35 @@ class TestSimpleGA(unittest.TestCase):
         self.assertLess(prob['mass'], 6.0)
         assert_rel_error(self, prob['mat1'], 3, 1e-5)
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
-        #Material 3 can be anything
+        # Material 3 can be anything
+
+    def test_analysis_error(self):
+        np.random.seed(1)
+
+        class ValueErrorComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('f', 1.0)
+
+            def compute(self, inputs, outputs):
+                raise ValueError
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p', IndepVarComp('x', 0.0))
+        model.add_subsystem('comp', ValueErrorComp())
+
+        model.connect('p.x', 'comp.x')
+
+        model.add_design_var('p.x', lower=-5.0, upper=10.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver(max_gen=75, pop_size=25)
+        prob.driver._randomstate = 1
+        prob.setup(check=False)
+        # prob.run_driver()
+        self.assertRaises(ValueError, prob.run_driver)
 
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):

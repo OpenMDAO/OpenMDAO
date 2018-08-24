@@ -63,6 +63,20 @@ class NanComp2(ExplicitComponent):
         J['y', 'x'] = np.NaN
         J['y2', 'x'] = 2.0
 
+class DupPartialsComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('c', np.zeros(19))
+        self.add_output('x', np.zeros(11))
+
+        rows = [0, 1, 4, 10, 7, 9, 10]
+        cols = [0, 18, 11, 2, 5, 9, 2]
+        self.declare_partials(of='x', wrt='c', rows=rows, cols=cols)
+
+    def compute(self, inputs, outputs):
+        pass
+
+    def compute_partials(self, inputs, partials):
+        pass
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
@@ -109,10 +123,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'fwd')
 
         output = d_outputs._data
-        # The empty first entry in _data is due to the dummy
-        #     variable being in a different variable set not owned by g1
-        assert_rel_error(self, output[1], g1.expected_solution[0], 1e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 1e-15)
+        assert_rel_error(self, output, g1.expected_solution, 1e-15)
 
         # reverse
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
@@ -123,8 +134,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.run_solve_linear(['linear'], 'rev')
 
         output = d_residuals._data
-        assert_rel_error(self, output[1], g1.expected_solution[0], 3e-15)
-        assert_rel_error(self, output[5], g1.expected_solution[1], 3e-15)
+        assert_rel_error(self, output, g1.expected_solution, 3e-15)
 
     def test_rev_mode_bug(self):
 
@@ -194,6 +204,23 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_raise_error_on_dup_partials(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('des_vars', IndepVarComp('x', 1.0), promotes=['*'])
+        model.add_subsystem('dupcomp', DupPartialsComp())
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
+            prob.final_setup()
+
+        expected_msg = "CSC matrix data contains the following duplicate row/col entries: [(('dupcomp.x', 'dupcomp.c'), [(10, 2)])]\nThis would break internal indexing."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

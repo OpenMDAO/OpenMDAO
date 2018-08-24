@@ -22,7 +22,7 @@ else:
 class DistribExecComp(ExecComp):
     """
     An ExecComp that uses N procs and takes input var slices.  Unlike a normal
-    ExecComp, if only supports a single expression per proc.  If you give it
+    ExecComp, it only supports a single expression per proc.  If you give it
     multiple expressions, it will use a different one in each proc, repeating
     the last one in any remaining procs.
     """
@@ -242,7 +242,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
         prob.model = root = Group()
-
+        
         root.add_subsystem('P1', IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add_subsystem('P2', IndepVarComp('x', numpy.ones(size, dtype=float)))
         sub = root.add_subsystem('sub', ParallelGroup())

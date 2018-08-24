@@ -4,10 +4,12 @@ from __future__ import division
 
 from itertools import product, chain
 from six import iteritems, itervalues
+
 import numpy as np
+
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, _global2local_offsets
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -55,6 +57,8 @@ class DefaultTransfer(Transfer):
 
         transfers = group._transfers
         vectors = group._vectors
+        offsets = _global2local_offsets(group._get_var_offsets())
+
         for vec_name in group._lin_rel_vec_name_list:
             relvars, _ = group._relevant[vec_name]['@all']
             relvars_in = relvars['input']
@@ -62,28 +66,19 @@ class DefaultTransfer(Transfer):
 
             # Initialize empty lists for the transfer indices
             nsub_allprocs = len(group._subsystems_allprocs)
-            xfer_in = {}
-            xfer_out = {}
-            fwd_xfer_in = [{} for i in range(nsub_allprocs)]
-            fwd_xfer_out = [{} for i in range(nsub_allprocs)]
+            xfer_in = []
+            xfer_out = []
+            fwd_xfer_in = [[] for i in range(nsub_allprocs)]
+            fwd_xfer_out = [[] for i in range(nsub_allprocs)]
             if rev:
-                rev_xfer_in = [{} for i in range(nsub_allprocs)]
-                rev_xfer_out = [{} for i in range(nsub_allprocs)]
-            for set_name_in in group._num_var_byset[vec_name]['input']:
-                for set_name_out in group._num_var_byset[vec_name]['output']:
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key] = []
-                    xfer_out[key] = []
-                    for isub in range(nsub_allprocs):
-                        fwd_xfer_in[isub][key] = []
-                        fwd_xfer_out[isub][key] = []
-                        if rev:
-                            rev_xfer_in[isub][key] = []
-                            rev_xfer_out[isub][key] = []
+                rev_xfer_in = [[] for i in range(nsub_allprocs)]
+                rev_xfer_out = [[] for i in range(nsub_allprocs)]
 
-            allprocs_abs2idx_byset = group._var_allprocs_abs2idx_byset[vec_name]
-            sizes_byset_in = group._var_sizes_byset[vec_name]['input']
-            sizes_byset_out = group._var_sizes_byset[vec_name]['output']
+            allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
+            sizes_in = group._var_sizes[vec_name]['input']
+            sizes_out = group._var_sizes[vec_name]['output']
+            offsets_in = offsets[vec_name]['input']
+            offsets_out = offsets[vec_name]['output']
 
             # Loop through all explicit / implicit connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
@@ -97,15 +92,8 @@ class DefaultTransfer(Transfer):
                     meta_in = abs2meta[abs_in]
                     meta_out = allprocs_abs2meta[abs_out]
 
-                    # Get varset info
-                    set_name_in = meta_in['var_set']
-                    set_name_out = meta_out['var_set']
-                    idx_byset_in = allprocs_abs2idx_byset[abs_in]
-                    idx_byset_out = allprocs_abs2idx_byset[abs_out]
-
-                    # Get the sizes (byset) array
-                    sizes_in = sizes_byset_in[set_name_in]
-                    sizes_out = sizes_byset_out[set_name_out]
+                    idx_in = allprocs_abs2idx[abs_in]
+                    idx_out = allprocs_abs2idx[abs_out]
 
                     # Read in and process src_indices
                     shape_in = meta_in['shape']
@@ -130,41 +118,37 @@ class DefaultTransfer(Transfer):
                             src_indices = np.ravel_multi_index(dimidxs, shape_out)
 
                     # 1. Compute the output indices
+                    offset = offsets_out[iproc, idx_out]
                     if src_indices is None:
-                        offset = np.sum(sizes_out[iproc, :idx_byset_out])
                         output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                     else:
-                        output_inds = src_indices + np.sum(sizes_out[iproc, :idx_byset_out])
+                        output_inds = src_indices + offset
 
                     # 2. Compute the input indices
-                    ind1 = np.sum(sizes_in[iproc, :idx_byset_in])
-                    ind2 = ind1 + sizes_in[iproc, idx_byset_in]
-                    input_inds = np.arange(ind1, ind2, dtype=INT_DTYPE)
+                    input_inds = np.arange(offsets_in[iproc, idx_in],
+                                           offsets_in[iproc, idx_in] +
+                                           sizes_in[iproc, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key].append(input_inds)
-                    xfer_out[key].append(output_inds)
+                    xfer_in.append(input_inds)
+                    xfer_out.append(output_inds)
 
                     isub = abs2isub[abs_in]
-                    fwd_xfer_in[isub][key].append(input_inds)
-                    fwd_xfer_out[isub][key].append(output_inds)
+                    fwd_xfer_in[isub].append(input_inds)
+                    fwd_xfer_out[isub].append(output_inds)
                     if rev and abs_out in abs2isub:
                         isub = abs2isub[abs_out]
-                        rev_xfer_in[isub][key].append(input_inds)
-                        rev_xfer_out[isub][key].append(output_inds)
+                        rev_xfer_in[isub].append(input_inds)
+                        rev_xfer_out[isub].append(output_inds)
 
-            for set_name_in in group._num_var_byset[vec_name]['input']:
-                for set_name_out in group._num_var_byset[vec_name]['output']:
-                    key = (set_name_in, set_name_out)
-                    xfer_in[key] = merge(xfer_in[key])
-                    xfer_out[key] = merge(xfer_out[key])
-                    for isub in range(nsub_allprocs):
-                        fwd_xfer_in[isub][key] = merge(fwd_xfer_in[isub][key])
-                        fwd_xfer_out[isub][key] = merge(fwd_xfer_out[isub][key])
-                        if rev:
-                            rev_xfer_in[isub][key] = merge(rev_xfer_in[isub][key])
-                            rev_xfer_out[isub][key] = merge(rev_xfer_out[isub][key])
+            xfer_in = merge(xfer_in)
+            xfer_out = merge(xfer_out)
+            for isub in range(nsub_allprocs):
+                fwd_xfer_in[isub] = merge(fwd_xfer_in[isub])
+                fwd_xfer_out[isub] = merge(fwd_xfer_out[isub])
+                if rev:
+                    rev_xfer_in[isub] = merge(rev_xfer_in[isub])
+                    rev_xfer_out[isub] = merge(rev_xfer_out[isub])
 
             out_vec = vectors['output'][vec_name]
 
@@ -198,19 +182,7 @@ class DefaultTransfer(Transfer):
         out_vec : <Vector>
             reference to the output vector.
         """
-        in_inds = self._in_inds
-        out_inds = self._out_inds
-
-        # filter out any empty transfers
-        outs = {}
-        ins = {}
-        for key in in_inds:
-            if len(in_inds[key]) > 0:
-                ins[key] = in_inds[key]
-                outs[key] = out_inds[key]
-
-        self._in_inds = ins
-        self._out_inds = outs
+        pass
 
     def transfer(self, in_vec, out_vec, mode='fwd'):
         """
@@ -230,23 +202,9 @@ class DefaultTransfer(Transfer):
         out_inds = self._out_inds
 
         if mode == 'fwd':
-            do_complex = in_vec._vector_info._under_complex_step and out_vec._alloc_complex
 
-            for key in in_inds:
-                in_set_name, out_set_name = key
-                # this works whether the vecs have multi columns or not due to broadcasting
-                in_vec._data[in_set_name][in_inds[key]] = \
-                    out_vec._data[out_set_name][out_inds[key]]
-
-                # Imaginary transfer
-                # (for CS, so only need in fwd)
-                if do_complex:
-                    in_vec._imag_data[in_set_name][in_inds[key]] = \
-                        out_vec._imag_data[out_set_name][out_inds[key]]
+            # this works whether the vecs have multi columns or not due to broadcasting
+            in_vec._data[in_inds] = out_vec._data[out_inds]
 
         else:  # rev
-            for key in in_inds:
-                in_set_name, out_set_name = key
-                np.add.at(
-                    out_vec._data[out_set_name], out_inds[key],
-                    in_vec._data[in_set_name][in_inds[key]])
+            np.add.at(out_vec._data, out_inds, in_vec._data[in_inds])

@@ -19,7 +19,7 @@ env:
     - PY=2.7 NUMPY=1.12 PETSc=3.8.1
     - PY=2.7 NUMPY=1.12 PETSc=3.9.1
     - PY=3.6 NUMPY=1.12
-    - PY=3.6 NUMPY=1.12 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY=3.6 NUMPY=1.14 PETSc=3.8.1 UPLOAD_DOCS=1
     - PY=3.6 NUMPY=1.14 PETSc=3.9.1
 
 git:
@@ -100,7 +100,11 @@ install:
     ./miniconda.sh -b  -p $HOME/miniconda;
     export PATH=$HOME/miniconda/bin:$PATH;
     conda install --yes python=$PY;
-    conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+    if [ "$UPLOAD_DOCS" ]; then
+      conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
+    else
+      conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
+    fi
   else
     export PATH=$HOME/miniconda/bin:$PATH;
   fi
@@ -148,7 +152,7 @@ script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
-    make all;
+    make travis;
   fi
 
 # run the tests from down here to see if it can work without being at top level

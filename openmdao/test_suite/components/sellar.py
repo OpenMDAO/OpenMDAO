@@ -98,6 +98,16 @@ class SellarDis1withDerivatives(SellarDis1):
         partials['y1', 'x'] = 1.0
 
 
+class SellarDis1CS(SellarDis1):
+    """
+    Component containing Discipline 1 -- complex step version.
+    """
+
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*', method='cs')
+
+
 class SellarDis2(ExplicitComponent):
     """
     Component containing Discipline 2 -- no derivatives version.
@@ -175,6 +185,16 @@ class SellarDis2withDerivatives(SellarDis2):
 
         J['y2', 'y1'] = .5*y1**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
+
+
+class SellarDis2CS(SellarDis2):
+    """
+    Component containing Discipline 2 -- complex step version.
+    """
+
+    def _do_declares(self):
+        # Analytic Derivs
+        self.declare_partials(of='*', wrt='*', method='cs')
 
 
 class SellarNoDerivatives(Group):
@@ -418,9 +438,13 @@ class SellarStateConnection(Group):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        sub = self.add_subsystem('sub', Group(), promotes=['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2'])
+        sub = self.add_subsystem('sub', Group(),
+                                 promotes=['x', 'z', 'y1',
+                                           'state_eq.y2_actual', 'state_eq.y2_command',
+                                           'd1.y2', 'd2.y2'])
 
-        subgrp = sub.add_subsystem('state_eq_group', Group(), promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
+        subgrp = sub.add_subsystem('state_eq_group', Group(),
+                                   promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
         subgrp.add_subsystem('state_eq', StateConnection())
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
@@ -507,7 +531,7 @@ class SellarImplicitDis1(ImplicitComponent):
 
         y1 = outputs['y1']
 
-        resids['y1'] =  -(z1**2 + z2 + x1 - 0.2*y2 - y1)
+        resids['y1'] = -(z1**2 + z2 + x1 - 0.2*y2 - y1)
 
     def linearize(self, inputs, outputs, J):
         """
@@ -598,6 +622,26 @@ class SellarProblem(Problem):
         model.add_design_var('x', lower=0.0, upper=10.0)
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        # default to non-verbose
+        self.set_solver_print(0)
+
+
+class SellarProblemWithArrays(Problem):
+    """
+    The Sellar problem with ndarray variable options
+    """
+
+    def __init__(self, model_class=SellarDerivatives, **kwargs):
+        super(SellarProblemWithArrays, self).__init__(model_class(**kwargs))
+
+        model = self.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
         # default to non-verbose

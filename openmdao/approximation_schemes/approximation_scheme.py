@@ -76,11 +76,9 @@ class ApproximationScheme(object):
         if deriv_type == 'total':
             run_model = system.run_solve_nonlinear
             results_vec = outputs
-        elif deriv_type == 'partial':
+        else:
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
-        else:
-            raise ValueError('deriv_type must be one of "total" or "partial"')
 
         for in_name, idxs, delta in input_deltas:
             if in_name in outputs._views_flat:
@@ -93,9 +91,9 @@ class ApproximationScheme(object):
 
         run_model()
 
-        results_vec.get_data(result_array)
-        results_vec.set_data(out_tmp)
-        inputs.set_data(in_tmp)
+        result_array[:] = results_vec._data
+        results_vec._data[:] = out_tmp
+        inputs._data[:] = in_tmp
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
         if results_vec is not outputs:

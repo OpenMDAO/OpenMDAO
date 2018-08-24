@@ -48,9 +48,7 @@ class LinearRunOnce(LinearBlockGS):
 
         for vec_name in self._vec_names:
             if vec_name in system._rel_vec_names:
-                rhs = self._rhs_vecs[vec_name]
-                for varset, data in iteritems(b_vecs[vec_name]._data):
-                    rhs[varset][:] = data
+                self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
 
         with Recording('LinearRunOnce', 0, self) as rec:
             # Single iteration of GS

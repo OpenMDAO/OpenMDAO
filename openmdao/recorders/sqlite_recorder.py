@@ -3,19 +3,20 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 """
 
 from copy import deepcopy
-import io
+from io import BytesIO
+
 import os
 import sqlite3
 
 import warnings
 import json
 import numpy as np
-from six import iteritems
+
 from six.moves import cPickle as pickle
 
 from openmdao.recorders.base_recorder import BaseRecorder
 from openmdao.utils.mpi import MPI
-from openmdao.utils.record_util import values_to_array, check_path
+from openmdao.utils.record_util import values_to_array
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
@@ -26,6 +27,9 @@ from openmdao.solvers.solver import Solver
 """
 SQL case output format version history.
 ---------------------------------------
+5 -- OpenMDAO 2.4
+    More general handling of ndarray variable settings metadata.  Stores metadata keys which
+    are ndarrays in a separate 'ndarrays' entry to var_settings.
 4 -- OpenMDAO 2.4
     Added variable settings metadata that contains scaling info.
 3 -- OpenMDAO 2.4
@@ -58,7 +62,7 @@ def array_to_blob(array):
         The blob created from the array.
 
     """
-    out = io.BytesIO()
+    out = BytesIO()
     np.save(out, array)
     out.seek(0)
     return sqlite3.Binary(out.read())
@@ -80,7 +84,7 @@ def blob_to_array(blob):
     array :
         The array created from the blob.
     """
-    out = io.BytesIO(blob)
+    out = BytesIO(blob)
     out.seek(0)
     return np.load(out)
 
@@ -262,10 +266,6 @@ class SqliteRecorder(BaseRecorder):
         # otherwise we trample on values that are used elsewhere
         var_settings = deepcopy(var_settings)
         for name in var_settings:
-            if 'lower' in var_settings[name]:
-                var_settings[name]['lower'] = convert_to_list(var_settings[name]['lower'])
-            if 'upper' in var_settings[name]:
-                var_settings[name]['upper'] = convert_to_list(var_settings[name]['upper'])
             for prop in var_settings[name]:
                 val = var_settings[name][prop]
                 if isinstance(val, np.int8) or isinstance(val, np.int16) or\
@@ -273,6 +273,8 @@ class SqliteRecorder(BaseRecorder):
                     var_settings[name][prop] = val.item()
                 elif isinstance(val, tuple):
                     var_settings[name][prop] = [int(v) for v in val]
+                elif isinstance(val, np.ndarray):
+                    var_settings[name][prop] = convert_to_list(var_settings[name][prop])
 
         return var_settings
 

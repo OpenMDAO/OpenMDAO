@@ -60,6 +60,10 @@ class System(object):
         options dictionary
     recording_options : OptionsDictionary
         Recording options dictionary
+    under_complex_step : bool
+        When True, this system is undergoing complex step.
+    force_alloc_complex : bool
+        When True, the vectors have been allocated for checking with complex step.
     iter_count : int
         Int that holds the number of times this system has iterated
         in a recording run.
@@ -77,14 +81,8 @@ class System(object):
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
-    _subsystems_var_range_byset : {<vec_name>: {'input': list of dict, 'output': list of dict}, ...}
-        Same as above, but by var_set name.
     _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
         Number of allprocs variables owned by this system.
-    _num_var_byset : {<vec_name>: {'input': dict of int, 'output': dict of int}, ...}
-        Same as above, but by var_set name.
-    _var_set2iset : {'input': dict, 'output': dict}
-        Dictionary mapping the var_set name to the var_set index.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -100,29 +98,28 @@ class System(object):
     _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
-        ('units', 'shape', 'size', 'var_set') for inputs and
-        ('units', 'shape', 'size', 'var_set', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
+        ('units', 'shape', 'size') for inputs and
+        ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_allprocs_abs2idx_byset : {<vec_name>: {dict of dict}, ...}
-        Same as above, but by var_set name.
     _var_sizes : {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _var_sizes_byset : {'input': dict of ndarray, 'output': dict of ndarray}
-        Same as above, but by var_set name.
+    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
+        Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
+        of size nproc x num_var where nproc is the number of processors
+        in this System's communicator and num_var is the number of allprocs variables
+        in the given system.  This is only defined in a Group that owns one or more interprocess
+        connections or a top level Group or System that is used to compute total derivatives
+        across multiple processes.
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
-    _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-        Same as above, but by var_set name.
     _ext_sizes : {'input': (int, int), 'output': (int, int)}
         Total size of allprocs variables in system before/after this one.
-    _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-        Same as above, but by var_set name.
     _vec_names : [str, ...]
         List of names of all vectors, including the nonlinear vector.
     _lin_vec_names : [str, ...]
@@ -284,8 +281,6 @@ class System(object):
         self._subsystems_proc_range = []
 
         self._num_var = {'input': 0, 'output': 0}
-        self._num_var_byset = None
-        self._var_set2iset = OrderedDict([('input', {}), ('output', {})])
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
@@ -296,15 +291,12 @@ class System(object):
         self._var_abs2meta = {}
 
         self._var_allprocs_abs2idx = {}
-        self._var_allprocs_abs2idx_byset = None
 
         self._var_sizes = None
-        self._var_sizes_byset = None
+        self._var_offsets = None
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
-        self._ext_num_vars_byset = {'input': {}, 'output': {}}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
-        self._ext_sizes_byset = {'input': {}, 'output': {}}
 
         self._vectors = {'input': {}, 'output': {}, 'residual': {}}
 
@@ -329,6 +321,9 @@ class System(object):
         self._owns_approx_of = None
         self._owns_approx_wrt_idx = {}
         self._owns_approx_of_idx = {}
+
+        self.under_complex_step = False
+        self.force_alloc_complex = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -431,34 +426,9 @@ class System(object):
         """
         pass
 
-    def _get_initial_var_indices(self, initial):
-        """
-        Get initial values for _var_set2iset.
-
-        Parameters
-        ----------
-        initial : bool
-            Whether we are reconfiguring - i.e., whether the model has been previously setup.
-
-        Returns
-        -------
-        {'input': dict, 'output': dict}
-            Dictionary mapping the var_set name to the var_set index.
-        """
-        if not initial:
-            return self._var_set2iset
-        else:
-            set2iset = {}
-            for type_ in ['input', 'output']:
-                set2iset[type_] = {}
-                for iset, set_name in enumerate(self._num_var_byset['nonlinear'][type_]):
-                    set2iset[type_][set_name] = iset
-
-            return set2iset
-
     def _get_initial_global(self, initial):
         """
-        Get initial values for _ext_num_vars, _ext_num_vars_byset, _ext_sizes, _ext_sizes_byset.
+        Get initial values for _ext_num_vars, _ext_sizes.
 
         Parameters
         ----------
@@ -469,43 +439,26 @@ class System(object):
         -------
         _ext_num_vars : {'input': (int, int), 'output': (int, int)}
             Total number of allprocs variables in system before/after this one.
-        _ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         _ext_sizes : {'input': (int, int), 'output': (int, int)}
             Total size of allprocs variables in system before/after this one.
-        _ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         """
         if not initial:
-            return (self._ext_num_vars, self._ext_num_vars_byset,
-                    self._ext_sizes, self._ext_sizes_byset)
+            return (self._ext_num_vars, self._ext_sizes)
         else:
             ext_num_vars = {}
             ext_sizes = {}
-            ext_num_vars_byset = {}
-            ext_sizes_byset = {}
 
             for vec_name in self._lin_rel_vec_name_list:
                 ext_num_vars[vec_name] = {}
-                ext_num_vars_byset[vec_name] = {}
                 ext_sizes[vec_name] = {}
-                ext_sizes_byset[vec_name] = {}
                 for type_ in ['input', 'output']:
                     ext_num_vars[vec_name][type_] = (0, 0)
                     ext_sizes[vec_name][type_] = (0, 0)
-                    ext_num_vars_byset[vec_name][type_] = {
-                        set_name: (0, 0) for set_name in self._var_set2iset[type_]
-                    }
-                    ext_sizes_byset[vec_name][type_] = {
-                        set_name: (0, 0) for set_name in self._var_set2iset[type_]
-                    }
 
             ext_num_vars['nonlinear'] = ext_num_vars['linear']
-            ext_num_vars_byset['nonlinear'] = ext_num_vars_byset['linear']
             ext_sizes['nonlinear'] = ext_sizes['linear']
-            ext_sizes_byset['nonlinear'] = ext_sizes_byset['linear']
 
-            return ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset
+            return ext_num_vars, ext_sizes
 
     def _get_root_vectors(self, initial, force_alloc_complex=False):
         """
@@ -535,7 +488,6 @@ class System(object):
             relevant = self._relevant
             vec_names = self._rel_vec_name_list
             vois = self._vois
-            iproc = self.comm.rank
             abs2idx = self._var_allprocs_abs2idx
 
             # Check for complex step to set vectors up appropriately.
@@ -652,9 +604,7 @@ class System(object):
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
-            initial = True
             recurse = True
-            resize = False
 
             self.pathname = ''
             self.comm = comm
@@ -663,14 +613,10 @@ class System(object):
             self._local_vector_class = local_vector_class
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
-            initial = False
             recurse = True
-            resize = True
         # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
         elif setup_mode == 'update':
-            initial = False
             recurse = False
-            resize = False
 
         self._mode = mode
 
@@ -690,7 +636,7 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
         self._setup_vars(recurse=recurse)
-        self._setup_var_index_ranges(self._get_initial_var_indices(initial), recurse=recurse)
+        self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
@@ -768,9 +714,8 @@ class System(object):
 
         # For vector-related, setup, recursion is always necessary, even for updating.
         # For reconfiguration setup, we resize the vectors once, only in the current system.
-        ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset = \
-            self._get_initial_global(initial)
-        self._setup_global(ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset)
+        ext_num_vars, ext_sizes = self._get_initial_global(initial)
+        self._setup_global(ext_num_vars, ext_sizes)
         root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
         self._setup_bounds(*self._get_bounds_root_vectors(self._local_vector_class, initial),
@@ -804,7 +749,7 @@ class System(object):
 
     def _setup_vars(self, recurse=True):
         """
-        Count variables, total and by var_set.
+        Count total variables.
 
         Parameters
         ----------
@@ -812,20 +757,17 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._num_var = {}
-        self._num_var_byset = {}
 
-    def _setup_var_index_ranges(self, set2iset, recurse=True):
+    def _setup_var_index_ranges(self, recurse=True):
         """
-        Compute the division of variables by subsystem and pass down the set_name-to-iset maps.
+        Compute the division of variables by subsystem.
 
         Parameters
         ----------
-        set2iset : {'input': dict, 'output': dict}
-            Dictionary mapping the var_set name to the var_set index.
         recurse : bool
             Whether to call this method in subsystems.
         """
-        self._var_set2iset = set2iset
+        pass
 
     def _setup_var_data(self, recurse=True):
         """
@@ -853,23 +795,14 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_allprocs_abs2idx = abs2idx = {}
-        self._var_allprocs_abs2idx_byset = abs2idx_byset = {}
-        abs2meta = self._var_allprocs_abs2meta
 
         for vec_name in self._lin_rel_vec_name_list:
             abs2idx[vec_name] = abs2idx_t = {}
-            abs2idx_byset[vec_name] = abs2idx_byset_t = {}
             for type_ in ['input', 'output']:
-                counter = defaultdict(int)
-
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
-                    set_name = abs2meta[abs_name]['var_set']
-                    abs2idx_byset_t[abs_name] = counter[set_name]
-                    counter[set_name] += 1
 
         abs2idx['nonlinear'] = abs2idx['linear']
-        abs2idx_byset['nonlinear'] = abs2idx_byset['linear']
 
         # Recursion
         if recurse:
@@ -886,7 +819,6 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_sizes = {}
-        self._var_sizes_byset = {}
         self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
@@ -1053,7 +985,7 @@ class System(object):
         """
         pass
 
-    def _setup_global(self, ext_num_vars, ext_num_vars_byset, ext_sizes, ext_sizes_byset):
+    def _setup_global(self, ext_num_vars, ext_sizes):
         """
         Compute total number and total size of variables in systems before / after this system.
 
@@ -1061,17 +993,11 @@ class System(object):
         ----------
         ext_num_vars : {'input': (int, int), 'output': (int, int)}
             Total number of allprocs variables in system before/after this one.
-        ext_num_vars_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         ext_sizes : {'input': (int, int), 'output': (int, int)}
             Total size of allprocs variables in system before/after this one.
-        ext_sizes_byset : {'input': dict of (int, int), 'output': dict of (int, int)}
-            Same as above, but by var_set name.
         """
         self._ext_num_vars = ext_num_vars
-        self._ext_num_vars_byset = ext_num_vars_byset
         self._ext_sizes = ext_sizes
-        self._ext_sizes_byset = ext_sizes_byset
 
     def _setup_vectors(self, root_vectors, resize=False, alloc_complex=False):
         """
@@ -1096,8 +1022,9 @@ class System(object):
         # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
         # initially allocated as complex.
         if not alloc_complex and 'cs' in self._approx_schemes:
-            msg = 'In order to activate complex step during reconfiguration, you need to set ' + \
-                '"force_alloc_complex" to True during setup.'
+            msg = "In order to activate complex step during reconfiguration, " \
+                  "you need to set 'force_alloc_complex' to True during setup. " \
+                  "e.g. 'problem.setup(force_alloc_complex=True)'"
             raise RuntimeError(msg)
 
         vector_class = self._vector_class
@@ -1431,18 +1358,10 @@ class System(object):
 
         for vec in outputs:
 
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
-
             if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
-
-            # Process any complex views if under complex step.
-            if vec._vector_info._under_complex_step:
-                vec._remove_complex_views()
 
             if self._has_resid_scaling:
                 vec.scale('norm')
@@ -1587,6 +1506,34 @@ class System(object):
         return (self._vectors['input'][vec_name],
                 self._vectors['output'][vec_name],
                 self._vectors['residual'][vec_name])
+
+    def _get_var_offsets(self):
+        """
+        Compute offsets for variables.
+
+        Returns
+        -------
+        dict
+            Arrays of global offsets keyed by vec_name and deriv direction.
+        """
+        if self._var_offsets is None:
+            offsets = self._var_offsets = {}
+            for vec_name in self._lin_rel_vec_name_list:
+                offsets[vec_name] = off_vn = {}
+                for type_ in ['input', 'output']:
+                    vsizes = self._var_sizes[vec_name][type_]
+                    if vsizes.size > 0:
+                        csum = np.cumsum(vsizes)
+                        # shift the cumsum forward by one and set first entry to 0 to get
+                        # the correct offset.
+                        csum[1:] = csum[:-1]
+                        csum[0] = 0
+                        off_vn[type_] = csum.reshape(vsizes.shape)
+                    else:
+                        off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
+            offsets['nonlinear'] = offsets['linear']
+
+        return self._var_offsets
 
     @contextmanager
     def jacobian_context(self, jac):
@@ -1738,7 +1685,7 @@ class System(object):
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
-                       simul_coloring_excludes=None, cache_linear_solution=False):
+                       cache_linear_solution=False):
         r"""
         Add a design variable to this system.
 
@@ -1769,12 +1716,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : bool or iter of int
-            Only used when doing simultaneous derivatives in rev mode.  If a bool, exclude
-            from the coloring algorithm all columns in the total jacobian associated with
-            this design variable. If an iter of indices, exclude only those.  Indices, if given,
-            should be relative to this variable.  They will be automatically adjusted to map to
-            the proper columns in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -1863,15 +1804,13 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
-        dvs['simul_coloring_excludes'] = simul_coloring_excludes
 
         design_vars[name] = dvs
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False, simul_coloring_excludes=None,
-                     cache_linear_solution=False):
+                     vectorize_derivs=False, cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -1914,12 +1853,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : bool or iter of int
-            Only used when doing simultaneous derivatives in fwd mode.  If a bool, exclude
-            from the coloring algorithm all rows in the total jacobian associated with
-            this response. If an iter of indices, exclude only those.  Indices, if given,
-            should be relative to this variable.  They will be automatically adjusted to map to
-            the proper rows in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2044,15 +1977,13 @@ class System(object):
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
-        resp['simul_coloring_excludes'] = simul_coloring_excludes
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False, simul_coloring_excludes=None,
-                       cache_linear_solution=False):
+                       vectorize_derivs=False, cache_linear_solution=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2087,12 +2018,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : bool or iter of int
-            Only used when doing simultaneous derivatives in fwd mode.  If a bool, exclude
-            from the coloring algorithm all rows in the total jacobian associated with
-            this constraint. If an iter of indices, exclude only those.  Indices, if given,
-            should be relative to this variable.  They will be automatically adjusted to map to
-            the proper rows in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2109,13 +2034,11 @@ class System(object):
                           ref0=ref0, indices=indices, linear=linear,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring_excludes=simul_coloring_excludes,
                           cache_linear_solution=cache_linear_solution)
 
     def add_objective(self, name, ref=None, ref0=None, index=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False, simul_coloring_excludes=None,
-                      cache_linear_solution=False):
+                      vectorize_derivs=False, cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -2142,12 +2065,6 @@ class System(object):
             calculations with other variables sharing the same parallel_deriv_color.
         vectorize_derivs : bool
             If True, vectorize derivative calculations.
-        simul_coloring_excludes : bool or iter of int
-            Only used when doing simultaneous derivatives in fwd mode.  If a bool, exclude
-            from the coloring algorithm all rows in the total jacobian associated with
-            this objective. If an iter of indices, exclude only those.  Indices, if given,
-            should be relative to this variable.  They will be automatically adjusted to map to
-            the proper rows in the total jacobian.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2184,7 +2101,6 @@ class System(object):
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
                           vectorize_derivs=vectorize_derivs,
-                          simul_coloring_excludes=None,
                           cache_linear_solution=cache_linear_solution)
 
     def get_design_vars(self, recurse=True, get_sizes=True):
@@ -2407,6 +2323,7 @@ class System(object):
     def list_outputs(self,
                      explicit=True, implicit=True,
                      values=True,
+                     prom_name=False,
                      residuals=False,
                      residuals_tol=None,
                      units=False,
@@ -2431,6 +2348,9 @@ class System(object):
             include outputs from implicit components. Default is True.
         values : bool, optional
             When True, display/return output values. Default is True.
+        prom_name : bool, optional
+            When True, display/return the promoted name of the variable.
+            Default is False.
         residuals : bool, optional
             When True, display/return residual values. Default is False.
         residuals_tol : float, optional
@@ -2479,6 +2399,8 @@ class System(object):
             outs = {}
             if values:
                 outs['value'] = val
+            if prom_name:
+                outs['prom_name'] = self._var_abs2prom['output'][name]
             if residuals:
                 outs['resids'] = self._residuals._views[name]
             if units:
@@ -2717,7 +2639,7 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, var_inds=None):
+    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -2731,9 +2653,12 @@ class System(object):
             Set of names of relevant systems based on the current linear solve.
         mode : str
             'fwd' or 'rev'.
-        var_inds : [int, int, int, int] or None
-            ranges of variable IDs involved in this matrix-vector product.
-            The ordering is [lb1, ub1, lb2, ub2].
+        scope_out : set or None
+            Set of absolute output names in the scope of this mat-vec product.
+            If None, all are in the scope.
+        scope_in : set or None
+            Set of absolute input names in the scope of this mat-vec product.
+            If None, all are in the scope.
         """
         raise NotImplementedError("_apply_linear has not been overridden")
 
@@ -2916,6 +2841,23 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_complex_step = active
+            sub._inputs.set_complex_step_mode(active)
+            sub._outputs.set_complex_step_mode(active)
+            sub._residuals.set_complex_step_mode(active)
 
     def cleanup(self):
         """
