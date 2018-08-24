@@ -117,7 +117,7 @@ Then, from your `docs/conf.py`, invoke it with arguments of:
     ]
 
     from openmdao.docutils import generate_docs
-    generate_docs("..", "../..", packages)
+    generate_docs("..", "../..", packages, project_name='yourproject')
 
 
 OpenMDAO Tagging Tool
