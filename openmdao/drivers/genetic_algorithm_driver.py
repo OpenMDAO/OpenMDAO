@@ -68,7 +68,7 @@ class SimpleGADriver(Driver):
         self.supports['integer_design_vars'] = True
         self.supports['inequality_constraints'] = True
         self.supports['equality_constraints'] = True
-        self.supports['multiple_objectives'] = False
+        self.supports['multiple_objectives'] = True
 
         # What we don't support yet
         self.supports['two_sided_constraints'] = False
