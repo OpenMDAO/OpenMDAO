@@ -138,12 +138,10 @@ class BsplinesComp(ExplicitComponent):
         self.options.declare('bspline_order', 4, types=int, desc="B-spline order.")
         self.options.declare('in_name', types=str, default='h_cp',
                              desc="Name to use for the input variable (control points).")
-        self.options.declare('in_units', types=string_types, default=None, allow_none=True,
-                             desc="Units to use for the input variable (control points).")
         self.options.declare('out_name', types=str, default='h',
                              desc="Name to use for the output variable (interpolated points).")
-        self.options.declare('out_units', types=string_types, default=None, allow_none=True,
-                             desc="Units to use for the output variable (interpolated points).")
+        self.options.declare('units', types=string_types, default=None, allow_none=True,
+                             desc="Units to use for the input and output variables.")
         self.options.declare('distribution', default='sine', values=['uniform', 'sine'],
                              desc="Choice of spatial distribution to use for placing the control "
                                   "points. It can be 'sine' or 'uniform'.")
@@ -157,12 +155,11 @@ class BsplinesComp(ExplicitComponent):
         num_points = opts['num_points']
         vec_size = opts['vec_size']
         in_name = opts['in_name']
-        in_units = opts['in_units']
         out_name = opts['out_name']
-        out_units = opts['out_units']
+        units = opts['units']
 
-        self.add_input(in_name, val=np.random.rand(vec_size, num_control_points), units=in_units)
-        self.add_output(out_name, val=np.random.rand(vec_size, num_points), units=out_units)
+        self.add_input(in_name, val=np.random.rand(vec_size, num_control_points), units=units)
+        self.add_output(out_name, val=np.random.rand(vec_size, num_points), units=units)
 
         jac = get_bspline_mtx(num_control_points, num_points,
                               order=opts['bspline_order'],

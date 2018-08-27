@@ -52,6 +52,31 @@ class TestBsplinesComp(unittest.TestCase):
         # And that it gets middle points a little better.
         self.assertLess(max(delta[15:-15]), .06)
 
+    def test_units(self):
+        n_cp = 5
+        n_point = 10
+
+        interp = BsplinesComp(num_control_points=n_cp,
+                              num_points=n_point,
+                              in_name='h_cp',
+                              out_name='h',
+                              units='inch')
+
+        prob = Problem(model=interp)
+        prob.setup(check=False)
+        prob.run_model()
+
+        # verify that both input and output of the bsplines comp have proper units
+        inputs = interp.list_inputs(units=True, out_stream=None)
+        self.assertEqual(len(inputs), 1)
+        for var, meta in inputs:
+            self.assertEqual(meta['units'], 'inch')
+
+        outputs = interp.list_outputs(units=True, out_stream=None)
+        self.assertEqual(len(outputs), 1)
+        for var, meta in outputs:
+            self.assertEqual(meta['units'], 'inch')
+
 
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeature(unittest.TestCase):
@@ -223,83 +248,6 @@ class TestBsplinesCompFeature(unittest.TestCase):
         plt.legend(['Variable', 'Control Points'], loc=4)
         plt.grid(True)
         plt.show()
-
-    def test_units(self):
-        from openmdao.api import Problem, IndepVarComp
-        from openmdao.components.bsplines_comp import BsplinesComp
-        from openmdao.utils.units import convert_units
-        from openmdao.utils.general_utils import printoptions
-
-        prob = Problem()
-        model = prob.model
-
-        n_cp = 5
-        n_point = 10
-
-        t = np.linspace(0, 0.5*np.pi, n_cp)
-        x = 100*np.sin(t)
-
-        model.add_subsystem('px', IndepVarComp('x', val=x, units='cm'))
-        model.add_subsystem('interp', BsplinesComp(num_control_points=n_cp,
-                                                   num_points=n_point,
-                                                   in_name='h_cp',
-                                                   in_units='inch',
-                                                   out_name='h',
-                                                   out_units='ft'))
-        model.connect('px.x', 'interp.h_cp')
-
-        prob.setup(check=False)
-        prob.run_model()
-
-        xx = prob['interp.h'].flatten()
-
-        with printoptions(precision=3, floatmode='fixed'):
-            print('x: (cm):', x)
-            print('-> inch:', convert_units(x, 'cm', 'inch'))
-
-            print('h_cp:   ', prob['interp.h_cp'].flatten())
-            print('-> ft:  ', convert_units(prob['interp.h_cp'].flatten(), 'inch', 'ft'))
-
-            print('h:      ', prob['interp.h'].flatten())
-
-        with printoptions(precision=3, floatmode='fixed'):
-            self.assertEqual('Control Points (cm):', 'Control Points (cm):')
-            assert_rel_error(self, x, 100*np.sin(t), 1e-5)
-
-            self.assertEqual('Control Points (inches):', 'Control Points (inches):')
-            assert_rel_error(self, prob['interp.h_cp'].flatten(),
-                             convert_units(x, 'cm', 'inch'), 1e-5)
-
-            self.assertEqual('Output Points (ft):', 'Output Points (ft):')
-            assert_rel_error(self, xx[-1], convert_units(x[-1], 'cm', 'ft'), 1e-5)
-
-    def test_units_simple(self):
-        from openmdao.api import Problem, IndepVarComp, ExplicitComponent
-        from openmdao.utils.units import convert_units
-
-        class UnitsComp(ExplicitComponent):
-            def setup(self):
-                self.add_input('inp', 0., units='inch')
-                self.add_output('outp', 0., units='ft')
-
-                self.declare_partials('*', '*')
-
-            def compute(self, inputs, outputs):
-                outputs['outp'] = inputs['inp']
-
-        prob = Problem()
-
-        model = prob.model
-        model.add_subsystem('indep', IndepVarComp('x', val=10., units='cm'))
-        model.add_subsystem('units', UnitsComp())
-        model.connect('indep.x', 'units.inp')
-
-        prob.setup()
-        prob.run_model()
-
-        print('indep.x   ', prob['indep.x'],    'cm')
-        print('units.inp ', prob['units.inp'],  'inch  ( vs', convert_units(10., 'cm', 'inch'), ')')
-        print('units.outp', prob['units.outp'], 'ft    ( vs', convert_units(10., 'cm', 'ft'), ')')
 
 
 if __name__ == "__main__":
