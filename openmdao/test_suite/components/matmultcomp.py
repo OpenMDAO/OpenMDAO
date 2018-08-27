@@ -67,7 +67,7 @@ if __name__ == '__main__':
     
     model.connect('indep.x', 'comp.x')
 
-    import wingdbstub
+    #import wingdbstub
 
     p.setup(mode='fwd', force_alloc_complex=True)
     p.final_setup()

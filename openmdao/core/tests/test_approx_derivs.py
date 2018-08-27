@@ -706,9 +706,9 @@ class TestGroupCSMPI(unittest.TestCase):
         prob = Problem()
         prob.model = FanInSubbedIDVC()
         prob.model.options['num_par_fd'] = 2
+        prob.model.approx_totals(method='cs')
 
         prob.setup(local_vector_class=vector_class, check=False, mode='rev')
-        prob.model.approx_totals(method='cs')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -727,8 +727,8 @@ class TestGroupFDMPI(unittest.TestCase):
         prob.model = FanInSubbedIDVC()
         prob.model.options['num_par_fd'] = 2
 
-        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.model.approx_totals(method='fd')
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.set_solver_print(level=0)
         prob.run_model()
 

@@ -467,7 +467,8 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
-                    if subsys.comm.rank == 0 and vec_name in subsys._rel_vec_names:
+                    comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
+                    if comm.rank == 0 and vec_name in subsys._rel_vec_names:
                         allprocs_counters[type_][isub] = \
                             len(subsys._var_allprocs_relevant_names[vec_name][type_])
 

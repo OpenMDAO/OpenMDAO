@@ -170,7 +170,8 @@ class ComplexStep(ApproximationScheme):
             not isinstance(jac, dict)
 
         num_par_fd = system.options['num_par_fd']
-        use_parallel_fd = num_par_fd > 1 and system._full_comm.size > 1
+        use_parallel_fd = num_par_fd > 1 and (system._full_comm is not None and
+                                              system._full_comm.size > 1)
 
         results = defaultdict(list)
         iproc = system.comm.rank

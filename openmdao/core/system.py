@@ -71,6 +71,8 @@ class System(object):
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
+    _full_comm : MPI.Comm or None
+        MPI communicator object used when System's comm is split for parallel FD.
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]

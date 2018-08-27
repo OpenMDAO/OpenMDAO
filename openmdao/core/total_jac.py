@@ -257,7 +257,8 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, size, has_remote_vars):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
-        if self.comm.size > 1:
+        if self.comm.size > 1 or (self.model._full_comm is not None and
+                                  self.model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(size, dtype=float),
                                                   comm=self.comm)
             self.jac_petsc[mode] = tgt_vec
@@ -613,10 +614,7 @@ class _TotalJacInfo(object):
                                                            dtype=INT_DTYPE))
                         idx_array = np.hstack(dist_idxs)
                     else:
-                        if sizes[myproc, var_idx] > 0 and fwd:
-                            iproc = myproc
-                        else:
-                            iproc = owners[name]
+                        iproc = owners[name]
 
                         offset = offsets[iproc, var_idx]
                         idx_array = np.arange(offset, offset + sizes[iproc, var_idx],
