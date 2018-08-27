@@ -153,7 +153,7 @@ class Driver(object):
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
                                             'driver level')
-        self.recording_options.declare('includes', types=list, default=['*'],
+        self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
