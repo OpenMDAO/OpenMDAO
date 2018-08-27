@@ -257,8 +257,7 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, size, has_remote_vars):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
-        if PETSc is not None and (isinstance(self.output_vec[mode]['linear'], PETScVector)
-                                  or has_remote_vars[mode]):
+        if self.comm.size > 1:
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(size, dtype=float),
                                                   comm=self.comm)
             self.jac_petsc[mode] = tgt_vec

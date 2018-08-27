@@ -301,7 +301,7 @@ class Group(System):
         """
         self.pathname = pathname
 
-        if self.options['num_par_fd'] > 1:
+        if self.options['num_par_fd'] > 1 and self._owns_approx_jac:
             comm = self._setup_par_fd_procs(comm)
 
         self.comm = comm

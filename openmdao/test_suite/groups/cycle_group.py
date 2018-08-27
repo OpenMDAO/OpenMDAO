@@ -45,7 +45,7 @@ class CycleGroup(ParametericTestGroup):
         self.default_params.update({
             'connection_type': ['implicit', 'explicit'],
             'partial_type': ['array', 'sparse', 'aij'],
-            'finite_difference': [False, True],
+            'partial_method': ['exact', 'fd', 'cs'],
             'num_comp': [3, 2],
             'num_var': [3, 1],
             'var_shape': [(2, 3), (3,)],
@@ -63,9 +63,9 @@ class CycleGroup(ParametericTestGroup):
         self.options.declare('partial_type', default='array',
                              values=['array', 'sparse', 'aij'],
                              desc='type of partial derivatives')
-        self.options.declare('finite_difference', default=False,
-                             types=bool,
-                             desc='If the derivatives should be finite differenced.')
+        self.options.declare('partial_method', default='exact',
+                             types=str,
+                             desc='Method used to solve derivatives (exact, fd, cs).')
 
     def setup(self):
         num_comp = self.options['num_comp']
@@ -114,7 +114,7 @@ class CycleGroup(ParametericTestGroup):
             'jacobian_type': self.options['jacobian_type'],
             'partial_type': self.options['partial_type'],
             'connection_type': conn_type,
-            'finite_difference': self.options['finite_difference'],
+            'partial_method': self.options['partial_method'],
             'num_comp': self.options['num_comp']
         }
 

@@ -251,14 +251,14 @@ class FiniteDifference(ApproximationScheme):
         results = defaultdict(list)
         iproc = system.comm.rank
 
-        tot_idx = 0
+        fd_count = 0
         approx_groups = self._get_approx_groups(system)
         for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
 
             result._data[:] = system._outputs._data
 
             for i_count, idx in enumerate(in_idx):
-                if tot_idx % system._par_fd_id == 0:
+                if fd_count % num_par_fd == system._par_fd_id:
                     if current_coeff:
                         result._data[:] = current_vec._data
                         result._data *= current_coeff
@@ -276,6 +276,7 @@ class FiniteDifference(ApproximationScheme):
                         for of, subjac, out_idx in outputs:
                             results[(of, wrt)].append((i_count,
                                                        result._views_flat[of][out_idx].copy()))
+                fd_count += 1
 
         if use_parallel_fd:
             myproc = system._full_comm.rank

@@ -298,6 +298,8 @@ class System(object):
         self._var_sizes = None
         self._var_offsets = None
 
+        self._full_comm = None
+
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
 
@@ -362,7 +364,7 @@ class System(object):
 
         self._assembled_jac = None
 
-        self._par_fd_id = 1
+        self._par_fd_id = 0
 
     def _declare_options(self):
         """
@@ -682,8 +684,7 @@ class System(object):
             for i in range(num_par_fd):
                 color[offsets[i]:offsets[i] + sizes[i]] = i
 
-            # since we use _par_fd_id for modulo arithmetic, prevent zero value by adding 1.
-            self._par_fd_id = color[comm.rank] + 1
+            self._par_fd_id = color[comm.rank]
 
             comm = self._full_comm.Split(self._par_fd_id)
 

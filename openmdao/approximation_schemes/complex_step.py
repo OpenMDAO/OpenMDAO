@@ -175,12 +175,12 @@ class ComplexStep(ApproximationScheme):
         results = defaultdict(list)
         iproc = system.comm.rank
 
-        tot_idx = 0
+        fd_count = 0
         approx_groups = self._get_approx_groups(system)
         for tup in approx_groups:
             wrt, delta, fact, in_idx, in_size, outputs = tup
             for i_count, idx in enumerate(in_idx):
-                if tot_idx % system._par_fd_id == 0:
+                if fd_count % num_par_fd == system._par_fd_id:
                     # Run the Finite Difference
                     input_delta = [(wrt, idx, delta)]
                     result = self._run_point_complex(system, input_delta, results_clone, total)
@@ -189,7 +189,7 @@ class ComplexStep(ApproximationScheme):
                         for of, _, out_idx in outputs:
                             results[(of, wrt)].append((i_count,
                                                        result._views_flat[of][out_idx].imag.copy()))
-                tot_idx += 1
+                fd_count += 1
 
         if use_parallel_fd:
             myproc = system._full_comm.rank
