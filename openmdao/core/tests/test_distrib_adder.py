@@ -77,9 +77,8 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
-                 "PETSc is required." if PETScVector is None
-                 else "Unreliable on Travis CI.")
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedAdderTest(unittest.TestCase):
 
     N_PROCS = 3
