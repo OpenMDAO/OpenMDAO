@@ -1,11 +1,9 @@
 from __future__ import division, print_function
 
 import unittest
-import numpy as np
-from six import iteritems
 
 from openmdao.api import ExplicitComponent
-from openmdao.api import Problem, Group, view_model, IndepVarComp
+from openmdao.api import Problem, IndepVarComp
 
 from openmdao.utils.mpi import MPI
 
@@ -18,7 +16,7 @@ except ImportError:
 class ADFLOWComp(ExplicitComponent):
 
     def setup(self):
-        #self.distributed = True
+        # self.options['distributed'] = True
         self.add_input('shape', shape=8 * 12 * 2)
 
         self.add_output('cl')
@@ -63,8 +61,8 @@ class MatMatTestCase(unittest.TestCase):
         prob.setup(mode='rev')
 
         # this will hang if the bug is present.
-        J = prob.compute_totals(of=['cd','cl','thickness'],
-                                wrt=['shape','twist','alpha'])
+        prob.compute_totals(of=['cd', 'cl', 'thickness'],
+                            wrt=['shape', 'twist', 'alpha'])
 
 
 if __name__ == "__main__":

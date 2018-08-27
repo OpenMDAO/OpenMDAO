@@ -6,15 +6,12 @@ from six.moves import cStringIO
 
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
 
-from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
-
-from openmdao.utils.assert_utils import assert_rel_error
 
 
 class DistributedAdder(ExplicitComponent):
@@ -24,7 +21,8 @@ class DistributedAdder(ExplicitComponent):
 
     def __init__(self, size):
         super(DistributedAdder, self).__init__()
-        self.distributed = True
+
+        self.options['distributed'] = True
 
         self.local_size = self.size = size
 
@@ -52,8 +50,8 @@ class DistributedAdder(ExplicitComponent):
 
     def compute(self, inputs, outputs):
 
-        #NOTE: Each process will get just its local part of the vector
-        #print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
+        # NOTE: Each process will get just its local part of the vector
+        # print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
 
         outputs['y'] = inputs['x'] + 10.
 
@@ -69,8 +67,8 @@ class Summer(ExplicitComponent):
         self.size = size
 
     def setup(self):
-        #NOTE: this component depends on the full y array, so OpenMDAO
-        #      will automatically gather all the values for it
+        # NOTE: this component depends on the full y array, so OpenMDAO
+        #       will automatically gather all the values for it
         self.add_input('y', val=np.zeros(self.size))
         self.add_output('sum', 0.0, shape=1)
 
@@ -87,7 +85,7 @@ class DistributedAdderTest(unittest.TestCase):
 
     def test_distributed_array_list_vars(self):
 
-        size = 100 # how many items in the array
+        size = 100  # how many items in the array
 
         prob = Problem()
         prob.model = Group()
@@ -106,11 +104,11 @@ class DistributedAdderTest(unittest.TestCase):
         inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
         self.assertEqual(inputs[0][0], 'plus.x')
         self.assertEqual(inputs[1][0], 'summer.y')
-        self.assertEqual(inputs[0][1]['value'].size, 50) # should only return the half that is local
+        self.assertEqual(inputs[0][1]['value'].size, 50)  # should only return half that is local
         self.assertEqual(inputs[1][1]['value'].size, 100)
 
         text = stream.getvalue()
-        if prob.comm.rank: # Only rank 0 prints
+        if prob.comm.rank:  # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
             self.assertEqual(text.count('value'), 3)
@@ -122,7 +120,6 @@ class DistributedAdderTest(unittest.TestCase):
             # make sure all the arrays written have 100 elements in them
             self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
-
 
         stream = cStringIO()
         outputs = sorted(prob.model.list_outputs(values=True,
@@ -142,7 +139,7 @@ class DistributedAdderTest(unittest.TestCase):
         self.assertEqual(outputs[2][1]['value'].size, 1)
 
         text = stream.getvalue()
-        if prob.comm.rank: # Only rank 0 prints
+        if prob.comm.rank:  # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
             self.assertEqual(text.count('value'), 3)
@@ -157,8 +154,6 @@ class DistributedAdderTest(unittest.TestCase):
             self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[3].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[4].split(']')[0].split()), 100)
-
-
 
     def test_distributed_list_vars(self):
 
@@ -210,7 +205,7 @@ class DistributedAdderTest(unittest.TestCase):
         inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
         self.assertEqual(inputs[0][0], 'Obj.y1')
         self.assertEqual(inputs[1][0], 'Obj.y2')
-        if prob.comm.rank: # Only rank 0 prints
+        if prob.comm.rank:  # Only rank 0 prints
             self.assertEqual(inputs[2][0], 'par.G2.Cc.x')
             self.assertEqual(inputs[3][0], 'par.G2.Cy.x')
         else:
@@ -220,7 +215,7 @@ class DistributedAdderTest(unittest.TestCase):
         self.assertEqual(4, len(inputs))
 
         text = stream.getvalue()
-        if prob.comm.rank: # Only rank 0 prints
+        if prob.comm.rank:  # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
             self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
@@ -237,16 +232,16 @@ class DistributedAdderTest(unittest.TestCase):
 
         stream = cStringIO()
         outputs = sorted(prob.model.list_outputs(values=True,
-                                          units=True,
-                                          shape=True,
-                                          bounds=True,
-                                          residuals=True,
-                                          scaling=True,
-                                          hierarchical=True,
-                                          print_arrays=True,
-                                          out_stream=stream))
+                                                 units=True,
+                                                 shape=True,
+                                                 bounds=True,
+                                                 residuals=True,
+                                                 scaling=True,
+                                                 hierarchical=True,
+                                                 print_arrays=True,
+                                                 out_stream=stream))
         self.assertEqual(outputs[0][0], 'Obj.obj')
-        if prob.comm.rank: # outputs only return what is on their proc
+        if prob.comm.rank:  # outputs only return what is on their proc
             self.assertEqual(outputs[1][0], 'par.G2.Cc.c')
             self.assertEqual(outputs[2][0], 'par.G2.Cy.y')
             self.assertEqual(outputs[3][0], 'par.G2.indep_var_comp.x')
@@ -259,7 +254,7 @@ class DistributedAdderTest(unittest.TestCase):
         self.assertTrue('units' in outputs[0][1])
 
         text = stream.getvalue()
-        if prob.comm.rank: # Only rank 0 prints
+        if prob.comm.rank:  # Only rank 0 prints
             self.assertEqual(len(text), 0)
         else:
             self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))

@@ -1,6 +1,5 @@
 import errno
 import os
-import sqlite3
 import unittest
 from shutil import rmtree
 from tempfile import mkdtemp
@@ -9,6 +8,12 @@ import numpy as np
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+
+from openmdao.api import ExecComp, ExplicitComponent, Problem, \
+    Group, ParallelGroup, IndepVarComp, SqliteRecorder
+from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterDataRecorded
+from openmdao.recorders.tests.recorder_test_utils import run_driver
 
 if MPI:
     from openmdao.api import PETScVector
@@ -21,12 +26,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-from openmdao.api import ExecComp, ExplicitComponent, Problem, \
-    Group, ParallelGroup, IndepVarComp, SqliteRecorder
-from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterDataRecorded
-from openmdao.recorders.tests.recorder_test_utils import run_driver
-
 
 class DistributedAdder(ExplicitComponent):
     """
@@ -35,7 +34,8 @@ class DistributedAdder(ExplicitComponent):
 
     def __init__(self, size):
         super(DistributedAdder, self).__init__()
-        self.distributed = True
+
+        self.options['distributed'] = True
 
         self.local_size = self.size = size
 
@@ -63,8 +63,8 @@ class DistributedAdder(ExplicitComponent):
 
     def compute(self, inputs, outputs):
 
-        #NOTE: Each process will get just its local part of the vector
-        #print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
+        # NOTE: Each process will get just its local part of the vector
+        # print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
 
         outputs['y'] = inputs['x'] + 10.
 
@@ -80,8 +80,8 @@ class Summer(ExplicitComponent):
         self.size = size
 
     def setup(self):
-        #NOTE: this component depends on the full y array, so OpenMDAO
-        #      will automatically gather all the values for it
+        # NOTE: this component depends on the full y array, so OpenMDAO
+        #       will automatically gather all the values for it
         self.add_input('y', val=np.zeros(self.size))
         self.add_output('sum', 0.0, shape=1)
 
@@ -126,7 +126,8 @@ class DistributedRecorderTest(unittest.TestCase):
         try:
             prob.model.add_recorder(self.recorder)
         except RuntimeError as err:
-            self.assertEqual(str(err), "Recording of Systems when running parallel code is not supported yet")
+            msg = "Recording of Systems when running parallel code is not supported yet"
+            self.assertEqual(str(err), msg)
         else:
             self.fail('RuntimeError expected.')
 
@@ -136,7 +137,8 @@ class DistributedRecorderTest(unittest.TestCase):
         try:
             prob.model.nonlinear_solver.add_recorder(self.recorder)
         except RuntimeError as err:
-            self.assertEqual(str(err), "Recording of Solvers when running parallel code is not supported yet")
+            msg = "Recording of Solvers when running parallel code is not supported yet"
+            self.assertEqual(str(err), msg)
         else:
             self.fail('RuntimeError expected.')
 
@@ -206,7 +208,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = ['par.G1.Cy.y','par.G2.Cy.y']
+        prob.driver.recording_options['includes'] = ['par.G1.Cy.y', 'par.G2.Cy.y']
 
         prob.driver.add_recorder(self.recorder)
 
@@ -227,7 +229,8 @@ class DistributedRecorderTest(unittest.TestCase):
         rrank = prob.comm.rank  # root ( aka model ) rank.
         rowned = prob.model._owning_rank
         # names of sysincl vars on this rank
-        local_inclnames = [n for n in prob.driver.recording_options['includes'] if rrank == rowned[n]]
+        local_inclnames = [n for n in prob.driver.recording_options['includes']
+                           if rrank == rowned[n]]
         # Get values for vars on this rank
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
         #   Potential local sysvars are in this
@@ -238,9 +241,8 @@ class DistributedRecorderTest(unittest.TestCase):
         all_vars = prob.model.comm.gather(local_vars, root=0)
 
         if prob.comm.rank == 0:
-            # Only on rank 0 do we have all the values and only on rank 0
-            #   are we doing the testing.
-            # The all_vars variable is list of dicts from rank 0,1,... In this case just ranks 0 and 1
+            # Only on rank 0 do we have all the values. The all_vars variable is a list of
+            # dicts from all ranks 0,1,... In this case, just ranks 0 and 1
             dct = all_vars[-1]
             for d in all_vars[:-1]:
                 dct.update(d)
