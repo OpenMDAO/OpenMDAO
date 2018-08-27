@@ -2192,8 +2192,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # grab the data recorded in the first driver iteration
         first_driver_case = cr.driver_cases.get_case(0)
 
-        self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90830282)
-        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908303)
+        self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90804735)
+        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908047)
 
     def test_feature_driver_options_with_values(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader

@@ -1,4 +1,4 @@
-""" Test for the Backktracking Line Search"""
+""" Test for the Backtracking Line Search"""
 
 import sys
 import unittest
@@ -19,7 +19,7 @@ from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
 
 
-class TestArmejoGoldsteinBounds(unittest.TestCase):
+class TestArmijoGoldsteinBounds(unittest.TestCase):
 
     def setUp(self):
         top = Problem()

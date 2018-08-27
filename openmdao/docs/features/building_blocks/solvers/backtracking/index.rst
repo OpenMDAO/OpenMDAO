@@ -18,4 +18,5 @@ There are two different backtracking line-search algorithms in OpenMDAO:
 
     armijo_goldstein.rst
     bounds_enforce.rst
+    relaxation.rst
 

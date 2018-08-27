@@ -8,11 +8,12 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 from __future__ import print_function
 
 import sys
-import numpy as np
 from six import iteritems, reraise
 
+import numpy as np
+
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.solvers.solver import NonlinearSolver
+from openmdao.solvers.solver import LineSearch
 from openmdao.recorders.recording_iteration_stack import Recording
 
 
@@ -41,7 +42,7 @@ def _print_violations(unknowns, lower, upper):
             print("  Lower:", lower._views_flat[name], '\n')
 
 
-class BoundsEnforceLS(NonlinearSolver):
+class BoundsEnforceLS(LineSearch):
     """
     Bounds enforcement only.
 
@@ -50,9 +51,6 @@ class BoundsEnforceLS(NonlinearSolver):
 
     Attributes
     ----------
-    _do_subsolve : bool
-        Flag used by parent solver to tell the line search whether to solve subsystems while
-        backtracking.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
     """
@@ -70,8 +68,7 @@ class BoundsEnforceLS(NonlinearSolver):
         """
         super(BoundsEnforceLS, self).__init__(**kwargs)
 
-        # Parent solver sets this to control whether to solve subsystems.
-        self._do_subsolve = False
+        self._iter_count = 0
 
     def _declare_options(self):
         """
@@ -148,7 +145,7 @@ class BoundsEnforceLS(NonlinearSolver):
         return fail, norm, norm / norm0
 
 
-class ArmijoGoldsteinLS(NonlinearSolver):
+class ArmijoGoldsteinLS(LineSearch):
     """
     Backtracking line search that terminates using the Armijo-Goldstein condition..
 
@@ -156,9 +153,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
     ----------
     _analysis_error_raised : bool
         Flag is set to True if a subsystem raises an AnalysisError.
-    _do_subsolve : bool
-        Flag used by parent solver to tell the line search whether to solve subsystems while
-        backtracking.
     _iter_count : int
         Number of iterations for the current invocation of the solver.
     """
@@ -175,9 +169,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             Options dictionary.
         """
         super(ArmijoGoldsteinLS, self).__init__(**kwargs)
-
-        # Parent solver sets this to control whether to solve subsystems.
-        self._do_subsolve = False
 
         self._analysis_error_raised = False
 

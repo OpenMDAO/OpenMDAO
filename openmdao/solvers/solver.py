@@ -881,3 +881,29 @@ class BlockLinearSolver(LinearSolver):
         """
         super(BlockLinearSolver, self)._declare_options()
         self.supports['assembled_jac'] = False
+
+
+class LineSearch(NonlinearSolver):
+    """
+    A base class for linesearches.
+
+    Attributes
+    ----------
+    _do_subsolve : bool
+        Flag used by parent solver to tell the line search whether to solve subsystems while
+        backtracking.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(LineSearch, self).__init__(**kwargs)
+
+        # Parent solver sets this to control whether to solve subsystems.
+        self._do_subsolve = False
