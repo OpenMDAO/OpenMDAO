@@ -489,7 +489,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        #prob.model.nonlinear_solver = NewtonSolver()
+        # prob.model.nonlinear_solver = NewtonSolver()
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         G1.linear_solver = DirectSolver(assemble_jac=True)

@@ -322,7 +322,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup(check=False)
         self.assertEqual(str(err.exception),
-                         "comp1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['xx'].")
+                         "comp1: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: ['xx'].")
 
     def test_group_renames_errors_bad_tuple(self):
         p = Problem()
@@ -333,7 +334,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup(check=False)
         self.assertEqual(str(err.exception),
-                         "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' is not a string or tuple of size 2")
+                         "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' "
+                         "is not a string or tuple of size 2")
 
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
@@ -375,7 +377,8 @@ class TestGroup(unittest.TestCase):
                 dv.add_output('x', 1.0)
                 dv.add_output('z', np.array([5.0, 2.0]))
 
-                self.add_subsystem('d1', SellarDis2(), promotes_inputs=['y1'], promotes_outputs=['foo'])
+                self.add_subsystem('d1', SellarDis2(),
+                                   promotes_inputs=['y1'], promotes_outputs=['foo'])
                 self.add_subsystem('d2', SellarDis2())
 
         p = Problem()
@@ -384,7 +387,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup(check=False)
         self.assertEqual(str(err.exception),
-                         "d1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['foo'].")
+                         "d1: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: ['foo'].")
 
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
@@ -429,7 +433,7 @@ class TestGroup(unittest.TestCase):
         p.set_solver_print(level=0)
         p.run_model()
 
-        self.assertEqual(p['group1.comp1.x'],  5.0)
+        self.assertEqual(p['group1.comp1.x'], 5.0)
         self.assertEqual(p['group1.comp2.b'], 10.0)
         self.assertEqual(p['group2.comp1.b'], 20.0)
         self.assertEqual(p['group2.comp2.b'], 40.0)
@@ -440,7 +444,7 @@ class TestGroup(unittest.TestCase):
         G1 = prob.model.add_subsystem('G1', Group())
         G1.add_subsystem("C1", ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", ExecComp("y=2.0*x"), promotes=['y'])
-        msg = "Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
+        msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
         with assertRaisesRegex(self, Exception, msg):
             prob.setup(check=False)
 
@@ -533,13 +537,13 @@ class TestGroup(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 
         p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4,3))))
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2,2))))
+        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4, 3))))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2, 2))))
 
         # connect C1.x to entries (0,0), (-1,1), (2,1), (1,1) of indep.x
         p.model.connect('indep.x', 'C1.x',
-                        src_indices=[[(0,0), (-1,1)],
-                                     [(2,1), (1,1)]], flat_src_indices=False)
+                        src_indices=[[(0, 0), (-1, 1)],
+                                     [(2, 1), (1, 1)]], flat_src_indices=False)
 
         p.set_solver_print(level=0)
         p.setup()
@@ -558,7 +562,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C2: 'promotes_outputs' failed to find any matches for the following names or patterns: ['x*'].")
+                         "C2: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
         p = Problem()
@@ -570,7 +575,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C2: 'promotes_inputs' failed to find any matches for the following names or patterns: ['xx'].")
+                         "C2: 'promotes_inputs' failed to find any matches for "
+                         "the following names or patterns: ['xx'].")
 
     def test_promote_not_found3(self):
         p = Problem()
@@ -582,7 +588,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "C2: 'promotes' failed to find any matches for the following names or patterns: ['xx'].")
+                         "C2: 'promotes' failed to find any matches for "
+                         "the following names or patterns: ['xx'].")
 
     def test_missing_promote_var(self):
         p = Problem()
@@ -596,7 +603,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "d1: 'promotes_inputs' failed to find any matches for the following names or patterns: ['foo'].")
+                         "d1: 'promotes_inputs' failed to find any matches for "
+                         "the following names or patterns: ['foo'].")
 
     def test_missing_promote_var2(self):
         p = Problem()
@@ -610,7 +618,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup(check=False)
         self.assertEqual(str(context.exception),
-                         "d1: 'promotes_outputs' failed to find any matches for the following names or patterns: ['bar', 'blammo'].")
+                         "d1: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: ['bar', 'blammo'].")
 
     def test_promote_src_indices(self):
         import numpy as np
@@ -667,9 +676,9 @@ class TestGroup(unittest.TestCase):
                 # as our input.  If we didn't set flat_src_indices to False,
                 # we could specify src_indices as a 1D array of indices into
                 # the flattened source.
-                self.add_input('x', np.ones((2,2)),
-                               src_indices=[[(0,0), (3,1)],
-                                            [(2,1), (1,1)]],
+                self.add_input('x', np.ones((2, 2)),
+                               src_indices=[[(0, 0), (3, 1)],
+                                            [(2, 1), (1, 1)]],
                                flat_src_indices=False)
                 self.add_output('y', 1.0)
 
@@ -681,7 +690,7 @@ class TestGroup(unittest.TestCase):
         # by promoting the following output and inputs to 'x', they will
         # be automatically connected
         p.model.add_subsystem('indep',
-                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              IndepVarComp('x', np.arange(12).reshape((4, 3))),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(),
                               promotes_inputs=['x'])
@@ -698,7 +707,7 @@ class TestGroup(unittest.TestCase):
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(ExplicitComponent):
             def setup(self):
-                self.add_input('x', 1.0, src_indices=[(3,1)], shape=(1,))
+                self.add_input('x', 1.0, src_indices=[(3, 1)], shape=(1,))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -707,7 +716,7 @@ class TestGroup(unittest.TestCase):
         p = Problem()
 
         p.model.add_subsystem('indep',
-                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              IndepVarComp('x', np.arange(12).reshape((4, 3))),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
@@ -720,7 +729,7 @@ class TestGroup(unittest.TestCase):
     def test_promote_src_indices_nonflat_error(self):
         class MyComp(ExplicitComponent):
             def setup(self):
-                self.add_input('x', 1.0, src_indices=[(3,1)])
+                self.add_input('x', 1.0, src_indices=[(3, 1)])
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -729,7 +738,7 @@ class TestGroup(unittest.TestCase):
         p = Problem()
 
         p.model.add_subsystem('indep',
-                              IndepVarComp('x', np.arange(12).reshape((4,3))),
+                              IndepVarComp('x', np.arange(12).reshape((4, 3))),
                               promotes_outputs=['x'])
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
@@ -742,13 +751,12 @@ class TestGroup(unittest.TestCase):
                          "the input shape ambiguous.")
 
     @parameterized.expand(itertools.product(
-        [((4,3),  [(0,0), (3,1), (2,1), (1,1)]),
-         ((1,12), [(0,0), (0,10), (0,7), (0,4)]),
-         ((12,),  [0, 10, 7, 4]),
-         ((12,1), [(0,0), (10,0), (7,0), (4,0)])],
-        [(2,2), (4,), (4,1), (1,4)],
-        ), testcase_func_name=lambda f, n, p: 'test_promote_src_indices_'+'_'.join(str(a) for a in p.args)
-    )
+        [((4, 3),  [(0, 0), (3, 1), (2, 1), (1, 1)]),
+         ((1, 12), [(0, 0), (0, 10), (0, 7), (0, 4)]),
+         ((12,),   [0, 10, 7, 4]),
+         ((12, 1), [(0, 0), (10, 0), (7, 0), (4, 0)])],
+        [(2, 2), (4,), (4, 1), (1, 4)],
+    ), name_func=lambda f, n, p: 'test_promote_src_indices_'+'_'.join(str(a) for a in p.args))
     def test_promote_src_indices_param(self, src_info, tgt_shape):
         src_shape, idxvals = src_info
 
@@ -789,10 +797,11 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 21.)
 
     def test_set_order_feature(self):
-        from openmdao.api import Problem, IndepVarComp, NonlinearRunOnce
+        from openmdao.api import Problem, IndepVarComp
 
         class ReportOrderComp(ExplicitComponent):
             """Adds name to list."""
+
             def __init__(self, order_list):
                 super(ReportOrderComp, self).__init__()
                 self._order_list = order_list
@@ -881,7 +890,8 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          ": ['C3'] expected in subsystem order and not found.\n"
-                         ": subsystem(s) ['junk', 'junk2'] found in subsystem order but don't exist.")
+                         ": subsystem(s) ['junk', 'junk2'] found in subsystem order "
+                         "but don't exist.")
 
         # Dupes
         with self.assertRaises(ValueError) as cm:
@@ -941,8 +951,8 @@ class TestConnect(unittest.TestCase):
         sub = prob.model.add_subsystem('sub', Group())
 
         idv = sub.add_subsystem('src', IndepVarComp())
-        idv.add_output('x', np.arange(15).reshape((5,3)))  # array
-        idv.add_output('s', 3.)                            # scalar
+        idv.add_output('x', np.arange(15).reshape((5, 3)))  # array
+        idv.add_output('s', 3.)                             # scalar
 
         sub.add_subsystem('tgt', ExecComp('y = x'))
         sub.add_subsystem('cmp', ExecComp('z = x'))
@@ -1034,14 +1044,16 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.x' which has no units."
+        msg = "Output 'src.x2' with units of 'degC' is connected " \
+              "to input 'tgt.x' which has no units."
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             prob.setup(check=False)
             self.assertEqual(str(w[-1].message), msg)
 
     def test_connect_incompatible_units(self):
-        msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'tgt.x'."
+        msg = "Output units of 'degC' for 'src.x2' are incompatible " \
+              "with input units of 'm' for 'tgt.x'."
 
         prob = Problem(Group())
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0))
@@ -1098,31 +1110,38 @@ class TestConnect(unittest.TestCase):
 
     def test_mix_promotes_types(self):
         prob = Problem()
-        prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x']), promotes=['x', 'y'], promotes_outputs=['y2'])
+        prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x']),
+                                 promotes=['x', 'y'], promotes_outputs=['y2'])
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup(check=False)
 
-        self.assertEqual(str(context.exception), "src: 'promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'.")
+        self.assertEqual(str(context.exception),
+                         "src: 'promotes' cannot be used at the same time as "
+                         "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_mix_promotes_types2(self):
         prob = Problem()
-        prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x2']), promotes=['x', 'y'], promotes_inputs=['x2'])
+        prob.model.add_subsystem('src', ExecComp(['y = 2 * x', 'y2 = 3 * x2']),
+                                 promotes=['x', 'y'], promotes_inputs=['x2'])
         with self.assertRaises(RuntimeError) as context:
             prob.setup(check=False)
 
-        self.assertEqual(str(context.exception), "src: 'promotes' cannot be used at the same time as 'promotes_inputs' or 'promotes_outputs'.")
+        self.assertEqual(str(context.exception),
+                         "src: 'promotes' cannot be used at the same time as "
+                         "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_nested_nested_conn(self):
         prob = Problem()
         root = prob.model
 
-        p1 = root.add_subsystem('p', IndepVarComp('x', 1.0))
+        root.add_subsystem('p', IndepVarComp('x', 1.0))
+
         G1 = root.add_subsystem('G1', Group())
         par1 = G1.add_subsystem('par1', Group())
 
-        c2 = par1.add_subsystem('c2', ExecComp('y = x * 2.0'))
-        c4 = par1.add_subsystem('c4', ExecComp('y = x * 4.0'))
+        par1.add_subsystem('c2', ExecComp('y = x * 2.0'))
+        par1.add_subsystem('c4', ExecComp('y = x * 4.0'))
 
         prob.model.add_design_var('p.x')
         prob.model.add_constraint('G1.par1.c4.y', upper=0.0)
@@ -1146,14 +1165,14 @@ class TestConnect(unittest.TestCase):
 
     def test_bad_indices_shape(self):
         p = Problem()
-        p.model.add_subsystem('IV', IndepVarComp('x', np.arange(12).reshape((4,3))))
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2,2))))
+        p.model.add_subsystem('IV', IndepVarComp('x', np.arange(12).reshape((4, 3))))
+        p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2, 2))))
 
         p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
-        msg = ("The source indices \[\[1 1\]\] do not specify a valid shape for "
-               "the connection 'IV.x' to 'C1.x'. The target "
-               "shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
+        msg = (r"The source indices \[\[1 1\]\] do not specify a valid shape for "
+               r"the connection 'IV.x' to 'C1.x'. The target "
+               r"shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
 
         with assertRaisesRegex(self, ValueError, msg):
             p.setup(check=False)
@@ -1190,37 +1209,43 @@ class TestConnect(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_src_indices_shape(self):
-        prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
-                                 src_indices=[[4,5],[7,8]],
-                                 flat_src_indices=True)
+        src_indices_model(src_shape=(3, 3), tgt_shape=(2, 2),
+                          src_indices=[[4, 5], [7, 8]],
+                          flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
         try:
-            prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
-                                     src_indices=[[4,5],[7,9]],
-                                     flat_src_indices=True)
+            src_indices_model(src_shape=(3, 3), tgt_shape=(2, 2),
+                              src_indices=[[4, 5], [7, 9]],
+                              flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x'. Index '9' is out of range for a flat source of size 9.")
+            self.assertEqual(str(err), "The source indices do not specify a valid index "
+                                       "for the connection 'indeps.x' to 'C1.x'. "
+                                       "Index '9' is out of range for a flat source of size 9.")
         else:
             self.fail("Exception expected.")
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
         try:
-            prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
-                                     src_indices=[[4,5],[7,9]],
-                                     flat_src_indices=True, promotes=['x'])
+            src_indices_model(src_shape=(3, 3), tgt_shape=(2, 2),
+                              src_indices=[[4, 5], [7, 9]],
+                              flat_src_indices=True, promotes=['x'])
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x'. Index '9' is out of range for a flat source of size 9.")
+            self.assertEqual(str(err), "The source indices do not specify a valid index "
+                                       "for the connection 'indeps.x' to 'C1.x'. "
+                                       "Index '9' is out of range for a flat source of size 9.")
         else:
             self.fail("Exception expected.")
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
         try:
-            prob = src_indices_model(src_shape=(3,3), tgt_shape=(2,2),
-                                     src_indices=[[-10,5],[7,8]],
-                                     flat_src_indices=True)
+            src_indices_model(src_shape=(3, 3), tgt_shape=(2, 2),
+                              src_indices=[[-10, 5], [7, 8]],
+                              flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index for the connection 'indeps.x' to 'C1.x'. Index '-10' is out of range for a flat source of size 9.")
+            self.assertEqual(str(err), "The source indices do not specify a valid index "
+                                       "for the connection 'indeps.x' to 'C1.x'. "
+                                       "Index '-10' is out of range for a flat source of size 9.")
         else:
             self.fail("Exception expected.")
 
