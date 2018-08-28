@@ -61,9 +61,6 @@ class Component(System):
 
     Attributes
     ----------
-    distributed : bool
-        This is True if the component has variables that are distributed across multiple
-        processes.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _var_rel2data_io : dict
@@ -95,10 +92,6 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        # put these here to prevent them from possibly overriding values set
-        # by the user in initialize().
-        self.distributed = False
-
         super(Component, self).__init__(**kwargs)
 
         self._approx_schemes = OrderedDict()
@@ -112,6 +105,16 @@ class Component(System):
         self._declared_partials = []
         self._approximated_partials = []
         self._declared_partial_checks = []
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(Component, self)._declare_options()
+
+        self.options.declare('distributed', False,
+                             desc='True if the component has variables that are distributed '
+                                  'across multiple processes.')
 
     def setup(self):
         """
@@ -161,7 +164,7 @@ class Component(System):
         self.setup()
         self._static_mode = True
 
-        if self.distributed:
+        if self.options['distributed']:
             self._vector_class = self._distributed_vector_class
         else:
             self._vector_class = self._local_vector_class
@@ -536,7 +539,7 @@ class Component(System):
         metadata['ref0'] = ref0
         metadata['res_ref'] = res_ref
 
-        metadata['distributed'] = self.distributed
+        metadata['distributed'] = self.options['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:

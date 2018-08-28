@@ -3,10 +3,9 @@ from __future__ import print_function
 import unittest
 import time
 
-import six
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, ExecComp
+from openmdao.api import Problem, ExplicitComponent, Group, ExecComp
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_rel_error
@@ -71,10 +70,11 @@ class DistribCompSimple(ExplicitComponent):
 
 class DistribInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
+
     def __init__(self, arr_size=11):
         super(DistribInputComp, self).__init__()
         self.arr_size = arr_size
-        self.distributed = True
+        self.options['distributed'] = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -99,10 +99,11 @@ class DistribInputComp(ExplicitComponent):
 
 class DistribOverlappingInputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
+
     def __init__(self, arr_size=11):
         super(DistribOverlappingInputComp, self).__init__()
         self.arr_size = arr_size
-        self.distributed = True
+        self.options['distributed'] = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'][:] = 0
@@ -122,7 +123,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
         comm = self.comm
         rank = comm.rank
 
-        #need to initialize the input to have the correct local size
+        # need to initialize the input to have the correct local size
         if rank == 0:
             size = 8
             start = 0
@@ -139,10 +140,11 @@ class DistribOverlappingInputComp(ExplicitComponent):
 
 class DistribInputDistribOutputComp(ExplicitComponent):
     """Uses 2 procs and takes input var slices."""
+
     def __init__(self, arr_size=11):
         super(DistribInputDistribOutputComp, self).__init__()
         self.arr_size = arr_size
-        self.distributed = True
+        self.options['distributed'] = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -165,10 +167,11 @@ class DistribNoncontiguousComp(ExplicitComponent):
     """Uses 2 procs and takes non-contiguous input var slices and has output
     var slices as well
     """
+
     def __init__(self, arr_size=11):
         super(DistribNoncontiguousComp, self).__init__()
         self.arr_size = arr_size
-        self.distributed = True
+        self.options['distributed'] = True
 
     def compute(self, inputs, outputs):
         outputs['outvec'] = inputs['invec']*2.0
@@ -191,7 +194,7 @@ class DistribGatherComp(ExplicitComponent):
     def __init__(self, arr_size=11):
         super(DistribGatherComp, self).__init__()
         self.arr_size = arr_size
-        self.distributed = True
+        self.options['distributed'] = True
 
     def compute(self, inputs, outputs):
         if MPI:
@@ -219,6 +222,7 @@ class DistribGatherComp(ExplicitComponent):
 
 class NonDistribGatherComp(ExplicitComponent):
     """Uses 2 procs gathers a distrib output into a full input"""
+
     def __init__(self, size):
         super(NonDistribGatherComp, self).__init__()
         self.size = size
@@ -341,9 +345,11 @@ class MPITests(unittest.TestCase):
 
         if MPI:
             if self.comm.rank == 0:
-                self.assertTrue(all(C2._outputs['outvec'] == np.array(list(take_nth(0, 2, range(size))), 'f')*4))
+                self.assertTrue(all(C2._outputs['outvec'] ==
+                                    np.array(list(take_nth(0, 2, range(size))), 'f')*4))
             else:
-                self.assertTrue(all(C2._outputs['outvec'] == np.array(list(take_nth(1, 2, range(size))), 'f')*4))
+                self.assertTrue(all(C2._outputs['outvec'] ==
+                                    np.array(list(take_nth(1, 2, range(size))), 'f')*4))
 
             full_list = list(take_nth(0, 2, range(size))) + list(take_nth(1, 2, range(size)))
             self.assertTrue(all(C3._outputs['outvec'] == np.array(full_list, 'f')*4))
@@ -375,7 +381,8 @@ class MPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'][8:] == np.array(range(size, 0, -1), float)[8:]*4))
 
         # overlapping part should be double size of the rest
-        self.assertTrue(all(C2._outputs['outvec'][4:8] == np.array(range(size, 0, -1), float)[4:8]*8))
+        self.assertTrue(all(C2._outputs['outvec'][4:8] ==
+                            np.array(range(size, 0, -1), float)[4:8]*8))
 
     def test_nondistrib_gather(self):
         # regular comp --> distrib comp --> regular comp.  last comp should
@@ -411,11 +418,9 @@ class MPIFeatureTests(unittest.TestCase):
     def test_distribcomp_feature(self):
         import numpy as np
 
-        from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, PETScVector
+        from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
         from openmdao.utils.mpi import MPI
         from openmdao.utils.array_utils import evenly_distrib_idxs
-
-        from openmdao.utils.mpi import MPI
 
         if not MPI:
             raise unittest.SkipTest()
@@ -427,7 +432,7 @@ class MPIFeatureTests(unittest.TestCase):
             def __init__(self, size):
                 super(DistribComp, self).__init__()
                 self.size = size
-                self.distributed = True
+                self.options['distributed'] = True
 
             def compute(self, inputs, outputs):
                 if self.comm.rank == 0:
@@ -439,7 +444,7 @@ class MPIFeatureTests(unittest.TestCase):
                 comm = self.comm
                 rank = comm.rank
 
-                # this results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
+                # results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
                 sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
                 start = offsets[rank]
                 end = start + sizes[rank]
@@ -447,7 +452,6 @@ class MPIFeatureTests(unittest.TestCase):
                 self.add_input('invec', np.ones(sizes[rank], float),
                                src_indices=np.arange(start, end, dtype=int))
                 self.add_output('outvec', np.ones(sizes[rank], float))
-
 
         class Summer(ExplicitComponent):
             """Sums a distributed input."""
@@ -502,7 +506,7 @@ class TestGroupMPI(unittest.TestCase):
     def test_promote_distrib(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp
+        from openmdao.api import Problem, ExplicitComponent, IndepVarComp
 
         class MyComp(ExplicitComponent):
             def setup(self):
