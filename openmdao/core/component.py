@@ -116,6 +116,34 @@ class Component(System):
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
 
+    @property
+    def distributed(self):
+        """
+        Provide 'distributed' property for backwards compatibility.
+
+        Returns
+        -------
+        bool
+            reference to the 'distributed' property.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        return self.options['distributed']
+
+    @distributed.setter
+    def distributed(self, val):
+        """
+        Provide for setting of the 'distributed' property for backwards compatibility.
+
+        Parameters
+        ----------
+        val : bool
+            True if the component has variables that are distributed  across multiple processes.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        self.options['distributed'] = val
+
     def setup(self):
         """
         Declare inputs and outputs.

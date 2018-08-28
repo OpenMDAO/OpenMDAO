@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import unittest
 import time
+import warnings
 
 import numpy as np
 
@@ -407,6 +408,81 @@ class MPITests(unittest.TestCase):
 
         if MPI and self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
+
+class DeprecatedMPITests(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_distrib_idx_in_full_out_deprecated(self):
+
+        class DeprecatedDistribInputComp(ExplicitComponent):
+            """Deprecated version of DistribInputComp, uses attribute instead of option."""
+
+            def __init__(self, arr_size=11):
+                super(DeprecatedDistribInputComp, self).__init__()
+                self.arr_size = arr_size
+                self.distributed = True
+
+            def compute(self, inputs, outputs):
+                if MPI:
+                    self.comm.Allgatherv(inputs['invec']*2.0,
+                                         [outputs['outvec'], self.sizes,
+                                          self.offsets, MPI.DOUBLE])
+                else:
+                    outputs['outvec'] = inputs['invec'] * 2.0
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                self.sizes, self.offsets = evenly_distrib_idxs(comm.size, self.arr_size)
+                start = self.offsets[rank]
+                end = start + self.sizes[rank]
+
+                self.add_input('invec', np.ones(self.sizes[rank], float),
+                               src_indices=np.arange(start, end, dtype=int))
+                self.add_output('outvec', np.ones(self.arr_size, float),
+                                shape=np.int32(self.arr_size))
+
+        size = 11
+
+        p = Problem()
+        top = p.model
+
+        C1 = top.add_subsystem("C1", InOutArrayComp(size))
+
+        # check deprecation on setter
+        msg = "The 'distributed' property provides backwards compatibility " \
+              "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead."
+
+        with warnings.catch_warnings(record=True) as w:
+            C2 = top.add_subsystem("C2", DeprecatedDistribInputComp(size))
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
+
+        # check deprecation on getter
+        with warnings.catch_warnings(record=True) as w:
+            C2.distributed
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
+
+        # continue to make sure everything still works with the deprecation
+        top.connect('C1.outvec', 'C2.invec')
+        p.setup(check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+
+        p.run_model()
+
+        self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
