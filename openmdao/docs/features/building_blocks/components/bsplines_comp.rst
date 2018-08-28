@@ -43,13 +43,16 @@ BsplinesComp Option Examples
 
 **distribution**
 
-The "distribution" option can be used to change the spacing of the spline control points. A uniform distribution
-yields a set of evenly distributed control points, while a "sine" distribution places more points towards the edges.
+The :code:`distribution` option can be used to change the spacing of the spline control points. 
+A "uniform" distribution yields a set of evenly distributed control points, while a "sine" 
+distribution places more points towards the edges.
 
-For example, let's say we have a spatial distributed variable, like the beam thickness in the previous example, that
-has 100 nodes. We would like to reduce that to a more reasonable number like 20, so we use the BsplineComp. Our
-initial value for this variable is roughly a sine wave. When we create the BsplineComp and with a "uniform"
-distribution, our control points are evenly spaced over the domain, as seen in the figure below.
+For example, let's say we have a spatial distributed variable, like the beam thickness 
+in the :ref:`beam optimization <beam_optimization_example_part_2>` example, that has 100 nodes. 
+We would like to reduce that to a more reasonable number like 20, so we use the BsplineComp. 
+Our initial value for this variable is roughly a sine wave. When we create the BsplineComp 
+with a "uniform" distribution, our control points are evenly spaced over the domain, as seen 
+in the figure below.
 
 .. embed-code::
     openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_distribution_uniform

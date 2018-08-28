@@ -1,6 +1,7 @@
 """
 Simple B-spline component for interpolation.
 """
+from six import string_types
 
 import numpy as np
 from scipy.sparse import csc_matrix, csr_matrix
@@ -139,6 +140,8 @@ class BsplinesComp(ExplicitComponent):
                              desc="Name to use for the input variable (control points).")
         self.options.declare('out_name', types=str, default='h',
                              desc="Name to use for the output variable (interpolated points).")
+        self.options.declare('units', types=string_types, default=None, allow_none=True,
+                             desc="Units to use for the input and output variables.")
         self.options.declare('distribution', default='sine', values=['uniform', 'sine'],
                              desc="Choice of spatial distribution to use for placing the control "
                                   "points. It can be 'sine' or 'uniform'.")
@@ -153,9 +156,10 @@ class BsplinesComp(ExplicitComponent):
         vec_size = opts['vec_size']
         in_name = opts['in_name']
         out_name = opts['out_name']
+        units = opts['units']
 
-        self.add_input(in_name, val=np.random.rand(vec_size, num_control_points))
-        self.add_output(out_name, val=np.random.rand(vec_size, num_points))
+        self.add_input(in_name, val=np.random.rand(vec_size, num_control_points), units=units)
+        self.add_output(out_name, val=np.random.rand(vec_size, num_points), units=units)
 
         jac = get_bspline_mtx(num_control_points, num_points,
                               order=opts['bspline_order'],
