@@ -256,8 +256,6 @@ class FiniteDifference(ApproximationScheme):
         approx_groups = self._get_approx_groups(system)
         for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
 
-            result._data[:] = system._outputs._data
-
             for i_count, idx in enumerate(in_idx):
                 if fd_count % num_par_fd == system._par_fd_id:
                     if current_coeff:
