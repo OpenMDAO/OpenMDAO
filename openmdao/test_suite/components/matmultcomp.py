@@ -73,7 +73,7 @@ if __name__ == '__main__':
     model.connect('indep.x', 'comp.x')
 
     p.setup(mode='fwd', force_alloc_complex=True)
-    p.final_setup()
+    p.run_model()
 
     start = time.time()
     J = p.compute_totals(of=['comp.y'], wrt=['indep.x'])
