@@ -106,6 +106,16 @@ class Component(System):
         self._approximated_partials = []
         self._declared_partial_checks = []
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(Component, self)._declare_options()
+
+        self.options.declare('distributed', False,
+                             desc='True if the component has variables that are distributed '
+                                  'across multiple processes.')
+
     @property
     def distributed(self):
         """
@@ -133,16 +143,6 @@ class Component(System):
         warn_deprecation("The 'distributed' property provides backwards compatibility "
                          "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
         self.options['distributed'] = val
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        super(Component, self)._declare_options()
-
-        self.options.declare('distributed', False,
-                             desc='True if the component has variables that are distributed '
-                                  'across multiple processes.')
 
     def setup(self):
         """
