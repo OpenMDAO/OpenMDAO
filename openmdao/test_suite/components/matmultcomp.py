@@ -9,7 +9,7 @@ class MatMultComp(ExplicitComponent):
     """
     A simple component used for derivative testing.
     """
-    def __init__(self, mat, approx_method, **kwargs):
+    def __init__(self, mat, approx_method, sleep_time=0.1, **kwargs):
         """
         Store the mat for later use.
 
@@ -19,25 +19,30 @@ class MatMultComp(ExplicitComponent):
             Matrix used to multiply input x to get output y.
         approx_method : str
             Sets type of approximation ('fd' or 'cs')
+        sleep_time : float
+            Time to sleep on each compute call.
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super(MatMultComp, self).__init__(**kwargs)
         self.mat = mat
         self.approx_method = approx_method
+        self.sleep_time = sleep_time
 
     def setup(self):
         self.add_input('x', val=np.ones(self.mat.shape[1]))
         self.add_output('y', val=np.zeros(self.mat.shape[0]))
 
         self.declare_partials('*', '*', method=self.approx_method)
+        self.num_computes = 0
 
     def compute(self, inputs, outputs):
         """
         Multiply input by mat to get output.
         """
         outputs['y'] = self.mat.dot(inputs['x'])
-        time.sleep(0.1)
+        self.num_computes += 1
+        time.sleep(self.sleep_time)
 
 
 if __name__ == '__main__':

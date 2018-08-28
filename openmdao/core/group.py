@@ -638,8 +638,19 @@ class Group(System):
                         continue
                     proc_slice = slice(*subsystems_proc_range[ind])
                     var_slice = slice(*subsystems_var_range[type_][subsys.name])
-                    sizes[vec_name][type_][proc_slice, var_slice] = \
-                        subsys._var_sizes[vec_name][type_]
+                    if proc_slice.stop - proc_slice.start > subsys.comm.size:
+                        # in this case, we've split the proc for parallel FD
+                        assert (proc_slice.stop - proc_slice.start) % subsys.comm.size == 0, \
+                            "%s comm size is not an exact multiple of %s comm size" % (
+                                self.pathname, subsys.pathname)
+                        proc_i = proc_slice.start
+                        while proc_i < proc_slice.stop:
+                            sizes[vec_name][type_][proc_i:proc_i + subsys.comm.size, var_slice] = \
+                                subsys._var_sizes[vec_name][type_]
+                            proc_i += subsys.comm.size
+                    else:
+                        sizes[vec_name][type_][proc_slice, var_slice] = \
+                            subsys._var_sizes[vec_name][type_]
 
         # If parallel, all gather
         if self.comm.size > 1:
