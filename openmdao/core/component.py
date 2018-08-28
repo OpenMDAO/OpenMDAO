@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import warnings
+
 from collections import OrderedDict, Iterable
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -193,7 +195,14 @@ class Component(System):
         self._static_mode = True
 
         if self.options['distributed']:
-            self._vector_class = self._distributed_vector_class
+            if self._distributed_vector_class is None:
+                warnings.warn("The 'distributed' option is set to True for Component %s, "
+                              "but there is no distributed vector implementation (MPI/PETSc) "
+                              "available. The default non-distributed vectors will be used."
+                              % pathname)
+                self._vector_class = self._local_vector_class
+            else:
+                self._vector_class = self._distributed_vector_class
         else:
             self._vector_class = self._local_vector_class
 
