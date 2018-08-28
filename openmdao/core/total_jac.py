@@ -827,6 +827,15 @@ class _TotalJacInfo(object):
         idxs = imeta['idx_list']
         yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, None
 
+    def _zero_vecs(self, vecname, mode):
+        vecs = self.model._vectors
+
+        # clean out vectors from last solve
+        vecs['output'][vecname]._data[:] = 0.0
+        vecs['residual'][vecname]._data[:] = 0.0
+        if mode == 'rev':
+            vecs['input'][vecname]._data[:] = 0.0
+
     #
     # input setter functions
     #
@@ -853,6 +862,8 @@ class _TotalJacInfo(object):
             key used for storage of cached linear solve (if active, else None).
         """
         vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
+
+        self._zero_vecs(vecname, mode)
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
@@ -889,6 +900,8 @@ class _TotalJacInfo(object):
         """
         if itermeta is None:
             return self.single_input_setter(inds[0], None, mode)
+
+        self._zero_vecs('linear', mode)
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
@@ -963,6 +976,8 @@ class _TotalJacInfo(object):
 
         vec_name, rel_systems, cache_lin_sol = in_idx_map[inds[0]]
 
+        self._zero_vecs(vec_name, mode)
+
         dinputs = input_vec[vec_name]
 
         for col, i in enumerate(inds):
@@ -1013,6 +1028,8 @@ class _TotalJacInfo(object):
                 vec_names.add(vec_name)
             cache |= cache_lin_sol
             _update_rel_systems(all_rel_systems, rel_systems)
+
+            self._zero_vecs(vec_name, mode)
 
             dinputs = input_vec[vec_name]
             ncol = dinputs._ncol
@@ -1208,13 +1225,6 @@ class _TotalJacInfo(object):
             for key, idx_info in iteritems(self.idx_iter_dict[mode]):
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
-                    # this sets dinputs for the current par_deriv_color to 0
-                    # dinputs is dresids in fwd, doutouts in rev
-                    vec_doutput['linear']._data[:] = 0.0
-                    if mode == 'fwd':
-                        vec_dresid['linear']._data[:] = 0.0
-                    else:  # rev
-                        vec_dinput['linear']._data[:] = 0.0
 
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 

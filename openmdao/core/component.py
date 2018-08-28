@@ -143,9 +143,10 @@ class Component(System):
         """
         self.pathname = pathname
 
-        if self.options['num_par_fd'] > 1 and (self._owns_approx_jac or
-                                               self._approximated_partials):
+        if self.options['num_par_fd'] > 1 and comm.size > 1:
             comm = self._setup_par_fd_procs(comm)
+        else:
+            self.options['num_par_fd'] = 1
 
         self.comm = comm
         self._mode = mode
@@ -164,6 +165,16 @@ class Component(System):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
         self.setup()
+
+        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
+        # Unfortunately we have to do this check after system setup has been called because that's
+        # when declare_partials generally happens, so we raise an exception here instead of just
+        # resetting the value of num_par_fd (because the comm has already been split and possibly
+        # used by the system setup).
+        if self.options['num_par_fd'] > 1 and comm.size > 1 and not (self._owns_approx_jac or
+                                                                     self._approximated_partials):
+            raise RuntimeError("num_par_fd is > 1 but no FD is active.")
+
         self._static_mode = True
 
         if self.distributed:

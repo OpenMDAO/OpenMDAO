@@ -301,8 +301,10 @@ class Group(System):
         """
         self.pathname = pathname
 
-        if self.options['num_par_fd'] > 1 and self._owns_approx_jac:
+        if self.options['num_par_fd'] > 1 and comm.size > 1 and self._owns_approx_jac:
             comm = self._setup_par_fd_procs(comm)
+        else:
+            self.options['num_par_fd'] = 1
 
         self.comm = comm
         self._mode = mode
