@@ -126,7 +126,7 @@ class Component(System):
         Returns
         -------
         bool
-            reference to the 'distributed' property.
+            reference to the 'distributed' option.
         """
         warn_deprecation("The 'distributed' property provides backwards compatibility "
                          "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
@@ -140,7 +140,7 @@ class Component(System):
         Parameters
         ----------
         val : bool
-            True if the component has variables that are distributed  across multiple processes.
+            True if the component has variables that are distributed across multiple processes.
         """
         warn_deprecation("The 'distributed' property provides backwards compatibility "
                          "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
