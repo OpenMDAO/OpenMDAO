@@ -548,12 +548,11 @@ class Group(System):
 
                 # Assemble allprocs_prom2abs_list
                 sub_allprocs_prom2abs_list_t = subsys._var_allprocs_prom2abs_list[type_]
-                for sub_prom_name in sub_allprocs_prom2abs_list_t:
-                    prom_name = var_maps[type_][sub_prom_name]
+                for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
+                    prom_name = var_maps[type_][sub_prom]
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
-                    allprocs_prom2abs_list[type_][prom_name].extend(
-                        sub_allprocs_prom2abs_list_t[sub_prom_name])
+                    allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
 
         for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
             if len(abs_list) > 1:
@@ -563,7 +562,9 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+            mysub = self._subsystems_myproc[0] if len(self._subsystems_myproc) > 0 else False
+            if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
+                                                    mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_resid_scaling)
             else:

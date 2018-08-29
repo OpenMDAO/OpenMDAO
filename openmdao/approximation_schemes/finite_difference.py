@@ -177,7 +177,7 @@ class FiniteDifference(ApproximationScheme):
             if step_calc == 'rel':
                 if wrt in system._outputs._views_flat:
                     scale = np.linalg.norm(system._outputs._views_flat[wrt])
-                else:
+                elif wrt in system._inputs._views_flat:
                     scale = np.linalg.norm(system._inputs._views_flat[wrt])
                 step *= scale
 
@@ -271,20 +271,22 @@ class FiniteDifference(ApproximationScheme):
                         result_array *= coeff
                         result._data += result_array
 
-                    if iproc == 0 or not use_parallel_fd:
-                        for of, subjac, out_idx in outputs:
+                    for of, _, out_idx in outputs:
+                        if of in result._views_flat:
                             results[(of, wrt)].append((i_count,
                                                        result._views_flat[of][out_idx].copy()))
                 fd_count += 1
 
         if use_parallel_fd:
             myproc = system._full_comm.rank
+            new_results = defaultdict(list)
+
             # create full results list
             all_results = system._full_comm.allgather(results)
             for rank, proc_results in enumerate(all_results):
-                if rank != myproc or iproc != 0:
-                    for key in proc_results:
-                        results[key].extend(proc_results[key])
+                for key in proc_results:
+                    new_results[key].extend(proc_results[key])
+            results = new_results
 
         for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
             for of, subjac, _ in outputs:

@@ -289,28 +289,26 @@ class ParallelFDParametricTestCase(unittest.TestCase):
 class MatMultTestCase(unittest.TestCase):
     N_PROCS = 4
 
-    def run_model(self, size, num_par_fd):
+    def run_model(self, size, num_par_fd, method):
         if MPI:
             if MPI.COMM_WORLD.rank == 0:
                 mat = np.random.random(5 * size).reshape((5, size)) - 0.5
             else:
                 mat = None
             mat = MPI.COMM_WORLD.bcast(mat, root=0)
-            profname = "prof_%d.out" % MPI.COMM_WORLD.rank
         else:
             mat = np.random.random(5 * size).reshape((5, size)) - 0.5
-            profname = "prof.out"
 
         p = Problem()
 
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
-        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd'))
+        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method))
         comp.options['num_par_fd'] = num_par_fd
 
         model.connect('indep.x', 'comp.x')
 
-        p.setup(mode='fwd', force_alloc_complex=True)
+        p.setup(mode='fwd', force_alloc_complex=(method == 'cs'))
         p.run_model()
 
         comp.num_computes = 0
@@ -320,24 +318,135 @@ class MatMultTestCase(unittest.TestCase):
         ncomputes = comp.num_computes if comp.comm.rank == 0 else 0
 
         norm = np.linalg.norm(J['comp.y','indep.x'] - comp.mat)
-        self.assertLess(norm, 1.e-8)
+        self.assertLess(norm, 1.e-7)
         if MPI:
             self.assertEqual(MPI.COMM_WORLD.allreduce(ncomputes), size)
 
-    def test_20_by_4(self):
-        self.run_model(20, 4)
+    def test_20_by_4_fd(self):
+        self.run_model(20, 4, 'fd')
 
-    def test_21_by_4(self):
-        self.run_model(21, 4)
+    def test_21_by_4_fd(self):
+        self.run_model(21, 4, 'fd')
 
-    def test_21_by_2(self):
-        self.run_model(21, 2)
+    def test_21_by_2_fd(self):
+        self.run_model(21, 2, 'fd')
 
-    def test_21_by_3(self):
-        self.run_model(21, 3)
+    def test_21_by_3_fd(self):
+        self.run_model(21, 3, 'fd')
 
-    def test_22_by_3(self):
-        self.run_model(22, 3)
+    def test_22_by_3_fd(self):
+        self.run_model(22, 3, 'fd')
+
+    def test_20_by_4_cs(self):
+        self.run_model(20, 4, 'cs')
+
+    def test_21_by_4_cs(self):
+        self.run_model(21, 4, 'cs')
+
+    def test_21_by_2_cs(self):
+        self.run_model(21, 2, 'cs')
+
+    def test_21_by_3_cs(self):
+        self.run_model(21, 3, 'cs')
+
+    def test_22_by_3_cs(self):
+        self.run_model(22, 3, 'cs')
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class MatMultParallelTestCase(unittest.TestCase):
+    N_PROCS = 8
+
+    def run_model(self, size, num_par_fd1, num_par_fd2, method, total=False):
+        if MPI:
+            if MPI.COMM_WORLD.rank == 0:
+                mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
+            else:
+                mat1 = None
+            mat1 = MPI.COMM_WORLD.bcast(mat1, root=0)
+        else:
+            mat1 = np.random.random(5 * size).reshape((5, size)) - 0.5
+
+        mat2 = mat1 * 5.0
+
+        p = Problem()
+
+        #import wingdbstub
+
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat1.shape[1])))
+        par = model.add_subsystem('par', ParallelGroup())
+
+        if total:
+            meth = 'exact'
+        else:
+            meth = method
+        C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method=meth))
+        C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method=meth))
+
+        if total:
+            model.options['num_par_fd'] = num_par_fd1
+            model.approx_totals(method=method)
+        else:
+            C1.options['num_par_fd'] = num_par_fd1
+            C2.options['num_par_fd'] = num_par_fd2
+
+        model.connect('indep.x', 'par.C1.x')
+        model.connect('indep.x', 'par.C2.x')
+
+        p.setup(mode='fwd', force_alloc_complex=(method == 'cs'))
+        p.run_model()
+
+        J = p.compute_totals(of=['par.C1.y', 'par.C2.y'], wrt=['indep.x'])
+
+        norm = np.linalg.norm(J['par.C1.y','indep.x'] - C1.mat)
+        self.assertLess(norm, 1.e-7)
+
+        norm = np.linalg.norm(J['par.C2.y','indep.x'] - C2.mat)
+        self.assertLess(norm, 1.e-7)
+
+    def test_20_by_4_fd(self):
+        self.run_model(20, 4, 4, 'fd')
+
+    def test_20_by_4_3_fd(self):
+        self.run_model(20, 4, 3, 'fd')
+
+    def test_21_by_4_fd(self):
+        self.run_model(21, 4, 4, 'fd')
+
+    def test_21_by_2_fd(self):
+        self.run_model(21, 2, 2, 'fd')
+
+    def test_21_by_3_fd(self):
+        self.run_model(21, 3, 3, 'fd')
+
+    def test_22_by_3_fd(self):
+        self.run_model(22, 3, 3, 'fd')
+
+    def test_22_by_4_fd_total(self):
+        self.run_model(22, 4, 4, 'fd', total=True)
+
+    def test_20_by_4_cs(self):
+        self.run_model(20, 4, 4, 'cs')
+
+    def test_20_by_4_3_cs(self):
+        self.run_model(20, 4, 3, 'cs')
+
+    def test_21_by_4_cs(self):
+        self.run_model(21, 4, 4, 'cs')
+
+    def test_21_by_2_cs(self):
+        self.run_model(21, 2, 2, 'cs')
+
+    def test_21_by_3_cs(self):
+        self.run_model(21, 3, 3, 'cs')
+
+    def test_22_by_3_cs(self):
+        self.run_model(22, 3, 3, 'cs')
+
+    def test_22_by_4_cs_total(self):
+        self.run_model(22, 4, 4, 'cs', total=True)
+
 
 if __name__ == '__main__':
     unittest.main()
