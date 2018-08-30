@@ -20,7 +20,7 @@ Remember that we built our Sellar model as follows:
 
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarMDA
-    
+
 All the variables we need to set up the optimization are there. So now we just need the run script to execute the optimization.
 
 .. embed-code::
@@ -46,7 +46,7 @@ This is accomplished by this line of code:
 
 .. code::
 
-    prob.model.approx_total_derivs()
+    prob.model.approx_totals()
 
 .. note::
 
