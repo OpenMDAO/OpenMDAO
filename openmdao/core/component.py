@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import warnings
+
 from collections import OrderedDict, Iterable
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -61,9 +63,6 @@ class Component(System):
 
     Attributes
     ----------
-    distributed : bool
-        This is True if the component has variables that are distributed across multiple
-        processes.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _var_rel2data_io : dict
@@ -95,10 +94,6 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        # put these here to prevent them from possibly overriding values set
-        # by the user in initialize().
-        self.distributed = False
-
         super(Component, self).__init__(**kwargs)
 
         self._approx_schemes = OrderedDict()
@@ -112,6 +107,44 @@ class Component(System):
         self._declared_partials = []
         self._approximated_partials = []
         self._declared_partial_checks = []
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(Component, self)._declare_options()
+
+        self.options.declare('distributed', False,
+                             desc='True if the component has variables that are distributed '
+                                  'across multiple processes.')
+
+    @property
+    def distributed(self):
+        """
+        Provide 'distributed' property for backwards compatibility.
+
+        Returns
+        -------
+        bool
+            reference to the 'distributed' option.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        return self.options['distributed']
+
+    @distributed.setter
+    def distributed(self, val):
+        """
+        Provide for setting of the 'distributed' property for backwards compatibility.
+
+        Parameters
+        ----------
+        val : bool
+            True if the component has variables that are distributed across multiple processes.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        self.options['distributed'] = val
 
     def setup(self):
         """
@@ -177,8 +210,15 @@ class Component(System):
 
         self._static_mode = True
 
-        if self.distributed:
-            self._vector_class = self._distributed_vector_class
+        if self.options['distributed']:
+            if self._distributed_vector_class is not None:
+                self._vector_class = self._distributed_vector_class
+            else:
+                warnings.warn("The 'distributed' option is set to True for Component %s, "
+                              "but there is no distributed vector implementation (MPI/PETSc) "
+                              "available. The default non-distributed vectors will be used."
+                              % pathname)
+                self._vector_class = self._local_vector_class
         else:
             self._vector_class = self._local_vector_class
 
@@ -530,7 +570,7 @@ class Component(System):
         metadata['ref0'] = ref0
         metadata['res_ref'] = res_ref
 
-        metadata['distributed'] = self.distributed
+        metadata['distributed'] = self.options['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:

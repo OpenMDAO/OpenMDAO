@@ -873,7 +873,7 @@ class Group(System):
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):
                     self._local_system_set.update(s._local_system_set)
-                elif not s.distributed:
+                elif not s.options['distributed']:
                     self._local_system_set.add(s.pathname)
 
         if pathname == '':
@@ -1038,8 +1038,7 @@ class Group(System):
                                    "'%s' to '%s'. Index "
                                    "'%d' is out of range for a flat source "
                                    "of size %d.")
-                            raise ValueError(msg % (abs_out, abs_in,
-                                             bad_idx, out_size))
+                            raise ValueError(msg % (abs_out, abs_in, bad_idx, out_size))
                         if src_indices.ndim > 1:
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].flatten()
@@ -1054,8 +1053,7 @@ class Group(System):
                                            "'%s' to '%s'. Index "
                                            "'%d' is out of range for source "
                                            "dimension of size %d.")
-                                    raise ValueError(msg % (abs_out, abs_in,
-                                                     i, d_size))
+                                    raise ValueError(msg % (abs_out, abs_in, i, d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
