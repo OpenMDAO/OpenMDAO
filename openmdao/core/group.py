@@ -562,7 +562,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            mysub = self._subsystems_myproc[0] if len(self._subsystems_myproc) > 0 else False
+            mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta,
@@ -640,10 +640,14 @@ class Group(System):
                     proc_slice = slice(*subsystems_proc_range[ind])
                     var_slice = slice(*subsystems_var_range[type_][subsys.name])
                     if proc_slice.stop - proc_slice.start > subsys.comm.size:
-                        # in this case, we've split the proc for parallel FD
+                        # in this case, we've split the proc for parallel FD, so subsys doesn't
+                        # have var_sizes for all the ranks we need. Since each parallel FD comm
+                        # has the same size distribution (since all are identical), just 'tile'
+                        # the var_sizes from the subsystem to fill in the full rank range we need
+                        # at this level.
                         assert (proc_slice.stop - proc_slice.start) % subsys.comm.size == 0, \
-                            "%s comm size is not an exact multiple of %s comm size" % (
-                                self.pathname, subsys.pathname)
+                            "%s comm size (%d) is not an exact multiple of %s comm size (%d)" % (
+                                self.pathname, self.comm.size, subsys.pathname, subsys.comm.size)
                         proc_i = proc_slice.start
                         while proc_i < proc_slice.stop:
                             sizes[vec_name][type_][proc_i:proc_i + subsys.comm.size, var_slice] = \

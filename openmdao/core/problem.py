@@ -1099,7 +1099,7 @@ class Problem(object):
                             # them unless the fd is non zero. Note: subjacs_info is empty for
                             # undeclared partials, which is the default behavior now.
                             try:
-                                if subjacs[abs_key]['dependent'] is False:
+                                if not subjacs[abs_key]['dependent']:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
                                 indep_key[c_name].add(rel_key)

@@ -8,7 +8,7 @@ from itertools import product, chain
 
 from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.vectors.vector import Vector, INT_DTYPE
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import convert_neg
 

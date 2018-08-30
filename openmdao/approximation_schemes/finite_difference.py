@@ -177,10 +177,9 @@ class FiniteDifference(ApproximationScheme):
 
             if step_calc == 'rel':
                 if wrt in system._outputs._views_flat:
-                    scale = np.linalg.norm(system._outputs._views_flat[wrt])
+                    step *= np.linalg.norm(system._outputs._views_flat[wrt])
                 elif wrt in system._inputs._views_flat:
-                    scale = np.linalg.norm(system._inputs._views_flat[wrt])
-                step *= scale
+                    step *= np.linalg.norm(system._inputs._views_flat[wrt])
 
             deltas = fd_form.deltas * step
             coeffs = fd_form.coeffs / step
@@ -208,8 +207,6 @@ class FiniteDifference(ApproximationScheme):
                 outputs.append((of, np.zeros((out_size, in_size)), out_idx))
 
             self._approx_groups[i] = (wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs)
-
-        # TODO: Automatic sparse FD by constructing a graph of variable dependence?
 
     def compute_approximations(self, system, jac=None, total=False):
         """

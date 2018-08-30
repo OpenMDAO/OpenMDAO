@@ -229,7 +229,7 @@ class System(object):
     _assembled_jac : AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
     _par_fd_id : int
-        ID used to determine columns in the jacobian will be solved for when using parallel FD.
+        ID used to determine which columns in the jacobian will be computed when using parallel FD.
     """
 
     def __init__(self, **kwargs):

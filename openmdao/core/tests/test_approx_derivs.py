@@ -2,6 +2,7 @@
 from six.moves import range
 import unittest
 import itertools
+from six import iterkeys
 from parameterized import parameterized
 
 import numpy as np
@@ -17,6 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.test_suite.parametric_suite import parametric_suite
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -1555,6 +1557,42 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
+
+
+class ParallelFDParametricTestCase(unittest.TestCase):
+
+    @parametric_suite(
+        assembled_jac=[False],
+        jacobian_type=['dense'],
+        partial_type=['array'],
+        partial_method=['fd', 'cs'],
+        num_var=[3],
+        var_shape=[(2, 3), (2,)],
+        connection_type=['explicit'],
+        run_by_default=True,
+    )
+    def test_subset(self, param_instance):
+        param_instance.linear_solver_class = DirectSolver
+        param_instance.linear_solver_options = {}  # defaults not valid for DirectSolver
+
+        param_instance.setup()
+        problem = param_instance.problem
+        model = problem.model
+
+        expected_values = model.expected_values
+        if expected_values:
+            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            assert_rel_error(self, actual, expected_values, 1e-4)
+
+        expected_totals = model.expected_totals
+        if expected_totals:
+            # Forward Derivatives Check
+            totals = param_instance.compute_totals('fwd')
+            assert_rel_error(self, totals, expected_totals, 1e-4)
+
+            # Reverse Derivatives Check
+            totals = param_instance.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-4)
 
 
 if __name__ == "__main__":

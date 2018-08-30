@@ -134,8 +134,6 @@ class ComplexStep(ApproximationScheme):
 
             self._approx_groups[i] = (wrt, delta, fact, in_idx, in_size, outputs)
 
-        # TODO: Automatic sparse FD by constructing a graph of variable dependence?
-
     def compute_approximations(self, system, jac, total=False):
         """
         Execute the system to compute the approximate sub-Jacobians.

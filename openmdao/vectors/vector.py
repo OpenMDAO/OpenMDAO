@@ -86,7 +86,7 @@ class Vector(object):
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
-        A class attribute. When this is True, all vectors operate with complex numbers.
+        When True, self._data is replaced with self._cplx_data.
     """
 
     cite = ""
@@ -213,15 +213,6 @@ class Vector(object):
         if initialize_views:
             vec._initialize_views()
         return vec
-
-    def _get_array_dict_view(self, arr):
-        dict_view = {}
-        start = end = 0
-        for name, view in iteritems(self._views_flat):
-            end += view.size
-            dict_view[name] = arr[start:end]
-            start = end
-        return dict_view
 
     def _contains_abs(self, abs_name):
         """

@@ -7,7 +7,7 @@ Speeding up Derivative Approximations with Parallel Finite Difference and Parral
 If you have multiple processors available to you, it's possible to speed up the calculation of
 approximated partials or totals by computing multiple columns of the approximated Jacobian matrix
 simultaneously across multiple processes.  Setting up *parallel* finite difference or *parallel*
-complex step is identical to setting them up to execute serially, except for the additon of a single line
+complex step is identical to setting up for serial execution, except for the additon of a single line
 of code that sets the *num_par_fd* option on the System(s) where you want to compute the approximate
 derivatives.  For example,
 

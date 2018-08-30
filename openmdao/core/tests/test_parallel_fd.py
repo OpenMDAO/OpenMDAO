@@ -248,43 +248,6 @@ class ParallelDiamondFDTestCase(TestCase):
         assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
 
-class ParallelFDParametricTestCase(unittest.TestCase):
-    N_PROCS = 2
-
-    @parametric_suite(
-        assembled_jac=[False],
-        jacobian_type=['dense'],
-        partial_type=['array'],
-        partial_method=['fd', 'cs'],
-        num_var=[3],
-        var_shape=[(2, 3), (2,)],
-        connection_type=['explicit'],
-        run_by_default=True,
-    )
-    def test_subset(self, param_instance):
-        param_instance.linear_solver_class = DirectSolver
-        param_instance.linear_solver_options = {}  # defaults not valid for DirectSolver
-
-        param_instance.setup()
-        problem = param_instance.problem
-        model = problem.model
-
-        expected_values = model.expected_values
-        if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
-            assert_rel_error(self, actual, expected_values, 1e-4)
-
-        expected_totals = model.expected_totals
-        if expected_totals:
-            # Forward Derivatives Check
-            totals = param_instance.compute_totals('fwd')
-            assert_rel_error(self, totals, expected_totals, 1e-4)
-
-            # Reverse Derivatives Check
-            totals = param_instance.compute_totals('rev')
-            assert_rel_error(self, totals, expected_totals, 1e-4)
-
-
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MatMultTestCase(unittest.TestCase):
     N_PROCS = 4
@@ -370,8 +333,6 @@ class MatMultParallelTestCase(unittest.TestCase):
         mat2 = mat1 * 5.0
 
         p = Problem()
-
-        #import wingdbstub
 
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat1.shape[1])))

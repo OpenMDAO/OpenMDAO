@@ -46,7 +46,7 @@ class Jacobian(object):
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
-        if abskey is False:
+        if not abskey:
             self._abs_keys[key] = abskey = key2abs_key(self._system, key)
         return abskey
 
