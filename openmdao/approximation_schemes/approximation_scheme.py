@@ -63,7 +63,7 @@ class ApproximationScheme(object):
         """
         pass
 
-    def _run_point(self, system, input_deltas, out_tmp, in_tmp, result_array, total=False):
+    def _run_point(self, system, in_name, idxs, delta, out_tmp, in_tmp, result_array, total=False):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -71,8 +71,12 @@ class ApproximationScheme(object):
         ----------
         system : System
             The system having its derivs approximated.
-        input_deltas : list
-            List of (input name, indices, delta) tuples, where input name is an absolute name.
+        in_name : str
+            Input name.
+        idxs : ndarray
+            Input indices.
+        delta : float
+            Perturbation amount.
         out_tmp : ndarray
             A copy of the starting outputs array used to restore the outputs to original values.
         in_tmp : ndarray
@@ -99,14 +103,13 @@ class ApproximationScheme(object):
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] += delta
-            elif in_name in inputs._views_flat:
-                inputs._views_flat[in_name][idxs] += delta
-            else:
-                # If we make it here, this variable is remote, so don't increment by any delta.
-                pass
+        if in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] += delta
+        elif in_name in inputs._views_flat:
+            inputs._views_flat[in_name][idxs] += delta
+        else:
+            # If we make it here, this variable is remote, so don't increment by any delta.
+            pass
 
         run_model()
 
@@ -115,9 +118,7 @@ class ApproximationScheme(object):
         inputs._data[:] = in_tmp
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
-        if results_vec is not outputs:
-            for in_name, idxs, delta in input_deltas:
-                if in_name in outputs._views_flat:
-                    outputs._views_flat[in_name][idxs] -= delta
+        if results_vec is not outputs and in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] -= delta
 
         return result_array

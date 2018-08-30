@@ -183,8 +183,7 @@ class ComplexStep(ApproximationScheme):
             for i_count, idx in enumerate(in_idx):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # Run the Finite Difference
-                    input_delta = [(wrt, idx, delta)]
-                    result = self._run_point_complex(system, input_delta, results_clone, total)
+                    result = self._run_point_complex(system, wrt, idx, delta, results_clone, total)
 
                     for of, _, out_idx in outputs:
                         if of in result._views_flat:
@@ -221,7 +220,7 @@ class ComplexStep(ApproximationScheme):
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, input_deltas, result_clone, total=False):
+    def _run_point_complex(self, system, in_name, idxs, delta, result_clone, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -229,8 +228,12 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        input_deltas : list
-            List of (input name, indices, delta) tuples, where input name is an absolute name.
+        in_name : str
+            Input name.
+        idxs : ndarray
+            Input indices.
+        delta : complex
+            Perturbation amount.
         result_clone : Vector
             A vector cloned from the outputs vector. Used to store the results.
         total : bool
@@ -253,20 +256,18 @@ class ComplexStep(ApproximationScheme):
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] += delta
-            elif in_name in inputs._views_flat:
-                inputs._views_flat[in_name][idxs] += delta
+        if in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] += delta
+        elif in_name in inputs._views_flat:
+            inputs._views_flat[in_name][idxs] += delta
 
         run_model()
 
         result_clone.set_vec(results_vec)
 
-        for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] -= delta
-            elif in_name in inputs._views_flat:
-                inputs._views_flat[in_name][idxs] -= delta
+        if in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] -= delta
+        elif in_name in inputs._views_flat:
+            inputs._views_flat[in_name][idxs] -= delta
 
         return result_clone

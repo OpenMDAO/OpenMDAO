@@ -266,8 +266,8 @@ class FiniteDifference(ApproximationScheme):
 
                     # Run the Finite Difference
                     for delta, coeff in zip(deltas, coeffs):
-                        input_delta = [(wrt, idx, delta)]
-                        self._run_point(system, input_delta, out_tmp, in_tmp, result_array, total)
+                        self._run_point(system, wrt, idx, delta, out_tmp, in_tmp, result_array,
+                                        total)
                         result_array *= coeff
                         result._data += result_array
 
