@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import warnings
+
 from collections import OrderedDict, Iterable
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -116,6 +118,34 @@ class Component(System):
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
 
+    @property
+    def distributed(self):
+        """
+        Provide 'distributed' property for backwards compatibility.
+
+        Returns
+        -------
+        bool
+            reference to the 'distributed' option.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        return self.options['distributed']
+
+    @distributed.setter
+    def distributed(self, val):
+        """
+        Provide for setting of the 'distributed' property for backwards compatibility.
+
+        Parameters
+        ----------
+        val : bool
+            True if the component has variables that are distributed across multiple processes.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        self.options['distributed'] = val
+
     def setup(self):
         """
         Declare inputs and outputs.
@@ -165,7 +195,14 @@ class Component(System):
         self._static_mode = True
 
         if self.options['distributed']:
-            self._vector_class = self._distributed_vector_class
+            if self._distributed_vector_class is not None:
+                self._vector_class = self._distributed_vector_class
+            else:
+                warnings.warn("The 'distributed' option is set to True for Component %s, "
+                              "but there is no distributed vector implementation (MPI/PETSc) "
+                              "available. The default non-distributed vectors will be used."
+                              % pathname)
+                self._vector_class = self._local_vector_class
         else:
             self._vector_class = self._local_vector_class
 
