@@ -7,7 +7,8 @@ from six.moves import range, zip
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
+    _gather_jac_results
 from openmdao.utils.name_maps import abs_key2rel_key
 
 
@@ -277,8 +278,8 @@ class FiniteDifference(ApproximationScheme):
                     if is_parallel:
                         for of, _, out_idx in outputs:
                             if owns[of] == iproc:
-                                results[(of, wrt)].append((i_count,
-                                                           result._views_flat[of][out_idx].copy()))
+                                results[(of, wrt)].append(
+                                    (i_count, result._views_flat[of][out_idx].copy()))
                     else:
                         for of, subjac, out_idx in outputs:
                             subjac[:, i_count] = result._views_flat[of][out_idx]
@@ -286,17 +287,9 @@ class FiniteDifference(ApproximationScheme):
                 fd_count += 1
 
         if is_parallel:
-            myproc = mycomm.rank
-            new_results = defaultdict(list)
+            results = _gather_jac_results(mycomm, results)
 
-            # create full results list
-            all_results = mycomm.allgather(results)
-            for rank, proc_results in enumerate(all_results):
-                for key in proc_results:
-                    new_results[key].extend(proc_results[key])
-            results = new_results
-
-        for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
+        for wrt, _, _, _, _, _, outputs in approx_groups:
             for of, subjac, _ in outputs:
                 key = (of, wrt)
                 if is_parallel:

@@ -1,6 +1,8 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
+from collections import defaultdict
+
 
 class ApproximationScheme(object):
     """
@@ -62,3 +64,16 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         pass
+
+
+def _gather_jac_results(comm, results):
+    myproc = comm.rank
+    new_results = defaultdict(list)
+
+    # create full results list
+    all_results = comm.allgather(results)
+    for rank, proc_results in enumerate(all_results):
+        for key in proc_results:
+            new_results[key].extend(proc_results[key])
+
+    return new_results
