@@ -426,6 +426,10 @@ class MatMultParallelTestCase(unittest.TestCase):
     def test_22_by_4_fd_total(self):
         self.run_model(22, 4, 4, 'fd', total=True)
 
+    def test_22_fd_total_no_par_fd(self):
+        # this tests regular FD when not all vars are local
+        self.run_model(22, 1, 1, 'fd', total=True)
+
     def test_20_by_4_cs(self):
         self.run_model(20, 4, 4, 'cs')
 
@@ -446,6 +450,10 @@ class MatMultParallelTestCase(unittest.TestCase):
 
     def test_22_by_4_cs_total(self):
         self.run_model(22, 4, 4, 'cs', total=True)
+
+    def test_22_cs_total_no_par_fd(self):
+        # this tests regular CS when not all vars are local
+        self.run_model(22, 1, 1, 'cs', total=True)
 
 
 if __name__ == '__main__':

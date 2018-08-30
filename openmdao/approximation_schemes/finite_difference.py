@@ -248,9 +248,12 @@ class FiniteDifference(ApproximationScheme):
         num_par_fd = system.options['num_par_fd']
         use_parallel_fd = num_par_fd > 1 and (system._full_comm is not None and
                                               system._full_comm.size > 1)
+        is_parallel = use_parallel_fd or system.comm.size > 1
 
         results = defaultdict(list)
         iproc = system.comm.rank
+        owns = system._owning_rank
+        mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
         approx_groups = self._get_approx_groups(system)
@@ -271,18 +274,23 @@ class FiniteDifference(ApproximationScheme):
                         result_array *= coeff
                         result._data += result_array
 
-                    for of, _, out_idx in outputs:
-                        if of in result._views_flat:
-                            results[(of, wrt)].append((i_count,
-                                                       result._views_flat[of][out_idx].copy()))
+                    if is_parallel:
+                        for of, _, out_idx in outputs:
+                            if owns[of] == iproc:
+                                results[(of, wrt)].append((i_count,
+                                                           result._views_flat[of][out_idx].copy()))
+                    else:
+                        for of, subjac, out_idx in outputs:
+                            subjac[:, i_count] = result._views_flat[of][out_idx]
+
                 fd_count += 1
 
-        if use_parallel_fd:
-            myproc = system._full_comm.rank
+        if is_parallel:
+            myproc = mycomm.rank
             new_results = defaultdict(list)
 
             # create full results list
-            all_results = system._full_comm.allgather(results)
+            all_results = mycomm.allgather(results)
             for rank, proc_results in enumerate(all_results):
                 for key in proc_results:
                     new_results[key].extend(proc_results[key])
@@ -291,8 +299,9 @@ class FiniteDifference(ApproximationScheme):
         for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
             for of, subjac, _ in outputs:
                 key = (of, wrt)
-                for i, result in results[key]:
-                    subjac[:, i] = result
+                if is_parallel:
+                    for i, result in results[key]:
+                        subjac[:, i] = result
 
                 rel_key = abs_key2rel_key(system, key)
 
