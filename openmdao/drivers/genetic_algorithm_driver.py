@@ -20,6 +20,7 @@ Sobieszczanski-Sobieski, J., Morris, A. J., van Tooren, M. J. L. (2015)
 Multidisciplinary Design Optimization Supported by Knowledge Based Engineering.
 John Wiley & Sons, Ltd.
 """
+import os
 import copy
 
 from six import iteritems, itervalues, next
@@ -80,7 +81,10 @@ class SimpleGADriver(Driver):
         self._ga = None
 
         # random state can be set for predictability during testing
-        self._randomstate = None
+        if 'SimpleGADriver_seed' in os.environ:
+            self._randomstate = int(os.environ['SimpleGADriver_seed'])
+        else:
+            self._randomstate = None
 
         # Support for Parallel models.
         self._concurrent_pop_size = 0
