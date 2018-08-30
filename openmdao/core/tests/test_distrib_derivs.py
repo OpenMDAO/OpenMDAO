@@ -19,6 +19,7 @@ if MPI:
 else:
     rank = 0
 
+
 class DistribExecComp(ExecComp):
     """
     An ExecComp that uses N procs and takes input var slices.  Unlike a normal
@@ -26,10 +27,11 @@ class DistribExecComp(ExecComp):
     multiple expressions, it will use a different one in each proc, repeating
     the last one in any remaining procs.
     """
+
     def __init__(self, exprs, arr_size=11, **kwargs):
         super(DistribExecComp, self).__init__(exprs, **kwargs)
         self.arr_size = arr_size
-        self.distributed = True
+        self.options['distributed'] = True
 
     def setup(self):
         outs = set()
@@ -78,7 +80,8 @@ class DistribExecComp(ExecComp):
 class DistribCoordComp(ExplicitComponent):
     def __init__(self, **kwargs):
         super(DistribCoordComp, self).__init__(**kwargs)
-        self.distributed = True
+
+        self.options['distributed'] = True
 
     def setup(self):
         comm = self.comm
@@ -86,20 +89,20 @@ class DistribCoordComp(ExplicitComponent):
 
         if rank == 0:
             self.add_input('invec', numpy.zeros((5, 3)),
-                           src_indices=[[(0,0), (0,1), (0,2)],
-                                        [(1,0), (1,1), (1,2)],
-                                        [(2,0), (2,1), (2,2)],
-                                        [(3,0), (3,1), (3,2)],
-                                        [(4,0), (4,1), (4,2)]])
+                           src_indices=[[(0, 0), (0, 1), (0, 2)],
+                                        [(1, 0), (1, 1), (1, 2)],
+                                        [(2, 0), (2, 1), (2, 2)],
+                                        [(3, 0), (3, 1), (3, 2)],
+                                        [(4, 0), (4, 1), (4, 2)]])
             self.add_output('outvec', numpy.zeros((5, 3)))
         else:
             self.add_input('invec', numpy.zeros((4, 3)),
-                           src_indices=[[(5,0), (5,1), (5,2)],
-                                        [(6,0), (6,1), (6,2)],
-                                        [(7,0), (7,1), (7,2)],
+                           src_indices=[[(5, 0), (5, 1), (5, 2)],
+                                        [(6, 0), (6, 1), (6, 2)],
+                                        [(7, 0), (7, 1), (7, 2)],
                                         # use some negative indices here to
                                         # make sure they work
-                                        [(-1,0), (8,1), (-1,2)]])
+                                        [(-1, 0), (8, 1), (-1, 2)]])
             self.add_output('outvec', numpy.zeros((4, 3)))
 
     def compute(self, inputs, outputs):
@@ -134,8 +137,8 @@ class MPITests2(unittest.TestCase):
         prob.model.add_subsystem('indep', IndepVarComp('x', points))
         prob.model.add_subsystem('comp', DistribCoordComp())
         prob.model.add_subsystem('total', ExecComp('y=x',
-                                                   x=numpy.zeros((9,3)),
-                                                   y=numpy.zeros((9,3))))
+                                                   x=numpy.zeros((9, 3)),
+                                                   y=numpy.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
         prob.model.connect('comp.outvec', 'total.x')
 
@@ -242,7 +245,7 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
         prob.model = root = Group()
-        
+
         root.add_subsystem('P1', IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add_subsystem('P2', IndepVarComp('x', numpy.ones(size, dtype=float)))
         sub = root.add_subsystem('sub', ParallelGroup())
@@ -253,7 +256,8 @@ class MPITests2(unittest.TestCase):
         sub.add_subsystem('C2', ExecComp(['y=5.0*x'],
                                          x=numpy.zeros(size, dtype=float),
                                          y=numpy.zeros(size, dtype=float)))
-        root.add_subsystem('C3', DistribExecComp(['y=3.0*x1+7.0*x2', 'y=1.5*x1+3.5*x2'], arr_size=size,
+        root.add_subsystem('C3', DistribExecComp(['y=3.0*x1+7.0*x2', 'y=1.5*x1+3.5*x2'],
+                                                 arr_size=size,
                                                  x1=numpy.zeros(size, dtype=float),
                                                  x2=numpy.zeros(size, dtype=float),
                                                  y=numpy.zeros(size, dtype=float)))
@@ -293,7 +297,6 @@ class MPITests2(unittest.TestCase):
         raise unittest.SkipTest("distrib vois no supported yet")
 
 
-
 class DistribStateImplicit(ImplicitComponent):
     """
     This component is unusual in that it has a distributed variable 'states' that
@@ -301,8 +304,9 @@ class DistribStateImplicit(ImplicitComponent):
     values of 'states' and the output 'out_var' is the sum of all of the distributed values
     of 'states'.
     """
+
     def setup(self):
-        self.distributed = True
+        self.options['distributed'] = True
 
         self.add_input('a', val=10., units='m', src_indices=[0])
 
@@ -372,6 +376,7 @@ class DistribStateImplicit(ImplicitComponent):
             if 'a' in d_i:
                     d_i['a'] -= numpy.sum(d_r['states'])
 
+
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITests3(unittest.TestCase):
 
@@ -395,6 +400,7 @@ class MPITests3(unittest.TestCase):
         p.run_model()
         jac = p.compute_totals(of=['out_var'], wrt=['a'], return_format='dict')
         assert_rel_error(self, jac['out_var']['a'][0], expected, 1e-6)
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

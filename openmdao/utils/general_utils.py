@@ -448,7 +448,7 @@ def printoptions(*args, **kwds):
 
     Set print options for the scope of the `with` block, and restore the old
     options at the end. See `numpy.set_printoptions` for the full description of
-    available options.
+    available options. If any invalid options are specified, they will be ignored.
 
     Parameters
     ----------
@@ -471,8 +471,13 @@ def printoptions(*args, **kwds):
     set_printoptions, get_printoptions
     """
     opts = np.get_printoptions()
+
+    # ignore any keyword args that are not valid in this version of numpy
+    # e.g. numpy <=1.13 does not have the 'floatmode' option
+    kw_opts = dict((key, val) for key, val in kwds.items() if key in opts)
+
     try:
-        np.set_printoptions(*args, **kwds)
+        np.set_printoptions(*args, **kw_opts)
         yield np.get_printoptions()
     finally:
         np.set_printoptions(**opts)

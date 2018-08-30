@@ -12,9 +12,9 @@ try:
 except ImportError:
     PETScVector = None
 
-@unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
-                 "PETSc is required." if PETScVector is None
-                 else "Unreliable on Travis CI.")
+
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -57,7 +57,7 @@ class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['print_results'] = False
 
-        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+        prob.driver.options['debug_print'] = ['desvars', 'ln_cons', 'nl_cons', 'objs']
 
         prob.setup()
 
