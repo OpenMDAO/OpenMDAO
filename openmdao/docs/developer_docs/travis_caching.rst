@@ -36,7 +36,7 @@ Read the comments for some not-so-intuitive news on what caching does the first 
         rm -rf $HOME/miniconda;
       fi
 
-Finally, a last thing to cache might be something private, like in OpenMDAO's case, the code for SNOPT, to be used inside
+Another thing to cache might be something private, like in OpenMDAO's case, the code for SNOPT, to be used inside
 our pyoptsparse install. To do this, we need to keep our private code in a private location, then do the following:
 
     #. Set up passwordless entrance to the secure location with the SNOPT source.
@@ -52,7 +52,7 @@ In fulfillment of #1, let's get a key decrypted, placed, chmodded, and added for
         eval "$(ssh-agent -s)";
         chmod 600 /tmp/travis_deploy_rsa;
         ssh-add /tmp/travis_deploy_rsa;
-        echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
+        echo -e "Host [hostname]\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
       fi
 
 In fulfillment of #2, set $SNOPT_LOCATION to be an encrypted variable in your Travis CI settings that contains the
@@ -78,8 +78,8 @@ then, following a successful build/test, it will get cached.
 
 .. note::
 
-    There is one potentially-confusing complication to this whole process of caching of a private item. The use of an encrypted variable as described above is not allowed
-    by Travis on pull requests--Travis determines bringing in encrypted variables to be a security vulnerability. In other words, encrypted stuff won't work during a PR.
-    Only after that PR has been merged by a repo owner, then, during the subsequent master build, the encrypted items will work,
-    and will be cached if THAT master build/test is successful.  Once the encrypted item builds and caches on master, subsequent pull-request builds WILL have
+    Travis pull requests(PRs) are built as the submitting account. It is a potential vulnerability for someone to be able to submit a PR
+    and automatically execute something with the OpenMDAO account keys. Therefore, use of an encrypted variable as described above is not allowed
+    by Travis on pull requests. Only after that PR has been merged by a repo owner, during the subsequent master build, the encrypted items will work.
+    If that build and test succeeds, only then will encrypted items be cached.  From then onward, subsequent pull-request builds WILL have
     the cached private item in their caches, because the PR builds derive their caches from the master cache.

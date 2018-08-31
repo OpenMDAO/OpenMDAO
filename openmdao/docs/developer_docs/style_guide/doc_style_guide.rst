@@ -283,7 +283,7 @@ Embedding More Than Just Code
            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
 
-   Note, that as mentioned above, the default value of :code:`layout` is just "code," so the
+   Note that, as mentioned above, the default value of :code:`layout` is just "code," so the
    layout is not specified here. The resulting embed looks like this:
 
    .. embed-code::

@@ -7,7 +7,7 @@ Sample OpenMDAO-Compatible Repository Template
 ----------------------------------------------
 
 A lot of small details go into setting up a repository: the code itself, packaging mechanisms, continuous integration
-configuration, documentation building, and documentation styling, to name a few. To aid in the setup uof a new tool built
+configuration, documentation building, and documentation styling, to name a few. To aid in the setup of a new tool built
 upon OpenMDAO, we have created a Github repository that is a basic template of how to set up your project. It is a small
 working example that you can clone and copy to help set up your own repository: `OpenMDAO Library Template <https://github.com/OpenMDAO/library_template>`_
 
