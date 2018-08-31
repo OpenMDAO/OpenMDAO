@@ -49,7 +49,7 @@ class BM(unittest.TestCase):
             jacobian_type='dense',
             connection_type='explicit',
             partial_type='array',
-            finite_difference=False,
+            partial_method='exact',
             num_var=5, num_comp=200,
             var_shape=(3,)
         )
@@ -65,7 +65,7 @@ class BM(unittest.TestCase):
             jacobian_type='dense',
             connection_type='explicit',
             partial_type='array',
-            finite_difference=False,
+            partial_method='exact',
             num_var=5, num_comp=200,
             var_shape=(3,)
         )
@@ -80,7 +80,7 @@ class BM(unittest.TestCase):
             jacobian_type='dense',
             connection_type='explicit',
             partial_type='array',
-            finite_difference=False,
+            partial_method='exact',
             num_var=5, num_comp=200,
             var_shape=(3,)
         )
@@ -95,7 +95,7 @@ class BM(unittest.TestCase):
             jacobian_type='dense',
             connection_type='explicit',
             partial_type='array',
-            finite_difference=True,
+            partial_method='fd',
             num_var=5, num_comp=50,
             var_shape=(3,)
         )

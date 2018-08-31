@@ -16,11 +16,12 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.array_utils import evenly_distrib_idxs
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -70,6 +71,8 @@ class System(object):
     cite : str
         Listing of relevant citataions that should be referenced when
         publishing work that uses this class.
+    _full_comm : MPI.Comm or None
+        MPI communicator object used when System's comm is split for parallel FD.
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -81,8 +84,6 @@ class System(object):
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
         List of ranges of each myproc subsystem's allprocs variables relative to this system.
-    _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
-        Number of allprocs variables owned by this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -227,6 +228,8 @@ class System(object):
         Class to use for local data vectors.
     _assembled_jac : AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
+    _par_fd_id : int
+        ID used to determine which columns in the jacobian will be computed when using parallel FD.
     """
 
     def __init__(self, **kwargs):
@@ -248,6 +251,10 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
+
+        self.options.declare('num_par_fd', default=1, types=int,
+                             desc='Number of finite difference points that will be performed '
+                                  'concurrently, if FD is active.')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -280,8 +287,6 @@ class System(object):
         self._subsystems_myproc_inds = []
         self._subsystems_proc_range = []
 
-        self._num_var = {'input': 0, 'output': 0}
-
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
@@ -294,6 +299,8 @@ class System(object):
 
         self._var_sizes = None
         self._var_offsets = None
+
+        self._full_comm = None
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
@@ -358,6 +365,8 @@ class System(object):
         self._distributed_vector_class = None
 
         self._assembled_jac = None
+
+        self._par_fd_id = 0
 
     def _declare_options(self):
         """
@@ -635,11 +644,53 @@ class System(object):
         self._setup_vec_names(mode, self._vec_names, self._vois)
         self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
-        self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _setup_par_fd_procs(self, comm):
+        """
+        Split up the comm for use in parallel FD.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm>
+            MPI communicator object.
+        """
+        num_par_fd = self.options['num_par_fd']
+        if num_par_fd < 1:
+            raise ValueError("'%s': num_par_fd must be >= 1 but value is %s." %
+                             (self.pathname, self._num_par_fds))
+        if comm.size < num_par_fd:
+            raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
+                             (self.pathname, comm.size))
+
+        if not MPI:
+            self.options['num_par_fd'] = 1
+
+        self._full_comm = comm
+
+        if num_par_fd > 1:
+            sizes, offsets = evenly_distrib_idxs(num_par_fd, comm.size)
+
+            # a 'color' is assigned to each subsystem, with
+            # an entry for each processor it will be given
+            # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+            color = np.empty(comm.size, dtype=int)
+            for i in range(num_par_fd):
+                color[offsets[i]:offsets[i] + sizes[i]] = i
+
+            self._par_fd_id = color[comm.rank]
+
+            comm = self._full_comm.Split(self._par_fd_id)
+
+        return comm
 
     def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
@@ -746,17 +797,6 @@ class System(object):
         if self.recording_options['record_model_metadata']:
             for sub in self.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
-
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        self._num_var = {}
 
     def _setup_var_index_ranges(self, recurse=True):
         """
@@ -1357,12 +1397,10 @@ class System(object):
         yield
 
         for vec in outputs:
-
             if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
-
             if self._has_resid_scaling:
                 vec.scale('norm')
 
@@ -1523,11 +1561,9 @@ class System(object):
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]
                     if vsizes.size > 0:
-                        csum = np.cumsum(vsizes)
-                        # shift the cumsum forward by one and set first entry to 0 to get
-                        # the correct offset.
-                        csum[1:] = csum[:-1]
+                        csum = np.empty(vsizes.size, dtype=int)
                         csum[0] = 0
+                        csum[1:] = np.cumsum(vsizes)[:-1]
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
                         off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))

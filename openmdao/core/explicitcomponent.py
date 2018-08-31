@@ -7,6 +7,7 @@ from six import itervalues, iteritems
 from six.moves import range
 
 from openmdao.core.component import Component
+from openmdao.vectors.vector import Vector
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 
@@ -161,9 +162,6 @@ class ExplicitComponent(Component):
                 if (method is not None and method in self._approx_schemes and abs_key[1]
                         not in self._outputs._views_flat):
                     self._approx_schemes[method].add_approximation(abs_key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def _apply_nonlinear(self):
         """

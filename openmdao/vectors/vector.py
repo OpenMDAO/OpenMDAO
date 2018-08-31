@@ -85,6 +85,8 @@ class Vector(object):
         publishing work that uses this class.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
+    _under_complex_step : bool
+        When True, self._data is replaced with self._cplx_data.
     """
 
     cite = ""

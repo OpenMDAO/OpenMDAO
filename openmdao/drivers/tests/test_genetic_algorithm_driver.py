@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, PETScVector, \
-                         ParallelGroup
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, \
+    PETScVector, ParallelGroup
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
@@ -35,7 +35,6 @@ class TestSimpleGA(unittest.TestCase):
                 outputs['b'] = 18.0 - 32.0*x[0] + 12.0*x[0]**2 + 48.0*x[1] - 36.0*x[0]*x[1] + 27.0*x[1]**2
                 outputs['c'] = (x[0] + x[1] + 1.0)**2
                 outputs['d'] = 19.0 - 14.0*x[0] + 3.0*x[0]**2 - 14.0*x[1] + 6.0*x[0]*x[1] + 3.0*x[1]**2
-
 
         prob = Problem()
         prob.model = model = Group()
@@ -105,6 +104,7 @@ class TestSimpleGA(unittest.TestCase):
             """
             Weight objective with penalty on stress constraint.
             """
+
             def setup(self):
                 self.add_input('obj', 0.0)
                 self.add_input('stress', val=np.zeros((3, )))
@@ -121,7 +121,6 @@ class TestSimpleGA(unittest.TestCase):
                         pen += 10.0*(stress[j] - 1.0)**2
 
                 outputs['weighted'] = obj + pen
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -341,7 +340,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
@@ -393,7 +392,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
@@ -445,7 +444,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
@@ -604,7 +603,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
     def test_indivisible_error(self):
         prob = Problem()
         model = prob.model = Group()
-        par = model.add_subsystem('par', ParallelGroup())
+        model.add_subsystem('par', ParallelGroup())
 
         prob.driver = SimpleGADriver()
         prob.driver.options['run_parallel'] = True
@@ -625,6 +624,9 @@ class TestFeatureSimpleGA(unittest.TestCase):
     def setUp(self):
         import numpy as np
         np.random.seed(1)
+
+        import os
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_basic(self):
         from openmdao.api import Problem, Group, IndepVarComp, SimpleGADriver
@@ -767,14 +769,14 @@ class TestFeatureSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
         indeps.add_output('height', 3.)  # radius
 
         # setup the optimization
-        driver = prob.driver = SimpleGADriver()
+        prob.driver = SimpleGADriver()
         prob.driver.options['penalty_parameter'] = 3.
         prob.driver.options['penalty_exponent'] = 1.
         prob.driver.options['max_gen'] = 50
@@ -879,6 +881,7 @@ class MPIFeatureTests4(unittest.TestCase):
         print('comp.f', prob['comp.f'])
         print('p2.xI', prob['p2.xI'])
         print('p1.xC', prob['p1.xC'])
+
 
 if __name__ == "__main__":
     unittest.main()
