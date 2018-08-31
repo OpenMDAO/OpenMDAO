@@ -244,8 +244,6 @@ class ComplexStep(ApproximationScheme):
         Vector
             Copy of the results from running the perturbed system.
         """
-        # TODO: MPI
-
         inputs = system._inputs
         outputs = system._outputs
 
