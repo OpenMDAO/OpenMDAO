@@ -27,9 +27,6 @@ from openmdao.solvers.solver import Solver
 """
 SQL case output format version history.
 ---------------------------------------
-5 -- OpenMDAO 2.4
-    More general handling of ndarray variable settings metadata.  Stores metadata keys which
-    are ndarrays in a separate 'ndarrays' entry to var_settings.
 4 -- OpenMDAO 2.4
     Added variable settings metadata that contains scaling info.
 3 -- OpenMDAO 2.4
