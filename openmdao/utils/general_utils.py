@@ -504,7 +504,7 @@ def do_nothing_context():
 
 def _byteify(data, ignore_dicts=False):
     """
-    Convert any unicode items in a data structure to bytes.
+    Convert any unicode items in a data structure to bytes (object_hook for json load/loads).
 
     Credit: Mirec Miskuf
     stackoverflow.com/questions/956867/how-to-get-string-objects-instead-of-unicode-from-json
@@ -515,7 +515,7 @@ def _byteify(data, ignore_dicts=False):
         the data to be converted
     ignore_dicts : bool
         a flag to prevent recursion on dicts that have already been byteified.
-        False when object_hook passes it a new dict to byteify, True at all other times.
+        False when object_hook passes a new dict to byteify, True at all other times.
 
     Returns
     -------
@@ -550,7 +550,7 @@ def json_load_byteified(file_handle):
 
     Parameters
     ----------
-    file_handle : file containing json encoded data
+    file_handle : file
         file containing the data to be converted
 
     Returns
@@ -572,8 +572,8 @@ def json_loads_byteified(json_str):
 
     Parameters
     ----------
-    json_str : text containing json encoded data
-        the data to be converted
+    json_str : str
+        text string containing json encoded data
 
     Returns
     -------
