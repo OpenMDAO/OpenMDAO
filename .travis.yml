@@ -18,9 +18,9 @@ env:
     - PY=2.7 NUMPY=1.12
     - PY=2.7 NUMPY=1.12 PETSc=3.8.1
     - PY=2.7 NUMPY=1.12 PETSc=3.9.1
+    - PY=3.6 NUMPY=1.12
     - PY=3.6 NUMPY=1.14 PETSc=3.8.1 UPLOAD_DOCS=1
     - PY=3.6 NUMPY=1.14 PETSc=3.9.1
-    - PY=3.7 NUMPY=1.12
 
 git:
   depth: 99999
