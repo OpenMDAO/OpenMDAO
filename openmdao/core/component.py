@@ -175,6 +175,12 @@ class Component(System):
             reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
+
+        if self.options['num_par_fd'] > 1 and comm.size > 1:
+            comm = self._setup_par_fd_procs(comm)
+        else:
+            self.options['num_par_fd'] = 1
+
         self.comm = comm
         self._mode = mode
         self._subsystems_proc_range = []
@@ -192,6 +198,16 @@ class Component(System):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
         self.setup()
+
+        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
+        # Unfortunately we have to do this check after system setup has been called because that's
+        # when declare_partials generally happens, so we raise an exception here instead of just
+        # resetting the value of num_par_fd (because the comm has already been split and possibly
+        # used by the system setup).
+        if self.options['num_par_fd'] > 1 and comm.size > 1 and not (self._owns_approx_jac or
+                                                                     self._approximated_partials):
+            raise RuntimeError("num_par_fd is > 1 but no FD is active.")
+
         self._static_mode = True
 
         if self.options['distributed']:
@@ -205,27 +221,6 @@ class Component(System):
                 self._vector_class = self._local_vector_class
         else:
             self._vector_class = self._local_vector_class
-
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Component, self)._setup_vars()
-        num_var = self._num_var
-
-        for vec_name in self._lin_rel_vec_name_list:
-            num_var[vec_name] = {}
-            # Compute num_var
-            for type_ in ['input', 'output']:
-                relnames = self._var_allprocs_relevant_names[vec_name][type_]
-                num_var[vec_name][type_] = len(relnames)
-
-        self._num_var['nonlinear'] = self._num_var['linear']
 
     def _setup_var_data(self, recurse=True):
         """
@@ -289,19 +284,18 @@ class Component(System):
         vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
+        relnames = self._var_allprocs_relevant_names
+        abs2meta = self._var_abs2meta
 
         # Initialize empty arrays
         for vec_name in vec_names:
             sizes[vec_name] = {}
 
             for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
+                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[vec_name][type_])), int)
 
-            # Compute _var_sizes
-            abs2meta = self._var_abs2meta
-            for type_ in ('input', 'output'):
-                sz = sizes[vec_name][type_]
-                for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                # Compute _var_sizes
+                for idx, abs_name in enumerate(relnames[vec_name][type_]):
                     sz[iproc, idx] = abs2meta[abs_name]['size']
 
         if self.comm.size > 1:
@@ -894,11 +888,9 @@ class Component(System):
 
                 if rows.size > 0:
                     if rows.min() < 0:
-                        # of, wrt = abs_key2rel_key(self, abs_key)
                         msg = '{}: d({})/d({}): row indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     if cols.min() < 0:
-                        # of, wrt = abs_key2rel_key(self, abs_key)
                         msg = '{}: d({})/d({}): col indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     rows_max = rows.max()
@@ -1029,9 +1021,6 @@ class Component(System):
                 method = meta['method']
                 if method is not None and method in self._approx_schemes:
                     self._approx_schemes[method].add_approximation(key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def _guess_nonlinear(self):
         """

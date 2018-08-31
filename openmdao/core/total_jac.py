@@ -257,8 +257,8 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, size, has_remote_vars):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
-        if PETSc is not None and (isinstance(self.output_vec[mode]['linear'], PETScVector)
-                                  or has_remote_vars[mode]):
+        if self.comm.size > 1 or (self.model._full_comm is not None and
+                                  self.model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(size, dtype=float),
                                                   comm=self.comm)
             self.jac_petsc[mode] = tgt_vec
@@ -614,10 +614,7 @@ class _TotalJacInfo(object):
                                                            dtype=INT_DTYPE))
                         idx_array = np.hstack(dist_idxs)
                     else:
-                        if sizes[myproc, var_idx] > 0 and fwd:
-                            iproc = myproc
-                        else:
-                            iproc = owners[name]
+                        iproc = owners[name]
 
                         offset = offsets[iproc, var_idx]
                         idx_array = np.arange(offset, offset + sizes[iproc, var_idx],
@@ -1318,23 +1315,14 @@ class _TotalJacInfo(object):
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
 
+        totals = self.J_dict
         if return_format == 'flat_dict':
-            totals = OrderedDict()
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name],
-                                                            prom_out, prom_in, of_idx, wrt_idx)
+                    totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
+                                                               prom_out, prom_in, of_idx, wrt_idx)
 
-        elif return_format == 'dict':
-            totals = OrderedDict()
-            for prom_out, output_name in zip(self.prom_of, of):
-                totals[prom_out] = tot = OrderedDict()
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name],
-                                               prom_out, prom_in, of_idx, wrt_idx)
-
-        elif return_format == 'array':
-            totals = self.J_dict  # J_dict has views into the array jacobian
+        elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
