@@ -9,7 +9,7 @@ branch for public viewing by a project's users.
 
 .. warning::
     If you want to publish to github-pages from your docs built on Travis CI,  your Github repository must be public,
-    otherwise the instructions in this document will not work for you.
+    and you must be using travis-ci.ORG (not the private .COM)--otherwise the instructions in this document will not work for you.
 
 Personal Access Token
 ---------------------

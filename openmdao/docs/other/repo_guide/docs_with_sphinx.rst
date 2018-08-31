@@ -1,3 +1,5 @@
+.. _docs_with_sphinx:
+
 Setting Up Project Documentation in Sphinx
 ==========================================
 
@@ -30,6 +32,7 @@ Here's how you might bring in an OpenMDAO extension, by importing it, and then a
     ]
 
 
+For more information on some of OpenMDAO's custom embed extensions, please see :ref:`Custom Directives in OpenMDAO <custom_directives>`
 
 General Docs Settings
 ~~~~~~~~~~~~~~~~~~~~~
@@ -37,6 +40,11 @@ General Docs Settings
 Your Sphinx documentation will need its own `docs/conf.py`, theme directory, and style.css so that you may customize the docs
 into something that will make them their own. You can use OpenMDAO's `docs/conf.py`, `docs/_theme/theme.conf` and
 `docs/_theme/static/style.css` as a starting point.
+
+OpenMDAO's `docs/conf.py` file looks like this:
+
+.. embed-code::
+    conf.py
 
 OpenMDAO numpydoc monkeypatch
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,9 +100,10 @@ subpackage.  To import this tool:
 :code:`from openmdao.docutils import generate_docs`
 
 Then, from your `docs/conf.py`, invoke it with arguments of:
-    #. where to find packages (relative to where it's being called)
-    #. root of the project (relative to where it's being called)
-    #. which packages to include--omit things like "test" that don't make sense to document.
+
+    #. Where to find packages (relative to where it's being called).
+    #. Root of the project (relative to where it's being called).
+    #. Which packages to include--omit things like "test" that don't make sense to document.
 
 .. code-block:: python
 

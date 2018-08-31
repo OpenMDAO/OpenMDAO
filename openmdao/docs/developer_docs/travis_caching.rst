@@ -17,7 +17,7 @@ Certain commonly-used things can be easily cached, using code near the top of yo
         - $HOME/miniconda
         - $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse
 
-Later in your .travis.yml file, you need to check for a cached version before you install, or don't install an item.
+Later in your .travis.yml file, you need to check for a cached version before you install/don't install an item.
 Read the comments for some not-so-intuitive news on what caching does the first time through.
 
 .. code-block:: none

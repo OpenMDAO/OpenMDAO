@@ -201,6 +201,8 @@ which makes a link like this, that leads to the Direct solver's user docs:
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
+.. _`custom_directives`:
+
 Custom Directives for Embedding Items into OpenMDAO Documentation
 -----------------------------------------------------------------
 
