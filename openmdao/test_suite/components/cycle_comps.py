@@ -93,8 +93,8 @@ class ExplicitCycleComp(ExplicitComponent):
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
         self.options.declare('partial_method', default='exact',
-                              types=str,
-                              desc='How derivatives should be solves (exact, fd, or cs)')
+                              values=('exact', 'fd', 'cs'),
+                              desc='How derivatives should be solved (exact, fd, or cs)')
         self.options.declare('num_comp', types=int, default=2,
                               desc='Total number of components')
 

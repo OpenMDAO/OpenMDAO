@@ -143,8 +143,7 @@ class ComplexStep(ApproximationScheme):
         system : System
             System on which the execution is run.
         jac : dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
+            Approximations are stored in the given dict-like object.
         total : bool
             If True total derivatives are being approximated, else partials.
         """

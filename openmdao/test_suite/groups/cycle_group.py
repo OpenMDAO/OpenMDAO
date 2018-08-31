@@ -64,7 +64,7 @@ class CycleGroup(ParametericTestGroup):
                              values=['array', 'sparse', 'aij'],
                              desc='type of partial derivatives')
         self.options.declare('partial_method', default='exact',
-                             types=str,
+                             values=('exact', 'fd', 'cs'),
                              desc='Method used to solve derivatives (exact, fd, cs).')
 
     def setup(self):
