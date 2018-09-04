@@ -938,8 +938,6 @@ class MetaModelTestCase(unittest.TestCase):
                                 surrogate=surrogate,
                                 training_data=.5*np.sin(np.linspace(0,10,20)))
 
-                self.declare_partials(of='sin_x', wrt='x', method='fd')
-
         prob = Problem()
         indep = IndepVarComp()
         indep.add_output('x', 5.)
