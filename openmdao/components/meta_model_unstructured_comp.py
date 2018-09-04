@@ -166,7 +166,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         return metadata
 
-    def _setup_vars(self, recurse=True):
+    def _setup_var_data(self, recurse=True):
         """
         Count total variables.
 
@@ -190,7 +190,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # training will occur on first execution after setup
         self.train = True
 
-        super(MetaModelUnStructuredComp, self)._setup_vars()
+        super(MetaModelUnStructuredComp, self)._setup_var_data(recurse=recurse)
 
     def _setup_partials(self, recurse=True):
         """

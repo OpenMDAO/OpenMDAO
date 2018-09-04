@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, PETScVector, \
-                         ParallelGroup
+from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, \
+    PETScVector, ParallelGroup
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
 from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
@@ -35,7 +35,6 @@ class TestSimpleGA(unittest.TestCase):
                 outputs['b'] = 18.0 - 32.0*x[0] + 12.0*x[0]**2 + 48.0*x[1] - 36.0*x[0]*x[1] + 27.0*x[1]**2
                 outputs['c'] = (x[0] + x[1] + 1.0)**2
                 outputs['d'] = 19.0 - 14.0*x[0] + 3.0*x[0]**2 - 14.0*x[1] + 6.0*x[0]*x[1] + 3.0*x[1]**2
-
 
         prob = Problem()
         prob.model = model = Group()
@@ -105,6 +104,7 @@ class TestSimpleGA(unittest.TestCase):
             """
             Weight objective with penalty on stress constraint.
             """
+
             def setup(self):
                 self.add_input('obj', 0.0)
                 self.add_input('stress', val=np.zeros((3, )))
@@ -121,7 +121,6 @@ class TestSimpleGA(unittest.TestCase):
                         pen += 10.0*(stress[j] - 1.0)**2
 
                 outputs['weighted'] = obj + pen
-
 
         prob = Problem()
         model = prob.model = Group()
@@ -193,7 +192,7 @@ class TestSimpleGA(unittest.TestCase):
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
     def test_driver_options(self):
-        "Tests if Pm and Pc options can be set."
+        """Tests if Pm and Pc options can be set."""
         prob = Problem()
         model = prob.model
         indeps = model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
@@ -210,6 +209,111 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
         prob.run_driver()
         self.assertEqual(driver.options['Pm'], 0.1)
         self.assertEqual(driver.options['Pc'], 0.01)
+
+
+class TestMultiObjectiveSimpleGA(unittest.TestCase):
+
+    def test_multi_obj(self):
+
+        class Box(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('length', val=1.)
+                self.add_input('width', val=1.)
+                self.add_input('height', val=1.)
+
+                self.add_output('front_area', val=1.0)
+                self.add_output('top_area', val=1.0)
+                self.add_output('area', val=1.0)
+                self.add_output('volume', val=1.)
+
+            def compute(self, inputs, outputs):
+                length = inputs['length']
+                width = inputs['width']
+                height = inputs['height']
+
+                outputs['top_area'] = length * width
+                outputs['front_area'] = length * height
+                outputs['area'] = 2*length*height + 2*length*width + 2*height*width
+                outputs['volume'] = length*height*width
+
+        prob = Problem()
+        prob.model.add_subsystem('box', Box(), promotes=['*'])
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('length', 1.5)
+        indeps.add_output('width', 1.5)
+        indeps.add_output('height', 1.5)
+
+        # setup the optimization
+        prob.driver = SimpleGADriver()
+        prob.driver.options['max_gen'] = 100
+        prob.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob.driver.options['multi_obj_exponent'] = 1.
+        prob.driver.options['penalty_parameter'] = 10.
+        prob.driver.options['multi_obj_weights'] = {'box.front_area': 0.1,
+                                                    'box.top_area': 0.9}
+        prob.driver.options['multi_obj_exponent'] = 1
+
+        prob.model.add_design_var('length', lower=0.1, upper=2.)
+        prob.model.add_design_var('width', lower=0.1, upper=2.)
+        prob.model.add_design_var('height', lower=0.1, upper=2.)
+        prob.model.add_objective('front_area', scaler=-1)  # maximize
+        prob.model.add_objective('top_area', scaler=-1)  # maximize
+        prob.model.add_constraint('volume', upper=1.)
+
+        # run #1
+        prob.setup()
+        prob.run_driver()
+        front = prob['front_area']
+        top = prob['top_area']
+        l1 = prob['length']
+        w1 = prob['width']
+        h1 = prob['height']
+        print('Box dims: ', l1, w1, h1)
+        print('Front and top area: ', front, top)
+        print('Volume: ', prob['volume'])  # should be around 1
+
+        # run #2
+        # weights changed
+        prob2 = Problem()
+        prob2.model.add_subsystem('box', Box(), promotes=['*'])
+
+        indeps2 = prob2.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps2.add_output('length', 1.5)
+        indeps2.add_output('width', 1.5)
+        indeps2.add_output('height', 1.5)
+
+        # setup the optimization
+        prob2.driver = SimpleGADriver()
+        prob2.driver.options['max_gen'] = 100
+        prob2.driver.options['bits'] = {'length': 8, 'width': 8, 'height': 8}
+        prob2.driver.options['multi_obj_exponent'] = 1.
+        prob2.driver.options['penalty_parameter'] = 10.
+        prob2.driver.options['multi_obj_weights'] = {'box.front_area': 0.9,
+                                                     'box.top_area': 0.1}
+        prob2.driver.options['multi_obj_exponent'] = 1
+
+        prob2.model.add_design_var('length', lower=0.1, upper=2.)
+        prob2.model.add_design_var('width', lower=0.1, upper=2.)
+        prob2.model.add_design_var('height', lower=0.1, upper=2.)
+        prob2.model.add_objective('front_area', scaler=-1)  # maximize
+        prob2.model.add_objective('top_area', scaler=-1)  # maximize
+        prob2.model.add_constraint('volume', upper=1.)
+
+        # run #1
+        prob2.setup()
+        prob2.run_driver()
+        front2 = prob2['front_area']
+        top2 = prob2['top_area']
+        l2 = prob2['length']
+        w2 = prob2['width']
+        h2 = prob2['height']
+        print('Box dims: ', l2, w2, h2)
+        print('Front and top area: ', front2, top2)
+        print('Volume: ', prob['volume'])  # should be around 1
+        self.assertGreater(w1, w2)  # front area does not depend on width
+        self.assertGreater(h2, h1)  # top area does not depend on height
 
 
 class TestConstrainedSimpleGA(unittest.TestCase):
@@ -236,7 +340,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
@@ -288,7 +392,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
@@ -340,7 +444,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
@@ -499,7 +603,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
     def test_indivisible_error(self):
         prob = Problem()
         model = prob.model = Group()
-        par = model.add_subsystem('par', ParallelGroup())
+        model.add_subsystem('par', ParallelGroup())
 
         prob.driver = SimpleGADriver()
         prob.driver.options['run_parallel'] = True
@@ -520,6 +624,9 @@ class TestFeatureSimpleGA(unittest.TestCase):
     def setUp(self):
         import numpy as np
         np.random.seed(1)
+
+        import os
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_basic(self):
         from openmdao.api import Problem, Group, IndepVarComp, SimpleGADriver
@@ -662,14 +769,14 @@ class TestFeatureSimpleGA(unittest.TestCase):
                 outputs['Volume'] = volume
 
         prob = Problem()
-        cylinder = prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
+        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
 
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('radius', 2.)  # height
         indeps.add_output('height', 3.)  # radius
 
         # setup the optimization
-        driver = prob.driver = SimpleGADriver()
+        prob.driver = SimpleGADriver()
         prob.driver.options['penalty_parameter'] = 3.
         prob.driver.options['penalty_exponent'] = 1.
         prob.driver.options['max_gen'] = 50
@@ -774,6 +881,7 @@ class MPIFeatureTests4(unittest.TestCase):
         print('comp.f', prob['comp.f'])
         print('p2.xI', prob['p2.xI'])
         print('p1.xC', prob['p1.xC'])
+
 
 if __name__ == "__main__":
     unittest.main()

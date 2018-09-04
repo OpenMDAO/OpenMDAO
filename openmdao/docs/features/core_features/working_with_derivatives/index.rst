@@ -10,6 +10,7 @@ Using Finite Difference or Complex Step
 
     approximating_partials.rst
     approximating_totals.rst
+    parallel_fd.rst
 
 
 Providing Analytic Partial Derivatives

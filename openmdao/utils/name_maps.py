@@ -97,10 +97,10 @@ def prom_name2abs_name(system, prom_name, type_):
     str or None
         Absolute variable name or None if prom_name is invalid.
     """
-    prom2abs_list = system._var_allprocs_prom2abs_list[type_]
+    prom2abs_lists = system._var_allprocs_prom2abs_list[type_]
 
-    if prom_name in prom2abs_list:
-        abs_list = prom2abs_list[prom_name]
+    if prom_name in prom2abs_lists:
+        abs_list = prom2abs_lists[prom_name]
         if len(abs_list) == 1:
             return abs_list[0]
         else:
@@ -171,12 +171,10 @@ def prom_key2abs_key(system, prom_key):
     (str, str) or None
         Absolute name pair of sub-Jacobian or None is prom_key is invalid.
     """
-    abs_name0 = prom_name2abs_name(system, prom_key[0], 'output')
-
     abs_name1in = prom_name2abs_name(system, prom_key[1], 'input')
     abs_name1out = prom_name2abs_name(system, prom_key[1], 'output')
     if abs_name1in is None and abs_name1out is None:
-        abs_name1 = None
+        return None
     elif abs_name1in is None:
         abs_name1 = abs_name1out
     elif abs_name1out is None:
@@ -185,7 +183,8 @@ def prom_key2abs_key(system, prom_key):
         msg = 'The promoted name "{}" is invalid because it is non-unique.'
         raise KeyError(msg.format(prom_key[1]))
 
-    if abs_name0 is not None and abs_name1 is not None:
+    abs_name0 = prom_name2abs_name(system, prom_key[0], 'output')
+    if abs_name0 is not None:
         return (abs_name0, abs_name1)
 
 
@@ -211,14 +210,12 @@ def key2abs_key(system, key):
     if key in system._subjacs_info:
         return key
 
-    abs2meta = system._var_abs2meta
-
     abs_key = prom_key2abs_key(system, key)
     if abs_key is not None:
         return abs_key
 
     abs_key = rel_key2abs_key(system, key)
-    if abs_key[0] in abs2meta and abs_key[1] in abs2meta:
+    if abs_key[0] in system._var_abs2meta and abs_key[1] in system._var_abs2meta:
         return abs_key
     else:
         return None

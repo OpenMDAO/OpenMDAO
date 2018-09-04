@@ -197,7 +197,7 @@ class TestJacobian(unittest.TestCase):
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize
-        ), testcase_func_name=_test_func_name
+        ), name_func=_test_func_name
     )
     def test_src_indices(self, assembled_jac, comp_jac_class, nested, lincalls):
 
@@ -301,7 +301,7 @@ class TestJacobian(unittest.TestCase):
          (3, 3))
     ]
 
-    @parameterized.expand(itertools.product(dtypes, shapes), testcase_func_name=
+    @parameterized.expand(itertools.product(dtypes, shapes), name_func=
     lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
     def test_jacobian_set_item(self, dtypes, shapes):
 
@@ -489,7 +489,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        #prob.model.nonlinear_solver = NewtonSolver()
+        # prob.model.nonlinear_solver = NewtonSolver()
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         G1.linear_solver = DirectSolver(assemble_jac=True)

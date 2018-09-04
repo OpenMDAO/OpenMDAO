@@ -68,9 +68,15 @@ def take_nth(rank, size, seq):
     while True:
         for proc in range(size):
             if rank == proc:
-                yield six.next(it)
+                try:
+                    yield six.next(it)
+                except StopIteration:
+                    return
             else:
-                six.next(it)
+                try:
+                    six.next(it)
+                except StopIteration:
+                    return
 
 
 def convert_neg(arr, dim):

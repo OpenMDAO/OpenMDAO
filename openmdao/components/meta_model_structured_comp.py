@@ -683,7 +683,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
 
-    def _setup_vars(self, recurse=True):
+    def _setup_var_data(self, recurse=True):
         """
         Instantiate surrogates for the output variables that use the default surrogate.
 
@@ -705,7 +705,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         if self.options['training_data_gradients']:
             self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
-        super(MetaModelStructuredComp, self)._setup_vars()
+        super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
 
     def _setup_partials(self, recurse=True):
         """

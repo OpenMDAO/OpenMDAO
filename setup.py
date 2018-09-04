@@ -98,7 +98,6 @@ setup(
         'testflo',
         'parameterized',
         'pyparsing',
-        'pyyaml',
         'networkx>=2.0',
         'sphinx',
         'redbaron',

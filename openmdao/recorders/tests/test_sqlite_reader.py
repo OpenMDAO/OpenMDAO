@@ -163,7 +163,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if the case keys (iteration coords) come back correctly
         case_keys = cr.driver_cases.list_cases()
-        print (case_keys)
         for i, iter_coord in enumerate(case_keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
 
@@ -296,9 +295,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                            z=np.array([0.0, 0.0]), x={'value': 0.0, 'units': 'm'},
-                            y1={'units': 'm'}, y2={'units': 'cm'}),
+        model.add_subsystem('obj_cmp',
+                            ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                     z=np.array([0.0, 0.0]),
+                                     x={'value': 0.0, 'units': 'm'},
+                                     y1={'units': 'm'}, y2={'units': 'cm'}),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
@@ -519,8 +520,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        outputs = cr.list_outputs(None, True, True, True, True, None, True, True, True,
-                                  True, True, True)
+        outputs = cr.list_outputs(case=None, explicit=True, implicit=True, values=True,
+                                  residuals=True, residuals_tol=None,
+                                  units=True, shape=True, bounds=True,
+                                  scaling=True, hierarchical=True, print_arrays=True)
 
         expected_outputs = {
             'd2.y2': {
@@ -564,7 +567,33 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(vals['resids'], expected['resids'])
             np.testing.assert_almost_equal(vals['value'], expected['values'])
 
-        expected_outputs_case = {
+        # filter the outputs based on residuals_tol
+        # there should be only one output, 'd1.y1'
+        outputs = cr.list_outputs(case=None, explicit=True, implicit=True, values=True,
+                                  residuals=True, residuals_tol=1e-12,
+                                  units=True, shape=True, bounds=True,
+                                  scaling=True, hierarchical=True, print_arrays=True)
+
+        self.assertEqual(len(outputs), 1)
+        [name, vals] = outputs[0]
+        self.assertEqual(name, 'd1.y1')
+
+        expected = expected_outputs[name]
+        self.assertEqual(vals['lower'], expected['lower'])
+        self.assertEqual(vals['ref'], expected['ref'])
+        self.assertEqual(vals['shape'], expected['shape'])
+        np.testing.assert_almost_equal(vals['resids'], expected['resids'])
+        np.testing.assert_almost_equal(vals['value'], expected['values'])
+
+        # check the system case for 'd1'.
+        # there should be only one output, 'd1.y1'
+        sys_case = cr.system_cases.get_case(1)
+        outputs = cr.list_outputs(case=sys_case, explicit=True, implicit=True, values=True,
+                                  residuals=True, residuals_tol=None,
+                                  units=True, shape=True, bounds=True,
+                                  scaling=True, hierarchical=True, print_arrays=True)
+
+        expected_outputs = {
             'd1.y1': {
                 'lower': None,
                 'ref': 1.0,
@@ -574,31 +603,20 @@ class TestSqliteCaseReader(unittest.TestCase):
             }
         }
 
-        sys_case = cr.system_cases.get_case(1)
-        outputs_case = cr.list_outputs(sys_case, True, True, True, True, None, True, True, True,
-                                       True, True, True)
+        self.assertEqual(len(outputs), 1)
+        [name, vals] = outputs[0]
+        self.assertEqual(name, 'd1.y1')
 
-        for o in outputs_case:
-            vals = o[1]
-            name = o[0]
-            expected = expected_outputs_case[name]
-            self.assertEqual(vals['lower'], expected['lower'])
-            self.assertEqual(vals['ref'], expected['ref'])
-            self.assertEqual(vals['shape'], expected['shape'])
-            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
-            np.testing.assert_almost_equal(vals['value'], expected['values'])
+        expected = expected_outputs[name]
+        self.assertEqual(vals['lower'], expected['lower'])
+        self.assertEqual(vals['ref'], expected['ref'])
+        self.assertEqual(vals['shape'], expected['shape'])
+        np.testing.assert_almost_equal(vals['resids'], expected['resids'])
+        np.testing.assert_almost_equal(vals['value'], expected['values'])
 
-        for o in outputs_case:
-            vals = o[1]
-            name = o[0]
-            expected = expected_outputs_case[name]
-            self.assertEqual(vals['lower'], expected['lower'])
-            self.assertEqual(vals['ref'], expected['ref'])
-            self.assertEqual(vals['shape'], expected['shape'])
-            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
-            np.testing.assert_almost_equal(vals['value'], expected['values'])
-
-        impl_outputs_case = cr.list_outputs(sys_case, False, True)
+        # check implicit outputs
+        # there should not be any
+        impl_outputs_case = cr.list_outputs(sys_case, explicit=False, implicit=True)
         self.assertEqual(len(impl_outputs_case), 0)
 
     def test_list_inputs(self):
@@ -912,6 +930,85 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         _assert_model_matches_case(case, model)
 
+    def test_recording_option_precedence_driver_cases(self):
+        from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+            SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0)
+
+        prob.driver.add_recorder(self.recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['includes'] = []
+        prob.driver.recording_options['excludes'] = ['p2.y']
+
+        prob.set_solver_print(0)
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # First case with record_desvars = True and includes = []
+        cr = CaseReader(self.filename)
+        case = cr.driver_cases.get_case(0)
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+
+        # Second case with record_desvars = False and includes = []
+        self.recorder = SqliteRecorder(self.filename)
+        prob.driver.add_recorder(self.recorder)
+        prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['includes'] = []
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        case = cr.driver_cases.get_case(-1)
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
+
+        # Third case with record_desvars = True and includes = ['*']
+        self.recorder = SqliteRecorder(self.filename)
+        prob.driver.add_recorder(self.recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['includes'] = ['*']
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        case = cr.driver_cases.get_case(-1)
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+
+        # Fourth case with record_desvars = False and includes = ['*']
+        self.recorder = SqliteRecorder(self.filename)
+        prob.driver.add_recorder(self.recorder)
+        prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['includes'] = ['*']
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+        case = cr.driver_cases.get_case(-1)
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
+
     def test_load_driver_cases(self):
         prob = Problem()
         model = prob.model
@@ -933,6 +1030,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('c', lower=15.0)
 
         prob.driver.add_recorder(self.recorder)
+        prob.driver.recording_options['includes'] = ['*']
 
         prob.set_solver_print(0)
 
@@ -1151,13 +1249,14 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = Problem()
         model = prob.model
 
-        comp = TestExplCompArray(thickness=1.) #  has 2D arrays as inputs and outputs
+        comp = TestExplCompArray(thickness=1.)  # has 2D arrays as inputs and outputs
         model.add_subsystem('comp', comp, promotes=['*'])
         # just to add a connection, otherwise an exception is thrown in recording viewer data.
         # must be a bug
-        model.add_subsystem('double_area', ExecComp('double_area = 2 * areas',
-                            areas=np.zeros((2,2)),
-                            double_area=np.zeros((2,2))),
+        model.add_subsystem('double_area',
+                            ExecComp('double_area = 2 * areas',
+                                     areas=np.zeros((2, 2)),
+                                     double_area=np.zeros((2, 2))),
                             promotes=['*'])
 
         prob.driver.add_recorder(self.recorder)
