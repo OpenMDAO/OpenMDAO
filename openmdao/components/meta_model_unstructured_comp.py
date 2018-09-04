@@ -407,7 +407,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
             else:
                 if overrides_method('linearize', surrogate, SurrogateModel):
-                    # print( "calling {}".format(surrogate.linearize))
                     sjac = surrogate.linearize(flat_inputs)
 
                     idx = 0
