@@ -7,9 +7,7 @@ import unittest
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
-
 from openmdao.utils.logger_utils import TestLogger
-
 
 class MetaModelTestCase(unittest.TestCase):
 
@@ -928,6 +926,55 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob.run_model()
         assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
+
+    def test_metamodel_use_fd_if_no_surrogate_linearize(self):
+        class Trig(MetaModelUnStructuredComp):
+            def setup(self):
+
+                surrogate = FloatKrigingSurrogate()
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0,10,20))
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=.5*np.sin(np.linspace(0,10,20)))
+
+                self.declare_partials(of='sin_x', wrt='x', method='fd')
+
+        prob = Problem()
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+        prob.model.add_subsystem('indep', indep)
+        prob.model.add_subsystem('trig', Trig())
+        prob.model.connect('indep.x', 'trig.x')
+
+        prob.model.add_design_var('indep.x', lower=4, upper=7)
+        prob.model.add_objective('trig.sin_x')
+
+        prob.setup(check=True)
+        prob['indep.x'] = 5.0
+        prob.run_model()
+        J = prob.compute_totals()
+
+        deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+
+        prob['indep.x'] = 5.0
+
+        # Check to see that if the surrogate does not have a linearize,
+        #    fd is used to compute the derivatives correctly
+        linearize = KrigingSurrogate.linearize #  save for later
+        del KrigingSurrogate.linearize
+
+        prob.run_model()
+        J = prob.compute_totals()
+
+        # restore this so that other tests are not affected
+        KrigingSurrogate.linearize = linearize
+
+        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_fd, deriv_using_surrogate_linearize, 1e-4)
+        # Just to be extra sure
+        assert_rel_error(self, deriv_using_fd[0], .5 * np.cos(prob['indep.x']), 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

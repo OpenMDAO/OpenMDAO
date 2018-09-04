@@ -15,11 +15,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     """
     Class that creates a reduced order model for outputs from inputs.
 
-    Each output may have it's own surrogate model.
+    Each output may have its own surrogate model.
     Training inputs and outputs are automatically created with 'train:' prepended to the
     corresponding input/output name.
 
-    For a Float variable, the training data is an array of length m.
+    For a Float variable, the training data is an array of length m,
+    where m is the number of training points.
 
     Attributes
     ----------
@@ -395,21 +396,24 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 out_size = np.prod(out_shape)
                 for j in range(vec_size):
                     flat_input = flat_inputs[j]
-                    derivs = surrogate.linearize(flat_input)
-                    idx = 0
-                    for in_name, sz in self._surrogate_input_names:
-                        j1 = j * out_size * sz
-                        j2 = j1 + out_size * sz
-                        partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
-                        idx += sz
+                    if overrides_method('linearize', surrogate, SurrogateModel):
+                        derivs = surrogate.linearize(flat_input)
+                        idx = 0
+                        for in_name, sz in self._surrogate_input_names:
+                            j1 = j * out_size * sz
+                            j2 = j1 + out_size * sz
+                            partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
+                            idx += sz
 
             else:
-                sjac = surrogate.linearize(flat_inputs)
+                if overrides_method('linearize', surrogate, SurrogateModel):
+                    # print( "calling {}".format(surrogate.linearize))
+                    sjac = surrogate.linearize(flat_inputs)
 
-                idx = 0
-                for in_name, sz in self._surrogate_input_names:
-                    partials[(out_name, in_name)] = sjac[:, idx:idx + sz]
-                    idx += sz
+                    idx = 0
+                    for in_name, sz in self._surrogate_input_names:
+                        partials[(out_name, in_name)] = sjac[:, idx:idx + sz]
+                        idx += sz
 
     def _train(self):
         """
