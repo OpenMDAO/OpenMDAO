@@ -307,9 +307,9 @@ class Group(System):
                 if self._owns_approx_jac:
                     comm = self._setup_par_fd_procs(comm)
                 else:
-                    msg = "'%s': num_par_fd = (%d) but FD is not active." % (self.pathname,
-                                                                             self._num_par_fd)
-                    simple_warning(msg)
+                    msg = "'%s': num_par_fd = %d but FD is not active." % (self.pathname,
+                                                                           self._num_par_fd)
+                    raise RuntimeError(msg)
             elif not MPI:
                 msg = "'%s': MPI is not active but num_par_fd = %d" % (self.pathname,
                                                                        self._num_par_fd)

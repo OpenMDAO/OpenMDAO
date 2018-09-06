@@ -9,7 +9,7 @@ class MatMultComp(ExplicitComponent):
     """
     A simple component used for derivative testing.
     """
-    def __init__(self, mat, approx_method, sleep_time=0.1, **kwargs):
+    def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
         """
         Store the mat for later use.
 

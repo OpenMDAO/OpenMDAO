@@ -177,6 +177,7 @@ class Component(System):
         """
         self.pathname = pathname
 
+        orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
                 comm = self._setup_par_fd_procs(comm)
@@ -208,9 +209,9 @@ class Component(System):
         # when declare_partials generally happens, so we raise an exception here instead of just
         # resetting the value of num_par_fd (because the comm has already been split and possibly
         # used by the system setup).
-        if self._num_par_fd > 1 and comm.size > 1 and not (self._owns_approx_jac or
-                                                           self._approximated_partials):
-            raise RuntimeError("num_par_fd is > 1 but no FD is active.")
+        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
+                                                                self._approximated_partials):
+            raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
 
         self._static_mode = True
 
