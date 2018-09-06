@@ -664,9 +664,6 @@ class System(object):
             MPI communicator object.
         """
         num_par_fd = self.options['num_par_fd']
-        if num_par_fd < 1:
-            raise ValueError("'%s': num_par_fd must be >= 1 but value is %s." %
-                             (self.pathname, self._num_par_fds))
         if comm.size < num_par_fd:
             raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
                              (self.pathname, comm.size))

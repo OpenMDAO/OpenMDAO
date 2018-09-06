@@ -192,7 +192,7 @@ class SerialDiamondFDTestCase(TestCase):
         try:
             setup_diamond_model(0, 10, 'fd', 'model')
         except Exception as err:
-            self.assertEquals(str(err), "'': num_par_fds must be >= 1 but value is 0.")
+            self.assertEquals(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
 
 
 class ParallelDiamondFDTestCase(TestCase):
