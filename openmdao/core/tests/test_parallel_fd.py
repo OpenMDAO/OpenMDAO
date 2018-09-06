@@ -47,11 +47,9 @@ class ScalableComp(ExplicitComponent):
 
 
 def setup_1comp_model(par_fds, size, mult, add, method):
-    prob = Problem()
+    prob = Problem(model=Group(num_par_fd=par_fds))
     prob.model.add_subsystem('P1', IndepVarComp('x', np.ones(size)))
     prob.model.add_subsystem('C1', ScalableComp(size, mult, add))
-
-    prob.model.options['num_par_fd'] = par_fds
 
     prob.model.connect('P1.x', 'C1.x')
 
@@ -69,18 +67,20 @@ def setup_1comp_model(par_fds, size, mult, add, method):
 def setup_diamond_model(par_fds, size, method, par_fd_at):
     assert par_fd_at in ('model', 'par')
 
-    prob = Problem()
     if par_fd_at == 'model':
-        prob.model.options['num_par_fd'] = par_fds
+        prob = Problem(model=Group(num_par_fd=par_fds))
         prob.model.approx_totals(method=method)
+    else:
+        prob = Problem()
     root = prob.model
 
     root.add_subsystem('P1', IndepVarComp('x', np.ones(size)))
 
-    par = root.add_subsystem("par", Group())
     if par_fd_at == 'par':
-        par.options['num_par_fd'] = par_fds
+        par = root.add_subsystem("par", Group(num_par_fd=par_fds))
         par.approx_totals(method=method)
+    else:
+        par = root.add_subsystem("par", Group())
 
     par.add_subsystem('C1', ExecComp('y=2.0*x+1.0', x=np.zeros(size), y=np.zeros(size)))
     par.add_subsystem('C2', ExecComp('y=3.0*x+5.0', x=np.zeros(size), y=np.zeros(size)))
@@ -266,8 +266,7 @@ class MatMultTestCase(unittest.TestCase):
 
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
-        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method))
-        comp.options['num_par_fd'] = num_par_fd
+        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method, num_par_fd=num_par_fd))
 
         model.connect('indep.x', 'comp.x')
 
@@ -332,7 +331,11 @@ class MatMultParallelTestCase(unittest.TestCase):
 
         mat2 = mat1 * 5.0
 
-        p = Problem()
+        if total:
+            grp = Group(num_par_fd=num_par_fd1)
+        else:
+            grp = Group()
+        p = Problem(model=grp)
 
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat1.shape[1])))
@@ -342,15 +345,16 @@ class MatMultParallelTestCase(unittest.TestCase):
             meth = 'exact'
         else:
             meth = method
-        C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method=meth))
-        C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method=meth))
 
         if total:
-            model.options['num_par_fd'] = num_par_fd1
-            model.approx_totals(method=method)
+            C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method=meth))
+            C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method=meth))
         else:
-            C1.options['num_par_fd'] = num_par_fd1
-            C2.options['num_par_fd'] = num_par_fd2
+            C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method=meth, num_par_fd=num_par_fd1))
+            C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method=meth, num_par_fd=num_par_fd2))
+
+        if total:
+            model.approx_totals(method=method)
 
         model.connect('indep.x', 'par.C1.x')
         model.connect('indep.x', 'par.C2.x')

@@ -167,7 +167,7 @@ class ComplexStep(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        num_par_fd = system.options['num_par_fd']
+        num_par_fd = system._num_par_fd
         use_parallel_fd = num_par_fd > 1 and (system._full_comm is not None and
                                               system._full_comm.size > 1)
         is_parallel = use_parallel_fd or system.comm.size > 1

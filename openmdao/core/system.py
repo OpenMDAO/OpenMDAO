@@ -228,16 +228,21 @@ class System(object):
         Class to use for local data vectors.
     _assembled_jac : AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
+    _num_par_fd : int
+        If FD is active, and the value is > 1, turns on parallel FD and specifies the number of
+        concurrent FD solves.
     _par_fd_id : int
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_par_fd=1, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
+        num_par_fd : int
+            If FD is active, number of concurrent FD solves.
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the System options.
         """
@@ -251,10 +256,6 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
-
-        self.options.declare('num_par_fd', default=1, types=int, lower=1,
-                             desc='Number of finite difference points that will be performed '
-                                  'concurrently, if FD is active.')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -351,8 +352,11 @@ class System(object):
 
         self._scope_cache = {}
 
+        self._num_par_fd = num_par_fd
+
         self._declare_options()
         self.initialize()
+
         self.options.update(kwargs)
 
         self._has_guess = False
@@ -663,13 +667,14 @@ class System(object):
         MPI.Comm or <FakeComm>
             MPI communicator object.
         """
-        num_par_fd = self.options['num_par_fd']
+        num_par_fd = self._num_par_fd
         if comm.size < num_par_fd:
             raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
                              (self.pathname, comm.size))
 
         if not MPI:
-            self.options['num_par_fd'] = 1
+            warnings.warn("'%s': MPI is not active but num_par_fd = (%d)" % (self.pathname,
+                                                                             num_par_fd))
 
         self._full_comm = comm
 

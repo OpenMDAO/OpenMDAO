@@ -706,8 +706,7 @@ class TestGroupCSMPI(unittest.TestCase):
 
     def test_indepvarcomp_under_par_sys_par_cs(self):
         prob = Problem()
-        prob.model = FanInSubbedIDVC()
-        prob.model.options['num_par_fd'] = 2
+        prob.model = FanInSubbedIDVC(num_par_fd=2)
         prob.model.approx_totals(method='cs')
 
         prob.setup(local_vector_class=vector_class, check=False, mode='rev')
@@ -726,8 +725,7 @@ class TestGroupFDMPI(unittest.TestCase):
 
     def test_indepvarcomp_under_par_sys_par_fd(self):
         prob = Problem()
-        prob.model = FanInSubbedIDVC()
-        prob.model.options['num_par_fd'] = 2
+        prob.model = FanInSubbedIDVC(num_par_fd=2)
 
         prob.model.approx_totals(method='fd')
         prob.setup(local_vector_class=vector_class, check=False, mode='rev')

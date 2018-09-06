@@ -72,8 +72,7 @@ if __name__ == '__main__':
     p = Problem()
     model = p.model
     model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
-    comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd'))
-    comp.options['num_par_fd'] = 5
+    comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=5))
 
     model.connect('indep.x', 'comp.x')
 
