@@ -252,7 +252,7 @@ class System(object):
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
 
-        self.options.declare('num_par_fd', default=1, types=int,
+        self.options.declare('num_par_fd', default=1, types=int, lower=1,
                              desc='Number of finite difference points that will be performed '
                                   'concurrently, if FD is active.')
 
