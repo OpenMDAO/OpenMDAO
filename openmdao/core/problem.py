@@ -28,7 +28,7 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -850,10 +850,10 @@ class Problem(object):
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and nonlinear constraints)." %
-                          (mode, desvar_size, response_size), RuntimeWarning)
+            simple_warning("Inefficient choice of derivative mode.  You chose '%s' for a "
+                           "problem with %d design variables and %d response variables "
+                           "(objectives and nonlinear constraints)." %
+                           (mode, desvar_size, response_size), RuntimeWarning)
 
         self._setup_recording()
 
@@ -1226,7 +1226,7 @@ class Problem(object):
             msg += str(list(comps_could_not_cs))
             msg += "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
                    "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-            warnings.warn(msg)
+            simple_warning(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
@@ -1664,7 +1664,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if sys_name not in derivative_data:
             msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
-            warnings.warn(msg)
+            simple_warning(msg)
             continue
 
         derivatives = derivative_data[sys_name]

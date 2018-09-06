@@ -672,10 +672,6 @@ class System(object):
             raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
                              (self.pathname, comm.size))
 
-        if not MPI:
-            warnings.warn("'%s': MPI is not active but num_par_fd = (%d)" % (self.pathname,
-                                                                             num_par_fd))
-
         self._full_comm = comm
 
         if num_par_fd > 1:
