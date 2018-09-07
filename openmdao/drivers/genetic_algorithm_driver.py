@@ -219,6 +219,16 @@ class SimpleGADriver(Driver):
             lower_bound[i:j] = meta['lower']
             upper_bound[i:j] = meta['upper']
 
+        # Initial Design Vars
+        x0 = np.empty(count)
+        desvar_vals = self.get_design_var_values()
+        i = 0
+        for name, meta in iteritems(self._designvars):
+            size = meta['size']
+            x0[i:i + size] = desvar_vals[name]
+            i += size
+
+
         ga.elite = self.options['elitism']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
@@ -243,7 +253,7 @@ class SimpleGADriver(Driver):
         if pop_size == 0:
             pop_size = 4 * np.sum(bits)
 
-        desvar_new, obj, nfit = ga.execute_ga(lower_bound, upper_bound,
+        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound,
                                               bits, pop_size, max_gen,
                                               self._randomstate, Pm, Pc)
 
@@ -467,12 +477,14 @@ class GeneticAlgorithm(object):
         self.elite = True
         self.model_mpi = model_mpi
 
-    def execute_ga(self, vlb, vub, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
+    def execute_ga(self, x0, vlb, vub, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
         """
         Perform the genetic algorithm.
 
         Parameters
         ----------
+        x0 : ndarray
+            Initial design values
         vlb : ndarray
             Lower bounds array.
         vub : ndarray
@@ -514,10 +526,9 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
-        # TODO: from an user-supplied intial population
-        # new_gen, lchrom = encode(x0, vlb, vub, bits)
         new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
                                random_state=random_state))
+        new_gen[0] = self.encode(x0, vlb, vub, bits)
 
         # Main Loop
         nfit = 0
@@ -747,5 +758,9 @@ class GeneticAlgorithm(object):
         ndarray
             Population of points, encoded.
         """
-        # TODO : We need this method if we ever start with user defined initial sampling points.
-        pass
+        interval = (vub - vlb) / (2**bits - 1)
+        x = np.maximum(x, vlb)
+        x = np.minimum(x, vub)
+        x = np.round((x - vlb) / interval).astype(np.int)
+        byte_str = [("0" * b + bin(i)[2:])[-b:] for i, b in zip(x, bits)]
+        return np.array([int(c) for s in byte_str for c in s])
