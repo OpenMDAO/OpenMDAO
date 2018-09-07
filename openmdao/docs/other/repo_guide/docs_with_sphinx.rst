@@ -32,7 +32,8 @@ Here's how you might bring in an OpenMDAO extension, by importing it, and then a
     ]
 
 
-For more information on some of OpenMDAO's custom embed extensions, please see :ref:`Custom Directives in OpenMDAO <custom_directives>`
+.. note::
+    For more information on some of OpenMDAO's custom embed extensions, please see :ref:`Custom Directives in OpenMDAO <custom_directives>`
 
 General Docs Settings
 ~~~~~~~~~~~~~~~~~~~~~

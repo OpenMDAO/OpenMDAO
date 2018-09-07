@@ -120,10 +120,9 @@ def _get_viewer_data(data_source):
         raise TypeError('get_model_viewer_data only accepts Problems, Groups or filenames')
 
     data_dict = {}
-    component_execution_idx = [0]  # list so pass by ref
-    component_execution_orders = {}
-    data_dict['tree'] = _get_tree_dict(root_group, component_execution_orders,
-                                       component_execution_idx)
+    comp_exec_idx = [0]  # list so pass by ref
+    comp_exec_orders = {}
+    data_dict['tree'] = _get_tree_dict(root_group, comp_exec_orders, comp_exec_idx)
 
     connections_list = []
 
@@ -138,31 +137,28 @@ def _get_viewer_data(data_source):
             continue
         src_subsystem = out_abs.rsplit('.', 1)[0]
         tgt_subsystem = in_abs.rsplit('.', 1)[0]
+        src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
+
         count = 0
         edges_list = []
         for li in scc_list:
             if src_subsystem in li and tgt_subsystem in li:
-                count = count+1
+                count += 1
                 if(count > 1):
                     raise ValueError('Count greater than 1')
 
-                exe_tgt = component_execution_orders[tgt_subsystem]
-                exe_src = component_execution_orders[src_subsystem]
+                exe_tgt = comp_exec_orders[tgt_subsystem]
+                exe_src = comp_exec_orders[src_subsystem]
                 exe_low = min(exe_tgt, exe_src)
                 exe_high = max(exe_tgt, exe_src)
-                subg = G.subgraph(li).copy()
-                for n in list(subg.nodes()):
-                    exe_order = component_execution_orders[n]
-                    if(exe_order < exe_low or exe_order > exe_high):
-                        subg.remove_node(n)
 
-                src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
-                for tup in subg.edges():
-                    edge_str = tup[0] + ' ' + tup[1]
+                subg = G.subgraph(n for n in li if exe_low <= comp_exec_orders[n] <= exe_high)
+                for edge in subg.edges():
+                    edge_str = ' '.join(edge)
                     if edge_str != src_to_tgt_str:
                         edges_list.append(edge_str)
 
-        if(len(edges_list) > 0):
+        if(edges_list):
             edges_list.sort()  # make deterministic so same .html file will be produced each run
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
                                                  ('cycle_arrows', edges_list)]))
