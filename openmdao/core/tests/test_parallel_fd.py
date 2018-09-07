@@ -285,6 +285,14 @@ class MatMultTestCase(unittest.TestCase):
         if MPI:
             self.assertEqual(MPI.COMM_WORLD.allreduce(ncomputes), size)
 
+        norm = np.linalg.norm(comp._jacobian['y', 'x'] - comp.mat)
+        self.assertLess(norm, 1.e-7)
+
+        # make sure check_partials works
+        data = p.check_partials(out_stream=None)
+        norm = np.linalg.norm(data['comp']['y', 'x']['J_fd'] - comp.mat)
+        self.assertLess(norm, 1.e-7)
+
     def test_20_by_4_fd(self):
         self.run_model(20, 4, 'fd')
 
@@ -363,6 +371,26 @@ class MatMultParallelTestCase(unittest.TestCase):
 
         norm = np.linalg.norm(J['par.C2.y','indep.x'] - C2.mat)
         self.assertLess(norm, 1.e-7)
+
+        if not total:
+            # if total is True, the partials won't be computed during the compute_totals call
+            if C1 in par._subsystems_myproc:
+                norm = np.linalg.norm(C1._jacobian['y', 'x'] - C1.mat)
+                self.assertLess(norm, 1.e-7)
+
+            if C2 in par._subsystems_myproc:
+                norm = np.linalg.norm(C2._jacobian['y', 'x'] - C2.mat)
+                self.assertLess(norm, 1.e-7)
+
+        # make sure check_partials works
+        data = p.check_partials(out_stream=None)
+        if 'par.C1' in data:
+            norm = np.linalg.norm(data['par.C1']['y', 'x']['J_fd'] - C1.mat)
+            self.assertLess(norm, 1.e-7)
+
+        if 'par.C2' in data:
+            norm = np.linalg.norm(data['par.C2']['y', 'x']['J_fd'] - C2.mat)
+            self.assertLess(norm, 1.e-7)
 
     def test_20_by_4_fd(self):
         self.run_model(20, 4, 4, 'fd')

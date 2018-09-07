@@ -1866,16 +1866,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     # Magnitudes
                     if out_stream:
-                        out_buffer.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
-                        out_buffer.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
-                                         + '\n')
+                        out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                        out_buffer.write('    Forward Magnitude : {:.6e}\n'.format(
+                            magnitude.forward))
                     if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
                             out_buffer.write(txt.format(magnitude.reverse) + '\n')
                     if out_stream:
-                        out_buffer.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
-                                         fd_desc) + '\n')
+                        out_buffer.write('         Fd Magnitude : {:.6e} ({})\n'.format(
+                            magnitude.fd, fd_desc))
                     # Absolute Errors
                     if totals or not system.matrix_free:
                         error_descs = ('(Jfor  - Jfd) ', )
@@ -1886,8 +1886,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if error_str.endswith('*'):
                             num_bad_jacs += 1
                         if out_stream:
-                            out_buffer.write('    Absolute Error {}: {}'.format(desc, error_str) +
-                                             '\n')
+                            out_buffer.write('    Absolute Error {}: {}\n'.format(desc, error_str))
                     if out_stream:
                         out_buffer.write('\n')
 
@@ -1897,10 +1896,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if error_str.endswith('*'):
                             num_bad_jacs += 1
                         if out_stream:
-                            out_buffer.write('    Relative Error {}: {}'.format(desc, error_str) +
-                                             '\n')
+                            out_buffer.write('    Relative Error {}: {}\n'.format(desc, error_str))
 
                     if out_stream:
+                        if MPI and MPI.COMM_WORLD.size > 1:
+                            out_buffer.write('    MPI Rank {}\n'.format(MPI.COMM_WORLD.rank))
                         out_buffer.write('\n')
 
                     # Raw Derivatives
