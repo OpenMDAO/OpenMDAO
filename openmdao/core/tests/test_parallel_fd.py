@@ -451,7 +451,7 @@ class ParFDWarningsTestCase(unittest.TestCase):
 
         self.assertEqual(len(w), 1)
         self.assertEqual(str(w[0].message),
-                         "'': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
+                         "'comp': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
 
 
 
