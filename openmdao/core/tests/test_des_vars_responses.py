@@ -1,6 +1,7 @@
 """ Unit tests for the design_variable and response interface to system."""
 from __future__ import print_function
 
+import sys
 from six.moves import range
 
 import unittest
@@ -300,6 +301,32 @@ class TestDesvarOnModel(unittest.TestCase):
 
         self.assertAlmostEqual( x_scaler*(x_ref0 + x_adder), 0.0, places=12)
         self.assertAlmostEqual( x_scaler*(x_ref + x_adder), 1.0, places=12)
+
+    def test_desvar_inf_bounds(self):
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', scaler=10.)
+        prob.model.add_objective('obj', scaler=10.)
+        prob.model.add_constraint('con1', scaler=10.)
+        prob.model.add_constraint('con2', scaler=10.)
+
+        prob.setup(check=False)
+
+        des_vars = prob.model.get_design_vars()
+
+        self.assertEqual(des_vars['px.x']['upper'], sys.float_info.max)
+        self.assertEqual(des_vars['px.x']['lower'], -sys.float_info.max)
+        
+        responses = prob.model.get_responses()
+
+        self.assertEqual(responses['con_cmp1.con1']['upper'], sys.float_info.max)
+        self.assertEqual(responses['con_cmp1.con1']['lower'], -sys.float_info.max)
+        self.assertEqual(responses['con_cmp2.con2']['upper'], sys.float_info.max)
+        self.assertEqual(responses['con_cmp2.con2']['lower'], -sys.float_info.max)
 
     def test_desvar_invalid_name(self):
 
