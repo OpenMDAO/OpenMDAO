@@ -291,6 +291,31 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     return values
 
 
+def inf2maxfloat(f):
+    """
+    If f is inf or -inf, return sys.float_info.max or -sys.float_info.max, else return f.
+
+    Parameters
+    ----------
+    f : float or ndarray
+        A floating point number/array to be constrained between +- sys.float_info.max.
+
+    Returns
+    -------
+    float or ndarray
+        A floating point number/array between +- sys.float_info.max (inclusive).
+    """
+    if isinstance(f, np.ndarray):
+        f[np.isposinf(f)] = sys.float_info.max
+        f[np.isneginf(f)] = -sys.float_info.max
+        return f
+    elif f == float('inf'):
+        return sys.float_info.max
+    elif f == -float('inf'):
+        return -sys.float_info.max
+    return f
+
+
 class ContainsAll(object):
     """
     A fake dictionary that always reports __contains__(name) to be True.

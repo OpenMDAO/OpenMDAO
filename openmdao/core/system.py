@@ -13,7 +13,7 @@ import numpy as np
 
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, warn_deprecation, ContainsAll
+    format_as_float_or_array, warn_deprecation, ContainsAll, inf2maxfloat
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.vectors.vector import Vector, INT_DTYPE
@@ -1790,6 +1790,10 @@ class System(object):
         lower = (lower + adder) * scaler
         upper = (upper + adder) * scaler
 
+        # ensure that scaled bounds are within +- sys.float_info.max
+        lower = inf2maxfloat(lower)
+        upper = inf2maxfloat(upper)
+
         if self._static_mode:
             design_vars = self._static_design_vars
         else:
@@ -1950,10 +1954,10 @@ class System(object):
 
             # Scale the bounds
             if lower is not None:
-                lower = (lower + adder) * scaler
+                lower = inf2maxfloat((lower + adder) * scaler)
 
             if upper is not None:
-                upper = (upper + adder) * scaler
+                upper = inf2maxfloat((upper + adder) * scaler)
 
             if equals is not None:
                 equals = (equals + adder) * scaler
