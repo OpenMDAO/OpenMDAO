@@ -201,6 +201,8 @@ which makes a link like this, that leads to the Direct solver's user docs:
     :ref:`Direct <openmdao.solvers.linear.direct.py>`
 
 
+.. _`custom_directives`:
+
 Custom Directives for Embedding Items into OpenMDAO Documentation
 -----------------------------------------------------------------
 
@@ -281,7 +283,7 @@ Embedding More Than Just Code
            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
 
-   Note that as mentioned above, the default value of :code:`layout` is just "code," so the
+   Note that, as mentioned above, the default value of :code:`layout` is just "code," so the
    layout is not specified here. The resulting embed looks like this:
 
    .. embed-code::
