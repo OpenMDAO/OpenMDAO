@@ -442,14 +442,17 @@ class ParFDWarningsTestCase(unittest.TestCase):
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=True)
 
         self.assertEqual(len(w), 1)
-        self.assertEqual(str(w[0].message), "'': MPI is not active but num_par_fd = 3")
+        self.assertEqual(str(w[0].message),
+                         "'': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
 
     def test_partial_no_mpi(self):
         with warnings.catch_warnings(record=True) as w:
             _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
 
         self.assertEqual(len(w), 1)
-        self.assertEqual(str(w[0].message), "'comp': MPI is not active but num_par_fd = 3")
+        self.assertEqual(str(w[0].message),
+                         "'': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
+
 
 
 
@@ -499,6 +502,7 @@ class ParFDFeatureTestCase(unittest.TestCase):
         post_count =  comp.num_computes
 
         # how many computes were used in this proc to compute the total jacobian?
+        # Each proc should be doing 2 computes.
         jac_count = post_count - pre_count
 
         self.assertEqual(jac_count, 2)
@@ -521,11 +525,16 @@ class ParFDFeatureTestCase(unittest.TestCase):
 
         pre_count = comp.num_computes
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        # calling compute_totals will result in the computation of partials for comp
+        p.compute_totals(of=['comp.y'], wrt=['indep.x'])
+
+        # get the partial jacobian matrix
+        J = comp._jacobian['y', 'x']
 
         post_count =  comp.num_computes
 
-        # how many computes were used in this proc to compute the total jacobian?
+        # how many computes were used in this proc to compute the partial jacobian?
+        # Each proc should be doing 2 computes.
         jac_count = post_count - pre_count
 
         self.assertEqual(jac_count, 2)

@@ -311,8 +311,8 @@ class Group(System):
                                                                            self._num_par_fd)
                     raise RuntimeError(msg)
             elif not MPI:
-                msg = "'%s': MPI is not active but num_par_fd = %d" % (self.pathname,
-                                                                       self._num_par_fd)
+                msg = ("'%s': MPI is not active but num_par_fd = %d. No parallel finite difference "
+                       "will be performed." % (self.pathname,  self._num_par_fd))
                 simple_warning(msg)
 
         self.comm = comm

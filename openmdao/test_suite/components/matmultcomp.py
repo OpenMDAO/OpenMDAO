@@ -1,3 +1,6 @@
+"""
+A simple component used for derivative testing.
+"""
 
 from __future__ import division, print_function
 import time
@@ -6,24 +9,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class MatMultComp(ExplicitComponent):
-    """
-    A simple component used for derivative testing.
-    """
     def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
-        """
-        Store the mat for later use.
-
-        Parameters
-        ----------
-        mat : ndarray
-            Matrix used to multiply input x to get output y.
-        approx_method : str
-            Sets type of approximation ('fd' or 'cs')
-        sleep_time : float
-            Time to sleep on each compute call.
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
-        """
         super(MatMultComp, self).__init__(**kwargs)
         self.mat = mat
         self.approx_method = approx_method
@@ -37,9 +23,6 @@ class MatMultComp(ExplicitComponent):
         self.num_computes = 0
 
     def compute(self, inputs, outputs):
-        """
-        Multiply input by mat to get output.
-        """
         outputs['y'] = self.mat.dot(inputs['x'])
         self.num_computes += 1
         time.sleep(self.sleep_time)
