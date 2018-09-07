@@ -1,10 +1,11 @@
 .. _`advanced_operations_automation`:
 
-Automating Doc Build and Custom Deployment from Travis CI
-=========================================================
+Automating Doc Build and Custom Doc Deployment from Travis CI
+=============================================================
 
 .. note::
-    The current recommended procedure for new repos is to use github-pages as outlined :ref:`earlier <github_pages>`. This page exists to explain how OpenMDAO's docs work for now. If you are
+    The current recommended procedure for new repos is to use github-pages as outlined :ref:`here <github_pages>`.
+    These instructions exist to explain how OpenMDAO's docs work for now. If you are
     starting a new project, go follow the :ref:`github-pages instructions <github_pages>` instructions, as they are much simpler.
 
 The following process is a one-time setup for the owner of a project to complete.  Once it is finished, it will become
