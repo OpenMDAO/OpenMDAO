@@ -92,7 +92,7 @@ install:
     conda create --yes -n PY$PY python=$PY;
     source $HOME/miniconda/bin/activate PY$PY;
 
-    conda install --yes numpy=$NUMPY scipy>=1.0 cython swig nose sphinx mock matplotlib;
+    conda install --yes numpy=$NUMPY scipy>=1.0 cython swig nose sphinx mock;
 
     pip install --upgrade pip;
     pip install redbaron;
@@ -115,6 +115,8 @@ install:
     if [ "$PETSc" ]; then
       pip install mpi4py petsc4py==$PETSc;
     fi
+
+    conda install --yes matplotlib;
   fi
 
 # install OpenMDAO (Not using -e on purpose here, to catch pkging errors)
