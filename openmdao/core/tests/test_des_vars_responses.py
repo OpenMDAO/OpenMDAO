@@ -303,6 +303,34 @@ class TestDesvarOnModel(unittest.TestCase):
         self.assertAlmostEqual( x_scaler*(x_ref0 + x_adder), 0.0, places=12)
         self.assertAlmostEqual( x_scaler*(x_ref + x_adder), 1.0, places=12)
 
+    def test_desvar_inf_bounds(self):
+
+        # make sure no overflow when there is no specified upper/lower bound and significatn scaling
+
+        prob = Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+
+        prob.model.add_design_var('x', scaler=1e6)
+        prob.model.add_objective('obj', scaler=1e6)
+        prob.model.add_constraint('con1', scaler=1e6)
+        prob.model.add_constraint('con2', scaler=1e6)
+
+        prob.setup(check=False)
+
+        des_vars = prob.model.get_design_vars()
+
+        self.assertFalse(np.isinf(des_vars['px.x']['upper']))
+        self.assertFalse(np.isinf(-des_vars['px.x']['lower']))
+
+        responses = prob.model.get_responses()
+
+        self.assertFalse(np.isinf(responses['con_cmp1.con1']['upper']))
+        self.assertFalse(np.isinf(responses['con_cmp2.con2']['upper']))
+        self.assertFalse(np.isinf(-responses['con_cmp1.con1']['lower']))
+        self.assertFalse(np.isinf(-responses['con_cmp2.con2']['lower']))
+
     def test_desvar_invalid_name(self):
 
         prob = Problem()
