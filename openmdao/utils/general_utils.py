@@ -15,6 +15,7 @@ import numbers
 import json
 
 import numpy as np
+import openmdao
 
 
 def warn_deprecation(msg):
@@ -279,9 +280,9 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     elif values is None:
         values = val_if_none
     elif values == float('inf'):
-        values = sys.float_info.max
+        values = openmdao.INF_BOUND
     elif values == -float('inf'):
-        values = -sys.float_info.max
+        values = -openmdao.INF_BOUND
     elif isinstance(values, numbers.Number):
         values = float(values)
     else:
@@ -289,31 +290,6 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
                         'numeric values, or a scalar numeric value. '
                         'Got {1} instead.'.format(name, values))
     return values
-
-
-def inf2maxfloat(f):
-    """
-    If f is inf or -inf, return sys.float_info.max or -sys.float_info.max, else return f.
-
-    Parameters
-    ----------
-    f : float or ndarray
-        A floating point number/array to be constrained between +- sys.float_info.max.
-
-    Returns
-    -------
-    float or ndarray
-        A floating point number/array between +- sys.float_info.max (inclusive).
-    """
-    if isinstance(f, np.ndarray):
-        f[np.isposinf(f)] = sys.float_info.max
-        f[np.isneginf(f)] = -sys.float_info.max
-        return f
-    elif f == float('inf'):
-        return sys.float_info.max
-    elif f == -float('inf'):
-        return -sys.float_info.max
-    return f
 
 
 class ContainsAll(object):

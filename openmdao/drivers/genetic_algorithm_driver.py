@@ -29,6 +29,7 @@ from six.moves import range, zip
 import numpy as np
 from pyDOE2 import lhs
 
+import openmdao
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent import concurrent_eval
 from openmdao.utils.mpi import MPI
@@ -230,6 +231,8 @@ class SimpleGADriver(Driver):
         bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
         prom2abs = model._var_allprocs_prom2abs_list['output']
 
+        print("bits:", bits)
+
         for name, val in iteritems(user_bits):
             try:
                 i, j = self._desvar_idx[name]
@@ -354,7 +357,7 @@ class SimpleGADriver(Driver):
             self.set_design_var(name, x[i:j])
 
         # a very large number, but smaller than the result of nan_to_num in Numpy
-        almost_inf = 1e300
+        almost_inf = openmdao.INF_BOUND
 
         # Execute the model
         with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
