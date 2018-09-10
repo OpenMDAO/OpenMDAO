@@ -231,8 +231,6 @@ class SimpleGADriver(Driver):
         bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
         prom2abs = model._var_allprocs_prom2abs_list['output']
 
-        print("bits:", bits)
-
         for name, val in iteritems(user_bits):
             try:
                 i, j = self._desvar_idx[name]

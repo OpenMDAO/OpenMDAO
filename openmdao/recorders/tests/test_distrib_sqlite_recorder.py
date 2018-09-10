@@ -254,98 +254,11 @@ class DistributedRecorderTest(unittest.TestCase):
 
             expected_outputs.update(expected_includes)
 
-            coordinate = [0, 'SLSQP', (48,)]
+            coordinate = [0, 'SLSQP', (2,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)
 
-class JunkRecorderTest(unittest.TestCase):
-    def setUp(self):
-        self.dir = mkdtemp()
-        self.filename = os.path.join(self.dir, "sqlite_test")
-        self.recorder = SqliteRecorder(self.filename)
-        self.eps = 1e-5
-
-    def tearDown(self):
-        try:
-            rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
-
-    def test_recording_junk(self):
-        prob = Problem()
-
-        prob.model.add_subsystem('par', Group())
-
-        prob.model.par.add_subsystem('G1', Mygroup())
-        prob.model.par.add_subsystem('G2', Mygroup())
-
-        prob.model.add_subsystem('Obj', ExecComp('obj=y1+y2'))
-
-        prob.model.connect('par.G1.y', 'Obj.y1')
-        prob.model.connect('par.G2.y', 'Obj.y2')
-
-        prob.model.add_objective('Obj.obj')
-
-        prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
-        prob.driver.recording_options['record_objectives'] = True
-        prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = ['par.G1.Cy.y', 'par.G2.Cy.y']
-
-        prob.driver.add_recorder(self.recorder)
-
-        prob.setup()
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
-
-        # Since the test will compare the last case recorded, just check the
-        #   current values in the problem. This next section is about getting those values
-
-        # These involve collective gathers so all ranks need to run this
-        expected_outputs = prob.driver.get_design_var_values()
-        expected_outputs.update(prob.driver.get_objective_values())
-        expected_outputs.update(prob.driver.get_constraint_values())
-
-        # Determine the expected values for the sysincludes
-        # this gets all of the outputs but just locally
-        rrank = prob.comm.rank  # root ( aka model ) rank.
-        rowned = prob.model._owning_rank
-        # names of sysincl vars on this rank
-        local_inclnames = [n for n in prob.driver.recording_options['includes']
-                           if rrank == rowned[n]]
-        # Get values for vars on this rank
-        inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
-        #   Potential local sysvars are in this
-        sysvars = outputs._views
-        # Just get the values for the sysincl vars on this rank
-        local_vars = {c: sysvars[c] for c in local_inclnames}
-        # Gather up the values for all the sysincl vars on all ranks
-        all_vars = prob.model.comm.gather(local_vars, root=0)
-
-        if prob.comm.rank == 0:
-            # Only on rank 0 do we have all the values. The all_vars variable is a list of
-            # dicts from all ranks 0,1,... In this case, just ranks 0 and 1
-            dct = all_vars[-1]
-            for d in all_vars[:-1]:
-                dct.update(d)
-
-            expected_includes = {
-                'par.G1.Cy.y': dct['par.G1.Cy.y'],
-                'par.G2.Cy.y': dct['par.G2.Cy.y'],
-            }
-
-            expected_outputs.update(expected_includes)
-
-            coordinate = [0, 'SLSQP', (48,)]
-
-            expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
-            assertDriverIterDataRecorded(self, expected_data, self.eps)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
