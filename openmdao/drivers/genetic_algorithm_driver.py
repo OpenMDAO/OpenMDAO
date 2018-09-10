@@ -212,22 +212,15 @@ class SimpleGADriver(Driver):
 
         lower_bound = np.empty((count, ))
         upper_bound = np.empty((count, ))
+        x0 = np.empty(count)
+        desvar_vals = self.get_design_var_values()
 
-        # Figure out bounds vectors.
+        # Figure out bounds vectors and initial design vars
         for name, meta in iteritems(desvars):
             i, j = self._desvar_idx[name]
             lower_bound[i:j] = meta['lower']
             upper_bound[i:j] = meta['upper']
-
-        # Initial Design Vars
-        x0 = np.empty(count)
-        desvar_vals = self.get_design_var_values()
-        i = 0
-        for name, meta in iteritems(self._designvars):
-            size = meta['size']
-            x0[i:i + size] = desvar_vals[name]
-            i += size
-
+            x0[i:j] = desvar_vals[name]
 
         ga.elite = self.options['elitism']
         pop_size = self.options['pop_size']
