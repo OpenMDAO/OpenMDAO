@@ -589,7 +589,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p1', IndepVarComp('xC', 5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
         par = model.add_subsystem('par', ParallelGroup())
 
