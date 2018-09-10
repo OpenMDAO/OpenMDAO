@@ -1,7 +1,6 @@
 """ Unit tests for the design_variable and response interface to system."""
 from __future__ import print_function
 
-import sys
 from six.moves import range
 
 import unittest
