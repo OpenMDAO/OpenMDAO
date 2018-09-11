@@ -370,8 +370,7 @@ class pyOptSparseDriver(Driver):
         # framework is left in the right final state
         dv_dict = sol.getDVs()
         for name in indep_list:
-            val = dv_dict[name]
-            self.set_design_var(name, val)
+            self.set_design_var(name, dv_dict[name])
 
         with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             model._solve_nonlinear()

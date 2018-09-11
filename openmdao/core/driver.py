@@ -454,9 +454,10 @@ class Driver(object):
                 else:
                     val = vec[name][indices]
             else:
-                if indices is not None:
+                if not (indices is None or ignore_indices):
                     size = len(indices)
                 val = np.empty(size)
+
             comm.Bcast(val, root=owner)
         else:
             if indices is None or ignore_indices:

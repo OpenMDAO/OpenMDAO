@@ -649,10 +649,12 @@ def _write_sparsity(sparsity, stream):
     stream.write("{\n")
 
     last_res_idx = len(sparsity) - 1
-    for i, (out, out_dict) in enumerate(iteritems(sparsity)):
+    for i, out in enumerate(sorted(sparsity)):
+        out_dict = sparsity[out]
         stream.write('"%s": {\n' % out)
         last_dv_idx = len(out_dict) - 1
-        for j, (inp, subjac) in enumerate(iteritems(out_dict)):
+        for j, inp in enumerate(sorted(out_dict)):
+            subjac = out_dict[inp]
             rows, cols, shape = subjac
             if len(rows) > 15:
                 stream.write('   "%s": [\n' % inp)
@@ -1148,10 +1150,6 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
     show_jac : bool
         If True, display a visualization of the colored jacobian.
     """
-    # for now, raise an exception when MPI is used with simul_coloring
-    if MPI:
-        raise RuntimeError("simul coloring currently does not work under MPI.")
-
     problem = driver._problem
     driver._total_jac = None
 
@@ -1225,7 +1223,7 @@ def _simul_coloring_cmd(options):
                                         repeats=options.num_jacs, tol=options.tolerance,
                                         show_jac=options.show_jac,
                                         include_sparsity=not options.no_sparsity,
-                                        setup=True, run_model=True,
+                                        setup=False, run_model=True,
                                         stream=outfile)
 
         if sys.stdout.isatty():
