@@ -31,8 +31,33 @@ def warn_deprecation(msg):
     warnings.simplefilter('always', DeprecationWarning)
 
     # note, stack level 3 should take us back to original caller.
-    warnings.warn(msg, DeprecationWarning, stacklevel=3)
+    simple_warning(msg, DeprecationWarning, stacklevel=3)
     warnings.simplefilter('ignore', DeprecationWarning)
+
+
+def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
+    return '%s:%s: %s:%s\n' % (filename, lineno, category.__name__, message)
+
+
+def simple_warning(msg, category=UserWarning, stacklevel=2):
+    """
+    Display a simple warning message without the annoying extra line showing the warning call.
+
+    Parameters
+    ----------
+    msg : str
+        The warning message.
+    category : class
+        The warning class.
+    stacklevel : int
+        Number of levels up the stack to identify as the warning location.
+    """
+    old_format = warnings.formatwarning
+    warnings.formatwarning = _warn_simple_format
+    try:
+        warnings.warn(msg, category, stacklevel)
+    finally:
+        warnings.formatwarning = old_format
 
 
 def ensure_compatible(name, value, shape=None, indices=None):

@@ -13,6 +13,7 @@ import numpy as np
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import simple_warning
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -223,7 +224,7 @@ class BroydenSolver(NonlinearSolver):
             msg = "The following states are not covered by a solver, and may have been " + \
                   "omitted from the BroydenSolver 'state_vars': "
             msg += ', '.join(sorted(missing))
-            warnings.warn(msg)
+            simple_warning(msg)
 
     def _assembled_jac_solver_iter(self):
         """

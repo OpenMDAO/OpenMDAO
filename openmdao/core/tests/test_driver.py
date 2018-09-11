@@ -276,7 +276,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.driver.options['debug_print'] = ['bad_option']
         self.assertEqual(str(context.exception),
-                         "Function is_valid(['bad_option']) returns False for option 'debug_print'.")
+                         "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = Problem()

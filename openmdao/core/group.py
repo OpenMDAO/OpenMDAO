@@ -24,7 +24,8 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors, \
+    simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -301,10 +302,18 @@ class Group(System):
         """
         self.pathname = pathname
 
-        if self.options['num_par_fd'] > 1 and comm.size > 1 and self._owns_approx_jac:
-            comm = self._setup_par_fd_procs(comm)
-        else:
-            self.options['num_par_fd'] = 1
+        if self._num_par_fd > 1:
+            if comm.size > 1:
+                if self._owns_approx_jac:
+                    comm = self._setup_par_fd_procs(comm)
+                else:
+                    msg = "'%s': num_par_fd = %d but FD is not active." % (self.pathname,
+                                                                           self._num_par_fd)
+                    raise RuntimeError(msg)
+            elif not MPI:
+                msg = ("'%s': MPI is not active but num_par_fd = %d. No parallel finite difference "
+                       "will be performed." % (self.pathname, self._num_par_fd))
+                simple_warning(msg)
 
         self.comm = comm
         self._mode = mode
@@ -963,18 +972,18 @@ class Group(System):
 
             if out_units:
                 if not in_units:
-                    warnings.warn("Output '%s' with units of '%s' is "
-                                  "connected to input '%s' which has no"
-                                  " units." % (abs_out, out_units, abs_in))
+                    simple_warning("Output '%s' with units of '%s' is "
+                                   "connected to input '%s' which has no"
+                                   " units." % (abs_out, out_units, abs_in))
                 elif not is_compatible(in_units, out_units):
                     raise RuntimeError("Output units of '%s' for '%s' are"
                                        " incompatible with input units of "
                                        "'%s' for '%s'." %
                                        (out_units, abs_out, in_units, abs_in))
             elif in_units is not None:
-                warnings.warn("Input '%s' with units of '%s' is "
-                              "connected to output '%s' which has "
-                              "no units." % (abs_in, in_units, abs_out))
+                simple_warning("Input '%s' with units of '%s' is "
+                               "connected to output '%s' which has "
+                               "no units." % (abs_in, in_units, abs_out))
 
             # check shape compatibility
             if abs_in in abs2meta and abs_out in abs2meta:

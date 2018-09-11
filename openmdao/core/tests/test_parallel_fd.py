@@ -4,6 +4,7 @@ from __future__ import print_function
 import time
 import numpy as np
 import unittest
+import warnings
 TestCase = unittest.TestCase
 from six import iterkeys
 
@@ -47,11 +48,9 @@ class ScalableComp(ExplicitComponent):
 
 
 def setup_1comp_model(par_fds, size, mult, add, method):
-    prob = Problem()
+    prob = Problem(model=Group(num_par_fd=par_fds))
     prob.model.add_subsystem('P1', IndepVarComp('x', np.ones(size)))
     prob.model.add_subsystem('C1', ScalableComp(size, mult, add))
-
-    prob.model.options['num_par_fd'] = par_fds
 
     prob.model.connect('P1.x', 'C1.x')
 
@@ -69,18 +68,20 @@ def setup_1comp_model(par_fds, size, mult, add, method):
 def setup_diamond_model(par_fds, size, method, par_fd_at):
     assert par_fd_at in ('model', 'par')
 
-    prob = Problem()
     if par_fd_at == 'model':
-        prob.model.options['num_par_fd'] = par_fds
+        prob = Problem(model=Group(num_par_fd=par_fds))
         prob.model.approx_totals(method=method)
+    else:
+        prob = Problem()
     root = prob.model
 
     root.add_subsystem('P1', IndepVarComp('x', np.ones(size)))
 
-    par = root.add_subsystem("par", Group())
     if par_fd_at == 'par':
-        par.options['num_par_fd'] = par_fds
+        par = root.add_subsystem("par", Group(num_par_fd=par_fds))
         par.approx_totals(method=method)
+    else:
+        par = root.add_subsystem("par", Group())
 
     par.add_subsystem('C1', ExecComp('y=2.0*x+1.0', x=np.zeros(size), y=np.zeros(size)))
     par.add_subsystem('C2', ExecComp('y=3.0*x+5.0', x=np.zeros(size), y=np.zeros(size)))
@@ -192,7 +193,7 @@ class SerialDiamondFDTestCase(TestCase):
         try:
             setup_diamond_model(0, 10, 'fd', 'model')
         except Exception as err:
-            self.assertEquals(str(err), "'': num_par_fds must be >= 1 but value is 0.")
+            self.assertEquals(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
 
 
 class ParallelDiamondFDTestCase(TestCase):
@@ -266,8 +267,7 @@ class MatMultTestCase(unittest.TestCase):
 
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
-        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method))
-        comp.options['num_par_fd'] = num_par_fd
+        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method, num_par_fd=num_par_fd))
 
         model.connect('indep.x', 'comp.x')
 
@@ -284,6 +284,14 @@ class MatMultTestCase(unittest.TestCase):
         self.assertLess(norm, 1.e-7)
         if MPI:
             self.assertEqual(MPI.COMM_WORLD.allreduce(ncomputes), size)
+
+        norm = np.linalg.norm(comp._jacobian['y', 'x'] - comp.mat)
+        self.assertLess(norm, 1.e-7)
+
+        # make sure check_partials works
+        data = p.check_partials(out_stream=None)
+        norm = np.linalg.norm(data['comp']['y', 'x']['J_fd'] - comp.mat)
+        self.assertLess(norm, 1.e-7)
 
     def test_20_by_4_fd(self):
         self.run_model(20, 4, 'fd')
@@ -332,25 +340,23 @@ class MatMultParallelTestCase(unittest.TestCase):
 
         mat2 = mat1 * 5.0
 
-        p = Problem()
+        if total:
+            grp = Group(num_par_fd=num_par_fd1)
+        else:
+            grp = Group()
+        p = Problem(model=grp)
 
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat1.shape[1])))
         par = model.add_subsystem('par', ParallelGroup())
 
         if total:
-            meth = 'exact'
-        else:
-            meth = method
-        C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method=meth))
-        C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method=meth))
-
-        if total:
-            model.options['num_par_fd'] = num_par_fd1
+            C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method='exact'))
+            C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method='exact'))
             model.approx_totals(method=method)
         else:
-            C1.options['num_par_fd'] = num_par_fd1
-            C2.options['num_par_fd'] = num_par_fd2
+            C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method=method, num_par_fd=num_par_fd1))
+            C2 = par.add_subsystem('C2', MatMultComp(mat2, approx_method=method, num_par_fd=num_par_fd2))
 
         model.connect('indep.x', 'par.C1.x')
         model.connect('indep.x', 'par.C2.x')
@@ -365,6 +371,26 @@ class MatMultParallelTestCase(unittest.TestCase):
 
         norm = np.linalg.norm(J['par.C2.y','indep.x'] - C2.mat)
         self.assertLess(norm, 1.e-7)
+
+        if not total:
+            # if total is True, the partials won't be computed during the compute_totals call
+            if C1 in par._subsystems_myproc:
+                norm = np.linalg.norm(C1._jacobian['y', 'x'] - C1.mat)
+                self.assertLess(norm, 1.e-7)
+
+            if C2 in par._subsystems_myproc:
+                norm = np.linalg.norm(C2._jacobian['y', 'x'] - C2.mat)
+                self.assertLess(norm, 1.e-7)
+
+        # make sure check_partials works
+        data = p.check_partials(out_stream=None)
+        if 'par.C1' in data:
+            norm = np.linalg.norm(data['par.C1']['y', 'x']['J_fd'] - C1.mat)
+            self.assertLess(norm, 1.e-7)
+
+        if 'par.C2' in data:
+            norm = np.linalg.norm(data['par.C2']['y', 'x']['J_fd'] - C2.mat)
+            self.assertLess(norm, 1.e-7)
 
     def test_20_by_4_fd(self):
         self.run_model(20, 4, 4, 'fd')
@@ -416,6 +442,133 @@ class MatMultParallelTestCase(unittest.TestCase):
         # this tests regular CS when not all vars are local
         self.run_model(22, 1, 1, 'cs', total=True)
 
+
+def _setup_problem(mat, total_method='exact', partial_method='exact', total_num_par_fd=1,
+                   partial_num_par_fd=1, approx_totals=False):
+    p = Problem(model=Group(num_par_fd=total_num_par_fd))
+    model = p.model
+    model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+    model.add_subsystem('comp', MatMultComp(mat, approx_method=partial_method,
+                        num_par_fd=partial_num_par_fd))
+
+    model.connect('indep.x', 'comp.x')
+
+    if approx_totals:
+        p.model.approx_totals()
+
+    p.setup(mode='fwd', force_alloc_complex='cs' in (total_method, partial_method))
+    return p
+
+
+class ParFDWarningsTestCase(unittest.TestCase):
+    def setUp(self):
+        size = 20
+        self.mat = np.random.random(5 * size).reshape((5, size)) - 0.5
+
+    def test_total_no_mpi(self):
+        with warnings.catch_warnings(record=True) as w:
+            _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=True)
+
+        self.assertEqual(len(w), 1)
+        self.assertEqual(str(w[0].message),
+                         "'': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
+
+    def test_partial_no_mpi(self):
+        with warnings.catch_warnings(record=True) as w:
+            _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
+
+        self.assertEqual(len(w), 1)
+        self.assertEqual(str(w[0].message),
+                         "'comp': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
+
+
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class ParFDErrorsMPITestCase(unittest.TestCase):
+    N_PROCS = 3
+
+    def setUp(self):
+        size = 20
+        self.mat = np.random.random(5 * size).reshape((5, size)) - 0.5
+
+    def test_no_approx_totals(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=False)
+
+        self.assertEqual(str(ctx.exception), "'': num_par_fd = 3 but FD is not active.")
+
+    def test_no_partial_approx(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
+
+        self.assertEqual(str(ctx.exception), "'comp': num_par_fd is > 1 but no FD is active.")
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+class ParFDFeatureTestCase(unittest.TestCase):
+    N_PROCS = 3
+
+    def test_fd_totals(self):
+        mat = np.arange(30, dtype=float).reshape(5, 6)
+
+        p = Problem(model=Group(num_par_fd=3))
+        model = p.model
+        model.approx_totals(method='fd')
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+        comp = model.add_subsystem('comp', MatMultComp(mat))
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup(mode='fwd')
+        p.run_model()
+
+        pre_count = comp.num_computes
+
+        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+
+        post_count =  comp.num_computes
+
+        # how many computes were used in this proc to compute the total jacobian?
+        # Each proc should be doing 2 computes.
+        jac_count = post_count - pre_count
+
+        self.assertEqual(jac_count, 2)
+
+        # J and mat should be the same
+        self.assertLess(np.linalg.norm(J - mat), 1.e-7)
+
+    def test_fd_partials(self):
+        mat = np.arange(30, dtype=float).reshape(5, 6)
+
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=3))
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup(mode='fwd')
+        p.run_model()
+
+        pre_count = comp.num_computes
+
+        # calling compute_totals will result in the computation of partials for comp
+        p.compute_totals(of=['comp.y'], wrt=['indep.x'])
+
+        # get the partial jacobian matrix
+        J = comp._jacobian['y', 'x']
+
+        post_count =  comp.num_computes
+
+        # how many computes were used in this proc to compute the partial jacobian?
+        # Each proc should be doing 2 computes.
+        jac_count = post_count - pre_count
+
+        self.assertEqual(jac_count, 2)
+
+        # J and mat should be the same
+        self.assertLess(np.linalg.norm(J - mat), 1.e-7)
 
 if __name__ == '__main__':
     unittest.main()
