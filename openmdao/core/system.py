@@ -11,6 +11,7 @@ from six import iteritems, string_types
 
 import numpy as np
 
+import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
@@ -1779,11 +1780,11 @@ class System(object):
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+        lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
                                          flatten=True)
 
         # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+        upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
                                          flatten=True)
 
         # Apply scaler/adder to lower and upper
@@ -1937,11 +1938,11 @@ class System(object):
 
         if type_ == 'con':
             # Convert lower to ndarray/float as necessary
-            lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+            lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
                                              flatten=True)
 
             # Convert upper to ndarray/float as necessary
-            upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+            upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
                                              flatten=True)
 
             # Convert equals to ndarray/float as necessary

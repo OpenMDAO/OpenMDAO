@@ -15,6 +15,7 @@ import numbers
 import json
 
 import numpy as np
+import openmdao
 
 
 def warn_deprecation(msg):
@@ -279,9 +280,9 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     elif values is None:
         values = val_if_none
     elif values == float('inf'):
-        values = sys.float_info.max
+        values = openmdao.INF_BOUND
     elif values == -float('inf'):
-        values = -sys.float_info.max
+        values = -openmdao.INF_BOUND
     elif isinstance(values, numbers.Number):
         values = float(values)
     else:
