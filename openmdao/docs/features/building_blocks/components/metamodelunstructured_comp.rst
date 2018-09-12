@@ -87,3 +87,17 @@ to be the same size as specified in the ``vec_size`` argument.
     :layout: code, output
 
 .. tags:: MetaModelUnStructuredComp, Component
+
+Using Surrogates That Not Define Linearize Method
+-------------------------------------------------
+
+In some cases, users might define surrogates but not define a linearize method. In this case, the
+`MetaModelUnStructuredComp` derivatives will done using finite differences. By default, the default values for the
+finite differencing method will be used.
+
+If the user would like to specify finite differencing options, they can do so by calling the `declare_partials`
+method in the component's `setup` or `configure` methods.
+
+Complex step has not been tested with `MetaModelUnStructuredComp`. Use of complex step in this case will result
+in an exception.
+

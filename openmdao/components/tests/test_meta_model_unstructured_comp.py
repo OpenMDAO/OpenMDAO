@@ -927,51 +927,472 @@ class MetaModelTestCase(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
 
+    # def test_metamodel_use_fd_if_no_surrogate_linearize(self):
+    #     class Trig(MetaModelUnStructuredComp):
+    #         def setup(self):
+    #
+    #             surrogate = FloatKrigingSurrogate()
+    #             self.add_input('x', 0.,
+    #                            training_data=np.linspace(0,10,20))
+    #             self.add_output('sin_x', 0.,
+    #                             surrogate=surrogate,
+    #                             training_data=.5*np.sin(np.linspace(0,10,20)))
+    #
+    #     prob = Problem()
+    #     indep = IndepVarComp()
+    #     indep.add_output('x', 5.)
+    #     prob.model.add_subsystem('indep', indep)
+    #     prob.model.add_subsystem('trig', Trig())
+    #     prob.model.connect('indep.x', 'trig.x')
+    #
+    #     prob.model.add_design_var('indep.x', lower=4, upper=7)
+    #     prob.model.add_objective('trig.sin_x')
+    #
+    #     prob.setup(check=True)
+    #     prob['indep.x'] = 5.0
+    #     prob.run_model()
+    #     J = prob.compute_totals()
+    #
+    #     deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+    #
+    #     prob['indep.x'] = 5.0
+    #
+    #     # Check to see that if the surrogate does not have a linearize,
+    #     #    fd is used to compute the derivatives correctly
+    #     linearize = KrigingSurrogate.linearize #  save for later
+    #     del KrigingSurrogate.linearize
+    #
+    #     prob.run_model()
+    #     J = prob.compute_totals()
+    #
+    #     # restore this so that other tests are not affected
+    #     KrigingSurrogate.linearize = linearize
+    #
+    #     deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+    #     assert_rel_error(self, deriv_using_fd, deriv_using_surrogate_linearize, 1e-4)
+    #     # Just to be extra sure
+    #     assert_rel_error(self, deriv_using_fd[0], .5 * np.cos(prob['indep.x']), 1e-4)
+
+    # def test_metamodel_use_fd_if_no_surrogate_linearize_original(self):
+    #     class Trig(MetaModelUnStructuredComp):
+    #         def setup(self):
+    #
+    #             surrogate = FloatKrigingSurrogate()
+    #             self.add_input('x', 0.,
+    #                            training_data=np.linspace(0,10,20))
+    #             self.add_output('sin_x', 0.,
+    #                             surrogate=surrogate,
+    #                             training_data=.5*np.sin(np.linspace(0,10,20)))
+    #
+    #     # prob = Problem()
+    #     # indep = IndepVarComp()
+    #     # indep.add_output('x', 5.)
+    #     # prob.model.add_subsystem('indep', indep)
+    #     # prob.model.add_subsystem('trig', Trig())
+    #     # prob.model.connect('indep.x', 'trig.x')
+    #     #
+    #     # prob.model.add_design_var('indep.x', lower=4, upper=7)
+    #     # prob.model.add_objective('trig.sin_x')
+    #     #
+    #     # prob.setup(check=True)
+    #     # prob['indep.x'] = 5.0
+    #     # prob.run_model()
+    #     # J = prob.compute_totals()
+    #     #
+    #     # deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+    #     #
+    #
+    #
+    #
+    #     prob = Problem()
+    #     indep = IndepVarComp()
+    #     indep.add_output('x', 5.)
+    #     prob.model.add_subsystem('indep', indep)
+    #     prob.model.add_subsystem('trig', Trig())
+    #     prob.model.connect('indep.x', 'trig.x')
+    #
+    #     prob.model.add_design_var('indep.x', lower=4, upper=7)
+    #     prob.model.add_objective('trig.sin_x')
+    #
+    #     prob.setup(check=True)
+    #     prob['indep.x'] = 5.0
+    #     prob.run_model()
+    #     J = prob.compute_totals()
+    #
+    #     deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+    #
+    #
+    #     linearize = KrigingSurrogate.linearize #  save for later
+    #     del KrigingSurrogate.linearize
+    #
+    #
+    #     prob = Problem()
+    #     indep = IndepVarComp()
+    #     indep.add_output('x', 5.)
+    #     prob.model.add_subsystem('indep', indep)
+    #     prob.model.add_subsystem('trig', Trig())
+    #     prob.model.connect('indep.x', 'trig.x')
+    #
+    #     prob.model.add_design_var('indep.x', lower=4, upper=7)
+    #     prob.model.add_objective('trig.sin_x')
+    #
+    #     prob.setup(check=True)
+    #     prob['indep.x'] = 5.0
+    #     prob.run_model()
+    #     J = prob.compute_totals()
+    #
+    #     deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+    #
+    #     # restore this so that other tests are not affected
+    #     KrigingSurrogate.linearize = linearize
+    #
+    #     deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+    #     assert_rel_error(self, deriv_using_fd, deriv_using_surrogate_linearize, 1e-4)
+    #     # Just to be extra sure
+    #     assert_rel_error(self, deriv_using_fd[0], .5 * np.cos(prob['indep.x']), 1e-4)
+    #
+
+    # def test_metamodel_use_fd_if_no_surrogate_linearize_v5(self):
+    #     class Trig(MetaModelUnStructuredComp):
+    #         def setup(self):
+    #
+    #             surrogate = FloatKrigingSurrogate()
+    #             self.add_input('x', 0.,
+    #                            training_data=np.linspace(0,10,20))
+    #             self.add_output('sin_x', 0.,
+    #                             surrogate=surrogate,
+    #                             training_data=.5*np.sin(np.linspace(0,10,20)))
+    #
+    #     prob = Problem()
+    #     indep = IndepVarComp()
+    #     indep.add_output('x', 5.)
+    #     prob.model.add_subsystem('indep', indep)
+    #     prob.model.add_subsystem('trig', Trig())
+    #     prob.model.connect('indep.x', 'trig.x')
+    #
+    #     prob.model.add_design_var('indep.x', lower=4, upper=7)
+    #     prob.model.add_objective('trig.sin_x')
+    #
+    #     prob.setup(check=True)
+    #     prob['indep.x'] = 5.0
+    #     prob.run_model()
+    #     J = prob.compute_totals()
+    #
+    #     deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+
     def test_metamodel_use_fd_if_no_surrogate_linearize(self):
+        from openmdao.api import SurrogateModel
+        class SinSurrogate(SurrogateModel):
+
+            def train(self, x, y):
+                pass
+
+            def predict(self, x):
+                from math import sin
+                y = sin(x)
+                return y
+
+        class SinTwoInputsSurrogate(SurrogateModel):
+
+            def train(self, x, y):
+                pass
+
+            def predict(self, x):
+                from math import sin
+                y = sin(x[0] + x[1])
+                return y
+
         class Trig(MetaModelUnStructuredComp):
             def setup(self):
-
-                surrogate = FloatKrigingSurrogate()
+                surrogate = SinSurrogate()
                 self.add_input('x', 0.,
-                               training_data=np.linspace(0,10,20))
+                               training_data=np.linspace(0, 10, 20))
                 self.add_output('sin_x', 0.,
                                 surrogate=surrogate,
-                                training_data=.5*np.sin(np.linspace(0,10,20)))
+                                training_data=np.sin(np.linspace(0, 10, 20)))
 
+        class TrigWithFdInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0, 10, 20))
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=np.sin(np.linspace(0, 10, 20)))
+                self.declare_partials('sin_x', 'x', method='fd',
+                                      form='backward', step=1e-7,
+                                      step_calc='rel')
+
+        class TrigWithCsInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0, 10, 20))
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=np.sin(np.linspace(0, 10, 20)))
+                self.declare_partials('sin_x', 'x', method='cs')
+
+        class TrigGroup(Group):
+            def configure(self):
+                trig = self._get_subsystem('trig')
+                trig.declare_partials('sin_x', 'x', method='fd',
+                                      form='backward', step=1e-7,
+                                      step_calc='rel')
+
+        class TrigWithFdInConfigure(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0, 10, 20))
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=np.sin(np.linspace(0, 10, 20)))
+
+        class TrigTwoInputsWithFdInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinTwoInputsSurrogate()
+                self.add_input('x1', 0.,
+                               training_data=np.linspace(0, 10, 20))
+                self.add_input('x2', 0.,
+                               training_data=np.linspace(0, 10, 20))
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=np.sin(np.linspace(0, 10, 20)))
+                self.declare_partials('sin_x', 'x1', method='fd',
+                                      form='backward', step=1e-7,
+                                      step_calc='rel')
+
+        def no_surrogate_test_setup(trig, group=None):
+            prob = Problem()
+            if group:
+                prob.model = group
+            indep = IndepVarComp()
+            indep.add_output('x', 5.)
+            prob.model.add_subsystem('indep', indep)
+            prob.model.add_subsystem('trig', trig)
+            prob.model.connect('indep.x', 'trig.x')
+            # prob.model.add_design_var('indep.x', lower=4, upper=7)
+            prob.model.add_design_var('indep.x')
+            prob.model.add_objective('trig.sin_x')
+            prob.setup(check=True)
+            prob['indep.x'] = 5.0
+            prob.run_model()
+            return prob
+
+        # Test with user not explicitly setting fd
+        trig = Trig()
+        prob = no_surrogate_test_setup(trig)
+        J = prob.compute_totals()
+        deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_surrogate_linearize[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user not explicitly setting fd
+        # prob = Problem()
+        # indep = IndepVarComp()
+        # indep.add_output('x', 5.)
+        # prob.model.add_subsystem('indep', indep)
+        # trig = Trig()
+        # prob.model.add_subsystem('trig', trig)
+        # prob.model.connect('indep.x', 'trig.x')
+        # prob.model.add_design_var('indep.x', lower=4, upper=7)
+        # prob.model.add_objective('trig.sin_x')
+        # prob.setup(check=True)
+        # prob['indep.x'] = 5.0
+        # prob.run_model()
+        #
+        # J = prob.compute_totals()
+        # deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+        # assert_rel_error(self, deriv_using_surrogate_linearize[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user explicitly setting fd inside of setup
+        trig = TrigWithFdInSetup()
+        prob = no_surrogate_test_setup(trig)
+        of, wrt, method, fd_options = trig._approximated_partials[0]
+        expected_fd_options = {
+            'step': 1e-7,
+            'form': 'backward',
+            'step_calc': 'rel',
+        }
+        self.assertEqual(expected_fd_options, fd_options)
+        J = prob.compute_totals()
+        deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_surrogate_linearize[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user explicitly setting fd inside of setup
+        # prob = Problem()
+        # indep = IndepVarComp()
+        # indep.add_output('x', 5.)
+        # prob.model.add_subsystem('indep', indep)
+        # trig = TrigWithFdInSetup()
+        # prob.model.add_subsystem('trig', trig)
+        # prob.model.connect('indep.x', 'trig.x')
+        # prob.model.add_design_var('indep.x', lower=4, upper=7)
+        # prob.model.add_objective('trig.sin_x')
+        # prob.setup(check=True)
+        # of, wrt, method, fd_options = trig._approximated_partials[0]
+        # expected_fd_options = {
+        #     'step': 1e-7,
+        #     'form': 'backward',
+        #     'step_calc': 'rel',
+        # }
+        # self.assertEqual(expected_fd_options, fd_options)
+        # prob['indep.x'] = 5.0
+        # prob.run_model()
+        # J = prob.compute_totals()
+
+        # Test with user explicitly setting fd inside of configure for a group
+        trig = TrigWithFdInConfigure()
+        prob = no_surrogate_test_setup(trig, group = TrigGroup())
+        of, wrt, method, fd_options = trig._approximated_partials[0]
+        expected_fd_options = {
+            'step': 1e-7,
+            'form': 'backward',
+            'step_calc': 'rel',
+        }
+        self.assertEqual(expected_fd_options, fd_options)
+        J = prob.compute_totals()
+        deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_surrogate_linearize[0], np.cos(prob['indep.x']), 1e-4)
+
+
+        # Test with user explicitly setting fd inside of configure for a group
+        # prob = Problem()
+        # prob.model = TrigGroup()
+        # indep = IndepVarComp()
+        # indep.add_output('x', 5.)
+        # prob.model.add_subsystem('indep', indep)
+        # trig = TrigWithFdInConfigure()
+        # prob.model.add_subsystem('trig', trig)
+        # prob.model.connect('indep.x', 'trig.x')
+        # prob.model.add_design_var('indep.x', lower=4, upper=7)
+        # prob.model.add_objective('trig.sin_x')
+        # prob.setup(check=True)
+        # prob['indep.x'] = 5.0
+        # prob.run_model()
+        #
+        # of, wrt, method, fd_options = trig._approximated_partials[0]
+        # expected_fd_options = {
+        #     'step': 1e-7,
+        #     'form': 'backward',
+        #     'step_calc': 'rel',
+        # }
+        # self.assertEqual(expected_fd_options, fd_options)
+        #
+        # J = prob.compute_totals()
+        #
+        # deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+        # assert_rel_error(self, deriv_using_surrogate_linearize[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user explicitly setting cs inside of setup. Should throw an error
         prob = Problem()
         indep = IndepVarComp()
         indep.add_output('x', 5.)
         prob.model.add_subsystem('indep', indep)
-        prob.model.add_subsystem('trig', Trig())
+        trig = TrigWithCsInSetup()
+        prob.model.add_subsystem('trig', trig)
         prob.model.connect('indep.x', 'trig.x')
-
         prob.model.add_design_var('indep.x', lower=4, upper=7)
         prob.model.add_objective('trig.sin_x')
 
+        with self.assertRaises(ValueError) as context:
+            prob.setup(check=True)
+        expected_msg = 'Complex step has not been tested for MetaModelUnStructuredComp'
+        self.assertEqual(expected_msg, str(context.exception))
+
+        # Test with user explicitly setting fd on one of the inputs for a meta model
+        #   with two inputs. Check to make sure all inputs are fd
+        prob = Problem()
+        indep = IndepVarComp()
+        indep.add_output('x1', 5.)
+        indep.add_output('x2', 5.)
+        prob.model.add_subsystem('indep', indep)
+        trig = TrigTwoInputsWithFdInSetup()
+        prob.model.add_subsystem('trig', trig)
+        prob.model.connect('indep.x1', 'trig.x1')
+        prob.model.connect('indep.x2', 'trig.x2')
+        prob.model.add_design_var('indep.x1', lower=4, upper=7)
+        prob.model.add_design_var('indep.x2', lower=4, upper=7)
+        prob.model.add_objective('trig.sin_x')
         prob.setup(check=True)
-        prob['indep.x'] = 5.0
+        prob['indep.x1'] = 5.0
+        prob['indep.x2'] = 5.0
         prob.run_model()
-        J = prob.compute_totals()
 
-        deriv_using_surrogate_linearize = J[('trig.sin_x', 'indep.x')]
+        self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['method'])
+        self.assertEqual('backward', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['form'])
+        self.assertEqual(1e-07, trig._subjacs_info[('trig.sin_x', 'trig.x1')]['step'])
+        self.assertEqual('rel', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['step_calc'])
 
-        prob['indep.x'] = 5.0
+        self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x2')]['method'])
+        self.assertTrue('form' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+        self.assertTrue('step' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+        self.assertTrue('step_calc' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
 
-        # Check to see that if the surrogate does not have a linearize,
-        #    fd is used to compute the derivatives correctly
-        linearize = KrigingSurrogate.linearize #  save for later
-        del KrigingSurrogate.linearize
-
-        prob.run_model()
-        J = prob.compute_totals()
-
-        # restore this so that other tests are not affected
-        KrigingSurrogate.linearize = linearize
-
-        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
-        assert_rel_error(self, deriv_using_fd, deriv_using_surrogate_linearize, 1e-4)
-        # Just to be extra sure
-        assert_rel_error(self, deriv_using_fd[0], .5 * np.cos(prob['indep.x']), 1e-4)
+    # def test_metamodel_use_fd_if_no_surrogate_linearize_using_sin_junk(self):
+    #     class SinTwoInputsSurrogate(SurrogateModel):
+    #
+    #         def train(self, x, y):
+    #             pass
+    #
+    #         def predict(self, x):
+    #             from math import sin
+    #             y = sin(x[0] + x[1])
+    #             return y
+    #
+    #     class TrigWithFdInSetup(MetaModelUnStructuredComp):
+    #         def setup(self):
+    #             surrogate = SinTwoInputsSurrogate()
+    #             self.add_input('x1', 0.,
+    #                            training_data=np.linspace(0, 10, 20))
+    #             self.add_input('x2', 0.,
+    #                            training_data=np.linspace(0, 10, 20))
+    #             self.add_output('sin_x', 0.,
+    #                             surrogate=surrogate,
+    #                             training_data=np.sin(np.linspace(0, 10, 20)))
+    #             # self.declare_partials('sin_x', 'x', method='fd', step=None, form=None,
+    #             #                       step_calc=None)
+    #             # self.declare_partials('sin_x', '*', method='fd',
+    #             #                       form='forward', step=1e-8,
+    #             #                       step_calc='rel')
+    #             self.declare_partials('sin_x', 'x1', method='fd',
+    #                                   form='backward', step=1e-7,
+    #                                   step_calc='rel')
+    #
+    #     # Test with user explicitly setting fd inside of setup
+    #     prob = Problem()
+    #     indep = IndepVarComp()
+    #     indep.add_output('x1', 5.)
+    #     indep.add_output('x2', 5.)
+    #     prob.model.add_subsystem('indep', indep)
+    #     trig = TrigWithFdInSetup()
+    #     prob.model.add_subsystem('trig', trig)
+    #     prob.model.connect('indep.x1', 'trig.x1')
+    #     prob.model.connect('indep.x2', 'trig.x2')
+    #     prob.model.add_design_var('indep.x1', lower=4, upper=7)
+    #     prob.model.add_design_var('indep.x2', lower=4, upper=7)
+    #     prob.model.add_objective('trig.sin_x')
+    #     prob.setup(check=True)
+    #     of, wrt, method, fd_options = trig._approximated_partials[0]
+    #     expected_fd_options = {
+    #         'step': 1e-7,
+    #         'form': 'backward',
+    #         'step_calc': 'rel',
+    #     }
+    #     # self.assertEqual(expected_fd_options, fd_options)
+    #     prob['indep.x1'] = 5.0
+    #     prob['indep.x2'] = 5.0
+    #     prob.run_model()
+    #
+    #     self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['method'])
+    #     self.assertEqual('backward', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['form'])
+    #     self.assertEqual(1e-07, trig._subjacs_info[('trig.sin_x', 'trig.x1')]['step'])
+    #     self.assertEqual('rel', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['step_calc'])
+    #
+    #     self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x2')]['method'])
+    #     self.assertTrue('form' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+    #     self.assertTrue('step' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+    #     self.assertTrue('step_calc' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
 
 
 if __name__ == "__main__":

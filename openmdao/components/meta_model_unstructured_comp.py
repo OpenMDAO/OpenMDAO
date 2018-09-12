@@ -5,6 +5,7 @@ from itertools import chain
 
 import numpy as np
 
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
@@ -225,6 +226,21 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                    wrt=[name[0] for name in self._surrogate_input_names])
 
+            # ### TODO: just temporary. Trying something !!!
+            for out_name, out_shape in self._surrogate_output_names:
+                surrogate = self._metadata(out_name).get('surrogate')
+                if not overrides_method('linearize', surrogate, SurrogateModel):
+                    # self.declare_partials(of=out_name, wrt='*', method='fd')
+                    self._approx_partials(of=out_name, wrt='*', method='fd' )
+                    self._approx_schemes['fd'] = FiniteDifference()
+                    pass
+
+                    # if user has not declared partials on this output, issue a warning that
+                    #   defaults will be used
+
+                    # I can check here to see what values of self._approximated_partials
+                    # and self._declared_partials have values
+
     def check_config(self, logger):
         """
         Perform optional error checks.
@@ -371,6 +387,56 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 idx += sz
 
         return arr
+
+    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
+                         method='exact', step=None, form=None, step_calc=None):
+        """
+        Declare information about this component's subjacobians.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        dependent : bool(True)
+            If False, specifies no dependence between the output(s) and the
+            input(s). This is only necessary in the case of a sparse global
+            jacobian, because if 'dependent=False' is not specified and
+            declare_partials is not called for a given pair, then a dense
+            matrix of zeros will be allocated in the sparse global jacobian
+            for that pair.  In the case of a dense global jacobian it doesn't
+            matter because the space for a dense subjac will always be
+            allocated for every pair.
+        rows : ndarray of int or None
+            Row indices for each nonzero entry.  For sparse subjacobians only.
+        cols : ndarray of int or None
+            Column indices for each nonzero entry.  For sparse subjacobians only.
+        val : float or ndarray of float or scipy.sparse
+            Value of subjacobian.  If rows and cols are not None, this will
+            contain the values found at each (row, col) location in the subjac.
+        method : str
+            The type of approximation that should be used. Valid options include:
+            'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+            defined analytic derivatives. Default is 'exact'.
+        step : float
+            Step size for approximation. Defaults to None, in which case the approximation
+            method provides its default value.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
+            to None, in which case the approximation method provides its default value.
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. Defaults to None, in which case the approximation method provides
+            its default value.
+        """
+        if method == 'cs':
+            raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
+        super(MetaModelUnStructuredComp, self).declare_partials(of, wrt, dependent, rows, cols,
+                                                                val, method, step, form, step_calc)
 
     def compute_partials(self, inputs, partials):
         """
