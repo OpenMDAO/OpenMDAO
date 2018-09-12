@@ -156,12 +156,12 @@ def json_to_np_array(vals, abs2meta):
         return None
 
     for var in json_vals:
-        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta)
+        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta[var]['shape'])
 
     return values_to_array(json_vals)
 
 
-def convert_to_np_array(val, varname, abs2meta):
+def convert_to_np_array(val, varname, shape):
     """
     Convert list to numpy array.
 
@@ -171,8 +171,8 @@ def convert_to_np_array(val, varname, abs2meta):
         the list to be converted to an np.array
     varname : str
         name of variable to be converted
-    abs2meta : dict
-        Dictionary mapping absolute variable names to variable metadata.
+    shape : tuple
+        the shape of the resulting np.array
 
     Returns
     -------
@@ -181,9 +181,9 @@ def convert_to_np_array(val, varname, abs2meta):
     """
     if isinstance(val, list):
         array = np.array(val)
-        shape = abs2meta[varname]['shape']
         array = np.resize(array, shape)
         return array
+
     return val
 
 

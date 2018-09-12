@@ -10,7 +10,7 @@ import sys
 import sqlite3
 from collections import OrderedDict
 
-from six import PY2, PY3, reraise
+from six import PY2, PY3, reraise, iteritems
 from six.moves import range
 
 import numpy as np
@@ -19,9 +19,12 @@ from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
     PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
-from openmdao.utils.record_util import is_valid_sqlite3_db, json_to_np_array, convert_to_np_array
+from openmdao.utils.record_util import json_to_np_array, convert_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.write_outputs import write_outputs
+
+from pprint import pprint
+import json
 
 if PY2:
     import cPickle as pickle
@@ -32,6 +35,38 @@ elif PY3:
 
 
 _DEFAULT_OUT_STREAM = object()
+
+# Regular expression used for splitting iteration coordinates.
+_coord_split_re = re.compile('\|\\d+\|*')
+
+
+def check_valid_sqlite3_db(filename):
+    """
+    Raises an IOError if the given filename does not reference a valid SQLite3 database file.
+
+    Parameters
+    ----------
+    filename : str
+        The path to the file to be tested
+
+    Raises
+    ------
+    IOError
+        If the given filename does not reference a valid SQLite3 database file.
+    """
+    # check that the file exists
+    if not os.path.isfile(filename):
+        raise IOError('File does not exist({0})'.format(filename))
+
+    # check that the file is large enough (SQLite database file header is 100 bytes)
+    if os.path.getsize(filename) < 100:
+        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
+
+    # check that the first 100 bytes actually contains a valid SQLite database header
+    with open(filename, 'rb') as fd:
+        header = fd.read(100)
+    if header[:16] != b'SQLite format 3\x00':
+        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -57,13 +92,11 @@ class SqliteCaseReader(BaseCaseReader):
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
-    _coordinate_split_re : RegularExpression
-        Regular expression used for splitting iteration coordinates.
     _var_settings : dict
         Dictionary mapping absolute variable names to variable settings.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename, pre_load=False):
         """
         Initialize.
 
@@ -71,76 +104,60 @@ class SqliteCaseReader(BaseCaseReader):
         ----------
         filename : str
             The path to the filename containing the recorded data.
+        pre_load : bool
+            If True, load all the data into memory during initialization.
         """
         super(SqliteCaseReader, self).__init__(filename)
 
-        if filename is not None:
-            if not is_valid_sqlite3_db(filename):
-                if not os.path.exists(filename):
-                    raise IOError('File does not exist({0})'.format(filename))
-                else:
-                    raise IOError('File does not contain a valid '
-                                  'sqlite database ({0})'.format(filename))
-
-        self._coordinate_split_re = re.compile('\|\\d+\|*')
+        check_valid_sqlite3_db(filename)
 
         with sqlite3.connect(self.filename) as con:
-            cur = con.cursor()
+            con.row_factory = sqlite3.Row
 
-            # need to see what columns are in the metadata table before we query it
-            cursor = cur.execute('select * from metadata')
-            names = [description[0] for description in cursor.description]
-            if "var_settings" in names:
-                cur.execute(
-                    "SELECT format_version, abs2prom, prom2abs, abs2meta, var_settings "
-                    "FROM metadata")
-            else:
-                cur.execute(
-                    "SELECT format_version, abs2prom, prom2abs, abs2meta FROM metadata")
+            cur = con.cursor()
+            cur.execute('select * from metadata')
+
             row = cur.fetchone()
-            self.format_version = row[0]
-            self._abs2prom = None
-            self._prom2abs = None
-            self._abs2meta = None
-            self._var_settings = None
+
+            self.format_version = row['format_version']
 
             if self.format_version >= 4:
-                self._var_settings = json_loads(row[4])
+                self._var_settings = json_loads(row['var_settings'])
+            else:
+                self._var_settings = None
 
             if self.format_version >= 3:
-                self._abs2prom = json_loads(row[1])
-                self._prom2abs = json_loads(row[2])
-                self._abs2meta = json_loads(row[3])
+                self._abs2prom = json_loads(row['abs2prom'])
+                self._prom2abs = json_loads(row['prom2abs'])
+                self._abs2meta = json_loads(row['abs2meta'])
 
-                for name in self._abs2meta:
-                    if 'lower' in self._abs2meta[name]:
-                        self._abs2meta[name]['lower'] =\
-                            convert_to_np_array(self._abs2meta[name]['lower'], name,
-                                                self._abs2meta[name]['shape'])
-                    if 'upper' in self._abs2meta[name]:
-                        self._abs2meta[name]['upper'] =\
-                            convert_to_np_array(self._abs2meta[name]['upper'], name,
-                                                self._abs2meta[name]['shape'])
+                # need to convert bounds to numpy arrays
+                for name, meta in iteritems(self._abs2meta):
+                    if 'lower' in meta:
+                        meta['lower'] = convert_to_np_array(meta['lower'], name, meta['shape'])
+                    if 'upper' in meta:
+                        meta['upper'] = convert_to_np_array(meta['upper'], name, meta['shape'])
 
             elif self.format_version in (1, 2):
+                abs2prom = row['abs2prom']
+                prom2abs = row['prom2abs']
+                abs2meta = row['abs2meta']
+
                 if PY2:
-                    self._abs2prom = pickle.loads(str(row[1])) if row[1] is not None else None
-                    self._prom2abs = pickle.loads(str(row[2])) if row[2] is not None else None
-                    self._abs2meta = pickle.loads(str(row[3])) if row[3] is not None else None
+                    self._abs2prom = pickle.loads(str(abs2prom))
+                    self._prom2abs = pickle.loads(str(prom2abs))
+                    self._abs2meta = pickle.loads(str(abs2meta))
 
                 if PY3:
                     try:
-                        self._abs2prom = pickle.loads(row[1]) if row[1] is not None else None
-                        self._prom2abs = pickle.loads(row[2]) if row[2] is not None else None
-                        self._abs2meta = pickle.loads(row[3]) if row[3] is not None else None
+                        self._abs2prom = pickle.loads(abs2prom)
+                        self._prom2abs = pickle.loads(prom2abs)
+                        self._abs2meta = pickle.loads(abs2meta)
                     except TypeError:
                         # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                        self._abs2prom = pickle.loads(row[1].encode()) if row[1] is not None \
-                            else None
-                        self._prom2abs = pickle.loads(row[2].encode()) if row[2] is not None \
-                            else None
-                        self._abs2meta = pickle.loads(row[3].encode()) if row[3] is not None \
-                            else None
+                        self._abs2prom = pickle.loads(abs2prom.encode())
+                        self._prom2abs = pickle.loads(prom2abs.encode())
+                        self._abs2meta = pickle.loads(abs2meta.encode())
 
         con.close()
 
@@ -150,6 +167,9 @@ class SqliteCaseReader(BaseCaseReader):
                                                 self._abs2prom, False)
 
         self._load()
+
+        if pre_load:
+            self.load_cases()
 
     def _load(self):
         """
@@ -307,13 +327,12 @@ class SqliteCaseReader(BaseCaseReader):
             solver_iter = cur.fetchall()
         con.close()
 
-        split_iter_coord = self._split_coordinate(iter_coord) if iter_coord is not ''\
-            else []
+        split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
 
         # grab an array of possible lengths of coordinates
         coord_lengths = [2]  # start with 2 because that is the length of driver iteration coords
         for s in solver_iter:
-            s_len = len(self._split_coordinate(s[0]))
+            s_len = len(_coord_split_re.split(s[0]))
             if s_len not in coord_lengths:
                 coord_lengths.append(s_len)
         coord_lengths = sorted(coord_lengths)
@@ -366,7 +385,7 @@ class SqliteCaseReader(BaseCaseReader):
                 for d in driver_iter:
                     ret.append((d[0], 'driver'))
                     if recursive:
-                        ret += self._find_child_cases(d[0], self._split_coordinate(d[0]),
+                        ret += self._find_child_cases(d[0], _coord_split_re.split(d[0]),
                                                       driver_iter, solver_iter, recursive,
                                                       coord_lengths)
             elif len(solver_iter) > 0:  # grabbing first layer of solver iterations
@@ -376,7 +395,7 @@ class SqliteCaseReader(BaseCaseReader):
                     min_iter_len = coord_lengths[1]
 
                 for s in solver_iter:
-                    split_coord = self._split_coordinate(s[0])
+                    split_coord = _coord_split_re.split(s[0])
                     if len(split_coord) is min_iter_len:
                         ret.append((s[0], 'solver'))
                         if recursive:
@@ -387,7 +406,7 @@ class SqliteCaseReader(BaseCaseReader):
                 if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
                     ret.append((s[0], 'solver'))
                     if recursive:
-                        ret += self._find_child_cases(s[0], self._split_coordinate(s[0]),
+                        ret += self._find_child_cases(s[0], _coord_split_re.split(s[0]),
                                                       driver_iter, solver_iter, recursive,
                                                       coord_lengths)
 
@@ -412,28 +431,12 @@ class SqliteCaseReader(BaseCaseReader):
             True if the given coordinate indicates that the case is a child of the
             given parent case. False otherwise.
         """
-        split_coord = self._split_coordinate(coordinate)
+        split_coord = _coord_split_re.split(coordinate)
         if coordinate.startswith(parent_coordinate) and\
            len(split_coord) is expected_child_length:
             return True
 
         return False
-
-    def _split_coordinate(self, coordinate):
-        """
-        Split up an iteration coordinate string based on the iteration index.
-
-        Parameters
-        ----------
-        coordinate : str
-            The iteration coordinate to split.
-
-        Returns
-        -------
-        list
-            coordinate as list of strings.
-        """
-        return self._coordinate_split_re.split(coordinate)
 
     def list_inputs(self,
                     case=None,
@@ -684,7 +687,7 @@ class SqliteCaseReader(BaseCaseReader):
         # grabbed values from this system
         coord_map = {}
         for c in coords:
-            split_iter = self._split_coordinate(c)
+            split_iter = _coord_split_re.split(c)
             iter_key = ':'.join(split_iter)
             coord_map[iter_key] = False
 
@@ -699,7 +702,7 @@ class SqliteCaseReader(BaseCaseReader):
         while not self._has_all_values(coord_map):
             iteration = self.system_cases._case_keys[iteration_num]
             iteration_num -= 1
-            split_iter = self._split_coordinate(iteration)
+            split_iter = _coord_split_re.split(iteration)
             iter_key = ':'.join(split_iter)
 
             # if coord_map[iter_key] is False, we haven't grabbed variable values
