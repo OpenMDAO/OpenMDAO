@@ -22,7 +22,7 @@ except ImportError:
 
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import ContainsAll
+from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
 
@@ -176,7 +176,7 @@ class _TotalJacInfo(object):
                            "be turned off.\ncoloring design vars: %s, current design vars: "
                            "%s\ncoloring responses: %s, current responses: %s." %
                            (driver_wrt, wrt, driver_of, of))
-                    warnings.warn(msg)
+                    simple_warning(msg)
                     self.simul_coloring = None
 
             self.has_lin_cons = has_lin_cons

@@ -6,7 +6,8 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecComp, \
     PETScVector, ParallelGroup
-from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver
+from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver,\
+    GeneticAlgorithm
 from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
@@ -187,6 +188,30 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup(check=False)
         # prob.run_driver()
         self.assertRaises(ValueError, prob.run_driver)
+
+    def test_encode_and_decode(self):
+        ga = GeneticAlgorithm(None)
+        gen = np.array([[0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1,
+                         1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0,
+                         1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0,
+                         0, 1, 0],
+                        [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1,
+                         1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0,
+                         1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1,
+                         0, 1, 0]])
+        vlb = np.array([-170.0, -170.0, -170.0, -170.0, -170.0, -170.0])
+        vub = np.array([255.0, 255.0, 255.0, 170.0, 170.0, 170.0])
+        bits = np.array([9, 9, 9, 9, 9, 9])
+        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454,
+                       116.77103718, 76.18395303],
+                      [248.34637965, 191.79060665, -31.93737769, 97.47553816,
+                       118.76712329, 92.15264188]])
+
+        ga.npop = 2
+        ga.lchrom = int(np.sum(bits))
+        np.testing.assert_array_almost_equal(x, ga.decode(gen, vlb, vub, bits))
+        np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
+        np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
 
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
@@ -564,7 +589,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p1', IndepVarComp('xC', 5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
         par = model.add_subsystem('par', ParallelGroup())
 

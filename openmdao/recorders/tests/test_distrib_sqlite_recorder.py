@@ -254,7 +254,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
             expected_outputs.update(expected_includes)
 
-            coordinate = [0, 'SLSQP', (48,)]
+            coordinate = [0, 'SLSQP', (2,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)

@@ -1,3 +1,6 @@
+"""
+A simple component used for derivative testing.
+"""
 
 from __future__ import division, print_function
 import time
@@ -6,24 +9,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 
 
 class MatMultComp(ExplicitComponent):
-    """
-    A simple component used for derivative testing.
-    """
-    def __init__(self, mat, approx_method, sleep_time=0.1, **kwargs):
-        """
-        Store the mat for later use.
-
-        Parameters
-        ----------
-        mat : ndarray
-            Matrix used to multiply input x to get output y.
-        approx_method : str
-            Sets type of approximation ('fd' or 'cs')
-        sleep_time : float
-            Time to sleep on each compute call.
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
-        """
+    def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
         super(MatMultComp, self).__init__(**kwargs)
         self.mat = mat
         self.approx_method = approx_method
@@ -37,9 +23,6 @@ class MatMultComp(ExplicitComponent):
         self.num_computes = 0
 
     def compute(self, inputs, outputs):
-        """
-        Multiply input by mat to get output.
-        """
         outputs['y'] = self.mat.dot(inputs['x'])
         self.num_computes += 1
         time.sleep(self.sleep_time)
@@ -72,8 +55,7 @@ if __name__ == '__main__':
     p = Problem()
     model = p.model
     model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
-    comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd'))
-    comp.options['num_par_fd'] = 5
+    comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=5))
 
     model.connect('indep.x', 'comp.x')
 

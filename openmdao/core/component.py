@@ -19,9 +19,10 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, find_matches
+    warn_deprecation, find_matches, simple_warning
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
+from openmdao.utils.mpi import MPI
 
 
 # Suppored methods for derivatives
@@ -176,10 +177,14 @@ class Component(System):
         """
         self.pathname = pathname
 
-        if self.options['num_par_fd'] > 1 and comm.size > 1:
-            comm = self._setup_par_fd_procs(comm)
-        else:
-            self.options['num_par_fd'] = 1
+        orig_comm = comm
+        if self._num_par_fd > 1:
+            if comm.size > 1:
+                comm = self._setup_par_fd_procs(comm)
+            elif not MPI:
+                msg = ("'%s': MPI is not active but num_par_fd = %d. No parallel finite difference "
+                       "will be performed." % (self.pathname, self._num_par_fd))
+                simple_warning(msg)
 
         self.comm = comm
         self._mode = mode
@@ -204,9 +209,9 @@ class Component(System):
         # when declare_partials generally happens, so we raise an exception here instead of just
         # resetting the value of num_par_fd (because the comm has already been split and possibly
         # used by the system setup).
-        if self.options['num_par_fd'] > 1 and comm.size > 1 and not (self._owns_approx_jac or
-                                                                     self._approximated_partials):
-            raise RuntimeError("num_par_fd is > 1 but no FD is active.")
+        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
+                                                                self._approximated_partials):
+            raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
 
         self._static_mode = True
 
@@ -214,10 +219,10 @@ class Component(System):
             if self._distributed_vector_class is not None:
                 self._vector_class = self._distributed_vector_class
             else:
-                warnings.warn("The 'distributed' option is set to True for Component %s, "
-                              "but there is no distributed vector implementation (MPI/PETSc) "
-                              "available. The default non-distributed vectors will be used."
-                              % pathname)
+                simple_warning("The 'distributed' option is set to True for Component %s, "
+                               "but there is no distributed vector implementation (MPI/PETSc) "
+                               "available. The default non-distributed vectors will be used."
+                               % pathname)
                 self._vector_class = self._local_vector_class
         else:
             self._vector_class = self._local_vector_class

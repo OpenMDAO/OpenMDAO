@@ -1,14 +1,15 @@
 .. _`github_pages`:
 
-github-pages Repository Setup
-=============================
+Hosting Documentation on github-pages
+=====================================
 
-This document is meant to help a repo owner get their docs built on Travis CI and then transfer those built docs to a github-pages
+The purpose of this document is to teach you how to host your project's documentation on github-pages.
+In it we'll show a repo owner how to get their docs built on Travis CI and then transfer those built docs to a github-pages
 branch for public viewing by a project's users.
 
 .. warning::
-    If you want to publish to github-pages from your docs built on Travis CI, make sure your Github repository is set up to be public,
-    otherwise the instructions in this document will not work for you.
+    If you want to publish to github-pages from your docs built on Travis CI,  your Github repository must be public,
+    and you must be using travis-ci.ORG (not the private .COM)--otherwise the instructions in this document will not work for you.
 
 Personal Access Token
 ---------------------
@@ -53,7 +54,7 @@ travis-sphinx Usage
 `travis-sphinx` is a standalone script for automated building and deploying of sphinx docs to github-pages
 via TravisCI.
 
-Once your personal access token is set up, you can begin using travis-sphinx within your Sphinx configuration file. (`docs/conf.py`)
+Once your personal access token is set up, you can begin using travis-sphinx within your Travis configuration file. (`docs/.travis.yml`)
 The two calls that should be used are, in their respective sections:
 
 .. code-block:: python
