@@ -976,6 +976,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
     def test_multipoint_with_coloring(self):
         size = 10
+        num_pts = self.N_PROCS
 
         np.random.seed(11)
 
@@ -989,50 +990,42 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
-        for i in range(self.N_PROCS):
+        for i in range(num_pts):
             model.add_subsystem('indep%d' % i, IndepVarComp('x', val=np.ones(size)))
             model.add_design_var('indep%d.x' % i)
 
         par1 = model.add_subsystem('par1', ParallelGroup())
-        for i in range(self.N_PROCS):
+        for i in range(num_pts):
             mat = _get_mat(5, size)
             par1.add_subsystem('comp%d' % i, MatMultCompWithDerivs(mat, approx_method='exact'))
             model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
         par2 = model.add_subsystem('par2', ParallelGroup())
-        for i in range(self.N_PROCS):
+        for i in range(num_pts):
             mat = _get_mat(size, 5)
             par2.add_subsystem('comp%d' % i, MatMultCompWithDerivs(mat, approx_method='exact'))
             model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
             par2.add_constraint('comp%d.y' % i, lower=-1.)
 
-            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(dot(x, x))", x=np.zeros(size)))
+            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.zeros(size)))
             model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
 
-        model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(self.N_PROCS)])))
+        model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
 
-        for i in range(self.N_PROCS):
+        for i in range(num_pts):
             model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
 
         model.add_objective('obj.y')
-
-        #import wingdbstub
 
         p.setup()
 
         p.run_driver()
 
-        #p.model.list_outputs()
-        print("final obj 1:", p['obj.y'])
-
         J = p.compute_totals()
 
-        import pprint
-        pprint.pprint(J)
+        # p.check_partials(compact_print=True, show_only_incorrect=True)
 
-        #p.check_partials(compact_print=True, show_only_incorrect=True)
-
-        for i in range(self.N_PROCS):
+        for i in range(num_pts):
             norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
                                   getattr(par2, 'comp%d'%i).mat.dot(getattr(par1, 'comp%d'%i).mat))
             self.assertLess(norm, 1.e-7)

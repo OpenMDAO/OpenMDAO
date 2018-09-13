@@ -381,7 +381,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_row_nonzeros[r] = ncols  # make sure we don't pick this one again
+            M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
             M_col_nonzeros[Jc_rows[r]] -= 1
 
             r = M_row_nonzeros.argmin()
@@ -396,7 +396,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_col_nonzeros[c] = nrows  # make sure we don't pick this one again
+            M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
 
             c = M_col_nonzeros.argmin()
@@ -581,8 +581,8 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
 
-    with open("array_viz%d.out" % system.comm.rank, "w") as f:
-        array_viz(boolJ, prob=prob, stream=f)
+    # with open("array_viz%d.out" % system.comm.rank, "w") as f:
+    #     array_viz(boolJ, prob=prob, stream=f)
 
     return boolJ
 
@@ -1138,7 +1138,7 @@ def dynamic_sparsity(driver):
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
+def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=False):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1146,6 +1146,8 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
     ----------
     driver : <Driver>
         The driver performing the optimization.
+    run_model : bool
+        If True, call run_model before computing coloring.
     do_sparsity : bool
         If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
     show_jac : bool
@@ -1159,7 +1161,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
         coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=do_sparsity,
-                                  setup=False, run_model=False, show_jac=show_jac, stream=f)
+                                  setup=False, run_model=run_model, show_jac=show_jac, stream=f)
     driver.set_simul_deriv_color(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:
