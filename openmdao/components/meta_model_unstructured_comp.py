@@ -220,20 +220,36 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
 
                     self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
+            for of, shape_of in self._surrogate_output_names:
+                surrogate = self._metadata(of).get('surrogate')
+                for wrt, n_wrt in self._surrogate_input_names:
+
+                    n_of = np.prod(shape_of)
+                    rows = np.repeat(np.arange(n_of), n_wrt)
+                    cols = np.tile(np.arange(n_wrt), n_of)
+                    nnz = len(rows)
+                    rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
+                    cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
+
+                    if surrogate and not overrides_method('linearize', surrogate, SurrogateModel):
+                        self._approx_partials(of=of, wrt=wrt, rows=rows, cols=cols, method='fd')
+                        # self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols, method='fd')
+                        self._approx_schemes['fd'] = FiniteDifference()
+                    else:
+                        self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
 
         else:
             # Dense specification of partials for non-vectorized models.
             self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                    wrt=[name[0] for name in self._surrogate_input_names])
 
-            # ### TODO: just temporary. Trying something !!!
             for out_name, out_shape in self._surrogate_output_names:
                 surrogate = self._metadata(out_name).get('surrogate')
-                if not overrides_method('linearize', surrogate, SurrogateModel):
-                    # self.declare_partials(of=out_name, wrt='*', method='fd')
-                    self._approx_partials(of=out_name, wrt='*', method='fd' )
+                if surrogate and not overrides_method('linearize', surrogate, SurrogateModel):
+                    self._approx_partials(of=out_name,
+                                          wrt=[name[0] for name in self._surrogate_input_names],
+                                          method='fd')
                     self._approx_schemes['fd'] = FiniteDifference()
-                    pass
 
                     # if user has not declared partials on this output, issue a warning that
                     #   defaults will be used

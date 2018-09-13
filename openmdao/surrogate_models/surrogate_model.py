@@ -68,6 +68,7 @@ class SurrogateModel(object):
         """
         pass
 
+
 class MultiFiSurrogateModel(SurrogateModel):
     """
     Base class for surrogate models using multi-fidelity training data.
