@@ -4,11 +4,13 @@ from itertools import product
 
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
+from scipy.sparse import coo_matrix
 
 from six import string_types
 from six.moves import range
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.coloring import _tol_sweep
 
 # regex to check for variable names.
 VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -48,7 +50,7 @@ class ExecComp(ExplicitComponent):
         Step size used for complex step which is used for derivatives.
     """
 
-    def __init__(self, exprs, **kwargs):
+    def __init__(self, exprs, vectorize=False, **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -120,6 +122,9 @@ class ExecComp(ExplicitComponent):
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
+        vectorize : bool
+            If True, assume partial sub-jacobians are diagonal.
+
         **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
@@ -164,6 +169,7 @@ class ExecComp(ExplicitComponent):
             exprs = [exprs]
 
         self._exprs = exprs[:]
+        self._vectorize = vectorize
         self._codes = None
         self._kwargs = kwargs
 
@@ -206,6 +212,8 @@ class ExecComp(ExplicitComponent):
             else:
                 init_vals[arg] = val
 
+        of = []
+        wrt = []
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
             val = init_vals.get(var, 0.0)
@@ -213,13 +221,29 @@ class ExecComp(ExplicitComponent):
 
             if var in outs:
                 self.add_output(var, val, **meta)
+                of.append(var)
             else:
                 self.add_input(var, val, **meta)
+                wrt.append(var)
 
         self._codes = self._compile_exprs(self._exprs)
 
         # All derivatives are defined.
-        self.declare_partials(of='*', wrt='*')
+        if self._vectorize:
+            for inp in wrt:
+                if inp in init_vals:
+                    insize = np.atleast_1d(init_vals[inp])
+                else:
+                    insize = 1
+                for out in of:
+                    if out in init_vals:
+                        outsize = np.atleast_1d(init_vals[out])
+                    else:
+                        outsize = 1
+
+                    self.declare_partials()
+        else:
+           self.declare_partials(of='*', wrt='*')  #, method='cs')
 
     def _compile_exprs(self, exprs):
         compiled = []
@@ -295,6 +319,47 @@ class ExecComp(ExplicitComponent):
         """
         for expr in self._codes:
             exec(expr, _expr_dict, _IODict(outputs, inputs))
+
+    # def __setup_partials(self, recurse=True):
+    #     """
+    #     Call setup_partials in components.
+
+    #     Parameters
+    #     ----------
+    #     recurse : bool
+    #         Whether to call this method in subsystems.
+    #     """
+    #     Jfull = {}
+    #     nruns = 2
+    #     saved_inputs = self._inputs._data.copy()
+    #     abs2prom = self._var_abs2prom
+    #     for i in range(nruns):
+    #         J = {}
+    #         self._inputs._data[:] = np.random.random(self._inputs._data.size) - 0.5
+    #         self._compute_partials(self._inputs, J)
+    #         for inp in self._var_allprocs_abs_names['input']:
+    #             for out in self._var_allprocs_abs_names['output']:
+    #                 key = (abs2prom['output'][out], abs2prom['input'][inp])
+    #                 if key in Jfull:
+    #                     Jfull[key] += np.abs(J[key])
+    #                 else:
+    #                     Jfull[key] = np.abs(J[key])
+
+    #     for key in Jfull:
+    #         of, wrt = key
+    #         J = Jfull[key]
+    #         J /= np.max(J)
+    #         good_tol = _tol_sweep(J)[0]
+    #         boolJ = np.zeros(J.shape, dtype=bool)
+    #         boolJ[J > good_tol] = True
+    #         if np.count_nonzero(boolJ) < J.size:
+    #             coo = coo_matrix(boolJ)
+    #             self.declare_partials(of, wrt, rows=coo.row, cols=coo.col)
+    #         else:
+    #             self.declare_partials(of, wrt)
+
+    #     self._inputs._data[:] = saved_inputs
+    #     super(ExecComp, self)._setup_partials(recurse=recurse)
 
     def compute_partials(self, inputs, partials):
         """

@@ -526,6 +526,16 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     if run_model:
         prob.run_model()
 
+    wrt = list(prob.driver._designvars)
+
+    # get responses in order used by the driver
+    of = prob.driver._get_ordered_nl_responses()
+
+    if not of or not wrt:
+        raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
+                           "variables and responses.")
+
+    # change the _jacobian _set_abs methods to set random values
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
         jac = system._assembled_jac
@@ -536,15 +546,6 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
             jac._set_abs = _SubjacRandomizer(jac, tol)
             seen.add(jac)
 
-    wrt = list(prob.driver._designvars)
-
-    # get responses in order used by the driver
-    of = prob.driver._get_ordered_nl_responses()
-
-    if not of or not wrt:
-        raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
-                           "variables and responses.")
-
     start_time = time.time()
     fullJ = None
     for i in range(repeats):
@@ -554,17 +555,6 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
         else:
             fullJ += np.abs(J)
     elapsed = time.time() - start_time
-
-    # normalize the full J by dividing by the max value
-    fullJ /= np.max(fullJ)
-
-    good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
-
-    print("\nUsing tolerance: %g" % good_tol)
-    print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
-          "tested.\n" % (zero_entries, fullJ.size, nz_matches, n_tested))
-    print("Full total jacobian was computed %d times, taking %f seconds." % (repeats, elapsed))
-    print("Total jacobian shape:", fullJ.shape, "\n")
 
     # now revert the _jacobian _set_abs methods back to their original values
     seen = set()
@@ -577,11 +567,22 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
             jac._set_abs = randomizer._orig_set_abs
             seen.add(jac)
 
+    # normalize the full J by dividing by the max value
+    fullJ /= np.max(fullJ)
+
+    good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
+
+    print("\nUsing tolerance: %g" % good_tol)
+    print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
+          "tested.\n" % (zero_entries, fullJ.size, nz_matches, n_tested))
+    print("Full total jacobian was computed %d times, taking %f seconds." % (repeats, elapsed))
+    print("Total jacobian shape:", fullJ.shape, "\n")
+
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
 
-    # with open("array_viz.out", "w") as f:
-    #     array_viz(boolJ, stream=f)
+    with open("array_viz%d.out" % system.comm.rank, "w") as f:
+        array_viz(boolJ, prob=prob, stream=f)
 
     return boolJ
 
