@@ -13,3 +13,4 @@ openmdao/docs/_srcdocs/index.rst
 *testflo_report.out
 openmdao/docs/tags/
 *.out
+doc_plot_*

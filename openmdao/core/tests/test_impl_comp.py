@@ -461,10 +461,6 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
                 self.inv_jac = 1.0 / (2 * a * x + b)
 
-            def solve_nonlinear(self, inputs, outputs):
-                """ Do nothing. """
-                pass
-
             def guess_nonlinear(self, inputs, outputs, resids):
                 # Solution at 1 and 3. Default value takes us to -1 solution. Here
                 # we set it to a value that will tke us to the 3 solution.
