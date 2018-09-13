@@ -285,7 +285,6 @@ class _TotalJacInfo(object):
                 tgt_indexset = PETSc.IS().createGeneral(jac_inds, comm=self.comm)
                 jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
                                                                tgt_vec, tgt_indexset)
-                # self.solvec_map[mode] = None  # clean up memory
         else:
             for vecname in self.model._lin_vec_names:
                 jac_scatters[vecname] = None

@@ -4,13 +4,11 @@ from itertools import product
 
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
-from scipy.sparse import coo_matrix
 
 from six import string_types
 from six.moves import range
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.coloring import _tol_sweep
 
 # regex to check for variable names.
 VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -208,8 +206,6 @@ class ExecComp(ExplicitComponent):
             else:
                 init_vals[arg] = val
 
-        of = []
-        wrt = []
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
             val = init_vals.get(var, 1.0)
@@ -217,10 +213,8 @@ class ExecComp(ExplicitComponent):
 
             if var in outs:
                 self.add_output(var, val, **meta)
-                of.append(var)
             else:
                 self.add_input(var, val, **meta)
-                wrt.append(var)
 
         self._codes = self._compile_exprs(self._exprs)
 

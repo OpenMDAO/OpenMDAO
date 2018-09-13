@@ -524,8 +524,6 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                           dynamic_simul_derivs=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        p_color.check_partials(compact_print=True, show_only_incorrect=True)
-
         # run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -1023,14 +1021,12 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         J = p.compute_totals()
 
-        # p.check_partials(compact_print=True, show_only_incorrect=True)
-
         for i in range(num_pts):
             norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
                                   getattr(par2, 'comp%d'%i).mat.dot(getattr(par1, 'comp%d'%i).mat))
             self.assertLess(norm, 1.e-7)
 
-        print("final obj:", p['obj.y'])
+        # print("final obj:", p['obj.y'])
 
 
 if __name__ == '__main__':

@@ -434,9 +434,9 @@ class TestJacobian(unittest.TestCase):
         prob = Problem()
         prob.model = Group(assembled_jac_type='dense')
         prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
-        prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b'))
-        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c'))
-        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
+        prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b', a=0., b=0., c=0.))
+        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
+        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
 
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
@@ -448,7 +448,7 @@ class TestJacobian(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
-        assert_rel_error(self, prob['C3.ee'], 12.0, 0000.1)
+        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
     def test_assembled_jacobian_submat_indexing_dense(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
