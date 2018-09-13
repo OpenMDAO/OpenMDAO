@@ -448,7 +448,7 @@ class TestJacobian(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup(check=False)
         prob.run_model()
-        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
+        assert_rel_error(self, prob['C3.ee'], 12.0, 0000.1)
 
     def test_assembled_jacobian_submat_indexing_dense(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))

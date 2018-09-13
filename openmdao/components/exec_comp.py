@@ -160,7 +160,7 @@ class ExecComp(ExplicitComponent):
         super(ExecComp, self).__init__()
 
         # if complex step is used for derivatives, this is the stepsize
-        self.complex_stepsize = 1.e-6
+        self.complex_stepsize = 1.e-40
 
         if isinstance(exprs, string_types):
             exprs = [exprs]
@@ -212,7 +212,7 @@ class ExecComp(ExplicitComponent):
         wrt = []
         for var in sorted(allvars):
             # if user supplied an initial value, use it, otherwise set to 0.0
-            val = init_vals.get(var, 0.0)
+            val = init_vals.get(var, 1.0)
             meta = kwargs2.get(var, {})
 
             if var in outs:
