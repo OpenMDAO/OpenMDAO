@@ -4,7 +4,6 @@ Definition of the SqliteCaseReader.
 from __future__ import print_function, absolute_import
 
 from copy import deepcopy
-import os
 import re
 import sys
 import sqlite3
@@ -16,10 +15,10 @@ from six.moves import range
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
+from openmdao.recorders.case import Case, DriverCase, SystemCase, SolverCase, ProblemCase, \
     PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
-from openmdao.utils.record_util import json_to_np_array, convert_to_np_array
+from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array, convert_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.write_outputs import write_outputs
 
@@ -38,35 +37,6 @@ _DEFAULT_OUT_STREAM = object()
 
 # Regular expression used for splitting iteration coordinates.
 _coord_split_re = re.compile('\|\\d+\|*')
-
-
-def check_valid_sqlite3_db(filename):
-    """
-    Raises an IOError if the given filename does not reference a valid SQLite3 database file.
-
-    Parameters
-    ----------
-    filename : str
-        The path to the file to be tested
-
-    Raises
-    ------
-    IOError
-        If the given filename does not reference a valid SQLite3 database file.
-    """
-    # check that the file exists
-    if not os.path.isfile(filename):
-        raise IOError('File does not exist({0})'.format(filename))
-
-    # check that the file is large enough (SQLite database file header is 100 bytes)
-    if os.path.getsize(filename) < 100:
-        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
-
-    # check that the first 100 bytes actually contains a valid SQLite database header
-    with open(filename, 'rb') as fd:
-        header = fd.read(100)
-    if header[:16] != b'SQLite format 3\x00':
-        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -161,10 +131,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         con.close()
 
-        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
-                                                 self._abs2prom, True)
-        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs,
-                                                self._abs2prom, False)
+        self.output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 1)
+        self.input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 0)
 
         self._load()
 
@@ -289,7 +257,7 @@ class SqliteCaseReader(BaseCaseReader):
         self.system_cases.load_cases()
         self.problem_cases.load_cases()
 
-    def get_cases(self, parent=None, recursive=False):
+    def get_cases(self, source='problem', recurse=True, flat=False):
         """
         Allow one to iterate over the driver and solver cases.
 
@@ -297,56 +265,61 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        parent : DriverCase or SolverCase or str, optional
-            Identifies which case's children to return. None indicates Root. Can pass a
-            driver case, a solver case, or an iteration coordinate identifying a solver
-            or driver case. Defaults to None.
-        recursive : bool, optional
+        source : {'problem', 'driver', iteration_coordinate}
+            Identifies which cases to return. 'iteration_coordinate' can refer to
+            a system or a solver hierarchy location. Defaults to 'problem'.
+        recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
         """
-        iter_coord = ''
-        if parent is not None:
-            if parent is DriverCase or parent is SolverCase:
-                iter_coord = parent.iteration_coordinate
-            elif type(parent) is str:
-                iter_coord = parent
-            else:
-                raise TypeError("parent parameter can only be DriverCase, SolverCase, or string")
+        if not isinstance(source, str):
+            raise TypeError("'source' parameter must be a string.")
 
-        driver_iter = []
-        solver_iter = []
-        with sqlite3.connect(self.filename) as con:
-            cur = con.cursor()
-            cur.execute("SELECT iteration_coordinate FROM driver_iterations "
-                        "ORDER BY counter ASC")
-            driver_iter = cur.fetchall()
+        elif source == 'problem':
+            print('yielding problem cases...')
+            for case in self.problem_cases.cases():
+                yield case
 
-            cur.execute("SELECT iteration_coordinate, counter FROM solver_iterations "
-                        "ORDER BY counter ASC")
-            solver_iter = cur.fetchall()
-        con.close()
+        elif source == 'driver':
+            for case in self.driver_cases.cases():
+                yield case
 
-        split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
+        else:
+            iter_coord = source
 
-        # grab an array of possible lengths of coordinates
-        coord_lengths = [2]  # start with 2 because that is the length of driver iteration coords
-        for s in solver_iter:
-            s_len = len(_coord_split_re.split(s[0]))
-            if s_len not in coord_lengths:
-                coord_lengths.append(s_len)
-        coord_lengths = sorted(coord_lengths)
+            driver_iter = []
+            solver_iter = []
+            with sqlite3.connect(self.filename) as con:
+                cur = con.cursor()
+                cur.execute("SELECT iteration_coordinate FROM driver_iterations "
+                            "ORDER BY counter ASC")
+                driver_iter = cur.fetchall()
 
-        # grab full set of cases to iterate over
-        iter_set = self._find_child_cases(iter_coord, split_iter_coord, driver_iter,
-                                          solver_iter, recursive, coord_lengths)
+                cur.execute("SELECT iteration_coordinate, counter FROM solver_iterations "
+                            "ORDER BY counter ASC")
+                solver_iter = cur.fetchall()
+            con.close()
 
-        # iterate over set of cases
-        for iteration in iter_set:
-            if iteration[1] is 'driver':
-                yield self.driver_cases.get_case(iteration[0])
-            else:
-                yield self.solver_cases.get_case(iteration[0])
+            split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
+
+            # grab an array of possible lengths of coordinates
+            coord_lengths = [2]  # start with 2 because that is the length of driver iter coords
+            for s in solver_iter:
+                s_len = len(_coord_split_re.split(s[0]))
+                if s_len not in coord_lengths:
+                    coord_lengths.append(s_len)
+            coord_lengths = sorted(coord_lengths)
+
+            # grab full set of cases to iterate over
+            iter_set = self._find_child_cases(iter_coord, split_iter_coord, driver_iter,
+                                              solver_iter, recurse, coord_lengths)
+
+            # iterate over set of cases
+            for iteration in iter_set:
+                if iteration[1] is 'driver':
+                    yield self.driver_cases.get_case(iteration[0])
+                else:
+                    yield self.solver_cases.get_case(iteration[0])
 
     def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
                           solver_iter, recursive, coord_lengths):
@@ -868,6 +841,19 @@ class DriverCases(BaseCases):
                 case = self._extract_case_from_row(row)
                 self._cases[case.iteration_coordinate] = case
 
+    def cases(self):
+        """
+        Iterate over all driver cases, while storing them into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM driver_iterations")
+            rows = cur.fetchall()
+            for row in rows:
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
+                yield case
+
     def get_case(self, case_id, scaled=False):
         """
         Get a case from the database.
@@ -1031,6 +1017,19 @@ class ProblemCases(BaseCases):
             for row in rows:
                 case = self._extract_case_from_row(row)
                 self._cases[case.iteration_coordinate] = case
+
+    def cases(self):
+        """
+        Iterate over all problem cases, while storing them into memory.
+        """
+        with sqlite3.connect(self.filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT * FROM problem_cases")
+            rows = cur.fetchall()
+            for row in rows:
+                case = self._extract_case_from_row(row)
+                self._cases[case.iteration_coordinate] = case
+                yield case
 
     def get_case(self, case_name):
         """

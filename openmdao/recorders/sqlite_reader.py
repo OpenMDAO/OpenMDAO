@@ -19,7 +19,7 @@ from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
     PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
-from openmdao.utils.record_util import is_valid_sqlite3_db, json_to_np_array, convert_to_np_array
+from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array, convert_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.write_outputs import write_outputs
 
@@ -74,13 +74,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         super(SqliteCaseReader, self).__init__(filename)
 
-        if filename is not None:
-            if not is_valid_sqlite3_db(filename):
-                if not os.path.exists(filename):
-                    raise IOError('File does not exist({0})'.format(filename))
-                else:
-                    raise IOError('File does not contain a valid '
-                                  'sqlite database ({0})'.format(filename))
+        check_valid_sqlite3_db(filename)
 
         self._coordinate_split_re = re.compile('\|\\d+\|*')
 

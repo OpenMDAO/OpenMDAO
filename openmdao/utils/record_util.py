@@ -69,31 +69,33 @@ def format_iteration_coordinate(coord, prefix=None):
     return ':'.join([prefix, separator.join(iteration_coordinate)])
 
 
-def is_valid_sqlite3_db(filename):
+def check_valid_sqlite3_db(filename):
     """
-    Return true if the given filename contains a valid SQLite3 database file.
+    Raises an IOError if the given filename does not reference a valid SQLite3 database file.
 
     Parameters
     ----------
     filename : str
         The path to the file to be tested
 
-    Returns
-    -------
-    bool :
-        True if the filename specifies a valid SQlite3 database.
-
+    Raises
+    ------
+    IOError
+        If the given filename does not reference a valid SQLite3 database file.
     """
+    # check that the file exists
     if not os.path.isfile(filename):
-        return False
-    if os.path.getsize(filename) < 100:
-        # SQLite database file header is 100 bytes
-        return False
+        raise IOError('File does not exist({0})'.format(filename))
 
+    # check that the file is large enough (SQLite database file header is 100 bytes)
+    if os.path.getsize(filename) < 100:
+        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
+
+    # check that the first 100 bytes actually contains a valid SQLite database header
     with open(filename, 'rb') as fd:
         header = fd.read(100)
-
-    return header[:16] == b'SQLite format 3\x00'
+    if header[:16] != b'SQLite format 3\x00':
+        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
 
 
 def check_path(path, includes, excludes, include_all_path=False):

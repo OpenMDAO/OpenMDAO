@@ -15,7 +15,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.record_util import is_valid_sqlite3_db
+from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 
 
@@ -93,10 +93,10 @@ def _get_viewer_data(data_source):
         else:
             # this function only makes sense when it is at the root
             return {}
-    elif is_valid_sqlite3_db(data_source):
+    elif isinstance(data_source, str):
+        check_valid_sqlite3_db(data_source)
         import sqlite3
-        con = sqlite3.connect(data_source,
-                              detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(data_source, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         cur.execute("SELECT format_version FROM metadata")
         row = cur.fetchone()
