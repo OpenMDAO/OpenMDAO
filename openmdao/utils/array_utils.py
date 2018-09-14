@@ -123,6 +123,12 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     if len(arr.shape) != 2:
         raise RuntimeError("array_viz only works for 2d arrays.")
 
+    if prob is not None:
+        if of is None:
+            of = prob.driver._get_ordered_nl_responses()
+        if wrt is None:
+            wrt = list(prob.driver._designvars)
+
     if prob is None or of is None or wrt is None:
         for r in range(arr.shape[0]):
             for c in range(arr.shape[1]):

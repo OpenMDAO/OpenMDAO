@@ -590,7 +590,8 @@ class System(object):
         self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
                     distributed_vector_class=self._distributed_vector_class,
                     local_vector_class=self._local_vector_class)
-        self._final_setup(self.comm, setup_mode=setup_mode)
+        self._final_setup(self.comm, setup_mode=setup_mode,
+                          force_alloc_complex=self._outputs._alloc_complex)
 
     def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class):
         """

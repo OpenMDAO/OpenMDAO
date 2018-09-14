@@ -71,6 +71,9 @@ class DefaultVector(Vector):
             root_vec._data[old_sizes[0] + old_sizes[1]:],
         ])
 
+        if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
+            root_vec._cplx_data = np.zeros(root_vec._data.size, dtype=complex)
+
         root_vec._initialize_views()
 
     def _extract_data(self):
