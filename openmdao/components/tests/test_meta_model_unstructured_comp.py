@@ -4,6 +4,7 @@ Unit tests for the unstructured metamodel component.
 from math import sin
 import numpy as np
 import unittest
+import warnings
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel
@@ -90,7 +91,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # create a MetaModelUnStructuredComp for Sin and add it to a Problem
         sin_mm = MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0., training_data=np.linspace(0,10,200))
+        sin_mm.add_input('x', 0., training_data=x)
         sin_mm.add_output('f_x', 0., training_data=f_x)
 
         prob = Problem()
@@ -948,7 +949,7 @@ class MetaModelTestCase(unittest.TestCase):
             def setup(self):
                 surrogate = SinSurrogate()
                 self.add_input('x', 0.)
-                self.add_output('sin_x', 0., surrogate=surrogate,)
+                self.add_output('sin_x', 0., surrogate=surrogate)
 
         class TrigWithFdInSetup(MetaModelUnStructuredComp):
             def setup(self):
@@ -995,7 +996,7 @@ class MetaModelTestCase(unittest.TestCase):
             prob.model.add_subsystem('indep', indep)
             prob.model.add_subsystem('trig', trig)
             prob.model.connect('indep.x', 'trig.x')
-            prob.setup(check=True)
+            prob.setup(check=False)
             prob['indep.x'] = 5.0
             trig.train = False
             prob.run_model()
@@ -1003,7 +1004,15 @@ class MetaModelTestCase(unittest.TestCase):
 
         # Test with user not explicitly setting fd
         trig = Trig()
-        prob = no_surrogate_test_setup(trig)
+        with warnings.catch_warnings(record=True) as w:
+            prob = no_surrogate_test_setup(trig)
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
+        expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
+        "OpenMDAO will use finite differences to compute derivates. Some of the derivatives will be computed\n" \
+        "using default finite difference options because they were not explicitly declared.\n" \
+        "The derivatives computed using the defaults are:\n" \
+        "    trig.sin_x, trig.x\n"
+        self.assertEqual(expected_msg, str(w[0].message))
         J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
         deriv_using_fd = J[('trig.sin_x', 'indep.x')]
         assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
@@ -1045,7 +1054,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('trig', trig)
         prob.model.connect('indep.x', 'trig.x')
         with self.assertRaises(ValueError) as context:
-            prob.setup(check=True)
+            prob.setup(check=False)
         expected_msg = 'Complex step has not been tested for MetaModelUnStructuredComp'
         self.assertEqual(expected_msg, str(context.exception))
 
@@ -1061,11 +1070,19 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('trig', trig)
         prob.model.connect('indep.x1', 'trig.x1')
         prob.model.connect('indep.x2', 'trig.x2')
-        prob.setup(check=True)
+        prob.setup(check=False)
         prob['indep.x1'] = 5.0
         prob['indep.x2'] = 5.0
         trig.train = False
-        prob.run_model()
+        with warnings.catch_warnings(record=True) as w:
+            prob.run_model()
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
+        expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
+        "OpenMDAO will use finite differences to compute derivates. Some of the derivatives will be computed\n" \
+        "using default finite difference options because they were not explicitly declared.\n" \
+        "The derivatives computed using the defaults are:\n" \
+        "    trig.sin_x, trig.x2\n"
+        self.assertEqual(expected_msg, str(w[0].message))
 
         self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['method'])
         self.assertEqual('backward', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['form'])
@@ -1077,6 +1094,38 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue('step' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
         self.assertTrue('step_calc' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
 
+    def test_feature_metamodel_use_fd_if_no_surrogate_linearize(self):
+        from openmdao.api import SurrogateModel, MetaModelUnStructuredComp, Problem, IndepVarComp
+        class SinSurrogate(SurrogateModel):
+            def train(self, x, y):
+                pass
+
+            def predict(self, x):
+                return sin(x)
+
+        class TrigWithFdInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+                self.declare_partials('sin_x', 'x', method='fd',
+                                      form='backward', step=1e-7, step_calc='rel')
+
+        # Test with user explicitly setting fd inside of setup
+        prob = Problem()
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+        prob.model.add_subsystem('indep', indep)
+        trig = TrigWithFdInSetup()
+        prob.model.add_subsystem('trig', trig)
+        prob.model.connect('indep.x', 'trig.x')
+        prob.setup(check=True)
+        prob['indep.x'] = 5.0
+        trig.train = False
+        prob.run_model()
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
+        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
 
 
 if __name__ == "__main__":

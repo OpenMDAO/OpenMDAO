@@ -1,7 +1,7 @@
 """MetaModel provides basic meta modeling capability."""
 from six.moves import range
 from copy import deepcopy
-from itertools import chain
+from itertools import chain, product
 
 import numpy as np
 
@@ -9,7 +9,8 @@ from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):
@@ -220,28 +221,39 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
 
                     self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
-            for of, shape_of in self._surrogate_output_names:
-                surrogate = self._metadata(of).get('surrogate')
-                for wrt, n_wrt in self._surrogate_input_names:
-
-                    n_of = np.prod(shape_of)
-                    rows = np.repeat(np.arange(n_of), n_wrt)
-                    cols = np.tile(np.arange(n_wrt), n_of)
-                    nnz = len(rows)
-                    rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
-                    cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
-
-                    if surrogate and not overrides_method('linearize', surrogate, SurrogateModel):
-                        self._approx_partials(of=of, wrt=wrt, rows=rows, cols=cols, method='fd')
-                        # self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols, method='fd')
-                        self._approx_schemes['fd'] = FiniteDifference()
-                    else:
-                        self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
-
         else:
             # Dense specification of partials for non-vectorized models.
             self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                    wrt=[name[0] for name in self._surrogate_input_names])
+
+            # warn the user that if they don’t explicitly set options for fd,
+            #   the defaults will be used
+            # get a list of approximated partials
+            declared_partials = set()
+            for of, wrt, method, fd_options in self._approximated_partials:
+                pattern_matches = self._find_partial_matches(of, wrt)
+                for of_bundle, wrt_bundle in product(*pattern_matches):
+                    of_pattern, of_matches = of_bundle
+                    wrt_pattern, wrt_matches = wrt_bundle
+                    for rel_key in product(of_matches, wrt_matches):
+                        abs_key = rel_key2abs_key(self, rel_key)
+                        declared_partials.add(abs_key)
+            non_declared_partials = []
+            for of, n_of in self._surrogate_output_names:
+                for wrt, n_wrt in self._surrogate_input_names:
+                    abs_key = rel_key2abs_key(self, (of, wrt))
+                    if abs_key not in declared_partials:
+                        non_declared_partials.append((abs_key))
+            if non_declared_partials:
+                msg = "Because the MetaModelUnStructuredComp '{}' uses a surrogate " \
+                       "which does not define a linearize method,\nOpenMDAO will use " \
+                       "finite differences to compute derivates. Some of the derivatives " \
+                       "will be computed\nusing default finite difference " \
+                       "options because they were not explicitly declared.\n".format(self.name)
+                msg += "The derivatives computed using the defaults are:\n"
+                for abs_key in non_declared_partials:
+                    msg += "    {}, {}\n".format(*abs_key)
+                simple_warning(msg, RuntimeWarning)
 
             for out_name, out_shape in self._surrogate_output_names:
                 surrogate = self._metadata(out_name).get('surrogate')
@@ -250,12 +262,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                                           wrt=[name[0] for name in self._surrogate_input_names],
                                           method='fd')
                     self._approx_schemes['fd'] = FiniteDifference()
-
-                    # if user has not declared partials on this output, issue a warning that
-                    #   defaults will be used
-
-                    # I can check here to see what values of self._approximated_partials
-                    # and self._declared_partials have values
 
     def check_config(self, logger):
         """
