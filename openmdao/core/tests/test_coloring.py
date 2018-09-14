@@ -982,10 +982,11 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.options['dynamic_simul_derivs'] = True
-        p.driver.opt_settings['Major iterations limit'] = 100
-        p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-        p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-        p.driver.opt_settings['iSumm'] = 6
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+            p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
         for i in range(num_pts):
