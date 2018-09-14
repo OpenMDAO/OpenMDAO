@@ -25,7 +25,6 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
-from openmdao.test_suite.components.matmultcomp import MatMultCompWithDerivs
 import openmdao.test_suite
 
 try:
@@ -67,23 +66,23 @@ def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
                                      -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
     indeps.add_output('r', .7)
 
-    p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)',
+    p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)', vectorize=True,
                                                  g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
 
-    p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r',
+    p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
                                             g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     thetas = np.linspace(0, np.pi/4, SIZE)
-    p.model.add_subsystem('theta_con', ExecComp('g = x - theta',
+    p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
                                                 g=np.ones(SIZE), x=np.ones(SIZE),
                                                 theta=thetas))
-    p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd',
+    p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
                                                       g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                       odd=np.ones(SIZE//2)))
 
-    p.model.add_subsystem('l_conx', ExecComp('g=x-1', g=np.ones(SIZE), x=np.ones(SIZE)))
+    p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
 
     IND = np.arange(SIZE, dtype=int)
     ODD_IND = IND[1::2]  # all odd indices
@@ -996,17 +995,17 @@ class MatMultMultipointTestCase(unittest.TestCase):
         par1 = model.add_subsystem('par1', ParallelGroup())
         for i in range(num_pts):
             mat = _get_mat(5, size)
-            par1.add_subsystem('comp%d' % i, MatMultCompWithDerivs(mat, approx_method='exact'))
+            par1.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
             model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
         par2 = model.add_subsystem('par2', ParallelGroup())
         for i in range(num_pts):
             mat = _get_mat(size, 5)
-            par2.add_subsystem('comp%d' % i, MatMultCompWithDerivs(mat, approx_method='exact'))
+            par2.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
             model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
             par2.add_constraint('comp%d.y' % i, lower=-1.)
 
-            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.zeros(size)))
+            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.ones(size)))
             model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
 
         model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
@@ -1023,9 +1022,13 @@ class MatMultMultipointTestCase(unittest.TestCase):
         J = p.compute_totals()
 
         for i in range(num_pts):
-            norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
-                                  getattr(par2, 'comp%d'%i).mat.dot(getattr(par1, 'comp%d'%i).mat))
-            self.assertLess(norm, 1.e-7)
+            vname = 'par2.comp%d.A' % i
+            if vname in model._var_abs_names['input']:
+                norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
+                                      getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
+                self.assertLess(norm, 1.e-7)
+            elif vname not in model._var_allprocs_abs_names['input']:
+                self.fail("Can't find variable par2.comp%d.A" % i)
 
         # print("final obj:", p['obj.y'])
 

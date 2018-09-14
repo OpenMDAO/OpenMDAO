@@ -6,6 +6,7 @@ import math
 from six import iteritems
 
 import numpy as np
+from numpy.testing import assert_almost_equal
 import scipy
 
 from parameterized import parameterized
@@ -525,6 +526,36 @@ class TestExecComp(unittest.TestCase):
         expect[2, 2] = 2.0
 
         assert_rel_error(self, C1._jacobian['y', 'x'], expect, 0.00001)
+
+    def test_vectorize_error(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(3)))
+        model.add_design_var('indep.x')
+
+        mat = np.arange(15).reshape((3,5))
+        model.add_subsystem('comp', ExecComp('y=A.dot(x)', vectorize=True, A=mat, x=np.ones(5), y=np.ones(3)))
+        model.connect('indep.x', 'comp.x')
+
+        with self.assertRaises(Exception) as context:
+            p.setup()
+        self.assertEqual(str(context.exception),
+                         "comp: vectorize is True but partial(A, y) is not square (shape=(15, 3)).")
+
+    def test_feature_vectorize(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+
+        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', vectorize=True, x=np.ones(5), y=np.ones(5)))
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_feature_simple(self):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp

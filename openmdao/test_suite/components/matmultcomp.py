@@ -45,11 +45,6 @@ class MatMultComp(ExplicitComponent):
         time.sleep(self.sleep_time)
 
 
-class MatMultCompWithDerivs(MatMultComp):
-    def compute_partials(self, inputs, partials):
-        partials['y', 'x'] = self.mat.copy()
-
-
 if __name__ == '__main__':
     import sys
     from openmdao.api import Problem, IndepVarComp
