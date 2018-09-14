@@ -221,12 +221,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
 
                     self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
+
         else:
             # Dense specification of partials for non-vectorized models.
             self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                    wrt=[name[0] for name in self._surrogate_input_names])
 
-            # warn the user that if they don’t explicitly set options for fd,
+            # warn the user that if they don't explicitly set options for fd,
             #   the defaults will be used
             # get a list of approximated partials
             declared_partials = set()
@@ -243,13 +244,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 for wrt, n_wrt in self._surrogate_input_names:
                     abs_key = rel_key2abs_key(self, (of, wrt))
                     if abs_key not in declared_partials:
-                        non_declared_partials.append((abs_key))
+                        non_declared_partials.append(abs_key)
             if non_declared_partials:
                 msg = "Because the MetaModelUnStructuredComp '{}' uses a surrogate " \
-                       "which does not define a linearize method,\nOpenMDAO will use " \
-                       "finite differences to compute derivates. Some of the derivatives " \
-                       "will be computed\nusing default finite difference " \
-                       "options because they were not explicitly declared.\n".format(self.name)
+                      "which does not define a linearize method,\nOpenMDAO will use " \
+                      "finite differences to compute derivates. Some of the derivatives " \
+                      "will be computed\nusing default finite difference " \
+                      "options because they were not explicitly declared.\n".format(self.name)
                 msg += "The derivatives computed using the defaults are:\n"
                 for abs_key in non_declared_partials:
                     msg += "    {}, {}\n".format(*abs_key)

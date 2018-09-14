@@ -87,16 +87,16 @@ to be the same size as specified in the ``vec_size`` argument.
     :layout: code, output
 
 
-Using Surrogates That Not Define Linearize Method
--------------------------------------------------
+Using Surrogates That Do Not Define Linearize Method
+----------------------------------------------------
 
 In some cases, users might define surrogates but not define a `linearize` method. In this case, the
 `MetaModelUnStructuredComp` derivatives will be computed using finite differences for the output variables that use that
 surrogate. By default, the default values for the finite differencing method will be used.
 
 If the user would like to specify finite differencing options, they can do so by calling the `declare_partials`
-method in the component's `setup` or `configure` methods. This example, which uses a simplified surrogate with no
-`linearize` method and no training, shows `declare_partials` called in `setup`.
+method in the component's `setup` or in a parent group's configure method. This example, which uses a surrogate with no
+`linearize` method and no training for simplicity, shows `declare_partials` called in `setup`.
 
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_feature_metamodel_use_fd_if_no_surrogate_linearize
