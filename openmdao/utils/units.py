@@ -1029,7 +1029,7 @@ if __name__ == '__main__':
         (conversion_to_base_units('cm'), (0., 1.0e-2)),
         (conversion_to_base_units('km'), (0., 1.0e3)),
         (convert_units(3.0, 'mm'), (3.0e-3)),
-        (convert_units(3.0, 'mm', 'cm'), (3.0e-1))
+        (convert_units(3.0, 'mm', 'cm'), (3.0e-1)),
         (convert_units(100, 'degC', 'degF'), (212.))
     ]:
         print(returned, 'should be', expected)
