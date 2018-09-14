@@ -403,3 +403,7 @@ def openmdao_cmd():
             options.executor(options)
         else:
             print("\nNothing to do.")
+
+
+if __name__ == '__main__':
+    openmdao_cmd()

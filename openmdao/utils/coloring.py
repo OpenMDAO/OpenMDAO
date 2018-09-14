@@ -381,7 +381,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_row_nonzeros[r] = ncols  # make sure we don't pick this one again
+            M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
             M_col_nonzeros[Jc_rows[r]] -= 1
 
             r = M_row_nonzeros.argmin()
@@ -396,7 +396,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_col_nonzeros[c] = nrows  # make sure we don't pick this one again
+            M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
 
             c = M_col_nonzeros.argmin()
@@ -526,6 +526,16 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     if run_model:
         prob.run_model()
 
+    wrt = list(prob.driver._designvars)
+
+    # get responses in order used by the driver
+    of = prob.driver._get_ordered_nl_responses()
+
+    if not of or not wrt:
+        raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
+                           "variables and responses.")
+
+    # change the _jacobian _set_abs methods to set random values
     seen = set()
     for system in prob.model.system_iter(recurse=True, include_self=True):
         jac = system._assembled_jac
@@ -536,15 +546,6 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
             jac._set_abs = _SubjacRandomizer(jac, tol)
             seen.add(jac)
 
-    wrt = list(prob.driver._designvars)
-
-    # get responses in order used by the driver
-    of = prob.driver._get_ordered_nl_responses()
-
-    if not of or not wrt:
-        raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
-                           "variables and responses.")
-
     start_time = time.time()
     fullJ = None
     for i in range(repeats):
@@ -554,17 +555,6 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
         else:
             fullJ += np.abs(J)
     elapsed = time.time() - start_time
-
-    # normalize the full J by dividing by the max value
-    fullJ /= np.max(fullJ)
-
-    good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
-
-    print("\nUsing tolerance: %g" % good_tol)
-    print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
-          "tested.\n" % (zero_entries, fullJ.size, nz_matches, n_tested))
-    print("Full total jacobian was computed %d times, taking %f seconds." % (repeats, elapsed))
-    print("Total jacobian shape:", fullJ.shape, "\n")
 
     # now revert the _jacobian _set_abs methods back to their original values
     seen = set()
@@ -577,11 +567,22 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
             jac._set_abs = randomizer._orig_set_abs
             seen.add(jac)
 
+    # normalize the full J by dividing by the max value
+    fullJ /= np.max(fullJ)
+
+    good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
+
+    print("\nUsing tolerance: %g" % good_tol)
+    print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
+          "tested.\n" % (zero_entries, fullJ.size, nz_matches, n_tested))
+    print("Full total jacobian was computed %d times, taking %f seconds." % (repeats, elapsed))
+    print("Total jacobian shape:", fullJ.shape, "\n")
+
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
 
-    # with open("array_viz.out", "w") as f:
-    #     array_viz(boolJ, stream=f)
+    # with open("array_viz%d.out" % system.comm.rank, "w") as f:
+    #     array_viz(boolJ, prob=prob, stream=f)
 
     return boolJ
 
@@ -649,10 +650,12 @@ def _write_sparsity(sparsity, stream):
     stream.write("{\n")
 
     last_res_idx = len(sparsity) - 1
-    for i, (out, out_dict) in enumerate(iteritems(sparsity)):
+    for i, out in enumerate(sorted(sparsity)):
+        out_dict = sparsity[out]
         stream.write('"%s": {\n' % out)
         last_dv_idx = len(out_dict) - 1
-        for j, (inp, subjac) in enumerate(iteritems(out_dict)):
+        for j, inp in enumerate(sorted(out_dict)):
+            subjac = out_dict[inp]
             rows, cols, shape = subjac
             if len(rows) > 15:
                 stream.write('   "%s": [\n' % inp)
@@ -1135,7 +1138,7 @@ def dynamic_sparsity(driver):
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
+def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=False):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1143,15 +1146,13 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
     ----------
     driver : <Driver>
         The driver performing the optimization.
+    run_model : bool
+        If True, call run_model before computing coloring.
     do_sparsity : bool
         If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
     show_jac : bool
         If True, display a visualization of the colored jacobian.
     """
-    # for now, raise an exception when MPI is used with simul_coloring
-    if MPI:
-        raise RuntimeError("simul coloring currently does not work under MPI.")
-
     problem = driver._problem
     driver._total_jac = None
 
@@ -1160,7 +1161,7 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
         coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=do_sparsity,
-                                  setup=False, run_model=False, show_jac=show_jac, stream=f)
+                                  setup=False, run_model=run_model, show_jac=show_jac, stream=f)
     driver.set_simul_deriv_color(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:
@@ -1225,7 +1226,7 @@ def _simul_coloring_cmd(options):
                                         repeats=options.num_jacs, tol=options.tolerance,
                                         show_jac=options.show_jac,
                                         include_sparsity=not options.no_sparsity,
-                                        setup=True, run_model=True,
+                                        setup=False, run_model=True,
                                         stream=outfile)
 
         if sys.stdout.isatty():

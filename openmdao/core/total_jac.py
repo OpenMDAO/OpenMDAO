@@ -184,9 +184,6 @@ class _TotalJacInfo(object):
             if self.simul_coloring is None:
                 modes = [self.mode]
             else:
-                # for now, raise an exception when MPI is used with simul_coloring
-                if MPI:
-                    raise RuntimeError("simul coloring currently does not work under MPI.")
                 modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
 
             self.in_idx_map = {}
@@ -1065,10 +1062,10 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         vecname, _, _ = self.in_idx_map[mode][i]
-        deriv_idxs, jac_idxs = self.solvec_map[mode]
 
         scatter = self.jac_scatters[mode][vecname]
         if scatter is None:
+            deriv_idxs, jac_idxs = self.solvec_map[mode]
             deriv_val = self.output_vec[mode][vecname]._data
             if mode == 'fwd':
                 self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
@@ -1117,10 +1114,16 @@ class _TotalJacInfo(object):
         # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
         # deriv coloring, vecname will always be 'linear', and we don't need to check
         # vecname for each index.
-        deriv_val = self.output_vec[mode]['linear']._data
-        reduced_derivs = deriv_val[deriv_idxs['linear']]
+        scatter = self.jac_scatters[mode]['linear']
 
-        # TODO: add code here to handle running under MPI
+        if scatter is None:
+            deriv_val = self.output_vec[mode]['linear']._data
+            reduced_derivs = deriv_val[deriv_idxs['linear']]
+        else:
+            self.jac_petsc[mode].array[:] = 0.
+            scatter.scatter(self.soln_petsc[mode]['linear'][0],
+                            self.jac_petsc[mode], addv=False, mode=False)
+            reduced_derivs = self.jac_petsc[mode].array
 
         if fwd:
             for i in inds:
