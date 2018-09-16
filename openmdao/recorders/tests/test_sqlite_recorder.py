@@ -1298,7 +1298,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'pz.z': [0., 0.],
             'd1.y1': [-9.10908321e-11],
             'd2.y2': [0.],
-            'obj_cmp.obj': [2.03287907e-20],
+            'obj_cmp.obj': [2.28698896e-20],
             'con_cmp1.con1': [0.],
             'con_cmp2.con2': [0.]
         }

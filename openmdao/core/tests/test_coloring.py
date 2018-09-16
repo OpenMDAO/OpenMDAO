@@ -18,13 +18,20 @@ except ImportError:
     load_npz = None
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
-    ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver
+    ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver, ParallelGroup
 from openmdao.utils.assert_utils import assert_rel_error
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
+from openmdao.utils.mpi import MPI
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+from openmdao.test_suite.components.matmultcomp import MatMultCompWithDerivs
 import openmdao.test_suite
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 # check that pyoptsparse is installed
@@ -60,29 +67,34 @@ def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
                                      -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
     indeps.add_output('r', .7)
 
+    p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)',
+                                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+
     p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
 
     p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r',
                                             g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     thetas = np.linspace(0, np.pi/4, SIZE)
-    p.model.add_subsystem('theta_con', ExecComp('g=arctan(y/x) - theta',
-                                                g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE),
+    p.model.add_subsystem('theta_con', ExecComp('g = x - theta',
+                                                g=np.ones(SIZE), x=np.ones(SIZE),
                                                 theta=thetas))
-    p.model.add_subsystem('delta_theta_con', ExecComp('g = arctan(y/x)[::2]-arctan(y/x)[1::2]',
-                                                      g=np.ones(SIZE//2), x=np.ones(SIZE),
-                                                      y=np.ones(SIZE)))
-
-    thetas = np.linspace(0, np.pi/4, SIZE)
+    p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd',
+                                                      g=np.ones(SIZE//2), even=np.ones(SIZE//2),
+                                                      odd=np.ones(SIZE//2)))
 
     p.model.add_subsystem('l_conx', ExecComp('g=x-1', g=np.ones(SIZE), x=np.ones(SIZE)))
 
+    IND = np.arange(SIZE, dtype=int)
+    ODD_IND = IND[1::2]  # all odd indices
+    EVEN_IND = IND[0::2]  # all even indices
+
     p.model.connect('r', ('circle.r', 'r_con.r'))
-    p.model.connect('x', ['r_con.x', 'theta_con.x', 'delta_theta_con.x'])
-
-    p.model.connect('x', 'l_conx.x')
-
-    p.model.connect('y', ['r_con.y', 'theta_con.y', 'delta_theta_con.y'])
+    p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
+    p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+    p.model.connect('arctan_yox.g', 'theta_con.x')
+    p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
+    p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
     p.driver = driver_class()
     p.driver.options.update(options)
@@ -94,9 +106,7 @@ def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
     # nonlinear constraints
     p.model.add_constraint('r_con.g', equals=0)
 
-    IND = np.arange(SIZE, dtype=int)
-    ODD_IND = IND[0::2]  # all odd indices
-    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=ODD_IND)
+    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
     p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
     # this constrains x[0] to be 1 (see definition of l_conx)
@@ -902,7 +912,7 @@ class BidirectionalTestCase(unittest.TestCase):
                              "%d" % (n, tot_colors, n))
 
     def test_arrowhead(self):
-        for n in range(5, 50, 5):
+        for n in range(5, 50, 55):
             builder = TotJacBuilder(n, n)
             builder.add_row(0)
             builder.add_col(0)
@@ -945,6 +955,79 @@ class BidirectionalTestCase(unittest.TestCase):
         tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
 
         self.assertEqual(tot_colors, 105)
+
+
+def _get_mat(rows, cols):
+    if MPI:
+        if MPI.COMM_WORLD.rank == 0:
+            mat = np.random.random(rows * cols).reshape((rows, cols)) - 0.5
+        else:
+            mat = None
+        return MPI.COMM_WORLD.bcast(mat, root=0)
+    else:
+        return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
+
+
+@unittest.skipUnless(PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
+class MatMultMultipointTestCase(unittest.TestCase):
+    N_PROCS = 4
+
+    def test_multipoint_with_coloring(self):
+        size = 10
+        num_pts = self.N_PROCS
+
+        np.random.seed(11)
+
+        p = Problem()
+        p.driver = pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.options['dynamic_simul_derivs'] = True
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+            p.driver.opt_settings['iSumm'] = 6
+
+        model = p.model
+        for i in range(num_pts):
+            model.add_subsystem('indep%d' % i, IndepVarComp('x', val=np.ones(size)))
+            model.add_design_var('indep%d.x' % i)
+
+        par1 = model.add_subsystem('par1', ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_mat(5, size)
+            par1.add_subsystem('comp%d' % i, MatMultCompWithDerivs(mat, approx_method='exact'))
+            model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
+
+        par2 = model.add_subsystem('par2', ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_mat(size, 5)
+            par2.add_subsystem('comp%d' % i, MatMultCompWithDerivs(mat, approx_method='exact'))
+            model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
+            par2.add_constraint('comp%d.y' % i, lower=-1.)
+
+            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.zeros(size)))
+            model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
+
+        model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
+
+        for i in range(num_pts):
+            model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
+
+        model.add_objective('obj.y')
+
+        p.setup()
+
+        p.run_driver()
+
+        J = p.compute_totals()
+
+        for i in range(num_pts):
+            norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
+                                  getattr(par2, 'comp%d'%i).mat.dot(getattr(par1, 'comp%d'%i).mat))
+            self.assertLess(norm, 1.e-7)
+
+        # print("final obj:", p['obj.y'])
 
 
 if __name__ == '__main__':
