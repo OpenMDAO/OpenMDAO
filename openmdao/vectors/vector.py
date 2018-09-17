@@ -214,22 +214,6 @@ class Vector(object):
             vec._initialize_views()
         return vec
 
-    def _contains_abs(self, abs_name):
-        """
-        Check if the variable is involved in the current mat-vec product.
-
-        Parameters
-        ----------
-        abs_name : str
-            Absolute variable name in the owning system's namespace.
-
-        Returns
-        -------
-        boolean
-            True or False.
-        """
-        return abs_name in self._names
-
     def keys(self):
         """
         Return variable names of variables contained in this vector (relative names).
