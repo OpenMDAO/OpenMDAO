@@ -138,7 +138,7 @@ class ExecComp(ExplicitComponent):
 
         Notes
         -----
-        If a variable has an initial value that is anything other than 0.0,
+        If a variable has an initial value that is anything other than 1.0,
         either because it has a different type than float or just because its
         initial value is != 1.0, you must use a keyword arg
         to set the initial value.  For example, let's say we have an
@@ -343,17 +343,14 @@ class ExecComp(ExplicitComponent):
         # our complex step
         step = self.complex_stepsize * 1j
         out_names = self._var_allprocs_prom2abs_list['output']
+        inv_stepsize = 1.0 / self.complex_stepsize
 
         for param in inputs:
 
             pwrap = _TmpDict(inputs)
             pval = inputs[param]
-            if isinstance(pval, ndarray):
-                psize = pval.size
-                pwrap[param] = np.asarray(pval, npcomplex)
-            else:
-                psize = 1
-                pwrap[param] = npcomplex(pval)
+            psize = pval.size
+            pwrap[param] = np.asarray(pval, npcomplex)
 
             if self._vectorize or psize == 1:
                 # set a complex param value
@@ -366,11 +363,7 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    jval = imag(uwrap[u] / self.complex_stepsize)
-                    if psize > 1 and jval.size > 1:
-                        partials[(u, param)] = jval.flat
-                    else:
-                        partials[(u, param)] = jval
+                    partials[(u, param)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old param value
                 pwrap[param] -= step
@@ -386,12 +379,8 @@ class ExecComp(ExplicitComponent):
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
-                        jval = imag(uwrap[u] / self.complex_stepsize)
-                        if (u, param) not in partials:  # create the dict entry
-                            partials[(u, param)] = np.zeros((jval.size, psize))
-
                         # set the column in the Jacobian entry
-                        partials[(u, param)][:, i] = jval.flat
+                        partials[(u, param)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
                     # restore old param value
                     pwrap[param][idx] -= step
