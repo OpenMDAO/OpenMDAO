@@ -365,12 +365,10 @@ class ExecComp(ExplicitComponent):
 
                     for u in out_names:
                         jval = imag(uwrap[u] / self.complex_stepsize)
-                        if (u, param) not in partials and jval.size == 1:
-                            partials[(u, param)] = np.zeros((jval.size, psize))
-
-                        # set the diagonal of the subjac
-                        # partials[(u, param)].flat[::jval.size + 1] = jval.flat
-                        partials[(u, param)] = jval.flat
+                        if psize > 1 and jval.size > 1:
+                            partials[(u, param)] = jval.flat
+                        else:
+                            partials[(u, param)] = jval
 
                     # restore old param value
                     pwrap[param] -= step
