@@ -348,54 +348,14 @@ class ExecComp(ExplicitComponent):
 
             pwrap = _TmpDict(inputs)
             pval = inputs[param]
-
             if isinstance(pval, ndarray):
-                # replace the param array with a complex copy
-                pwrap[param] = np.asarray(pval, npcomplex)
                 psize = pval.size
-                if self._vectorize and psize > 1:
-                    # set a complex param value
-                    pwrap[param] += step
-
-                    uwrap = _TmpDict(self._outputs, return_complex=True)
-
-                    # solve with complex param value
-                    self._residuals.set_const(0.0)
-                    self.compute(pwrap, uwrap)
-
-                    for u in out_names:
-                        jval = imag(uwrap[u] / self.complex_stepsize)
-                        if psize > 1 and jval.size > 1:
-                            partials[(u, param)] = jval.flat
-                        else:
-                            partials[(u, param)] = jval
-
-                    # restore old param value
-                    pwrap[param] -= step
-                else:
-                    for i, idx in enumerate(array_idx_iter(pwrap[param].shape)):
-                        # set a complex param value
-                        pwrap[param][idx] += step
-
-                        uwrap = _TmpDict(self._outputs, return_complex=True)
-
-                        # solve with complex param value
-                        self._residuals.set_const(0.0)
-                        self.compute(pwrap, uwrap)
-
-                        for u in out_names:
-                            jval = imag(uwrap[u] / self.complex_stepsize)
-                            if (u, param) not in partials:  # create the dict entry
-                                partials[(u, param)] = np.zeros((jval.size, psize))
-
-                            # set the column in the Jacobian entry
-                            partials[(u, param)][:, i] = jval.flat
-
-                        # restore old param value
-                        pwrap[param][idx] -= step
+                pwrap[param] = np.asarray(pval, npcomplex)
             else:
+                psize = 1
                 pwrap[param] = npcomplex(pval)
 
+            if self._vectorize or psize == 1:
                 # set a complex param value
                 pwrap[param] += step
 
@@ -407,14 +367,34 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     jval = imag(uwrap[u] / self.complex_stepsize)
-                    if (u, param) not in partials:  # create the dict entry
-                        partials[(u, param)] = np.zeros((jval.size, 1))
-
-                    # set the column in the Jacobian entry
-                    partials[(u, param)][:, i] = jval.flat
+                    if psize > 1 and jval.size > 1:
+                        partials[(u, param)] = jval.flat
+                    else:
+                        partials[(u, param)] = jval
 
                 # restore old param value
                 pwrap[param] -= step
+            else:
+                for i, idx in enumerate(array_idx_iter(pwrap[param].shape)):
+                    # set a complex param value
+                    pwrap[param][idx] += step
+
+                    uwrap = _TmpDict(self._outputs, return_complex=True)
+
+                    # solve with complex param value
+                    self._residuals.set_const(0.0)
+                    self.compute(pwrap, uwrap)
+
+                    for u in out_names:
+                        jval = imag(uwrap[u] / self.complex_stepsize)
+                        if (u, param) not in partials:  # create the dict entry
+                            partials[(u, param)] = np.zeros((jval.size, psize))
+
+                        # set the column in the Jacobian entry
+                        partials[(u, param)][:, i] = jval.flat
+
+                    # restore old param value
+                    pwrap[param][idx] -= step
 
 
 class _TmpDict(object):
