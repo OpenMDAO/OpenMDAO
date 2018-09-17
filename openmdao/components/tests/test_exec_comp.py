@@ -540,7 +540,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "comp: vectorize is True but partial(A, y) is not square (shape=(15, 3)).")
+                         "comp: vectorize is True but partial(y, A) is not square (shape=(3, 15)).")
 
     def test_feature_vectorize(self):
         p = Problem()

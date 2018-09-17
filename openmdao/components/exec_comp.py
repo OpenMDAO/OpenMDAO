@@ -216,10 +216,12 @@ class ExecComp(ExplicitComponent):
             else:
                 init_vals[arg] = val
 
-        arrays = []
         for var in sorted(allvars):
-            # if user supplied an initial value, use it, otherwise set to 0.0
-            val = init_vals.get(var, 1.0)
+            # if user supplied an initial value, use it, otherwise set to 1.0
+            if var in init_vals:
+                val = init_vals[var]
+            else:
+                init_vals[var] = val = 1.0
             meta = kwargs2.get(var, {})
 
             if var in outs:
@@ -227,25 +229,29 @@ class ExecComp(ExplicitComponent):
             else:
                 self.add_input(var, val, **meta)
 
-            if self._vectorize and var in init_vals and isinstance(init_vals[var], np.ndarray):
-                arrays.append(var)
-
         if self._vectorize:
             # check that sizes of any input/output vars match or one of them is size 1
-            inputs = [(var, init_vals[var].size) for var in arrays if var in outs]
-            outputs = [(var, init_vals[var].size) for var in arrays if var not in outs]
-            for inp, isize in inputs:
-                if isize > 1:
-                    for out, osize in outputs:
-                        if osize > 1 and osize != isize:
+            osorted = sorted(self._var_rel_names['output'])
+            for inp in sorted(self._var_rel_names['input']):
+                ival = init_vals[inp]
+                iarray = isinstance(ival, ndarray) and ival.size > 1
+                for out in osorted:
+                    oval = init_vals[out]
+                    if (iarray and isinstance(oval, ndarray) and oval.size > 1):
+                        if oval.size != ival.size:
                             raise RuntimeError("%s: vectorize is True but partial(%s, %s) is not "
                                                "square (shape=(%d, %d))." %
-                                               (self.pathname, out, inp, osize, isize))
+                                               (self.pathname, out, inp, oval.size, ival.size))
+                        # partial will be declared as diagonal
+                        inds = np.arange(oval.size, dtype=int)
+                    else:
+                        inds = None
+                    self.declare_partials(of=[out], wrt=[inp], rows=inds, cols=inds)
+        else:
+            # All derivatives are defined as dense
+            self.declare_partials(of='*', wrt='*')
 
         self._codes = self._compile_exprs(self._exprs)
-
-        # All derivatives are defined.
-        self.declare_partials(of='*', wrt='*')
 
     def _compile_exprs(self, exprs):
         compiled = []
@@ -359,11 +365,12 @@ class ExecComp(ExplicitComponent):
 
                     for u in out_names:
                         jval = imag(uwrap[u] / self.complex_stepsize)
-                        if (u, param) not in partials:  # create the dict entry
+                        if (u, param) not in partials and jval.size == 1:
                             partials[(u, param)] = np.zeros((jval.size, psize))
 
                         # set the diagonal of the subjac
-                        partials[(u, param)].flat[::jval.size + 1] = jval.flat
+                        # partials[(u, param)].flat[::jval.size + 1] = jval.flat
+                        partials[(u, param)] = jval.flat
 
                     # restore old param value
                     pwrap[param] -= step
