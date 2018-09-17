@@ -262,7 +262,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     self._approx_partials(of=out_name,
                                           wrt=[name[0] for name in self._surrogate_input_names],
                                           method='fd')
-                    self._approx_schemes['fd'] = FiniteDifference()
+                    if "fd" not in self._approx_schemes:
+                        self._approx_schemes['fd'] = FiniteDifference()
 
     def check_config(self, logger):
         """

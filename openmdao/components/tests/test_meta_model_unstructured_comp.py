@@ -1111,7 +1111,7 @@ class MetaModelTestCase(unittest.TestCase):
                 self.declare_partials('sin_x', 'x', method='fd',
                                       form='backward', step=1e-7, step_calc='rel')
 
-        # Test with user explicitly setting fd inside of setup
+        # Testing explicitly setting fd inside of setup
         prob = Problem()
         indep = IndepVarComp()
         indep.add_output('x', 5.)
