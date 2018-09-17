@@ -11,6 +11,7 @@ from tempfile import mkdtemp, mkstemp
 import numpy as np
 from six import iteritems, assertRaisesRegex
 
+from pprint import pprint
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearRunOnce, \
     NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
@@ -32,7 +33,7 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
-def CaseReader(filename):
+def CaseReader(filename, pre_load=True):
     """
     Return a CaseReader for the given file.
 
@@ -47,7 +48,7 @@ def CaseReader(filename):
     reader : BaseCaseReader
         An instance of a SqliteCaseReader that is reading filename.
     """
-    reader = SqliteCaseReader(filename)
+    reader = SqliteCaseReader(filename, pre_load)
     return reader
 
 
@@ -73,7 +74,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 raise e
 
     def test_bad_filetype(self):
-        # Pass it a plain text file.
+        # Pass a plain text file.
         fd, filepath = mkstemp()
         with os.fdopen(fd, 'w') as tmp:
             tmp.write("Lorem ipsum")
@@ -86,7 +87,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(str(cm.exception).startswith(msg))
 
     def test_bad_filename(self):
-
+        # Pass a nonexistent file.
         with self.assertRaises(IOError) as cm:
             CaseReader('junk.sql')
 
@@ -1105,7 +1106,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
 
-    def test_loading_cases(self):
+    def test_pre_load(self):
         prob = SellarProblem()
         prob.setup()
 
@@ -1119,14 +1120,32 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.record_iteration('c_2')
         prob.cleanup()
 
-        cr = CaseReader(self.filename)
+        # without pre_load, we should get format_version and metadata
+        cr = CaseReader(self.filename, pre_load=False)
 
         self.assertEqual(len(cr.driver_cases._cases), 0)
         self.assertEqual(len(cr.solver_cases._cases), 0)
         self.assertEqual(len(cr.system_cases._cases), 0)
         self.assertEqual(len(cr.problem_cases._cases), 0)
 
-        cr.load_cases()
+        self.assertEqual(cr.format_version, format_version,
+                         msg='format version not read correctly')
+
+        expected_systems = ['root'] + [sys.name for sys in prob.model._subsystems_allprocs]
+        self.assertEqual(sorted(cr.system_metadata.keys()),
+                         sorted(expected_systems),
+                         msg='system metadata is not populated as expected.')
+
+        self.assertEqual(sorted(cr.driver_metadata.keys()),
+                         ['abs2prom', 'connections_list', 'tree'],
+                         msg='driver metadata is not populated as expected.')
+
+        pprint(cr.problem_metadata.keys())
+        self.assertEqual(cr.problem_metadata, {},
+                         msg='problem metadata not read correctly')
+
+        # without pre_load, we should also get all the cases
+        cr = CaseReader(self.filename, pre_load=True)
 
         # assert that we have now stored each of the cases
         self.assertEqual(len(cr.driver_cases._cases), cr.driver_cases.num_cases)

@@ -94,6 +94,7 @@ def check_valid_sqlite3_db(filename):
     # check that the first 100 bytes actually contains a valid SQLite database header
     with open(filename, 'rb') as fd:
         header = fd.read(100)
+
     if header[:16] != b'SQLite format 3\x00':
         raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
 

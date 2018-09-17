@@ -15,7 +15,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import Case, DriverCase, SystemCase, SolverCase, ProblemCase, \
+from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
     PromotedToAbsoluteMap, DriverDerivativesCase
 from openmdao.recorders.cases import BaseCases
 from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array, convert_to_np_array
@@ -37,6 +37,322 @@ _DEFAULT_OUT_STREAM = object()
 
 # Regular expression used for splitting iteration coordinates.
 _coord_split_re = re.compile('\|\\d+\|*')
+
+
+class Case(object):
+    """
+    Case wraps the data from a single iteration of a recording to make it more easily accessible.
+
+    Attributes
+    ----------
+    source : str
+        The unique id of the system/solver/driver/problem that did the recording.
+    iteration_coordinate : str
+        The full unique identifier for this iteration.
+    timestamp : float
+        Time of execution of the case.
+    parent_iteration : str
+        The full unique identifier for the parent this iteration.
+    parent_iteration : list
+        The full unique identifiers for children of this iteration.
+    outputs : PromotedToAbsoluteMap
+        Map of outputs to values recorded.
+    inputs : PromotedToAbsoluteMap or None
+        Map of inputs to values recorded (None if not recorded).
+    residuals : PromotedToAbsoluteMap or None
+        Map of outputs to residuals recorded (None if not recorded).
+    jacobian : PromotedToAbsoluteMap or None
+        Map of (output, input) to derivatives recorded (None if not recorded).
+    abs_tol : float or None
+        Absolute tolerance (None if not recorded).
+    rel_tol : float or None
+        Relative tolerance (None if not recorded).
+    success : str
+        Success flag for the case.
+    msg : str
+        Message associated with the case.
+    """
+
+    def __init__(self, source, iteration_coordinate, timestamp, success, msg,
+                 outputs, inputs=None, residuals=None, jacobian=None):
+        pass
+
+    def get_design_variables(self, scaled=True, use_indices=True):
+        """
+        Get the values of the design variables, as seen by the driver, for this case.
+
+        Parameters
+        ----------
+        scaled : bool
+            The unique id of the system/solver/driver/problem that did the recording.
+        use_indices : bool
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        dict
+            The values of the design variables as seen by the driver.
+        """
+        pass
+
+    def get_constraints(self, scaled=True, use_indices=True):
+        """
+        Get the values of the constraints, as seen by the driver, for this case.
+
+        Parameters
+        ----------
+        scaled : bool
+            The unique id of the system/solver/driver/problem that did the recording.
+        use_indices : bool
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        dict
+            The values of the constraints as seen by the driver.
+        """
+        pass
+
+    def get_objectives(self, scaled=True, use_indices=True):
+        """
+        Get the values of the objectives, as seen by the driver, for this case.
+
+        Parameters
+        ----------
+        scaled : bool
+            The unique id of the system/solver/driver/problem that did the recording.
+        use_indices : bool
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        dict
+            The values of the objectives as seen by the driver.
+        """
+        pass
+
+    def get_responses(self, scaled=True, use_indices=True):
+        """
+        Get the values of the responses, as seen by the driver, for this case.
+
+        Parameters
+        ----------
+        scaled : bool
+            The unique id of the system/solver/driver/problem that did the recording.
+        use_indices : bool
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        dict
+            The values of the responses as seen by the driver.
+        """
+        pass
+
+    def list_inputs(self,
+                    values=True,
+                    units=False,
+                    hierarchical=True,
+                    print_arrays=False,
+                    out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Return and optionally log a list of input names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
+
+        Parameters
+        ----------
+        values : bool, optional
+            When True, display/return input values. Default is True.
+        units : bool, optional
+            When True, display/return units. Default is False.
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of input names and other optional information about those inputs
+        """
+        pass
+
+    def list_outputs(self,
+                     explicit=True, implicit=True,
+                     values=True,
+                     prom_name=False,
+                     residuals=False,
+                     residuals_tol=None,
+                     units=False,
+                     shape=False,
+                     bounds=False,
+                     scaling=False,
+                     hierarchical=True,
+                     print_arrays=False,
+                     out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Return and optionally log a list of output names and other optional information.
+
+        If the model is parallel, only the local variables are returned to the process.
+        Also optionally logs the information to a user defined output stream. If the model is
+        parallel, the rank 0 process logs information about all variables across all processes.
+
+        Parameters
+        ----------
+        explicit : bool, optional
+            include outputs from explicit components. Default is True.
+        implicit : bool, optional
+            include outputs from implicit components. Default is True.
+        values : bool, optional
+            When True, display/return output values. Default is True.
+        prom_name : bool, optional
+            When True, display/return the promoted name of the variable.
+            Default is False.
+        residuals : bool, optional
+            When True, display/return residual values. Default is False.
+        residuals_tol : float, optional
+            If set, limits the output of list_outputs to only variables where
+            the norm of the resids array is greater than the given 'residuals_tol'.
+            Default is None.
+        units : bool, optional
+            When True, display/return units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
+        bounds : bool, optional
+            When True, display/return bounds (lower and upper). Default is False.
+        scaling : bool, optional
+            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        hierarchical : bool, optional
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool, optional
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        list
+            list of output names and other optional information about those outputs
+        """
+        pass
+
+
+class CaseReader():
+    """
+    A CaseReader specific to files created with SqliteRecorder.
+
+    Parameters
+    ----------
+    filename : str
+        The path to the filename containing the recorded data.
+
+    Attributes
+    ----------
+    format_version : int
+        The version of the format assumed when loading the file.
+    system_metadata : dict
+        Metadata about each system in the recorded model, including options and scaling factors.
+    problem_metadata : dict
+        Metadata about the problem, including the system hierachy and connections.
+    """
+
+    def __init__(self, filename, pre_load=False):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the filename containing the recorded data.
+        pre_load : bool
+            If True, load all the data into memory during initialization.
+        """
+        pass
+
+    def get_cases(self, source, recurse=True, flat=False):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', iteration_coordinate}
+            Identifies which cases to return. 'iteration_coordinate' can refer to
+            a system or a solver hierarchy location. Defaults to 'problem'.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy
+            rather than just the direct children. Defaults to True.
+        flat : bool
+            If True, return a flat dictionary rather than a nested dictionary.
+
+        Returns
+        -------
+        dict
+            The cases identified by the source
+        """
+        pass
+
+    def get_case(self, id, recurse=True):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        id : str
+            The unique identifier of the case to return.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy
+            rather than just the direct children. Defaults to True.
+
+        Returns
+        -------
+        dict
+            The case identified by the is
+        """
+        pass
+
+    def list_sources(self):
+        """
+        List of all the different recording sources for which there is recorded data.
+
+        Returns
+        -------
+        list
+            One or more of: `problem`, `driver`, `<component hierarchy location>`,
+            `<solver hierarchy location>`
+        """
+        pass
+
+    def list_source_vars(self, source):
+        """
+        List of all the different recording sources for which there is recorded data.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', iteration_coordinate}
+            Identifies which cases to return. 'iteration_coordinate' can refer to
+            a system or a solver hierarchy location. Defaults to 'problem'.
+
+        Returns
+        -------
+        dict
+            {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+        """
+        pass
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -144,8 +460,7 @@ class SqliteCaseReader(BaseCaseReader):
         Load data from the sqlite database file.
 
         Load the metadata from the sqlite file, populating the
-        `format_version`, `parameters`, and `unknowns` attributes of this
-        CaseReader.
+        `format_version`, `parameters`, and `unknowns` attributes of this CaseReader.
 
         The `iterations` table is read to load the keys which identify
         the individual cases/iterations from the recorded file.
@@ -166,31 +481,31 @@ class SqliteCaseReader(BaseCaseReader):
             with sqlite3.connect(self.filename) as con:
 
                 # Read in iterations from Drivers, Systems, Problems, and Solvers
+                iter_query = "SELECT iteration_coordinate FROM %s ORDER BY id ASC"
+
                 cur = con.cursor()
-                cur.execute("SELECT iteration_coordinate FROM driver_iterations ORDER BY id ASC")
+                cur.execute(iter_query % "driver_iterations")
                 rows = cur.fetchall()
                 self.driver_cases._case_keys = [coord[0] for coord in rows]
                 self.driver_cases.num_cases = len(self.driver_cases._case_keys)
 
                 try:
-                    cur.execute("SELECT iteration_coordinate FROM driver_derivatives "
-                                "ORDER BY id ASC")
+                    cur.execute(iter_query % "driver_derivatives")
                     rows = cur.fetchall()
                     dcase = self.driver_derivative_cases
                     dcase._case_keys = [coord[0] for coord in rows]
                     dcase.num_cases = len(dcase._case_keys)
-
                 except sqlite3.OperationalError:
                     # Cases recorded in version 1 won't have a 'derivatives' table.
                     if self.format_version >= 2:
                         reraise(*sys.exc_info())
 
-                cur.execute("SELECT iteration_coordinate FROM system_iterations ORDER BY id ASC")
+                cur.execute(iter_query % "system_iterations")
                 rows = cur.fetchall()
                 self.system_cases._case_keys = [coord[0] for coord in rows]
                 self.system_cases.num_cases = len(self.system_cases._case_keys)
 
-                cur.execute("SELECT iteration_coordinate FROM solver_iterations ORDER BY id ASC")
+                cur.execute(iter_query % "solver_iterations")
                 rows = cur.fetchall()
                 self.solver_cases._case_keys = [coord[0] for coord in rows]
                 self.solver_cases.num_cases = len(self.solver_cases._case_keys)
