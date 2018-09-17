@@ -10,6 +10,7 @@ import warnings
 from collections import OrderedDict, defaultdict
 from itertools import combinations
 from distutils.version import LooseVersion
+from contextlib import contextmanager
 
 from six import iteritems
 from six.moves import range
@@ -65,7 +66,7 @@ class _SubjacRandomizer(object):
         Tolerance used to shift random numbers away from 0.
     """
 
-    def __init__(self, jac, tol):
+    def __init__(self, jac):
         """
         Initialize the function replacement.
 
@@ -73,12 +74,9 @@ class _SubjacRandomizer(object):
         ----------
         jac : Jacobian
             The Jacobian having its _set_abs method replaced.
-        tol : float
-            Values between -tol and tol will be shifted away from 0.
         """
         self._orig_set_abs = jac._set_abs
         self._jac = jac
-        self._tol = tol
 
     def __call__(self, key, subjac):
         """
@@ -92,7 +90,6 @@ class _SubjacRandomizer(object):
             Value of the subjacobian being assigned to key.
         """
         jac = self._jac
-        tol = self._tol
 
         if key in jac._subjacs_info:
             info = jac._subjacs_info[key]
@@ -483,6 +480,41 @@ def _tol_sweep(arr, tol=1e-15, orders=5):
     return good_tol, len(sorted_items[0][1]), n_tested, sorted_items[0][0]
 
 
+@contextmanager
+def _computing_coloring_context(top):
+    """
+    Context manager for computing total jac sparsity for simultaneous coloring.
+
+    Parameters
+    ----------
+    top : System
+        Top of the system hierarchy where coloring will be done.
+    """
+    # change the _jacobian _set_abs methods to set random values
+    seen = set()
+    for system in top.system_iter(recurse=True, include_self=True):
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
+        if jac is not None and jac not in seen:
+            # replace jacobian set_abs with one that replaces all subjacs with random numbers
+            jac._set_abs = _SubjacRandomizer(jac)
+            seen.add(jac)
+
+    yield
+
+    # now revert the _jacobian _set_abs methods back to their original values
+    seen = set()
+    for system in top.system_iter(recurse=True, include_self=True):
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
+        if jac is not None and jac not in seen:
+            randomizer = jac._set_abs
+            jac._set_abs = randomizer._orig_set_abs
+            seen.add(jac)
+
+
 def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
@@ -535,37 +567,16 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
                            "variables and responses.")
 
-    # change the _jacobian _set_abs methods to set random values
-    seen = set()
-    for system in prob.model.system_iter(recurse=True, include_self=True):
-        jac = system._assembled_jac
-        if jac is None:
-            jac = system._jacobian
-        if jac is not None and jac not in seen:
-            # replace jacobian set_abs with one that replaces all subjacs with random numbers
-            jac._set_abs = _SubjacRandomizer(jac, tol)
-            seen.add(jac)
-
-    start_time = time.time()
-    fullJ = None
-    for i in range(repeats):
-        J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-        if fullJ is None:
-            fullJ = np.abs(J)
-        else:
-            fullJ += np.abs(J)
-    elapsed = time.time() - start_time
-
-    # now revert the _jacobian _set_abs methods back to their original values
-    seen = set()
-    for system in prob.model.system_iter(recurse=True, include_self=True):
-        jac = system._assembled_jac
-        if jac is None:
-            jac = system._jacobian
-        if jac is not None and jac not in seen:
-            randomizer = jac._set_abs
-            jac._set_abs = randomizer._orig_set_abs
-            seen.add(jac)
+    with _computing_coloring_context(prob.model):
+        start_time = time.time()
+        fullJ = None
+        for i in range(repeats):
+            J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+            if fullJ is None:
+                fullJ = np.abs(J)
+            else:
+                fullJ += np.abs(J)
+        elapsed = time.time() - start_time
 
     # normalize the full J by dividing by the max value
     fullJ /= np.max(fullJ)
