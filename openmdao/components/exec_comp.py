@@ -246,7 +246,7 @@ class ExecComp(ExplicitComponent):
                         inds = np.arange(oval.size, dtype=int)
                     else:
                         inds = None
-                    self.declare_partials(of=[out], wrt=[inp], rows=inds, cols=inds)
+                    self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
         else:
             # All derivatives are defined as dense
             self.declare_partials(of='*', wrt='*')
