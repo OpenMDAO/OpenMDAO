@@ -16,7 +16,6 @@ from six import iteritems
 from six.moves import range
 
 import numpy as np
-from numpy.random import rand
 from scipy.sparse.compressed import get_index_dtype
 from scipy.sparse import coo_matrix
 
@@ -50,64 +49,6 @@ else:
             return np.count_nonzero(arr)
 
         return count
-
-
-class _SubjacRandomizer(object):
-    """
-    A replacement for Jacobian._set_abs that replaces subjac with random numbers.
-
-    Attributes
-    ----------
-    _orig_set_abs : bound function
-        Original _set_abs function for the given Jacobian.
-    _jac : Jacobian
-        The jacobian having its _set_abs replaced.
-    _tol : float
-        Tolerance used to shift random numbers away from 0.
-    """
-
-    def __init__(self, jac):
-        """
-        Initialize the function replacement.
-
-        Parameters
-        ----------
-        jac : Jacobian
-            The Jacobian having its _set_abs method replaced.
-        """
-        self._orig_set_abs = jac._set_abs
-        self._jac = jac
-
-    def __call__(self, key, subjac):
-        """
-        Call this function replacement.
-
-        Parameters
-        ----------
-        key : (str, str)
-            Tuple of (response_name, dv_name)
-        subjac : array-like
-            Value of the subjacobian being assigned to key.
-        """
-        jac = self._jac
-
-        if key in jac._subjacs_info:
-            info = jac._subjacs_info[key]
-            rows = info['rows']
-        else:
-            rows = None
-
-        if rows is not None:  # list form
-            subjac = rand(rows.size) + 1.0
-        elif isinstance(subjac, sparse_types):  # sparse
-            subjac = subjac.copy()
-            subjac.data = rand(subjac.data.size) + 1.0
-        elif isinstance(subjac, np.ndarray):   # dense array
-            subjac = rand(*(subjac.shape)) + 1.0
-        else:  # scalar
-            subjac = rand() + 1.0
-
-        self._orig_set_abs(key, subjac)
 
 
 def _order_by_ID(col_matrix):
@@ -490,29 +431,25 @@ def _computing_coloring_context(top):
     top : System
         Top of the system hierarchy where coloring will be done.
     """
-    # change the _jacobian _set_abs methods to set random values
-    seen = set()
     for system in top.system_iter(recurse=True, include_self=True):
+        if system.matrix_free:
+            raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
+                               "components." % system.pathname)
+
         jac = system._assembled_jac
         if jac is None:
             jac = system._jacobian
-        if jac is not None and jac not in seen:
-            # replace jacobian set_abs with one that replaces all subjacs with random numbers
-            jac._set_abs = _SubjacRandomizer(jac)
-            seen.add(jac)
+        if jac is not None:
+            jac._randomize = True
 
     yield
 
-    # now revert the _jacobian _set_abs methods back to their original values
-    seen = set()
     for system in top.system_iter(recurse=True, include_self=True):
         jac = system._assembled_jac
         if jac is None:
             jac = system._jacobian
-        if jac is not None and jac not in seen:
-            randomizer = jac._set_abs
-            jac._set_abs = randomizer._orig_set_abs
-            seen.add(jac)
+        if jac is not None:
+            jac._randomize = False
 
 
 def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=False):
@@ -1177,6 +1114,8 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
     driver._setup_simul_coloring()
     if do_sparsity:
         driver._setup_tot_jac_sparsity()
+
+    simul_coloring_summary(coloring, stream=sys.stdout)
 
 
 def _simul_coloring_setup_parser(parser):

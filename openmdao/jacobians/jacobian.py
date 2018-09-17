@@ -1,9 +1,11 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy as np
+from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
+from six import itervalues
 
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
@@ -28,6 +30,8 @@ class Jacobian(object):
         can assign a jacobian with less rows or columns than the variable sizes.
     _abs_keys : defaultdict
         A cache dict for key to absolute key.
+    _randomize : bool
+        If True, sparsity is being computed for simultaneous derivative coloring.
     """
 
     def __init__(self, system):
@@ -43,6 +47,7 @@ class Jacobian(object):
         self._subjacs_info = system._subjacs_info
         self._override_checks = False
         self._abs_keys = defaultdict(bool)
+        self._randomize = False
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -212,3 +217,24 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         pass
+
+    def _randomize_subjac(self, subjac):
+        """
+        Return a subjac that is the given subjac filled with random values.
+
+        Parameters
+        ----------
+        subjac : ndarray or csc_matrix
+            Sub-jacobian to be randomized.
+
+        Returns
+        -------
+        ndarray or csc_matrix
+            Randomized version of the subjac.
+        """
+        if isinstance(subjac, sparse_types):  # sparse
+            sparse = subjac.copy()
+            sparse.data = rand(sparse.data.size) + 1.0
+            return sparse
+
+        return rand(*subjac.shape) + 1.0

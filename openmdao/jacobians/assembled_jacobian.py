@@ -334,14 +334,24 @@ class AssembledJacobian(Jacobian):
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
-        for _, key, do_add in iters:
-            if do_add:
-                int_mtx._update_add_submat(key, subjacs[key]['value'])
-            else:
-                int_mtx._update_submat(key, subjacs[key]['value'])
+        if self._randomize:
+            for _, key, do_add in iters:
+                if do_add:
+                    int_mtx._update_add_submat(key, self._randomize_subjac(subjacs[key]['value']))
+                else:
+                    int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
 
-        for key in iters_in_ext:
-            ext_mtx._update_submat(key, subjacs[key]['value'])
+            for key in iters_in_ext:
+                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
+        else:
+            for _, key, do_add in iters:
+                if do_add:
+                    int_mtx._update_add_submat(key, subjacs[key]['value'])
+                else:
+                    int_mtx._update_submat(key, subjacs[key]['value'])
+
+            for key in iters_in_ext:
+                ext_mtx._update_submat(key, subjacs[key]['value'])
 
     def _apply(self, d_inputs, d_outputs, d_residuals, mode):
         """
