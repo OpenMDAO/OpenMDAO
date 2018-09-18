@@ -277,7 +277,6 @@ class AssembledJacobian(Jacobian):
                 global_conns = system._conn_global_abs_in2out
 
             output_names = set(system._var_abs_names['output'])
-            input_names = set(system._var_abs_names['input'])
 
             rev_conns = defaultdict(list)
             for tgt, src in iteritems(global_conns):
@@ -294,7 +293,7 @@ class AssembledJacobian(Jacobian):
                 _, wrtname = abs_key
                 if wrtname in output_names:
                     if abs_key in int_mtx._submats:
-                        iters.append((abs_key, abs_key, False))
+                        iters.append((abs_key, False))
                     else:
                         # This happens when the src is an indepvarcomp that is
                         # contained in the system.
@@ -302,15 +301,15 @@ class AssembledJacobian(Jacobian):
                         if wrt in rev_conns:
                             for tgt in rev_conns[wrt]:
                                 if (of, tgt) in int_mtx._submats:
-                                    iters.append((of, tgt), abs_key, False)
+                                    iters.append(abs_key, False)
                                     break
                 else:  # wrt is an input
                     if wrtname in global_conns:
                         mapped = keymap[abs_key]
                         if mapped in seen:
-                            iters.append((mapped, abs_key, True))
+                            iters.append((abs_key, True))
                         else:
-                            iters.append((mapped, abs_key, False))
+                            iters.append((abs_key, False))
                             seen.add(mapped)
                     elif ext_mtx is not None:
                         iters_in_ext.append(abs_key)
@@ -335,7 +334,7 @@ class AssembledJacobian(Jacobian):
         iters, iters_in_ext = self._get_subjac_iters(system)
 
         if self._randomize:
-            for _, key, do_add in iters:
+            for key, do_add in iters:
                 if do_add:
                     int_mtx._update_add_submat(key, self._randomize_subjac(subjacs[key]['value']))
                 else:
@@ -344,7 +343,7 @@ class AssembledJacobian(Jacobian):
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
         else:
-            for _, key, do_add in iters:
+            for key, do_add in iters:
                 if do_add:
                     int_mtx._update_add_submat(key, subjacs[key]['value'])
                 else:
