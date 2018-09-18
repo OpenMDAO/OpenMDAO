@@ -66,8 +66,7 @@ class SurrogateModel(object):
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
         """
-        msg = "{0} has not defined a jacobian method.".format(type(self).__name__)
-        raise RuntimeError(msg)
+        pass
 
 
 class MultiFiSurrogateModel(SurrogateModel):

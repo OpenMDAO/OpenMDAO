@@ -1,25 +1,28 @@
 """MetaModel provides basic meta modeling capability."""
 from six.moves import range
 from copy import deepcopy
-from itertools import chain
+from itertools import chain, product
 
 import numpy as np
 
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.name_maps import rel_key2abs_key
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):
     """
     Class that creates a reduced order model for outputs from inputs.
 
-    Each output may have it's own surrogate model.
+    Each output may have its own surrogate model.
     Training inputs and outputs are automatically created with 'train:' prepended to the
     corresponding input/output name.
 
-    For a Float variable, the training data is an array of length m.
+    For a Float variable, the training data is an array of length m,
+    where m is the number of training points.
 
     Attributes
     ----------
@@ -224,6 +227,44 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
                                    wrt=[name[0] for name in self._surrogate_input_names])
 
+            # warn the user that if they don't explicitly set options for fd,
+            #   the defaults will be used
+            # get a list of approximated partials
+            declared_partials = set()
+            for of, wrt, method, fd_options in self._approximated_partials:
+                pattern_matches = self._find_partial_matches(of, wrt)
+                for of_bundle, wrt_bundle in product(*pattern_matches):
+                    of_pattern, of_matches = of_bundle
+                    wrt_pattern, wrt_matches = wrt_bundle
+                    for rel_key in product(of_matches, wrt_matches):
+                        abs_key = rel_key2abs_key(self, rel_key)
+                        declared_partials.add(abs_key)
+            non_declared_partials = []
+            for of, n_of in self._surrogate_output_names:
+                for wrt, n_wrt in self._surrogate_input_names:
+                    abs_key = rel_key2abs_key(self, (of, wrt))
+                    if abs_key not in declared_partials:
+                        non_declared_partials.append(abs_key)
+            if non_declared_partials:
+                msg = "Because the MetaModelUnStructuredComp '{}' uses a surrogate " \
+                      "which does not define a linearize method,\nOpenMDAO will use " \
+                      "finite differences to compute derivates. Some of the derivatives " \
+                      "will be computed\nusing default finite difference " \
+                      "options because they were not explicitly declared.\n".format(self.name)
+                msg += "The derivatives computed using the defaults are:\n"
+                for abs_key in non_declared_partials:
+                    msg += "    {}, {}\n".format(*abs_key)
+                simple_warning(msg, RuntimeWarning)
+
+            for out_name, out_shape in self._surrogate_output_names:
+                surrogate = self._metadata(out_name).get('surrogate')
+                if surrogate and not overrides_method('linearize', surrogate, SurrogateModel):
+                    self._approx_partials(of=out_name,
+                                          wrt=[name[0] for name in self._surrogate_input_names],
+                                          method='fd')
+                    if "fd" not in self._approx_schemes:
+                        self._approx_schemes['fd'] = FiniteDifference()
+
     def check_config(self, logger):
         """
         Perform optional error checks.
@@ -371,6 +412,56 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         return arr
 
+    def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
+                         method='exact', step=None, form=None, step_calc=None):
+        """
+        Declare information about this component's subjacobians.
+
+        Parameters
+        ----------
+        of : str or list of str
+            The name of the residual(s) that derivatives are being computed for.
+            May also contain a glob pattern.
+        wrt : str or list of str
+            The name of the variables that derivatives are taken with respect to.
+            This can contain the name of any input or output variable.
+            May also contain a glob pattern.
+        dependent : bool(True)
+            If False, specifies no dependence between the output(s) and the
+            input(s). This is only necessary in the case of a sparse global
+            jacobian, because if 'dependent=False' is not specified and
+            declare_partials is not called for a given pair, then a dense
+            matrix of zeros will be allocated in the sparse global jacobian
+            for that pair.  In the case of a dense global jacobian it doesn't
+            matter because the space for a dense subjac will always be
+            allocated for every pair.
+        rows : ndarray of int or None
+            Row indices for each nonzero entry.  For sparse subjacobians only.
+        cols : ndarray of int or None
+            Column indices for each nonzero entry.  For sparse subjacobians only.
+        val : float or ndarray of float or scipy.sparse
+            Value of subjacobian.  If rows and cols are not None, this will
+            contain the values found at each (row, col) location in the subjac.
+        method : str
+            The type of approximation that should be used. Valid options include:
+            'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+            defined analytic derivatives. Default is 'exact'.
+        step : float
+            Step size for approximation. Defaults to None, in which case the approximation
+            method provides its default value.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
+            to None, in which case the approximation method provides its default value.
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
+            relative. Defaults to None, in which case the approximation method provides
+            its default value.
+        """
+        if method == 'cs':
+            raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
+        super(MetaModelUnStructuredComp, self).declare_partials(of, wrt, dependent, rows, cols,
+                                                                val, method, step, form, step_calc)
+
     def compute_partials(self, inputs, partials):
         """
         Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
@@ -395,21 +486,23 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 out_size = np.prod(out_shape)
                 for j in range(vec_size):
                     flat_input = flat_inputs[j]
-                    derivs = surrogate.linearize(flat_input)
-                    idx = 0
-                    for in_name, sz in self._surrogate_input_names:
-                        j1 = j * out_size * sz
-                        j2 = j1 + out_size * sz
-                        partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
-                        idx += sz
+                    if overrides_method('linearize', surrogate, SurrogateModel):
+                        derivs = surrogate.linearize(flat_input)
+                        idx = 0
+                        for in_name, sz in self._surrogate_input_names:
+                            j1 = j * out_size * sz
+                            j2 = j1 + out_size * sz
+                            partials[out_name, in_name][j1:j2] = derivs[:, idx:idx + sz].flat
+                            idx += sz
 
             else:
-                sjac = surrogate.linearize(flat_inputs)
+                if overrides_method('linearize', surrogate, SurrogateModel):
+                    sjac = surrogate.linearize(flat_inputs)
 
-                idx = 0
-                for in_name, sz in self._surrogate_input_names:
-                    partials[(out_name, in_name)] = sjac[:, idx:idx + sz]
-                    idx += sz
+                    idx = 0
+                    for in_name, sz in self._surrogate_input_names:
+                        partials[(out_name, in_name)] = sjac[:, idx:idx + sz]
+                        idx += sz
 
     def _train(self):
         """
