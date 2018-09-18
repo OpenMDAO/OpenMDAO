@@ -1494,10 +1494,11 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         for i, iter_coord in enumerate(cr._driver_cases.keys):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
 
-        # Test driver metadata
-        self.assertIsNotNone(cr.driver_metadata)
-        self.assertTrue('tree' in cr.driver_metadata)
-        self.assertTrue('connections_list' in cr.driver_metadata)
+        # Test problem metadata
+        self.assertIsNotNone(cr.problem_metadata)
+        self.assertTrue('connections_list' in cr.problem_metadata)
+        self.assertTrue('tree' in cr.problem_metadata)
+        self.assertTrue('variables' in cr.problem_metadata)
 
         # While we are here, make sure we can load this case.
 
@@ -1560,9 +1561,10 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
 
         # Test driver metadata
-        self.assertIsNotNone(cr.driver_metadata)
-        self.assertTrue('tree' in cr.driver_metadata)
-        self.assertTrue('connections_list' in cr.driver_metadata)
+        self.assertIsNotNone(cr.problem_metadata)
+        self.assertTrue('connections_list' in cr.problem_metadata)
+        self.assertTrue('tree' in cr.problem_metadata)
+        self.assertTrue('variables' in cr.problem_metadata)
 
         # While we are here, make sure we can load this case.
 
@@ -1595,7 +1597,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
         filename = os.path.join(filename, 'case_driver_solver_system_02.sql')
 
-        cases = CaseReader(filename).solver_cases
+        cases = CaseReader(filename)._solver_cases
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cases.num_cases, 7)
