@@ -374,16 +374,10 @@ class AssembledJacobian(Jacobian):
         """
         system = self._system
         int_mtx = self._int_mtx
-        if system.pathname in self._ext_mtx:
-            ext_mtx = self._ext_mtx[system.pathname]
-        else:
-            ext_mtx = None
+        ext_mtx = self._ext_mtx[system.pathname]
 
-        if system.pathname in self._view_ranges:
-            ranges = self._view_ranges[system.pathname]
-            int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
-        else:
-            int_ranges = None
+        ranges = self._view_ranges[system.pathname]
+        int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
 
         # TODO: remove the _unscaled_context call here (and in DictionaryJacobian)
         # and do it outside so that we can avoid an unnecessary extra unscaling/rescaling
