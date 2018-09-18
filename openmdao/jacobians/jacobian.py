@@ -238,3 +238,9 @@ class Jacobian(object):
             return sparse
 
         return rand(*subjac.shape) + 1.0
+
+    def _reset_mats(self):
+        """
+        Zero out internal matrices.
+        """
+        pass

@@ -52,6 +52,9 @@ class AssembledJacobian(Jacobian):
         Column ranges for inputs.
     _out_ranges : dict
         Row ranges for outputs.
+    _has_overlapping_partials : bool
+        If True, this jacobian contains subjacobians that overlap, which happens when a single
+        source connects to multiple inputs on the same component.
     """
 
     def __init__(self, matrix_class, system):
@@ -78,6 +81,7 @@ class AssembledJacobian(Jacobian):
         self._matrix_class = matrix_class
         self._in_ranges = None
         self._out_ranges = None
+        self._has_overlapping_partials = False
 
         self._subjac_iters = defaultdict(lambda: None)
         self._init_ranges()
@@ -308,6 +312,7 @@ class AssembledJacobian(Jacobian):
                         mapped = keymap[abs_key]
                         if mapped in seen:
                             iters.append((abs_key, True))
+                            self._has_overlapping_partials = True
                         else:
                             iters.append((abs_key, False))
                             seen.add(mapped)
@@ -432,6 +437,15 @@ class DenseJacobian(AssembledJacobian):
             Parent system to this jacobian.
         """
         super(DenseJacobian, self).__init__(DenseMatrix, system=system)
+
+    def _reset_mats(self):
+        """
+        Zero out internal matrices if needed.
+        """
+        if self._has_overlapping_partials:
+            self._int_mtx._matrix[:] = 0.0
+            for key in self._ext_mtx:
+                self._ext_mtx[key]._matrix[:] = 0.0
 
 
 class COOJacobian(AssembledJacobian):

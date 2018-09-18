@@ -52,9 +52,13 @@ class CounterGroup(Group):
 # note: size must be an even number
 SIZE = 10
 
-def run_opt(driver_class, mode, color_info=None, sparsity=None, **options):
+def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, **options):
 
     p = Problem(model=CounterGroup())
+
+    if assemble_type is not None:
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+        p.model.options['assembled_jac_type'] = assemble_type
 
     indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
 
@@ -192,7 +196,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
                "indeps.r": [[], [], [5, 1]]
             }
         }}
-        p_color = run_opt(pyOptSparseDriver, 'fwd', color_info, optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'fwd', color_info=color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -221,6 +225,23 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
 
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_simul_coloring_snopt_auto_assembled(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False,
+                          dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 21) / 21,
+                         (p_color.model._solve_count - 21 * 4) / 5)
 
     def test_simul_coloring_pyoptsparse_slsqp_fwd(self):
         try:
@@ -291,7 +312,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
             }
         }}
 
-        p_color = run_opt(pyOptSparseDriver, 'fwd', color_info, optimizer='SLSQP', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'fwd', color_info=color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # run w/o coloring
@@ -398,7 +419,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                "indeps.r": [[], [], [1, 1]]
             }
         }}
-        p_color = run_opt(pyOptSparseDriver, 'rev', color_info, optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'rev', color_info=color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -496,7 +517,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
             }
         }}
 
-        p_color = run_opt(pyOptSparseDriver, 'rev', color_info, optimizer='SLSQP', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'rev', color_info=color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # run w/o coloring
@@ -577,7 +598,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False)
-        p_color = run_opt(ScipyOptimizeDriver, 'fwd', self.color_info, optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info=self.color_info, optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -599,7 +620,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_bad_mode(self):
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(ScipyOptimizeDriver, 'rev', self.color_info, optimizer='SLSQP', disp=False)
+            p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info=self.color_info, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does forward solves but mode has been set to 'rev'")
 
@@ -772,7 +793,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         color_info = self.color_info
 
         p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
-        p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info, optimizer='SLSQP', disp=False)
+        p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info=color_info, optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -785,7 +806,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_bad_mode(self):
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(ScipyOptimizeDriver, 'fwd', self.color_info, optimizer='SLSQP', disp=False)
+            p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info=self.color_info, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 

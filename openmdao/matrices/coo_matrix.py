@@ -83,8 +83,8 @@ class COOMatrix(Matrix):
                                        "CSR partial jacobian and at least one of them is either "
                                        "not dense or uses src_indices.  This can occur when "
                                        "multiple inputs on the same "
-                                       "component are connected to the same output." %
-                                       sorted((key, otherkey)))
+                                       "component are connected to the same output. Try using"
+                                       "a dense jacobian instead." % sorted((key, otherkey)))
             else:
                 ind1 = counter
                 counter += delta
