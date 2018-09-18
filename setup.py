@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 # exec this file to set __version__
 exec(open('openmdao/__init__.py').read())
