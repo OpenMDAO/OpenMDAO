@@ -1169,7 +1169,7 @@ class Problem(object):
                     if local_method:
                         method = local_method
 
-                # We can't use CS if we havent' allocated a complex vector, so we fall back on fd.
+                # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
                 if method == 'cs' and not alloc_complex:
                     comps_could_not_cs.add(c_name)
                     method = 'fd'

@@ -44,11 +44,15 @@ class ExecComp(ExplicitComponent):
         List of expressions.
     _codes : list
         List of code objects.
+    _vectorize : bool
+        If True, treat all array/array partials as diagonal if both arrays have size > 1.
+        All arrays with size > 1 must have the same flattened size or an exception will be raised.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
+
     """
 
-    def __init__(self, exprs, **kwargs):
+    def __init__(self, exprs, vectorize=False, **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -120,6 +124,11 @@ class ExecComp(ExplicitComponent):
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
+        vectorize : bool
+            If True, treat all array/array partials as diagonal if both arrays have size > 1.
+            All arrays with size > 1 must have the same flattened size or an exception will be
+            raised.
+
         **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
@@ -129,9 +138,9 @@ class ExecComp(ExplicitComponent):
 
         Notes
         -----
-        If a variable has an initial value that is anything other than 0.0,
+        If a variable has an initial value that is anything other than 1.0,
         either because it has a different type than float or just because its
-        initial value is nonzero, you must use a keyword arg
+        initial value is != 1.0, you must use a keyword arg
         to set the initial value.  For example, let's say we have an
         ExecComp that takes an array 'x' as input and outputs a float variable
         'y' which is the sum of the entries in 'x'.
@@ -143,7 +152,7 @@ class ExecComp(ExplicitComponent):
             excomp = ExecComp('y=sum(x)', x=numpy.ones(10,dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
-        and would be given the default initial value of 0.0, while 'x' would be
+        and would be given the default initial value of 1.0, while 'x' would be
         initialized with a size 10 float array of ones.
 
         If you want to assign certain metadata for 'x' in addition to its
@@ -166,6 +175,7 @@ class ExecComp(ExplicitComponent):
         self._exprs = exprs[:]
         self._codes = None
         self._kwargs = kwargs
+        self._vectorize = vectorize
 
     def setup(self):
         """
@@ -207,8 +217,11 @@ class ExecComp(ExplicitComponent):
                 init_vals[arg] = val
 
         for var in sorted(allvars):
-            # if user supplied an initial value, use it, otherwise set to 0.0
-            val = init_vals.get(var, 1.0)
+            # if user supplied an initial value, use it, otherwise set to 1.0
+            if var in init_vals:
+                val = init_vals[var]
+            else:
+                init_vals[var] = val = 1.0
             meta = kwargs2.get(var, {})
 
             if var in outs:
@@ -216,10 +229,29 @@ class ExecComp(ExplicitComponent):
             else:
                 self.add_input(var, val, **meta)
 
-        self._codes = self._compile_exprs(self._exprs)
+        if self._vectorize:
+            # check that sizes of any input/output vars match or one of them is size 1
+            osorted = sorted(self._var_rel_names['output'])
+            for inp in sorted(self._var_rel_names['input']):
+                ival = init_vals[inp]
+                iarray = isinstance(ival, ndarray) and ival.size > 1
+                for out in osorted:
+                    oval = init_vals[out]
+                    if (iarray and isinstance(oval, ndarray) and oval.size > 1):
+                        if oval.size != ival.size:
+                            raise RuntimeError("%s: vectorize is True but partial(%s, %s) is not "
+                                               "square (shape=(%d, %d))." %
+                                               (self.pathname, out, inp, oval.size, ival.size))
+                        # partial will be declared as diagonal
+                        inds = np.arange(oval.size, dtype=int)
+                    else:
+                        inds = None
+                    self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
+        else:
+            # All derivatives are defined as dense
+            self.declare_partials(of='*', wrt='*')
 
-        # All derivatives are defined.
-        self.declare_partials(of='*', wrt='*')
+        self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
         compiled = []
@@ -311,28 +343,18 @@ class ExecComp(ExplicitComponent):
         # our complex step
         step = self.complex_stepsize * 1j
         out_names = self._var_allprocs_prom2abs_list['output']
+        inv_stepsize = 1.0 / self.complex_stepsize
 
         for param in inputs:
 
             pwrap = _TmpDict(inputs)
-
             pval = inputs[param]
-            if isinstance(pval, ndarray):
-                # replace the param array with a complex copy
-                pwrap[param] = np.asarray(pval, npcomplex)
-                idx_iter = array_idx_iter(pwrap[param].shape)
-                psize = pval.size
-            else:
-                pwrap[param] = npcomplex(pval)
-                idx_iter = (None,)
-                psize = 1
+            psize = pval.size
+            pwrap[param] = np.asarray(pval, npcomplex)
 
-            for i, idx in enumerate(idx_iter):
+            if self._vectorize or psize == 1:
                 # set a complex param value
-                if idx is None:
-                    pwrap[param] += step
-                else:
-                    pwrap[param][idx] += step
+                pwrap[param] += step
 
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
@@ -341,17 +363,26 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    jval = imag(uwrap[u] / self.complex_stepsize)
-                    if (u, param) not in partials:  # create the dict entry
-                        partials[(u, param)] = np.zeros((jval.size, psize))
-
-                    # set the column in the Jacobian entry
-                    partials[(u, param)][:, i] = jval.flat
+                    partials[(u, param)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old param value
-                if idx is None:
-                    pwrap[param] -= step
-                else:
+                pwrap[param] -= step
+            else:
+                for i, idx in enumerate(array_idx_iter(pwrap[param].shape)):
+                    # set a complex param value
+                    pwrap[param][idx] += step
+
+                    uwrap = _TmpDict(self._outputs, return_complex=True)
+
+                    # solve with complex param value
+                    self._residuals.set_const(0.0)
+                    self.compute(pwrap, uwrap)
+
+                    for u in out_names:
+                        # set the column in the Jacobian entry
+                        partials[(u, param)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+
+                    # restore old param value
                     pwrap[param][idx] -= step
 
 
