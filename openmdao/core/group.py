@@ -469,10 +469,7 @@ class Group(System):
 
         subsystems_var_range = self._subsystems_var_range = {}
 
-        if self._use_derivatives:
-            vec_names = self._lin_rel_vec_name_list
-        else:
-            vec_names = self._vec_names
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         # First compute these on one processor for each subsystem
         for vec_name in vec_names:
@@ -641,10 +638,7 @@ class Group(System):
         sizes = self._var_sizes
         relnames = self._var_allprocs_relevant_names
 
-        if self._use_derivatives:
-            vec_names = self._lin_rel_vec_name_list
-        else:
-            vec_names = self._vec_names
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         # Compute _var_sizes
         for vec_name in vec_names:

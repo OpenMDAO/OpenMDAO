@@ -465,10 +465,7 @@ class System(object):
             ext_num_vars = {}
             ext_sizes = {}
 
-            if self._use_derivatives:
-                vec_names = self._lin_rel_vec_name_list
-            else:
-                vec_names = self._vec_names
+            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
             for vec_name in vec_names:
                 ext_num_vars[vec_name] = {}
@@ -509,7 +506,7 @@ class System(object):
 
         if initial:
             relevant = self._relevant
-            vec_names = self._rel_vec_name_list
+            vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
             vois = self._vois
             abs2idx = self._var_allprocs_abs2idx
 
@@ -850,13 +847,16 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
-        for vec_name in self._lin_rel_vec_name_list:
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
+        for vec_name in vec_names:
             abs2idx[vec_name] = abs2idx_t = {}
             for type_ in ['input', 'output']:
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
 
-        abs2idx['nonlinear'] = abs2idx['linear']
+        if self._use_derivatives:
+            abs2idx['nonlinear'] = abs2idx['linear']
 
         # Recursion
         if recurse:
@@ -1580,7 +1580,9 @@ class System(object):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            for vec_name in self._lin_rel_vec_name_list:
+            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
+            for vec_name in vec_names:
                 offsets[vec_name] = off_vn = {}
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]
@@ -1591,7 +1593,9 @@ class System(object):
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
                         off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
-            offsets['nonlinear'] = offsets['linear']
+
+            if self._use_derivatives:
+                offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
 

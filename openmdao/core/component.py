@@ -294,7 +294,7 @@ class Component(System):
         # for a given component, so we don't have to mess with figuring out what vars are local.
         if self._use_derivatives:
             relnames = self._var_allprocs_relevant_names
-            vec_names = vec_names = self._lin_rel_vec_name_list
+            vec_names = self._lin_rel_vec_name_list
         else:
             relnames = self._var_allprocs_abs_names
             vec_names = self._vec_names
