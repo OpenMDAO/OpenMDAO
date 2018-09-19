@@ -71,7 +71,7 @@ def format_iteration_coordinate(coord, prefix=None):
 
 def check_valid_sqlite3_db(filename):
     """
-    Raises an IOError if the given filename does not reference a valid SQLite3 database file.
+    Raise an IOError if the given filename does not reference a valid SQLite3 database file.
 
     Parameters
     ----------

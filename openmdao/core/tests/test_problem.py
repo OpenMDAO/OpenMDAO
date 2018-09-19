@@ -157,8 +157,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
         # before the bug fix, the following two derivs contained nonzero values even
         # though the variables involved were not dependent on each other.
-        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3,5)), 1e-10)
-        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5,3)), 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3, 5)), 1e-10)
+        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5, 3)), 1e-10)
 
     def test_set_2d_array(self):
         import numpy as np
@@ -551,7 +551,6 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
 
-
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
@@ -589,7 +588,6 @@ class TestProblem(unittest.TestCase):
 
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
-
 
         prob = Problem()
         prob.model = Group()
@@ -1426,12 +1424,12 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEquals(output[1], 'Design Variables')
-        assertRegex(self, output[5], '^pz.z +\|[0-9. e+-]+\| +2')
-        self.assertEquals(output[9], 'Constraints')
-        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
-        self.assertEquals(output[17], 'Objectives')
-        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[1], r'Design Variables')
+        assertRegex(self, output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertEquals(output[9], r'Constraints')
+        assertRegex(self, output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[17], r'Objectives')
+        assertRegex(self, output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
         stdout = sys.stdout
@@ -1442,9 +1440,9 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[5], '^z +\|[0-9. e+-]+\| +2')
-        assertRegex(self, output[14], '^con2 +\[[0-9. e+-]+\] +1')
-        assertRegex(self, output[21], '^obj +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[5], r'^z +\|[0-9. e+-]+\| +2')
+        assertRegex(self, output[14], r'^con2 +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout

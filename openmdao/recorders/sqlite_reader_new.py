@@ -13,6 +13,7 @@ from six import PY2, PY3, reraise, iteritems
 from six.moves import range
 
 import numpy as np
+
 from abc import ABCMeta, abstractmethod
 
 # from openmdao.recorders.base_case_reader import BaseCaseReader
@@ -42,39 +43,43 @@ _coord_split_re = re.compile('\|\\d+\|*')
 class Case(object):
     """
     Case wraps the data from a single iteration of a recording to make it more easily accessible.
-
-    Attributes
-    ----------
-    source : str
-        The unique id of the system/solver/driver/problem that did the recording.
-    iteration_coordinate : str
-        The full unique identifier for this iteration.
-    timestamp : float
-        Time of execution of the case.
-    parent_iteration : str
-        The full unique identifier for the parent this iteration.
-    parent_iteration : list
-        The full unique identifiers for children of this iteration.
-    outputs : PromotedToAbsoluteMap
-        Map of outputs to values recorded.
-    inputs : PromotedToAbsoluteMap or None
-        Map of inputs to values recorded (None if not recorded).
-    residuals : PromotedToAbsoluteMap or None
-        Map of outputs to residuals recorded (None if not recorded).
-    jacobian : PromotedToAbsoluteMap or None
-        Map of (output, input) to derivatives recorded (None if not recorded).
-    abs_tol : float or None
-        Absolute tolerance (None if not recorded).
-    rel_tol : float or None
-        Relative tolerance (None if not recorded).
-    success : str
-        Success flag for the case.
-    msg : str
-        Message associated with the case.
     """
 
     def __init__(self, source, iteration_coordinate, timestamp, success, msg,
-                 outputs, inputs=None, residuals=None, jacobian=None):
+                 outputs, inputs=None, residuals=None, jacobian=None,
+                 parent=None, children=None, abs_tol=None, rel_tol=None):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        source : str
+            The unique id of the system/solver/driver/problem that did the recording.
+        iteration_coordinate : str
+            The full unique identifier for this iteration.
+        timestamp : float
+            Time of execution of the case.
+        success : str
+            Success flag for the case.
+        msg : str
+            Message associated with the case.
+        outputs : PromotedToAbsoluteMap
+            Map of outputs to values recorded.
+        inputs : PromotedToAbsoluteMap or None
+            Map of inputs to values recorded (None if not recorded).
+        residuals : PromotedToAbsoluteMap or None
+            Map of outputs to residuals recorded (None if not recorded).
+        jacobian : PromotedToAbsoluteMap or None
+            Map of (output, input) to derivatives recorded (None if not recorded).
+        parent : str
+            The full unique identifier for the parent this iteration.
+        children : list
+            The full unique identifiers for children of this iteration.
+        abs_tol : float or None
+            Absolute tolerance (None if not recorded).
+        rel_tol : float or None
+            Relative tolerance (None if not recorded).
+        """
         pass
 
     def get_design_variables(self, scaled=True, use_indices=True):
@@ -261,6 +266,8 @@ def CaseReader(filename, pre_load=True):
     filename : str
         A path to the recorded file.  The file should have been recorded using
         either the SqliteRecorder or the HDF5Recorder.
+    pre_load : bool
+        If True, load all the data into memory during initialization.
 
     Returns
     -------
@@ -273,12 +280,7 @@ def CaseReader(filename, pre_load=True):
 
 class BaseCaseReader():
     """
-    A CaseReader specific to files created with SqliteRecorder.
-
-    Parameters
-    ----------
-    filename : str
-        The path to the filename containing the recorded data.
+    Base class of all CaseReader implementations.
 
     Attributes
     ----------
@@ -297,11 +299,13 @@ class BaseCaseReader():
         Parameters
         ----------
         filename : str
-            The path to the filename containing the recorded data.
+            The path to the file containing the recorded data.
         pre_load : bool
             If True, load all the data into memory during initialization.
         """
-        pass
+        self.format_version = None
+        self.problem_metadata = {}
+        self.system_metadata = {}
 
     def get_cases(self, source, recurse=True, flat=False):
         """
@@ -378,25 +382,39 @@ class SqliteCaseReader(BaseCaseReader):
     """
     A CaseReader specific to files created with SqliteRecorder.
 
-    Parameters
-    ----------
-    filename : str
-        The path to the filename containing the recorded data.
-
     Attributes
     ----------
     format_version : int
         The version of the format assumed when loading the file.
-    output2meta : dict
-        Dictionary mapping output variables to their metadata
-    input2meta : dict
-        Dictionary mapping input variables to their metadata
+    problem_metadata : dict
+        Metadata about the problem, including the system hierachy and connections.
+    system_metadata : dict
+        Metadata about each system in the recorded model, including options and scaling factors.
+    _solver_metadata : dict
+        Metadata for all the solvers in the model, including their type and options
+    _filename : str
+        The path to the filename containing the recorded data.
+    _solver_metadata :
     _abs2meta : dict
         Dictionary mapping variables to their metadata
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _output2meta : dict
+        Dictionary mapping output variables to their metadata
+    _input2meta : dict
+        Dictionary mapping input variables to their metadata
+    _driver_cases : DriverCases
+        Helper object for accessing cases from the driver_iterations table.
+    _deriv_cases : DerivCases
+        Helper object for accessing cases from the driver_derivatives table.
+    _system_cases : SystemCases
+        Helper object for accessing cases from the system_iterations table.
+    _solver_cases : SolverCases
+        Helper object for accessing cases from the solver_iterations table.
+    _problem_cases : ProblemCases
+        Helper object for accessing cases from the problem_cases table.
     """
 
     def __init__(self, filename, pre_load=False):
@@ -410,14 +428,9 @@ class SqliteCaseReader(BaseCaseReader):
         pre_load : bool
             If True, load all the data into memory during initialization.
         """
-        super(SqliteCaseReader, self).__init__(filename)
+        super(SqliteCaseReader, self).__init__(filename, pre_load)
 
         check_valid_sqlite3_db(filename)
-
-        # initialize public attributes
-        self.format_version = None
-        self.problem_metadata = {}
-        self.system_metadata = {}
 
         # initialize private attributes
         self._filename = filename
@@ -428,7 +441,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._output2meta = None
         self._input2meta = None
 
-        # collect metadata from database to populate attributes
+        # collect metadata from database
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
@@ -478,10 +491,16 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _collect_metadata(self, cur):
         """
-        Load data from the metadata table, populating the `format_version` attribute
-        and the `variables` data in the `problem_metadata` attribute of this CaseReader.
+        Load data from the metadata table.
 
-        Also save the variable name maps and variable metadata to private attributes.
+        Populates the `format_version` attribute and the `variables` data in
+        the `problem_metadata` attribute of this CaseReader. Also saves the
+        variable name maps and variable metadata to private attributes.
+
+        Parameters
+        ----------
+        cur : sqlite3.Cursor
+            Database cursor to use for reading the data.
         """
         cur.execute('select * from metadata')
 
@@ -536,8 +555,16 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _collect_driver_metadata(self, cur):
         """
-        Load data from the driver_metadata table, populating the `problem_metadata` attribute.
+        Load data from the driver_metadata table.
+
+        Populates the `problem_metadata` attribute of this CaseReader.
+
+        Parameters
+        ----------
+        cur : sqlite3.Cursor
+            Database cursor to use for reading the data.
         """
+        print(type(cur))
         cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = cur.fetchone()
 
@@ -554,7 +581,14 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _collect_system_metadata(self, cur):
         """
-        Load data from the system table, populating the `system_metadata` attribute.
+        Load data from the system table.
+
+        Populates the `system_metadata` attribute of this CaseReader.
+
+        Parameters
+        ----------
+        cur : sqlite3.Cursor
+            Database cursor to use for reading the data.
         """
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
@@ -570,7 +604,14 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _collect_solver_metadata(self, cur):
         """
-        Load data from the solver_metadata table, populating the `solver_metadata` attribute.
+        Load data from the solver_metadata table.
+
+        Populates the `solver_metadata` attribute of this CaseReader.
+
+        Parameters
+        ----------
+        cur : sqlite3.Cursor
+            Database cursor to use for reading the data.
         """
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
         for row in cur:
@@ -609,17 +650,20 @@ class SqliteCaseReader(BaseCaseReader):
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
+        flat : bool, optional
+            If True, will enable iterating over all successors in case hierarchy
+            rather than just the direct children. Defaults to False.
         """
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
-        elif source == 'problem':
-            for case in self._problem_cases.cases():
-                yield case
-
         elif source == 'driver' and not recurse:
             # return driver cases only
             for case in self._driver_cases.cases():
+                yield case
+
+        elif source == 'problem':
+            for case in self._problem_cases.cases():
                 yield case
 
         else:
@@ -1122,14 +1166,14 @@ class BaseCases(object):
 
     Attributes
     ----------
-    filename : str
-        The name of the file from which the recorded cases are to be loaded.
     format_version : int
         The version of the format assumed when loading the file.
     num_cases : int
         The number of cases contained in the recorded file.
     keys : tuple
         Case string identifiers available in this CaseReader.
+    _filename : str
+        The name of the file from which the recorded cases are to be loaded.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _abs2meta : dict
@@ -1159,14 +1203,14 @@ class BaseCases(object):
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
         """
-        self.keys = ()
-        self.num_cases = 0
         self._filename = filename
         self.format_version = format_version
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._prom2abs = prom2abs
         self._cases = {}
+        self.keys = ()
+        self.num_cases = 0
 
     @abstractmethod
     def get_case(self, case_id, scaled=False):
@@ -1380,8 +1424,6 @@ class DerivCases(BaseCases):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        var_settings : dict
-            Dictionary mapping absolute variable names to variable settings.
         """
         super(DerivCases, self).__init__(filename, format_version, abs2prom, abs2meta, prom2abs)
 
@@ -1493,10 +1535,7 @@ class ProblemCases(BaseCases):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        var_settings : dict
-            Dictionary mapping absolute variable names to variable settings.
         """
-
         super(ProblemCases, self).__init__(filename, format_version, abs2prom, abs2meta, prom2abs)
 
         with sqlite3.connect(filename) as con:
