@@ -583,7 +583,8 @@ class SqliteCaseReader(BaseCaseReader):
         self._driver_cases.load_cases()
         self._solver_cases.load_cases()
         self._system_cases.load_cases()
-        self._problem_cases.load_cases()
+        if self.format_version >= 2:
+            self._problem_cases.load_cases()
 
     def get_cases(self, source='problem', recurse=True, flat=False):
         """
