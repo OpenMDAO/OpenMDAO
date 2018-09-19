@@ -241,6 +241,6 @@ class Jacobian(object):
 
     def _reset_mats(self):
         """
-        Zero out internal matrices.
+        Zero out internal matrices if needed.
         """
         pass
