@@ -428,7 +428,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._output2meta = None
         self._input2meta = None
 
-        # populate attributes from database
+        # collect metadata from database to populate attributes
         with sqlite3.connect(filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
@@ -468,6 +468,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._problem_cases = ProblemCases(filename, self.format_version,
                                            self._abs2prom, self._abs2meta, self._prom2abs)
 
+        # if requested, load all the iteration data into memory
         if pre_load:
             self.load_cases()
 
