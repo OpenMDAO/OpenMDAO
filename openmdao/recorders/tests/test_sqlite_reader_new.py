@@ -425,6 +425,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
+        # check driver cases
         expected_coords = [
             'rank0:SLSQP|0',
             'rank0:SLSQP|1',
@@ -434,13 +435,12 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|5',
             'rank0:SLSQP|6'
         ]
-        ind = 0
-        for c in cr.get_cases('driver', recurse=True):
-            self.assertEqual(c.iteration_coordinate, expected_coords[ind])
-            ind += 1
-        self.assertEqual(ind, len(expected_coords))
+        for i, c in enumerate(cr.get_cases()):
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+        self.assertEqual(i+1, len(expected_coords))
 
-        coords_2 = [
+        # check driver cases with recursion
+        expected_coords = [
             'rank0:SLSQP|0',
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
             'rank0:SLSQP|1',
@@ -456,18 +456,16 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|6',
             'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
         ]
-        ind = 0
-        for c in cr.get_cases('driver', recurse=True):
-            print(ind, c.iteration_coordinate, coords_2[ind])
-            # self.assertEqual(c.iteration_coordinate, coords_2[ind])
-            ind += 1
-        self.assertEqual(ind, len(coords_2))
+        for i, c in enumerate(cr.get_cases(recurse=True)):
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+        self.assertEqual(i+1, len(expected_coords))
 
-        coord_children = [
+        expected_coords = [
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0'
         ]
-        for c in cr.get_cases('rank0:SLSQP|0', True):
-            self.assertEqual(c.iteration_coordinate, coord_children[0])
+        for i, c in enumerate(cr.get_cases('rank0:SLSQP|0', recurse=True)):
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+        self.assertEqual(i+1, len(expected_coords))
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")

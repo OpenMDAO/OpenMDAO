@@ -436,7 +436,7 @@ class SqliteCaseReader(BaseCaseReader):
             # collect data from the metadata table. this includes:
             #   format_version
             #   VOI metadata, which is added to problem_metadata
-            #   var name maps and metadata for all vars, which are saved as private atrributes
+            #   var name maps and metadata for all vars, which are saved as private attributes
             self._collect_metadata(cur)
 
             # collect data from the driver_metadata table. this includes:
@@ -453,6 +453,10 @@ class SqliteCaseReader(BaseCaseReader):
             self._collect_solver_metadata(cur)
 
         con.close()
+
+        # create maps to facilitate accessing variable metadata using absolute or promoted name
+        self._output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 1)
+        self._input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 0)
 
         # create helper objects for accessing cases from the four iteration tables and
         # the problem cases table
@@ -474,27 +478,29 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _collect_metadata(self, cur):
         """
-        Load the metadata from the sqlite file, populating the `format_version` attribute
+        Load data from the metadata table, populating the `format_version` attribute
         and the `variables` data in the `problem_metadata` attribute of this CaseReader.
 
-        Also save the variable name maps and variable metadata to provate attributes.
+        Also save the variable name maps and variable metadata to private attributes.
         """
         cur.execute('select * from metadata')
 
         row = cur.fetchone()
 
+        # get format_version
         self.format_version = version = row['format_version']
 
         if version not in range(1, format_version + 1):
             raise ValueError('SQliteCaseReader encountered an unhandled '
                              'format version: {0}'.format(self.format_version))
+
         # add metadata for VOIs (des vars, objective, constraints) to problem metadata
         if version >= 4:
             self.problem_metadata['variables'] = json_loads(row['var_settings'])
         else:
             self.problem_metadata['variables'] = None
 
-        #
+        # get variable name maps and metadata for all variables
         if version >= 3:
             self._abs2prom = json_loads(row['abs2prom'])
             self._prom2abs = json_loads(row['prom2abs'])
@@ -528,12 +534,10 @@ class SqliteCaseReader(BaseCaseReader):
                     self._prom2abs = pickle.loads(prom2abs.encode())
                     self._abs2meta = pickle.loads(abs2meta.encode())
 
-        self._output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 1)
-        self._input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 0)
-
     def _collect_driver_metadata(self, cur):
-        driver_metadata = None
-
+        """
+        Load data from the driver_metadata table, populating the `problem_metadata` attribute.
+        """
         cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = cur.fetchone()
 
@@ -546,10 +550,12 @@ class SqliteCaseReader(BaseCaseReader):
                 if PY3:
                     driver_metadata = pickle.loads(row[0])
 
-            if driver_metadata is not None:
-                self.problem_metadata.update(driver_metadata)
+            self.problem_metadata.update(driver_metadata)
 
     def _collect_system_metadata(self, cur):
+        """
+        Load data from the system table, populating the `system_metadata` attribute.
+        """
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
@@ -563,6 +569,9 @@ class SqliteCaseReader(BaseCaseReader):
                 self.system_metadata[id]['component_options'] = pickle.loads(row[2])
 
     def _collect_solver_metadata(self, cur):
+        """
+        Load data from the solver_metadata table, populating the `solver_metadata` attribute.
+        """
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
         for row in cur:
             id = row[0]
@@ -586,7 +595,7 @@ class SqliteCaseReader(BaseCaseReader):
         if self.format_version >= 2:
             self._problem_cases.load_cases()
 
-    def get_cases(self, source='problem', recurse=True, flat=False):
+    def get_cases(self, source='driver', recurse=False, flat=False):
         """
         Allow one to iterate over the driver and solver cases.
 
@@ -596,7 +605,7 @@ class SqliteCaseReader(BaseCaseReader):
         ----------
         source : {'problem', 'driver', iteration_coordinate}
             Identifies which cases to return. 'iteration_coordinate' can refer to
-            a system or a solver hierarchy location. Defaults to 'problem'.
+            a system or a solver hierarchy location. Defaults to 'driver'.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
@@ -608,12 +617,17 @@ class SqliteCaseReader(BaseCaseReader):
             for case in self._problem_cases.cases():
                 yield case
 
-        elif source == 'driver':
+        elif source == 'driver' and not recurse:
+            # return driver cases only
             for case in self._driver_cases.cases():
                 yield case
 
         else:
-            iter_coord = source
+            if source == 'driver':
+                # return all driver cases and recurse to solver cases
+                iter_coord = ''
+            else:
+                iter_coord = source
 
             driver_iter = []
             solver_iter = []
