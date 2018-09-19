@@ -651,8 +651,8 @@ class SqliteCaseReader(BaseCaseReader):
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
         flat : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children. Defaults to False.
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
         """
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
