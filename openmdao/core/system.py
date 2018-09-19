@@ -234,6 +234,8 @@ class System(object):
         concurrent FD solves.
     _par_fd_id : int
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
+    _use_derivatives : bool
+        If True, perform any memory allocations necessary for derivative computation.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -368,6 +370,7 @@ class System(object):
         self._vector_class = None
         self._local_vector_class = None
         self._distributed_vector_class = None
+        self._use_derivatives = True
 
         self._assembled_jac = None
 
@@ -462,15 +465,21 @@ class System(object):
             ext_num_vars = {}
             ext_sizes = {}
 
-            for vec_name in self._lin_rel_vec_name_list:
+            if self._use_derivatives:
+                vec_names = self._lin_rel_vec_name_list
+            else:
+                vec_names = self._vec_names
+
+            for vec_name in vec_names:
                 ext_num_vars[vec_name] = {}
                 ext_sizes[vec_name] = {}
                 for type_ in ['input', 'output']:
                     ext_num_vars[vec_name][type_] = (0, 0)
                     ext_sizes[vec_name][type_] = (0, 0)
 
-            ext_num_vars['nonlinear'] = ext_num_vars['linear']
-            ext_sizes['nonlinear'] = ext_sizes['linear']
+            if self._use_derivatives:
+                ext_num_vars['nonlinear'] = ext_num_vars['linear']
+                ext_sizes['nonlinear'] = ext_sizes['linear']
 
             return ext_num_vars, ext_sizes
 
@@ -589,11 +598,13 @@ class System(object):
         """
         self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
                     distributed_vector_class=self._distributed_vector_class,
-                    local_vector_class=self._local_vector_class)
+                    local_vector_class=self._local_vector_class,
+                    use_derivatives=self._use_derivatives)
         self._final_setup(self.comm, setup_mode=setup_mode,
                           force_alloc_complex=self._outputs._alloc_complex)
 
-    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class):
+    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
+               use_derivatives):
         """
         Perform setup for this system and its descendant systems.
 
@@ -616,6 +627,8 @@ class System(object):
         local_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in intraprocess communication.
+        use_derivatives : bool
+            If True, perform any memory allocations necessary for derivative computation.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -626,6 +639,7 @@ class System(object):
             self._relevant = None
             self._distributed_vector_class = distributed_vector_class
             self._local_vector_class = local_vector_class
+            self._use_derivatives = use_derivatives
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             recurse = True
@@ -938,15 +952,19 @@ class System(object):
 
         self._vois = vois
         if vec_names is None:  # should only occur at top level on full setup
-            vec_names = ['nonlinear', 'linear']
-            if mode == 'fwd':
-                desvars = self.get_design_vars(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(_filter_names(desvars)))
-                self._vois = vois = desvars
-            else:  # rev
-                responses = self.get_responses(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(_filter_names(responses)))
-                self._vois = vois = responses
+            if self._use_derivatives:
+                vec_names = ['nonlinear', 'linear']
+                if mode == 'fwd':
+                    desvars = self.get_design_vars(recurse=True, get_sizes=False)
+                    vec_names.extend(sorted(_filter_names(desvars)))
+                    self._vois = vois = desvars
+                else:  # rev
+                    responses = self.get_responses(recurse=True, get_sizes=False)
+                    vec_names.extend(sorted(_filter_names(responses)))
+                    self._vois = vois = responses
+            else:
+                vec_names = ['nonlinear']
+                self._vois = {}
 
         self._vec_names = vec_names
         self._lin_vec_names = vec_names[1:]  # only linear vec names
@@ -973,7 +991,8 @@ class System(object):
         relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
                                            'output': ContainsAll()},
                                           ContainsAll())}
-        relevant['linear'] = relevant['nonlinear']
+        if self._use_derivatives:
+            relevant['linear'] = relevant['nonlinear']
         return relevant
 
     def _setup_relevance(self, mode, relevant=None):
@@ -996,6 +1015,8 @@ class System(object):
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+
+        use_derivs = self._use_derivatives
 
         self._rel_vec_name_list = []
         for vec_name in self._vec_names:
@@ -1199,6 +1220,9 @@ class System(object):
         recurse : bool
             If True, setup jacobians in all descendants.
         """
+        if not self._use_derivatives:
+            return
+
         asm_jac_solvers = set()
         if self._linear_solver is not None:
             asm_jac_solvers.update(self._linear_solver._assembled_jac_solver_iter())
