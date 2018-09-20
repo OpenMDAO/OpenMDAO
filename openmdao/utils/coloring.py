@@ -22,6 +22,7 @@ from scipy.sparse import coo_matrix
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 
 # If this is True, then IF simul coloring/sparsity is specified, use it.
@@ -1127,6 +1128,10 @@ def dynamic_sparsity(driver):
         The driver performing the optimization.
     """
     problem = driver._problem
+    if not problem.model._use_derivatives:
+        simple_warning("Derivatives have been turned off. Skipping dynamic sparsity computation.")
+        return
+
     driver._total_jac = None
     repeats = driver.options['dynamic_derivs_repeats']
 
@@ -1154,6 +1159,10 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
         If True, display a visualization of the colored jacobian.
     """
     problem = driver._problem
+    if not problem.model._use_derivatives:
+        simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
+        return
+
     driver._total_jac = None
 
     # save the coloring.json file for later inspection
@@ -1219,19 +1228,21 @@ def _simul_coloring_cmd(options):
             outfile = sys.stdout
         else:
             outfile = open(options.outfile, 'w')
-        Problem._post_setup_func = None  # avoid recursive loop
+        if prob.model._use_derivatives:
+            Problem._post_setup_func = None  # avoid recursive loop
 
-        with profiling('coloring_profile.out') if options.profile else do_nothing_context():
-            color_info = get_simul_meta(prob,
-                                        repeats=options.num_jacs, tol=options.tolerance,
-                                        show_jac=options.show_jac,
-                                        include_sparsity=not options.no_sparsity,
-                                        setup=False, run_model=True,
-                                        stream=outfile)
+            with profiling('coloring_profile.out') if options.profile else do_nothing_context():
+                color_info = get_simul_meta(prob,
+                                            repeats=options.num_jacs, tol=options.tolerance,
+                                            show_jac=options.show_jac,
+                                            include_sparsity=not options.no_sparsity,
+                                            setup=False, run_model=True,
+                                            stream=outfile)
 
-        if sys.stdout.isatty():
-            simul_coloring_summary(color_info, stream=sys.stdout)
-
+            if sys.stdout.isatty():
+                simul_coloring_summary(color_info, stream=sys.stdout)
+        else:
+            print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
     return _simul_coloring
 

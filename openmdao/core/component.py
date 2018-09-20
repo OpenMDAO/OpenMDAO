@@ -313,12 +313,13 @@ class Component(System):
         if nproc > 1:
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]
-                for type_ in ['input', 'output']:
-                    if self.distributed:
+                if self.options['distributed']:
+                    for type_ in ['input', 'output']:
                         self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
-                    else:
-                        # if component isn't distributed, we don't need to allgather sizes since
-                        # they'll all be the same.
+                else:
+                    # if component isn't distributed, we don't need to allgather sizes since
+                    # they'll all be the same.
+                    for type_ in ['input', 'output']:
                         sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
 
         if self._use_derivatives:

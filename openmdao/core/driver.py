@@ -16,6 +16,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -993,6 +994,10 @@ class Driver(object):
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:
+            return
+
+        if not self._problem.model._use_derivatives:
+            simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
         if isinstance(self._simul_coloring_info, string_types):
