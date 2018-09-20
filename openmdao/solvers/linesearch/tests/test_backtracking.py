@@ -715,6 +715,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         prob.setup()
 
+        # Initial value for the state:
         prob['comp.y'] = 12.0
 
         # You can change the NewtonSolver settings after setup is called
@@ -722,11 +723,11 @@ class TestFeatureLineSearch(unittest.TestCase):
         prob.model.linear_solver = DirectSolver()
         newton.options['iprint'] = 2
         newton.options['rtol'] = 1e-8
-        newton.options['maxiter'] = 75
         newton.options['solve_subsystems'] = True
 
         newton.linesearch = BoundsEnforceLS()
         newton.linesearch.options['iprint'] = 2
+
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], 19.68734033, 1e-6)
