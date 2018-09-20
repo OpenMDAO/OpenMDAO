@@ -253,8 +253,6 @@ class NOMPITests(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             p.setup(check=False)
 
-        print(w[0].message)
-        print(w[1].message)
         self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, UserWarning))
         self.assertEqual(str(w[0].message),

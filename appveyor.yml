@@ -23,4 +23,4 @@ install:
   - conda list
 
 test_script:
-  - testflo . -vs -n 1
+  - testflo . -n 1
