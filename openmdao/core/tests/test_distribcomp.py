@@ -253,7 +253,6 @@ class NOMPITests(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             p.setup(check=False)
 
-        self.assertEqual(len(w), 1)
         self.assertTrue(issubclass(w[0].category, UserWarning))
         self.assertEqual(str(w[0].message),
                          "The 'distributed' option is set to True for Component C2, "
@@ -514,7 +513,6 @@ class DeprecatedMPITests(unittest.TestCase):
             p.setup(check=False)
 
         if PETScVector is None:
-            self.assertEqual(len(w), 1)
             self.assertTrue(issubclass(w[0].category, UserWarning))
             self.assertEqual(str(w[0].message),
                              "The 'distributed' option is set to True for Component C2, "
