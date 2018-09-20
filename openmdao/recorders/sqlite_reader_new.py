@@ -12,13 +12,18 @@ from collections import OrderedDict
 from six import PY2, PY3, reraise, iteritems
 from six.moves import range
 
-import numpy as np
+# import numpy as np
 
 from abc import ABCMeta, abstractmethod
 
 # from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import DriverCase, SystemCase, SolverCase, ProblemCase, \
-    PromotedToAbsoluteMap, DriverDerivativesCase
+from openmdao.recorders.case_new import Case, PromotedToAbsoluteMap
+from openmdao.recorders.case_new import DriverCase
+from openmdao.recorders.case_new import SystemCase
+from openmdao.recorders.case_new import SolverCase
+from openmdao.recorders.case_new import ProblemCase
+from openmdao.recorders.case_new import DriverDerivativesCase
+
 from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array, convert_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.write_outputs import write_outputs
@@ -34,227 +39,8 @@ elif PY3:
     from json import loads as json_loads
 
 
-_DEFAULT_OUT_STREAM = object()
-
 # Regular expression used for splitting iteration coordinates.
 _coord_split_re = re.compile('\|\\d+\|*')
-
-
-class Case(object):
-    """
-    Case wraps the data from a single iteration of a recording to make it more easily accessible.
-    """
-
-    def __init__(self, source, iteration_coordinate, timestamp, success, msg,
-                 outputs, inputs=None, residuals=None, jacobian=None,
-                 parent=None, children=None, abs_tol=None, rel_tol=None):
-        """
-        Initialize.
-
-        Parameters
-        ----------
-        source : str
-            The unique id of the system/solver/driver/problem that did the recording.
-        iteration_coordinate : str
-            The full unique identifier for this iteration.
-        timestamp : float
-            Time of execution of the case.
-        success : str
-            Success flag for the case.
-        msg : str
-            Message associated with the case.
-        outputs : PromotedToAbsoluteMap
-            Map of outputs to values recorded.
-        inputs : PromotedToAbsoluteMap or None
-            Map of inputs to values recorded (None if not recorded).
-        residuals : PromotedToAbsoluteMap or None
-            Map of outputs to residuals recorded (None if not recorded).
-        jacobian : PromotedToAbsoluteMap or None
-            Map of (output, input) to derivatives recorded (None if not recorded).
-        parent : str
-            The full unique identifier for the parent this iteration.
-        children : list
-            The full unique identifiers for children of this iteration.
-        abs_tol : float or None
-            Absolute tolerance (None if not recorded).
-        rel_tol : float or None
-            Relative tolerance (None if not recorded).
-        """
-        pass
-
-    def get_design_variables(self, scaled=True, use_indices=True):
-        """
-        Get the values of the design variables, as seen by the driver, for this case.
-
-        Parameters
-        ----------
-        scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
-        use_indices : bool
-            The full unique identifier for this iteration.
-
-        Returns
-        -------
-        dict
-            The values of the design variables as seen by the driver.
-        """
-        pass
-
-    def get_constraints(self, scaled=True, use_indices=True):
-        """
-        Get the values of the constraints, as seen by the driver, for this case.
-
-        Parameters
-        ----------
-        scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
-        use_indices : bool
-            The full unique identifier for this iteration.
-
-        Returns
-        -------
-        dict
-            The values of the constraints as seen by the driver.
-        """
-        pass
-
-    def get_objectives(self, scaled=True, use_indices=True):
-        """
-        Get the values of the objectives, as seen by the driver, for this case.
-
-        Parameters
-        ----------
-        scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
-        use_indices : bool
-            The full unique identifier for this iteration.
-
-        Returns
-        -------
-        dict
-            The values of the objectives as seen by the driver.
-        """
-        pass
-
-    def get_responses(self, scaled=True, use_indices=True):
-        """
-        Get the values of the responses, as seen by the driver, for this case.
-
-        Parameters
-        ----------
-        scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
-        use_indices : bool
-            The full unique identifier for this iteration.
-
-        Returns
-        -------
-        dict
-            The values of the responses as seen by the driver.
-        """
-        pass
-
-    def list_inputs(self,
-                    values=True,
-                    units=False,
-                    hierarchical=True,
-                    print_arrays=False,
-                    out_stream=_DEFAULT_OUT_STREAM):
-        """
-        Return and optionally log a list of input names and other optional information.
-
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
-
-        Parameters
-        ----------
-        values : bool, optional
-            When True, display/return input values. Default is True.
-        units : bool, optional
-            When True, display/return units. Default is False.
-        hierarchical : bool, optional
-            When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
-            When False, in the columnar display, just display norm of any ndarrays with size > 1.
-            The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format is affected
-            by the values set with numpy.set_printoptions
-            Default is False.
-        out_stream : file-like object
-            Where to send human readable output. Default is sys.stdout.
-            Set to None to suppress.
-
-        Returns
-        -------
-        list
-            list of input names and other optional information about those inputs
-        """
-        pass
-
-    def list_outputs(self,
-                     explicit=True, implicit=True,
-                     values=True,
-                     prom_name=False,
-                     residuals=False,
-                     residuals_tol=None,
-                     units=False,
-                     shape=False,
-                     bounds=False,
-                     scaling=False,
-                     hierarchical=True,
-                     print_arrays=False,
-                     out_stream=_DEFAULT_OUT_STREAM):
-        """
-        Return and optionally log a list of output names and other optional information.
-
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
-
-        Parameters
-        ----------
-        explicit : bool, optional
-            include outputs from explicit components. Default is True.
-        implicit : bool, optional
-            include outputs from implicit components. Default is True.
-        values : bool, optional
-            When True, display/return output values. Default is True.
-        prom_name : bool, optional
-            When True, display/return the promoted name of the variable.
-            Default is False.
-        residuals : bool, optional
-            When True, display/return residual values. Default is False.
-        residuals_tol : float, optional
-            If set, limits the output of list_outputs to only variables where
-            the norm of the resids array is greater than the given 'residuals_tol'.
-            Default is None.
-        units : bool, optional
-            When True, display/return units. Default is False.
-        shape : bool, optional
-            When True, display/return the shape of the value. Default is False.
-        bounds : bool, optional
-            When True, display/return bounds (lower and upper). Default is False.
-        scaling : bool, optional
-            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-        hierarchical : bool, optional
-            When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
-            When False, in the columnar display, just display norm of any ndarrays with size > 1.
-            The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected
-            by the values set with numpy.set_printoptions
-            Default is False.
-        out_stream : file-like
-            Where to send human readable output. Default is sys.stdout.
-            Set to None to suppress.
-
-        Returns
-        -------
-        list
-            list of output names and other optional information about those outputs
-        """
-        pass
 
 
 def CaseReader(filename, pre_load=True):
@@ -303,7 +89,7 @@ class BaseCaseReader():
         pre_load : bool
             If True, load all the data into memory during initialization.
         """
-        self.format_version = None
+        self._format_version = None
         self.problem_metadata = {}
         self.system_metadata = {}
 
@@ -384,12 +170,12 @@ class SqliteCaseReader(BaseCaseReader):
 
     Attributes
     ----------
-    format_version : int
-        The version of the format assumed when loading the file.
     problem_metadata : dict
         Metadata about the problem, including the system hierachy and connections.
     system_metadata : dict
         Metadata about each system in the recorded model, including options and scaling factors.
+    _format_version : int
+        The version of the format assumed when loading the file.
     _solver_metadata : dict
         Metadata for all the solvers in the model, including their type and options
     _filename : str
@@ -473,16 +259,16 @@ class SqliteCaseReader(BaseCaseReader):
 
         # create helper objects for accessing cases from the four iteration tables and
         # the problem cases table
-        self._driver_cases = DriverCases(filename, self.format_version,
+        self._driver_cases = DriverCases(filename, self._format_version,
                                          self._abs2prom, self._abs2meta, self._prom2abs,
                                          self.problem_metadata['variables'])
-        self._deriv_cases = DerivCases(filename, self.format_version,
+        self._deriv_cases = DerivCases(filename, self._format_version,
                                        self._abs2prom, self._abs2meta, self._prom2abs)
-        self._system_cases = SystemCases(filename, self.format_version,
+        self._system_cases = SystemCases(filename, self._format_version,
                                          self._abs2prom, self._abs2meta, self._prom2abs)
-        self._solver_cases = SolverCases(filename, self.format_version,
+        self._solver_cases = SolverCases(filename, self._format_version,
                                          self._abs2prom, self._abs2meta, self._prom2abs)
-        self._problem_cases = ProblemCases(filename, self.format_version,
+        self._problem_cases = ProblemCases(filename, self._format_version,
                                            self._abs2prom, self._abs2meta, self._prom2abs)
 
         # if requested, load all the iteration data into memory
@@ -507,11 +293,11 @@ class SqliteCaseReader(BaseCaseReader):
         row = cur.fetchone()
 
         # get format_version
-        self.format_version = version = row['format_version']
+        self._format_version = version = row['format_version']
 
         if version not in range(1, format_version + 1):
             raise ValueError('SQliteCaseReader encountered an unhandled '
-                             'format version: {0}'.format(self.format_version))
+                             'format version: {0}'.format(self._format_version))
 
         # add metadata for VOIs (des vars, objective, constraints) to problem metadata
         if version >= 4:
@@ -569,9 +355,9 @@ class SqliteCaseReader(BaseCaseReader):
         row = cur.fetchone()
 
         if row is not None:
-            if self.format_version >= 3:
+            if self._format_version >= 3:
                 driver_metadata = json_loads(row[0])
-            elif self.format_version in (1, 2):
+            elif self._format_version in (1, 2):
                 if PY2:
                     driver_metadata = pickle.loads(str(row[0]))
                 if PY3:
@@ -633,7 +419,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._driver_cases.load_cases()
         self._solver_cases.load_cases()
         self._system_cases.load_cases()
-        if self.format_version >= 2:
+        if self._format_version >= 2:
             self._problem_cases.load_cases()
 
     def get_cases(self, source='driver', recurse=False, flat=False):
@@ -710,198 +496,6 @@ class SqliteCaseReader(BaseCaseReader):
                     yield self._driver_cases.get_case(iteration[0])
                 else:
                     yield self._solver_cases.get_case(iteration[0])
-
-    def list_inputs(self,
-                    case=None,
-                    values=True,
-                    units=False,
-                    hierarchical=True,
-                    print_arrays=False,
-                    out_stream=_DEFAULT_OUT_STREAM):
-        """
-        Return and optionally log a list of input names and other optional information.
-
-        Also optionally logs the information to a user defined output stream.
-
-        Parameters
-        ----------
-        case : Case, optional
-            The case whose inputs will be listed. If None, gives all inputs. Defaults to None.
-        values : bool, optional
-            When True, display/return input values. Default is True.
-        units : bool, optional
-            When True, display/return units. Default is False.
-        hierarchical : bool, optional
-            When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
-            When False, in the columnar display, just display norm of any ndarrays with size > 1.
-            The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format is affected
-            by the values set with numpy.set_printoptions
-            Default is False.
-        out_stream : file-like object
-            Where to send human readable output. Default is sys.stdout.
-            Set to None to suppress.
-
-        Returns
-        -------
-        list
-            list of input names and other optional information about those inputs
-        """
-        meta = self._abs2meta
-        if case is None:
-            sys_vars = self._get_all_sysvars(False)
-        else:
-            sys_vars = self._get_case_sysvars(case, False)
-        inputs = []
-
-        if sys_vars is not None and len(sys_vars) > 0:
-            for name in sys_vars:
-                outs = {}
-                if values:
-                    outs['value'] = sys_vars[name]['value']
-                if units:
-                    outs['units'] = meta[name]['units']
-                inputs.append((name, outs))
-
-        if out_stream == _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
-        if out_stream:
-            if sys_vars is None:
-                out_stream.write('WARNING: No system cases recorded. Make sure the recorder ' +
-                                 'is attached to a system object\n')
-            elif len(sys_vars) is 0:
-                out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
-                                 'settings have record_inputs set to True\n')
-
-            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
-
-        return inputs
-
-    def list_outputs(self,
-                     case=None,
-                     explicit=True, implicit=True,
-                     values=True,
-                     residuals=False,
-                     residuals_tol=None,
-                     units=False,
-                     shape=False,
-                     bounds=False,
-                     scaling=False,
-                     hierarchical=True,
-                     print_arrays=False,
-                     out_stream=_DEFAULT_OUT_STREAM):
-        """
-        Return and optionally log a list of output names and other optional information.
-
-        Also optionally logs the information to a user defined output stream.
-
-        Parameters
-        ----------
-        case : Case, optional
-            The case whose outputs will be listed. If None, gives all outputs. Defaults to None.
-        explicit : bool, optional
-            include outputs from explicit components. Default is True.
-        implicit : bool, optional
-            include outputs from implicit components. Default is True.
-        values : bool, optional
-            When True, display/return output values. Default is True.
-        residuals : bool, optional
-            When True, display/return residual values. Default is False.
-        residuals_tol : float, optional
-            If set, limits the output of list_outputs to only variables where
-            the norm of the resids array is greater than the given 'residuals_tol'.
-            Default is None.
-        units : bool, optional
-            When True, display/return units. Default is False.
-        shape : bool, optional
-            When True, display/return the shape of the value. Default is False.
-        bounds : bool, optional
-            When True, display/return bounds (lower and upper). Default is False.
-        scaling : bool, optional
-            When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-        hierarchical : bool, optional
-            When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
-            When False, in the columnar display, just display norm of any ndarrays with size > 1.
-            The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected
-            by the values set with numpy.set_printoptions
-            Default is False.
-        out_stream : file-like
-            Where to send human readable output. Default is sys.stdout.
-            Set to None to suppress.
-
-        Returns
-        -------
-        list
-            list of output names and other optional information about those outputs
-        """
-        meta = self._abs2meta
-        expl_outputs = []
-        impl_outputs = []
-        sys_vars = self._get_all_sysvars()
-
-        if case is None:
-            sys_vars = self._get_all_sysvars()
-        else:
-            sys_vars = self._get_case_sysvars(case)
-
-        if sys_vars is not None and len(sys_vars) > 0:
-            for name in sys_vars:
-                if residuals_tol and \
-                   sys_vars[name]['residuals'] is not 'Not Recorded' and \
-                   np.linalg.norm(sys_vars[name]['residuals']) < residuals_tol:
-                    continue
-                outs = {}
-                if values:
-                    outs['value'] = sys_vars[name]['value']
-                if residuals:
-                    outs['resids'] = sys_vars[name]['residuals']
-                if units:
-                    outs['units'] = meta[name]['units']
-                if shape:
-                    outs['shape'] = sys_vars[name]['value'].shape
-                if bounds:
-                    outs['lower'] = meta[name]['lower']
-                    outs['upper'] = meta[name]['upper']
-                if scaling:
-                    outs['ref'] = meta[name]['ref']
-                    outs['ref0'] = meta[name]['ref0']
-                    outs['res_ref'] = meta[name]['res_ref']
-                if meta[name]['explicit']:
-                    expl_outputs.append((name, outs))
-                else:
-                    impl_outputs.append((name, outs))
-
-        if out_stream == _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
-        if out_stream:
-            if sys_vars is None:
-                out_stream.write('WARNING: No system cases recorded. Make sure the recorder ' +
-                                 'is attached to a system object\n')
-            elif len(sys_vars) is 0:
-                out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
-                                 'settings have record_outputs set to True\n')
-
-            if explicit:
-                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
-                                    out_stream)
-
-            if implicit:
-                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
-                                    out_stream)
-
-        if explicit and implicit:
-            return expl_outputs + impl_outputs
-        elif explicit:
-            return expl_outputs
-        elif implicit:
-            return impl_outputs
-        else:
-            raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
     def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
                           solver_iter, recursive, coord_lengths):
@@ -1204,7 +798,7 @@ class BaseCases(object):
             Dictionary mapping promoted names to absolute names.
         """
         self._filename = filename
-        self.format_version = format_version
+        self._format_version = format_version
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._prom2abs = prom2abs
@@ -1316,16 +910,16 @@ class DriverCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
             outputs_text, = row
 
-        if self.format_version >= 3:
+        if self._format_version >= 3:
             inputs_array = json_to_np_array(inputs_text, self._abs2meta)
             outputs_array = json_to_np_array(outputs_text, self._abs2meta)
-        elif self.format_version in (1, 2):
+        elif self._format_version in (1, 2):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
 
-        case = DriverCase(self._filename, counter, iteration_coordinate, timestamp,
-                          success, msg, inputs_array, outputs_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta, self._var_settings)
+        case = DriverCase('driver', iteration_coordinate, timestamp, success, msg,
+                          outputs_array, inputs_array, self._prom2abs, self._abs2prom,
+                          self._var_settings)
         return case
 
     def load_cases(self):
@@ -1436,7 +1030,7 @@ class DerivCases(BaseCases):
                 self.num_cases = len(self.keys)
             except sqlite3.OperationalError:
                 # Cases recorded in version 1 won't have a 'derivatives' table.
-                if self.format_version >= 2:
+                if self._format_version >= 2:
                     reraise(*sys.exc_info())
 
         con.close()
@@ -1548,7 +1142,7 @@ class ProblemCases(BaseCases):
             except sqlite3.OperationalError:
                 # Cases recorded in some early iterations of version 1 won't have
                 # the 'problem_cases' table.
-                if self.format_version >= 2:
+                if self._format_version >= 2:
                     reraise(*sys.exc_info())
 
         con.close()
@@ -1570,9 +1164,9 @@ class ProblemCases(BaseCases):
         idx, counter, case_name, timestamp, success, msg, \
             outputs_text, = row
 
-        if self.format_version >= 3:
+        if self._format_version >= 3:
             outputs_array = json_to_np_array(outputs_text, self._abs2meta)
-        elif self.format_version in (1, 2):
+        elif self._format_version in (1, 2):
             outputs_array = blob_to_array(outputs_text)
 
         case = ProblemCase(self._filename, counter, case_name, timestamp,
@@ -1696,11 +1290,11 @@ class SystemCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text,\
             outputs_text, residuals_text = row
 
-        if self.format_version >= 3:
+        if self._format_version >= 3:
             inputs_array = json_to_np_array(inputs_text, self._abs2meta)
             outputs_array = json_to_np_array(outputs_text, self._abs2meta)
             residuals_array = json_to_np_array(residuals_text, self._abs2meta)
-        elif self.format_version in (1, 2):
+        elif self._format_version in (1, 2):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
             residuals_array = blob_to_array(residuals_text)
@@ -1813,11 +1407,11 @@ class SolverCases(BaseCases):
         idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
             input_text, output_text, residuals_text = row
 
-        if self.format_version >= 3:
+        if self._format_version >= 3:
             input_array = json_to_np_array(input_text, self._abs2meta)
             output_array = json_to_np_array(output_text, self._abs2meta)
             residuals_array = json_to_np_array(residuals_text, self._abs2meta)
-        elif self.format_version in (1, 2):
+        elif self._format_version in (1, 2):
             input_array = blob_to_array(input_text)
             output_array = blob_to_array(output_text)
             residuals_array = blob_to_array(residuals_text)
