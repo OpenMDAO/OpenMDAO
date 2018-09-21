@@ -255,6 +255,10 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+
+        if isinstance(self, LinearSolver) and not system._use_derivatives:
+            return
+
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 

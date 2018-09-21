@@ -22,6 +22,8 @@ if __name__ == '__main__':
 
     changes = []
 
+    markers = ['.', 'v', '^', '<', '>', 's', 'p', 'P', '*', 'd', '+', 'x', '1', '2', '3', '4']
+
     for i, arg in enumerate(options.file):
         delta = []
         total = []
@@ -41,10 +43,14 @@ if __name__ == '__main__':
 
                     if len(parts) > 7:
                         delta.append(float(parts[8]))
-                        total.append(float(parts[5]))
-                        elapsed.append(timestamp)
-                        changes.append((delta[-1], elapsed[-1], fullname, arg))
-                    elif fname == options.func:
+                    else:
+                        delta.append(0.0)
+                    total.append(float(parts[5]))
+                    elapsed.append(timestamp)
+                    changes.append((delta[-1], elapsed[-1], total[-1], fullname, arg))
+
+                    print("fname:", fname)
+                    if fname == options.func:
                         calls.append(float(parts[5]))
                         call_times.append(timestamp)
 
@@ -54,12 +60,26 @@ if __name__ == '__main__':
         #         label="%s sum of deltas" % arg.rsplit('.', 1)[0],
         #         linestyle='-.')
 
-    changes = sorted(changes, key=lambda t: t[0], reverse=True)
+    sorted_changes = sorted(changes, key=lambda t: t[0], reverse=True)
     nresults = 50
 
-    for i, (change, ctime, func, fname) in enumerate(changes):
+    for i, (change, ctime, tot, func, fname) in enumerate(sorted_changes):
         print("Change of %+9.2f KB at %8.5f sec in file %s in %s." %
               (change, ctime, fname, func))
+        if i == nresults:
+            break
+
+    delta_totals = []
+    for i, (change, ctime, tot, func, fname) in enumerate(changes):
+        if i > 0:
+            delta_totals.append((tot - changes[i-1][2], changes[i-1], changes[i]))
+        else:
+            delta_totals.append((0.0, changes[i], changes[i]))
+
+    for i, (delta, changes1, changes2) in enumerate(sorted(delta_totals, key=lambda t: t[0],
+                                                           reverse=True)):
+        print("Largest total delta of %+9.2f between %s and %s at %8.5f" %
+              (delta, changes1[3], changes2[3], changes2[1]))
         if i == nresults:
             break
 

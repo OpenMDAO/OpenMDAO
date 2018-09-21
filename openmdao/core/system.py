@@ -789,8 +789,9 @@ class System(object):
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
-        self._setup_partials(recurse=recurse)
-        self._setup_jacobians(recurse=recurse)
+        if self._use_derivatives:
+            self._setup_partials(recurse=recurse)
+            self._setup_jacobians(recurse=recurse)
 
         self._setup_recording(recurse=recurse)
 

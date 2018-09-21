@@ -871,6 +871,7 @@ class Group(System):
             relevant = defaultdict(dict)
             relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
                                               ContainsAll())}
+            return relevant
 
     def _setup_connections(self, recurse=True):
         """
