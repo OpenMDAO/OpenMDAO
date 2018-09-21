@@ -14,33 +14,6 @@ from openmdao.utils.mpi import MPI
 _registered = False
 
 
-# def _trace_mem_call(frame, arg, stack, context):
-#     """
-#     Called whenever a function is called that matches glob patterns and isinstance checks.
-#     """
-#     memstack, _ = context
-#     memstack.append([(frame.f_code.co_filename,
-#                      frame.f_code.co_firstlineno,
-#                      frame.f_code.co_name), mem_usage()])
-
-
-# def _trace_mem_ret(frame, arg, stack, context):
-#     """
-#     Called whenever a function returns that matches glob patterns and isinstance checks.
-#     """
-#     memstack, mem_changes = context
-#     key, mem_start = memstack.pop()
-#     usage = mem_usage()
-#     delta = usage - mem_start
-#     if delta > 0.0:
-#         mem_changes[key][0] += delta
-#         mem_changes[key][1] += 1
-#         if memstack:
-#             mem_changes[key][2].add(memstack[-1][0])
-#         # print("%g (+%g) MB %s:%d:%s" % (usage, delta,
-#         #                                 key[0], key[1], key[2]))
-
-
 def _create_profile_callback(stream):
 
     from openmdao.core.system import System
@@ -256,24 +229,23 @@ def postprocess_memtrace(fname):
                     raise RuntimeError("event is not 'call' or 'return'")
 
     srt = sorted(info.values(), key=lambda x: x['total_mem'])
-    for val in srt:
-        print(val['qualname'], val['objname'], val['total_mem'], val['calls'])
 
     val = srt[-1]  # by_qual['Problem.final_setup', 'Problem#0']
 
-    min_mem = .1
+    min_mem = 1
     seen = set()
-    stack = [('', [val])]
+    stack = [('', iter([val]))]
     while stack:
-        indent, vals = stack.pop()
-        for val in vals:
-            #if val['total_mem'] > min_mem:
-            print("%s%s" % (indent, val['qualname']), val['objname'], val['total_mem'], val['calls'])
-            # kids = [c for c in val['children'] if id(c) not in seen]
-            # seen.update(id(k) for k in kids)
-            if id(val) not in seen:
-                seen.add(id(val))
-                stack.append((indent + '  ', val['children']))
+        indent, children = stack[-1]
+        try:
+            val = next(children)
+            if val['total_mem'] > min_mem:
+                print("%s%s" % (indent, val['qualname']), val['objname'], val['total_mem'])
+                if id(val) not in seen:
+                    seen.add(id(val))
+                    stack.append((indent + '  ', iter(val['children'])))
+        except StopIteration:
+            stack.pop()
 
     print("Max mem usage:", maxmem)
 
