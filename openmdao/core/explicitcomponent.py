@@ -344,7 +344,7 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
+            Ignored.
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
