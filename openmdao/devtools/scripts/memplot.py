@@ -22,8 +22,6 @@ if __name__ == '__main__':
 
     changes = []
 
-    markers = ['.', 'v', '^', '<', '>', 's', 'p', 'P', '*', 'd', '+', 'x', '1', '2', '3', '4']
-
     for i, arg in enumerate(options.file):
         delta = []
         total = []
@@ -49,7 +47,6 @@ if __name__ == '__main__':
                     elapsed.append(timestamp)
                     changes.append((delta[-1], elapsed[-1], total[-1], fullname, arg))
 
-                    print("fname:", fname)
                     if fname == options.func:
                         calls.append(float(parts[5]))
                         call_times.append(timestamp)
