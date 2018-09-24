@@ -135,6 +135,26 @@ def _mem_prof_exec(options):
     postprocess_memtrace(options.outfile, options.min_mem)
 
 
+def _mempost_setup_parser(parser):
+    parser.add_argument('--out', action='store', dest='outfile', default=None,
+                        help='Dump memory tree to given file.')
+    parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
+                        help='Dump function trace with memory usage to given file.')
+    parser.add_argument('file', metavar='file', nargs=1, help='Memory dump file to process.')
+
+
+def _mempost_exec(options):
+    """
+    Process command line args and perform postprocessing on the specified memory dump file.
+    """
+    if options.outfile is None:
+        stream = sys.stdout
+    else:
+        stream = open(options.outfile, "w")
+
+    postprocess_memtrace(options.file[0], options.min_mem, stream=stream)
+
+
 def _process_parts(parts):
     event, fpath, lineno, func, mem, elapsed, class_, objname, instnum = parts[:9]
     lineno = parts[2] = int(lineno)
@@ -159,7 +179,7 @@ def _process_parts(parts):
     return parts
 
 
-def postprocess_memtrace(fname, min_mem=1.0):
+def postprocess_memtrace(fname, min_mem=1.0, stream=None):
     from openmdao.utils.general_utils import simple_warning
 
     info = {}
@@ -169,6 +189,9 @@ def postprocess_memtrace(fname, min_mem=1.0):
     stack = []
     path_stack = []
     maxmem = 0.0
+
+    if stream is None:
+        stream = sys.stdout
 
     with open(fname, 'r') as f:
         for i, line in enumerate(f):
@@ -265,14 +288,15 @@ def postprocess_memtrace(fname, min_mem=1.0):
             val = next(children)
             if val['total_mem'] > min_mem:
                 print("%s%s %s %7.2f MB  (%d calls)" % (indent, val['qualname'], val['objname'],
-                                                        val['total_mem'], val['calls']))
+                                                        val['total_mem'], val['calls']),
+                      file=stream)
                 if id(val) not in seen:
                     seen.add(id(val))
                     stack.append((indent + '  ', iter(val['children'])))
         except StopIteration:
             stack.pop()
 
-    print("Max mem usage:", maxmem)
+    print("Max mem usage:", maxmem, file=stream)
 
 if __name__ == '__main__':
     import sys
