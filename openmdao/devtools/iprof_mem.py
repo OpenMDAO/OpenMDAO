@@ -47,17 +47,18 @@ def _create_profile_callback(stream):
 
                 print(event, os.path.abspath(frame.f_code.co_filename), frame.f_code.co_firstlineno,
                       frame.f_code.co_name, mem_usage(), time.time(), class_, name, inst_num,
-                      flush=True, file=stream)
+                      file=stream)
 
     return _wrapped
 
 
 def _setup(options):
-    global _registered, _trace_memory, mem_usage
+    global _registered, _trace_memory, mem_usage, _out_stream
     if not _registered:
         from openmdao.devtools.memory import mem_usage
 
-        _trace_memory = _create_profile_callback(open(options.fname, "w"))
+        _out_stream = open(options.outfile, "w", buffering=1024*1024)
+        _trace_memory = _create_profile_callback(_out_stream)
         _registered = True
 
 
@@ -89,12 +90,15 @@ def stop():
     """
     Turn off memory profiling.
     """
+    global _out_stream
     sys.setprofile(None)
+    _out_stream.close()
 
 
 def _mem_prof_setup_parser(parser):
-    parser.add_argument('-f', '--file', action='store', dest='fname',
-                        default='mem_trace.raw',
+    parser.add_argument('-f', '--file', action='store', dest='outfile', default='mem_trace.raw',
+                        help='Dump function trace with memory usage to given file.')
+    parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
                         help='Dump function trace with memory usage to given file.')
     parser.add_argument('file', metavar='file', nargs=1,
                         help='Python file to profile.')
@@ -126,113 +130,133 @@ def _mem_prof_exec(options):
 
     exec (code, globals_dict)
 
+    stop()
+
+    postprocess_memtrace(options.outfile, options.min_mem)
 
 
-def postprocess_memtrace(fname):
+def _process_parts(parts):
+    event, fpath, lineno, func, mem, elapsed, class_, objname, instnum = parts[:9]
+    lineno = parts[2] = int(lineno)
+    mem = parts[4] = float(mem)
+    elapsed = parts[5] = float(elapsed)
+    instnum = parts[8] = int(instnum)
+
+    if instnum >= 0:
+        class_ = "%s#%d" % (class_, instnum)
+        if objname == '?':
+            objname = class_
+        else:
+            objname = "%s:%s" % (class_, objname)
+    else:
+        objname = class_ = ''
+
+    parts[7] = objname
+
+    call = "%s:%d:%s%s" % (fpath, lineno, class_, func)
+    parts.append(call)
+
+    return parts
+
+
+def postprocess_memtrace(fname, min_mem=1.0):
     from openmdao.utils.general_utils import simple_warning
-    from six import iteritems
 
     info = {}
-    by_qual = {}
     cache = {}
 
     top = None
     stack = []
+    path_stack = []
     maxmem = 0.0
 
     with open(fname, 'r') as f:
         for i, line in enumerate(f):
             if i > 0:   # skip first line, which is return from profile start()
-                parts = line.split()
-                event, fpath, lineno, func, mem, elapsed, class_, objname, instnum = parts
-                lineno = parts[2] = int(lineno)
-                mem = parts[4] = float(mem)
+                parts = _process_parts(line.split())
+                event, fpath, lineno, func, mem, elapsed, class_, objname, instnum, call = parts
+
                 if mem > maxmem:
                     maxmem = mem
-                elapsed = parts[5] = float(elapsed)
-                instnum = parts[8] = int(instnum)
-                key = (fpath, lineno, objname)
 
                 if event == 'call':
-                    if func.startswith('<'):
-                        qualname = func
-                    else:
-                        qualname = find_qualified_name(fpath, lineno, cache, full=True)
 
-                    if qualname == '<module>':
-                        qualname = fpath + ':' + qualname
+                    path_stack.append(call)
+                    call_path = '|'.join(path_stack)
 
-                    if objname == "?" and class_ != "?" and instnum >=0:
-                        objname = "%s#%d" % (class_, instnum)
+                    key = call_path
 
                     if key not in info:
-                        info[key] = defaultdict(lambda: None)
-                        info[key]['calls'] = 0
-                        info[key]['fpath'] = fpath
-                        info[key]['line'] = lineno
-                        info[key]['func'] = func
-                        info[key]['total_mem'] = 0.
-                        info[key]['time'] = elapsed
-                        info[key]['class'] = class_
-                        info[key]['objname'] = objname
-                        info[key]['qualname'] = qualname
-                        info[key]['children'] = []
-                        info[key]['child_ids'] = set()
+                        if func.startswith('<'):
+                            qualname = fpath + ':' + func
+                        else:
+                            qualname = find_qualified_name(fpath, lineno, cache, full=True)
 
-                        by_qual[qualname, objname] = info[key]
+                        info[key] = idict = {
+                            'calls': 0,
+                            'fpath': fpath,
+                            'line': lineno,
+                            'func': func,
+                            'total_mem': 0.,
+                            'time': elapsed,
+                            'class': class_,
+                            'objname': objname,
+                            'qualname': qualname,
+                            'children': [],
+                            'child_ids': set(),
+                            'call_path': call_path,
+                        }
+                    else:
+                        idict = info[key]
 
-                    info[key]['calls'] += 1
-                    info[key]['start_mem'] = mem
+                    idict['calls'] += 1
 
                     if stack:
-                        _, pfpath, plineno, _, _, _, _, pobjname, _ = stack[-1]
-                        parent = info[pfpath, plineno, pobjname]
+                        pcall_path = '|'.join(path_stack[:-1])
+                        parent = info[pcall_path]
                         ident = id(info[key])
                         if ident not in parent['child_ids']:
                             parent['children'].append(info[key])
                             parent['child_ids'].add(ident)
 
                     stack.append(parts)
+
                 elif event == 'return':
                     try:
-                        (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed,
-                         c_class, c_obj, c_instnum) = stack.pop()
+                        c_parts = stack.pop()
                     except IndexError:
-                        pass  # last line is a return from funct called before we start recording
+                        path_stack.pop()
+                        continue  # last line is a return from funct called before we start recording
+
+                    c_parts = _process_parts(c_parts[:9])
+                    (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj, c_instnum, c_call) = c_parts
 
                     assert c_event == 'call'
 
                     # there are cases where sometimes a call is recorded but not a return,
                     # so we have to deal with those  :(
 
-                    if c_fpath != fpath or c_lineno != lineno:
-                        simple_warning("No return found for %s line %d" % (c_fpath, c_lineno))
-                        while c_fpath != fpath or c_lineno != lineno:
-                            try:
-                                (c_event, c_fpath, c_lineno, c_func, c_mem,
-                                c_elapsed, c_class, c_obj, c_instnum) = stack.pop()
-                            except IndexError:
-                                break
+                    while call != c_call:
+                        simple_warning("No return found for %s." % c_call)
+                        try:
+                            c_parts = stack.pop()
+                            path_stack.pop()
+                        except IndexError:
+                            continue
 
-                    if c_fpath == fpath and c_lineno == lineno and c_class == class_:
-                        c_key = (c_fpath, c_lineno, c_obj)
-                        if c_obj != objname and c_instnum == instnum:
-                            obj = info[c_key]
-                            del info[c_key]
-                            info[key] = obj
-                            c_key = key
+                        c_parts = _process_parts(c_parts)
+                        (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj, c_instnum, c_call) = c_parts
 
-                        if c_key == key:
-                            info[key]['total_mem'] += (mem - c_mem)
+                    info['|'.join(path_stack)]['total_mem'] += (mem - c_mem)
 
+                    path_stack.pop()
                 else:
                     raise RuntimeError("event is not 'call' or 'return'")
 
     srt = sorted(info.values(), key=lambda x: x['total_mem'])
 
-    val = srt[-1]  # by_qual['Problem.final_setup', 'Problem#0']
+    val = srt[-1]
 
-    min_mem = 1
     seen = set()
     stack = [('', iter([val]))]
     while stack:
