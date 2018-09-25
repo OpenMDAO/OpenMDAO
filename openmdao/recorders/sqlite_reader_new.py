@@ -18,11 +18,6 @@ from abc import ABCMeta, abstractmethod
 
 # from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case_new import Case, PromotedToAbsoluteMap
-from openmdao.recorders.case_new import DriverCase
-from openmdao.recorders.case_new import SystemCase
-from openmdao.recorders.case_new import SolverCase
-from openmdao.recorders.case_new import ProblemCase
-from openmdao.recorders.case_new import DriverDerivativesCase
 
 from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array, convert_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
@@ -39,7 +34,7 @@ elif PY3:
     from json import loads as json_loads
 
 
-# Regular expression used for splitting iteration coordinates.
+# Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\|\\d+\|*')
 
 
@@ -273,7 +268,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         # if requested, load all the iteration data into memory
         if pre_load:
-            self.load_cases()
+            self._load_cases()
 
     def _collect_metadata(self, cur):
         """
@@ -350,7 +345,6 @@ class SqliteCaseReader(BaseCaseReader):
         cur : sqlite3.Cursor
             Database cursor to use for reading the data.
         """
-        print(type(cur))
         cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = cur.fetchone()
 
@@ -412,15 +406,15 @@ class SqliteCaseReader(BaseCaseReader):
                 'solver_class': solver_class,
             }
 
-    def load_cases(self):
+    def _load_cases(self):
         """
         Load all driver, solver, and system cases into memory.
         """
-        self._driver_cases.load_cases()
-        self._solver_cases.load_cases()
-        self._system_cases.load_cases()
+        self._driver_cases._load_cases()
+        self._solver_cases._load_cases()
+        self._system_cases._load_cases()
         if self._format_version >= 2:
-            self._problem_cases.load_cases()
+            self._problem_cases._load_cases()
 
     def get_cases(self, source='driver', recurse=False, flat=False):
         """
@@ -904,7 +898,7 @@ class DriverCases(BaseCases):
 
         Returns
         -------
-        DriverCase
+        Case
             Case for associated row.
         """
         idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text, \
@@ -917,12 +911,12 @@ class DriverCases(BaseCases):
             inputs_array = blob_to_array(inputs_text)
             outputs_array = blob_to_array(outputs_text)
 
-        case = DriverCase('driver', iteration_coordinate, timestamp, success, msg,
-                          outputs_array, inputs_array, self._prom2abs, self._abs2prom,
-                          self._var_settings)
+        case = Case('driver', iteration_coordinate, timestamp, success, msg,
+                    outputs=outputs_array, inputs=inputs_array,
+                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
         return case
 
-    def load_cases(self):
+    def _load_cases(self):
         """
         Load all driver cases into memory.
         """
@@ -1046,19 +1040,18 @@ class DerivCases(BaseCases):
 
         Returns
         -------
-        DriverDerivativesCase
+        Case
             Case for associated row.
         """
         idx, counter, iteration_coordinate, timestamp, success, msg, totals_blob = row
 
         totals_array = blob_to_array(totals_blob)
 
-        case = DriverDerivativesCase(self._filename, counter, iteration_coordinate,
-                                     timestamp, success, msg, totals_array,
-                                     self._prom2abs, self._abs2prom, self._abs2meta)
+        case = Case('driver', iteration_coordinate, timestamp, success, msg,
+                    jacobian=totals_array, prom2abs=self._prom2abs, abs2prom=self._abs2prom)
         return case
 
-    def load_cases(self):
+    def _load_cases(self):
         """
         Load all driver cases into memory.
         """
@@ -1158,7 +1151,7 @@ class ProblemCases(BaseCases):
 
         Returns
         -------
-        ProblemCase
+        Case
             Case for associated row.
         """
         idx, counter, case_name, timestamp, success, msg, \
@@ -1169,12 +1162,11 @@ class ProblemCases(BaseCases):
         elif self._format_version in (1, 2):
             outputs_array = blob_to_array(outputs_text)
 
-        case = ProblemCase(self._filename, counter, case_name, timestamp,
-                           success, msg, outputs_array, self._prom2abs,
-                           self._abs2prom, self._abs2meta)
+        case = Case('problem', case_name, timestamp, success, msg, outputs=outputs_array,
+                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
         return case
 
-    def load_cases(self):
+    def _load_cases(self):
         """
         Load all problem cases into memory.
         """
@@ -1284,10 +1276,10 @@ class SystemCases(BaseCases):
 
         Returns
         -------
-        SystemCase
+        Case
             Case for associated row.
         """
-        idx, counter, iteration_coordinate, timestamp, success, msg, inputs_text,\
+        idx, counter, iter_coord, timestamp, success, msg, inputs_text,\
             outputs_text, residuals_text = row
 
         if self._format_version >= 3:
@@ -1299,12 +1291,16 @@ class SystemCases(BaseCases):
             outputs_array = blob_to_array(outputs_text)
             residuals_array = blob_to_array(residuals_text)
 
-        case = SystemCase(self._filename, counter, iteration_coordinate, timestamp,
-                          success, msg, inputs_array, outputs_array, residuals_array,
-                          self._prom2abs, self._abs2prom, self._abs2meta)
+        split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
+        source = '|'.join(split_iter_coord)
+
+        case = Case(source, iter_coord, timestamp, success, msg,
+                    inputs=inputs_array, outputs=outputs_array, residuals=residuals_array,
+                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
+
         return case
 
-    def load_cases(self):
+    def _load_cases(self):
         """
         Load all system cases into memory.
         """
@@ -1401,10 +1397,10 @@ class SolverCases(BaseCases):
 
         Returns
         -------
-        SolverCase
+        Case
             Case for associated row.
         """
-        idx, counter, iteration_coordinate, timestamp, success, msg, abs_err, rel_err, \
+        idx, counter, iter_coord, timestamp, success, msg, abs_err, rel_err, \
             input_text, output_text, residuals_text = row
 
         if self._format_version >= 3:
@@ -1416,12 +1412,17 @@ class SolverCases(BaseCases):
             output_array = blob_to_array(output_text)
             residuals_array = blob_to_array(residuals_text)
 
-        case = SolverCase(self._filename, counter, iteration_coordinate, timestamp,
-                          success, msg, abs_err, rel_err, input_array, output_array,
-                          residuals_array, self._prom2abs, self._abs2prom, self._abs2meta)
+        split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
+        source = '|'.join(split_iter_coord)
+
+        case = Case(source, iter_coord, timestamp, success, msg,
+                    inputs=input_array, outputs=output_array, residuals=residuals_array,
+                    abs_err=abs_err, rel_err=rel_err,
+                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
+
         return case
 
-    def load_cases(self):
+    def _load_cases(self):
         """
         Load all solver cases into memory.
         """

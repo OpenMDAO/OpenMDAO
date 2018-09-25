@@ -36,16 +36,16 @@ class Case(object):
             The full unique identifier for the parent this iteration.
         children : list
             The full unique identifiers for children of this iteration.
-        abs_tol : float or None
+        abs_err : float or None
             Absolute tolerance (None if not recorded).
-        rel_tol : float or None
+        rel_err : float or None
             Relative tolerance (None if not recorded).
     """
 
     def __init__(self, source, iteration_coordinate, timestamp, success, msg,
-                 outputs, inputs=None, residuals=None, jacobian=None,
-                 parent=None, children=None, abs_tol=None, rel_tol=None,
-                 prom2abs=None, abs2prom=None):
+                 outputs=None, inputs=None, residuals=None, jacobian=None,
+                 parent=None, children=None, abs_err=None, rel_err=None,
+                 prom2abs=None, abs2prom=None, abs2meta=None, voi_meta=None):
         """
         Initialize.
 
@@ -73,31 +73,58 @@ class Case(object):
             The full unique identifier for the parent this iteration.
         children : list
             The full unique identifiers for children of this iteration.
-        abs_tol : float or None
-            Absolute tolerance for solver. (Solver cases only, None if not recorded).
-        rel_tol : float or None
-            Relative tolerance for solver. (Solver cases only, None if not recorded).
+        abs_err : float or None
+            Absolute error for solver. (Solver cases only, None if not recorded).
+        rel_err : float or None
+            Relative error for solver. (Solver cases only, None if not recorded).
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names of all variables to absolute names.
+        abs2prom : {'input': dict, 'output': dict}
+            Dictionary mapping absolute names of all variables to promoted names.
+        abs2meta : dict
+            Dictionary mapping absolute names of all variables to variable metadata.
+        voi_meta : dict
+            Dictionary mapping absolute names of variables of interest to variable metadata.
         """
         self.source = source
         self.iteration_coordinate = iteration_coordinate
+
         self.timestamp = timestamp
         self.success = success
         self.msg = msg
 
-        self.jacobian = jacobian
         self.parent = parent
         self.children = children
-        self.abs_tol = abs_tol
-        self.rel_tol = rel_tol
 
+        # for a solver case
+        self.abs_err = abs_err
+        self.rel_err = rel_err
+
+        # default properties to None
+        self.inputs = None
+        self.outputs = None
+        self.residuals = None
+        self.jacobian = None
+
+        # if provided, convert to properties allowing access via either promoted or absolute name
         if inputs is not None and inputs.dtype.names:
             self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
         if outputs is not None and outputs.dtype.names:
             self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs, abs2prom)
         if residuals is not None and residuals.dtype.names:
             self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs, abs2prom)
+        if jacobian is not None and jacobian.dtype.names:
+            self.jacobian = PromotedToAbsoluteMap(jacobian[0], prom2abs, abs2prom, output=True)
 
-    def get_desvars(self, scaled=True, use_indices=True):
+        # save var name & meta dict references for use by self._get_variables_of_type()
+        self._prom2abs = prom2abs
+        self._abs2prom = abs2prom
+        self._abs2meta = abs2meta
+
+        # save VOI dict reference for use by self.scale()
+        self._voi_meta = voi_meta
+
+    def get_design_vars(self, scaled=True, use_indices=True):
         """
         Get the values of the design variables, as seen by the driver, for this case.
 
@@ -187,14 +214,14 @@ class Case(object):
             Map of variables to their values.
         """
         if self.outputs is None:
-            return PromotedToAbsoluteMap({}, self.prom2abs, self.abs2prom)
+            return PromotedToAbsoluteMap({}, self._prom2abs, self._abs2prom)
 
         ret_vars = {}
         for var in self.outputs.absolute_names():
-            if var_type in self.meta[var]['type']:
+            if var_type in self._abs2meta[var]['type']:
                 ret_vars[var] = self.outputs[var]
 
-        return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom)
+        return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
 
     def list_inputs(self,
                     values=True,
@@ -298,155 +325,17 @@ class Case(object):
         """
         pass
 
-
-class DriverCase(Case):
-    """
-    Wrap data from a single iteration of a Driver recording to make it more easily accessible.
-
-    Attributes
-    ----------
-    _var_settings : dict
-        Dictionary mapping absolute variable names to variable settings.
-    """
-
-    def __init__(self, source, iteration_coordinate, timestamp, success, msg,
-                 outputs, inputs, prom2abs, abs2prom, var_settings):
-        """
-        Initialize.
-
-        Parameters
-        ----------
-        source : str
-            The unique id of the system/solver/driver/problem that did the recording.
-        iteration_coordinate : str
-            The full unique identifier for this iteration.
-        timestamp : float
-            Time of execution of the case.
-        success : str
-            Success flag for the case.
-        msg : str
-            Message associated with the case.
-        inputs : array
-            Inputs as read from the recording file.
-        outputs : array
-            Outputs as read from the recording file.
-        var_settings : dict
-            Dictionary mapping absolute variable names to variable settings.
-        """
-        super(DriverCase, self).__init__(iteration_coordinate, timestamp, success, msg,
-                                         outputs, inputs, prom2abs=prom2abs, abs2prom=abs2prom)
-        self._var_settings = var_settings
-
     def scale(self):
         """
-        Scale the outputs array using _var_settings.
+        Scale the outputs array using _voi_meta.
         """
         for name in self.outputs.absolute_names():
-            if name in self._var_settings:
+            if name in self._voi_meta:
                 # physical to scaled
-                if self._var_settings[name]['adder'] is not None:
-                    self.outputs[name] += self._var_settings[name]['adder']
-                if self._var_settings[name]['scaler'] is not None:
-                    self.outputs[name] *= self._var_settings[name]['scaler']
-
-
-class SystemCase(Case):
-    """
-    Wraps data from a single iteration of a System recording to make it more accessible.
-    """
-
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg, inputs,
-                 outputs, residuals, prom2abs, abs2prom, meta):
-        """
-        Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The filename from which the SystemCase was constructed.
-        counter : int
-            The global execution counter.
-        iteration_coordinate : str
-            The string that holds the full unique identifier for the desired iteration.
-        timestamp : float
-            Time of execution of the case
-        success : str
-            Success flag for the case
-        msg : str
-            Message associated with the case
-        inputs : array
-            System inputs to read in from the recording file.
-        outputs : array
-            System outputs to read in from the recording file.
-        residuals : array
-            System residuals to read in from the recording file.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        """
-        super(SystemCase, self).__init__(filename, counter, iteration_coordinate,
-                                         timestamp, success, msg, prom2abs,
-                                         abs2prom, meta, inputs, outputs,
-                                         residuals=residuals)
-
-
-class SolverCase(Case):
-    """
-    Wraps data from a single iteration of a System recording to make it more accessible.
-
-    Attributes
-    ----------
-    abs_err : array
-        Solver absolute error that has been read in from the recording file.
-    rel_err : array
-        Solver relative error that has been read in from the recording file.
-    """
-
-    def __init__(self, filename, counter, iteration_coordinate, timestamp, success, msg,
-                 abs_err, rel_err, inputs, outputs, residuals, prom2abs, abs2prom, meta):
-        """
-        Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The filename from which the SystemCase was constructed.
-        counter : int
-            The global execution counter.
-        iteration_coordinate : str
-            The iteration coordinate, in a specific format.
-        timestamp : float
-            Time of execution of the case
-        success : str
-            Success flag for the case
-        msg : str
-            Message associated with the case
-        abs_err : array
-            Solver absolute error to read in from the recording file.
-        rel_err : array
-            Solver relative error to read in from the recording file.
-        inputs : array
-            Solver inputs to read in from the recording file.
-        outputs : array
-            Solver outputs to read in from the recording file.
-        residuals : array
-            Solver residuals to read in from the recording file.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        """
-        super(SolverCase, self).__init__(filename, counter, iteration_coordinate, timestamp,
-                                         success, msg, prom2abs, abs2prom, meta,
-                                         inputs, outputs, residuals=residuals)
-
-        self.abs_err = abs_err
-        self.rel_err = rel_err
+                if self._voi_meta[name]['adder'] is not None:
+                    self.outputs[name] += self._voi_meta[name]['adder']
+                if self._voi_meta[name]['scaler'] is not None:
+                    self.outputs[name] *= self._voi_meta[name]['scaler']
 
 
 class ProblemCase(Case):
@@ -690,78 +579,3 @@ class PromotedToAbsoluteMap(dict):
                 yield (of, wrt)
             else:
                 yield key
-
-
-class DriverDerivativesCase(object):
-    """
-    Wrap data from a derivative calculation in a Driver recording to make it more accessible.
-
-    Attributes
-    ----------
-    iteration_coordinate : str
-        The string that holds the full unique identifier for this iteration.
-    timestamp : float
-        Time of execution of the case.
-    success : str
-        Success flag for the case.
-    msg : str
-        Message associated with the case.
-    prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-    abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names.
-    meta : dict
-        Dictionary mapping absolute variable names to variable metadata.
-    totals : PromotedToAbsoluteMap
-        Map of inputs to values recorded.
-    """
-
-    def __init__(self, iteration_coordinate, timestamp, success, msg, totals,
-                 prom2abs, abs2prom, meta):
-        """
-        Initialize.
-
-        Parameters
-        ----------
-        iteration_coordinate : str
-            The string that holds the full unique identifier for this iteration.
-        timestamp : float
-            Time of execution of the case.
-        success : str
-            Success flag for the case.
-        msg : str
-            Message associated with the case.
-        totals : array
-            Derivatives to read in from the recording file.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        """
-        self.iteration_coordinate = iteration_coordinate
-
-        self.timestamp = timestamp
-        self.success = success
-        self.msg = msg
-        self.meta = meta
-        self.prom2abs = prom2abs
-        self.abs2prom = abs2prom
-
-        if totals is not None and totals.dtype.names:
-            self.totals = PromotedToAbsoluteMap(totals[0], prom2abs, abs2prom, output=True)
-
-    def get_derivatives(self):
-        """
-        Get the derivatives and their values.
-
-        Returns
-        -------
-        PromotedToAbsoluteMap
-            Map of derivatives to their values.
-        """
-        ret_vars = {}
-        for key in self.totals.absolute_names():
-            ret_vars[key] = self.totals[key]
-        return PromotedToAbsoluteMap(ret_vars, self.prom2abs, self.abs2prom, output=True)

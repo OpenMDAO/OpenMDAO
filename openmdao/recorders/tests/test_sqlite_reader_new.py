@@ -82,7 +82,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader(self.filename)
-        self.assertEqual(cr.format_version, format_version,
+        self.assertEqual(cr._format_version, format_version,
                          msg='format version not read correctly')
 
     def test_reader_instantiates(self):
@@ -135,7 +135,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        ' for {0}'.format('pz.z'))
 
         deriv_case = cr._deriv_cases.get_case('rank0:SLSQP|3')
-        np.testing.assert_almost_equal(deriv_case.totals['obj', 'pz.z'],
+        np.testing.assert_almost_equal(deriv_case.jacobian['obj', 'pz.z'],
                                        [[3.8178954, 1.73971323]],
                                        decimal=2,
                                        err_msg='Case reader gives '
@@ -143,7 +143,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        ' for {0}'.format('pz.z'))
 
         # While thinking about derivatives, let's get them all.
-        derivs = deriv_case.get_derivatives()
+        derivs = deriv_case.jacobian
 
         self.assertEqual(set(derivs.keys()), set([
             ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
@@ -183,7 +183,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         deriv_case = cr._deriv_cases.get_case('rank0:SLSQP|1')
 
         # Get all derivatives from that case.
-        derivs = deriv_case.get_derivatives()
+        derivs = deriv_case.jacobian
 
         # See what derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([
@@ -694,7 +694,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
         driver_case = cr._driver_cases.get_case(0)
-        desvars = driver_case.get_desvars()
+        desvars = driver_case.get_design_vars()
         objectives = driver_case.get_objectives()
         constraints = driver_case.get_constraints()
         responses = driver_case.get_responses()
@@ -1108,7 +1108,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # without pre_load, we should get format_version and metadata but no cases
         cr = CaseReader(self.filename, pre_load=False)
 
-        self.assertEqual(cr.format_version, format_version,
+        self.assertEqual(cr._format_version, format_version,
                          msg='format version not read correctly')
 
         expected_systems = ['root'] + [sys.name for sys in prob.model._subsystems_allprocs]
@@ -1128,7 +1128,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # with pre_load, we should get format_version, metadata and all cases
         cr = CaseReader(self.filename, pre_load=True)
 
-        self.assertEqual(cr.format_version, format_version,
+        self.assertEqual(cr._format_version, format_version,
                          msg='format version not read correctly')
 
         expected_systems = ['root'] + [sys.name for sys in prob.model._subsystems_allprocs]
@@ -1350,8 +1350,8 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         driver_case = cr._driver_cases.get_case(-1)
         deriv_case = cr._deriv_cases.get_case(-1)
 
-        dvs = driver_case.get_desvars()
-        derivs = deriv_case.get_derivatives()
+        dvs = driver_case.get_design_vars()
+        derivs = deriv_case.jacobian
 
         # verify that map looks and acts like a regular dict
         self.assertTrue(isinstance(dvs, dict))
