@@ -304,8 +304,8 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
         except StopIteration:
             stack.pop()
 
-    cprint("Max mem usage: ")
-    cprint("%f\n" % maxmem, color=Fore.RED + Style.BRIGHT)
+    cprint("\nMax mem usage: ")
+    cprint("%7.2f MB\n" % maxmem, color=Fore.RED + Style.BRIGHT)
 
 if __name__ == '__main__':
     import sys
