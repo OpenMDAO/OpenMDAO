@@ -263,13 +263,11 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
                         continue  # last line is a return from funct called before we start recording
 
                     c_parts = _process_parts(c_parts[:9])
-                    (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj, c_instnum, c_call) = c_parts
-
-                    assert c_event in ('call', 'c_call'), "Event (%s) doesn't match return." % c_event
+                    (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj,
+                     c_instnum, c_call) = c_parts
 
                     # there are cases where sometimes a call is recorded but not a return,
                     # so we have to deal with those  :(
-
                     while call != c_call:
                         simple_warning("No return found for %s." % c_call)
                         try:
@@ -279,7 +277,8 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
                             continue
 
                         c_parts = _process_parts(c_parts)
-                        (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj, c_instnum, c_call) = c_parts
+                        (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj,
+                         c_instnum, c_call) = c_parts
 
                     info['|'.join(path_stack)]['total_mem'] += (mem - c_mem)
 
