@@ -295,9 +295,9 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
         try:
             val = next(children)
             if val['total_mem'] > min_mem:
-                cprint("%s%s %s  " % (indent, val['qualname'], val['objname']))
-                cprint("%7.2f" % val['total_mem'], color=Fore.GREEN + Style.BRIGHT)
-                cprint(" MB  (%d calls)\n" % val['calls'])
+                cprint("%s%7.2f " % (indent, val['total_mem']), color=Fore.GREEN + Style.BRIGHT)
+                cprint(" (%d calls)  " % val['calls'])
+                cprint("%s %s\n" % (val['qualname'], val['objname']))
                 if id(val) not in seen:
                     seen.add(id(val))
                     stack.append((indent + '  ', iter(val['children'])))
