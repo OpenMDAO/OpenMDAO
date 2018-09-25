@@ -5,10 +5,12 @@ import os
 import argparse
 import time
 from collections import defaultdict
+from os.path import abspath, isfile
 
 from openmdao.devtools.iprof_utils import find_qualified_name, func_group, \
      _collect_methods, _setup_func_group, _get_methods, _Options
 from openmdao.utils.mpi import MPI
+from openmdao.devtools.debug import _get_color_printer
 
 
 _registered = False
@@ -21,33 +23,33 @@ def _create_profile_callback(stream):
 
     def _wrapped(frame, event, arg):
         fname = frame.f_code.co_filename
-        if fname[0] != '<' and 'site-packages' not in fname and 'lib/python' not in fname:
-            if event == 'call' or event == 'return':
-                if 'self' in frame.f_locals:
-                    self = frame.f_locals['self']
-                    class_ = self.__class__.__name__
-                    ident = id(self)
-                    d = class_insts[class_]
-                    if ident in d:
-                        inst_num = d[ident]
-                    else:
-                        d[ident] = inst_num = len(d)
-                    if isinstance(self, System):
-                        try:
-                            name = self.pathname
-                            if not name:
-                                name = "''"
-                        except AttributeError:
-                            name = '?'
-                    else:
+        # exclude any c calls and any builtin python '<func>' functions
+        if fname[0] != '<' and (event == 'call' or event == 'return'):
+            if 'self' in frame.f_locals:
+                self = frame.f_locals['self']
+                class_ = self.__class__.__name__
+                ident = id(self)
+                d = class_insts[class_]
+                if ident in d:
+                    inst_num = d[ident]
+                else:
+                    d[ident] = inst_num = len(d)
+                if isinstance(self, System):
+                    try:
+                        name = self.pathname
+                        if not name:
+                            name = "''"
+                    except AttributeError:
                         name = '?'
                 else:
-                    class_ = name = '?'
-                    inst_num = -1
+                    name = '?'
+            else:
+                class_ = name = '?'
+                inst_num = -1
 
-                print(event, os.path.abspath(frame.f_code.co_filename), frame.f_code.co_firstlineno,
-                      frame.f_code.co_name, mem_usage(), time.time(), class_, name, inst_num,
-                      file=stream)
+            print(event, abspath(frame.f_code.co_filename), frame.f_code.co_firstlineno,
+                    frame.f_code.co_name, mem_usage(), time.time(), class_, name, inst_num,
+                    sep='|', file=stream)
 
     return _wrapped
 
@@ -96,12 +98,15 @@ def stop():
 
 
 def _mem_prof_setup_parser(parser):
-    parser.add_argument('-f', '--file', action='store', dest='outfile', default='mem_trace.raw',
-                        help='Dump function trace with memory usage to given file.')
+    parser.add_argument('-o', '--outfile', action='store', dest='outfile', default='mem_trace.raw',
+                        help='Name of file containing memory dump.')
     parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
-                        help='Dump function trace with memory usage to given file.')
-    parser.add_argument('file', metavar='file', nargs=1,
-                        help='Python file to profile.')
+                        help='Dump function trace with memory usage in MB above min_mem to the '
+                        'given file. Default is 1.0.')
+    parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
+                        help="Display colors if the terminal supports it.  Requires 'colorama' "
+                             "python package.  Use 'pip install colorama' to install it.")
+    parser.add_argument('file', metavar='file', nargs=1, help='Python file to profile.')
 
 
 def _mem_prof_exec(options):
@@ -132,7 +137,8 @@ def _mem_prof_exec(options):
 
     stop()
 
-    postprocess_memtrace(options.outfile, options.min_mem)
+    postprocess_memtrace(fname=options.outfile, min_mem=options.min_mem,
+                         show_colors=options.show_colors)
 
 
 def _mempost_setup_parser(parser):
@@ -140,6 +146,9 @@ def _mempost_setup_parser(parser):
                         help='Dump memory tree to given file.')
     parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
                         help='Dump function trace with memory usage to given file.')
+    parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
+                        help="Display colors if the terminal supports it.  Requires 'colorama' "
+                             "python package.  Use 'pip install colorama' to install it.")
     parser.add_argument('file', metavar='file', nargs=1, help='Memory dump file to process.')
 
 
@@ -147,12 +156,13 @@ def _mempost_exec(options):
     """
     Process command line args and perform postprocessing on the specified memory dump file.
     """
-    if options.outfile is None:
+    if options.outfile in ('sys.stdout', None):
         stream = sys.stdout
     else:
-        stream = open(options.outfile, "w")
+        stream = open(options.outfile, 'w')
 
-    postprocess_memtrace(options.file[0], options.min_mem, stream=stream)
+    postprocess_memtrace(fname=options.file[0], min_mem=options.min_mem,
+                         show_colors=options.show_colors, stream=stream)
 
 
 def _process_parts(parts):
@@ -179,8 +189,9 @@ def _process_parts(parts):
     return parts
 
 
-def postprocess_memtrace(fname, min_mem=1.0, stream=None):
+def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sys.stdout):
     from openmdao.utils.general_utils import simple_warning
+    cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
 
     info = {}
     cache = {}
@@ -196,13 +207,13 @@ def postprocess_memtrace(fname, min_mem=1.0, stream=None):
     with open(fname, 'r') as f:
         for i, line in enumerate(f):
             if i > 0:   # skip first line, which is return from profile start()
-                parts = _process_parts(line.split())
+                parts = _process_parts(line.split('|'))
                 event, fpath, lineno, func, mem, elapsed, class_, objname, instnum, call = parts
 
                 if mem > maxmem:
                     maxmem = mem
 
-                if event == 'call':
+                if event in ('call', 'c_call'):
 
                     path_stack.append(call)
                     call_path = '|'.join(path_stack)
@@ -210,10 +221,10 @@ def postprocess_memtrace(fname, min_mem=1.0, stream=None):
                     key = call_path
 
                     if key not in info:
-                        if func.startswith('<'):
-                            qualname = fpath + ':' + func
-                        else:
+                        if not func[0] == '<' and isfile(fpath):
                             qualname = find_qualified_name(fpath, lineno, cache, full=True)
+                        else:
+                            qualname = "%s:%d:%s" % (fpath, lineno, func)
 
                         info[key] = idict = {
                             'calls': 0,
@@ -244,7 +255,7 @@ def postprocess_memtrace(fname, min_mem=1.0, stream=None):
 
                     stack.append(parts)
 
-                elif event == 'return':
+                elif event in ('return', 'c_return'):
                     try:
                         c_parts = stack.pop()
                     except IndexError:
@@ -254,7 +265,7 @@ def postprocess_memtrace(fname, min_mem=1.0, stream=None):
                     c_parts = _process_parts(c_parts[:9])
                     (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj, c_instnum, c_call) = c_parts
 
-                    assert c_event == 'call'
+                    assert c_event in ('call', 'c_call'), "Event (%s) doesn't match return." % c_event
 
                     # there are cases where sometimes a call is recorded but not a return,
                     # so we have to deal with those  :(
@@ -273,8 +284,6 @@ def postprocess_memtrace(fname, min_mem=1.0, stream=None):
                     info['|'.join(path_stack)]['total_mem'] += (mem - c_mem)
 
                     path_stack.pop()
-                else:
-                    raise RuntimeError("event is not 'call' or 'return'")
 
     srt = sorted(info.values(), key=lambda x: x['total_mem'])
 
@@ -287,16 +296,17 @@ def postprocess_memtrace(fname, min_mem=1.0, stream=None):
         try:
             val = next(children)
             if val['total_mem'] > min_mem:
-                print("%s%s %s %7.2f MB  (%d calls)" % (indent, val['qualname'], val['objname'],
-                                                        val['total_mem'], val['calls']),
-                      file=stream)
+                cprint("%s%s %s  " % (indent, val['qualname'], val['objname']))
+                cprint("%7.2f" % val['total_mem'], color=Fore.GREEN + Style.BRIGHT)
+                cprint(" MB  (%d calls)\n" % val['calls'])
                 if id(val) not in seen:
                     seen.add(id(val))
                     stack.append((indent + '  ', iter(val['children'])))
         except StopIteration:
             stack.pop()
 
-    print("Max mem usage:", maxmem, file=stream)
+    cprint("Max mem usage: ")
+    cprint("%f\n" % maxmem, color=Fore.RED + Style.BRIGHT)
 
 if __name__ == '__main__':
     import sys
