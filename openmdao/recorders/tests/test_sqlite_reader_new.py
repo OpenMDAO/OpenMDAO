@@ -520,11 +520,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        outputs = cr.list_outputs(case=None, explicit=True, implicit=True, values=True,
-                                  residuals=True, residuals_tol=None,
-                                  units=True, shape=True, bounds=True,
-                                  scaling=True, hierarchical=True, print_arrays=True,
-                                  out_stream=None)
+        case = cr._system_cases.get_case(0)
+
+        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
+                                    residuals=True, residuals_tol=None,
+                                    units=True, shape=True, bounds=True,
+                                    scaling=True, hierarchical=True, print_arrays=True,
+                                    out_stream=None)
 
         expected_outputs = {
             'd2.y2': {
@@ -570,11 +572,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # filter the outputs based on residuals_tol
         # there should be only one output, 'd1.y1'
-        outputs = cr.list_outputs(case=None, explicit=True, implicit=True, values=True,
-                                  residuals=True, residuals_tol=1e-12,
-                                  units=True, shape=True, bounds=True,
-                                  scaling=True, hierarchical=True, print_arrays=True,
-                                  out_stream=None)
+        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
+                                    residuals=True, residuals_tol=1e-12,
+                                    units=True, shape=True, bounds=True,
+                                    scaling=True, hierarchical=True, print_arrays=True,
+                                    out_stream=None)
 
         self.assertEqual(len(outputs), 1)
         [name, vals] = outputs[0]
@@ -589,12 +591,12 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check the system case for 'd1'.
         # there should be only one output, 'd1.y1'
-        sys_case = cr._system_cases.get_case(1)
-        outputs = cr.list_outputs(case=sys_case, explicit=True, implicit=True, values=True,
-                                  residuals=True, residuals_tol=None,
-                                  units=True, shape=True, bounds=True,
-                                  scaling=True, hierarchical=True, print_arrays=True,
-                                  out_stream=None)
+        case = cr._system_cases.get_case(1)
+        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
+                                    residuals=True, residuals_tol=None,
+                                    units=True, shape=True, bounds=True,
+                                    scaling=True, hierarchical=True, print_arrays=True,
+                                    out_stream=None)
 
         expected_outputs = {
             'd1.y1': {
@@ -619,8 +621,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check implicit outputs
         # there should not be any
-        impl_outputs_case = cr.list_outputs(sys_case, explicit=False, implicit=True,
-                                            out_stream=None)
+        impl_outputs_case = case.list_outputs(explicit=False, implicit=True,
+                                              out_stream=None)
         self.assertEqual(len(impl_outputs_case), 0)
 
     def test_list_inputs(self):
@@ -639,9 +641,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader(self.filename)
+        case = cr._system_cases.get_case(0)
 
-        inputs = cr.list_inputs(case=None, values=True, units=True, hierarchical=True,
-                                out_stream=None)
+        inputs = case.list_inputs(values=True, units=True, hierarchical=True,
+                                  out_stream=None)
 
         expected_inputs = {
             'obj_cmp.x': {'value': [1.]},
@@ -670,9 +673,9 @@ class TestSqliteCaseReader(unittest.TestCase):
             'd1.y2': {'value': [12.27257053]}
         }
 
-        sys_case = cr._system_cases.get_case(1)
-        inputs_case = cr.list_inputs(sys_case, values=True, units=True, hierarchical=True,
-                                     out_stream=None)
+        case = cr._system_cases.get_case(1)
+        inputs_case = case.list_inputs(values=True, units=True, hierarchical=True,
+                                       out_stream=None)
 
         for o in inputs_case:
             vals = o[1]
@@ -842,8 +845,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # make sure the loaded unit strings are compatible with `convert_units`
         from openmdao.utils.units import convert_units
-        outputs = cr.list_outputs(case=case, explicit=True, implicit=True, values=True,
-                                  units=True, shape=True, out_stream=None)
+        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
+                                    units=True, shape=True, out_stream=None)
         meta = {}
         for name, vals in outputs:
             meta[name] = vals
@@ -1442,6 +1445,18 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def setUp(self):
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
+
+    def tearDown(self):
+        os.chdir(self.orig_dir)
+        try:
+            rmtree(self.temp_dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
 
     def test_driver_v3(self):
         """

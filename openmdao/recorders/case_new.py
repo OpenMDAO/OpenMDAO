@@ -2,8 +2,15 @@
 A Case class.
 """
 
+import sys
 import re
 import itertools
+
+from collections import OrderedDict
+
+import numpy as np
+
+from openmdao.utils.write_outputs import write_outputs
 
 _DEFAULT_OUT_STREAM = object()
 
@@ -223,6 +230,18 @@ class Case(object):
 
         return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
 
+    def _scale(self):
+        """
+        Scale the outputs array using _voi_meta.
+        """
+        for name in self.outputs.absolute_names():
+            if name in self._voi_meta:
+                # physical to scaled
+                if self._voi_meta[name]['adder'] is not None:
+                    self.outputs[name] += self._voi_meta[name]['adder']
+                if self._voi_meta[name]['scaler'] is not None:
+                    self.outputs[name] *= self._voi_meta[name]['scaler']
+
     def list_inputs(self,
                     values=True,
                     units=False,
@@ -232,9 +251,7 @@ class Case(object):
         """
         Return and optionally log a list of input names and other optional information.
 
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
+        Also optionally logs the information to a user defined output stream.
 
         Parameters
         ----------
@@ -259,7 +276,35 @@ class Case(object):
         list
             list of input names and other optional information about those inputs
         """
-        pass
+        meta = self._abs2meta
+        inp_vars = {}
+        inputs = []
+
+        if self.inputs is not None:
+            for abs_name in self.inputs.absolute_names():
+                if abs_name not in inp_vars:
+                    inp_vars[abs_name] = {'value': self.inputs[abs_name]}
+
+        if inp_vars is not None and len(inp_vars) > 0:
+            for name in inp_vars:
+                outs = {}
+                if values:
+                    outs['value'] = inp_vars[name]['value']
+                if units:
+                    outs['units'] = meta[name]['units']
+                inputs.append((name, outs))
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        if out_stream:
+            if len(inp_vars) is 0:
+                out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
+                                 'settings have record_inputs set to True\n')
+
+            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
+
+        return inputs
 
     def list_outputs(self,
                      explicit=True, implicit=True,
@@ -277,9 +322,7 @@ class Case(object):
         """
         Return and optionally log a list of output names and other optional information.
 
-        If the model is parallel, only the local variables are returned to the process.
-        Also optionally logs the information to a user defined output stream. If the model is
-        parallel, the rank 0 process logs information about all variables across all processes.
+        Also optionally logs the information to a user defined output stream.
 
         Parameters
         ----------
@@ -323,19 +366,117 @@ class Case(object):
         list
             list of output names and other optional information about those outputs
         """
-        pass
+        meta = self._abs2meta
+        expl_outputs = []
+        impl_outputs = []
+        out_vars = {}
 
-    def scale(self):
+        for abs_name in self.outputs.absolute_names():
+            out_vars[abs_name] = {'value': self.outputs[abs_name]}
+            if self.residuals and abs_name in self.residuals.absolute_names():
+                out_vars[abs_name]['residuals'] = self.residuals[abs_name]
+            else:
+                out_vars[abs_name]['residuals'] = 'Not Recorded'
+
+        if len(out_vars) > 0:
+            for name in out_vars:
+                if residuals_tol and \
+                   out_vars[name]['residuals'] is not 'Not Recorded' and \
+                   np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:
+                    continue
+                outs = {}
+                if values:
+                    outs['value'] = out_vars[name]['value']
+                if prom_name:
+                    outs['prom_name'] = self._var_abs2prom['output'][name]
+                if residuals:
+                    outs['resids'] = out_vars[name]['residuals']
+                if units:
+                    outs['units'] = meta[name]['units']
+                if shape:
+                    outs['shape'] = out_vars[name]['value'].shape
+                if bounds:
+                    outs['lower'] = meta[name]['lower']
+                    outs['upper'] = meta[name]['upper']
+                if scaling:
+                    outs['ref'] = meta[name]['ref']
+                    outs['ref0'] = meta[name]['ref0']
+                    outs['res_ref'] = meta[name]['res_ref']
+                if meta[name]['explicit']:
+                    expl_outputs.append((name, outs))
+                else:
+                    impl_outputs.append((name, outs))
+
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        if out_stream:
+            if len(out_vars) is 0:
+                out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
+                                 'settings have record_outputs set to True\n')
+
+            if explicit:
+                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
+                                    out_stream)
+
+            if implicit:
+                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
+                                    out_stream)
+
+        if explicit and implicit:
+            return expl_outputs + impl_outputs
+        elif explicit:
+            return expl_outputs
+        elif implicit:
+            return impl_outputs
+        else:
+            raise RuntimeError('You have excluded both Explicit and Implicit components.')
+
+    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
+                       out_stream, meta):
         """
-        Scale the outputs array using _voi_meta.
+        Write table of variable names, values, residuals, and metadata to out_stream.
+
+        The output values could actually represent input variables.
+        In this context, outputs refers to the data that is being logged to an output stream.
+
+        Parameters
+        ----------
+        in_or_out : str, 'input' or 'output'
+            indicates whether the values passed in are from inputs or output variables.
+        comp_type : str, 'Explicit' or 'Implicit'
+            the type of component with the output values.
+        outputs : list
+            list of (name, dict of vals and metadata) tuples.
+        hierarchical : bool
+            When True, human readable output shows variables in hierarchical format.
+        print_arrays : bool
+            When False, in the columnar display, just display norm of any ndarrays with size > 1.
+            The norm is surrounded by vertical bars to indicate that it is a norm.
+            When True, also display full values of the ndarray below the row. Format  is affected
+            by the values set with numpy.set_printoptions
+            Default is False.
+        out_stream : file-like object
+            Where to send human readable output.
+            Set to None to suppress.
+        meta : dict
+            Dictionary mapping absolute names to metadata dictionaries for myproc variables.
         """
-        for name in self.outputs.absolute_names():
-            if name in self._voi_meta:
-                # physical to scaled
-                if self._voi_meta[name]['adder'] is not None:
-                    self.outputs[name] += self._voi_meta[name]['adder']
-                if self._voi_meta[name]['scaler'] is not None:
-                    self.outputs[name] *= self._voi_meta[name]['scaler']
+        if out_stream is None:
+            return
+
+        # Make a dict of outputs. Makes it easier to work with in this method
+        dict_of_outputs = OrderedDict()
+        for name, vals in outputs:
+            dict_of_outputs[name] = vals
+
+        allprocs_abs_names = {
+            'input': dict_of_outputs.keys(),
+            'output': dict_of_outputs.keys()
+        }
+
+        write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
+                      'model', allprocs_abs_names)
 
 
 class ProblemCase(Case):
