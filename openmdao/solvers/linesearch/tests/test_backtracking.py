@@ -2,6 +2,7 @@
 
 import sys
 import unittest
+from math import atan
 
 from six.moves import cStringIO as StringIO
 from six.moves import range
@@ -661,32 +662,75 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
 
+class CompAtan(ImplicitComponent):
+    """
+    A simple implicit component with the following equation:
+
+    F(x, y) = 33.0 * atan(y-20)**2 + x
+
+    x is an input, y is the state to be solved.
+    for x = -100, y should be 19.68734033
+
+    This equation poses a challenge because a guess that is far from the solution yields large
+    gradients and divergence. Additionally, the jacobian becomes singular at y = 20. To address
+    this, a lower and upper bound are added on y so that a solver with a BoundsEnforceLS does not
+    allow it to stray into problematic regions.
+    """
+
+    def setup(self):
+        self.add_input('x', 1.0)
+        self.add_output('y', 1.0, lower=1.0, upper=19.9)
+
+        self.declare_partials(of='y', wrt='x')
+        self.declare_partials(of='y', wrt='y')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        x = inputs['x']
+        y = outputs['y']
+
+        residuals['y'] = (33.0 * atan(y-20.0))**2 + x
+
+    def linearize(self, inputs, outputs, jacobian):
+        x = inputs['x']
+        y = outputs['y']
+
+        jacobian['y', 'y'] = 2178.0*atan(y-20.0) / (y**2 - 40.0*y + 401.0)
+        jacobian['y', 'x'] = 1.0
+
+
 class TestFeatureLineSearch(unittest.TestCase):
 
     def test_feature_specification(self):
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, BoundsEnforceLS
+        from openmdao.api import DirectSolver
+        from openmdao.solvers.linesearch.tests.test_backtracking import CompAtan
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
-        top.model.add_subsystem('comp', ImplCompTwoStates())
-        top.model.connect('px.x', 'comp.x')
+        prob = Problem()
+        model = prob.model
 
-        top.model.nonlinear_solver = NewtonSolver()
-        top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        model.add_subsystem('px', IndepVarComp('x', -100.0))
+        model.add_subsystem('comp', CompAtan())
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
-        ls.options['maxiter'] = 10
+        model.connect('px.x', 'comp.x')
 
-        top.setup(check=False)
+        prob.setup()
 
-        top['px.x'] = 2.0
-        top['comp.y'] = 0.0
-        top['comp.z'] = 1.6
-        top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
+        # Initial value for the state:
+        prob['comp.y'] = 12.0
+
+        # You can change the NewtonSolver settings after setup is called
+        newton = prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.linear_solver = DirectSolver()
+        newton.options['iprint'] = 2
+        newton.options['rtol'] = 1e-8
+        newton.options['solve_subsystems'] = True
+
+        newton.linesearch = BoundsEnforceLS()
+        newton.linesearch.options['iprint'] = 2
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 19.68734033, 1e-6)
 
     def test_feature_boundsenforcels_basic(self):
         import numpy as np
