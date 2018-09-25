@@ -258,8 +258,8 @@ class NOMPITests(unittest.TestCase):
                     "available. The default non-distributed vectors will be used.")
 
         for warn in w:
-           if str(warn.message) == expected:
-               break
+            if str(warn.message) == expected:
+                break
         else:
             self.fail("Did not see expected warning: %s" % expected)
 

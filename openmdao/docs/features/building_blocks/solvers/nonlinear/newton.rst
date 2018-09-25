@@ -126,12 +126,16 @@ By default, NewtonSolver does not perform a line search. We will show how to spe
 let's set up a problem that has implicit bounds on one of its states.
 
 .. embed-code::
-    openmdao.test_suite.components.implicit_newton_linesearch.ImplCompTwoStates
+    openmdao.solvers.linesearch.tests.test_backtracking.CompAtan
 
-In this component, the state "z" is only valid between 1.5 and 2.5, while the other state is valid
-everywhere. You can verify that if NewtonSolver is used with no backtracking specified, the solution
-violates the bounds on "z".  Here, we specify :ref:`ArmijoGoldsteinLS <openmdao.solvers.linesearch.backtracking.py>`
-as our line search algorithm, and we get a solution on the lower bounds for "z".
+This equation poses a challenge because a guess that is far from the solution yields large
+gradients and the solution will diverge. Additionally, the jacobian becomes singular at y = 20. To address
+both of these problems, a lower and upper bound are added on y so that a solver with a BoundsEnforceLS does not
+allow it to stray into problematic regions. Without the linsearch, Newton is unable to solve this problem unless you start
+very close to the solution.
+
+Here, we specify :ref:`BoundsEnforceLS <openmdao.solvers.linesearch.backtracking.py>`
+as our line search algorithm, and we get the expected solution for "y".
 
 .. embed-code::
     openmdao.solvers.linesearch.tests.test_backtracking.TestFeatureLineSearch.test_feature_specification
