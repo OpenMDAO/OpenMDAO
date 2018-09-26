@@ -122,9 +122,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if we got the correct number of cases
         self.assertEqual(cr._driver_cases.num_cases, 7)
-        self.assertEqual(cr._deriv_cases.num_cases, 6)
         self.assertEqual(cr._system_cases.num_cases, 0)
         self.assertEqual(cr._solver_cases.num_cases, 0)
+
+        self.assertEqual(cr.list_cases('driver'), [
+            'rank0:SLSQP|0', 'rank0:SLSQP|1', 'rank0:SLSQP|2', 'rank0:SLSQP|3',
+            'rank0:SLSQP|4', 'rank0:SLSQP|5', 'rank0:SLSQP|6'
+        ])
 
         # Test to see if the access by case keys works:
         seventh_slsqp_iteration_case = cr._driver_cases.get_case('rank0:SLSQP|5')
@@ -135,7 +139,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                                        'incorrect Parameter value'
                                        ' for {0}'.format('pz.z'))
 
-        deriv_case = cr._deriv_cases.get_case('rank0:SLSQP|3')
+        deriv_case = cr._driver_cases.get_case('rank0:SLSQP|3')
         np.testing.assert_almost_equal(deriv_case.jacobian['obj', 'pz.z'],
                                        [[3.8178954, 1.73971323]],
                                        decimal=2,
@@ -181,7 +185,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # Get derivatives associated with the first iteration.
-        deriv_case = cr._deriv_cases.get_case('rank0:SLSQP|1')
+        deriv_case = cr._driver_cases.get_case('rank0:SLSQP|1')
 
         # Get all derivatives from that case.
         derivs = deriv_case.jacobian
@@ -346,7 +350,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
-        prob.model.linear_solver.add_recorder(self.recorder)
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComponent)
         d1.nonlinear_solver = NonlinearBlockGS(maxiter=5)
@@ -359,11 +362,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
             sorted(metadata.keys()),
-            sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
+            sorted(['root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
         )
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
-        self.assertEqual(metadata['root.LinearBlockGS']['solver_class'], 'LinearBlockGS')
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -1314,10 +1316,9 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         driver_case = cr._driver_cases.get_case(-1)
-        deriv_case = cr._deriv_cases.get_case(-1)
 
         dvs = driver_case.get_design_vars()
-        derivs = deriv_case.jacobian
+        derivs = driver_case.jacobian
 
         # verify that map looks and acts like a regular dict
         self.assertTrue(isinstance(dvs, dict))
@@ -1335,6 +1336,7 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         dvs['x'] = 111.
         self.assertEqual(dvs['x'], 111.)
         self.assertEqual(dvs['px.x'], 111.)
+
         dvs['px.x'] = 222.
         self.assertEqual(dvs['x'], 222.)
         self.assertEqual(dvs['px.x'], 222.)
@@ -1352,12 +1354,12 @@ class TestPromotedToAbsoluteMap(unittest.TestCase):
         # verify we can access derivs via tuple or string, with promoted or absolute names
         J = prob.compute_totals(of=['obj'], wrt=['x'])
         expected = J[('obj', 'x')]
-        self.assertEqual(derivs[('obj', 'x')], expected)
-        self.assertEqual(derivs[('obj', 'px.x')], expected)
-        self.assertEqual(derivs[('obj_cmp.obj', 'px.x')], expected)
-        self.assertEqual(derivs['obj,x'], expected)
-        self.assertEqual(derivs['obj,px.x'], expected)
-        self.assertEqual(derivs['obj_cmp.obj,x'], expected)
+        np.testing.assert_almost_equal(derivs[('obj', 'x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs[('obj', 'px.x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs[('obj_cmp.obj', 'px.x')], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj,x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj,px.x'], expected, decimal=6)
+        np.testing.assert_almost_equal(derivs['obj_cmp.obj,x'], expected, decimal=6)
 
         # verify we can set derivs via tuple or string, with promoted or absolute names
         # (although users wouldn't normally do this, it's used when copying)
