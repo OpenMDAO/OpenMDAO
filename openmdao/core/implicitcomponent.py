@@ -157,8 +157,7 @@ class ImplicitComponent(Component):
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
-                with self.jacobian_context(jac):
-                    jac._apply(d_inputs, d_outputs, d_residuals, mode)
+                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
                 # if we're not matrix free, we can skip the bottom of
                 # this loop because apply_linear does nothing.

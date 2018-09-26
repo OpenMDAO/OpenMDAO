@@ -199,7 +199,7 @@ class ScipyOptimizeDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        problem = self._problem
+        problem = self._problem()
         opt = self.options['optimizer']
         model = problem.model
         self.iter_count = 0
@@ -377,7 +377,7 @@ class ScipyOptimizeDriver(Driver):
         float
             Value of the objective function evaluated at the new design point.
         """
-        model = self._problem.model
+        model = self._problem().model
 
         try:
 

@@ -162,7 +162,7 @@ class DOEDriver(Driver):
         else:
             case_gen = self.options['generator']
 
-        for case in case_gen(self._designvars, self._problem.model):
+        for case in case_gen(self._designvars, self._problem().model):
             self._run_case(case)
             self.iter_count += 1
 
@@ -191,7 +191,7 @@ class DOEDriver(Driver):
 
         with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
-                failure_flag, _, _ = self._problem.model._solve_nonlinear()
+                failure_flag, _, _ = self._problem().model._solve_nonlinear()
                 metadata['success'] = not failure_flag
                 metadata['msg'] = ''
             except AnalysisError:
@@ -301,7 +301,7 @@ class DOEDriver(Driver):
         else:
             res_vars = {}
 
-        model = self._problem.model
+        model = self._problem().model
 
         names = model._outputs._names
         views = model._outputs._views

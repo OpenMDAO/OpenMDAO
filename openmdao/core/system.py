@@ -1261,7 +1261,7 @@ class System(object):
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
-            asm_jac._initialize()
+            asm_jac._initialize(self)
             asm_jac._init_view(self)
 
     def set_initial_values(self):

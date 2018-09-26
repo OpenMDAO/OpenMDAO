@@ -1512,11 +1512,10 @@ class Group(System):
             elif jac is None and self._assembled_jac is not None:
                 jac = self._assembled_jac
             if jac is not None:
-                with self.jacobian_context(jac):
-                    for vec_name in vec_names:
-                        with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                            d_inputs, d_outputs, d_residuals = vecs
-                            jac._apply(d_inputs, d_outputs, d_residuals, mode)
+                for vec_name in vec_names:
+                    with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                        d_inputs, d_outputs, d_residuals = vecs
+                        jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
             # Apply recursion
             else:
                 if rel_systems is not None:
@@ -1733,50 +1732,49 @@ class Group(System):
                 else:
                     wrt.add(var)
 
-            with self.jacobian_context(J):
-                for key in product(of, wrt.union(of)):
-                    if key in self._subjacs_info:
-                        meta = self._subjacs_info[key]
-                    else:
-                        meta = SUBJAC_META_DEFAULTS.copy()
-                        if key[0] == key[1]:
-                            size = self._var_allprocs_abs2meta[key[0]]['size']
-                            meta['rows'] = meta['cols'] = np.arange(size)
-                            # All group approximations are treated as explicit components, so we
-                            # have a -1 on the diagonal.
-                            meta['value'] = np.full(size, -1.0)
+            for key in product(of, wrt.union(of)):
+                if key in self._subjacs_info:
+                    meta = self._subjacs_info[key]
+                else:
+                    meta = SUBJAC_META_DEFAULTS.copy()
+                    if key[0] == key[1]:
+                        size = self._var_allprocs_abs2meta[key[0]]['size']
+                        meta['rows'] = meta['cols'] = np.arange(size)
+                        # All group approximations are treated as explicit components, so we
+                        # have a -1 on the diagonal.
+                        meta['value'] = np.full(size, -1.0)
 
-                    meta['method'] = method
+                meta['method'] = method
 
-                    # A group under approximation needs all keys from below, so set dependent to
-                    # True.
-                    # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
-                    meta['dependent'] = True
+                # A group under approximation needs all keys from below, so set dependent to
+                # True.
+                # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
+                meta['dependent'] = True
 
-                    meta.update(self._owns_approx_jac_meta)
+                meta.update(self._owns_approx_jac_meta)
 
-                    # Create approximations, but only for the ones we need.
-                    if meta['dependent']:
+                # Create approximations, but only for the ones we need.
+                if meta['dependent']:
 
-                        # Skip indepvarcomp res wrt other srcs
-                        if key[0] in ivc:
+                    # Skip indepvarcomp res wrt other srcs
+                    if key[0] in ivc:
+                        continue
+
+                    # Skip explicit res wrt outputs
+                    if key[1] in of and key[1] not in ivc:
+
+                        # Support for specifying a desvar as an obj/con.
+                        if key[1] not in wrt or key[0] == key[1]:
                             continue
 
-                        # Skip explicit res wrt outputs
-                        if key[1] in of and key[1] not in ivc:
+                    approx.add_approximation(key, meta)
 
-                            # Support for specifying a desvar as an obj/con.
-                            if key[1] not in wrt or key[0] == key[1]:
-                                continue
+                if meta['value'] is None:
+                    shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
+                    meta['shape'] = shape
+                    meta['value'] = np.zeros(shape)
 
-                        approx.add_approximation(key, meta)
-
-                    if meta['value'] is None:
-                        shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
-                        meta['shape'] = shape
-                        meta['value'] = np.zeros(shape)
-
-                    self._subjacs_info[key] = meta
+                self._subjacs_info[key] = meta
 
         super(Group, self)._setup_jacobians(recurse=recurse)
 

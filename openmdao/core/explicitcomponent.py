@@ -243,8 +243,7 @@ class ExplicitComponent(Component):
                     d_inputs, d_outputs, d_residuals = vecs
 
                     # Jacobian and vectors are all scaled, unitless
-                    with self.jacobian_context(J):
-                        J._apply(d_inputs, d_outputs, d_residuals, mode)
+                    J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
                     # if we're not matrix free, we can skip the bottom of
                     # this loop because compute_jacvec_product does nothing.

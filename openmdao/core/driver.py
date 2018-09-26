@@ -7,6 +7,7 @@ from collections import OrderedDict
 import pprint
 import sys
 import warnings
+import weakref
 
 from six import iteritems, itervalues, string_types
 
@@ -248,7 +249,7 @@ class Driver(object):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        self._problem = problem
+        self._problem = weakref.ref(problem)
         model = problem.model
         mode = problem._mode
 
@@ -308,7 +309,7 @@ class Driver(object):
         """
         Set up case recording.
         """
-        problem = self._problem
+        problem = self._problem()
         model = problem.model
 
         mydesvars = myobjectives = myconstraints = myresponses = set()
@@ -366,7 +367,7 @@ class Driver(object):
                                                            all_constraints)
 
         if rec_inputs:
-            prob = self._problem
+            prob = self._problem()
             root = prob.model
             myinputs = {n for n in root._inputs
                         if check_path(n, incl, excl)}
@@ -440,7 +441,7 @@ class Driver(object):
         float or ndarray
             The value of the named variable of interest.
         """
-        model = self._problem.model
+        model = self._problem().model
         comm = model.comm
         vec = model._outputs._views_flat
         indices = meta['indices']
@@ -516,8 +517,10 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
+        problem = self._problem()
+
         if (name in self._remote_dvs and
-                self._problem.model._owning_rank[name] != self._problem.comm.rank):
+                problem.model._owning_rank[name] != problem.comm.rank):
             return
 
         meta = self._designvars[name]
@@ -525,7 +528,7 @@ class Driver(object):
         if indices is None:
             indices = slice(None)
 
-        desvar = self._problem.model._outputs._views_flat[name]
+        desvar = problem.model._outputs._views_flat[name]
         desvar[indices] = value
 
         if self._has_scaling:
@@ -701,7 +704,7 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            failure_flag, _, _ = self._problem.model._solve_nonlinear()
+            failure_flag, _, _ = self._problem().model._solve_nonlinear()
 
         self.iter_count += 1
         return failure_flag
@@ -732,6 +735,7 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
+        problem = self._problem()
         total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
                                                                    MPI.COMM_WORLD.rank == 0)
@@ -741,12 +745,12 @@ class Driver(object):
             print(header)
             print(len(header) * '-' + '\n')
 
-        if self._problem.model._owns_approx_jac:
+        if problem.model._owns_approx_jac:
             recording_iteration.stack.append(('_compute_totals_approx', 0))
 
             try:
                 if total_jac is None:
-                    total_jac = _TotalJacInfo(self._problem, of, wrt, global_names,
+                    total_jac = _TotalJacInfo(problem, of, wrt, global_names,
                                               return_format, approx=True, debug_print=debug_print)
                     self._total_jac = total_jac
                     totals = total_jac.compute_totals_approx(initialize=True)
@@ -757,7 +761,7 @@ class Driver(object):
 
         else:
             if total_jac is None:
-                total_jac = _TotalJacInfo(self._problem, of, wrt, global_names, return_format,
+                total_jac = _TotalJacInfo(problem, of, wrt, global_names, return_format,
                                           debug_print=debug_print)
 
             # don't cache linear constraint jacobian
@@ -814,7 +818,7 @@ class Driver(object):
         con_vars = {name: con_vars[name] for name in filt['con']}
         # res_vars = {name: res_vars[name] for name in filt['res']}
 
-        model = self._problem.model
+        model = self._problem().model
 
         names = model._outputs._names
         views = model._outputs._views
@@ -996,7 +1000,8 @@ class Driver(object):
         if not coloring_mod._use_sparsity:
             return
 
-        if not self._problem.model._use_derivatives:
+        problem = self._problem()
+        if not problem.model._use_derivatives:
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
@@ -1004,16 +1009,16 @@ class Driver(object):
             with open(self._simul_coloring_info, 'r') as f:
                 self._simul_coloring_info = coloring_mod._json2coloring(json.load(f))
 
-        if 'rev' in self._simul_coloring_info and self._problem._orig_mode not in ('rev', 'auto'):
+        if 'rev' in self._simul_coloring_info and problem._orig_mode not in ('rev', 'auto'):
             revcol = self._simul_coloring_info['rev'][0][0]
             if revcol:
                 raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
-                                   "been set to '%s'" % self._problem._orig_mode)
-        if 'fwd' in self._simul_coloring_info and self._problem._orig_mode not in ('fwd', 'auto'):
+                                   "been set to '%s'" % problem._orig_mode)
+        if 'fwd' in self._simul_coloring_info and problem._orig_mode not in ('fwd', 'auto'):
             fwdcol = self._simul_coloring_info['fwd'][0][0]
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
-                                   "been set to '%s'" % self._problem._orig_mode)
+                                   "been set to '%s'" % problem._orig_mode)
 
         # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns

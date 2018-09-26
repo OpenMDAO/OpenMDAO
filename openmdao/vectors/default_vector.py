@@ -12,8 +12,6 @@ import numpy as np
 from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.vectors.default_transfer import DefaultTransfer
 
-real_types = (numbers.Real, np.float32, np.float64)
-
 
 class DefaultVector(Vector):
     """
