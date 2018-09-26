@@ -293,14 +293,12 @@ class FiniteDifference(ApproximationScheme):
                     for i, result in results[key]:
                         subjac[:, i] = result
 
-                rel_key = abs_key2rel_key(system, key)
-
                 if uses_src_indices:
                     jac._override_checks = True
-                    jac[rel_key] = subjac
+                    jac[key] = subjac
                     jac._override_checks = False
                 else:
-                    jac[rel_key] = subjac
+                    jac[key] = subjac
 
     def _run_point(self, system, in_name, idxs, delta, out_tmp, in_tmp, result_array, total=False):
         """

@@ -36,6 +36,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.name_maps import abs_key2rel_key
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1216,8 +1217,8 @@ class Problem(object):
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
-            for rel_key, partial in iteritems(approx_jac):
-                abs_key = rel_key2abs_key(comp, rel_key)
+            for abs_key, partial in iteritems(approx_jac):
+                rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts

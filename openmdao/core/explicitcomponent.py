@@ -153,6 +153,7 @@ class ExplicitComponent(Component):
         """
         for abs_key, meta in iteritems(self._subjacs_info):
 
+            # if there isn't a declared partial value, set it to a dense matrix
             if meta['value'] is None:
                 meta['value'] = np.zeros(meta['shape'])
 
@@ -359,6 +360,10 @@ class ExplicitComponent(Component):
             if self._has_compute_partials:
                 self._inputs.read_only = True
 
+                # We don't need to set the _system attribute on jac here because jac (if not None)
+                # shares the _subjacs_info metadata with our _jacobian, and our _jacobian knows
+                # how to properly convert relative names (used by the component in compute_partials)
+                # to absolute names (used by all jacobians internally).
                 try:
                     # We used to negate the jacobian here, and then re-negate after the hook.
                     self.compute_partials(self._inputs, self._jacobian)

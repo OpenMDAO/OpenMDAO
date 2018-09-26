@@ -1600,21 +1600,6 @@ class System(object):
 
         return self._var_offsets
 
-    @contextmanager
-    def jacobian_context(self, jac):
-        """
-        Context manager that yields the Jacobian assigned to this system in this system's context.
-
-        Yields
-        ------
-        <Jacobian>
-            The current system's jacobian with its _system set to self.
-        """
-        oldsys = jac._system
-        jac._system = self
-        yield jac
-        jac._system = oldsys
-
     @property
     def nonlinear_solver(self):
         """
