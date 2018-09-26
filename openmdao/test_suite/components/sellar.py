@@ -225,7 +225,7 @@ class SellarNoDerivatives(Group):
         cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                           z=np.array([0.0, 0.0]), x=0.0),
+                                               z=np.array([0.0, 0.0]), x=0.0),
                            promotes=['x', 'z', 'y1', 'y2', 'obj'])
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
@@ -273,12 +273,14 @@ class SellarDerivatives(Group):
         self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                           z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0, obj=0.0),
+        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                               x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0,  y1=0.0), promotes=['con1', 'y1'])
-        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0), promotes=['con2', 'y2'])
+        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                           promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                           promotes=['con2', 'y2'])
 
         nl = self.options['nonlinear_solver']
         self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
@@ -308,7 +310,7 @@ class SellarDerivativesConnected(Group):
         self.add_subsystem('d2', SellarDis2withDerivatives())
 
         self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                           z=np.array([0.0, 0.0]), x=0.0))
+                                               z=np.array([0.0, 0.0]), x=0.0))
 
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'))
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'))
@@ -614,6 +616,7 @@ class SellarProblem(Problem):
     """
     The Sellar problem with configurable model class.
     """
+
     def __init__(self, model_class=SellarDerivatives, **kwargs):
         super(SellarProblem, self).__init__(model_class(**kwargs))
 

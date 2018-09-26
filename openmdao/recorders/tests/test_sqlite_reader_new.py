@@ -13,8 +13,8 @@ from six import iteritems, assertRaisesRegex
 
 # from pprint import pprint
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearRunOnce, \
-    NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver, NewtonSolver
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
+    NonlinearRunOnce, NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 # from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader_new import SqliteCaseReader, CaseReader
@@ -305,8 +305,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = LinearBlockGS()
+        model.nonlinear_solver = NonlinearBlockGS(iprint=0)
+        model.linear_solver = LinearBlockGS(iprint=0)
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -473,7 +473,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_get_child_cases_system(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=True)
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         driver.opt_settings['ACC'] = 1e-9
         prob.setup()
 
@@ -825,12 +825,17 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         model = prob.model
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = LinearBlockGS()
-        model.linear_solver.add_recorder(self.recorder)
+        model.nonlinear_solver.add_recorder(self.recorder)
 
-        prob.run_model()
+        # adding a recorder to a linear solver should raise an error
+        with self.assertRaises(RuntimeError) as cm:
+            model.linear_solver.add_recorder(self.recorder)
+        self.assertEqual(str(cm.exception), 'Recording is not supported on Linear Solvers.')
+
+        fail = prob.run_driver()
         prob.cleanup()
+
+        self.assertFalse(fail, 'Problem failed to converge')
 
         cr = CaseReader(self.filename)
         case = cr._solver_cases.get_case(0)
@@ -936,11 +941,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
 
@@ -953,8 +953,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.set_solver_print(0)
 
         prob.setup()
-        prob.run_driver()
+        fail = prob.run_driver()
         prob.cleanup()
+
+        self.assertFalse(fail, 'Problem failed to converge')
 
         cr = CaseReader(self.filename)
         case = cr._driver_cases.get_case(0)

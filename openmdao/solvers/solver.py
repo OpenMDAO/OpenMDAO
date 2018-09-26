@@ -14,13 +14,11 @@ import numpy as np
 from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 _emptyset = set()
 
@@ -222,7 +220,7 @@ class Solver(object):
 
     def add_recorder(self, recorder):
         """
-        Add a recorder to the driver's RecordingManager.
+        Add a recorder to the solver's RecordingManager.
 
         Parameters
         ----------
@@ -738,6 +736,17 @@ class LinearSolver(Solver):
         """
         if self.options['assemble_jac']:
             yield self
+
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the solver's RecordingManager.
+
+        Parameters
+        ----------
+        recorder : <BaseRecorder>
+           A recorder instance to be added to RecManager.
+        """
+        raise RuntimeError('Recording is not supported on Linear Solvers.')
 
     def _declare_options(self):
         """

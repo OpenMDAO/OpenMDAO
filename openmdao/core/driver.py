@@ -1,12 +1,10 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
-import os
 import json
 from collections import OrderedDict
 import pprint
 import sys
-import warnings
 
 from six import iteritems, itervalues, string_types
 
@@ -249,7 +247,6 @@ class Driver(object):
         """
         self._problem = problem
         model = problem.model
-        mode = problem._mode
 
         self._total_jac = None
 
@@ -699,7 +696,7 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
             failure_flag, _, _ = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
