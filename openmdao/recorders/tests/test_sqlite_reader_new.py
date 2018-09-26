@@ -522,75 +522,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr._system_cases.get_case(0)
 
-        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
-                                    residuals=True, residuals_tol=None,
-                                    units=True, shape=True, bounds=True,
-                                    scaling=True, hierarchical=True, print_arrays=True,
-                                    out_stream=None)
-
-        expected_outputs = {
-            'd2.y2': {
-                'lower': None, 'ref': 1.0,
-                'resids': [0.], 'shape': (1,), 'values': [12.0584882]
-            },
-            'con_cmp1.con1': {
-                'lower': None, 'ref': 1.0,
-                'resids': [0.], 'shape': (1,), 'values': [-22.4283024]
-            },
-            'pz.z': {
-                'lower': None, 'ref': 1.0,
-                'resids': [0., 0.], 'shape': (2,), 'values': [5., 2.]
-            },
-            'obj_cmp.obj': {
-                'lower': None, 'ref': 1.0,
-                'resids': [0.], 'shape': (1,), 'values': [28.5883082]
-            },
-            'px.x': {
-                'lower': None, 'ref': 1.0,
-                'resids': [0.], 'shape': (1,), 'values': [1.]
-            },
-            'con_cmp2.con2': {
-                'lower': None, 'ref': 1.0,
-                'resids': [0.], 'shape': (1,), 'values': [-11.9415118]
-            },
-            'd1.y1': {
-                'lower': None, 'ref': 1.0,
-                'resids': [1.318e-10], 'shape': (1,), 'values': [25.5883024]
-            }
-        }
-
-        self.assertEqual(len(outputs), 7)
-        for o in outputs:
-            name = o[0]
-            vals = o[1]
-            expected = expected_outputs[name]
-            self.assertEqual(vals['lower'], expected['lower'])
-            self.assertEqual(vals['ref'], expected['ref'])
-            self.assertEqual(vals['shape'], expected['shape'])
-            np.testing.assert_almost_equal(vals['resids'], expected['resids'])
-            np.testing.assert_almost_equal(vals['value'], expected['values'])
-
-        # filter the outputs based on residuals_tol
-        # there should be only one output, 'd1.y1'
-        outputs = case.list_outputs(explicit=True, implicit=True, values=True,
-                                    residuals=True, residuals_tol=1e-12,
-                                    units=True, shape=True, bounds=True,
-                                    scaling=True, hierarchical=True, print_arrays=True,
-                                    out_stream=None)
-
-        self.assertEqual(len(outputs), 1)
-        [name, vals] = outputs[0]
-        self.assertEqual(name, 'd1.y1')
-
-        expected = expected_outputs[name]
-        self.assertEqual(vals['lower'], expected['lower'])
-        self.assertEqual(vals['ref'], expected['ref'])
-        self.assertEqual(vals['shape'], expected['shape'])
-        np.testing.assert_almost_equal(vals['resids'], expected['resids'])
-        np.testing.assert_almost_equal(vals['value'], expected['values'])
-
-        # check the system case for 'd1'.
-        # there should be only one output, 'd1.y1'
+        # check the system case for 'd1' (there should be only one output, 'd1.y1')
         case = cr._system_cases.get_case(1)
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     residuals=True, residuals_tol=None,
@@ -641,31 +573,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader(self.filename)
-        case = cr._system_cases.get_case(0)
-
-        inputs = case.list_inputs(values=True, units=True, hierarchical=True,
-                                  out_stream=None)
-
-        expected_inputs = {
-            'obj_cmp.x': {'value': [1.]},
-            'd2.z': {'value': [5., 2.]},
-            'con_cmp2.y2': {'value': [12.05848815]},
-            'obj_cmp.y2': {'value': [12.05848815]},
-            'obj_cmp.z': {'value': [5., 2.]},
-            'd1.x': {'value': [1.]},
-            'd1.z': {'value': [5., 2.]},
-            'd1.y2': {'value': [12.05848815]},
-            'con_cmp1.y1': {'value': [25.58830237]},
-            'obj_cmp.y1': {'value': [25.58830237]},
-            'd2.y1': {'value': [25.58830237]}
-        }
-
-        self.assertEqual(len(inputs), 11)
-        for o in inputs:
-            vals = o[1]
-            name = o[0]
-            expected = expected_inputs[name]
-            np.testing.assert_almost_equal(vals['value'], expected['value'])
 
         expected_inputs_case = {
             'd1.z': {'value': [5., 2.]},
