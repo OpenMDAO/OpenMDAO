@@ -59,7 +59,10 @@ class PETScTransfer(DefaultTransfer):
         transfers = group._transfers
         vectors = group._vectors
         offsets = group._get_var_offsets()
-        for vec_name in group._lin_rel_vec_name_list:
+
+        vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
+
+        for vec_name in vec_names:
             relvars, _ = group._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices
@@ -192,7 +195,8 @@ class PETScTransfer(DefaultTransfer):
                         vectors['input'][vec_name], vectors['output'][vec_name],
                         rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
 
-        transfers['nonlinear'] = transfers['linear']
+        if group._use_derivatives:
+            transfers['nonlinear'] = transfers['linear']
 
     def _initialize_transfer(self, in_vec, out_vec):
         """

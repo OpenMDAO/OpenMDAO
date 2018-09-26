@@ -388,6 +388,7 @@ class Group(System):
             subsys._local_vector_class = self._local_vector_class
             subsys._distributed_vector_class = self._distributed_vector_class
             subsys.force_alloc_complex = self.force_alloc_complex
+            subsys._use_derivatives = self._use_derivatives
 
             if self.pathname:
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
@@ -468,8 +469,10 @@ class Group(System):
 
         subsystems_var_range = self._subsystems_var_range = {}
 
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
         # First compute these on one processor for each subsystem
-        for vec_name in self._lin_rel_vec_name_list:
+        for vec_name in vec_names:
 
             # Here, we count the number of variables in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
@@ -506,7 +509,8 @@ class Group(System):
                         np.sum(allprocs_counters[type_][:isub]),
                         np.sum(allprocs_counters[type_][:isub + 1]))
 
-        subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
+        if self._use_derivatives:
+            subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
 
         # Recursion
         if recurse:
@@ -634,8 +638,10 @@ class Group(System):
         sizes = self._var_sizes
         relnames = self._var_allprocs_relevant_names
 
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
         # Compute _var_sizes
-        for vec_name in self._lin_rel_vec_name_list:
+        for vec_name in vec_names:
             sizes[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
 
@@ -676,14 +682,15 @@ class Group(System):
             # compute owning ranks
             owns = self._owning_rank
             for type_ in ('input', 'output'):
-                sizes = self._var_sizes['linear'][type_]
+                sizes = self._var_sizes[vec_names[0]][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             break
 
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        if self._use_derivatives:
+            self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._setup_global_shapes()
 
@@ -856,9 +863,15 @@ class Group(System):
         dict
             The relevance dictionary.
         """
-        desvars = self.get_design_vars(recurse=True, get_sizes=False)
-        responses = self.get_responses(recurse=True, get_sizes=False)
-        return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
+        if self._use_derivatives:
+            desvars = self.get_design_vars(recurse=True, get_sizes=False)
+            responses = self.get_responses(recurse=True, get_sizes=False)
+            return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
+        else:
+            relevant = defaultdict(dict)
+            relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                              ContainsAll())}
+            return relevant
 
     def _setup_connections(self, recurse=True):
         """
@@ -1127,7 +1140,12 @@ class Group(System):
             sub_ext_num_vars = {}
             sub_ext_sizes = {}
 
-            for vec_name in subsys._lin_rel_vec_name_list:
+            if subsys._use_derivatives:
+                vec_names = subsys._lin_rel_vec_name_list
+            else:
+                vec_names = subsys._vec_names
+
+            for vec_name in vec_names:
                 subsystems_var_range = self._subsystems_var_range[vec_name]
                 sizes = self._var_sizes[vec_name]
 
@@ -1149,8 +1167,9 @@ class Group(System):
                         ext_sizes[vec_name][type_][1] + size2,
                     )
 
-            sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
-            sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
+            if subsys._use_derivatives:
+                sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
+                sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
 
             subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
 
@@ -1674,6 +1693,9 @@ class Group(System):
         recurse : bool
             If True, setup jacobians in all descendants.
         """
+        if not self._use_derivatives:
+            return
+
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:

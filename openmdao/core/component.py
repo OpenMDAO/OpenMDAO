@@ -286,30 +286,47 @@ class Component(System):
 
         iproc = self.comm.rank
         nproc = self.comm.size
-        vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
-        relnames = self._var_allprocs_relevant_names
         abs2meta = self._var_abs2meta
+
+        if self._use_derivatives:
+            vec_names = self._lin_rel_vec_name_list
+        else:
+            vec_names = self._vec_names
 
         # Initialize empty arrays
         for vec_name in vec_names:
-            sizes[vec_name] = {}
+            # at component level, _var_allprocs_* is the same as var_* since all vars exist in all
+            # procs for a given component, so we don't have to mess with figuring out what vars are
+            # local.
+            if self._use_derivatives:
+                relnames = self._var_allprocs_relevant_names[vec_name]
+            else:
+                relnames = self._var_allprocs_abs_names
 
+            sizes[vec_name] = {}
             for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[vec_name][type_])), int)
+                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[type_])), int)
 
                 # Compute _var_sizes
-                for idx, abs_name in enumerate(relnames[vec_name][type_]):
+                for idx, abs_name in enumerate(relnames[type_]):
                     sz[iproc, idx] = abs2meta[abs_name]['size']
 
-        if self.comm.size > 1:
+        if nproc > 1:
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]
-                for type_ in ['input', 'output']:
-                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                if self.options['distributed']:
+                    for type_ in ['input', 'output']:
+                        self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                else:
+                    # if component isn't distributed, we don't need to allgather sizes since
+                    # they'll all be the same.
+                    for type_ in ['input', 'output']:
+                        sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
 
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        if self._use_derivatives:
+            self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._setup_global_shapes()
 

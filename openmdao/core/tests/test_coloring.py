@@ -52,7 +52,8 @@ class CounterGroup(Group):
 # note: size must be an even number
 SIZE = 10
 
-def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, **options):
+def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, derivs=True,
+           **options):
 
     p = Problem(model=CounterGroup())
 
@@ -126,7 +127,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
 
-    p.setup(mode=mode)
+    p.setup(mode=mode, derivatives=derivs)
     p.run_driver()
 
     return p
@@ -825,6 +826,13 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 1) / 22,
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
+
+    def test_dynamic_simul_coloring_no_derivs(self):
+        with self.assertRaises(Exception) as context:
+            p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
+                              dynamic_simul_derivs=True, derivs=False)
+        self.assertEqual(str(context.exception),
+                         "Derivative support has been turned off but compute_totals was called.")
 
 
 class SparsityTestCase(unittest.TestCase):
