@@ -913,7 +913,8 @@ class DriverCases(BaseCases):
 
         case = Case('driver', iteration_coordinate, timestamp, success, msg,
                     outputs=outputs_array, inputs=inputs_array,
-                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
+                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta,
+                    voi_meta=self._var_settings)
         return case
 
     def _load_cases(self):
@@ -945,7 +946,7 @@ class DriverCases(BaseCases):
 
         con.close()
 
-    def get_case(self, case_id, scaled=False):
+    def get_case(self, case_id):
         """
         Get a case from the database.
 
@@ -981,12 +982,6 @@ class DriverCases(BaseCases):
 
             # save so we don't query again
             self._cases[case.iteration_coordinate] = case
-
-        if scaled:
-            # We have to do some scaling first before we return it
-            # Need to make a copy, otherwise we modify the object in the cache
-            case = deepcopy(case)
-            case.scale()
 
         return case
 

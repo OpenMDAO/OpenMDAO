@@ -128,7 +128,7 @@ class Case(object):
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
 
-        # save VOI dict reference for use by self.scale()
+        # save VOI dict reference for use by self._scale()
         self._voi_meta = voi_meta
 
     def get_design_vars(self, scaled=True, use_indices=True):
@@ -147,7 +147,11 @@ class Case(object):
         PromotedToAbsoluteMap
             Map of variables to their values.
         """
-        return self._get_variables_of_type('desvar')
+        vals = self._get_variables_of_type('desvar')
+        if scaled:
+            return self._scale(vals)
+        else:
+            return vals
 
     def get_objectives(self, scaled=True, use_indices=True):
         """
@@ -165,7 +169,11 @@ class Case(object):
         PromotedToAbsoluteMap
             Map of variables to their values.
         """
-        return self._get_variables_of_type('objective')
+        vals = self._get_variables_of_type('objective')
+        if scaled:
+            return self._scale(vals)
+        else:
+            return vals
 
     def get_constraints(self, scaled=True, use_indices=True):
         """
@@ -183,7 +191,11 @@ class Case(object):
         PromotedToAbsoluteMap
             Map of variables to their values.
         """
-        return self._get_variables_of_type('constraint')
+        vals = self._get_variables_of_type('constraint')
+        if scaled:
+            return self._scale(vals)
+        else:
+            return vals
 
     def get_responses(self, scaled=True, use_indices=True):
         """
@@ -203,7 +215,11 @@ class Case(object):
         PromotedToAbsoluteMap
             Map of variables to their values.
         """
-        return self._get_variables_of_type('response')
+        vals = self._get_variables_of_type('response')
+        if scaled:
+            return self._scale(vals)
+        else:
+            return vals
 
     def _get_variables_of_type(self, var_type):
         """
@@ -230,17 +246,30 @@ class Case(object):
 
         return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
 
-    def _scale(self):
+    def _scale(self, vals):
         """
-        Scale the outputs array using _voi_meta.
+        Scale the values array using adder and scaler from _voi_meta.
+
+
+        Parameters
+        ----------
+        vals : PromotedToAbsoluteMap
+            Map of variables to their values.
+
+        Returns
+        -------
+        PromotedToAbsoluteMap
+            Map of variables to their scaled values.
         """
-        for name in self.outputs.absolute_names():
+        for name in vals.absolute_names():
             if name in self._voi_meta:
                 # physical to scaled
                 if self._voi_meta[name]['adder'] is not None:
-                    self.outputs[name] += self._voi_meta[name]['adder']
+                    vals[name] += self._voi_meta[name]['adder']
                 if self._voi_meta[name]['scaler'] is not None:
-                    self.outputs[name] *= self._voi_meta[name]['scaler']
+                    vals[name] *= self._voi_meta[name]['scaler']
+
+        return vals
 
     def list_inputs(self,
                     values=True,
