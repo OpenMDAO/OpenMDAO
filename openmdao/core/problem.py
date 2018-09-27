@@ -84,8 +84,6 @@ class Problem(object):
     _mode : 'fwd' or 'rev'
         Derivatives calculation mode, 'fwd' for forward, and 'rev' for
         reverse (adjoint).
-    _use_ref_vector : bool
-        If True, allocate vectors to store ref. values.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
     _initial_condition_cache : dict
@@ -109,7 +107,7 @@ class Problem(object):
 
     _post_setup_func = None
 
-    def __init__(self, model=None, driver=None, comm=None, use_ref_vector=True, root=None):
+    def __init__(self, model=None, driver=None, comm=None, root=None):
         """
         Initialize attributes.
 
@@ -121,8 +119,6 @@ class Problem(object):
             The driver for the problem. If not specified, a simple "Run Once" driver will be used.
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        use_ref_vector : bool
-            If True, allocate vectors to store ref. values.
         root : <System> or None
             Deprecated kwarg for `model`.
         """
@@ -161,7 +157,6 @@ class Problem(object):
 
         self.comm = comm
 
-        self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
 
         self._mode = None  # mode is assigned in setup()
@@ -737,7 +732,7 @@ class Problem(object):
 
         When `setup` is called, the model hierarchy is assembled, the processors are allocated
         (for MPI), and variables and connections are all assigned. This method traverses down
-        the model hierarchy to call `setup` on each subsystem, and then traverses up te model
+        the model hierarchy to call `setup` on each subsystem, and then traverses up the model
         hierarchy to call `configure` on each subsystem.
 
         Parameters

@@ -94,7 +94,6 @@ Which will result in output that looks like this:
       model=None
       root=None
       self=<openmdao.core.problem.Problem object>
-      use_ref_vector=True
         Group#1.Group.__init__ (1)
           kwargs={}
           self=<openmdao.core.group.Group object>
