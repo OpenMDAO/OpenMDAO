@@ -87,7 +87,9 @@ class Group(System):
         self._static_manual_connections = {}
         self._conn_global_abs_in2out = {}
         self._conn_abs_in2out = {}
+        self._conn_discrete_in2out = {}
         self._transfers = {}
+        self._discrete_transfers = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -875,7 +877,7 @@ class Group(System):
 
     def _setup_connections(self, recurse=True):
         """
-        Compute dict of all implicit and explicit connections owned by this system.
+        Compute dict of all implicit and explicit connections owned by this Group.
 
         Parameters
         ----------
@@ -883,6 +885,7 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         abs_in2out = self._conn_abs_in2out = {}
+        discrete_in2out = self._conn_discrete_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
 
@@ -902,10 +905,7 @@ class Group(System):
                 elif not s.options['distributed']:
                     self._local_system_set.add(s.pathname)
 
-        if pathname == '':
-            path_len = 0
-        else:
-            path_len = len(pathname) + 1
+        path_len = len(pathname) + 1 if pathname else 0
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 

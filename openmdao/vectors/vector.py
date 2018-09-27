@@ -164,7 +164,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[name][self._typ][self._iproc, :])
+        self._length = np.sum(system._var_sizes[name][self._typ][self._iproc, :])
 
         self.read_only = False
 

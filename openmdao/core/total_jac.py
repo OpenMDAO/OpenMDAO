@@ -11,6 +11,7 @@ from six import iteritems, itervalues
 from six.moves import zip
 import sys
 import time
+import weakref
 
 import numpy as np
 
@@ -56,7 +57,7 @@ class _TotalJacInfo(object):
         Dict of indices keyed to solution vectors.
     mode : str
         If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
-    model : <System>
+    model : weakref to <System>
         The top level System of the System tree.
     out_meta : dict
         Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
@@ -111,7 +112,8 @@ class _TotalJacInfo(object):
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
 
-        self.model = model = problem.model
+        model = problem.model
+        self.model = weakref.ref(model)
         self.comm = problem.comm
         self.mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
@@ -202,13 +204,13 @@ class _TotalJacInfo(object):
             zeros = model._var_sizes['linear']['output'] == 0
             if 'fwd' in modes:
                 for name in of:
-                    if (np.any(zeros[:, self.model._var_allprocs_abs2idx['linear'][name]]) or
+                    if (np.any(zeros[:, model._var_allprocs_abs2idx['linear'][name]]) or
                             abs2meta[name]['distributed']):
                         has_remote_vars['fwd'] = True
                         break
             if 'rev' in modes:
                 for name in wrt:
-                    if (np.any(zeros[:, self.model._var_allprocs_abs2idx['linear'][name]]) or
+                    if (np.any(zeros[:, model._var_allprocs_abs2idx['linear'][name]]) or
                             abs2meta[name]['distributed']):
                         has_remote_vars['rev'] = True
                         break
@@ -258,14 +260,16 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, size, has_remote_vars):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
-        if self.comm.size > 1 or (self.model._full_comm is not None and
-                                  self.model._full_comm.size > 1):
+        model = self.model()
+
+        if self.comm.size > 1 or (model._full_comm is not None and
+                                  model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(size, dtype=float),
                                                   comm=self.comm)
             self.jac_petsc[mode] = tgt_vec
             self.soln_petsc[mode] = {}
             sol_idxs, jac_idxs = self.solvec_map[mode]
-            for vecname in self.model._lin_vec_names:
+            for vecname in model._lin_vec_names:
                 src_arr = self.output_vec[mode][vecname]._data
                 if isinstance(self.output_vec[mode][vecname], PETScVector):
                     src_vec = self.output_vec[mode][vecname]._petsc
@@ -290,7 +294,7 @@ class _TotalJacInfo(object):
                 jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
                                                                tgt_vec, tgt_indexset)
         else:
-            for vecname in self.model._lin_vec_names:
+            for vecname in model._lin_vec_names:
                 jac_scatters[vecname] = None
 
     def _initialize_approx(self):
@@ -300,7 +304,7 @@ class _TotalJacInfo(object):
         of_set = frozenset(self.of)
         wrt_set = frozenset(self.wrt)
 
-        model = self.model
+        model = self.model()
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != of_set \
@@ -391,12 +395,13 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         owning_ranks = self.owning_ranks
-        relevant = self.model._relevant
+        model = self.model()
+        relevant = model._relevant
         has_par_deriv_color = False
-        abs2meta = self.model._var_allprocs_abs2meta
-        var_sizes = self.model._var_sizes
-        var_offsets = self.model._var_offsets
-        abs2idx = self.model._var_allprocs_abs2idx
+        abs2meta = model._var_allprocs_abs2meta
+        var_sizes = model._var_sizes
+        var_offsets = model._var_offsets
+        abs2idx = model._var_allprocs_abs2idx
         idx_iter_dict = OrderedDict()  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
@@ -584,14 +589,14 @@ class _TotalJacInfo(object):
         """
         idxs = {}
         jac_idxs = {}
-        model = self.model
+        model = self.model()
         myproc = model.comm.rank
         owners = model._owning_rank
         fwd = mode == 'fwd'
         missing = False
         full_slice = slice(None)
 
-        for vecname in self.model._lin_vec_names:
+        for vecname in model._lin_vec_names:
             inds = []
             jac_inds = []
             sizes = model._var_sizes[vecname]['output']
@@ -829,7 +834,7 @@ class _TotalJacInfo(object):
         yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, None
 
     def _zero_vecs(self, vecname, mode):
-        vecs = self.model._vectors
+        vecs = self.model()._vectors
 
         # clean out vectors from last solve
         vecs['output'][vecname]._data[:] = 0.0
@@ -1211,7 +1216,7 @@ class _TotalJacInfo(object):
 
         has_lin_cons = self.has_lin_cons
 
-        model = self.model
+        model = self.model()
         vec_dinput = model._vectors['input']
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
@@ -1290,7 +1295,7 @@ class _TotalJacInfo(object):
         """
         of = self.of
         wrt = self.wrt
-        model = self.model
+        model = self.model()
         return_format = self.return_format
 
         # Prepare model for calculation by cleaning out the derivatives

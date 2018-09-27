@@ -104,6 +104,8 @@ class System(object):
         ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+    _var_discrete : dict
+        Dictionary of discrete var metadata and values.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
@@ -298,6 +300,7 @@ class System(object):
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_discrete = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {}
 

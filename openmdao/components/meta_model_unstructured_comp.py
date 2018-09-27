@@ -574,7 +574,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self.train = False
 
     def _metadata(self, name):
-        return self._var_rel2data_io[name]['metadata']
+        return self._var_rel2meta[name]
 
     @property
     def default_surrogate(self):
