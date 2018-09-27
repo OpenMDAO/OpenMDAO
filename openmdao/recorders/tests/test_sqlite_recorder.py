@@ -12,7 +12,7 @@ from tempfile import mkdtemp
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder, \
     ScipyOptimizeDriver, NonlinearRunOnce, NonlinearBlockGS, NonlinearBlockJac, NewtonSolver, \
     LinearRunOnce, LinearBlockGS, LinearBlockJac, DirectSolver, ScipyKrylov, PETScKrylov, \
-    BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, PETScVector, AnalysisError
+    BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, AnalysisError
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.recorders.recording_iteration_stack import recording_iteration
@@ -1101,313 +1101,23 @@ class TestSqliteRecorder(unittest.TestCase):
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps)
 
-    def test_record_solver_linear_direct_solver(self):
+    def test_record_solver_linear(self):
+        # adding a recorder to a linear solver should raise an error
         prob = SellarProblem()
         prob.setup()
 
         nl = prob.model.nonlinear_solver = NewtonSolver()
 
-        ln = nl.linear_solver = DirectSolver()  # used for analytic derivatives
-        ln.recording_options['record_abs_error'] = True
-        ln.recording_options['record_rel_error'] = True
-        ln.recording_options['record_solver_residuals'] = True
-        ln.add_recorder(self.recorder)
-
-        prob.set_solver_print(0)
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
-
-        # No norms so no expected norms
-        coordinate = [
-            0,
-            'Driver', (0,),
-            'root._solve_nonlinear', (0,),
-            'NewtonSolver', (2,),
-            'DirectSolver', (0,)
+        linear_solvers = [
+            DirectSolver, ScipyKrylov, PETScKrylov,
+            LinearBlockGS, LinearRunOnce, LinearBlockJac
         ]
 
-        expected_abs_error = None
-        expected_rel_error = None
-
-        expected_solver_output = {
-            'px.x': [0.],
-            'pz.z': [0.0, 0.00000000e+00],
-            'd1.y1': [0.00045069],
-            'd2.y2': [-0.00225346],
-            'obj_cmp.obj': [0.00045646],
-            'con_cmp1.con1': [-0.00045069],
-            'con_cmp2.con2': [-0.00225346]
-        }
-
-        expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [0.0],
-            'd2.y2': [0.00229801],
-            'obj_cmp.obj': [-5.75455956e-06],
-            'con_cmp1.con1': [-0.],
-            'con_cmp2.con2': [-0.]
-        }
-
-        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                          expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
-
-    def test_record_solver_linear_scipy_iterative_solver(self):
-        prob = SellarProblem()
-        prob.setup()
-
-        nl = prob.model.nonlinear_solver = NewtonSolver()
-
-        ln = nl.linear_solver = ScipyKrylov()  # used for analytic derivatives
-        ln.recording_options['record_abs_error'] = True
-        ln.recording_options['record_rel_error'] = True
-        ln.recording_options['record_solver_residuals'] = True
-        ln.add_recorder(self.recorder)
-
-        prob.set_solver_print(0)
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
-
-        coordinate = [
-            0,
-            'Driver', (0,),
-            'root._solve_nonlinear', (0,),
-            'NewtonSolver', (2,),
-            'ScipyKrylov', (1,)
-        ]
-
-        expected_abs_error = 0.0
-        expected_rel_error = 0.0
-
-        expected_solver_output = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [0.0],
-            'd2.y2': [0.41168147],
-            'obj_cmp.obj': [0.48667678],
-            'con_cmp1.con1': [-0.770496],
-            'con_cmp2.con2': [2.70578793e-06]
-        }
-
-        expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [-0.08233575],
-            'd2.y2': [-0.41168152],
-            'obj_cmp.obj': [-0.4866797],
-            'con_cmp1.con1': [0.77049654],
-            'con_cmp2.con2': [0.41167877]
-        }
-
-        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                          expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
-
-    @unittest.skipIf(PETScVector is None, "PETSc is required.")
-    def test_record_solver_linear_petsc_ksp(self):
-        prob = SellarProblem()
-        prob.setup()
-
-        nl = prob.model.nonlinear_solver = NewtonSolver()
-
-        ln = nl.linear_solver = PETScKrylov()  # used for analytic derivatives
-        ln.recording_options['record_abs_error'] = True
-        ln.recording_options['record_rel_error'] = True
-        ln.recording_options['record_solver_residuals'] = True
-        ln.add_recorder(self.recorder)
-
-        t0, t1 = run_driver(prob)
-
-        prob.cleanup()
-
-        coordinate = [
-            0,
-            'Driver', (0,),
-            'root._solve_nonlinear', (0,),
-            'NewtonSolver', (2,),
-            'PETScKrylov', (3,)
-        ]
-
-        expected_abs_error = 0.0
-        expected_rel_error = 0.0
-
-        expected_solver_output = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [-5.41157587e-07],
-            'd2.y2': [0.41168147],
-            'obj_cmp.obj': [0.48667678],
-            'con_cmp1.con1': [-0.770496],
-            'con_cmp2.con2': [2.70578793e-06]
-        }
-
-        expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [-0.08233575],
-            'd2.y2': [-0.41168152],
-            'obj_cmp.obj': [-0.4866797],
-            'con_cmp1.con1': [0.77049654],
-            'con_cmp2.con2': [0.41167877]
-        }
-
-        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                          expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
-
-    def test_record_solver_linear_block_gs(self):
-        prob = SellarProblem()
-        prob.setup()
-
-        nl = prob.model.nonlinear_solver = NewtonSolver()
-
-        ln = nl.linear_solver = LinearBlockGS()  # used for analytic derivatives
-        ln.recording_options['record_abs_error'] = True
-        ln.recording_options['record_rel_error'] = True
-        ln.recording_options['record_solver_residuals'] = True
-        ln.add_recorder(self.recorder)
-
-        prob.set_solver_print(-1)
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
-
-        coordinate = [
-            0,
-            'Driver', (0,),
-            'root._solve_nonlinear', (0,),
-            'NewtonSolver', (2,),
-            'LinearBlockGS', (6,)
-        ]
-
-        expected_abs_error = 9.109083208861876e-11
-        expected_rel_error = 9.114367543620551e-12
-
-        expected_solver_output = {
-            'px.x': [-0.],
-            'pz.z': [-0., -0.],
-            'd1.y1': [0.00045069],
-            'd2.y2': [-0.00225346],
-            'obj_cmp.obj': [0.00045646],
-            'con_cmp1.con1': [-0.00045069],
-            'con_cmp2.con2': [-0.00225346]
-        }
-
-        expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [-9.10908321e-11],
-            'd2.y2': [0.],
-            'obj_cmp.obj': [2.28698896e-20],
-            'con_cmp1.con1': [0.],
-            'con_cmp2.con2': [0.]
-        }
-
-        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                          expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
-
-    def test_record_solver_linear_linear_run_once(self):
-        prob = SellarProblem()
-        prob.setup()
-
-        nl = prob.model.nonlinear_solver = NewtonSolver()
-
-        ln = nl.linear_solver = LinearRunOnce()  # used for analytic derivatives
-        ln.recording_options['record_abs_error'] = True
-        ln.recording_options['record_rel_error'] = True
-        ln.recording_options['record_solver_residuals'] = True
-        ln.add_recorder(self.recorder)
-
-        prob.set_solver_print(-1)
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
-
-        coordinate = [
-            0,
-            'Driver', (0,),
-            'root._solve_nonlinear', (0,),
-            'NewtonSolver', (9,),
-            'LinearRunOnce', (0,)
-        ]
-
-        expected_abs_error = None
-        expected_rel_error = None
-
-        expected_solver_output = {
-            'px.x': [-0.],
-            'pz.z': [-0., -0.],
-            'd1.y1': [-4.15366975e-05],
-            'd2.y2': [-4.10568454e-06],
-            'obj_cmp.obj': [-4.15366737e-05],
-            'con_cmp1.con1': [4.15366975e-05],
-            'con_cmp2.con2': [-4.10568454e-06]
-        }
-
-        expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [4.15366975e-05],
-            'd2.y2': [-4.10564051e-06],
-            'obj_cmp.obj': [4.15366737e-05],
-            'con_cmp1.con1': [4.15366975e-05],
-            'con_cmp2.con2': [4.10568454e-06]
-        }
-
-        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                          expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
-
-    def test_record_solver_linear_block_jac(self):
-        prob = SellarProblem()
-        prob.setup()
-
-        nl = prob.model.nonlinear_solver = NewtonSolver()
-
-        ln = nl.linear_solver = LinearBlockJac()  # used for analytic derivatives
-        ln.recording_options['record_abs_error'] = True
-        ln.recording_options['record_rel_error'] = True
-        ln.recording_options['record_solver_residuals'] = True
-        ln.add_recorder(self.recorder)
-
-        prob.set_solver_print(-1)
-        t0, t1 = run_driver(prob)
-        prob.cleanup()
-
-        coordinate = [
-            0,
-            'Driver', (0,),
-            'root._solve_nonlinear', (0,),
-            'NewtonSolver', (3,),
-            'LinearBlockJac', (9,)
-        ]
-
-        expected_abs_error = 9.947388408259769e-11
-        expected_rel_error = 4.330301334141486e-08
-
-        expected_solver_output = {
-            'px.x': [-0.],
-            'pz.z': [-0., -0.],
-            'd1.y1': [4.55485639e-09],
-            'd2.y2': [-2.27783334e-08],
-            'obj_cmp.obj': [-2.28447051e-07],
-            'con_cmp1.con1': [2.28461863e-07],
-            'con_cmp2.con2': [-2.27742837e-08]
-        }
-
-        expected_solver_residuals = {
-            'px.x': [0.],
-            'pz.z': [0., 0.],
-            'd1.y1': [2.84055951e-16],
-            'd2.y2': [-6.93561782e-12],
-            'obj_cmp.obj': [-7.01674811e-11],
-            'con_cmp1.con1': [7.01674811e-11],
-            'con_cmp2.con2': [-1.42027975e-15]
-        }
-
-        expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
-                          expected_solver_output, expected_solver_residuals),)
-        assertSolverIterDataRecorded(self, expected_data, self.eps)
+        for solver in linear_solvers:
+            ln = nl.linear_solver = solver()
+            with self.assertRaises(RuntimeError) as cm:
+                ln.add_recorder(self.recorder)
+            self.assertEqual(str(cm.exception), 'Recording is not supported on Linear Solvers.')
 
     def test_record_driver_system_solver(self):
         # Test what happens when all three types are recorded: Driver, System, and Solver
@@ -1992,15 +1702,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # create recorder
         recorder = SqliteRecorder("cases.sql")
 
-        # add recorder to the nonlinear solver
+        # add recorder to the nonlinear solver for the model
         prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.nonlinear_solver.add_recorder(recorder)
 
-        # add recorder to the linear solver as well
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.linear_solver.add_recorder(recorder)
-
-        # add recorder to the nonlinear solver for Component 'd1' (SellarDis1withDerivatives)
+        # add recorder to the nonlinear solver for Component 'd1'
         d1 = prob.model.d1
         d1.nonlinear_solver = NonlinearBlockGS()
         d1.nonlinear_solver.options['maxiter'] = 5
@@ -2014,11 +1720,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         metadata = cr.solver_metadata
 
         self.assertEqual(sorted(metadata.keys()), [
-            'd1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS'
+            'd1.NonlinearBlockGS', 'root.NonlinearBlockGS'
         ])
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
-        self.assertEqual(metadata['root.LinearBlockGS']['solver_class'], 'LinearBlockGS')
 
     def test_feature_system_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader

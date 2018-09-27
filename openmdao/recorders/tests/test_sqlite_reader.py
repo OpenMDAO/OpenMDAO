@@ -346,7 +346,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
-        prob.model.linear_solver.add_recorder(self.recorder)
+        # prob.model.linear_solver.add_recorder(self.recorder)
 
         d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComponent)
         d1.nonlinear_solver = NonlinearBlockGS(maxiter=5)
@@ -359,11 +359,12 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
             sorted(metadata.keys()),
-            sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
+            # sorted(['root.LinearBlockGS', 'root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
+            sorted(['root.NonlinearBlockGS', 'd1.NonlinearBlockGS'])
         )
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
-        self.assertEqual(metadata['root.LinearBlockGS']['solver_class'], 'LinearBlockGS')
+        # self.assertEqual(metadata['root.LinearBlockGS']['solver_class'], 'LinearBlockGS')
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -910,7 +911,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = prob.model
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = LinearBlockGS()
-        model.linear_solver.add_recorder(self.recorder)
+
+        model.nonlinear_solver.add_recorder(self.recorder)
 
         prob.run_model()
         prob.cleanup()
