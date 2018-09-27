@@ -829,11 +829,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         model = prob.model
         model.nonlinear_solver.add_recorder(self.recorder)
 
-        # adding a recorder to a linear solver should raise an error
-        with self.assertRaises(RuntimeError) as cm:
-            model.linear_solver.add_recorder(self.recorder)
-        self.assertEqual(str(cm.exception), 'Recording is not supported on Linear Solvers.')
-
         fail = prob.run_driver()
         prob.cleanup()
 
@@ -1279,6 +1274,128 @@ class TestSqliteCaseReader(unittest.TestCase):
         adder, scaler = determine_adder_scaler(ref0, ref, None, None)
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
         self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+
+    def test_reading_all_case_types(self):
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        prob.setup(mode='rev')
+
+        driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        #
+        # Add recorders
+        #
+
+        # Driver
+        driver.recording_options['record_metadata'] = True
+        driver.recording_options['record_desvars'] = True
+        driver.recording_options['record_responses'] = True
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.add_recorder(self.recorder)
+
+        # System
+        pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
+        pz.recording_options['record_metadata'] = True
+        pz.recording_options['record_inputs'] = True
+        pz.recording_options['record_outputs'] = True
+        pz.recording_options['record_residuals'] = True
+        pz.add_recorder(self.recorder)
+
+        # Solver
+        nl = prob.model.mda.nonlinear_solver = NonlinearBlockGS()
+        nl.recording_options['record_metadata'] = True
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+        nl.add_recorder(self.recorder)
+
+        # problem
+        prob.recording_options['includes'] = []
+        prob.recording_options['record_objectives'] = True
+        prob.recording_options['record_constraints'] = True
+        prob.recording_options['record_desvars'] = True
+        prob.add_recorder(self.recorder)
+
+        fail = prob.run_driver()
+
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        self.assertFalse(fail, 'Problem optimization failed.')
+
+        cr = CaseReader(self.filename)
+
+        from pprint import pprint
+
+        sources = cr.list_sources()
+        print('sources:', sources)
+
+        for source in sources:
+            cases = cr.list_cases(source)
+            print(source, ':')
+            pprint(cases)
+
+        # #
+        # # Driver recording test
+        # #
+        # coordinate = [0, 'SLSQP', (5, )]
+
+        # expected_desvars = {
+        #     "pz.z": prob['pz.z'],
+        #     "px.x": prob['px.x']
+        # }
+        # expected_objectives = {
+        #     "obj_cmp.obj": prob['obj_cmp.obj']
+        # }
+        # expected_constraints = {
+        #     "con_cmp1.con1": prob['con_cmp1.con1'],
+        #     "con_cmp2.con2": prob['con_cmp2.con2']
+        # }
+
+        # expected_outputs = expected_desvars
+        # expected_outputs.update(expected_objectives)
+        # expected_outputs.update(expected_constraints)
+
+        # expected_driver_data = ((coordinate, (t0, t1), expected_outputs, None),)
+        # assertDriverIterDataRecorded(self, expected_driver_data, self.eps)
+
+        # #
+        # # System recording test
+        # #
+        # coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        #               'pz._solve_nonlinear', (2, )]
+
+        # expected_inputs = None
+        # expected_outputs = {"pz.z": [2.8640616, 0.825643, ], }
+        # expected_residuals = {"pz.z": [0.0, 0.0], }
+
+        # expected_system_data = (
+        #     (coordinate, (t0, t1), expected_inputs, expected_outputs, expected_residuals),
+        # )
+        # assertSystemIterDataRecorded(self, expected_system_data, self.eps)
+
+        # #
+        # # Solver recording test
+        # #
+        # coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
+        #               'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
+
+        # expected_abs_error = 0.0,
+        # expected_rel_error = 0.0,
+
+        # expected_solver_output = {
+        #     "mda.d2.y2": [3.75610187],
+        #     "mda.d1.y1": [3.16],
+        # }
+
+        # expected_solver_residuals = {
+        #     "mda.d2.y2": [0.0],
+        #     "mda.d1.y1": [0.0],
+        # }
+
+        # expected_solver_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
+        #                          expected_solver_output, expected_solver_residuals),)
+        # assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
 
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):

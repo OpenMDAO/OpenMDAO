@@ -8,7 +8,6 @@ from io import BytesIO
 import os
 import sqlite3
 
-import warnings
 import json
 import numpy as np
 
@@ -193,14 +192,15 @@ class SqliteRecorder(BaseRecorder):
 
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
-                c.execute("CREATE TABLE metadata( format_version INT, "
+                c.execute("CREATE TABLE metadata(format_version INT, "
                           "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT)")
                 c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
                           "VALUES(?,?,?)", (format_version, None, None))
 
-                # used to keep track of the order of the case records across all three tables
+                # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
                           "record_type TEXT, rowid INT)")
+
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT)")
@@ -208,19 +208,23 @@ class SqliteRecorder(BaseRecorder):
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, derivatives BLOB)")
                 c.execute("CREATE INDEX driv_iter_ind on driver_iterations(iteration_coordinate)")
+
                 c.execute("CREATE TABLE problem_cases(id INTEGER PRIMARY KEY, "
                           "counter INT, case_name TEXT, timestamp REAL, "
                           "success INT, msg TEXT, outputs TEXT)")
                 c.execute("CREATE INDEX prob_name_ind on problem_cases(case_name)")
+
                 c.execute("CREATE TABLE system_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
                 c.execute("CREATE INDEX sys_iter_ind on system_iterations(iteration_coordinate)")
+
                 c.execute("CREATE TABLE solver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, abs_err REAL, rel_err REAL, "
                           "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
+
                 c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                           "model_viewer_data TEXT)")
                 c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
