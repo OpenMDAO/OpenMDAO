@@ -462,9 +462,9 @@ class SqliteCaseReader(BaseCaseReader):
         elif source == 'problem':
             return self._problem_cases.list_cases(recurse, flat)
         elif source in self._system_cases.list_sources():
-            return self._system_cases.list_cases(recurse, flat, source=source)
+            return self._system_cases.list_cases(source, recurse, flat)
         elif source in self._solver_cases.list_sources():
-            return self._solver_cases.list_cases(recurse, flat, source=source)
+            return self._solver_cases.list_cases(source, recurse, flat)
         else:
             raise RuntimeError('Source not found:', source)
 
@@ -489,21 +489,25 @@ class SqliteCaseReader(BaseCaseReader):
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
+        elif source == 'problem':
+            for case in self._problem_cases.cases():
+                yield case
+
         elif source == 'driver' and not recurse:
             # return driver cases only
             for case in self._driver_cases.cases():
-                yield case
-
-        elif source == 'problem':
-            for case in self._problem_cases.cases():
                 yield case
 
         else:
             if source == 'driver':
                 # return all driver cases and recurse to solver cases
                 iter_coord = ''
+            elif source.find('solve_nonlinear'):
+                iter_coord = self._solver_cases._get_first(source).iteration_coordinate
+                print('first case from solver', source, '=', iter_coord)
             else:
-                iter_coord = source
+                iter_coord = self._driver_cases._get_first(source).iteration_coordinate
+                print('first case from driver', source, '=', iter_coord)
 
             driver_iter = []
             solver_iter = []
@@ -578,6 +582,8 @@ class SqliteCaseReader(BaseCaseReader):
         expected_child_length = coord_lengths[par_len_idx + 1] \
             if par_len_idx < len(coord_lengths) - 1 else -1
 
+        print(split_parent_iter_coord, 'par_len:', par_len, coord_lengths, 'child_len:', expected_child_length)
+
         if parent_iter_coord is '':  # CASE: grabbing children of 'root'
             if len(driver_iter) > 0:  # grabbing all driver cases
                 for d in driver_iter:
@@ -601,6 +607,8 @@ class SqliteCaseReader(BaseCaseReader):
                                                           solver_iter, recursive, coord_lengths)
         else:  # CASE: grabbing children of a case
             for s in solver_iter:
+                print(_coord_split_re.split(s[0]), 'child_len:', len(_coord_split_re.split(s[0])))
+                print('is child?', self._is_case_child(parent_iter_coord, s[0], expected_child_length))
                 if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
                     ret.append((s[0], 'solver'))
                     if recursive:
@@ -630,6 +638,7 @@ class SqliteCaseReader(BaseCaseReader):
             given parent case. False otherwise.
         """
         split_coord = _coord_split_re.split(coordinate)
+        print(coordinate.startswith(parent_coordinate), len(split_coord), expected_child_length)
         if coordinate.startswith(parent_coordinate) and len(split_coord) is expected_child_length:
             return True
 
@@ -867,12 +876,14 @@ class CaseTable(object):
 
         return rows[0][0]
 
-    def list_cases(self, recurse=False, flat=False, source=None):
+    def list_cases(self, source=None, recurse=False, flat=False):
         """
         Get list of case names for cases in the problem_cases table.
 
         Parameters
         ----------
+        source : str, optional
+            If not None, only cases that have the specified source will be returned
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
@@ -998,6 +1009,27 @@ class CaseTable(object):
 
         # return pathname of the system
         return '.'.join(path)
+
+    def _get_first(self, source):
+        """
+        Get the first case from the specified source.
+
+        Parameters
+        ----------
+        source : str
+            The source.
+
+        Returns
+        -------
+        Case
+            The first case from the specified source.
+        """
+        for case in self.cases():
+            print('checking source:', case.iteration_coordinate, case.source, 'vs', source)
+            if case.source == source:
+                break
+
+        return case
 
 
 class DriverCases(CaseTable):
@@ -1292,8 +1324,7 @@ class SystemCases(CaseTable):
             outputs_array = blob_to_array(outputs_text)
             residuals_array = blob_to_array(residuals_text)
 
-        split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
-        source = '|'.join(split_iter_coord)
+        source = self._get_source(iter_coord)
 
         case = Case(source, iter_coord, timestamp, success, msg,
                     inputs=inputs_array, outputs=outputs_array, residuals=residuals_array,
@@ -1361,8 +1392,7 @@ class SolverCases(CaseTable):
             output_array = blob_to_array(output_text)
             residuals_array = blob_to_array(residuals_text)
 
-        split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
-        source = '|'.join(split_iter_coord)
+        source = self._get_source(iter_coord)
 
         case = Case(source, iter_coord, timestamp, success, msg,
                     inputs=input_array, outputs=output_array, residuals=residuals_array,

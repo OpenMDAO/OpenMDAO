@@ -1293,6 +1293,14 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
 
+        # root Solver
+        nl = prob.model.nonlinear_solver
+        nl.recording_options['record_metadata'] = True
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+        nl.add_recorder(self.recorder)
+
         # System
         pz = prob.model.pz  # IndepVarComp which is an ExplicitComponent
         pz.recording_options['record_metadata'] = True
@@ -1301,7 +1309,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         pz.recording_options['record_residuals'] = True
         pz.add_recorder(self.recorder)
 
-        # Solver
+        # mda Solver
         nl = prob.model.mda.nonlinear_solver = NonlinearBlockGS()
         nl.recording_options['record_metadata'] = True
         nl.recording_options['record_abs_error'] = True
@@ -1329,11 +1337,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         sources = cr.list_sources()
         print('sources:', sources)
+        # pprint(cr.list_cases('root.nonlinear_solver', recurse=True))
 
-        for source in sources:
-            cases = cr.list_cases(source)
-            print(source, ':')
-            pprint(cases)
+        for case in cr.get_cases('root.nonlinear_solver', recurse=True):
+            print(case.iteration_coordinate)
+
+        # for source in sources:
+        #     cases = cr.list_cases(source)
+        #     print(source, ':')
+        #     pprint(cases)
 
         # #
         # # Driver recording test
