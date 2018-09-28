@@ -239,17 +239,13 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
-        abs_names = self._var_abs_names
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_abs2prom
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
-        if self.pathname:
-            prefix = self.pathname + '.'
-        else:
-            prefix = ''
+        prefix = self.pathname + '.' if self.pathname else ''
 
         for type_ in ['input', 'output']:
             for prom_name in self._var_rel_names[type_]:
@@ -258,7 +254,6 @@ class Component(System):
 
                 # Compute allprocs_abs_names, abs_names
                 allprocs_abs_names[type_].append(abs_name)
-                abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
@@ -272,6 +267,15 @@ class Component(System):
 
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
+
+            for prom_name, val in iteritems(self._var_discrete[type_]):
+                abs_name = prefix + prom_name
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                self._var_allprocs_discrete[type_][abs_name] = val
+
+        self._var_abs_names = self._var_allprocs_abs_names
+        self._discrete_inputs = DictValues(self._var_discrete['input'])
+        self._discrete_outputs = DictValues(self._var_discrete['output'])
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -1138,3 +1142,17 @@ class Component(System):
         Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass
+
+
+class DictValues(object):
+    def __init__(self, dct):
+        self._dict = dct
+
+    def __getitem__(self, key):
+        return self._dict[key]['value']
+
+    def __setitem__(self, key, value):
+        self._dict[key]['value'] = value
+
+    def __contains__(self, key):
+        return key in self._dict

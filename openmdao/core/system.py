@@ -301,6 +301,7 @@ class System(object):
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
         self._var_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {}
 

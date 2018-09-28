@@ -206,7 +206,10 @@ class ExplicitComponent(Component):
                 self._residuals.set_const(0.0)
                 self._inputs.read_only = True
                 try:
-                    failed = self.compute(self._inputs, self._outputs)
+                    if self._var_discrete['input'] or self._var_discrete['output']:
+                        failed = self.compute(self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        failed = self.compute(self._inputs, self._outputs)
                 finally:
                     self._inputs.read_only = False
 
@@ -370,7 +373,7 @@ class ExplicitComponent(Component):
                 finally:
                     self._inputs.read_only = False
 
-    def compute(self, inputs, outputs):
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
@@ -380,6 +383,10 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
 
         Returns
         -------

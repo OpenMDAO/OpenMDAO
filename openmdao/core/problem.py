@@ -212,6 +212,8 @@ class Problem(object):
             the requested output/input variable.
         """
         # Caching only needed if vectors aren't allocated yet.
+        proms = self.model._var_allprocs_prom2abs_list
+
         if self._setup_status == 1:
 
             # We have set and cached already
@@ -264,8 +266,20 @@ class Problem(object):
             val = self.model._inputs[name]
 
         else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+            if name in proms['input']:
+                abs_name = prom_name2abs_name(self.model, name, 'input')
+            else:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+
+            if name in self.model._discrete_outputs:
+                val = self.model._discrete_outputs[name]
+    
+            elif name in self.model._discrete_inputs:
+                val = self.model._discrete_inputs[name]
+    
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
 
         # Need to cache the "get" in case the user calls in-place numpy operations.
         self._initial_condition_cache[name] = val
