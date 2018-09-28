@@ -79,24 +79,15 @@ class pyOptSparseDriver(Driver):
         Optional file to hot start the optimization.
     opt_settings : dict
         Dictionary for setting optimizer-specific options.
-    problem : <Problem>
-        Pointer to the containing problem.
-    supports : <OptionsDictionary>
-        Provides a consistant way for drivers to declare what features they support.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
-    _cons : dict
-        Contains all constraint info.
-    _designvars : dict
-        Contains all design variable info.
     _indep_list : list
         List of design variables.
-    _objs : dict
-        Contains all objective info.
     _quantities : list
         Contains the objectives plus nonlinear constraints.
-    _responses : dict
-        Contains all response info.
+    cite : str
+        Listing of relevant citations that should be referenced when publishing
+        work that uses this class.
     """
 
     def __init__(self, **kwargs):
