@@ -17,7 +17,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.vectors.vector import Vector, INT_DTYPE
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path

@@ -33,6 +33,9 @@ elif PY3:
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\|\\d+\|*')
 
+# regular expression used to determine if a node in an iteration coordinate represents a system
+_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear|_solve_linear|_apply_linear)$')
+
 
 def CaseReader(filename, pre_load=True):
     """
@@ -885,13 +888,7 @@ class CaseTable(object):
         con.close()
 
         if source:
-            ret = []
-            print('-------------------')
-            print('checking %s for source:' % self._table_name, source)
-            for row in rows:
-                print(_coord_split_re.split(row[0]), 'from', source, '?')
-            print('-------------------')
-            return ret
+            return [row[0] for row in rows if self._get_source(row[0]) == source]
         else:
             return [row[0] for row in rows]
 
@@ -975,6 +972,32 @@ class CaseTable(object):
         for case in self.cases():
             # self._cases[case.iteration_coordinate] = case
             pass
+
+    def _get_source(self, iteration_coordinate):
+        """
+        Get pathname of system that is the source of the iteration.
+
+        Parameters
+        ----------
+        iteration_coordinate : str
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        str
+            The pathname of the system that is the source of the iteration.
+        """
+        path = []
+        parts = _coord_split_re.split(iteration_coordinate)
+        for part in parts:
+            if (_coord_system_re.search(part) is not None):
+                if ':' in part:
+                    # get rid of 'rank#:'
+                    part = part.split(':')[1]
+                path.append(part.split('.')[0])
+
+        # return pathname of the system
+        return '.'.join(path)
 
 
 class DriverCases(CaseTable):
@@ -1125,6 +1148,22 @@ class DriverCases(CaseTable):
         """
         return ['driver']
 
+    def _get_source(self, iteration_coordinate):
+        """
+        Get the source of the iteration.
+
+        Parameters
+        ----------
+        iteration_coordinate : str
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        str
+            'driver' (all cases in this table come from the driver).
+        """
+        return 'driver'
+
 
 class ProblemCases(CaseTable):
     """
@@ -1183,6 +1222,22 @@ class ProblemCases(CaseTable):
         Get list of problems that recorded data in this table.
         """
         return ['problem']
+
+    def _get_source(self, iteration_coordinate):
+        """
+        Get the source of the iteration.
+
+        Parameters
+        ----------
+        iteration_coordinate : str
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        str
+            'problem' (all cases in this table come from the problem).
+        """
+        return 'problem'
 
 
 class SystemCases(CaseTable):
@@ -1250,14 +1305,7 @@ class SystemCases(CaseTable):
         """
         Get list of systems that recorded data in this table.
         """
-        with sqlite3.connect(self._filename) as con:
-            cur = con.cursor()
-            cur.execute("SELECT id FROM system_metadata")
-            rows = cur.fetchall()
-
-        con.close()
-
-        return [row[0] for row in rows]
+        return set([self._get_source(case) for case in self.list_cases()])
 
 
 class SolverCases(CaseTable):
@@ -1327,11 +1375,20 @@ class SolverCases(CaseTable):
         """
         Get list of solvers that recorded data in this table.
         """
-        with sqlite3.connect(self._filename) as con:
-            cur = con.cursor()
-            cur.execute("SELECT id FROM solver_metadata")
-            rows = cur.fetchall()
+        return set([self._get_source(case) for case in self.list_cases()])
 
-        con.close()
+    def _get_source(self, iteration_coordinate):
+        """
+        Get pathname of solver that is the source of the iteration.
 
-        return [row[0] for row in rows]
+        Parameters
+        ----------
+        iteration_coordinate : str
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        str
+            The pathname of the solver that is the source of the iteration.
+        """
+        return super(SolverCases, self)._get_source(iteration_coordinate) + '.nonlinear_solver'
