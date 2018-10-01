@@ -274,8 +274,8 @@ class Component(System):
                 self._var_allprocs_discrete[type_][abs_name] = val
 
         self._var_abs_names = self._var_allprocs_abs_names
-        self._discrete_inputs = DictValues(self._var_discrete['input'])
-        self._discrete_outputs = DictValues(self._var_discrete['output'])
+        self._discrete_inputs = _DictValues(self._var_discrete['input'])
+        self._discrete_outputs = _DictValues(self._var_discrete['output'])
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -1144,7 +1144,11 @@ class Component(System):
         pass
 
 
-class DictValues(object):
+class _DictValues(object):
+    """
+    A dict-like wrapper for a dict of metadata, where getitem returns 'value' from metadata.
+    """
+
     def __init__(self, dct):
         self._dict = dct
 

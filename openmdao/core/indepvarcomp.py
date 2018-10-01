@@ -97,8 +97,8 @@ class IndepVarComp(ExplicitComponent):
         if len(self._indep) + len(self._indep_external) + len(self._indep_external_discrete) == 0:
             raise RuntimeError("No outputs (independent variables) have been declared for "
                                "component '{}'. They must either be declared during "
-                               "instantiation or by calling "
-                               "add_output or add_discrete_output afterwards.".format(self.pathname))
+                               "instantiation or by calling add_output or add_discrete_output "
+                               "afterwards.".format(self.pathname))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
@@ -159,11 +159,6 @@ class IndepVarComp(ExplicitComponent):
             The initial value of the variable being added in user-defined units. Default is 1.0.
         desc : str
             description of the variable.
-
-        Returns
-        -------
-        dict
-            metadata for added variable
         """
         kwargs = {'desc': desc}
         self._indep_external_discrete.append((name, val, kwargs))

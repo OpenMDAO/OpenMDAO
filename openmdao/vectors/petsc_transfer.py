@@ -238,8 +238,8 @@ class PETScTransfer(DefaultTransfer):
                     if iproc == owns[src_abs]:
                         send.add(src_var)
                     if (tgt_var in group._var_discrete['input'] and
-                        src_var not in group._var_discrete['output']):
-                            recv.append(src_var)
+                            src_var not in group._var_discrete['output']):
+                        recv.append(src_var)
                 transfers[tgt_sys] = (xfers, send, recv)
                 total_send.update(send)
                 total_recv.extend(recv)

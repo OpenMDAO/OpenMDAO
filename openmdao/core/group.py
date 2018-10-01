@@ -17,7 +17,7 @@ from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.system import System, INT_DTYPE
-from openmdao.core.component import Component, DictValues
+from openmdao.core.component import Component, _DictValues
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -635,8 +635,8 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-        self._discrete_inputs = DictValues(self._var_discrete['input'])
-        self._discrete_outputs = DictValues(self._var_discrete['output'])
+        self._discrete_inputs = _DictValues(self._var_discrete['input'])
+        self._discrete_outputs = _DictValues(self._var_discrete['output'])
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -793,12 +793,14 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if prom_out not in allprocs_prom2abs_list_out and prom_out not in self._var_allprocs_discrete['output']:
+            if (prom_out not in allprocs_prom2abs_list_out and
+                    prom_out not in self._var_allprocs_discrete['output']):
                 raise NameError(
                     "Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
                     (prom_out, self.pathname, prom_out, prom_in))
 
-            if prom_in not in allprocs_prom2abs_list_in and prom_in not in self._var_allprocs_discrete['input']:
+            if (prom_in not in allprocs_prom2abs_list_in and
+                    prom_in not in self._var_allprocs_discrete['input']):
                 raise NameError(
                     "Input '%s' does not exist for connection in '%s' from '%s' to '%s'." %
                     (prom_in, self.pathname, prom_out, prom_in))

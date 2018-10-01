@@ -103,7 +103,7 @@ class TestIndepVarComp(unittest.TestCase):
             self.assertEqual(str(err),
                 "No outputs (independent variables) have been declared for "
                 "component ''. They must either be declared during "
-                "instantiation or by calling add_output afterwards.")
+                "instantiation or by calling add_output or add_discrete_output afterwards.")
         else:
             self.fail('Exception expected.')
 

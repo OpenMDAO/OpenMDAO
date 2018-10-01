@@ -207,7 +207,8 @@ class ExplicitComponent(Component):
                 self._inputs.read_only = True
                 try:
                     if self._var_discrete['input'] or self._var_discrete['output']:
-                        failed = self.compute(self._inputs, self._outputs, self._discrete_inputs, self._discrete_outputs)
+                        failed = self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                              self._discrete_outputs)
                     else:
                         failed = self.compute(self._inputs, self._outputs)
                 finally:

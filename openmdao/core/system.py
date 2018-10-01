@@ -105,7 +105,9 @@ class System(object):
     _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
     _var_discrete : dict
-        Dictionary of discrete var metadata and values.
+        Dictionary of discrete var metadata and values local to this process.
+    _var_allprocs_discrete : dict
+        Dictionary of discrete var metadata and values for all processes.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.

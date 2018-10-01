@@ -273,10 +273,10 @@ class Problem(object):
 
             if name in self.model._discrete_outputs:
                 val = self.model._discrete_outputs[name]
-    
+
             elif name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
-    
+
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
