@@ -523,11 +523,11 @@ class SqliteCaseReader(BaseCaseReader):
             with sqlite3.connect(self._filename) as con:
                 cur = con.cursor()
                 cur.execute("SELECT iteration_coordinate FROM driver_iterations "
-                            "ORDER BY counter ASC")
+                            "ORDER BY id ASC")
                 driver_iter = cur.fetchall()
 
                 cur.execute("SELECT iteration_coordinate, counter FROM solver_iterations "
-                            "ORDER BY counter ASC")
+                            "ORDER BY id ASC")
                 solver_iter = cur.fetchall()
 
             con.close()
@@ -936,7 +936,7 @@ class CaseTable(object):
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT %s FROM %s ORDER BY counter ASC" %
+            cur.execute("SELECT %s FROM %s ORDER BY id ASC" %
                         (self._index_name, self._table_name))
             rows = cur.fetchall()
 
@@ -1023,7 +1023,7 @@ class CaseTable(object):
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s ORDER BY counter ASC" % self._table_name)
+            cur.execute("SELECT * FROM %s ORDER BY id ASC" % self._table_name)
             rows = cur.fetchall()
             for row in rows:
                 case = self._extract_case_from_row(row)
@@ -1176,7 +1176,7 @@ class DriverCases(CaseTable):
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s ORDER BY counter ASC" % self._table_name)
+            cur.execute("SELECT * FROM %s ORDER BY id ASC" % self._table_name)
             rows = cur.fetchall()
 
             for row in rows:
