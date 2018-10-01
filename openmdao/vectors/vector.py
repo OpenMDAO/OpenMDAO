@@ -85,6 +85,8 @@ class Vector(object):
         publishing work that uses this class.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
+    _under_complex_step : bool
+        When True, self._data is replaced with self._cplx_data.
     """
 
     cite = ""
@@ -211,22 +213,6 @@ class Vector(object):
         if initialize_views:
             vec._initialize_views()
         return vec
-
-    def _contains_abs(self, abs_name):
-        """
-        Check if the variable is involved in the current mat-vec product.
-
-        Parameters
-        ----------
-        abs_name : str
-            Absolute variable name in the owning system's namespace.
-
-        Returns
-        -------
-        boolean
-            True or False.
-        """
-        return abs_name in self._names
 
     def keys(self):
         """

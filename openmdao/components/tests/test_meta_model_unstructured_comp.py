@@ -1,15 +1,16 @@
 """
 Unit tests for the unstructured metamodel component.
 """
+from math import sin
 import numpy as np
 import unittest
+import warnings
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
-    FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver
+    FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel
+
 from openmdao.utils.assert_utils import assert_rel_error
-
 from openmdao.utils.logger_utils import TestLogger
-
 
 class MetaModelTestCase(unittest.TestCase):
 
@@ -90,7 +91,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # create a MetaModelUnStructuredComp for Sin and add it to a Problem
         sin_mm = MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0., training_data=np.linspace(0,10,200))
+        sin_mm.add_input('x', 0., training_data=x)
         sin_mm.add_output('f_x', 0., training_data=f_x)
 
         prob = Problem()
@@ -928,6 +929,204 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob.run_model()
         assert_rel_error(self, prob['mm.y1'], 1.5, 1e-2)
+
+    def test_metamodel_use_fd_if_no_surrogate_linearize(self):
+        class SinSurrogate(SurrogateModel):
+            def train(self, x, y):
+                pass
+
+            def predict(self, x):
+                return sin(x)
+
+        class SinTwoInputsSurrogate(SurrogateModel):
+            def train(self, x, y):
+                pass
+
+            def predict(self, x):
+                return sin(x[0] + x[1])
+
+        class Trig(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+
+        class TrigWithFdInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+                self.declare_partials('sin_x', 'x', method='fd',
+                                      form='backward', step=1e-7, step_calc='rel')
+
+        class TrigWithCsInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+                self.declare_partials('sin_x', 'x', method='cs')
+
+        class TrigGroup(Group):
+            def configure(self):
+                trig = self._get_subsystem('trig')
+                trig.declare_partials('sin_x', 'x', method='fd',
+                                      form='backward', step=1e-7, step_calc='rel')
+
+        class TrigWithFdInConfigure(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+
+        class TrigTwoInputsWithFdInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinTwoInputsSurrogate()
+                self.add_input('x1', 0.)
+                self.add_input('x2', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+                self.declare_partials('sin_x', 'x1', method='fd',
+                                      form='backward', step=1e-7, step_calc='rel')
+
+        def no_surrogate_test_setup(trig, group=None):
+            prob = Problem()
+            if group:
+                prob.model = group
+            indep = IndepVarComp()
+            indep.add_output('x', 5.)
+            prob.model.add_subsystem('indep', indep)
+            prob.model.add_subsystem('trig', trig)
+            prob.model.connect('indep.x', 'trig.x')
+            prob.setup(check=False)
+            prob['indep.x'] = 5.0
+            trig.train = False
+            prob.run_model()
+            return prob
+
+        # Test with user not explicitly setting fd
+        trig = Trig()
+        with warnings.catch_warnings(record=True) as w:
+            prob = no_surrogate_test_setup(trig)
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
+        expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
+        "OpenMDAO will use finite differences to compute derivates. Some of the derivatives will be computed\n" \
+        "using default finite difference options because they were not explicitly declared.\n" \
+        "The derivatives computed using the defaults are:\n" \
+        "    trig.sin_x, trig.x\n"
+        self.assertEqual(expected_msg, str(w[0].message))
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
+        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user explicitly setting fd inside of setup
+        trig = TrigWithFdInSetup()
+        prob = no_surrogate_test_setup(trig)
+        of, wrt, method, fd_options = trig._approximated_partials[0]
+        expected_fd_options = {
+            'step': 1e-7,
+            'form': 'backward',
+            'step_calc': 'rel',
+        }
+        self.assertEqual(expected_fd_options, fd_options)
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
+        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user explicitly setting fd inside of configure for a group
+        trig = TrigWithFdInConfigure()
+        prob = no_surrogate_test_setup(trig, group = TrigGroup())
+        of, wrt, method, fd_options = trig._approximated_partials[0]
+        expected_fd_options = {
+            'step': 1e-7,
+            'form': 'backward',
+            'step_calc': 'rel',
+        }
+        self.assertEqual(expected_fd_options, fd_options)
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
+        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+
+        # Test with user explicitly setting cs inside of setup. Should throw an error
+        prob = Problem()
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+        prob.model.add_subsystem('indep', indep)
+        trig = TrigWithCsInSetup()
+        prob.model.add_subsystem('trig', trig)
+        prob.model.connect('indep.x', 'trig.x')
+        with self.assertRaises(ValueError) as context:
+            prob.setup(check=False)
+        expected_msg = 'Complex step has not been tested for MetaModelUnStructuredComp'
+        self.assertEqual(expected_msg, str(context.exception))
+
+        # Test with user explicitly setting fd on one of the inputs for a meta model
+        #   with two inputs. Check to make sure all inputs are fd and with the correct
+        #   options
+        prob = Problem()
+        indep = IndepVarComp()
+        indep.add_output('x1', 5.)
+        indep.add_output('x2', 5.)
+        prob.model.add_subsystem('indep', indep)
+        trig = TrigTwoInputsWithFdInSetup()
+        prob.model.add_subsystem('trig', trig)
+        prob.model.connect('indep.x1', 'trig.x1')
+        prob.model.connect('indep.x2', 'trig.x2')
+        prob.setup(check=False)
+        prob['indep.x1'] = 5.0
+        prob['indep.x2'] = 5.0
+        trig.train = False
+        with warnings.catch_warnings(record=True) as w:
+            prob.run_model()
+        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
+        expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
+        "OpenMDAO will use finite differences to compute derivates. Some of the derivatives will be computed\n" \
+        "using default finite difference options because they were not explicitly declared.\n" \
+        "The derivatives computed using the defaults are:\n" \
+        "    trig.sin_x, trig.x2\n"
+        self.assertEqual(expected_msg, str(w[0].message))
+
+        self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['method'])
+        self.assertEqual('backward', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['form'])
+        self.assertEqual(1e-07, trig._subjacs_info[('trig.sin_x', 'trig.x1')]['step'])
+        self.assertEqual('rel', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['step_calc'])
+
+        self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x2')]['method'])
+        self.assertTrue('form' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+        self.assertTrue('step' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+        self.assertTrue('step_calc' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
+
+    def test_feature_metamodel_use_fd_if_no_surrogate_linearize(self):
+        from openmdao.api import SurrogateModel, MetaModelUnStructuredComp, Problem, IndepVarComp
+        class SinSurrogate(SurrogateModel):
+            def train(self, x, y):
+                pass
+
+            def predict(self, x):
+                return sin(x)
+
+        class TrigWithFdInSetup(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = SinSurrogate()
+                self.add_input('x', 0.)
+                self.add_output('sin_x', 0., surrogate=surrogate)
+                self.declare_partials('sin_x', 'x', method='fd',
+                                      form='backward', step=1e-7, step_calc='rel')
+
+        # Testing explicitly setting fd inside of setup
+        prob = Problem()
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+        prob.model.add_subsystem('indep', indep)
+        trig = TrigWithFdInSetup()
+        prob.model.add_subsystem('trig', trig)
+        prob.model.connect('indep.x', 'trig.x')
+        prob.setup(check=True)
+        prob['indep.x'] = 5.0
+        trig.train = False
+        prob.run_model()
+        J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
+        deriv_using_fd = J[('trig.sin_x', 'indep.x')]
+        assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

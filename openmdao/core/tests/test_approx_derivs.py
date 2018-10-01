@@ -2,6 +2,7 @@
 from six.moves import range
 import unittest
 import itertools
+from six import iterkeys
 from parameterized import parameterized
 
 import numpy as np
@@ -12,11 +13,12 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives, \
-     SellarDis1CS, SellarDis2CS
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+    SellarDis2withDerivatives, SellarDis1CS, SellarDis2CS
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.test_suite.parametric_suite import parametric_suite
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -697,6 +699,44 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
 
 
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestGroupCSMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_indepvarcomp_under_par_sys_par_cs(self):
+        prob = Problem()
+        prob.model = FanInSubbedIDVC(num_par_fd=2)
+        prob.model.approx_totals(method='cs')
+
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(wrt=['sub.sub1.p1.x', 'sub.sub2.p2.x'], of=['sum.y'])
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
+
+
+@unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
+class TestGroupFDMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_indepvarcomp_under_par_sys_par_fd(self):
+        prob = Problem()
+        prob.model = FanInSubbedIDVC(num_par_fd=2)
+
+        prob.model.approx_totals(method='fd')
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        J = prob.compute_totals(wrt=['sub.sub1.p1.x', 'sub.sub2.p2.x'], of=['sum.y'])
+        assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x'], [[2.0]], 1.0e-6)
+        assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
+
+
 def title(txt):
     """ Provide nice title for parameterized testing."""
     return str(txt).split('.')[-1].replace("'", '').replace('>', '')
@@ -712,11 +752,11 @@ class TestGroupComplexStep(unittest.TestCase):
         # Global stuff seems to not get cleaned up if test fails.
         try:
             self.prob.model._outputs._under_complex_step = False
-        except:
+        except Exception:
             pass
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_paraboloid_'+'_'.join(title(a) for a in p.args))
     def test_paraboloid(self, vec_class):
 
@@ -747,7 +787,7 @@ class TestGroupComplexStep(unittest.TestCase):
         self.assertEqual(len(model._approx_schemes['cs']._exec_list), 2)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_paraboloid_subbed_'+'_'.join(title(a) for a in p.args))
     def test_paraboloid_subbed(self, vec_class):
 
@@ -783,8 +823,8 @@ class TestGroupComplexStep(unittest.TestCase):
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 2)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
-                          'test_paraboloid_subbed_with_connections_'+'_'.join(title(a) for a in p.args))
+                          name_func=lambda f, n, p:
+                          'test_parab_subbed_with_connections_'+'_'.join(title(a) for a in p.args))
     def test_paraboloid_subbed_with_connections(self, vec_class):
 
         if not vec_class:
@@ -826,7 +866,7 @@ class TestGroupComplexStep(unittest.TestCase):
         self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 6)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_arrray_comp_'+'_'.join(title(a) for a in p.args))
     def test_arrray_comp(self, vec_class):
 
@@ -864,7 +904,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], comp.JJ[2:4, 2:4], 1e-6)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_unit_conv_group_'+'_'.join(title(a) for a in p.args))
     def test_unit_conv_group(self, vec_class):
 
@@ -915,7 +955,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_sellar_'+'_'.join(title(a) for a in p.args))
     def test_sellar(self, vec_class):
         # Basic sellar test.
@@ -1381,7 +1421,6 @@ class TestComponentComplexStep(unittest.TestCase):
                     print("x", inputs['x'])
                     print("y", outputs['y'])
 
-
         prob = Problem()
         prob.model = Group()
         prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
@@ -1558,6 +1597,42 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
+
+
+class ParallelFDParametricTestCase(unittest.TestCase):
+
+    @parametric_suite(
+        assembled_jac=[False],
+        jacobian_type=['dense'],
+        partial_type=['array'],
+        partial_method=['fd', 'cs'],
+        num_var=[3],
+        var_shape=[(2, 3), (2,)],
+        connection_type=['explicit'],
+        run_by_default=True,
+    )
+    def test_subset(self, param_instance):
+        param_instance.linear_solver_class = DirectSolver
+        param_instance.linear_solver_options = {}  # defaults not valid for DirectSolver
+
+        param_instance.setup()
+        problem = param_instance.problem
+        model = problem.model
+
+        expected_values = model.expected_values
+        if expected_values:
+            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            assert_rel_error(self, actual, expected_values, 1e-4)
+
+        expected_totals = model.expected_totals
+        if expected_totals:
+            # Forward Derivatives Check
+            totals = param_instance.compute_totals('fwd')
+            assert_rel_error(self, totals, expected_totals, 1e-4)
+
+            # Reverse Derivatives Check
+            totals = param_instance.compute_totals('rev')
+            assert_rel_error(self, totals, expected_totals, 1e-4)
 
 
 if __name__ == "__main__":

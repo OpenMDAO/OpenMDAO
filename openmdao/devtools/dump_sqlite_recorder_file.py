@@ -66,14 +66,15 @@ def print_scaling_factors(scaling_factors, in_out, linear_type):
     """
     Print the names and values of all variables in this vector, one per line.
     """
-    vector = scaling_factors[in_out][linear_type]
-    print(indent, in_out, linear_type)
-    if vector:
-        for abs_name, view in iteritems(vector._views):
-            print(2 * indent, abs_name, view)
-    else:
-        print(2 * indent, 'None')
-    print()
+    if linear_type in scaling_factors[in_out]:
+        vector = scaling_factors[in_out][linear_type]
+        print(indent, in_out, linear_type)
+        if vector:
+            for abs_name, view in iteritems(vector._views):
+                print(2 * indent, abs_name, view)
+        else:
+            print(2 * indent, 'None')
+        print()
 
 print_header('System Metadata', '=')
 cur.execute("SELECT id, scaling_factors FROM system_metadata")

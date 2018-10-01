@@ -24,7 +24,8 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import convert_neg, array_connection_compatible
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors, \
+    simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -300,6 +301,20 @@ class Group(System):
             reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
+
+        if self._num_par_fd > 1:
+            if comm.size > 1:
+                if self._owns_approx_jac:
+                    comm = self._setup_par_fd_procs(comm)
+                else:
+                    msg = "'%s': num_par_fd = %d but FD is not active." % (self.pathname,
+                                                                           self._num_par_fd)
+                    raise RuntimeError(msg)
+            elif not MPI:
+                msg = ("'%s': MPI is not active but num_par_fd = %d. No parallel finite difference "
+                       "will be performed." % (self.pathname, self._num_par_fd))
+                simple_warning(msg)
+
         self.comm = comm
         self._mode = mode
 
@@ -373,6 +388,7 @@ class Group(System):
             subsys._local_vector_class = self._local_vector_class
             subsys._distributed_vector_class = self._distributed_vector_class
             subsys.force_alloc_complex = self.force_alloc_complex
+            subsys._use_derivatives = self._use_derivatives
 
             if self.pathname:
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)
@@ -438,56 +454,6 @@ class Group(System):
 
         return sorted(all_states)
 
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Group, self)._setup_vars()
-        num_var = self._num_var
-
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_vars(recurse)
-
-        # Compute num_var, at least locally
-        for vec_name in self._lin_rel_vec_name_list:
-            num_var[vec_name] = {}
-            for type_ in ['input', 'output']:
-                num_var[vec_name][type_] = np.sum(
-                    [subsys._num_var[vec_name][type_] for subsys in self._subsystems_myproc
-                     if vec_name in subsys._rel_vec_names], dtype=INT_DTYPE)
-
-        # If running in parallel, allgather
-        if self.comm.size > 1:
-            # Perform a single allgather
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = num_var
-            else:
-                raw = None
-            gathered = self.comm.allgather(raw)
-
-            for vec_name in self._lin_rel_vec_name_list:
-                num_var = self._num_var[vec_name]
-
-                # Empty the dictionaries
-                for type_ in ['input', 'output']:
-                    num_var[type_] = 0
-
-                # Process the gathered data and update the dictionaries
-                for myproc_num_var in gathered:
-                    if myproc_num_var is None:
-                        continue
-                    for type_ in ['input', 'output']:
-                        num_var[type_] += myproc_num_var[vec_name][type_]
-
-        self._num_var['nonlinear'] = self._num_var['linear']
-
     def _setup_var_index_ranges(self, recurse=True):
         """
         Compute the division of variables by subsystem.
@@ -503,8 +469,10 @@ class Group(System):
 
         subsystems_var_range = self._subsystems_var_range = {}
 
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
         # First compute these on one processor for each subsystem
-        for vec_name in self._lin_rel_vec_name_list:
+        for vec_name in vec_names:
 
             # Here, we count the number of variables in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
@@ -513,8 +481,10 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
-                    if subsys.comm.rank == 0 and vec_name in subsys._rel_vec_names:
-                        allprocs_counters[type_][isub] = subsys._num_var[vec_name][type_]
+                    comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
+                    if comm.rank == 0 and vec_name in subsys._rel_vec_names:
+                        allprocs_counters[type_][isub] = \
+                            len(subsys._var_allprocs_relevant_names[vec_name][type_])
 
             # If running in parallel, allgather
             if self.comm.size > 1:
@@ -539,7 +509,8 @@ class Group(System):
                         np.sum(allprocs_counters[type_][:isub]),
                         np.sum(allprocs_counters[type_][:isub + 1]))
 
-        subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
+        if self._use_derivatives:
+            subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
 
         # Recursion
         if recurse:
@@ -590,12 +561,11 @@ class Group(System):
 
                 # Assemble allprocs_prom2abs_list
                 sub_allprocs_prom2abs_list_t = subsys._var_allprocs_prom2abs_list[type_]
-                for sub_prom_name in sub_allprocs_prom2abs_list_t:
-                    prom_name = var_maps[type_][sub_prom_name]
+                for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
+                    prom_name = var_maps[type_][sub_prom]
                     if prom_name not in allprocs_prom2abs_list[type_]:
                         allprocs_prom2abs_list[type_][prom_name] = []
-                    allprocs_prom2abs_list[type_][prom_name].extend(
-                        sub_allprocs_prom2abs_list_t[sub_prom_name])
+                    allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
 
         for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
             if len(abs_list) > 1:
@@ -605,7 +575,9 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1:
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+            mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
+            if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
+                                                    mysub._full_comm.rank == 0)):
                 raw = (allprocs_abs_names, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_resid_scaling)
             else:
@@ -664,14 +636,17 @@ class Group(System):
                 subsys._setup_var_sizes(recurse)
 
         sizes = self._var_sizes
+        relnames = self._var_allprocs_relevant_names
+
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
         # Compute _var_sizes
-        for vec_name in self._lin_rel_vec_name_list:
+        for vec_name in vec_names:
             sizes[vec_name] = {}
             subsystems_var_range = self._subsystems_var_range[vec_name]
 
             for type_ in ['input', 'output']:
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]),
+                sizes[vec_name][type_] = np.zeros((nproc, len(relnames[vec_name][type_])),
                                                   INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
@@ -679,8 +654,23 @@ class Group(System):
                         continue
                     proc_slice = slice(*subsystems_proc_range[ind])
                     var_slice = slice(*subsystems_var_range[type_][subsys.name])
-                    sizes[vec_name][type_][proc_slice, var_slice] = \
-                        subsys._var_sizes[vec_name][type_]
+                    if proc_slice.stop - proc_slice.start > subsys.comm.size:
+                        # in this case, we've split the proc for parallel FD, so subsys doesn't
+                        # have var_sizes for all the ranks we need. Since each parallel FD comm
+                        # has the same size distribution (since all are identical), just 'tile'
+                        # the var_sizes from the subsystem to fill in the full rank range we need
+                        # at this level.
+                        assert (proc_slice.stop - proc_slice.start) % subsys.comm.size == 0, \
+                            "%s comm size (%d) is not an exact multiple of %s comm size (%d)" % (
+                                self.pathname, self.comm.size, subsys.pathname, subsys.comm.size)
+                        proc_i = proc_slice.start
+                        while proc_i < proc_slice.stop:
+                            sizes[vec_name][type_][proc_i:proc_i + subsys.comm.size, var_slice] = \
+                                subsys._var_sizes[vec_name][type_]
+                            proc_i += subsys.comm.size
+                    else:
+                        sizes[vec_name][type_][proc_slice, var_slice] = \
+                            subsys._var_sizes[vec_name][type_]
 
         # If parallel, all gather
         if self.comm.size > 1:
@@ -692,14 +682,15 @@ class Group(System):
             # compute owning ranks
             owns = self._owning_rank
             for type_ in ('input', 'output'):
-                sizes = self._var_sizes['linear'][type_]
+                sizes = self._var_sizes[vec_names[0]][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             break
 
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        if self._use_derivatives:
+            self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._setup_global_shapes()
 
@@ -872,9 +863,15 @@ class Group(System):
         dict
             The relevance dictionary.
         """
-        desvars = self.get_design_vars(recurse=True, get_sizes=False)
-        responses = self.get_responses(recurse=True, get_sizes=False)
-        return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
+        if self._use_derivatives:
+            desvars = self.get_design_vars(recurse=True, get_sizes=False)
+            responses = self.get_responses(recurse=True, get_sizes=False)
+            return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses, mode)
+        else:
+            relevant = defaultdict(dict)
+            relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                              ContainsAll())}
+            return relevant
 
     def _setup_connections(self, recurse=True):
         """
@@ -902,7 +899,7 @@ class Group(System):
             for s in self._subsystems_myproc:
                 if isinstance(s, Group):
                     self._local_system_set.update(s._local_system_set)
-                elif not s.distributed:
+                elif not s.options['distributed']:
                     self._local_system_set.add(s.pathname)
 
         if pathname == '':
@@ -988,18 +985,18 @@ class Group(System):
 
             if out_units:
                 if not in_units:
-                    warnings.warn("Output '%s' with units of '%s' is "
-                                  "connected to input '%s' which has no"
-                                  " units." % (abs_out, out_units, abs_in))
+                    simple_warning("Output '%s' with units of '%s' is "
+                                   "connected to input '%s' which has no"
+                                   " units." % (abs_out, out_units, abs_in))
                 elif not is_compatible(in_units, out_units):
                     raise RuntimeError("Output units of '%s' for '%s' are"
                                        " incompatible with input units of "
                                        "'%s' for '%s'." %
                                        (out_units, abs_out, in_units, abs_in))
             elif in_units is not None:
-                warnings.warn("Input '%s' with units of '%s' is "
-                              "connected to output '%s' which has "
-                              "no units." % (abs_in, in_units, abs_out))
+                simple_warning("Input '%s' with units of '%s' is "
+                               "connected to output '%s' which has "
+                               "no units." % (abs_in, in_units, abs_out))
 
             # check shape compatibility
             if abs_in in abs2meta and abs_out in abs2meta:
@@ -1067,8 +1064,7 @@ class Group(System):
                                    "'%s' to '%s'. Index "
                                    "'%d' is out of range for a flat source "
                                    "of size %d.")
-                            raise ValueError(msg % (abs_out, abs_in,
-                                             bad_idx, out_size))
+                            raise ValueError(msg % (abs_out, abs_in, bad_idx, out_size))
                         if src_indices.ndim > 1:
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].flatten()
@@ -1083,8 +1079,7 @@ class Group(System):
                                            "'%s' to '%s'. Index "
                                            "'%d' is out of range for source "
                                            "dimension of size %d.")
-                                    raise ValueError(msg % (abs_out, abs_in,
-                                                     i, d_size))
+                                    raise ValueError(msg % (abs_out, abs_in, i, d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1139,12 +1134,18 @@ class Group(System):
         super(Group, self)._setup_global(ext_num_vars, ext_sizes)
 
         iproc = self.comm.rank
+        relnames = self._var_allprocs_relevant_names
 
         for subsys in self._subsystems_myproc:
             sub_ext_num_vars = {}
             sub_ext_sizes = {}
 
-            for vec_name in subsys._lin_rel_vec_name_list:
+            if subsys._use_derivatives:
+                vec_names = subsys._lin_rel_vec_name_list
+            else:
+                vec_names = subsys._vec_names
+
+            for vec_name in vec_names:
                 subsystems_var_range = self._subsystems_var_range[vec_name]
                 sizes = self._var_sizes[vec_name]
 
@@ -1152,7 +1153,7 @@ class Group(System):
                 sub_ext_sizes[vec_name] = {}
 
                 for type_ in ['input', 'output']:
-                    num = self._num_var[vec_name][type_]
+                    num = len(relnames[vec_name][type_])
                     idx1, idx2 = subsystems_var_range[type_][subsys.name]
                     size1 = np.sum(sizes[type_][iproc, :idx1])
                     size2 = np.sum(sizes[type_][iproc, idx2:])
@@ -1166,8 +1167,9 @@ class Group(System):
                         ext_sizes[vec_name][type_][1] + size2,
                     )
 
-            sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
-            sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
+            if subsys._use_derivatives:
+                sub_ext_num_vars['nonlinear'] = sub_ext_num_vars['linear']
+                sub_ext_sizes['nonlinear'] = sub_ext_sizes['linear']
 
             subsys._setup_global(sub_ext_num_vars, sub_ext_sizes)
 
@@ -1589,10 +1591,11 @@ class Group(System):
             with self.jacobian_context(jac):
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in itervalues(self._approx_schemes):
-                        approximation.compute_approximations(self, jac=jac, deriv_type='total')
+                        approximation.compute_approximations(self, jac=jac, total=True)
         else:
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
+                jac._reset_mats()  # zero out matrices if we have any overlapping partials
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:
@@ -1690,6 +1693,9 @@ class Group(System):
         recurse : bool
             If True, setup jacobians in all descendants.
         """
+        if not self._use_derivatives:
+            return
+
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
@@ -1771,8 +1777,6 @@ class Group(System):
                         meta['value'] = np.zeros(shape)
 
                     self._subjacs_info[key] = meta
-
-            approx._init_approximations()
 
         super(Group, self)._setup_jacobians(recurse=recurse)
 

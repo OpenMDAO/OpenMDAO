@@ -51,8 +51,8 @@ class ScalingExample2(ImplicitComponent):
     def setup(self):
         self.add_input('x1', val=100.0)
         self.add_input('x2', val=5000.0)
-        self.add_output('y1', val=200., res_ref=1e5)
-        self.add_output('y2', val=6000., res_ref=1e-5)
+        self.add_output('y1', val=200., ref=300.0, ref0=100.0)
+        self.add_output('y2', val=6000., ref=11000.0, ref0=1000.0)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         x1 = inputs['x1']
@@ -920,9 +920,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context_all():
             val = model.comp._outputs['y1']
-            assert_rel_error(self, val, 200.0)
+            assert_rel_error(self, val, 0.5)
             val = model.comp._outputs['y2']
-            assert_rel_error(self, val, 6000.0)
+            assert_rel_error(self, val, 0.5)
 
     def test_feature3(self):
         from openmdao.api import Problem, Group, IndepVarComp

@@ -1,9 +1,11 @@
 """Define the base Jacobian class."""
 from __future__ import division
 import numpy as np
+from numpy.random import rand
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
+from six import itervalues
 
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
@@ -28,6 +30,10 @@ class Jacobian(object):
         can assign a jacobian with less rows or columns than the variable sizes.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
+    _abs_keys : defaultdict
+        A cache dict for key to absolute key.
+    _randomize : bool
+        If True, sparsity is being computed for simultaneous derivative coloring.
     """
 
     def __init__(self, system):
@@ -43,6 +49,14 @@ class Jacobian(object):
         self._subjacs_info = system._subjacs_info
         self._override_checks = False
         self._under_complex_step = False
+        self._abs_keys = defaultdict(bool)
+        self._randomize = False
+
+    def _get_abs_key(self, key):
+        abskey = self._abs_keys[key]
+        if not abskey:
+            self._abs_keys[key] = abskey = key2abs_key(self._system, key)
+        return abskey
 
     def _abs_key2shape(self, abs_key):
         """
@@ -77,7 +91,7 @@ class Jacobian(object):
         boolean
             return whether sub-Jacobian has been defined.
         """
-        return key2abs_key(self._system, key) in self._subjacs_info
+        return self._get_abs_key(key) in self._subjacs_info
 
     def __getitem__(self, key):
         """
@@ -93,7 +107,7 @@ class Jacobian(object):
         ndarray or spmatrix or list[3]
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        abs_key = key2abs_key(self._system, key)
+        abs_key = self._get_abs_key(key)
         if abs_key in self._subjacs_info:
             return self._subjacs_info[abs_key]['value']
         else:
@@ -111,7 +125,7 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        abs_key = key2abs_key(self._system, key)
+        abs_key = self._get_abs_key(key)
         if abs_key is not None:
 
             # You can only set declared subjacobians.
@@ -204,5 +218,32 @@ class Jacobian(object):
             residuals linear vector.
         mode : str
             'fwd' or 'rev'.
+        """
+        pass
+
+    def _randomize_subjac(self, subjac):
+        """
+        Return a subjac that is the given subjac filled with random values.
+
+        Parameters
+        ----------
+        subjac : ndarray or csc_matrix
+            Sub-jacobian to be randomized.
+
+        Returns
+        -------
+        ndarray or csc_matrix
+            Randomized version of the subjac.
+        """
+        if isinstance(subjac, sparse_types):  # sparse
+            sparse = subjac.copy()
+            sparse.data = rand(sparse.data.size) + 1.0
+            return sparse
+
+        return rand(*subjac.shape) + 1.0
+
+    def _reset_mats(self):
+        """
+        Zero out internal matrices if needed.
         """
         pass

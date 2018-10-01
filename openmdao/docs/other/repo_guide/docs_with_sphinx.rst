@@ -1,18 +1,7 @@
-.. _`documentation_standardization`:
+.. _docs_with_sphinx:
 
-Documentation
-=============
-
-Project Documentation Structure
--------------------------------
-
-First, to make things run smoothly, set up your project structure so that your documentation lies in the top-level project directory
-in a directory named `/docs`. For instance, "openmdao/docs" or "openaerostruct/docs".  The reasons for this location:
-
-    #. This is where openmdao's sourcedoc-generating script, `generate_docs` will be looking for docs.
-    #. This is where the github-pages publishing package `travis-sphinx` will be looking for docs.
-
-If you must put docs elsewhere for some reason, just be aware that it will require modifications to things in the above list.
+Setting Up Project Documentation in Sphinx
+==========================================
 
 
 Importing Tools from OpenMDAO
@@ -43,6 +32,8 @@ Here's how you might bring in an OpenMDAO extension, by importing it, and then a
     ]
 
 
+.. note::
+    For more information on some of OpenMDAO's custom embed extensions, please see :ref:`Custom Directives in OpenMDAO <custom_directives>`
 
 General Docs Settings
 ~~~~~~~~~~~~~~~~~~~~~
@@ -50,6 +41,11 @@ General Docs Settings
 Your Sphinx documentation will need its own `docs/conf.py`, theme directory, and style.css so that you may customize the docs
 into something that will make them their own. You can use OpenMDAO's `docs/conf.py`, `docs/_theme/theme.conf` and
 `docs/_theme/static/style.css` as a starting point.
+
+OpenMDAO's `docs/conf.py` file looks like this:
+
+.. embed-code::
+    conf.py
 
 OpenMDAO numpydoc monkeypatch
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,9 +101,10 @@ subpackage.  To import this tool:
 :code:`from openmdao.docutils import generate_docs`
 
 Then, from your `docs/conf.py`, invoke it with arguments of:
-    #. where to find packages (relative to where it's being called)
-    #. root of the project (relative to where it's being called)
-    #. which packages to include--omit things like "test" that don't make sense to document.
+
+    #. Where to find packages (relative to where it's being called).
+    #. Root of the project (relative to where it's being called).
+    #. Which packages to include--omit things like "test" that don't make sense to document.
 
 .. code-block:: python
 
@@ -117,7 +114,7 @@ Then, from your `docs/conf.py`, invoke it with arguments of:
     ]
 
     from openmdao.docutils import generate_docs
-    generate_docs("..", "../..", packages)
+    generate_docs("..", "../..", packages, project_name='yourproject')
 
 
 OpenMDAO Tagging Tool

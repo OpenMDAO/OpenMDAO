@@ -17,7 +17,8 @@ from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
-from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser
+from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, \
+    _mempost_exec, _mempost_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
 from openmdao.utils.mpi import MPI
@@ -373,6 +374,7 @@ _non_post_setup_map = {
     'iprof': (_iprof_setup_parser, _iprof_exec),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec),
+    'mempost': (_mempost_setup_parser, _mempost_exec),
 }
 
 
@@ -403,3 +405,7 @@ def openmdao_cmd():
             options.executor(options)
         else:
             print("\nNothing to do.")
+
+
+if __name__ == '__main__':
+    openmdao_cmd()

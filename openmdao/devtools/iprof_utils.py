@@ -30,21 +30,25 @@ class FunctionFinder(ast.NodeVisitor):
         ast.NodeVisitor.__init__(self)
         self.fname = fname
         self.cache = cache
-        self.class_stack = []
+        self.stack = []
 
-    def visit_ClassDef(self, node):
-        self.class_stack.append(node.name)
-        for bnode in node.body:
-            self.visit(bnode)
-        self.class_stack.pop()
-
-    def visit_FunctionDef(self, node):
-        if self.class_stack:
-            qual =  (None, '.'.join(self.class_stack),  node.name)
+    def _do_callable_def(self, node):
+        if self.stack:
+            qual =  (None, '.'.join(self.stack),  node.name)
         else:
             qual = ("<%s:%d>" % (self.fname, node.lineno), None, node.name)
-
         self.cache[node.lineno] = qual
+
+        self.stack.append(node.name)
+        for bnode in node.body:
+            self.visit(bnode)
+        self.stack.pop()
+
+    def visit_ClassDef(self, node):
+        self._do_callable_def(node)
+
+    def visit_FunctionDef(self, node):
+        self._do_callable_def(node)
 
 
 def find_qualified_name(filename, line, cache, full=True):
@@ -56,7 +60,7 @@ def find_qualified_name(filename, line, cache, full=True):
     filename : str
         Name of file containing source code.
     line : int
-        Line number within the give file.
+        Line number within the given file.
     cache : dict
         A dictionary containing infomation by filename.
     full : bool
@@ -202,7 +206,7 @@ def _setup_func_group():
         pass
 
 
-def _collect_methods(method_patterns):
+def _collect_methods(method_patterns=None):
     """
     Iterate over a dict of method name patterns mapped to classes.  Search
     through the classes for anything that matches and return a dict of
@@ -219,6 +223,9 @@ def _collect_methods(method_patterns):
         Dict of method names and tuples of all classes that matched for that method. Default value
         of the dict is a class that matches nothing
     """
+    if method_patterns is None:
+        return None
+
     matches = defaultdict(list)
 
     # TODO: update this to also work with stand-alone functions
@@ -239,7 +246,8 @@ def _collect_methods(method_patterns):
     return matches
 
 
-def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=None, filters=None):
+def _create_profile_callback(stack, matches=None, do_call=None, do_ret=None, context=None,
+                             filters=None):
     """
     The wrapped function returned from here handles identification of matching calls when called
     as a setprofile callback.
@@ -254,7 +262,11 @@ def _create_profile_callback(stack, matches, do_call=None, do_ret=None, context=
 
     def _wrapped(frame, event, arg):
         if event == 'call':
-            if 'self' in frame.f_locals and frame.f_code.co_name in matches and \
+            if matches is None:
+                stack.append(id(frame))
+                if do_call is not None:
+                    return do_call(frame, arg, stack, context)
+            elif 'self' in frame.f_locals and frame.f_code.co_name in matches and \
                     isinstance(frame.f_locals['self'], matches[frame.f_code.co_name]):
                 pred = True
                 if filters:

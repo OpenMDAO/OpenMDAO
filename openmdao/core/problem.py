@@ -28,7 +28,7 @@ from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name
+from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -730,7 +730,7 @@ class Problem(object):
 
     def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
-              local_vector_class=DefaultVector):
+              local_vector_class=DefaultVector, derivatives=True):
         """
         Set up the model hierarchy.
 
@@ -763,6 +763,8 @@ class Problem(object):
         local_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in intraprocess communication.
+        derivatives : bool
+            If True, perform any memory allocations necessary for derivative computation.
 
         Returns
         -------
@@ -796,7 +798,8 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
-        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class)
+        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
+                     derivatives)
 
         # Cache all args for final setup.
         self._check = check
@@ -850,10 +853,10 @@ class Problem(object):
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and nonlinear constraints)." %
-                          (mode, desvar_size, response_size), RuntimeWarning)
+            simple_warning("Inefficient choice of derivative mode.  You chose '%s' for a "
+                           "problem with %d design variables and %d response variables "
+                           "(objectives and nonlinear constraints)." %
+                           (mode, desvar_size, response_size), RuntimeWarning)
 
         self._setup_recording()
 
@@ -934,6 +937,9 @@ class Problem(object):
             self.final_setup()
 
         model = self.model
+
+        if not model._use_derivatives:
+            raise RuntimeError("Can't check partials.  Derivative support has been turned off.")
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -1099,7 +1105,7 @@ class Problem(object):
                             # them unless the fd is non zero. Note: subjacs_info is empty for
                             # undeclared partials, which is the default behavior now.
                             try:
-                                if subjacs[abs_key]['dependent'] is False:
+                                if not subjacs[abs_key]['dependent']:
                                     indep_key[c_name].add(rel_key)
                             except KeyError:
                                 indep_key[c_name].add(rel_key)
@@ -1169,7 +1175,7 @@ class Problem(object):
                     if local_method:
                         method = local_method
 
-                # We can't use CS if we havent' allocated a complex vector, so we fall back on fd.
+                # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
                 if method == 'cs' and not alloc_complex:
                     comps_could_not_cs.add(c_name)
                     method = 'fd'
@@ -1207,9 +1213,7 @@ class Problem(object):
 
             approx_jac = {}
             for approximation in itervalues(approximations):
-                approximation._init_approximations()
-
-                # Peform the FD here.
+                # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
             for rel_key, partial in iteritems(approx_jac):
@@ -1228,7 +1232,7 @@ class Problem(object):
             msg += str(list(comps_could_not_cs))
             msg += "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
                    "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-            warnings.warn(msg)
+            simple_warning(msg)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
@@ -1666,7 +1670,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if sys_name not in derivative_data:
             msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
-            warnings.warn(msg)
+            simple_warning(msg)
             continue
 
         derivatives = derivative_data[sys_name]
@@ -1868,16 +1872,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     # Magnitudes
                     if out_stream:
-                        out_buffer.write("  {}: '{}' wrt '{}'".format(sys_name, of, wrt) + '\n')
-                        out_buffer.write('    Forward Magnitude : {:.6e}'.format(magnitude.forward)
-                                         + '\n')
+                        out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                        out_buffer.write('    Forward Magnitude : {:.6e}\n'.format(
+                            magnitude.forward))
                     if not totals and system.matrix_free:
                         txt = '    Reverse Magnitude : {:.6e}'
                         if out_stream:
                             out_buffer.write(txt.format(magnitude.reverse) + '\n')
                     if out_stream:
-                        out_buffer.write('         Fd Magnitude : {:.6e} ({})'.format(magnitude.fd,
-                                         fd_desc) + '\n')
+                        out_buffer.write('         Fd Magnitude : {:.6e} ({})\n'.format(
+                            magnitude.fd, fd_desc))
                     # Absolute Errors
                     if totals or not system.matrix_free:
                         error_descs = ('(Jfor  - Jfd) ', )
@@ -1888,8 +1892,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if error_str.endswith('*'):
                             num_bad_jacs += 1
                         if out_stream:
-                            out_buffer.write('    Absolute Error {}: {}'.format(desc, error_str) +
-                                             '\n')
+                            out_buffer.write('    Absolute Error {}: {}\n'.format(desc, error_str))
                     if out_stream:
                         out_buffer.write('\n')
 
@@ -1899,10 +1902,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                         if error_str.endswith('*'):
                             num_bad_jacs += 1
                         if out_stream:
-                            out_buffer.write('    Relative Error {}: {}'.format(desc, error_str) +
-                                             '\n')
+                            out_buffer.write('    Relative Error {}: {}\n'.format(desc, error_str))
 
                     if out_stream:
+                        if MPI and MPI.COMM_WORLD.size > 1:
+                            out_buffer.write('    MPI Rank {}\n'.format(MPI.COMM_WORLD.rank))
                         out_buffer.write('\n')
 
                     # Raw Derivatives

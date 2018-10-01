@@ -24,7 +24,7 @@ class OptionsDictionary(object):
         Dictionary of entries. Each entry is a dictionary consisting of value, values,
         types, desc, lower, and upper.
     _read_only : bool
-        If True, setting (via __setitem__ or update) is not permitted.
+        If True, no options can be set after declaration.
     """
 
     def __init__(self, read_only=False):
@@ -185,7 +185,7 @@ class OptionsDictionary(object):
 
         The optional checks consist of ensuring: the value is one of a list of acceptable values,
         the type of value is one of a list of acceptable types, value is not less than lower,
-        value is not greater than upper, and value satisfies is_valid.
+        value is not greater than upper, and value satisfies check_valid.
 
         Parameters
         ----------
@@ -199,7 +199,6 @@ class OptionsDictionary(object):
         types = meta['types']
         lower = meta['lower']
         upper = meta['upper']
-        is_valid = meta['is_valid']
 
         if not (value is None and meta['allow_none']):
             # If only values is declared
@@ -226,16 +225,15 @@ class OptionsDictionary(object):
             if lower is not None:
                 if value < lower:
                     raise ValueError("Value ({}) of option '{}' "
-                                     "exceeds minimum allowed value of {}.".format(value, name,
-                                                                                   upper))
+                                     "is less than minimum allowed value of {}.".format(value, name,
+                                                                                        lower))
 
         # General function test
-        if is_valid is not None and not is_valid(value):
-            raise ValueError("Function is_valid({}) returns False for option '{}'.".format(value,
-                                                                                           name))
+        if meta['check_valid'] is not None:
+            meta['check_valid'](name, value)
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, is_valid=None, allow_none=False):
+                upper=None, lower=None, check_valid=None, allow_none=False):
         r"""
         Declare an option.
 
@@ -262,8 +260,8 @@ class OptionsDictionary(object):
             Maximum allowable value.
         lower : float or None
             Minimum allowable value.
-        is_valid : function or None
-            General check function that returns True if valid.
+        check_valid : function or None
+            General check function that raises an exception if value is not valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
         """
@@ -293,7 +291,7 @@ class OptionsDictionary(object):
             'desc': desc,
             'upper': upper,
             'lower': lower,
-            'is_valid': is_valid,
+            'check_valid': check_valid,
             'has_been_set': default_provided,
             'allow_none': allow_none,
         }
@@ -365,18 +363,20 @@ class OptionsDictionary(object):
         value : -
             value of the option to be value- and type-checked if declared.
         """
-        if self._read_only:
-            msg = "Tried to set '{}' on a read-only OptionsDictionary."
+        try:
+            meta = self._dict[name]
+        except KeyError:
+            # The key must have been declared.
+            msg = "Option '{}' cannot be set because it has not been declared."
             raise KeyError(msg.format(name))
 
-        # The key must have been declared.
-        if name not in self._dict:
-            msg = "Key '{}' cannot be set because it has not been declared."
-            raise KeyError(msg.format(name))
+        if self._read_only:
+            raise KeyError("Tried to set read-only option '{}'.".format(name))
 
         self._assert_valid(name, value)
-        self._dict[name]['value'] = value
-        self._dict[name]['has_been_set'] = True
+
+        meta['value'] = value
+        meta['has_been_set'] = True
 
     def __getitem__(self, name):
         """

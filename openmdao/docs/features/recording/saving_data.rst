@@ -125,3 +125,14 @@ in the recorded case data:
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_record_with_prefix
     :layout: interleave
+
+Recording Options Precedence
+----------------------------
+
+The recording options that determine what gets recorded can sometime be a little confusing. Here is an example
+that might help. The code shows how the `record_desvars` and `includes` variables interact.
+
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_recording_option_precedence_driver_cases
+    :layout: interleave

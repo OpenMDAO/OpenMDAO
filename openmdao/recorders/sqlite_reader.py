@@ -13,8 +13,6 @@ from collections import OrderedDict
 from six import PY2, PY3, reraise
 from six.moves import range
 
-from yaml import safe_load
-
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
@@ -27,8 +25,11 @@ from openmdao.utils.write_outputs import write_outputs
 
 if PY2:
     import cPickle as pickle
+    from openmdao.utils.general_utils import json_loads_byteified as json_loads
 elif PY3:
     import pickle
+    from json import loads as json_loads
+
 
 _DEFAULT_OUT_STREAM = object()
 
@@ -104,12 +105,12 @@ class SqliteCaseReader(BaseCaseReader):
             self._var_settings = None
 
             if self.format_version >= 4:
-                self._var_settings = safe_load(row[4])
+                self._var_settings = json_loads(row[4])
 
             if self.format_version >= 3:
-                self._abs2prom = safe_load(row[1])
-                self._prom2abs = safe_load(row[2])
-                self._abs2meta = safe_load(row[3])
+                self._abs2prom = json_loads(row[1])
+                self._prom2abs = json_loads(row[2])
+                self._abs2meta = json_loads(row[3])
 
                 for name in self._abs2meta:
                     if 'lower' in self._abs2meta[name]:
@@ -220,7 +221,7 @@ class SqliteCaseReader(BaseCaseReader):
                 row = cur.fetchone()
                 if row is not None:
                     if self.format_version >= 3:
-                        self.driver_metadata = safe_load(row[0])
+                        self.driver_metadata = json_loads(row[0])
                     elif self.format_version in (1, 2):
                         if PY2:
                             self.driver_metadata = pickle.loads(str(row[0]))

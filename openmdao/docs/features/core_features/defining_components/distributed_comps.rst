@@ -21,7 +21,19 @@ distributed output.  Otherwise, the assumed *src_indices* will be from 0 to
 
 If a Component has *any* distributed outputs then *all* of its outputs are distributed.
 You tell the framework that a Component is a distributed component by setting its
-*distributed* attribute to True.
+:code:`distributed` option to True:
+
+
+Component Options
+-----------------
+
+.. embed-options::
+    openmdao.core.component
+    Component
+    options
+
+Distributed Component Example
+-----------------------------
 
 The following simple example shows how to create a distributed component that
 distributes its computation evenly across the available processes, up to a

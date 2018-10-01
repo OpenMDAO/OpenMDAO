@@ -22,7 +22,7 @@ except ImportError:
 
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.utils.general_utils import ContainsAll
+from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
 
@@ -123,6 +123,10 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv = {}
 
+        if not model._use_derivatives:
+            raise RuntimeError("Derivative support has been turned off but compute_totals "
+                               "was called.")
+
         driver_wrt = list(design_vars)
         driver_of = driver._get_ordered_nl_responses()
 
@@ -176,7 +180,7 @@ class _TotalJacInfo(object):
                            "be turned off.\ncoloring design vars: %s, current design vars: "
                            "%s\ncoloring responses: %s, current responses: %s." %
                            (driver_wrt, wrt, driver_of, of))
-                    warnings.warn(msg)
+                    simple_warning(msg)
                     self.simul_coloring = None
 
             self.has_lin_cons = has_lin_cons
@@ -184,9 +188,6 @@ class _TotalJacInfo(object):
             if self.simul_coloring is None:
                 modes = [self.mode]
             else:
-                # for now, raise an exception when MPI is used with simul_coloring
-                if MPI:
-                    raise RuntimeError("simul coloring currently does not work under MPI.")
                 modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
 
             self.in_idx_map = {}
@@ -257,8 +258,8 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, size, has_remote_vars):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
-        if PETSc is not None and (isinstance(self.output_vec[mode]['linear'], PETScVector)
-                                  or has_remote_vars[mode]):
+        if self.comm.size > 1 or (self.model._full_comm is not None and
+                                  self.model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(size, dtype=float),
                                                   comm=self.comm)
             self.jac_petsc[mode] = tgt_vec
@@ -614,10 +615,7 @@ class _TotalJacInfo(object):
                                                            dtype=INT_DTYPE))
                         idx_array = np.hstack(dist_idxs)
                     else:
-                        if sizes[myproc, var_idx] > 0 and fwd:
-                            iproc = myproc
-                        else:
-                            iproc = owners[name]
+                        iproc = owners[name]
 
                         offset = offsets[iproc, var_idx]
                         idx_array = np.arange(offset, offset + sizes[iproc, var_idx],
@@ -1068,12 +1066,12 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         vecname, _, _ = self.in_idx_map[mode][i]
-        deriv_idxs, jac_idxs = self.solvec_map[mode]
 
         scatter = self.jac_scatters[mode][vecname]
 
         # DefaultVector
         if scatter is None:
+            deriv_idxs, jac_idxs = self.solvec_map[mode]
             deriv_val = self.output_vec[mode][vecname]._data
             if mode == 'fwd':
                 self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
@@ -1129,10 +1127,16 @@ class _TotalJacInfo(object):
         # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
         # deriv coloring, vecname will always be 'linear', and we don't need to check
         # vecname for each index.
-        deriv_val = self.output_vec[mode]['linear']._data
-        reduced_derivs = deriv_val[deriv_idxs['linear']]
+        scatter = self.jac_scatters[mode]['linear']
 
-        # TODO: add code here to handle running under MPI
+        if scatter is None:
+            deriv_val = self.output_vec[mode]['linear']._data
+            reduced_derivs = deriv_val[deriv_idxs['linear']]
+        else:
+            self.jac_petsc[mode].array[:] = 0.
+            scatter.scatter(self.soln_petsc[mode]['linear'][0],
+                            self.jac_petsc[mode], addv=False, mode=False)
+            reduced_derivs = self.jac_petsc[mode].array
 
         if fwd:
             for i in inds:
@@ -1327,23 +1331,14 @@ class _TotalJacInfo(object):
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
 
+        totals = self.J_dict
         if return_format == 'flat_dict':
-            totals = OrderedDict()
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    totals[prom_out, prom_in] = _get_subjac(approx_jac[output_name, input_name],
-                                                            prom_out, prom_in, of_idx, wrt_idx)
+                    totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
+                                                               prom_out, prom_in, of_idx, wrt_idx)
 
-        elif return_format == 'dict':
-            totals = OrderedDict()
-            for prom_out, output_name in zip(self.prom_of, of):
-                totals[prom_out] = tot = OrderedDict()
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in] = _get_subjac(approx_jac[output_name, input_name],
-                                               prom_out, prom_in, of_idx, wrt_idx)
-
-        elif return_format == 'array':
-            totals = self.J_dict  # J_dict has views into the array jacobian
+        elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):

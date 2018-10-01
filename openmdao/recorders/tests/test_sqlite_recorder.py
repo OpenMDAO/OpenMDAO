@@ -180,6 +180,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
+        driver.recording_options['includes'] = ['*']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -255,6 +256,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
+        driver.recording_options['includes'] = ['*']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -301,6 +303,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
+        driver.recording_options['includes'] = ['*']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -354,6 +357,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.add_recorder(self.recorder)
+        driver.recording_options['includes'] = ['*']
 
         prob.setup()
         prob.set_solver_print(0)
@@ -1294,7 +1298,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'pz.z': [0., 0.],
             'd1.y1': [-9.10908321e-11],
             'd2.y2': [0.],
-            'obj_cmp.obj': [2.03287907e-20],
+            'obj_cmp.obj': [2.28698896e-20],
             'con_cmp1.con1': [0.],
             'con_cmp2.con2': [0.]
         }
@@ -1418,7 +1422,6 @@ class TestSqliteRecorder(unittest.TestCase):
         #
 
         # Driver
-        driver.recording_options['includes'] = []
         driver.recording_options['record_metadata'] = True
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
@@ -2173,7 +2176,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         recorder = SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
-
+        prob.driver.recording_options['includes'] = ['*']
         prob.setup()
 
         # set some initial guesses

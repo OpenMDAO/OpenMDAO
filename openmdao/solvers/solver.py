@@ -255,6 +255,10 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+
+        if isinstance(self, LinearSolver) and not system._use_derivatives:
+            return
+
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
@@ -767,8 +771,10 @@ class LinearSolver(Solver):
             b_vecs = self._system._vectors['output']
 
         self._rhs_vecs = {}
-        for vec_name in self._system._rel_vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
+
+        if system._use_derivatives:
+            for vec_name in self._system._lin_rel_vec_name_list:
+                self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
 
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "

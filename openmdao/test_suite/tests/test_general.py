@@ -21,7 +21,9 @@ CycleGroup ('group_type': 'cycle')
                     - 'array': Uses an ndarray.
                     - 'sparse': Uses the Scipy CSR sparse format.
                     - 'aij': Uses the [values, rows, cols] format.
-'finite_difference': bool. If derivatives should be approximated with finite differences.
+'partial_method': str. How derivatives should be solved.
+            Approximated with finite differences, (fd, cs) OR
+            solved for analytically, (exact).
 'num_comp': int. Number of components to use. Must be at least 2. (2)
 'num_var': int. Number of variables to use per component. Must be at least 1. (3)
 'var_shape': tuple(int). Shape to use for each variable. (2, 3).
@@ -49,7 +51,7 @@ class ParameterizedTestCases(unittest.TestCase):
             actual = {key: problem[key] for key in iterkeys(expected_values)}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
-        error_bound = 1e-4 if root.options['finite_difference'] else 1e-8
+        error_bound = 1e-4 if root.options['partial_method'] != 'exact' else 1e-8
 
         expected_totals = root.expected_totals
         if expected_totals:

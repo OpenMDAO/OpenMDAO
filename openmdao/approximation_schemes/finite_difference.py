@@ -1,13 +1,14 @@
 """Finite difference derivative approximations."""
 from __future__ import division, print_function
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from itertools import groupby
 from six.moves import range, zip
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
+    _gather_jac_results
 from openmdao.utils.name_maps import abs_key2rel_key
 
 
@@ -37,6 +38,8 @@ FD_COEFFS = {
                            coeffs=np.array([0.5, -0.5]),
                            current_coeff=0.),
 }
+
+_full_slice = slice(None)
 
 
 def _generate_fd_coeff(form, order):
@@ -81,6 +84,8 @@ class FiniteDifference(ApproximationScheme):
         A list of which derivatives (in execution order) to compute.
         The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
         and fd_options is a dictionary.
+    _approx_groups : list
+        A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
     """
 
     def __init__(self):
@@ -114,6 +119,7 @@ class FiniteDifference(ApproximationScheme):
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
         self._exec_list.append((of, wrt, fd_options))
+        self._approx_groups = None
 
     @staticmethod
     def _key_fun(approx_tuple):
@@ -135,55 +141,28 @@ class FiniteDifference(ApproximationScheme):
         return (approx_tuple[1], fd_options['form'], fd_options['order'],
                 fd_options['step'], fd_options['step_calc'])
 
-    def _init_approximations(self):
+    def _init_approximations(self, system):
         """
         Prepare for later approximations.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
         """
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
 
-        # TODO: Automatic sparse FD by constructing a graph of variable dependence?
+        # groupby (along with this key function) will group all 'of's that have the same wrt and
+        # step size.
+        # Note: Since access to `approximations` is required multiple times, we need to
+        # throw it in a list. The groupby iterator only works once.
+        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                        self._key_fun)]
 
-    def compute_approximations(self, system, jac=None, deriv_type='partial'):
-        """
-        Execute the system to compute the approximate sub-Jacobians.
-
-        Parameters
-        ----------
-        system : System
-            System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are
-            being approximated.
-        """
-        if len(self._exec_list) == 0:
-            return
-
-        if jac is None:
-            jac = system._jacobian
-
-        if deriv_type == 'total':
-            current_vec = system._outputs
-        else:
-            current_vec = system._residuals
-
-        result = system._outputs._clone(True)
-        result_array = result._data.copy()
-        out_tmp = current_vec._data.copy()
-        in_tmp = system._inputs._data.copy()
-
-        # To support driver src_indices, we need to override some checks in Jacobian, but do it
-        # selectively.
-        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
-            not isinstance(jac, dict)
-
-        for key, approximations in groupby(self._exec_list, self._key_fun):
-            # groupby (along with this key function) will group all 'of's that have the same wrt and
-            # step size.
+        self._approx_groups = [None] * len(approx_groups)
+        for i, (key, approximations) in enumerate(approx_groups):
             wrt, form, order, step, step_calc = key
 
             # FD forms are written as a collection of changes to inputs (deltas) and the associated
@@ -198,10 +177,9 @@ class FiniteDifference(ApproximationScheme):
 
             if step_calc == 'rel':
                 if wrt in system._outputs._views_flat:
-                    scale = np.linalg.norm(system._outputs._views_flat[wrt])
-                else:
-                    scale = np.linalg.norm(system._inputs._views_flat[wrt])
-                step *= scale
+                    step *= np.linalg.norm(system._outputs._views_flat[wrt])
+                elif wrt in system._inputs._views_flat:
+                    step *= np.linalg.norm(system._inputs._views_flat[wrt])
 
             deltas = fd_form.deltas * step
             coeffs = fd_form.coeffs / step
@@ -214,12 +192,8 @@ class FiniteDifference(ApproximationScheme):
                 in_size = system._var_allprocs_abs2meta[wrt]['size']
                 in_idx = range(in_size)
 
-            result._data[:] = system._outputs._data
-
             outputs = []
 
-            # Note: If access to `approximations` is required again in the future, we will need to
-            # throw it in a list first. The groupby iterator only works once.
             for approx_tuple in approximations:
                 of = approx_tuple[0]
                 # TODO: Sparse derivatives
@@ -228,34 +202,160 @@ class FiniteDifference(ApproximationScheme):
                     out_size = len(out_idx)
                 else:
                     out_size = system._var_allprocs_abs2meta[of]['size']
-                outputs.append((of, np.zeros((out_size, in_size))))
+                    out_idx = _full_slice
+
+                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
+
+            self._approx_groups[i] = (wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs)
+
+    def compute_approximations(self, system, jac=None, total=False):
+        """
+        Execute the system to compute the approximate sub-Jacobians.
+
+        Parameters
+        ----------
+        system : System
+            System on which the execution is run.
+        jac : None or dict-like
+            If None, update system with the approximated sub-Jacobians. Otherwise, store the
+            approximations in the given dict-like object.
+        total : bool
+            If True total derivatives are being approximated, else partials.
+        """
+        if len(self._exec_list) == 0:
+            return
+
+        if jac is None:
+            jac = system._jacobian
+
+        if total:
+            current_vec = system._outputs
+        else:
+            current_vec = system._residuals
+
+        result = system._outputs._clone(True)
+        result_array = result._data.copy()
+        out_tmp = current_vec._data.copy()
+        in_tmp = system._inputs._data.copy()
+
+        # To support driver src_indices, we need to override some checks in Jacobian, but do it
+        # selectively.
+        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
+            not isinstance(jac, dict)
+
+        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
+                                                      system._full_comm.size > 1)
+        num_par_fd = system._num_par_fd if use_parallel_fd else 1
+        is_parallel = use_parallel_fd or system.comm.size > 1
+
+        results = defaultdict(list)
+        iproc = system.comm.rank
+        owns = system._owning_rank
+        mycomm = system._full_comm if use_parallel_fd else system.comm
+
+        fd_count = 0
+        approx_groups = self._get_approx_groups(system)
+        for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
 
             for i_count, idx in enumerate(in_idx):
-                if current_coeff:
-                    result._data[:] = current_vec._data
-                    result._data *= current_coeff
-                else:
-                    result._data[:] = 0.
-
-                # Run the Finite Difference
-                for delta, coeff in zip(deltas, coeffs):
-                    input_delta = [(wrt, idx, delta)]
-                    self._run_point(system, input_delta, out_tmp, in_tmp, result_array, deriv_type)
-                    result_array *= coeff
-                    result._data += result_array
-
-                for of, subjac in outputs:
-                    if of in system._owns_approx_of_idx:
-                        out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = result._views_flat[of][out_idx]
+                if fd_count % num_par_fd == system._par_fd_id:
+                    if current_coeff:
+                        result._data[:] = current_vec._data
+                        result._data *= current_coeff
                     else:
-                        subjac[:, i_count] = result._views_flat[of]
+                        result._data[:] = 0.
 
-            for of, subjac in outputs:
-                rel_key = abs_key2rel_key(system, (of, wrt))
+                    # Run the Finite Difference
+                    for delta, coeff in zip(deltas, coeffs):
+                        self._run_point(system, wrt, idx, delta, out_tmp, in_tmp, result_array,
+                                        total)
+                        result_array *= coeff
+                        result._data += result_array
+
+                    if is_parallel:
+                        for of, _, out_idx in outputs:
+                            if owns[of] == iproc:
+                                results[(of, wrt)].append(
+                                    (i_count, result._views_flat[of][out_idx].copy()))
+                    else:
+                        for of, subjac, out_idx in outputs:
+                            subjac[:, i_count] = result._views_flat[of][out_idx]
+
+                fd_count += 1
+
+        if is_parallel:
+            results = _gather_jac_results(mycomm, results)
+
+        for wrt, _, _, _, _, _, outputs in approx_groups:
+            for of, subjac, _ in outputs:
+                key = (of, wrt)
+                if is_parallel:
+                    for i, result in results[key]:
+                        subjac[:, i] = result
+
+                rel_key = abs_key2rel_key(system, key)
+
                 if uses_src_indices:
                     jac._override_checks = True
                     jac[rel_key] = subjac
                     jac._override_checks = False
                 else:
                     jac[rel_key] = subjac
+
+    def _run_point(self, system, in_name, idxs, delta, out_tmp, in_tmp, result_array, total=False):
+        """
+        Alter the specified inputs by the given deltas, runs the system, and returns the results.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
+        in_name : str
+            Input name.
+        idxs : ndarray
+            Input indices.
+        delta : float
+            Perturbation amount.
+        out_tmp : ndarray
+            A copy of the starting outputs array used to restore the outputs to original values.
+        in_tmp : ndarray
+            A copy of the starting inputs array used to restore the inputs to original values.
+        result_array : ndarray
+            An array the same size as the system outputs. Used to store the results.
+        total : bool
+            If True total derivatives are being approximated, else partials.
+
+        Returns
+        -------
+        ndarray
+            The results from running the perturbed system.
+        """
+        inputs = system._inputs
+        outputs = system._outputs
+
+        if total:
+            run_model = system.run_solve_nonlinear
+            results_vec = outputs
+        else:
+            run_model = system.run_apply_nonlinear
+            results_vec = system._residuals
+
+        if in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] += delta
+        elif in_name in inputs._views_flat:
+            inputs._views_flat[in_name][idxs] += delta
+        else:
+            # If we make it here, this variable is remote, so don't increment by any delta.
+            pass
+
+        run_model()
+
+        result_array[:] = results_vec._data
+        results_vec._data[:] = out_tmp
+        inputs._data[:] = in_tmp
+
+        # if results_vec are the residuals then we need to remove the delta's we added earlier.
+        if results_vec is not outputs and in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] -= delta
+
+        return result_array

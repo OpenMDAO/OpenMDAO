@@ -5,7 +5,6 @@ import numpy as np
 
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
 
-from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
 try:
@@ -23,7 +22,8 @@ class DistributedAdder(ExplicitComponent):
 
     def __init__(self, size):
         super(DistributedAdder, self).__init__()
-        self.distributed = True
+
+        self.options['distributed'] = True
 
         self.local_size = self.size = size
 
@@ -51,8 +51,8 @@ class DistributedAdder(ExplicitComponent):
 
     def compute(self, inputs, outputs):
 
-        #NOTE: Each process will get just its local part of the vector
-        #print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
+        # NOTE: Each process will get just its local part of the vector
+        # print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
 
         outputs['y'] = inputs['x'] + 10.
 
@@ -68,8 +68,8 @@ class Summer(ExplicitComponent):
         self.size = size
 
     def setup(self):
-        #NOTE: this component depends on the full y array, so OpenMDAO
-        #      will automatically gather all the values for it
+        # NOTE: this component depends on the full y array, so OpenMDAO
+        #       will automatically gather all the values for it
         self.add_input('y', val=np.zeros(self.size))
         self.add_output('sum', 0.0, shape=1)
 
@@ -77,15 +77,14 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipIf(PETScVector is None or os.environ.get("TRAVIS"),
-                 "PETSc is required." if PETScVector is None
-                 else "Unreliable on Travis CI.")
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedAdderTest(unittest.TestCase):
 
     N_PROCS = 3
 
     def test_distributed_adder(self):
-        size = 100 #how many items in the array
+        size = 100  # how many items in the array
 
         prob = Problem()
         prob.model = Group()
@@ -105,7 +104,7 @@ class DistributedAdderTest(unittest.TestCase):
             diff = 11.0 - inp[i]
             if diff > 1.e-6 or diff < -1.e-6:
                 raise RuntimeError("Summer input y[%d] is %f but should be 11.0" %
-                                    (i, inp[i]))
+                                   (i, inp[i]))
 
         assert_rel_error(self, prob['sum'], 11.0 * size, 1.e-6)
 

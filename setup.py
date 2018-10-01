@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 # exec this file to set __version__
 exec(open('openmdao/__init__.py').read())
@@ -98,7 +98,6 @@ setup(
         'testflo',
         'parameterized',
         'pyparsing',
-        'pyyaml',
         'networkx>=2.0',
         'sphinx',
         'redbaron',

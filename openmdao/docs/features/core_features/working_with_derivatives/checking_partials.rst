@@ -9,7 +9,7 @@ approximations to check your implementations of the partial derivatives for a co
 
 :code:`Problem` has a method, :code:`check_partials`, that checks partial derivatives
  comprehensively for all Components in your model. To do this check, the framework compares the
- analytic result against a finite difference result. This means that the check_partial_derivatives
+ analytic result against a finite difference result. This means that the check_partials
  function can be quite computationally expensive. So use it to check your work, but don’t leave
  the call in your production run scripts.
 

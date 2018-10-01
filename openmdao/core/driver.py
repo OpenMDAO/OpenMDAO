@@ -16,33 +16,32 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 
 
-def _is_debug_print_opts_valid(opts):
+def _check_debug_print_opts_valid(name, opts):
     """
     Check validity of debug_print option for Driver.
 
     Parameters
     ----------
+    name : str
+        The name of the option.
     opts : list
         The value of the debug_print option set by the user.
-
-    Returns
-    -------
-    bool
-        True if the option is valid. Otherwise, False.
     """
     if not isinstance(opts, list):
-        return False
+        raise ValueError("Option '%s' with value %s is not a list." % (name, opts))
+
     _valid_opts = ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals']
     for opt in opts:
         if opt not in _valid_opts:
-            return False
-    return True
+            raise ValueError("Option '%s' contains value '%s' which is not one of %s." %
+                             (name, opt, _valid_opts))
 
 
 class Driver(object):
@@ -130,7 +129,7 @@ class Driver(object):
         # Driver options
         self.options = OptionsDictionary()
 
-        self.options.declare('debug_print', types=list, is_valid=_is_debug_print_opts_valid,
+        self.options.declare('debug_print', types=list, check_valid=_check_debug_print_opts_valid,
                              desc="List of what type of Driver variables to print at each "
                                   "iteration. Valid items in list are 'desvars', 'ln_cons', "
                                   "'nl_cons', 'objs', 'totals'",
@@ -153,7 +152,7 @@ class Driver(object):
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
                                             'driver level')
-        self.recording_options.declare('includes', types=list, default=['*'],
+        self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
@@ -454,9 +453,10 @@ class Driver(object):
                 else:
                     val = vec[name][indices]
             else:
-                if indices is not None:
+                if not (indices is None or ignore_indices):
                     size = len(indices)
                 val = np.empty(size)
+
             comm.Bcast(val, root=owner)
         else:
             if indices is None or ignore_indices:
@@ -994,6 +994,10 @@ class Driver(object):
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:
+            return
+
+        if not self._problem.model._use_derivatives:
+            simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
         if isinstance(self._simul_coloring_info, string_types):

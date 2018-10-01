@@ -31,6 +31,8 @@ But if you're going to build new features or add new examples, you'll want to bu
     :maxdepth: 2
 
     doc_build.rst
+    advanced_operations.rst
+    travis_caching.rst
 
 
 
@@ -47,18 +49,4 @@ in terms of formatting and embedding code.
     style_guide/sphinx_decorators.rst
 
 
-Setting Up an OpenMDAO Plugin
------------------------------
 
-There are several things to take into account when setting up a repository that depends on
-OpenMDAO.  Github settings, getting documentation transferred to github-pages, setting up
-continuous integration on Travis CI, and releasing software are some of the topics covered.
-
-.. toctree::
-    :maxdepth: 1
-
-    repo_guide/docs.rst
-    repo_guide/travis.rst
-    repo_guide/github.rst
-    repo_guide/release_process.rst
-    repo_guide/advanced_operations.rst

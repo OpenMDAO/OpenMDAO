@@ -698,17 +698,17 @@ class TestProblem(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('comp', ExecComp('y=x-25.',
                                                   x={'value': 77.0, 'units': 'degF'},
-                                                  y={'units': 'degC'}))
+                                                  y={'value': 0.0, 'units': 'degC'}))
         prob.model.add_subsystem('prom', ExecComp('yy=xx-25.',
                                                   xx={'value': 77.0, 'units': 'degF'},
-                                                  yy={'units': 'degC'}),
+                                                  yy={'value': 0.0, 'units': 'degC'}),
                                  promotes=['xx', 'yy'])
         prob.model.add_subsystem('acomp', ExecComp('y=x-25.',
                                                    x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                   y={'units': 'degC'}))
+                                                   y={'value': 0.0, 'units': 'degC'}))
         prob.model.add_subsystem('aprom', ExecComp('ayy=axx-25.',
                                                    axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                   ayy={'units': 'degC'}),
+                                                   ayy={'value': 0.0, 'units': 'degC'}),
                                  promotes=['axx', 'ayy'])
 
         prob.setup(check=False)

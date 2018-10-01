@@ -2,6 +2,8 @@
 
 from __future__ import division
 
+import warnings
+
 from collections import OrderedDict, Iterable
 from itertools import product
 from six import string_types, iteritems, itervalues
@@ -17,9 +19,10 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, find_matches
+    warn_deprecation, find_matches, simple_warning
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
+from openmdao.utils.mpi import MPI
 
 
 # Suppored methods for derivatives
@@ -61,9 +64,6 @@ class Component(System):
 
     Attributes
     ----------
-    distributed : bool
-        This is True if the component has variables that are distributed across multiple
-        processes.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _var_rel2data_io : dict
@@ -95,10 +95,6 @@ class Component(System):
         **kwargs : dict of keyword arguments
             available here and in all descendants of this system.
         """
-        # put these here to prevent them from possibly overriding values set
-        # by the user in initialize().
-        self.distributed = False
-
         super(Component, self).__init__(**kwargs)
 
         self._approx_schemes = OrderedDict()
@@ -112,6 +108,44 @@ class Component(System):
         self._declared_partials = []
         self._approximated_partials = []
         self._declared_partial_checks = []
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(Component, self)._declare_options()
+
+        self.options.declare('distributed', False,
+                             desc='True if the component has variables that are distributed '
+                                  'across multiple processes.')
+
+    @property
+    def distributed(self):
+        """
+        Provide 'distributed' property for backwards compatibility.
+
+        Returns
+        -------
+        bool
+            reference to the 'distributed' option.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        return self.options['distributed']
+
+    @distributed.setter
+    def distributed(self, val):
+        """
+        Provide for setting of the 'distributed' property for backwards compatibility.
+
+        Parameters
+        ----------
+        val : bool
+            True if the component has variables that are distributed across multiple processes.
+        """
+        warn_deprecation("The 'distributed' property provides backwards compatibility "
+                         "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead.")
+        self.options['distributed'] = val
 
     def setup(self):
         """
@@ -142,6 +176,16 @@ class Component(System):
             reverse (adjoint). Default is 'rev'.
         """
         self.pathname = pathname
+
+        orig_comm = comm
+        if self._num_par_fd > 1:
+            if comm.size > 1:
+                comm = self._setup_par_fd_procs(comm)
+            elif not MPI:
+                msg = ("'%s': MPI is not active but num_par_fd = %d. No parallel finite difference "
+                       "will be performed." % (self.pathname, self._num_par_fd))
+                simple_warning(msg)
+
         self.comm = comm
         self._mode = mode
         self._subsystems_proc_range = []
@@ -159,33 +203,29 @@ class Component(System):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
         self.setup()
+
+        # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
+        # Unfortunately we have to do this check after system setup has been called because that's
+        # when declare_partials generally happens, so we raise an exception here instead of just
+        # resetting the value of num_par_fd (because the comm has already been split and possibly
+        # used by the system setup).
+        if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
+                                                                self._approximated_partials):
+            raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
+
         self._static_mode = True
 
-        if self.distributed:
-            self._vector_class = self._distributed_vector_class
+        if self.options['distributed']:
+            if self._distributed_vector_class is not None:
+                self._vector_class = self._distributed_vector_class
+            else:
+                simple_warning("The 'distributed' option is set to True for Component %s, "
+                               "but there is no distributed vector implementation (MPI/PETSc) "
+                               "available. The default non-distributed vectors will be used."
+                               % pathname)
+                self._vector_class = self._local_vector_class
         else:
             self._vector_class = self._local_vector_class
-
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(Component, self)._setup_vars()
-        num_var = self._num_var
-
-        for vec_name in self._lin_rel_vec_name_list:
-            num_var[vec_name] = {}
-            # Compute num_var
-            for type_ in ['input', 'output']:
-                relnames = self._var_allprocs_relevant_names[vec_name][type_]
-                num_var[vec_name][type_] = len(relnames)
-
-        self._num_var['nonlinear'] = self._num_var['linear']
 
     def _setup_var_data(self, recurse=True):
         """
@@ -246,31 +286,47 @@ class Component(System):
 
         iproc = self.comm.rank
         nproc = self.comm.size
-        vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
+        abs2meta = self._var_abs2meta
+
+        if self._use_derivatives:
+            vec_names = self._lin_rel_vec_name_list
+        else:
+            vec_names = self._vec_names
 
         # Initialize empty arrays
         for vec_name in vec_names:
+            # at component level, _var_allprocs_* is the same as var_* since all vars exist in all
+            # procs for a given component, so we don't have to mess with figuring out what vars are
+            # local.
+            if self._use_derivatives:
+                relnames = self._var_allprocs_relevant_names[vec_name]
+            else:
+                relnames = self._var_allprocs_abs_names
+
             sizes[vec_name] = {}
-
             for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = np.zeros((nproc, self._num_var[vec_name][type_]), int)
+                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[type_])), int)
 
-            # Compute _var_sizes
-            abs2meta = self._var_abs2meta
-            for type_ in ('input', 'output'):
-                sz = sizes[vec_name][type_]
-                for idx, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
+                # Compute _var_sizes
+                for idx, abs_name in enumerate(relnames[type_]):
                     sz[iproc, idx] = abs2meta[abs_name]['size']
 
-        if self.comm.size > 1:
+        if nproc > 1:
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]
-                for type_ in ['input', 'output']:
-                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                if self.options['distributed']:
+                    for type_ in ['input', 'output']:
+                        self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                else:
+                    # if component isn't distributed, we don't need to allgather sizes since
+                    # they'll all be the same.
+                    for type_ in ['input', 'output']:
+                        sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
 
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        if self._use_derivatives:
+            self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._setup_global_shapes()
 
@@ -536,7 +592,7 @@ class Component(System):
         metadata['ref0'] = ref0
         metadata['res_ref'] = res_ref
 
-        metadata['distributed'] = self.distributed
+        metadata['distributed'] = self.options['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -854,11 +910,9 @@ class Component(System):
 
                 if rows.size > 0:
                     if rows.min() < 0:
-                        # of, wrt = abs_key2rel_key(self, abs_key)
                         msg = '{}: d({})/d({}): row indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     if cols.min() < 0:
-                        # of, wrt = abs_key2rel_key(self, abs_key)
                         msg = '{}: d({})/d({}): col indices must be non-negative'
                         raise ValueError(msg.format(self.pathname, of, wrt))
                     rows_max = rows.max()
@@ -989,9 +1043,6 @@ class Component(System):
                 method = meta['method']
                 if method is not None and method in self._approx_schemes:
                     self._approx_schemes[method].add_approximation(key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def _guess_nonlinear(self):
         """

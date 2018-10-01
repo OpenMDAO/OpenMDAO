@@ -68,9 +68,15 @@ def take_nth(rank, size, seq):
     while True:
         for proc in range(size):
             if rank == proc:
-                yield six.next(it)
+                try:
+                    yield six.next(it)
+                except StopIteration:
+                    return
             else:
-                six.next(it)
+                try:
+                    six.next(it)
+                except StopIteration:
+                    return
 
 
 def convert_neg(arr, dim):
@@ -116,6 +122,12 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
     """
     if len(arr.shape) != 2:
         raise RuntimeError("array_viz only works for 2d arrays.")
+
+    if prob is not None:
+        if of is None:
+            of = prob.driver._get_ordered_nl_responses()
+        if wrt is None:
+            wrt = list(prob.driver._designvars)
 
     if prob is None or of is None or wrt is None:
         for r in range(arr.shape[0]):
