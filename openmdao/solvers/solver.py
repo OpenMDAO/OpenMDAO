@@ -127,8 +127,6 @@ class Solver(object):
         Number of iterations for the current invocation of the solver.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this solver
-    _solver_info : <SolverInfo>
-        Object to store some formatting for iprint that is shared across all solvers.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -145,6 +143,7 @@ class Solver(object):
         Normalization factor
     """
 
+    # Object to store some formatting for iprint that is shared across all solvers.
     SOLVER = 'base_solver'
     _solver_info = SolverInfo()
 

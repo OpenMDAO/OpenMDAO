@@ -80,15 +80,13 @@ class Vector(object):
         True if this vector performs scaling.
     _scaling : dict
         Contains scale factors to convert data arrays.
-    cite : str
-        Listing of relevant citataions that should be referenced when
-        publishing work that uses this class.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
         When True, self._data is replaced with self._cplx_data.
     """
 
+    # Listing of relevant citataions that should be referenced when
     cite = ""
 
     def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,

@@ -64,6 +64,8 @@ class Group(System):
         First key is the vec_name, second key is (mode, isub) where
         mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
         or isub can be None for the full, simultaneous transfer.
+    _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
+        List of ranges of each myproc subsystem's allprocs variables relative to this system.
     """
 
     def __init__(self, **kwargs):
@@ -88,6 +90,7 @@ class Group(System):
         self._conn_global_abs_in2out = {}
         self._conn_abs_in2out = {}
         self._transfers = {}
+        self._subsystems_var_range = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
