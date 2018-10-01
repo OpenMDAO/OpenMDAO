@@ -131,6 +131,12 @@ class Case(object):
         # save VOI dict reference for use by self._scale()
         self._voi_meta = voi_meta
 
+    def __str__(self):
+        """
+        Return string representation of the case.
+        """
+        return str(self.iteration_coordinate + ': ' + str(self.outputs))
+
     def get_design_vars(self, scaled=True, use_indices=True):
         """
         Get the values of the design variables, as seen by the driver, for this case.
@@ -220,56 +226,6 @@ class Case(object):
             return self._scale(vals)
         else:
             return vals
-
-    def _get_variables_of_type(self, var_type):
-        """
-        Get the variables of a given type and their values.
-
-        Parameters
-        ----------
-        var_type : str
-            String indicating which value for 'type' should be accepted for a variable
-            to be included in the returned map.
-
-        Returns
-        -------
-        PromotedToAbsoluteMap
-            Map of variables to their values.
-        """
-        if self.outputs is None:
-            return PromotedToAbsoluteMap({}, self._prom2abs, self._abs2prom)
-
-        ret_vars = {}
-        for var in self.outputs.absolute_names():
-            if var_type in self._abs2meta[var]['type']:
-                ret_vars[var] = self.outputs[var]
-
-        return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
-
-    def _scale(self, vals):
-        """
-        Scale the values array using adder and scaler from _voi_meta.
-
-
-        Parameters
-        ----------
-        vals : PromotedToAbsoluteMap
-            Map of variables to their values.
-
-        Returns
-        -------
-        PromotedToAbsoluteMap
-            Map of variables to their scaled values.
-        """
-        for name in vals.absolute_names():
-            if name in self._voi_meta:
-                # physical to scaled
-                if self._voi_meta[name]['adder'] is not None:
-                    vals[name] += self._voi_meta[name]['adder']
-                if self._voi_meta[name]['scaler'] is not None:
-                    vals[name] *= self._voi_meta[name]['scaler']
-
-        return vals
 
     def list_inputs(self,
                     values=True,
@@ -461,8 +417,7 @@ class Case(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream, meta):
+    def _write_outputs(self, in_out, comp_type, outputs, hierarchical, print_arrays, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -471,7 +426,7 @@ class Case(object):
 
         Parameters
         ----------
-        in_or_out : str, 'input' or 'output'
+        in_out : str, 'input' or 'output'
             indicates whether the values passed in are from inputs or output variables.
         comp_type : str, 'Explicit' or 'Implicit'
             the type of component with the output values.
@@ -488,8 +443,6 @@ class Case(object):
         out_stream : file-like object
             Where to send human readable output.
             Set to None to suppress.
-        meta : dict
-            Dictionary mapping absolute names to metadata dictionaries for myproc variables.
         """
         if out_stream is None:
             return
@@ -504,46 +457,58 @@ class Case(object):
             'output': dict_of_outputs.keys()
         }
 
-        write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
+        write_outputs(in_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
                       'model', allprocs_abs_names)
 
-
-class ProblemCase(Case):
-    """
-    Wraps data from a single case of a Problem recording to make it more accessible.
-    """
-
-    def __init__(self, filename, counter, case_name, timestamp, success, msg,
-                 outputs, prom2abs, abs2prom, meta):
+    def _get_variables_of_type(self, var_type):
         """
-        Initialize.
+        Get the variables of a given type and their values.
 
         Parameters
         ----------
-        filename : str
-            The filename from which the SystemCase was constructed.
-        counter : int
-            The global execution counter.
-        case_name : str
-            Name used to identify this Problem case.
-        timestamp : float
-            Time of execution of the case
-        success : str
-            Success flag for the case
-        msg : str
-            Message associated with the case
-        outputs : array
-            Solver outputs to read in from the recording file.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
+        var_type : str
+            String indicating which value for 'type' should be accepted for a variable
+            to be included in the returned map.
+
+        Returns
+        -------
+        PromotedToAbsoluteMap
+            Map of variables to their values.
         """
-        super(ProblemCase, self).__init__(filename, counter, case_name, timestamp,
-                                          success, msg, prom2abs, abs2prom, meta,
-                                          None, outputs)
+        if self.outputs is None:
+            return PromotedToAbsoluteMap({}, self._prom2abs, self._abs2prom)
+
+        ret_vars = {}
+        for var in self.outputs.absolute_names():
+            if var_type in self._abs2meta[var]['type']:
+                ret_vars[var] = self.outputs[var]
+
+        return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
+
+    def _scale(self, vals):
+        """
+        Scale the values array using adder and scaler from _voi_meta.
+
+
+        Parameters
+        ----------
+        vals : PromotedToAbsoluteMap
+            Map of variables to their values.
+
+        Returns
+        -------
+        PromotedToAbsoluteMap
+            Map of variables to their scaled values.
+        """
+        for name in vals.absolute_names():
+            if name in self._voi_meta:
+                # physical to scaled
+                if self._voi_meta[name]['adder'] is not None:
+                    vals[name] += self._voi_meta[name]['adder']
+                if self._voi_meta[name]['scaler'] is not None:
+                    vals[name] *= self._voi_meta[name]['scaler']
+
+        return vals
 
 
 class PromotedToAbsoluteMap(dict):
@@ -627,6 +592,12 @@ class PromotedToAbsoluteMap(dict):
                     # derivative keys will be a string in the form of 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+
+    def __str__(self):
+        """
+        Return string representation of the case.
+        """
+        return super(PromotedToAbsoluteMap, self).__str__()
 
     def _deriv_keys(self, key):
         """

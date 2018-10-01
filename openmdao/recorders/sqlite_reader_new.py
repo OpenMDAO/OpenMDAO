@@ -260,8 +260,9 @@ class SqliteCaseReader(BaseCaseReader):
                                          self._abs2prom, self._abs2meta, self._prom2abs)
         self._solver_cases = SolverCases(filename, self._format_version,
                                          self._abs2prom, self._abs2meta, self._prom2abs)
-        self._problem_cases = ProblemCases(filename, self._format_version,
-                                           self._abs2prom, self._abs2meta, self._prom2abs)
+        if self._format_version >= 2:
+            self._problem_cases = ProblemCases(filename, self._format_version,
+                                               self._abs2prom, self._abs2meta, self._prom2abs)
 
         # if requested, load all the iteration data into memory
         if pre_load:
@@ -431,7 +432,7 @@ class SqliteCaseReader(BaseCaseReader):
             sources.extend(self._solver_cases.list_sources())
         if self._system_cases.count() > 0:
             sources.extend(self._system_cases.list_sources())
-        if self._problem_cases.count() > 0:
+        if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
         return sources
@@ -459,14 +460,14 @@ class SqliteCaseReader(BaseCaseReader):
 
         elif source == 'driver' and not recurse:
             return self._driver_cases.list_cases(recurse, flat)
-        elif source == 'problem':
+        elif source == 'problem' and self._format_version >= 2:
             return self._problem_cases.list_cases(recurse, flat)
         elif source in self._system_cases.list_sources():
             return self._system_cases.list_cases(source, recurse, flat)
         elif source in self._solver_cases.list_sources():
             return self._solver_cases.list_cases(source, recurse, flat)
         else:
-            raise RuntimeError('Source not found:', source)
+            raise RuntimeError('Source not found: %s.' % source)
 
     def get_cases(self, source='driver', recurse=False, flat=False):
         """
@@ -489,7 +490,7 @@ class SqliteCaseReader(BaseCaseReader):
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
-        elif source == 'problem':
+        elif source == 'problem' and self._format_version >= 2:
             for case in self._problem_cases.cases():
                 yield case
 
@@ -498,11 +499,18 @@ class SqliteCaseReader(BaseCaseReader):
             for case in self._driver_cases.cases():
                 yield case
 
+        elif source in self._system_cases.list_sources():
+            if not recurse:
+                for case_id in self._system_cases.list_cases(source):
+                    yield self._system_cases.get_case(case_id)
+            else:
+                raise RuntimeError('TODO: recurse on system get_cases')
+
         else:
             if source == 'driver':
                 # return all driver cases and recurse to solver cases
                 iter_coord = ''
-            elif source.find('solve_nonlinear'):
+            elif source.find('solve_nonlinear') >= 0:
                 iter_coord = self._solver_cases._get_first(source).iteration_coordinate
                 print('first case from solver', source, '=', iter_coord)
             else:
@@ -547,6 +555,36 @@ class SqliteCaseReader(BaseCaseReader):
                 else:
                     yield self._solver_cases.get_case(iteration[0])
 
+    def get_case(self, case_id, recurse=False):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        case_id : str
+            The unique identifier of the case to return.
+        recurse : bool, optional
+            If True, will return all successors to the case as well.
+
+        Returns
+        -------
+        dict
+            The case identified by case_id
+        """
+        tables = [self._driver_cases, self._system_cases, self._solver_cases]
+        if self._format_version >= 2:
+            tables.append(self._problem_cases)
+
+        for table in tables:
+            case = table.get_case(case_id)
+            if case and not recurse:
+                return case
+
+        if case and recurse:
+            raise RuntimeError('TODO: return nested case:', case_id)
+        else:
+            raise RuntimeError('Case not found:', case_id)
+
     def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
                           solver_iter, recursive, coord_lengths):
         """
@@ -582,7 +620,9 @@ class SqliteCaseReader(BaseCaseReader):
         expected_child_length = coord_lengths[par_len_idx + 1] \
             if par_len_idx < len(coord_lengths) - 1 else -1
 
-        print(split_parent_iter_coord, 'par_len:', par_len, coord_lengths, 'child_len:', expected_child_length)
+        print(split_parent_iter_coord,
+              'par_len:', par_len, coord_lengths,
+              'child_len:', expected_child_length)
 
         if parent_iter_coord is '':  # CASE: grabbing children of 'root'
             if len(driver_iter) > 0:  # grabbing all driver cases
@@ -833,7 +873,7 @@ class CaseTable(object):
         Dictionary mapping iteration coordinates to cases that have already been loaded.
     """
 
-    def __init__(self, filename, version, table, index, abs2prom, abs2meta, prom2abs):
+    def __init__(self, filename, format_version, table, index, abs2prom, abs2meta, prom2abs):
         """
         Initialize.
 
@@ -861,6 +901,9 @@ class CaseTable(object):
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
         self._prom2abs = prom2abs
+
+        # cached keys/cases
+        self._keys = []
         self._cases = {}
 
     def count(self):
@@ -878,7 +921,7 @@ class CaseTable(object):
 
     def list_cases(self, source=None, recurse=False, flat=False):
         """
-        Get list of case names for cases in the problem_cases table.
+        Get list of case names for cases in the table.
 
         Parameters
         ----------
@@ -893,7 +936,8 @@ class CaseTable(object):
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT %s FROM %s" % (self._index_name, self._table_name))
+            cur.execute("SELECT %s FROM %s ORDER BY counter ASC" %
+                        (self._index_name, self._table_name))
             rows = cur.fetchall()
 
         con.close()
@@ -903,47 +947,58 @@ class CaseTable(object):
         else:
             return [row[0] for row in rows]
 
-    def get_case(self, case_name):
+    def get_case(self, case_id, cache=False):
         """
         Get a case from the database.
 
         Parameters
         ----------
-        case_name : str
-            The string-identifier of the case to be retrieved.
+        case_id : str or int
+            The string-identifier of the case to be retrieved or the index of the case.
+        cache : bool
+            If True, case will be cached for faster access by key.
 
         Returns
         -------
-            An instance of a Driver Case populated with data from the
+            An instance of a Case populated with data from the
             specified case/iteration.
         """
-        # check to see if we've already cached this case
-        if case_name in self._cases:
-            return self._cases[case_name]
+        # If case_id is an integer, then it is an index into the keys
+        if isinstance(case_id, int):
+            case_id = self._get_iteration_coordinate(case_id)
 
-        # we don't have it, so fetch and extract it
+        # if we've already cached this case, return the cached instance
+        if case_id in self._cases:
+            return self._cases[case_id]
+
+        # we don't have it, so fetch it
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s WHERE %s=%s" %
-                        (self._table_name, self._index_name, self._index_name))
+            cur.execute("SELECT * FROM %s WHERE %s='%s'" %
+                        (self._table_name, self._index_name, case_id))
             row = cur.fetchone()
 
         con.close()
 
-        case = self._extract_case_from_row(row)
+        # if found, extract the data and optionally cache the Case
+        if row is not None:
+            case = self._extract_case_from_row(row)
 
-        # save so we don't query again
-        self._cases[case_name] = case
+            # cache it if requested
+            if cache:
+                self._cases[case_id] = case
 
-        return case
+            return case
+        else:
+            return None
 
-    def get_iteration_coordinate(self, case_id):
+    def _get_iteration_coordinate(self, case_idx):
         """
-        Return the iteration coordinate.
+        Return the iteration coordinate for the indexed case (handles negative indices, etc.).
 
         Parameters
         ----------
-        case_id : int
+        case_idx : int
             The case number that we want the iteration coordinate for.
 
         Returns
@@ -951,27 +1006,29 @@ class CaseTable(object):
         iteration_coordinate : str
             The iteration coordinate.
         """
-        if isinstance(case_id, int):
-            # If case_id is an integer, assume the user
-            # wants a case as an index
-            iteration_coordinate = self.keys[case_id]  # handles negative indices for example
-        else:
-            # Otherwise assume we were given the case string identifier
-            iteration_coordinate = case_id
+        # if keys have not been cached yet, get them now
+        if not self._keys:
+            self._keys = self.list_cases(recurse=True, flat=True)
 
-        return iteration_coordinate
+        return self._keys[case_idx]
 
-    def cases(self):
+    def cases(self, cache=False):
         """
-        Iterate over all cases, while storing them into memory.
+        Iterate over all cases, optionally caching them into memory.
+
+        Parameters
+        ----------
+        cache : bool
+            If True, cases will be cached for faster access by key.
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s" % self._table_name)
+            cur.execute("SELECT * FROM %s ORDER BY counter ASC" % self._table_name)
             rows = cur.fetchall()
             for row in rows:
                 case = self._extract_case_from_row(row)
-                self._cases[case.iteration_coordinate] = case
+                if cache:
+                    self._cases[case.iteration_coordinate] = case
                 yield case
 
         con.close()
@@ -980,9 +1037,14 @@ class CaseTable(object):
         """
         Load all cases into memory.
         """
-        for case in self.cases():
-            # self._cases[case.iteration_coordinate] = case
+        for case in self.cases(cache=True):
             pass
+
+    def list_sources(self):
+        """
+        Get list of sources that recorded data in this table.
+        """
+        return set([self._get_source(case) for case in self.list_cases()])
 
     def _get_source(self, iteration_coordinate):
         """
@@ -1024,6 +1086,8 @@ class CaseTable(object):
         Case
             The first case from the specified source.
         """
+        case = None
+
         for case in self.cases():
             print('checking source:', case.iteration_coordinate, case.source, 'vs', source)
             if case.source == source:
@@ -1098,14 +1162,21 @@ class DriverCases(CaseTable):
                     prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta,
                     voi_meta=self._var_settings)
 
-    def cases(self):
+    def cases(self, cache=False):
         """
-        Iterate over all driver cases, while storing them into memory.
+        Iterate over all cases, optionally caching them into memory.
+
+        Override base class to add derivatives from the derivatives table.
+
+        Parameters
+        ----------
+        cache : bool
+            If True, cases will be cached for faster access by key.
         """
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s" % self._table_name)
+            cur.execute("SELECT * FROM %s ORDER BY counter ASC" % self._table_name)
             rows = cur.fetchall()
 
             for row in rows:
@@ -1118,12 +1189,13 @@ class DriverCases(CaseTable):
                     deriv_row = None
 
                 case = self._extract_case_from_row(row, deriv_row)
-                self._cases[case.iteration_coordinate] = case
+                if cache:
+                    self._cases[case.iteration_coordinate] = case
                 yield case
 
         con.close()
 
-    def get_case(self, case_id):
+    def get_case(self, case_id, cache=False):
         """
         Get a case from the database.
 
@@ -1140,43 +1212,47 @@ class DriverCases(CaseTable):
             specified case/iteration.
         """
         # check to see if we've already cached this case
-        iteration_coordinate = self.get_iteration_coordinate(case_id)
-        if iteration_coordinate in self._cases:
-            case = self._cases[iteration_coordinate]
-        else:
-            # Get an unscaled case if does not already exist in _cases
-            with sqlite3.connect(self._filename) as con:
-                con.row_factory = sqlite3.Row
-                cur = con.cursor()
+        if isinstance(case_id, int):
+            case_id = self._get_iteration_coordinate(case_id)
 
-                # fetch driver iteration data
-                cur.execute("SELECT * FROM driver_iterations WHERE "
+        # return cached case if present, else fetch it
+        if case_id in self._cases:
+            return self._cases[case_id]
+
+        # Get an unscaled case if does not already exist in _cases
+        with sqlite3.connect(self._filename) as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+
+            # fetch driver iteration data
+            cur.execute("SELECT * FROM driver_iterations WHERE "
+                        "iteration_coordinate=:iteration_coordinate",
+                        {"iteration_coordinate": case_id})
+            driver_row = cur.fetchone()
+
+            # fetch associated derivative data, if available
+            if driver_row and self._format_version > 1:
+                cur.execute("SELECT * FROM driver_derivatives WHERE "
                             "iteration_coordinate=:iteration_coordinate",
-                            {"iteration_coordinate": iteration_coordinate})
-                driver_row = cur.fetchone()
+                            {"iteration_coordinate": case_id})
+                deriv_row = cur.fetchone()
+            else:
+                deriv_row = None
 
-                # fetch associated derivative data, if available
-                if self._format_version > 1:
-                    cur.execute("SELECT * FROM driver_derivatives WHERE "
-                                "iteration_coordinate=:iteration_coordinate",
-                                {"iteration_coordinate": iteration_coordinate})
-                    deriv_row = cur.fetchone()
-                else:
-                    deriv_row = None
+        con.close()
 
-            con.close()
-
-            # Initialize the Case object from the fetched data
+        # if found, create Case object (and cache it if requested) else return None
+        if driver_row:
             case = self._extract_case_from_row(driver_row, deriv_row)
-
-            # save so we don't query again
-            self._cases[case.iteration_coordinate] = case
-
-        return case
+            if cache:
+                self._cases[case_id] = case
+            return case
+        else:
+            return None
 
     def list_sources(self):
         """
-        Get list of problems that recorded data in this table.
+        Get list of sources that recorded data in this table (just the driver).
         """
         return ['driver']
 
@@ -1251,7 +1327,7 @@ class ProblemCases(CaseTable):
 
     def list_sources(self):
         """
-        Get list of problems that recorded data in this table.
+        Get list of sources that recorded data in this table (just the problem itself).
         """
         return ['problem']
 
@@ -1332,12 +1408,6 @@ class SystemCases(CaseTable):
 
         return case
 
-    def list_sources(self):
-        """
-        Get list of systems that recorded data in this table.
-        """
-        return set([self._get_source(case) for case in self.list_cases()])
-
 
 class SolverCases(CaseTable):
     """
@@ -1400,12 +1470,6 @@ class SolverCases(CaseTable):
                     prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
 
         return case
-
-    def list_sources(self):
-        """
-        Get list of solvers that recorded data in this table.
-        """
-        return set([self._get_source(case) for case in self.list_cases()])
 
     def _get_source(self, iteration_coordinate):
         """
