@@ -88,7 +88,6 @@ class Group(System):
         self._conn_global_abs_in2out = {}
         self._conn_abs_in2out = {}
         self._transfers = {}
-        self._subsystems_var_range = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
