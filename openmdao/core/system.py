@@ -372,10 +372,6 @@ class System(object):
 
         self._par_fd_id = 0
 
-        self._filtered_vars_to_record = {}
-        self._owning_rank = {}
-        self._lin_vec_names = []
-
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
