@@ -217,7 +217,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         sys.stdout = stdout
 
         output = strout.getvalue()
-        target = "'thrust_equilibrium_group.thrust_bal.thrust': array([1207.1])}"
+        target = "'thrust_equilibrium_group.thrust_bal.thrust'"
         self.assertTrue( target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
