@@ -64,7 +64,7 @@ class BaseCaseReader():
 
     Attributes
     ----------
-    format_version : int
+    _format_version : int
         The version of the format assumed when loading the file.
     problem_metadata : dict
         Metadata about the problem, including the system hierachy and connections.
@@ -454,6 +454,11 @@ class SqliteCaseReader(BaseCaseReader):
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
+
+        Returns
+        -------
+            iterator or dict
+                An iterator or a nested dictionary of identified cases.
         """
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
@@ -648,7 +653,8 @@ class SqliteCaseReader(BaseCaseReader):
         else:  # CASE: grabbing children of a case
             for s in solver_iter:
                 print(_coord_split_re.split(s[0]), 'child_len:', len(_coord_split_re.split(s[0])))
-                print('is child?', self._is_case_child(parent_iter_coord, s[0], expected_child_length))
+                print('is child?',
+                      self._is_case_child(parent_iter_coord, s[0], expected_child_length))
                 if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
                     ret.append((s[0], 'solver'))
                     if recursive:
@@ -855,22 +861,24 @@ class CaseTable(object):
 
     Attributes
     ----------
-    format_version : int
-        The version of the format assumed when loading the file.
-    num_cases : int
-        The number of cases contained in the recorded file.
-    keys : tuple
-        Case string identifiers available in this CaseReader.
     _filename : str
-        The name of the file from which the recorded cases are to be loaded.
+        The name of the recording file from which to instantiate the case reader.
+    _format_version : int
+        The version of the format assumed when loading the file.
+    _table_name : str
+        The name of the table in the database.
+    _index_name : str
+        The name of the case index column in the table.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _abs2meta : dict
         Dictionary mapping absolute variable names to variable metadata.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _keys : list
+        List of keys of cases in the table.
     _cases : dict
-        Dictionary mapping iteration coordinates to cases that have already been loaded.
+        Dictionary mapping keys to cases that have already been loaded.
     """
 
     def __init__(self, filename, format_version, table, index, abs2prom, abs2meta, prom2abs):
@@ -908,7 +916,12 @@ class CaseTable(object):
 
     def count(self):
         """
-        Get the number of cases stored in the table
+        Get the number of cases recorded in the table.
+
+        Returns
+        -------
+        int
+            The number of cases recorded in the table.
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
@@ -933,6 +946,11 @@ class CaseTable(object):
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
+
+        Returns
+        -------
+        list or dict
+            The cases from the table that have the specified source.
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
@@ -960,8 +978,8 @@ class CaseTable(object):
 
         Returns
         -------
-            An instance of a Case populated with data from the
-            specified case/iteration.
+        Case
+            The specified case from the table.
         """
         # If case_id is an integer, then it is an index into the keys
         if isinstance(case_id, int):
@@ -1042,7 +1060,12 @@ class CaseTable(object):
 
     def list_sources(self):
         """
-        Get list of sources that recorded data in this table.
+        Get the list of sources that recorded data in this table.
+
+        Returns
+        -------
+        list
+            List of sources.
         """
         return set([self._get_source(case) for case in self.list_cases()])
 
@@ -1136,8 +1159,11 @@ class DriverCases(CaseTable):
 
         Parameters
         ----------
-        row : (id, counter, iter_coordinate, timestamp, success, msg, inputs, outputs)
-            Queried SQLite driver table row.
+        row : sqlite3.Row
+            Row from driver table.
+
+        deriv_row : sqlite3.Row
+            Matching row from driver_derivatives table.
 
         Returns
         -------
@@ -1203,13 +1229,13 @@ class DriverCases(CaseTable):
         ----------
         case_id : int or str
             The integer index or string-identifier of the case to be retrieved.
-        scaled : bool
-            If True, return variables scaled. Otherwise, return physical values.
+        cache : bool
+            If True, cache the case so it does not have to be fetched on next access.
 
         Returns
         -------
-            An instance of a Driver Case populated with data from the
-            specified case/iteration.
+        Case
+            The specified case from the driver_iterations and driver_derivatives tables.
         """
         # check to see if we've already cached this case
         if isinstance(case_id, int):
@@ -1252,7 +1278,12 @@ class DriverCases(CaseTable):
 
     def list_sources(self):
         """
-        Get list of sources that recorded data in this table (just the driver).
+        Get the list of sources that recorded data in this table (just the driver).
+
+        Returns
+        -------
+        list
+            List of sources.
         """
         return ['driver']
 
@@ -1327,7 +1358,12 @@ class ProblemCases(CaseTable):
 
     def list_sources(self):
         """
-        Get list of sources that recorded data in this table (just the problem itself).
+        Get the list of sources that recorded data in this table (just the problem).
+
+        Returns
+        -------
+        list
+            List of sources.
         """
         return ['problem']
 

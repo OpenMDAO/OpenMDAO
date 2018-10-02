@@ -7,7 +7,6 @@ from six import itervalues, iteritems
 from six.moves import range
 
 from openmdao.core.component import Component
-from openmdao.vectors.vector import Vector
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 

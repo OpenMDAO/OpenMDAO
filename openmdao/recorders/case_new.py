@@ -21,32 +21,40 @@ class Case(object):
 
     Attributes
     ----------
-        source : str
-            The unique id of the system/solver/driver/problem that did the recording.
-        iteration_coordinate : str
-            The full unique identifier for this iteration.
-        timestamp : float
-            Time of execution of the case.
-        success : str
-            Success flag for the case.
-        msg : str
-            Message associated with the case.
-        outputs : PromotedToAbsoluteMap
-            Map of outputs to values recorded.
-        inputs : PromotedToAbsoluteMap or None
-            Map of inputs to values recorded (None if not recorded).
-        residuals : PromotedToAbsoluteMap or None
-            Map of outputs to residuals recorded (None if not recorded).
-        jacobian : PromotedToAbsoluteMap or None
-            Map of (output, input) to derivatives recorded (None if not recorded).
-        parent : str
-            The full unique identifier for the parent this iteration.
-        children : list
-            The full unique identifiers for children of this iteration.
-        abs_err : float or None
-            Absolute tolerance (None if not recorded).
-        rel_err : float or None
-            Relative tolerance (None if not recorded).
+    source : str
+        The unique id of the system/solver/driver/problem that did the recording.
+    iteration_coordinate : str
+        The full unique identifier for this iteration.
+    timestamp : float
+        Time of execution of the case.
+    success : str
+        Success flag for the case.
+    msg : str
+        Message associated with the case.
+    outputs : PromotedToAbsoluteMap
+        Map of outputs to values recorded.
+    inputs : PromotedToAbsoluteMap or None
+        Map of inputs to values recorded (None if not recorded).
+    residuals : PromotedToAbsoluteMap or None
+        Map of outputs to residuals recorded (None if not recorded).
+    jacobian : PromotedToAbsoluteMap or None
+        Map of (output, input) to derivatives recorded (None if not recorded).
+    parent : str
+        The full unique identifier for the parent this iteration.
+    children : list
+        The full unique identifiers for children of this iteration.
+    abs_err : float or None
+        Absolute tolerance (None if not recorded).
+    rel_err : float or None
+        Relative tolerance (None if not recorded).
+    _prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names of all variables to absolute names.
+    _abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names of all variables to promoted names.
+    _abs2meta : dict
+        Dictionary mapping absolute names of all variables to variable metadata.
+    _voi_meta : dict
+        Dictionary mapping absolute names of variables of interest to variable metadata.
     """
 
     def __init__(self, source, iteration_coordinate, timestamp, success, msg,
@@ -133,7 +141,12 @@ class Case(object):
 
     def __str__(self):
         """
-        Return string representation of the case.
+        Get string representation of the case.
+
+        Returns
+        -------
+        str
+            String representation of the case.
         """
         return str(self.iteration_coordinate + ': ' + str(self.outputs))
 
@@ -214,8 +227,6 @@ class Case(object):
         use_indices : bool
             The full unique identifier for this iteration.
 
-        Returns
-        -------
         Returns
         -------
         PromotedToAbsoluteMap
@@ -489,7 +500,6 @@ class Case(object):
         """
         Scale the values array using adder and scaler from _voi_meta.
 
-
         Parameters
         ----------
         vals : PromotedToAbsoluteMap
@@ -595,7 +605,12 @@ class PromotedToAbsoluteMap(dict):
 
     def __str__(self):
         """
-        Return string representation of the case.
+        Get string representation of the dictionary.
+
+        Returns
+        -------
+        str
+            String representation of the dictionary.
         """
         return super(PromotedToAbsoluteMap, self).__str__()
 
