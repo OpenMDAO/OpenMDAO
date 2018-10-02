@@ -163,7 +163,7 @@ class DiscreteTestCase(unittest.TestCase):
         model = prob.model
 
         indep = model.add_subsystem('indep', IndepVarComp())
-        indep.add_discrete_output('x', 'foo')
+        indep.add_discrete_output('x', val='foo')
         model.add_subsystem('comp', ModCompEx(3))
 
         model.connect('indep.x', 'comp.x')
