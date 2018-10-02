@@ -5,7 +5,7 @@ from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
-from six import itervalues
+from six import itervalues, iteritems
 
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
@@ -247,3 +247,23 @@ class Jacobian(object):
         Zero out internal matrices if needed.
         """
         pass
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the default real ndarray is replaced with a complex ndarray and all
+        pointers are updated to point to it.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for key, meta in iteritems(self._subjacs_info):
+            if active:
+                meta['value'] = meta['value'].astype(np.complex)
+            else:
+                meta['value'] = meta['value'].real
+
+        self._under_complex_step = active

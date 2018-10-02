@@ -63,7 +63,7 @@ class PETScVector(DefaultVector):
                                                           comm=self._system.comm)
 
         # Allocate imaginary for complex step
-        if self._alloc_complex and self._name == 'nonlinear':
+        if self._alloc_complex:
             data = self._cplx_data.imag
             if self._ncol == 1:
                 self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)

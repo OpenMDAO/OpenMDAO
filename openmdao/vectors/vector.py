@@ -56,7 +56,7 @@ class Vector(object):
     _root_vector : Vector
         Pointer to the vector owned by the root system.
     _alloc_complex : Bool
-        If True, then space for the imaginary part is also allocated.
+        If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
     _cplx_data : ndarray

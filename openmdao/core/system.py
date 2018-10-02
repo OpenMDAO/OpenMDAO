@@ -2927,6 +2927,13 @@ class System(object):
             sub._outputs.set_complex_step_mode(active)
             sub._residuals.set_complex_step_mode(active)
 
+            if sub._vectors['output']['linear']._alloc_complex:
+                sub._vectors['output']['linear'].set_complex_step_mode(active)
+                sub._vectors['input']['linear'].set_complex_step_mode(active)
+                sub._vectors['residual']['linear'].set_complex_step_mode(active)
+
+        self._jacobian.set_complex_step_mode(active)
+
     def cleanup(self):
         """
         Clean up resources prior to exit.
