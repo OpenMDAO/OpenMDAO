@@ -960,9 +960,9 @@ class Group(System):
                 out_subsys = abs_out[path_len:].split('.', 1)[0]
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
                 if out_subsys != in_subsys:
-                    if abs_in not in allprocs_abs2meta:
+                    if abs_in in allprocs_discrete_in:
                         self._conn_discrete_in2out[abs_in] = abs_out
-                    elif abs_out not in allprocs_abs2meta:
+                    elif abs_out in allprocs_discrete_out:
                         raise RuntimeError("Can't connect discrete output '%s' to continuous "
                                            "input '%s'." % (abs_out, abs_in))
                     else:
