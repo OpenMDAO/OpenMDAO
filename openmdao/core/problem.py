@@ -1296,6 +1296,11 @@ class Problem(object):
         """
         model = self.model
 
+        if method == 'cs' and not model._outputs._alloc_complex:
+            msg = "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
+                   "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+            raise RuntimeError(msg)
+
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
         with self.model._scaled_context_all():

@@ -51,11 +51,19 @@ class NonlinearBlockGS(NonlinearSolver):
             error at the first iteration.
         """
         if self.options['use_aitken']:
-            self._aitken_work1 = self._system._outputs._clone()
-            self._aitken_work2 = self._system._outputs._clone()
-            self._aitken_work3 = self._system._outputs._clone()
-            self._aitken_work4 = self._system._outputs._clone()
+            outputs = self._system._outputs
+            self._aitken_work1 = outputs._clone()
+            self._aitken_work2 = outputs._clone()
+            self._aitken_work3 = outputs._clone()
+            self._aitken_work4 = outputs._clone()
             self._theta_n_1 = 1.
+
+            cs_active = outputs._under_complex_step
+            if cs_active:
+                self._aitken_work1.set_complex_step_mode(cs_active)
+                self._aitken_work2.set_complex_step_mode(cs_active)
+                self._aitken_work3.set_complex_step_mode(cs_active)
+                self._aitken_work4.set_complex_step_mode(cs_active)
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
@@ -67,6 +75,7 @@ class NonlinearBlockGS(NonlinearSolver):
         use_aitken = self.options['use_aitken']
 
         if use_aitken:
+
             outputs = self._system._outputs
             aitken_min_factor = self.options['aitken_min_factor']
             aitken_max_factor = self.options['aitken_max_factor']

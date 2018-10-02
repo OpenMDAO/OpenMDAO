@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, \
     IndepVarComp, ExecComp, NonlinearRunOnce, NonlinearBlockGS, ScipyKrylov, NewtonSolver, \
-    DirectSolver
+    DirectSolver, LinearBlockGS
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -2208,7 +2208,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Basic sellar test.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         sub = model.add_subsystem('sub', Group(), promotes=['*'])
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
@@ -2227,18 +2227,39 @@ class TestProblemCheckTotals(unittest.TestCase):
         sub.nonlinear_solver = NewtonSolver()
         sub.linear_solver = DirectSolver()
 
+        # Need this.
+        model.linear_solver = LinearBlockGS()
+
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.add_objective('obj')
         prob.model.add_constraint('con1', upper=0.0)
         prob.model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup(check=False, force_alloc_complex=True)
         prob.set_solver_print(level=0)
 
         prob.run_model()
 
-        totals = prob.check_totals()
+        totals = prob.check_totals(method='cs', step=1e-3)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-2)
+
+    def test_cs_error_allocate(self):
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p', IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('comp', ParaboloidTricky(), promotes=['*'])
+        prob.setup(check=False)
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.check_totals(method='cs')
+
+        msg = "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
+                "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+        self.assertEqual(str(cm.exception), msg)
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
