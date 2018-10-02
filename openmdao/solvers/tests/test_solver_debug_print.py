@@ -217,7 +217,8 @@ class TestNonlinearSolvers(unittest.TestCase):
         sys.stdout = stdout
 
         output = strout.getvalue()
-        self.assertTrue("'thrust_equilibrium_group.thrust_bal.thrust': array([1207.1])}" in output)
+        target = "'thrust_equilibrium_group.thrust_bal.thrust': array([1207.1])}"
+        self.assertTrue( target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
