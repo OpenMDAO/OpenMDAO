@@ -85,7 +85,7 @@ class KSComp(ExplicitComponent):
     Attributes
     ----------
     cite : str
-        Listing of relevant citataions that should be referenced when publishing
+        Listing of relevant citations that should be referenced when publishing
         work that uses this class.
     """
 
