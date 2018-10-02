@@ -1241,13 +1241,16 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
-        wrt = ['z']
-        of = ['obj']
+        wrt = ['z', 'x']
+        of = ['obj', 'con1']
 
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
-
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
 class TestComponentComplexStep(unittest.TestCase):
 
