@@ -648,6 +648,7 @@ class NonlinearSolver(Solver):
         except Exception:
             fail = True
             raised = True
+            exc = sys.exc_info()
 
         if fail and self.options['debug_print']:
             coord = recording_iteration.get_formatted_iteration_coordinate()
@@ -670,7 +671,6 @@ class NonlinearSolver(Solver):
                 sys.stdout.flush()
 
         if raised:
-            exc = sys.exc_info()
             reraise(*exc)
 
         return fail, abs_err, rel_err
