@@ -86,7 +86,7 @@ class Vector(object):
         When True, self._data is replaced with self._cplx_data.
     """
 
-    # Listing of relevant citataions that should be referenced when
+    # Listing of relevant citations that should be referenced when
     cite = ""
 
     def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,

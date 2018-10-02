@@ -85,9 +85,6 @@ class pyOptSparseDriver(Driver):
         List of design variables.
     _quantities : list
         Contains the objectives plus nonlinear constraints.
-    cite : str
-        Listing of relevant citations that should be referenced when publishing
-        work that uses this class.
     """
 
     def __init__(self, **kwargs):

@@ -59,7 +59,7 @@ class Driver(object):
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     _problem : <Problem>
         Pointer to the containing problem.

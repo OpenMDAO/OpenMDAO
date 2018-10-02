@@ -76,9 +76,6 @@ class ScipyOptimizeDriver(Driver):
     _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
-    cite : str
-        Listing of relevant citations that should be referenced when publishing
-        work that uses this class.
     """
 
     def __init__(self, **kwargs):

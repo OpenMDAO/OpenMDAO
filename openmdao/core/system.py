@@ -70,7 +70,7 @@ class System(object):
         Int that holds the number of times this system has iterated
         in a recording run.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     _full_comm : MPI.Comm or None
         MPI communicator object used when System's comm is split for parallel FD.
