@@ -212,54 +212,65 @@ class PETScTransfer(DefaultTransfer):
             Whether to call this method in subsystems.
         """
         group._discrete_transfers = transfers = defaultdict(list)
-        offset = len(group.pathname) + 1 if group.pathname else 0
+        name_offset = len(group.pathname) + 1 if group.pathname else 0
 
         iproc = group.comm.rank
         owns = group._owning_rank
 
+        # collect all xfers for each tgt system
         for tgt, src in iteritems(group._conn_discrete_in2out):
-            src_sys, src_var = src[offset:].split('.', 1)
-            tgt_sys, tgt_var = tgt[offset:].split('.', 1)
+            src_sys, src_var = src[name_offset:].split('.', 1)
+            tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
             xfer = (src_sys, src_var, tgt_sys, tgt_var)
             transfers[tgt_sys].append(xfer)
-            transfers[None].append(xfer)
 
         total_send = set()
         total_recv = []
-        for tgt_sys, xfers in iteritems(transfers):
-            if tgt_sys is not None:
-                send = set()
-                recv = []
-                for src_sys, src_var, tgt_sys, tgt_var in xfers:
-                    if group.pathname:
-                        src_abs = '.'.join([group.pathname, src_sys, src_var])
-                    else:
-                        src_abs = '.'.join([src_sys, src_var])
-                    if iproc == owns[src_abs]:
-                        send.add(src_var)
-                    if (tgt_var in group._var_discrete['input'] and
-                            src_var not in group._var_discrete['output']):
-                        recv.append(src_var)
-                transfers[tgt_sys] = (xfers, send, recv)
-                total_send.update(send)
-                total_recv.extend(recv)
+        total_xfers = []
 
-        all_recv = group.comm.allgather(total_recv)
-        allprocs_recv = defaultdict(list)
-        for rank, recvs in enumerate(all_recv):
-            for recv in recvs:
-                allprocs_recv[recv].append(rank)
+        for tgt_sys, xfers in iteritems(transfers):
+            send = set()
+            recv = []
+            for src_sys, src_var, tgt_sys, tgt_var in xfers:
+                if group.pathname:
+                    src_abs = '.'.join([group.pathname, src_sys, src_var])
+                else:
+                    src_abs = '.'.join([src_sys, src_var])
+                tgt_rel = '.'.join((tgt_sys, tgt_var))
+                src_rel = '.'.join((src_sys, src_var))
+                if iproc == owns[src_abs]:
+                    # we own this var, so we'll send it out to others
+                    send.add(src_rel)
+                if (tgt_rel in group._var_discrete['input'] and
+                        src_rel not in group._var_discrete['output']):
+                    # we have the target locally, but not the source, so we need someone
+                    # to send it to us.
+                    recv.append(src_rel)
+
+            transfers[tgt_sys] = (xfers, send, recv)
+            total_xfers.extend(xfers)
+            total_send.update(send)
+            total_recv.extend(recv)
+
+        transfers[None] = (total_xfers, total_send, total_recv)
+
+        # find out all ranks that need to receive each discrete source var
+        allproc_xfers = group.comm.allgather(transfers)
+        allprocs_recv = defaultdict(lambda: defaultdict(list))
+        for rank, rank_transfers in enumerate(allproc_xfers):
+            for tgt_sys, (_, _, recvs) in iteritems(rank_transfers):
+                for recv in recvs:
+                    allprocs_recv[tgt_sys][recv].append(rank)
 
         group._allprocs_discrete_recv = allprocs_recv
 
-        # we only need to send what someone wants to receive
+        # if we own a src var but it's local for every rank, we don't need to send it to anyone.
         total_send = total_send.intersection(allprocs_recv)
-        transfers[None] = (transfers[None], total_send, total_recv)
 
-        for tgt in transfers:
-            if tgt is not None:
-                xfers, send, recv = transfers[tgt]
-                transfers[tgt] = (xfers, send.intersection(allprocs_recv), recv)
+        for tgt_sys in transfers:
+            xfers, send, recv = transfers[tgt_sys]
+            # update send list to remove any vars that don't have a remote receiver.
+            transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]), recv)
 
     def _initialize_transfer(self, in_vec, out_vec):
         """

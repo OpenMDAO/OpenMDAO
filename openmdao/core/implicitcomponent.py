@@ -73,7 +73,11 @@ class ImplicitComponent(Component):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self._inputs.read_only = self._outputs.read_only = True
                 try:
-                    self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                                             self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
                 finally:
                     self._inputs.read_only = self._outputs.read_only = False
 
@@ -102,7 +106,12 @@ class ImplicitComponent(Component):
             else:
                 with self._unscaled_context(outputs=[self._outputs]):
                     with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-                        result = self.solve_nonlinear(self._inputs, self._outputs)
+                        if self._discrete_inputs or self._discrete_outputs:
+                            result = self.solve_nonlinear(self._inputs, self._outputs,
+                                                          self._discrete_inputs,
+                                                          self._discrete_outputs)
+                        else:
+                            result = self.solve_nonlinear(self._inputs, self._outputs)
         finally:
             self._inputs.read_only = False
 

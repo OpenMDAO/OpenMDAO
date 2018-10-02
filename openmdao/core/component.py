@@ -274,8 +274,11 @@ class Component(System):
                 self._var_allprocs_discrete[type_][abs_name] = val
 
         self._var_abs_names = self._var_allprocs_abs_names
-        self._discrete_inputs = _DictValues(self._var_discrete['input'])
-        self._discrete_outputs = _DictValues(self._var_discrete['output'])
+        if self._var_discrete['input'] or self._var_discrete['output']:
+            self._discrete_inputs = _DictValues(self._var_discrete['input'])
+            self._discrete_outputs = _DictValues(self._var_discrete['output'])
+        else:
+            self._discrete_inputs = self._discrete_outputs = None
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -1160,3 +1163,6 @@ class _DictValues(object):
 
     def __contains__(self, key):
         return key in self._dict
+
+    def __len__(self):
+        return len(self._dict)

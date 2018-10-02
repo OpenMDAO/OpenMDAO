@@ -179,7 +179,11 @@ class ExplicitComponent(Component):
 
                 self._inputs.read_only = True
                 try:
-                    self.compute(self._inputs, outputs)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                     self._discrete_outputs)
+                    else:
+                        self.compute(self._inputs, self._outputs)
                 finally:
                     self._inputs.read_only = False
 
@@ -206,7 +210,7 @@ class ExplicitComponent(Component):
                 self._residuals.set_const(0.0)
                 self._inputs.read_only = True
                 try:
-                    if self._var_discrete['input'] or self._var_discrete['output']:
+                    if self._discrete_inputs or self._discrete_outputs:
                         failed = self.compute(self._inputs, self._outputs, self._discrete_inputs,
                                               self._discrete_outputs)
                     else:

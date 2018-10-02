@@ -635,8 +635,11 @@ class Group(System):
                             allprocs_prom2abs_list[type_][prom_name] = []
                         allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
-        self._discrete_inputs = _DictValues(self._var_discrete['input'])
-        self._discrete_outputs = _DictValues(self._var_discrete['output'])
+        if self._var_discrete['input'] or self._var_discrete['output']:
+            self._discrete_inputs = _DictValues(self._var_discrete['input'])
+            self._discrete_outputs = _DictValues(self._var_discrete['output'])
+        else:
+            self._discrete_inputs = self._discrete_outputs = None
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -715,7 +718,7 @@ class Group(System):
                             owns[name] = rank
                             break
 
-                if self._conn_discrete_in2out:
+                if self._var_discrete[type_]:
                     local = list(self._var_discrete[type_])
                     for i, names in enumerate(self.comm.allgather(local)):
                         for n in names:
@@ -921,6 +924,8 @@ class Group(System):
         discrete_in2out = self._conn_discrete_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+        allprocs_discrete_out = self._var_allprocs_discrete['output']
 
         # Recursion
         if recurse:
@@ -948,7 +953,6 @@ class Group(System):
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in iteritems(global_abs_in2out):
-            discrete = False
 
             # First, check that this system owns both the input and output.
             if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
@@ -958,7 +962,6 @@ class Group(System):
                 if out_subsys != in_subsys:
                     if abs_in not in allprocs_abs2meta:
                         self._conn_discrete_in2out[abs_in] = abs_out
-                        discrete = True
                     else:
                         abs_in2out[abs_in] = abs_out
 
@@ -974,7 +977,8 @@ class Group(System):
                                 self._vector_class = self._distributed_vector_class
 
             # if connected output has scaling then we need input scaling
-            if not self._has_input_scaling and not discrete:
+            if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
+                                                    abs_out in allprocs_discrete_out):
                 out_units = allprocs_abs2meta[abs_out]['units']
                 in_units = allprocs_abs2meta[abs_in]['units']
 
@@ -1016,7 +1020,7 @@ class Group(System):
             # rel_in = abs_in[len(self.pathname) + 1:] if self.pathname else abs_in
             in_type = self._var_allprocs_discrete['input'][abs_in]['type']
             rel_out = abs_out[len(self.pathname) + 1:] if self.pathname else abs_out
-            out_type = self._var_allprocs_discrete['output'][rel_out]['type']
+            out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             if not issubclass(in_type, out_type):
                 raise RuntimeError("Type '%s' of output '%s' is"
                                    " incompatible with type '%s' of input '%s'." %
@@ -1157,6 +1161,9 @@ class Group(System):
                 self._transfers[vec_name][mode, isub].transfer(vec_inputs,
                                                                self._vectors['output'][vec_name],
                                                                mode)
+            if self._conn_discrete_in2out and vec_name == 'nonlinear':
+                self._discrete_transfer(isub)
+
         else:  # rev
             if self._has_input_scaling:
                 vec_inputs.scale('phys')
@@ -1168,9 +1175,6 @@ class Group(System):
                 self._transfers[vec_name][mode, isub].transfer(vec_inputs,
                                                                self._vectors['output'][vec_name],
                                                                mode)
-
-        if self._conn_discrete_in2out and mode == 'fwd' and vec_name == 'nonlinear':
-            self._discrete_transfer(isub)
 
     def _discrete_transfer(self, isub):
         """
@@ -1190,7 +1194,7 @@ class Group(System):
                 tgt_sys = self._loc_subsys_map[tgt_sys_name]
                 src_sys = self._loc_subsys_map[src_sys_name]
                 # note that we are not copying the discrete value here, so if the
-                # discrete value is some immutable object, for example not an int or str,
+                # discrete value is some mutable object, for example not an int or str,
                 # the downstream system will have a reference to the same object
                 # as the source, allowing the downstream system to modify the value as
                 # seen by the source system.
@@ -1202,26 +1206,33 @@ class Group(System):
             discrete_out = self._var_discrete['output']
             if key in self._discrete_transfers:
                 xfers, send, recv = self._discrete_transfers[key]
-                sendvars = [(n, discrete_out[n]) for n in send]
-                allprocs_send = comm.gather(send, root=0)
-                if comm.rank == 0:
-                    recvs = [{} for i in range(comm.size)]
-                    for r in recv:
-                        val = discrete_out[r]
-                        for i in allprocs_recv[r]:
-                            recvs[i][r] = val
-                    data = comm.scatter(recvs, root=0)
+                if send or recv:
+                    sendvars = [(n, discrete_out[n]['value']) for n in send]
+                    allprocs_send = comm.gather(sendvars, root=0)
+                    if comm.rank == 0:
+                        allprocs_dict = {}
+                        for i in range(comm.size):
+                            allprocs_dict.update(allprocs_send[i])
+                        recvs = [{} for i in range(comm.size)]
+                        for r, ranks in iteritems(allprocs_recv[key]):
+                            val = allprocs_dict[r]
+                            for i in ranks:
+                                recvs[i][r] = val
+                        data = comm.scatter(recvs, root=0)
+                    else:
+                        data = comm.scatter(None, root=0)
                 else:
-                    data = comm.scatter(None, root=0)
+                    data = None
 
                 for src_sys_name, src, tgt_sys_name, tgt in xfers:
                     if tgt_sys_name in self._loc_subsys_map:
                         tgt_sys = self._loc_subsys_map[tgt_sys_name]
                         if tgt in tgt_sys._discrete_inputs:
-                            if src_sys_name in self._loc_subsys_map:
-                                src_val = self._loc_subsys_map[src_sys_name]._discrete_outputs[src]
+                            abs_src = '.'.join((src_sys_name, src))
+                            if data is not None and abs_src in data:
+                                src_val = data[abs_src]
                             else:
-                                src_val = data[src]
+                                src_val = self._loc_subsys_map[src_sys_name]._discrete_outputs[src]
                             tgt_sys._discrete_inputs[tgt] = src_val
 
     def _setup_global(self, ext_num_vars, ext_sizes):

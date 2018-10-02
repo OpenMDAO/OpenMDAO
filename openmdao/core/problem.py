@@ -271,10 +271,10 @@ class Problem(object):
             else:
                 abs_name = prom_name2abs_name(self.model, name, 'output')
 
-            if name in self.model._discrete_outputs:
+            if self.model._discrete_outputs and name in self.model._discrete_outputs:
                 val = self.model._discrete_outputs[name]
 
-            elif name in self.model._discrete_inputs:
+            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
 
             else:
@@ -399,8 +399,12 @@ class Problem(object):
         else:
             if self.model._outputs and name in self.model._outputs:
                 self.model._outputs[name] = value
+            elif self.model._discrete_outputs and name in self.model._discrete_outputs:
+                self.model._discrete_outputs[name] = value
             elif self.model._inputs and name in self.model._inputs:
                 self.model._inputs[name] = value
+            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
+                self.model._discrete_inputs[name] = value
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
