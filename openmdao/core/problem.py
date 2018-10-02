@@ -730,7 +730,7 @@ class Problem(object):
 
     def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
-              local_vector_class=DefaultVector):
+              local_vector_class=DefaultVector, derivatives=True):
         """
         Set up the model hierarchy.
 
@@ -763,6 +763,8 @@ class Problem(object):
         local_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in intraprocess communication.
+        derivatives : bool
+            If True, perform any memory allocations necessary for derivative computation.
 
         Returns
         -------
@@ -796,7 +798,8 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
-        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class)
+        model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
+                     derivatives)
 
         # Cache all args for final setup.
         self._check = check
@@ -934,6 +937,9 @@ class Problem(object):
             self.final_setup()
 
         model = self.model
+
+        if not model._use_derivatives:
+            raise RuntimeError("Can't check partials.  Derivative support has been turned off.")
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 

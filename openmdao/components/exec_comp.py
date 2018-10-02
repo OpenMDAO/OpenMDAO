@@ -340,7 +340,6 @@ class ExecComp(ExplicitComponent):
         partials : `Jacobian`
             Contains sub-jacobians.
         """
-        # our complex step
         step = self.complex_stepsize * 1j
         out_names = self._var_allprocs_prom2abs_list['output']
         inv_stepsize = 1.0 / self.complex_stepsize

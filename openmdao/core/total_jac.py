@@ -123,6 +123,10 @@ class _TotalJacInfo(object):
         self.debug_print = debug_print
         self.par_deriv = {}
 
+        if not model._use_derivatives:
+            raise RuntimeError("Derivative support has been turned off but compute_totals "
+                               "was called.")
+
         driver_wrt = list(design_vars)
         driver_of = driver._get_ordered_nl_responses()
 

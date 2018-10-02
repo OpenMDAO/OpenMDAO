@@ -823,7 +823,7 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = DirectSolver()
 
         model.nonlinear_solver = NewtonSolver()
 
@@ -856,7 +856,7 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = DirectSolver()
 
         nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['maxiter'] = 2
@@ -890,7 +890,7 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = DirectSolver()
 
         nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['rtol'] = 1e-3
@@ -924,7 +924,7 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = DirectSolver()
 
         nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['atol'] = 1e-4
@@ -1033,7 +1033,7 @@ class TestNewtonFeatures(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = DirectSolver()
 
         nlgbs = model.nonlinear_solver = NewtonSolver()
         nlgbs.options['maxiter'] = 1

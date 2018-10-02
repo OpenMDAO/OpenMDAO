@@ -739,7 +739,8 @@ class TestJacobian(unittest.TestCase):
                          "Keys [('G1.C1.z', 'G1.C1.x'), ('G1.C1.z', 'G1.C1.y')] map to the same "
                          "sub-jacobian of a CSC or CSR partial jacobian and at least one of them "
                          "is either not dense or uses src_indices.  This can occur when multiple "
-                         "inputs on the same component are connected to the same output.")
+                         "inputs on the same component are connected to the same output. Try using"
+                         " a dense jacobian instead.")
 
     def test_one_src_2_tgts_csc_error(self):
         size = 10

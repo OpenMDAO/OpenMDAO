@@ -253,12 +253,15 @@ class NOMPITests(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             p.setup(check=False)
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, UserWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'distributed' option is set to True for Component C2, "
-                         "but there is no distributed vector implementation (MPI/PETSc) "
-                         "available. The default non-distributed vectors will be used.")
+        expected = ("The 'distributed' option is set to True for Component C2, "
+                    "but there is no distributed vector implementation (MPI/PETSc) "
+                    "available. The default non-distributed vectors will be used.")
+
+        for warn in w:
+            if str(warn.message) == expected:
+                break
+        else:
+            self.fail("Did not see expected warning: %s" % expected)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -514,12 +517,15 @@ class DeprecatedMPITests(unittest.TestCase):
             p.setup(check=False)
 
         if PETScVector is None:
-            self.assertEqual(len(w), 1)
-            self.assertTrue(issubclass(w[0].category, UserWarning))
-            self.assertEqual(str(w[0].message),
-                             "The 'distributed' option is set to True for Component C2, "
-                             "but there is no distributed vector implementation (MPI/PETSc) "
-                             "available. The default non-distributed vectors will be used.")
+            expected = ("The 'distributed' option is set to True for Component C2, "
+                        "but there is no distributed vector implementation (MPI/PETSc) "
+                        "available. The default non-distributed vectors will be used.")
+
+            for warn in w:
+                if str(warn.message) == expected:
+                    break
+            else:
+                self.fail("Did not see expected warning: %s" % expected)
 
         p.final_setup()
 
