@@ -1347,12 +1347,30 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        sources = cr.list_sources()
-        print('sources:', sources)
-        # pprint(cr.list_cases('root.nonlinear_solver', recurse=True))
+        self.assertEqual(sorted(cr.list_sources()), [
+            'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
+        ])
 
-        for case in cr.get_cases('root.nonlinear_solver', recurse=True):
-            print(case.iteration_coordinate)
+        # check root solver cases
+        expected_coords = [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0'
+        ]
+        root_solver_iter = len(expected_coords)
+        for i, case in enumerate(cr.get_cases('root.nonlinear_solver')):
+            self.assertEqual(case.iteration_coordinate, expected_coords[i])
+        self.assertEqual(i+1, root_solver_iter)
+
+        # check recursive solver cases
+        mda_solver_iter = len(cr._solver_cases.list_cases('root.mda.nonlinear_solver'))
+        all_solver_iter = len(cr._solver_cases.list_cases('root.nonlinear_solver', recurse=True))
+
+        self.assertEqual(all_solver_iter, root_solver_iter + mda_solver_iter)
 
         # for source in sources:
         #     cases = cr.list_cases(source)

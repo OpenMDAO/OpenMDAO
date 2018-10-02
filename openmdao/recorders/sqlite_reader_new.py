@@ -518,24 +518,19 @@ class SqliteCaseReader(BaseCaseReader):
                                    self._format_version)
 
         elif source in self._system_cases.list_sources():
-            if not recurse:
-                for case_id in self._system_cases.list_cases(source):
-                    yield self._system_cases.get_case(case_id)
-            else:
-                raise RuntimeError('TODO: recurse on system get_cases')
+            for case_id in self._system_cases.list_cases(source, recurse, flat):
+                yield self._system_cases.get_case(case_id)
+
+        elif source in self._solver_cases.list_sources():
+            for case_id in self._solver_cases.list_cases(source, recurse, flat):
+                yield self._solver_cases.get_case(case_id)
 
         else:
             if source == 'driver':
-                # return all driver cases and recurse to solver cases
+                # return driver cases and recurse to child cases
                 iter_coord = ''
             else:
                 iter_coord = source
-            # elif source.find('solve_nonlinear') >= 0:
-            #     iter_coord = self._solver_cases._get_first(source).iteration_coordinate
-            #     print('first case from solver', source, '=', iter_coord)
-            # else:
-            #     iter_coord = self._driver_cases._get_first(source).iteration_coordinate
-            #     print('first case from driver', source, '=', iter_coord)
 
             driver_iter = []
             solver_iter = []
