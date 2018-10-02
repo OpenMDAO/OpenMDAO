@@ -303,22 +303,38 @@ class TestNLBGaussSeidel(unittest.TestCase):
     def test_NLBGS_Aitken_cs(self):
 
         prob = Problem(model=SellarDerivatives())
-        model = prob.model
-        model.nonlinear_solver = NonlinearBlockGS()
 
-        model.approx_totals(method='cs')
+        model = prob.model
+        model.approx_totals(method='cs', step=1e-1)
 
         prob.setup()
-        prob.set_solver_print(level=2)
+        prob.set_solver_print(level=0)
         model.nonlinear_solver.options['use_aitken'] = True
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
-        #self.assertTrue(model.nonlinear_solver._iter_count == 5)
 
         J = prob.compute_totals(of=['y1'], wrt=['x'])
         assert_rel_error(self, J['y1', 'x'][0][0], 0.98061448, 1e-6)
+
+    def test_NLBGS_cs(self):
+
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.approx_totals(method='cs', step=1e-1)
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        J = prob.compute_totals(of=['y1'], wrt=['x'])
+        assert_rel_error(self, J['y1', 'x'][0][0], 0.98061448, 1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

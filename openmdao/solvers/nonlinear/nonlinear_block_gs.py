@@ -86,8 +86,10 @@ class NonlinearBlockGS(NonlinearSolver):
             outputs_n = self._aitken_work3
             temp = self._aitken_work4
             theta_n_1 = self._theta_n_1
+
             # store a copy of the outputs, used to compute the change in outputs later
             delta_outputs_n.set_vec(outputs)
+
             # store a copy of the outputs
             outputs_n.set_vec(outputs)
 
@@ -111,12 +113,14 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 temp.set_vec(delta_outputs_n)
                 temp -= delta_outputs_n_1
-                temp_norm = temp.get_norm()
+                temp_norm = temp.get_norm(complex=True)
                 if temp_norm == 0.:
                     temp_norm = 1e-12  # prevent division by 0 in the next line
                 theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
+
                 # limit relaxation factor to the specified range
                 theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
+
                 # save relaxation factor for the next iteration
                 theta_n_1 = theta_n
             else:

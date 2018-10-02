@@ -329,16 +329,25 @@ class DefaultVector(Vector):
         """
         return np.dot(self._data, vec._data)
 
-    def get_norm(self):
+    def get_norm(self, complex=False):
         """
         Return the norm of this vector.
+
+        Parameters
+        ----------
+        complex : bool
+            Set to True to take the norm of the complex vector value. Otherwise, return the norm
+            of the real part.
 
         Returns
         -------
         float
             norm of this vector.
         """
-        return np.sum(self._data.real**2) ** 0.5
+        if complex:
+            return np.sum(self._data**2) ** 0.5
+        else:
+            return np.sum(self._data.real**2) ** 0.5
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
