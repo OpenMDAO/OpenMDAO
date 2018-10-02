@@ -22,7 +22,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm, DiscreteStrTestCase, PathCompEx
+from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm, DiscretePromTestCase, PathCompEx
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -73,8 +73,10 @@ class DiscreteMPITestCase(unittest.TestCase):
             assert_rel_error(self, prob['par.comp2.y'], 2)
 
 
+# This re-runs all of the DiscretePromTestCase tests under MPI
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class DiscreteStrMPITestCase(DiscreteStrTestCase):
+class DiscretePromMPITestCase(DiscretePromTestCase):
     N_PROCS = 2
 
 

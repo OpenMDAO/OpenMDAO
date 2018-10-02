@@ -128,8 +128,53 @@ class DiscreteTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.y'], 2)
 
+    def test_float_to_discrete_error(self):
+        prob = Problem()
+        model = prob.model
 
-class DiscreteStrTestCase(unittest.TestCase):
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('x', 1.0)
+        model.add_subsystem('comp', ModCompEx(3))
+
+        model.connect('indep.x', 'comp.x')
+
+        with self.assertRaises(Exception) as ctx:
+            prob.setup()
+        self.assertEqual(str(ctx.exception), 
+                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+
+    def test_discrete_to_float_error(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_discrete_output('x', 1)
+        model.add_subsystem('comp', ExecComp("y=2.0*x"))
+
+        model.connect('indep.x', 'comp.x')
+
+        with self.assertRaises(Exception) as ctx:
+            prob.setup()
+        self.assertEqual(str(ctx.exception), 
+                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+
+    def test_discrete_mismatch_error(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_discrete_output('x', 'foo')
+        model.add_subsystem('comp', ModCompEx(3))
+
+        model.connect('indep.x', 'comp.x')
+
+        with self.assertRaises(Exception) as ctx:
+            prob.setup()
+        self.assertEqual(str(ctx.exception), 
+                         "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+
+
+class DiscretePromTestCase(unittest.TestCase):
     def test_str_pass(self):
         prob = Problem()
         model = prob.model

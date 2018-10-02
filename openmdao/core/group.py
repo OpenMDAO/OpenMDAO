@@ -962,6 +962,9 @@ class Group(System):
                 if out_subsys != in_subsys:
                     if abs_in not in allprocs_abs2meta:
                         self._conn_discrete_in2out[abs_in] = abs_out
+                    elif abs_out not in allprocs_abs2meta:
+                        raise RuntimeError("Can't connect discrete output '%s' to continuous "
+                                           "input '%s'." % (abs_out, abs_in))
                     else:
                         abs_in2out[abs_in] = abs_out
 
@@ -1017,14 +1020,16 @@ class Group(System):
 
         # check compatability for any discrete connections
         for abs_in, abs_out in iteritems(self._conn_discrete_in2out):
-            # rel_in = abs_in[len(self.pathname) + 1:] if self.pathname else abs_in
             in_type = self._var_allprocs_discrete['input'][abs_in]['type']
-            rel_out = abs_out[len(self.pathname) + 1:] if self.pathname else abs_out
-            out_type = self._var_allprocs_discrete['output'][abs_out]['type']
+            try:
+                out_type = self._var_allprocs_discrete['output'][abs_out]['type']
+            except KeyError:
+                raise RuntimeError("Can't connect discrete output '%s' to continuous "
+                                   "input '%s'." % (abs_out, abs_in))
             if not issubclass(in_type, out_type):
                 raise RuntimeError("Type '%s' of output '%s' is"
                                    " incompatible with type '%s' of input '%s'." %
-                                   (out_type, abs_out, in_type, abs_in))
+                                   (out_type.__name__, abs_out, in_type.__name__, abs_in))
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
