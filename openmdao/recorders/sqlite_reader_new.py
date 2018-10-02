@@ -445,9 +445,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', iteration_coordinate}
-            Identifies which cases to return. 'iteration_coordinate' can refer to
-            a system or a solver hierarchy location. Defaults to 'driver'.
+        source : {'problem', 'driver', component pathname, solver pathname}
+            Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
             rather than just the direct children. Defaults to False.
@@ -457,20 +456,31 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
-            iterator or dict
-                An iterator or a nested dictionary of identified cases.
+        iterator or dict
+            An iterator or a nested dictionary of identified cases.
         """
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
-        elif source == 'driver' and not recurse:
-            return self._driver_cases.list_cases(recurse, flat)
-        elif source == 'problem' and self._format_version >= 2:
-            return self._problem_cases.list_cases(recurse, flat)
+        elif source == 'driver':
+            if not recurse:
+                return self._driver_cases.list_cases()
+            else:
+                raise RuntimeError('TODO: recurse on list_cases(source=driver)')
+
+        elif source == 'problem':
+            if self._format_version >= 2:
+                return self._problem_cases.list_cases(recurse, flat)
+            else:
+                raise RuntimeError('No problem cases recorded (data format = %d).' %
+                                   self._format_version)
+
         elif source in self._system_cases.list_sources():
             return self._system_cases.list_cases(source, recurse, flat)
+
         elif source in self._solver_cases.list_sources():
             return self._solver_cases.list_cases(source, recurse, flat)
+
         else:
             raise RuntimeError('Source not found: %s.' % source)
 
@@ -482,12 +492,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', iteration_coordinate}
-            Identifies which cases to return. 'iteration_coordinate' can refer to
-            a system or a solver hierarchy location. Defaults to 'driver'.
+        source : {'problem', 'driver', component pathname, solver pathname, iteration_coordinate}
+            Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children. Defaults to False.
+            rather than just the direct children.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
@@ -495,14 +504,18 @@ class SqliteCaseReader(BaseCaseReader):
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
-        elif source == 'problem' and self._format_version >= 2:
-            for case in self._problem_cases.cases():
-                yield case
-
         elif source == 'driver' and not recurse:
             # return driver cases only
             for case in self._driver_cases.cases():
                 yield case
+
+        elif source == 'problem':
+            if self._format_version >= 2:
+                for case in self._problem_cases.cases():
+                    yield case
+            else:
+                raise RuntimeError('No problem cases recorded (data format = %d).' %
+                                   self._format_version)
 
         elif source in self._system_cases.list_sources():
             if not recurse:
@@ -515,12 +528,14 @@ class SqliteCaseReader(BaseCaseReader):
             if source == 'driver':
                 # return all driver cases and recurse to solver cases
                 iter_coord = ''
-            elif source.find('solve_nonlinear') >= 0:
-                iter_coord = self._solver_cases._get_first(source).iteration_coordinate
-                print('first case from solver', source, '=', iter_coord)
             else:
-                iter_coord = self._driver_cases._get_first(source).iteration_coordinate
-                print('first case from driver', source, '=', iter_coord)
+                iter_coord = source
+            # elif source.find('solve_nonlinear') >= 0:
+            #     iter_coord = self._solver_cases._get_first(source).iteration_coordinate
+            #     print('first case from solver', source, '=', iter_coord)
+            # else:
+            #     iter_coord = self._driver_cases._get_first(source).iteration_coordinate
+            #     print('first case from driver', source, '=', iter_coord)
 
             driver_iter = []
             solver_iter = []
@@ -625,9 +640,9 @@ class SqliteCaseReader(BaseCaseReader):
         expected_child_length = coord_lengths[par_len_idx + 1] \
             if par_len_idx < len(coord_lengths) - 1 else -1
 
-        print(split_parent_iter_coord,
-              'par_len:', par_len, coord_lengths,
-              'child_len:', expected_child_length)
+        # print(split_parent_iter_coord,
+        #       'par_len:', par_len, coord_lengths,
+        #       'child_len:', expected_child_length)
 
         if parent_iter_coord is '':  # CASE: grabbing children of 'root'
             if len(driver_iter) > 0:  # grabbing all driver cases
@@ -652,9 +667,9 @@ class SqliteCaseReader(BaseCaseReader):
                                                           solver_iter, recursive, coord_lengths)
         else:  # CASE: grabbing children of a case
             for s in solver_iter:
-                print(_coord_split_re.split(s[0]), 'child_len:', len(_coord_split_re.split(s[0])))
-                print('is child?',
-                      self._is_case_child(parent_iter_coord, s[0], expected_child_length))
+                # print(_coord_split_re.split(s[0]), 'child_len:', len(_coord_split_re.split(s[0])))
+                # print('is child?',
+                #       self._is_case_child(parent_iter_coord, s[0], expected_child_length))
                 if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
                     ret.append((s[0], 'solver'))
                     if recursive:
@@ -684,7 +699,7 @@ class SqliteCaseReader(BaseCaseReader):
             given parent case. False otherwise.
         """
         split_coord = _coord_split_re.split(coordinate)
-        print(coordinate.startswith(parent_coordinate), len(split_coord), expected_child_length)
+        # print(coordinate.startswith(parent_coordinate), len(split_coord), expected_child_length)
         if coordinate.startswith(parent_coordinate) and len(split_coord) is expected_child_length:
             return True
 
@@ -1109,14 +1124,12 @@ class CaseTable(object):
         Case
             The first case from the specified source.
         """
-        case = None
-
         for case in self.cases():
             print('checking source:', case.iteration_coordinate, case.source, 'vs', source)
             if case.source == source:
-                break
+                return case
 
-        return case
+        return None
 
 
 class DriverCases(CaseTable):

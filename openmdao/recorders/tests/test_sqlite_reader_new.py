@@ -383,12 +383,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
-    def test_get_cases(self):
+    def test_get_child_cases(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
 
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        driver.options['print_results'] = False
-        driver.opt_settings['ACC'] = 1e-9
+        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        prob.driver.opt_settings['ACC'] = 1e-9
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -441,6 +440,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
         self.assertEqual(i+1, len(expected_coords))
 
+        # check child cases
         expected_coords = [
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0'
         ]
@@ -452,9 +452,9 @@ class TestSqliteCaseReader(unittest.TestCase):
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_get_child_cases_system(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-
-        driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        driver.opt_settings['ACC'] = 1e-9
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        prob.driver.opt_settings['ACC'] = 1e-9
+        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
         prob.setup()
 
         model = prob.model
@@ -467,7 +467,17 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
+        for c in cr.get_cases(recurse=True):
+            print(c.iteration_coordinate, c.source)
+
         parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear'
+
+        print('============================')
+        for c in cr.get_cases(source=parent_coord, recurse=True):
+            print(c.iteration_coordinate, c.source)
+
+        print('============================')
+
         coords = [
             parent_coord + '|0|NLRunOnce|0',
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
