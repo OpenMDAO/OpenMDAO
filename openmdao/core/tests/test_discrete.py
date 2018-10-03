@@ -140,7 +140,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as ctx:
             prob.setup()
-        self.assertEqual(str(ctx.exception), 
+        self.assertEqual(str(ctx.exception),
                          "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
@@ -155,7 +155,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as ctx:
             prob.setup()
-        self.assertEqual(str(ctx.exception), 
+        self.assertEqual(str(ctx.exception),
                          "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
@@ -170,7 +170,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as ctx:
             prob.setup()
-        self.assertEqual(str(ctx.exception), 
+        self.assertEqual(str(ctx.exception),
                          "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
 
 
@@ -206,6 +206,12 @@ class DiscretePromTestCase(unittest.TestCase):
         self.assertEqual(prob['C3.y'], 'indep/G.G1.C1_1/G.G1.C1_2/C3/')
         self.assertEqual(prob['C4.y'], 'indep/G.G2.C2_1/G.G2.C2_2/C4/')
 
+        prob['indep.x'] = 'foobar/'
+        prob.run_model()
+
+        self.assertEqual(prob['C3.y'], 'foobar/G.G1.C1_1/G.G1.C1_2/C3/')
+        self.assertEqual(prob['C4.y'], 'foobar/G.G2.C2_1/G.G2.C2_2/C4/')
+
     def test_obj_pass(self):
         prob = Problem()
         model = prob.model
@@ -236,6 +242,49 @@ class DiscretePromTestCase(unittest.TestCase):
 
         self.assertEqual(prob['C3.y'].getval(), 40)
         self.assertEqual(prob['C4.y'].getval(), 52)
+
+
+
+class DiscreteFeatureTestCase(unittest.TestCase):
+    def test_feature_discrete(self):
+        from openmdao.api import Problem, IndepVarComp, ExplicitComponent
+
+        class BladeSolidity(ExplicitComponent):
+            def setup(self):
+
+                # Continuous Inputs
+                self.add_input('r_m', 1.0, units="ft", desc="Mean radius")
+                self.add_input('chord', 1.0, units="ft", desc="Chord length")
+
+                # Discrete Inputs
+                self.add_discrete_input('num_blades', 2, desc="Number of blades")
+
+                # Continuous Outputs
+                self.add_output('blade_solidity', 0.0, desc="Blade solidity")
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+
+                num_blades = discrete_inputs['num_blades']
+                chord = inputs['chord']
+                r_m = inputs['r_m']
+
+                outputs['blade_solidity'] = chord / (2.0 * np.pi * r_m / num_blades)
+
+        # build the model
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('r_m', 3.2, units="ft")
+        indeps.add_output('chord', .3, units='ft')
+        indeps.add_discrete_output('num_blades', 2)
+
+        prob.model.add_subsystem('SolidityComp', BladeSolidity(),
+                                 promotes_inputs=['r_m', 'chord', 'num_blades'])
+
+        prob.setup()
+        prob.run_model()
+
+        # minimum value
+        assert_rel_error(self, prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
 
 if __name__ == "__main__":
     unittest.main()

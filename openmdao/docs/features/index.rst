@@ -5,7 +5,8 @@ Features
 ********
 
 OpenMDAO's fully-supported features are documented here, each in a self-contained context.
-Anything documented here has been thoroughly tested, and should be considered fully functional.
+Any feature documented here, with the exception of those in the *Experimental Featuers* section,
+has been thoroughly tested, and should be considered fully functional.
 
 .. toctree::
    :maxdepth: 2
@@ -15,3 +16,4 @@ Anything documented here has been thoroughly tested, and should be considered fu
    recording/index.rst
    debugging/index.rst
    units.rst
+   experimental/index.rst

@@ -463,9 +463,8 @@ class Component(System):
         ----------
         name : str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray or Iterable
-            The initial value of the variable being added in user-defined units.
-            Default is 1.0.
+        val : a picklable object
+            The initial value of the variable being added.
         desc : str
             description of the variable
 
@@ -667,8 +666,8 @@ class Component(System):
         ----------
         name : str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
-            The initial value of the variable being added in user-defined units. Default is 1.0.
+        val : a picklable object
+            The initial value of the variable being added.
         desc : str
             description of the variable.
 
