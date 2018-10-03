@@ -305,11 +305,14 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
-        model.approx_totals(method='cs', step=1e-1)
+        model.approx_totals(method='cs', step=1e-10)
 
         prob.setup()
-        prob.set_solver_print(level=0)
+        prob.set_solver_print(level=2)
         model.nonlinear_solver.options['use_aitken'] = True
+        model.nonlinear_solver.options['atol'] = 1e-15
+        model.nonlinear_solver.options['rtol'] = 1e-15
+
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -323,10 +326,13 @@ class TestNLBGaussSeidel(unittest.TestCase):
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
-        model.approx_totals(method='cs', step=1e-1)
+        model.approx_totals(method='cs')
 
         prob.setup()
         prob.set_solver_print(level=0)
+        model.nonlinear_solver.options['atol'] = 1e-15
+        model.nonlinear_solver.options['rtol'] = 1e-15
+
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)

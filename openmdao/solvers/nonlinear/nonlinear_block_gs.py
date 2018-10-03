@@ -1,5 +1,7 @@
 """Define the NonlinearBlockGS class."""
 
+import numpy as np
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -38,6 +40,9 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='lower limit for Aitken relaxation factor')
         self.options.declare('aitken_max_factor', default=1.5,
                              desc='upper limit for Aitken relaxation factor')
+        self.options.declare('cs_reconverge', default=True,
+                             desc='When True, when this driver solves under a complex step, nudge '
+                             'the Solution vector by a small amount so that it reconverges.')
 
     def _iter_initialize(self):
         """
@@ -64,6 +69,13 @@ class NonlinearBlockGS(NonlinearSolver):
                 self._aitken_work2.set_complex_step_mode(cs_active)
                 self._aitken_work3.set_complex_step_mode(cs_active)
                 self._aitken_work4.set_complex_step_mode(cs_active)
+
+        # When under a complex step from higher in the hierarchy, sometimes the step is too small
+        # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
+        # one iteration.
+        if self._system.under_complex_step and self.options['cs_reconverge']:
+            factor = np.linalg.norm(self._system._outputs._data) * 1e-10
+            self._system._outputs._data += np.full(self._system._outputs._data.shape, factor)
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
@@ -113,7 +125,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 temp.set_vec(delta_outputs_n)
                 temp -= delta_outputs_n_1
-                temp_norm = temp.get_norm(complex=True)
+                temp_norm = temp.get_norm()
                 if temp_norm == 0.:
                     temp_norm = 1e-12  # prevent division by 0 in the next line
                 theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)

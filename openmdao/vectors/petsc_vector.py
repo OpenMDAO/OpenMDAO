@@ -75,22 +75,17 @@ class PETScVector(DefaultVector):
                     self._imag_petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
                                                                    comm=self._system.comm)
 
-    def get_norm(self, complex=False):
+    def get_norm(self):
         """
         Return the norm of this vector.
-
-        Parameters
-        ----------
-        complex : bool
-            Set to True to take the norm of the complex vector value. Otherwise, return the norm
-            of the real part.
 
         Returns
         -------
         float
             norm of this vector.
         """
-        if complex:
-            return self._system.comm.allreduce(np.sum(self._data**2)) ** 0.5
+        if self._under_complex_step:
+            return self._system.comm.allreduce(np.sum(self._data.real**2) +
+                                               np.sum(self._data.imag**2)) ** 0.5
         else:
-            return self._system.comm.allreduce(np.sum(self._data.real**2)) ** 0.5
+            return self._system.comm.allreduce(np.sum(self._data**2)) ** 0.5

@@ -154,6 +154,8 @@ class FiniteDifference(ApproximationScheme):
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
 
+        dtype = system._outputs._data.dtype
+
         # groupby (along with this key function) will group all 'of's that have the same wrt and
         # step size.
         # Note: Since access to `approximations` is required multiple times, we need to
@@ -204,7 +206,7 @@ class FiniteDifference(ApproximationScheme):
                     out_size = system._var_allprocs_abs2meta[of]['size']
                     out_idx = _full_slice
 
-                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
+                outputs.append((of, np.zeros((out_size, in_size), dtype=dtype), out_idx))
 
             self._approx_groups[i] = (wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs)
 
@@ -234,6 +236,11 @@ class FiniteDifference(ApproximationScheme):
             current_vec = system._residuals
 
         result = system._outputs._clone(True)
+
+        cs_active = system._outputs._under_complex_step
+        if cs_active:
+            result.set_complex_step_mode(cs_active)
+
         result_array = result._data.copy()
         out_tmp = current_vec._data.copy()
         in_tmp = system._inputs._data.copy()
@@ -254,7 +261,7 @@ class FiniteDifference(ApproximationScheme):
         mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
-        approx_groups = self._get_approx_groups(system)
+        approx_groups = self._get_approx_groups(system, under_cs=cs_active)
         for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
 
             for i_count, idx in enumerate(in_idx):

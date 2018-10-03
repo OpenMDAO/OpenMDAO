@@ -980,9 +980,10 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver.options['atol'] = 1e-50
+        prob.model.nonlinear_solver.options['rtol'] = 1e-50
 
-        # Had to make this step larger so that solver would reconverge adequately.
-        model.approx_totals(method='cs', step=1.0e-1)
+        model.approx_totals(method='cs')
 
         prob.setup(check=False, local_vector_class=vec_class)
         prob.set_solver_print(level=0)
@@ -1142,8 +1143,10 @@ class TestGroupComplexStep(unittest.TestCase):
 
         sub.nonlinear_solver = NewtonSolver()
         sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver.options['atol'] = 1e-10
+        sub.nonlinear_solver.options['rtol'] = 1e-10
 
-        model.approx_totals(method='cs', step=1e-4)
+        model.approx_totals(method='cs')
 
         prob.setup(check=False, local_vector_class=vec_class)
         prob.set_solver_print(level=0)
@@ -1188,8 +1191,11 @@ class TestGroupComplexStep(unittest.TestCase):
 
         sub.nonlinear_solver = NewtonSolver()
         sub.linear_solver = ScipyKrylov()
+        sub.nonlinear_solver.options['atol'] = 1e-10
+        sub.nonlinear_solver.options['rtol'] = 1e-10
+        sub.linear_solver.options['atol'] = 1e-15
 
-        model.approx_totals(method='cs', step=1e-4)
+        model.approx_totals(method='cs', step=1e-14)
 
         prob.setup(check=False, local_vector_class=vec_class)
         prob.set_solver_print(level=0)
@@ -1231,8 +1237,10 @@ class TestGroupComplexStep(unittest.TestCase):
 
         sub.nonlinear_solver = NewtonSolver()
         sub.linear_solver = ScipyKrylov(assemble_jac=True)
+        sub.nonlinear_solver.options['atol'] = 1e-20
+        sub.nonlinear_solver.options['rtol'] = 1e-20
 
-        model.approx_totals(method='cs', step=1e-3)
+        model.approx_totals(method='cs', step=1e-12)
 
         prob.setup(check=False)
         prob.set_solver_print(level=0)
@@ -1251,6 +1259,58 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
+    def test_newton_with_fd_group(self):
+        # Basic sellar test.
+
+        prob = Problem()
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        subfd = sub.add_subsystem('subfd', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        subfd.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        subfd.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        # Finite difference for the Newton linear solve only
+        subfd.approx_totals(method='fd')
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver.options['maxiter'] = 12
+        sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver.options['atol'] = 1e-20
+        sub.nonlinear_solver.options['rtol'] = 1e-20
+
+        # Complex Step for top derivatives
+        model.approx_totals(method='cs', step=1e-14)
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
 
 class TestComponentComplexStep(unittest.TestCase):
 

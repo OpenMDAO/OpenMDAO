@@ -526,8 +526,11 @@ class TestProblem(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        # check derivatives with complex step and a larger step size.
-        prob.check_totals(method='cs', step=1.0e-1)
+        prob.model.nonlinear_solver.options['atol'] = 1e-15
+        prob.model.nonlinear_solver.options['rtol'] = 1e-15
+
+        # check derivatives with complex step
+        prob.check_totals(method='cs')
 
     def test_check_totals_user_detect(self):
 
