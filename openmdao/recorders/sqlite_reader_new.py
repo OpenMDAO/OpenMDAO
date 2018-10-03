@@ -58,7 +58,7 @@ def CaseReader(filename, pre_load=True):
     return reader
 
 
-class BaseCaseReader():
+class BaseCaseReader(object):
     """
     Base class of all CaseReader implementations.
 
