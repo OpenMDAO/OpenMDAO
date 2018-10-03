@@ -1374,12 +1374,20 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
+        #
+        # check sources
+        #
         self.assertEqual(sorted(cr.list_sources()), [
             'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
         ])
 
+        #
+        # check solver cases
+        #
+
         # check root solver cases
-        expected_coords = [
+        root_solver_cases = cr.list_cases('root.nonlinear_solver')
+        expected_cases = [
             'rank0:root._solve_nonlinear|0|NLRunOnce|0',
             'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
             'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0',
@@ -1388,45 +1396,75 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0',
             'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0'
         ]
-        root_solver_iter = len(expected_coords)
-        for i, case in enumerate(cr.get_cases('root.nonlinear_solver')):
-            self.assertEqual(case.iteration_coordinate, expected_coords[i])
-        self.assertEqual(i+1, root_solver_iter)
+        self.assertEqual(len(root_solver_cases), len(expected_cases))
+        for i, coord in enumerate(root_solver_cases):
+            self.assertEqual(coord, expected_cases[i])
 
-        # check recursive solver cases
-        mda_solver_iter = len(cr.list_cases('root.mda.nonlinear_solver'))
-        all_solver_iter = len(cr.list_cases('root.nonlinear_solver', recurse=True))
+        # check mda solver cases
+        # check that there are multiple iterations and mda solver is part of the coordinate
+        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver')
+        self.assertTrue(len(mda_solver_cases) > 1)
+        for coord in mda_solver_cases:
+            self.assertTrue('mda._solve_nonlinear' in coord)
 
-        self.assertEqual(all_solver_iter, root_solver_iter + mda_solver_iter)
+        # check that the recurse option returns both root and mda solver cases
+        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True)
+        self.assertEqual(len(all_solver_cases), len(root_solver_cases) + len(mda_solver_cases))
 
-        # for source in sources:
-        #     cases = cr.list_cases(source)
-        #     print(source, ':')
-        #     pprint(cases)
+        #
+        # check driver cases
+        #
 
-        # #
-        # # Driver recording test
-        # #
-        # coordinate = [0, 'SLSQP', (5, )]
+        driver_cases = cr.list_cases('driver')
 
-        # expected_desvars = {
-        #     "pz.z": prob['pz.z'],
-        #     "px.x": prob['px.x']
-        # }
-        # expected_objectives = {
-        #     "obj_cmp.obj": prob['obj_cmp.obj']
-        # }
-        # expected_constraints = {
-        #     "con_cmp1.con1": prob['con_cmp1.con1'],
-        #     "con_cmp2.con2": prob['con_cmp2.con2']
-        # }
+        # check that there are multiple iterations and they have the expected coordinates
+        self.assertTrue(len(driver_cases) > 1)
+        for i, coord in enumerate(driver_cases):
+            self.assertEqual(coord, 'rank0:SLSQP|%d' % i)
 
-        # expected_outputs = expected_desvars
-        # expected_outputs.update(expected_objectives)
-        # expected_outputs.update(expected_constraints)
+        # check VOI values from last driver iteration
+        case = cr.get_case(driver_cases[-1])
 
-        # expected_driver_data = ((coordinate, (t0, t1), expected_outputs, None),)
-        # assertDriverIterDataRecorded(self, expected_driver_data, self.eps)
+        expected_dvs = {
+            "z": prob['pz.z'],
+            "x": prob['px.x']
+        }
+        expected_obj = {
+            "obj": prob['obj_cmp.obj']
+        }
+        expected_con = {
+            "con1": prob['con_cmp1.con1'],
+            "con2": prob['con_cmp2.con2']
+        }
+
+        dvs = case.get_design_vars()
+        obj = case.get_objectives()
+        con = case.get_constraints()
+
+        self.assertEqual(dvs.keys(), expected_dvs.keys())
+        for key in expected_dvs:
+            np.testing.assert_almost_equal(dvs[key], expected_dvs[key], decimal=6)
+
+        self.assertEqual(obj.keys(), expected_obj.keys())
+        for key in expected_obj:
+            np.testing.assert_almost_equal(obj[key], expected_obj[key], decimal=6)
+
+        self.assertEqual(con.keys(), expected_con.keys())
+        for key in expected_con:
+            np.testing.assert_almost_equal(con[key], expected_con[key], decimal=6)
+
+        # check accessing values via outputs attribute
+        expected_outputs = expected_dvs
+        expected_outputs.update(expected_obj)
+        expected_outputs.update(expected_con)
+
+        self.assertEqual(case.outputs.keys(), expected_outputs.keys())
+        for key in expected_outputs:
+            np.testing.assert_almost_equal(case.outputs[key], expected_outputs[key], decimal=6)
+
+        # check that the recurse option also returns solver cases
+        all_driver_cases = cr.list_cases('driver', recurse=True)
+        self.assertEqual(len(all_driver_cases), len(driver_cases) + len(all_solver_cases))
 
         # #
         # # System recording test

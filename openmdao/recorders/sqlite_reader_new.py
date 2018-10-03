@@ -501,6 +501,9 @@ class SqliteCaseReader(BaseCaseReader):
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
         """
+        print(source, 'in', self._solver_cases.list_sources(), '?',
+              source in self._solver_cases.list_sources())
+
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
@@ -630,14 +633,11 @@ class SqliteCaseReader(BaseCaseReader):
         ret = []
 
         par_len = len(split_parent_iter_coord)
+
         par_len_idx = coord_lengths.index(par_len if par_len is not 0 else 2)
 
         expected_child_length = coord_lengths[par_len_idx + 1] \
             if par_len_idx < len(coord_lengths) - 1 else -1
-
-        # print(split_parent_iter_coord,
-        #       'par_len:', par_len, coord_lengths,
-        #       'child_len:', expected_child_length)
 
         if parent_iter_coord is '':  # CASE: grabbing children of 'root'
             if len(driver_iter) > 0:  # grabbing all driver cases
@@ -662,9 +662,6 @@ class SqliteCaseReader(BaseCaseReader):
                                                           solver_iter, recursive, coord_lengths)
         else:  # CASE: grabbing children of a case
             for s in solver_iter:
-                # print(_coord_split_re.split(s[0]), 'child_len:', len(_coord_split_re.split(s[0])))
-                # print('is child?',
-                #       self._is_case_child(parent_iter_coord, s[0], expected_child_length))
                 if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
                     ret.append((s[0], 'solver'))
                     if recursive:
@@ -674,7 +671,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         return ret
 
-    def _is_case_child(self, parent_coordinate, coordinate, expected_child_length):
+    def _is_case_child(self, parent_coordinate, coordinate, expected_child_length=0):
         """
         Tell if the given case is a child case of the parent.
 
@@ -694,8 +691,7 @@ class SqliteCaseReader(BaseCaseReader):
             given parent case. False otherwise.
         """
         split_coord = _coord_split_re.split(coordinate)
-        # print(coordinate.startswith(parent_coordinate), len(split_coord), expected_child_length)
-        if coordinate.startswith(parent_coordinate) and len(split_coord) is expected_child_length:
+        if coordinate.startswith(parent_coordinate) and len(split_coord) >= expected_child_length:
             return True
 
         return False
@@ -952,7 +948,6 @@ class CaseTable(object):
             If not None, only cases that have the specified source will be returned
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children. Defaults to False.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
@@ -970,10 +965,17 @@ class CaseTable(object):
 
         con.close()
 
-        if source:
-            return [row[0] for row in rows if self._get_source(row[0]) == source]
-        else:
+        if not source:
+            # return all cases
             return [row[0] for row in rows]
+        else:
+            if recurse:
+                # return all cases under the source system
+                source_sys = source.replace('.nonlinear_solver', '')
+                return [row[0] for row in rows if self._get_source(row[0]).startswith(source_sys)]
+            else:
+                # return only cases from the source
+                return [row[0] for row in rows if self._get_source(row[0]) == source]
 
     def get_case(self, case_id, cache=False):
         """
@@ -1120,7 +1122,6 @@ class CaseTable(object):
             The first case from the specified source.
         """
         for case in self.cases():
-            print('checking source:', case.iteration_coordinate, case.source, 'vs', source)
             if case.source == source:
                 return case
 
