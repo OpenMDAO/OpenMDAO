@@ -1504,6 +1504,108 @@ class TestSqliteCaseReader(unittest.TestCase):
         #                          expected_solver_output, expected_solver_residuals),)
         # assertSolverIterDataRecorded(self, expected_solver_data, self.eps)
 
+    def test_bug(self):
+        from openmdao.api import Problem, IndepVarComp, ExplicitComponent
+
+        class BlackBoxComponent(ExplicitComponent):
+            def setup(self):
+                self.add_input('bx')
+                self.add_output('by')
+
+            def compute(self, inputs, outputs):
+                outputs['by'] = inputs['bx']**2
+
+        def blackbox(x):
+            prob_bb = Problem()
+
+            indeps = prob_bb.model.add_subsystem('indeps', IndepVarComp())
+            indeps.add_output('bx')
+
+            prob_bb.model.add_subsystem('box', BlackBoxComponent())
+            prob_bb.model.connect('indeps.bx', 'box.bx')
+            prob_bb.setup()
+
+            prob_bb['indeps.bx'] = x
+            prob_bb.run_driver()
+
+            return prob_bb['box.by']
+
+        class MainComponent(ExplicitComponent):
+            def setup(self):
+                self.add_input('x')
+                self.add_output('z')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                z = blackbox(x)
+                outputs['z'] = z
+
+        prob = Problem()
+
+        ivc = prob.model.add_subsystem('ivc', IndepVarComp())
+        ivc.add_output('x')
+        prob.model.add_subsystem('main_comp', MainComponent())
+        prob.model.connect('ivc.x', 'main_comp.x')
+
+        prob.setup()
+
+        prob['ivc.x'] = 5
+        prob.run_driver()
+
+        print(prob['main_comp.z'])
+
+    def test_bug_workaround(self):
+        from openmdao.api import Problem, IndepVarComp, ExplicitComponent
+
+        class BlackBoxComponent(ExplicitComponent):
+            def setup(self):
+                self.add_input('bx')
+                self.add_output('by')
+
+            def compute(self, inputs, outputs):
+                outputs['by'] = inputs['bx']**2
+
+        class BlackBoxProblem(Problem):
+            def __init__(self):
+                super(BlackBoxProblem, self).__init__()
+
+                model = self.model
+
+                indeps = model.add_subsystem('indeps', IndepVarComp())
+                indeps.add_output('bx')
+
+                model.add_subsystem('box', BlackBoxComponent())
+                model.connect('indeps.bx', 'box.bx')
+
+        class MainComponent(ExplicitComponent):
+            def setup(self):
+                self.add_input('x')
+                self.add_output('z')
+                self.subproblem = BlackBoxProblem()
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+
+                self.subproblem.setup()
+                self.subproblem['indeps.bx'] = x
+                self.subproblem.run_driver()
+
+                outputs['z'] = self.subproblem['box.by']
+
+        prob = Problem()
+
+        ivc = prob.model.add_subsystem('ivc', IndepVarComp())
+        ivc.add_output('x')
+        prob.model.add_subsystem('main_comp', MainComponent())
+        prob.model.connect('ivc.x', 'main_comp.x')
+
+        prob.setup()
+
+        prob['ivc.x'] = 5
+        prob.run_driver()
+
+        print(prob['main_comp.z'])
+
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):
     def setUp(self):
