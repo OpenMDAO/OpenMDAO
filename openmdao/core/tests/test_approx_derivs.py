@@ -1457,10 +1457,10 @@ class TestComponentComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.model.linear_solver = DirectSolver()
 
-        prob.setup(check=False, force_alloc_complex=True)
+        prob.setup(check=False)
         prob.set_solver_print(level=0)
         prob.run_model()
 
