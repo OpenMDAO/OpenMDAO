@@ -78,6 +78,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         Stores the size of the inputs at each level.
     _nfi : float
         number of levels of fidelity
+    _training_input : dict
+        Training data for inputs.
     """
 
     def __init__(self, **kwargs):
