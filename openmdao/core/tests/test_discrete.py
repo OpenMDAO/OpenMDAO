@@ -244,7 +244,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             J = prob.compute_totals()
         self.assertEqual(str(ctx.exception),
-                         "Total derivative of 'C4.y' wrt 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
+                         "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
 
 
 class DiscretePromTestCase(unittest.TestCase):

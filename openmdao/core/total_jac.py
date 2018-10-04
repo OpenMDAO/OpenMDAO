@@ -111,8 +111,7 @@ class _TotalJacInfo(object):
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
 
-        model = problem.model
-        self.model = model
+        self.model = model = problem.model
         self.comm = problem.comm
         self.mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
@@ -149,26 +148,15 @@ class _TotalJacInfo(object):
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
             discrete_outs = set(model._var_allprocs_discrete['output'])
-            if self.mode == 'rev':
-                inps = of
-                outs = wrt
-            else:
-                inps = wrt
-                outs = of
-            rel_outs = set()
+            inps = of if self.mode == 'rev' else wrt
+
             for inp in inps:
-                for out in outs:
-                    for relout, tup in iteritems(model._relevant[inp]):
-                        dct, _ = tup
-                        rel_outs.update(dct['output'])
-            inter = discrete_outs.intersection(rel_outs)
-            if inter:
-                if self.mode == 'rev':
-                    _of, _wrt = inp, out
-                else:
-                    _of, _wrt = out, inp
-                raise RuntimeError("Total derivative of '%s' wrt '%s' depends upon "
-                                   "discrete output variables %s." % (_of, _wrt, sorted(inter)))
+                inter = discrete_outs.intersection(model._relevant[inp]['@all'][0]['output'])
+                if inter:
+                    kind = 'of' if self.mode == 'rev' else 'with respect to'
+                    raise RuntimeError("Total derivative %s '%s' depends upon "
+                                       "discrete output variables %s." %
+                                       (kind, inp, sorted(inter)))
 
         self.of = of
         self.wrt = wrt
