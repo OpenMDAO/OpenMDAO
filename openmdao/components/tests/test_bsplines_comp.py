@@ -7,10 +7,7 @@ import unittest
 
 import numpy as np
 
-try:
-    import matplotlib
-except ImportError:
-    matplotlib = None
+import matplotlib
 
 from openmdao.api import Problem, IndepVarComp
 from openmdao.components.bsplines_comp import BsplinesComp
@@ -78,7 +75,6 @@ class TestBsplinesComp(unittest.TestCase):
             self.assertEqual(meta['units'], 'inch')
 
 
-@unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeature(unittest.TestCase):
 
     def setUp(self):
