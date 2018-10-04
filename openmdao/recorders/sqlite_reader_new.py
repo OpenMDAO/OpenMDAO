@@ -466,21 +466,31 @@ class SqliteCaseReader(BaseCaseReader):
             if not recurse:
                 return self._driver_cases.list_cases()
             elif flat:
-                ret = []
+                cases = []
                 system_cases = self._system_cases.list_cases()
                 solver_cases = self._solver_cases.list_cases()
                 driver_cases = self._driver_cases.list_cases()
                 for driver_coord in driver_cases:
                     for system_coord in system_cases:
                         if system_coord.startswith(driver_coord):
-                            ret.append(system_coord)
+                            cases.append(system_coord)
                     for solver_coord in solver_cases:
                         if solver_coord.startswith(driver_coord):
-                            ret.append(solver_coord)
-                    ret.append(driver_coord)
-                return ret
+                            cases.append(solver_coord)
+                    cases.append(driver_coord)
+                return cases
             else:
-                raise RuntimeError('TODO: Hierarchical recursive driver case list')
+                cases = OrderedDict()
+                driver_cases = self._driver_cases.list_cases()
+                for driver_coord in driver_cases:
+                    driver_case = cases[driver_coord] = OrderedDict()
+                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
+                    for system_case in system_cases:
+                        driver_case[system_case] = system_cases[system_case]
+                    solver_cases = self._solver_cases.list_cases(driver_coord, recurse=True)
+                    for solver_case in solver_cases:
+                        driver_case[solver_case] = solver_cases[solver_case]
+                return cases
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -982,14 +992,34 @@ class CaseTable(object):
         if not source:
             # return all cases
             return [row[0] for row in rows]
-        else:
-            if recurse:
-                # return all cases under the source system
-                source_sys = source.replace('.nonlinear_solver', '')
-                return [row[0] for row in rows if self._get_source(row[0]).startswith(source_sys)]
+        elif '|' in source:
+            # source is a coordinate
+            if recurse and not flat:
+                cases = OrderedDict()
+                for row in rows:
+                    if len(row[0]) > len(source) and row[0].startswith(source):
+                        cases[row[0]] = self.list_cases(row[0], recurse, flat)
+                return cases
             else:
-                # return only cases from the source
-                return [row[0] for row in rows if self._get_source(row[0]) == source]
+                return [row[0] for row in rows if row[0].startswith(source)]
+        else:
+            # source is a system or solver
+            if recurse:
+                if flat:
+                    # return all cases under the source system
+                    source_sys = source.replace('.nonlinear_solver', '')
+                    return [row[0] for row in rows
+                            if self._get_source(row[0]).startswith(source_sys)]
+                else:
+                    cases = OrderedDict()
+                    for row in rows:
+                        row_source = self._get_source(row[0])
+                        if row_source == source:
+                            cases[row[0]] = self.list_cases(row[0], recurse, flat)
+                    return cases
+            else:
+                return [row[0] for row in rows
+                        if self._get_source(row[0]) == source]
 
     def get_case(self, case_id, cache=False):
         """

@@ -12,6 +12,7 @@ import numpy as np
 from six import iteritems, assertRaisesRegex
 
 from pprint import pprint
+import json
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     NonlinearRunOnce, NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver
@@ -1479,6 +1480,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
         self.assertEqual(len(all_solver_cases), len(root_solver_cases) + len(mda_solver_cases))
 
+        # tree = cr.list_cases('root.nonlinear_solver', recurse=True, flat=False)
+        # pprint(json.loads(json.dumps(tree)))
+        # import sys; sys.exit(0)
+
         #
         # check driver cases
         #
@@ -1548,7 +1553,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
 
+        # check nested version of recurse option
         all_driver_cases = cr.list_cases('driver', recurse=True, flat=False)
+        pprint(json.loads(json.dumps(all_driver_cases)))
 
     @unittest.skip('bug to be fixed.')
     def test_bug(self):
