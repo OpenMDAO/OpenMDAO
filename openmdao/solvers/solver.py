@@ -127,8 +127,6 @@ class Solver(object):
         Number of iterations for the current invocation of the solver.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this solver
-    _solver_info : <SolverInfo>
-        Object to store some formatting for iprint that is shared across all solvers.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -145,6 +143,7 @@ class Solver(object):
         Normalization factor
     """
 
+    # Object to store some formatting for iprint that is shared across all solvers.
     SOLVER = 'base_solver'
     _solver_info = SolverInfo()
 
@@ -577,36 +576,8 @@ class NonlinearSolver(Solver):
 
     Attributes
     ----------
-    _system : <System>
-        Pointer to the owning system.
-    _depth : int
-        How many subsolvers deep this solver is (0 means not a subsolver).
-    _vec_names : [str, ...]
-        List of right-hand-side (RHS) vector names.
-    _mode : str
-        'fwd' or 'rev', applicable to linear solvers only.
-    _iter_count : int
-        Number of iterations for the current invocation of the solver.
-    _rec_mgr : <RecordingManager>
-        object that manages all recorders added to this solver
-    _solver_info : <SolverInfo>
-        Object to store some formatting for iprint that is shared across all solvers.
     _err_cache : dict
         Dictionary holding input and output vectors at start of iteration, if requested.
-    cite : str
-        Listing of relevant citations that should be referenced when
-        publishing work that uses this class.
-    options : <OptionsDictionary>
-        Options dictionary.
-    recording_options : <OptionsDictionary>
-        Recording options dictionary.
-    supports : <OptionsDictionary>
-        Options dictionary describing what features are supported by this
-        solver.
-    _filtered_vars_to_record: Dict
-        Dict of list of var names to record
-    _norm0: float
-        Normalization factor
     """
 
     def __init__(self, **kwargs):

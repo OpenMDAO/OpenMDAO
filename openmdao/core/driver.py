@@ -58,15 +58,13 @@ class Driver(object):
         Dictionary with general pyoptsparse options.
     recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
-    debug_print : <OptionsDictionary>
-        Dictionary with debugging printing options.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     _problem : <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
-        Provides a consistant way for drivers to declare what features they support.
+        Provides a consistent way for drivers to declare what features they support.
     _designvars : dict
         Contains all design variable info.
     _cons : dict
@@ -81,17 +79,6 @@ class Driver(object):
         Dict of lists of var names indicating what to record
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
-    _remote_dvs : dict
-        Dict of design variables that are remote on at least one proc. Values are
-        (owning rank, size).
-    _remote_cons : dict
-        Dict of constraints that are remote on at least one proc. Values are
-        (owning rank, size).
-    _remote_objs : dict
-        Dict of objectives that are remote on at least one proc. Values are
-        (owning rank, size).
-    _remote_responses : dict
-        A combined dict containing entries from _remote_cons and _remote_objs.
     _simul_coloring_info : tuple of dicts
         A data structure describing coloring for simultaneous derivs.
     _total_jac_sparsity : dict, str, or None

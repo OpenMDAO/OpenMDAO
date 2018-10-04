@@ -486,8 +486,6 @@ class LatinHypercubeGenerator(DOEGenerator):
     _samples : int
         The number of evenly spaced levels between each design variable
         lower and upper bound.
-    _supported_criterion : list
-        supported pyDOE criterion names.
     _criterion : string
         the pyDOE criterion to use.
     _iterations : int
@@ -496,6 +494,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         Random seed.
     """
 
+    # supported pyDOE criterion names.
     _supported_criterion = [
         "center", "c",
         "maximin", "m",

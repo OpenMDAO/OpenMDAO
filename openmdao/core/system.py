@@ -70,7 +70,7 @@ class System(object):
         Int that holds the number of times this system has iterated
         in a recording run.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     _full_comm : MPI.Comm or None
         MPI communicator object used when System's comm is split for parallel FD.
@@ -83,8 +83,6 @@ class System(object):
         (i.e. among _subsystems_allprocs).
     _subsystems_proc_range : (int, int)
         List of ranges of each myproc subsystem's processors relative to those of this system.
-    _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
-        List of ranges of each myproc subsystem's allprocs variables relative to this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -226,8 +224,6 @@ class System(object):
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
-    _norm0: float
-        Normalization factor
     _vector_class : class
         Class to use for data vectors.  After setup will contain the value of either
         _distributed_vector_class or _local_vector_class.
@@ -385,6 +381,10 @@ class System(object):
         self._assembled_jac = None
 
         self._par_fd_id = 0
+
+        self._filtered_vars_to_record = {}
+        self._owning_rank = {}
+        self._lin_vec_names = []
 
     def _declare_options(self):
         """

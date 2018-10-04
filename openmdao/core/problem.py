@@ -95,7 +95,7 @@ class Problem(object):
         1 -- The `setup` method has been called, but vectors not initialized.
         2 -- The `final_setup` has been run, everything ready to run.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     recording_options : <OptionsDictionary>
         Dictionary with problem recording options.

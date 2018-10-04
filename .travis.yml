@@ -2,6 +2,8 @@ branches:
   only:
   - master
 
+sudo: false
+
 group: deprecated-2017Q4
 
 filter_secrets: false
