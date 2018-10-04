@@ -2,6 +2,7 @@
 import unittest
 from docutils import nodes
 from docutils.parsers.rst import Directive
+import re
 from sphinx.errors import SphinxError
 import sphinx
 import traceback
@@ -67,7 +68,8 @@ class EmbedCodeDirective(Directive):
             raise self.directive_error(2, str(err))
 
         is_test = class_ is not None and inspect.isclass(class_) and issubclass(class_, unittest.TestCase)
-        shows_plot = '.show(' in source
+        plotting_functions = ['\.show\(', 'partial_deriv_plot\(']
+        shows_plot = re.compile('|'.join(plotting_functions)).search(source)
 
         if 'layout' in self.options:
             layout = [s.strip() for s in self.options['layout'].split(',')]
