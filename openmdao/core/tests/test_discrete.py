@@ -47,6 +47,42 @@ class ModCompIm(ImplicitComponent):
         discrete_outputs['y'] = discrete_inputs['x'] % self.modval
 
 
+class MixedCompDiscIn(ExplicitComponent):
+    def __init__(self, mult, **kwargs):
+        super(MixedCompDiscIn, self).__init__(**kwargs)
+        self.mult = mult
+
+    def setup(self):
+        self.add_discrete_input('x', val=1)
+        self.add_output('y')
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        outputs['y'] = discrete_inputs['x'] * self.mult
+
+
+class MixedCompDiscOut(ExplicitComponent):
+    def __init__(self, mult, **kwargs):
+        super(MixedCompDiscOut, self).__init__(**kwargs)
+        self.mult = mult
+
+    def setup(self):
+        self.add_input('x')
+        self.add_discrete_output('y', val=1)
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        discrete_outputs['y'] = inputs['x'] * self.mult
+
+
+class InternalDiscreteGroup(Group):
+    # this group has an internal discrete connection with continuous external vars,
+    # so it can be spliced into an existing continuous model to test for discrete
+    # var error checking.
+    def setup(self):
+        self.add_subsystem('C1', MixedCompDiscOut(1), promotes_inputs=['x'])
+        self.add_subsystem('C2', MixedCompDiscIn(1), promotes_outputs=['y'])
+        self.connect('C1.y', 'C2.x')
+
+
 class _DiscreteVal(object):
     """Generic discrete value to test passing of objects."""
     def __init__(self, val):
@@ -172,6 +208,43 @@ class DiscreteTestCase(unittest.TestCase):
             prob.setup()
         self.assertEqual(str(ctx.exception),
                          "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+
+    def test_deriv_err(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp(), promotes_outputs=['x'])
+        indep.add_output('x', 1.0)
+
+        G = model.add_subsystem('G', Group(), promotes_inputs=['x'])
+
+        G1 = G.add_subsystem('G1', InternalDiscreteGroup(), promotes_inputs=['x'], promotes_outputs=['y'])
+
+        G2 = G.add_subsystem('G2', Group(), promotes_inputs=['x'])
+        G2.add_subsystem('C2_1', ExecComp('y=3*x'), promotes_inputs=['x'])
+        G2.add_subsystem('C2_2', ExecComp('y=4*x'), promotes_outputs=['y'])
+        G2.connect('C2_1.y', 'C2_2.x')
+
+        model.add_subsystem('C3', ExecComp('y=3+x'))
+        model.add_subsystem('C4', ExecComp('y=4+x'))
+
+        model.connect('G.y', 'C3.x')
+        model.connect('G.G2.y', 'C4.x')
+
+        prob.model.add_design_var('x')
+        prob.model.add_objective('C3.y')
+        prob.model.add_constraint('C4.y')
+
+        prob.setup()
+        prob.run_model()
+
+        self.assertEqual(prob['C3.y'], 4.0)
+        self.assertEqual(prob['C4.y'], 16.0)
+
+        with self.assertRaises(Exception) as ctx:
+            J = prob.compute_totals()
+        self.assertEqual(str(ctx.exception),
+                         "Total derivative of 'C4.y' wrt 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
 
 
 class DiscretePromTestCase(unittest.TestCase):

@@ -147,6 +147,30 @@ class _TotalJacInfo(object):
             if not global_names:
                 of = [prom2abs[name][0] for name in prom_of]
 
+        # raise an exception if we depend on any discrete outputs
+        if model._var_allprocs_discrete['output']:
+            discrete_outs = set(model._var_allprocs_discrete['output'])
+            if self.mode == 'rev':
+                inps = of
+                outs = wrt
+            else:
+                inps = wrt
+                outs = of
+            rel_outs = set()
+            for inp in inps:
+                for out in outs:
+                    for relout, tup in iteritems(model._relevant[inp]):
+                        dct, _ = tup
+                        rel_outs.update(dct['output'])
+            inter = discrete_outs.intersection(rel_outs)
+            if inter:
+                if self.mode == 'rev':
+                    _of, _wrt = inp, out
+                else:
+                    _of, _wrt = out, inp
+                raise RuntimeError("Total derivative of '%s' wrt '%s' depends upon "
+                                   "discrete output variables %s." % (_of, _wrt, sorted(inter)))
+
         self.of = of
         self.wrt = wrt
         self.prom_of = prom_of

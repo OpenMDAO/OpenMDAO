@@ -100,6 +100,11 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
 
+        # check for any discrete variables
+        if system._var_allprocs_discrete['output']:
+            raise RuntimeError("System '%s' has a Newton solver and contains discrete outputs %s." %
+                               (system.pathname, sorted(system._var_allprocs_discrete['output'])))
+
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system, self._depth + 1)
         else:
