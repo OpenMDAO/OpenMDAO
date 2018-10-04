@@ -110,6 +110,12 @@ def get_bspline_mtx(num_cp, num_pt, order=4, distribution='sine'):
 class BsplinesComp(ExplicitComponent):
     """
     Simple B-spline component for interpolation.
+
+    Attributes
+    ----------
+    cite : str
+        Listing of relevant citations that should be referenced when publishing
+        work that uses this class.
     """
 
     def __init__(self, **kwargs):
