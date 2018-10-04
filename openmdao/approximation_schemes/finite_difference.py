@@ -84,8 +84,6 @@ class FiniteDifference(ApproximationScheme):
         A list of which derivatives (in execution order) to compute.
         The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
         and fd_options is a dictionary.
-    _approx_groups : list
-        A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
     """
 
     def __init__(self):

@@ -23,22 +23,6 @@ class BaseRecorder(object):
         Output to the recorder.
     _counter : int
         A global counter for execution order, used in iteration coordinate.
-    _filtered_driver : dict
-        Filtered subset of driver variables to record, based on includes/excludes.
-    _filtered_system_outputs_driver_recording : dict
-        Filtered subset of System outputs to record during Driver recording.
-    _filtered_solver : dict
-        Filtered subset of solver variables to record, based on includes/excludes.
-    _filtered_system : dict
-        Filtered subset of system variables to record, based on includes/excludes.
-    _desvars_values : dict
-        Driver desvar values, post-filtering, to be used by a derived recorder.
-    _responses_values : dict
-        Driver response values, post-filtering, to be used by a derived recorder.
-    _objectives_values : dict
-        Driver objectives values, post-filtering, to be used by a derived recorder.
-    _constraints_values : dict
-        Driver constraints values, post-filtering, to be used by a derived recorder.
     _inputs : dict
         System inputs values, post-filtering, to be used by a derived recorder.
     _outputs : dict

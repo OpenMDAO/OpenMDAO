@@ -81,6 +81,12 @@ class KSComp(ExplicitComponent):
     Component that aggregates a number of functions to a single value via the
     Kreisselmeier-Steinhauser Function. This new constraint is satisfied when it
     is less than or equal to zero.
+
+    Attributes
+    ----------
+    cite : str
+        Listing of relevant citations that should be referenced when publishing
+        work that uses this class.
     """
 
     def __init__(self, **kwargs):
