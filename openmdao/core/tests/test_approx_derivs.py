@@ -244,7 +244,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 3 outputs x 2 inputs
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
 
-    def test_arrray_comp(self):
+    def test_array_comp(self):
 
         class DoubleArrayFD(DoubleArrayComp):
 
@@ -867,8 +867,8 @@ class TestGroupComplexStep(unittest.TestCase):
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
-                          'test_arrray_comp_'+'_'.join(title(a) for a in p.args))
-    def test_arrray_comp(self, vec_class):
+                          'test_array_comp_'+'_'.join(title(a) for a in p.args))
+    def test_array_comp(self, vec_class):
 
         if not vec_class:
             raise unittest.SkipTest("PETSc is not installed")
@@ -998,6 +998,9 @@ class TestGroupComplexStep(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+        self.assertFalse(model._vectors['output']['linear']._alloc_complex,
+                         msg="Linear vector should not be allocated as complex.")
 
     def test_desvar_and_response_with_indices(self):
 
@@ -1454,10 +1457,10 @@ class TestComponentComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = NewtonSolver()
         prob.model.linear_solver = DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup(check=False, force_alloc_complex=True)
         prob.set_solver_print(level=0)
         prob.run_model()
 
