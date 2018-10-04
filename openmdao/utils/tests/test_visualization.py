@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-import matplotlib.pyplot as plt
+import matplotlib
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, partial_deriv_plot
 from openmdao.utils.assert_utils import assert_rel_error
@@ -12,13 +12,13 @@ from openmdao.utils.assert_utils import assert_rel_error
 class TestVisualization(unittest.TestCase):
 
     def setUp(self):
-        plt.switch_backend('Agg') # so not plots are actually drawn in interactive mode
+        matplotlib.use('Agg') # so not plots are actually drawn
 
     def test_partial_deriv_plot(self):
 
         class ArrayComp2D(ExplicitComponent):
             """
-            A fairly simple array component.
+            A fairly simple array component with an intentional error in compute_partials.
             """
             def setup(self):
                 self.JJ = np.array([[1.0, 0.0, 0.0, 7.0],
@@ -127,6 +127,99 @@ class TestVisualization(unittest.TestCase):
                                      title="tol greater than err")
         partial_deriv_plot('y1', 'x1', check_partials_data, tol=1e-10,
                                      title="tol less than err")
+
+
+class TestFeatureVisualization(unittest.TestCase):
+
+    def setUp(self):
+        matplotlib.use('Agg') # so not plots are actually drawn in interactive mode
+
+    def test_partial_deriv_plot(self):
+        class ArrayComp2D(ExplicitComponent):
+            """
+                    A fairly simple array component with an intentional error in compute_partials.
+            """
+            def setup(self):
+                self.JJ = np.array([[1.0, 0.0, 0.0, 7.0],
+                                    [0.0, 2.5, 0.0, 0.0],
+                                    [-1.0, 0.0, 8.0, 0.0],
+                                    [0.0, 4.0, 0.0, 6.0]])
+                # Params
+                self.add_input('x1', np.zeros([4]))
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                # create some error to force the diff plot to show something
+                error = np.zeros((4, 4))
+                err = 1e-7
+                error[0][3] = err
+                error[1][2] = - 2.0 * err
+                partials[('y1', 'x1')] = self.JJ + error
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        prob.setup(check=False, mode='fwd')
+        check_partials_data = prob.check_partials(out_stream=None)
+
+        # plot with defaults
+        partial_deriv_plot('y1', 'x1', check_partials_data, title="Defaults")
+
+    def test_partial_deriv_non_binary_plot(self):
+        class ArrayComp2D(ExplicitComponent):
+            """
+                    A fairly simple array component with an intentional error in compute_partials.
+            """
+            def setup(self):
+                self.JJ = np.array([[1.0, 0.0, 0.0, 7.0],
+                                    [0.0, 2.5, 0.0, 0.0],
+                                    [-1.0, 0.0, 8.0, 0.0],
+                                    [0.0, 4.0, 0.0, 6.0]])
+                # Params
+                self.add_input('x1', np.zeros([4]))
+                # Unknowns
+                self.add_output('y1', np.zeros([4]))
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.JJ.dot(inputs['x1'])
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                # create some error to force the diff plot to show something
+                error = np.zeros((4, 4))
+                err = 1e-7
+                error[0][3] = err
+                error[1][2] = - 2.0 * err
+                partials[('y1', 'x1')] = self.JJ + error
+
+        prob = Problem()
+        prob.model = model = Group()
+        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
+        model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
+        prob.setup(check=False, mode='fwd')
+        check_partials_data = prob.check_partials(out_stream=None)
+
+        # plot in non-binary mode
+        partial_deriv_plot('y1', 'x1', check_partials_data, binary = False, title="non-binary")
+
 
 if __name__ == "__main__":
 
