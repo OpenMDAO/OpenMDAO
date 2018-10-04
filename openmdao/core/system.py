@@ -83,8 +83,6 @@ class System(object):
         (i.e. among _subsystems_allprocs).
     _subsystems_proc_range : (int, int)
         List of ranges of each myproc subsystem's processors relative to those of this system.
-     _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
-        List of ranges of each myproc subsystem's allprocs variables relative to this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -373,6 +371,10 @@ class System(object):
         self._assembled_jac = None
 
         self._par_fd_id = 0
+
+        self._filtered_vars_to_record = {}
+        self._owning_rank = {}
+        self._lin_vec_names = []
 
     def _declare_options(self):
         """

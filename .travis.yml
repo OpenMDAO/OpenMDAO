@@ -2,6 +2,8 @@ branches:
   only:
   - master
 
+sudo: required
+
 group: deprecated-2017Q4
 
 filter_secrets: false
@@ -17,7 +19,7 @@ env:
     - PY=2.7 NUMPY=1.13 SCIPY=1.1 PETSc=3.8.1
     - PY=3.6 NUMPY=1.12 SCIPY=1.1
     - PY=3.6 NUMPY=1.14 SCIPY=1.0.1 PETSc=3.8.1 UPLOAD_DOCS=1
-    - PY=3.7 NUMPY=1.15.1 SCIPY=1.1 PETSc=3.9.1
+    - PY=3.7 NUMPY=1.15 SCIPY=1.1 PETSc=3.9.1
 
 git:
   depth: 99999
