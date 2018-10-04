@@ -143,7 +143,7 @@ class SimpleGADriver(Driver):
         super(SimpleGADriver, self)._setup_driver(problem)
 
         model_mpi = None
-        comm = self._problem().comm
+        comm = self._problem.comm
         if self._concurrent_pop_size > 0:
             model_mpi = (self._concurrent_pop_size, self._concurrent_color)
         elif not self.options['run_parallel']:
@@ -200,7 +200,7 @@ class SimpleGADriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        model = self._problem().model
+        model = self._problem.model
         ga = self._ga
 
         # Size design variables.
@@ -336,7 +336,7 @@ class SimpleGADriver(Driver):
         int
             Case number, used for identification when run in parallel.
         """
-        model = self._problem().model
+        model = self._problem.model
         success = 1
 
         objs = self.get_objective_values()

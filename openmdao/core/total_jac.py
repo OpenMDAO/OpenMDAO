@@ -11,7 +11,6 @@ from six import iteritems, itervalues
 from six.moves import zip
 import sys
 import time
-import weakref
 
 import numpy as np
 
@@ -57,7 +56,7 @@ class _TotalJacInfo(object):
         Dict of indices keyed to solution vectors.
     mode : str
         If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
-    model : weakref to <System>
+    model : <System>
         The top level System of the System tree.
     out_meta : dict
         Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
@@ -113,7 +112,7 @@ class _TotalJacInfo(object):
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
 
         model = problem.model
-        self.model = weakref.ref(model)
+        self.model = model
         self.comm = problem.comm
         self.mode = problem._mode
         self.owning_ranks = problem.model._owning_rank
@@ -284,7 +283,7 @@ class _TotalJacInfo(object):
     def _compute_jac_scatters(self, mode, size, has_remote_vars):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
-        model = self.model()
+        model = self.model
 
         if self.comm.size > 1 or (model._full_comm is not None and
                                   model._full_comm.size > 1):
@@ -328,7 +327,7 @@ class _TotalJacInfo(object):
         of_set = frozenset(self.of)
         wrt_set = frozenset(self.wrt)
 
-        model = self.model()
+        model = self.model
 
         # Initialization based on driver (or user) -requested "of" and "wrt".
         if not model._owns_approx_jac or model._owns_approx_of != of_set \
@@ -419,7 +418,7 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         owning_ranks = self.owning_ranks
-        model = self.model()
+        model = self.model
         relevant = model._relevant
         has_par_deriv_color = False
         abs2meta = model._var_allprocs_abs2meta
@@ -613,7 +612,7 @@ class _TotalJacInfo(object):
         """
         idxs = {}
         jac_idxs = {}
-        model = self.model()
+        model = self.model
         myproc = model.comm.rank
         owners = model._owning_rank
         fwd = mode == 'fwd'
@@ -858,7 +857,7 @@ class _TotalJacInfo(object):
         yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, None
 
     def _zero_vecs(self, vecname, mode):
-        vecs = self.model()._vectors
+        vecs = self.model._vectors
 
         # clean out vectors from last solve
         vecs['output'][vecname]._data[:] = 0.0
@@ -1240,7 +1239,7 @@ class _TotalJacInfo(object):
 
         has_lin_cons = self.has_lin_cons
 
-        model = self.model()
+        model = self.model
         vec_dinput = model._vectors['input']
         vec_doutput = model._vectors['output']
         vec_dresid = model._vectors['residual']
@@ -1319,7 +1318,7 @@ class _TotalJacInfo(object):
         """
         of = self.of
         wrt = self.wrt
-        model = self.model()
+        model = self.model
         return_format = self.return_format
 
         # Prepare model for calculation by cleaning out the derivatives

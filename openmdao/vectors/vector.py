@@ -2,7 +2,6 @@
 from __future__ import division, print_function
 
 import os
-import weakref
 import numpy as np
 from six import iteritems, PY3
 
@@ -124,7 +123,7 @@ class Vector(object):
         self._icol = None
         self._relevant = relevant
 
-        self._system = weakref.ref(system)
+        self._system = system
 
         self._iproc = system.comm.rank
         self._views = {}
@@ -208,7 +207,7 @@ class Vector(object):
         <Vector>
             instance of the clone; the data is copied.
         """
-        vec = self.__class__(self._name, self._kind, self._system(), self._root_vector,
+        vec = self.__class__(self._name, self._kind, self._system, self._root_vector,
                              alloc_complex=self._alloc_complex, ncol=self._ncol)
         vec._clone_data()
         if initialize_views:
@@ -235,7 +234,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        system = self._system()
+        system = self._system
         path = system.pathname
         idx = len(path) + 1 if path else 0
 
@@ -255,7 +254,7 @@ class Vector(object):
         boolean
             True or False.
         """
-        return name2abs_name(self._system(), name, self._names, self._typ) is not None
+        return name2abs_name(self._system, name, self._names, self._typ) is not None
 
     def __getitem__(self, name):
         """
@@ -271,7 +270,7 @@ class Vector(object):
         float or ndarray
             variable value (not scaled, not dimensionless).
         """
-        abs_name = name2abs_name(self._system(), name, self._names, self._typ)
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self._icol is None:
                 return self._views[abs_name]
@@ -292,7 +291,7 @@ class Vector(object):
         value : float or list or tuple or ndarray
             variable value to set (not scaled, not dimensionless)
         """
-        abs_name = name2abs_name(self._system(), name, self._names, self._typ)
+        abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
             if self.read_only:
                 msg = "Attempt to set value of '{}' in {} vector when it is read only."
@@ -541,7 +540,7 @@ class Vector(object):
         """
         Print the names and values of all variables in this vector, one per line.
         """
-        abs2prom = self._system()._var_abs2prom[self._typ]
+        abs2prom = self._system._var_abs2prom[self._typ]
         print('-' * 35)
         print('   Vector %s, type %s' % (self._name, self._typ))
         for abs_name, view in iteritems(self._views):

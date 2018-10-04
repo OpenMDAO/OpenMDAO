@@ -292,7 +292,7 @@ class SqliteRecorder(BaseRecorder):
 
         # grab the system
         if isinstance(recording_requester, Driver):
-            system = recording_requester._problem().model
+            system = recording_requester._problem.model
         elif isinstance(recording_requester, System):
             system = recording_requester
         elif isinstance(recording_requester, Problem):

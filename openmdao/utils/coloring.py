@@ -1075,7 +1075,7 @@ def dynamic_sparsity(driver):
     driver : <Driver>
         The driver performing the optimization.
     """
-    problem = driver._problem()
+    problem = driver._problem
     if not problem.model._use_derivatives:
         simple_warning("Derivatives have been turned off. Skipping dynamic sparsity computation.")
         return
@@ -1106,7 +1106,7 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
     show_jac : bool
         If True, display a visualization of the colored jacobian.
     """
-    problem = driver._problem()
+    problem = driver._problem
     if not problem.model._use_derivatives:
         simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
         return

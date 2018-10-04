@@ -50,30 +50,30 @@ class PETScVector(DefaultVector):
 
         if self._ncol == 1:
             if self._alloc_complex:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
             else:
-                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
         else:
             # for now the petsc array is only the size of one column and we do separate
             # transfers for each column.
             if data.size == 0:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system.comm)
             else:
                 self._petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                          comm=self._system().comm)
+                                                          comm=self._system.comm)
 
         # Allocate imaginary for complex step
         if self._alloc_complex:
             data = self._cplx_data.imag
             if self._ncol == 1:
-                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system.comm)
             else:
                 if data.size == 0:
                     self._imag_petsc = PETSc.Vec().createWithArray(data.copy(),
-                                                                   comm=self._system().comm)
+                                                                   comm=self._system.comm)
                 else:
                     self._imag_petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                                   comm=self._system().comm)
+                                                                   comm=self._system.comm)
 
     def get_norm(self):
         """
@@ -84,4 +84,4 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        return self._system().comm.allreduce(np.sum(self._data.real**2)) ** 0.5
+        return self._system.comm.allreduce(np.sum(self._data.real**2)) ** 0.5

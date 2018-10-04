@@ -33,7 +33,7 @@ class AEDriver(Driver):
         Just handle it and return an error state.
         """
         try:
-            failure_flag, _, _ = self._problem().model._solve_nonlinear()
+            failure_flag, _, _ = self._problem.model._solve_nonlinear()
         except AnalysisError:
             return True
 

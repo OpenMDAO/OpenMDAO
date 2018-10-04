@@ -33,14 +33,14 @@ class DefaultVector(Vector):
             zeros array of correct size to hold all of this vector's variables.
         """
         ncol = self._ncol
-        size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
+        size = np.sum(self._system._var_sizes[self._name][self._typ][self._iproc, :])
         return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
 
     def _update_root_data(self):
         """
         Resize the root data if necesary (i.e., due to reconfiguration).
         """
-        system = self._system()
+        system = self._system
         type_ = self._typ
         vec_name = self._name
         iproc = self._iproc
@@ -83,7 +83,7 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size.
         """
-        system = self._system()
+        system = self._system
         type_ = self._typ
         iproc = self._iproc
         root_vec = self._root_vector
@@ -135,7 +135,7 @@ class DefaultVector(Vector):
                     self._scaling['norm'] = (np.zeros(data.size), np.ones(data.size))
                 elif self._name == 'linear':
                     # reuse the nonlinear scaling vecs since they're the same as ours
-                    nlvec = self._system()._root_vecs[self._kind]['nonlinear']
+                    nlvec = self._system._root_vecs[self._kind]['nonlinear']
                     self._scaling['phys'] = (None, nlvec._scaling['phys'][1])
                     self._scaling['norm'] = (None, nlvec._scaling['norm'][1])
                 else:
@@ -157,7 +157,7 @@ class DefaultVector(Vector):
         _views
         _views_flat
         """
-        system = self._system()
+        system = self._system
         type_ = self._typ
         kind = self._kind
         iproc = self._iproc

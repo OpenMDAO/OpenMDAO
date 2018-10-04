@@ -7,7 +7,6 @@ from collections import OrderedDict
 import pprint
 import sys
 import warnings
-import weakref
 
 from six import iteritems, itervalues, string_types
 
@@ -249,7 +248,7 @@ class Driver(object):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        self._problem = weakref.ref(problem)
+        self._problem = problem
         model = problem.model
         mode = problem._mode
 
@@ -309,7 +308,7 @@ class Driver(object):
         """
         Set up case recording.
         """
-        problem = self._problem()
+        problem = self._problem
         model = problem.model
 
         mydesvars = myobjectives = myconstraints = myresponses = set()
@@ -367,7 +366,7 @@ class Driver(object):
                                                            all_constraints)
 
         if rec_inputs:
-            prob = self._problem()
+            prob = self._problem
             root = prob.model
             myinputs = {n for n in root._inputs
                         if check_path(n, incl, excl)}
@@ -441,7 +440,7 @@ class Driver(object):
         float or ndarray
             The value of the named variable of interest.
         """
-        model = self._problem().model
+        model = self._problem.model
         comm = model.comm
         vec = model._outputs._views_flat
         indices = meta['indices']
@@ -517,7 +516,7 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
-        problem = self._problem()
+        problem = self._problem
 
         if (name in self._remote_dvs and
                 problem.model._owning_rank[name] != problem.comm.rank):
@@ -704,7 +703,7 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            failure_flag, _, _ = self._problem().model._solve_nonlinear()
+            failure_flag, _, _ = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
         return failure_flag
@@ -735,7 +734,7 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        problem = self._problem()
+        problem = self._problem
         total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
                                                                    MPI.COMM_WORLD.rank == 0)
@@ -818,7 +817,7 @@ class Driver(object):
         con_vars = {name: con_vars[name] for name in filt['con']}
         # res_vars = {name: res_vars[name] for name in filt['res']}
 
-        model = self._problem().model
+        model = self._problem.model
 
         names = model._outputs._names
         views = model._outputs._views
@@ -1000,7 +999,7 @@ class Driver(object):
         if not coloring_mod._use_sparsity:
             return
 
-        problem = self._problem()
+        problem = self._problem
         if not problem.model._use_derivatives:
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
