@@ -711,6 +711,17 @@ class NonlinearSolver(Solver):
         """
         return self._system._residuals.get_norm()
 
+    def _disallow_discrete_outputs(self):
+        """
+        Raise an exception if any discrete outputs exist in our System.
+        """
+        system = self._system
+
+        if system._var_allprocs_discrete['output']:
+            raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
+                               (system.pathname, type(self).__name__,
+                                sorted(system._var_allprocs_discrete['output'])))
+
 
 class LinearSolver(Solver):
     """

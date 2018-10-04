@@ -131,10 +131,11 @@ def format_nan_error(system, matrix):
     # Because of how we built the matrix, a NaN in a comp cause the whole row to be NaN, so we
     # need to associate each index with a variable.
     varname = []
+    all_vars = system._var_allprocs_abs_names['output']
     varsizes = system._var_sizes['nonlinear']['output']
     for row in rows:
         n = 0
-        for j, name in enumerate(system._var_allprocs_abs_names['output']):
+        for j, name in enumerate(all_vars):
             n += varsizes[system._owning_rank[name]][j]
             if row < n:
                 relname = system._var_abs2prom['output'][name]

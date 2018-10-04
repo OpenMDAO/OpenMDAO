@@ -108,6 +108,10 @@ class System(object):
         Dictionary of discrete var metadata and values local to this process.
     _var_allprocs_discrete : dict
         Dictionary of discrete var metadata and values for all processes.
+    _discrete_inputs : dict-like or None
+        Storage for discrete input values.
+    _discrete_outputs : dict-like or None
+        Storage for discrete output values.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.

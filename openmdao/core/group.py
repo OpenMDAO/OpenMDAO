@@ -69,6 +69,8 @@ class Group(System):
         or isub can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata
         Key is system pathname or None for the full, simultaneous transfer.
+    _loc_subsys_map : dict
+        Mapping of local subsystem names to their corresponding System.
     """
 
     def __init__(self, **kwargs):

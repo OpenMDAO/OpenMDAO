@@ -799,54 +799,6 @@ class TestNewton(unittest.TestCase):
         J = prob.compute_totals()
         assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
 
-    def test_discrete_err(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        proms = ['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2']
-        sub = model.add_subsystem('sub', Group(), promotes=proms)
-
-        subgrp = sub.add_subsystem('state_eq_group', Group(),
-                                   promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
-        subgrp.linear_solver = ScipyKrylov()
-        subgrp.add_subsystem('state_eq', StateConnection())
-
-        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
-        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1'])
-
-        model.connect('state_eq.y2_command', 'd1.y2')
-        model.connect('d2.y2', 'state_eq.y2_actual')
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                           promotes=['x', 'z', 'y1', 'obj'])
-        model.connect('d2.y2', 'obj_cmp.y2')
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
-
-        # splice a group containing discrete vars into the model
-        model.add_subsystem('discrete_g', InternalDiscreteGroup())
-        model.connect('d2.y2', 'discrete_g.x')
-        model.connect('discrete_g.y', 'con_cmp2.y2')
-
-        model.nonlinear_solver = NewtonSolver()
-
-        # The good solver
-        model.nonlinear_solver.linear_solver = DirectSolver()
-
-        prob.set_solver_print(level=0)
-        prob.setup(check=False)
-
-        with self.assertRaises(Exception) as ctx:
-            prob.run_model()
-
-        self.assertEqual(str(ctx.exception),
-                         "System '' has a Newton solver and contains discrete outputs ['discrete_g.C1.y'].")
-
 
 class TestNewtonFeatures(unittest.TestCase):
 

@@ -148,6 +148,8 @@ class BroydenSolver(NonlinearSolver):
         self._recompute_jacobian = True
         self._computed_jacobians = 0
 
+        self._disallow_discrete_outputs()
+
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system, self._depth + 1)
         else:
