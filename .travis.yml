@@ -2,7 +2,7 @@ branches:
   only:
   - master
 
-sudo: required
+sudo: false
 
 group: deprecated-2017Q4
 
