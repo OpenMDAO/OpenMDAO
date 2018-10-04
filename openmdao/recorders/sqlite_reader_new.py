@@ -465,8 +465,22 @@ class SqliteCaseReader(BaseCaseReader):
         elif source == 'driver':
             if not recurse:
                 return self._driver_cases.list_cases()
+            elif flat:
+                ret = []
+                system_cases = self._system_cases.list_cases()
+                solver_cases = self._solver_cases.list_cases()
+                driver_cases = self._driver_cases.list_cases()
+                for driver_coord in driver_cases:
+                    for system_coord in system_cases:
+                        if system_coord.startswith(driver_coord):
+                            ret.append(system_coord)
+                    for solver_coord in solver_cases:
+                        if solver_coord.startswith(driver_coord):
+                            ret.append(solver_coord)
+                    ret.append(driver_coord)
+                return ret
             else:
-                raise RuntimeError('TODO: recurse on list_cases(source=driver)')
+                raise RuntimeError('TODO: Hierarchical recursive driver case list')
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -529,8 +543,8 @@ class SqliteCaseReader(BaseCaseReader):
                 yield self._solver_cases.get_case(case_id)
 
         else:
+            # source is driver with recurse=True or an iteration coordinate
             if source == 'driver':
-                # return driver cases and recurse to child cases
                 iter_coord = ''
             else:
                 iter_coord = source
@@ -1054,8 +1068,8 @@ class CaseTable(object):
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
             cur.execute("SELECT * FROM %s ORDER BY id ASC" % self._table_name)
-            rows = cur.fetchall()
-            for row in rows:
+            # rows = cur.fetchall()
+            for row in cur:
                 case = self._extract_case_from_row(row)
                 if cache:
                     self._cases[case.iteration_coordinate] = case

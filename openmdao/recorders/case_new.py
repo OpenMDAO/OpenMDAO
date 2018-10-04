@@ -148,7 +148,7 @@ class Case(object):
         str
             String representation of the case.
         """
-        return str(self.iteration_coordinate + ': ' + str(self.outputs))
+        return ' '.join([self.source, self.iteration_coordinate, str(self.outputs)])
 
     def get_design_vars(self, scaled=True, use_indices=True):
         """
