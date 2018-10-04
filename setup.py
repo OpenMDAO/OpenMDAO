@@ -104,8 +104,7 @@ setup(
         'mock',
         'requests_mock',
         'tornado',
-        'pyDOE2',
-        'matplotlib'
+        'pyDOE2'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""

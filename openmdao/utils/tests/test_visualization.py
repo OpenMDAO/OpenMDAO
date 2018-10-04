@@ -4,15 +4,19 @@ import unittest
 
 import numpy as np
 
-import matplotlib
+try:
+    import matplotlib
+except ImportError:
+    matplotlib = None
 
 from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, partial_deriv_plot
 from openmdao.utils.assert_utils import assert_rel_error
 
+@unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestVisualization(unittest.TestCase):
 
     def setUp(self):
-        matplotlib.use('Agg') # so not plots are actually drawn
+        matplotlib.use('Agg') # so no plots are actually drawn
 
     def test_partial_deriv_plot(self):
 
@@ -129,10 +133,11 @@ class TestVisualization(unittest.TestCase):
                                      title="tol less than err")
 
 
+@unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestFeatureVisualization(unittest.TestCase):
 
     def setUp(self):
-        matplotlib.use('Agg') # so not plots are actually drawn in interactive mode
+        matplotlib.use('Agg') # so no plots are actually drawn in interactive mode
 
     def test_partial_deriv_plot(self):
         import numpy as np
