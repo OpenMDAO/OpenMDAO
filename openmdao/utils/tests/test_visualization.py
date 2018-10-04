@@ -135,9 +135,11 @@ class TestFeatureVisualization(unittest.TestCase):
         matplotlib.use('Agg') # so not plots are actually drawn in interactive mode
 
     def test_partial_deriv_plot(self):
+        import numpy as np
+        from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
         class ArrayComp2D(ExplicitComponent):
             """
-                    A fairly simple array component with an intentional error in compute_partials.
+            A fairly simple array component with an intentional error in compute_partials.
             """
             def setup(self):
                 self.JJ = np.array([[1.0, 0.0, 0.0, 7.0],
@@ -175,12 +177,14 @@ class TestFeatureVisualization(unittest.TestCase):
         check_partials_data = prob.check_partials(out_stream=None)
 
         # plot with defaults
-        partial_deriv_plot('y1', 'x1', check_partials_data, title="Defaults")
+        partial_deriv_plot('y1', 'x1', check_partials_data)
 
     def test_partial_deriv_non_binary_plot(self):
+        import numpy as np
+        from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
         class ArrayComp2D(ExplicitComponent):
             """
-                    A fairly simple array component with an intentional error in compute_partials.
+            A fairly simple array component with an intentional error in compute_partials.
             """
             def setup(self):
                 self.JJ = np.array([[1.0, 0.0, 0.0, 7.0],
@@ -218,7 +222,7 @@ class TestFeatureVisualization(unittest.TestCase):
         check_partials_data = prob.check_partials(out_stream=None)
 
         # plot in non-binary mode
-        partial_deriv_plot('y1', 'x1', check_partials_data, binary = False, title="non-binary")
+        partial_deriv_plot('y1', 'x1', check_partials_data, binary = False)
 
 
 if __name__ == "__main__":

@@ -171,12 +171,12 @@ Plotting Check Partials Results
 -------------------------------
 
 The function :code:`partial_deriv_plot` lets you see a visual representation of the values
-returned by :code:`check_partials` .
+returned by :code:`check_partials`.
 
 .. autofunction:: openmdao.utils.visualization.partial_deriv_plot
     :noindex:
 
-Here is an example of its use. Note that in this example, the :code:`compute_partials` method intentionally
+Here are two examples of its use. Note that in these examples, the :code:`compute_partials` method intentionally
 computes the incorrect value so that the plots show how this function can be used to detect such errors.
 
 With the default value :code:`binary` equal to :code:`True`, the plots
