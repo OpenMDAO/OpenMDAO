@@ -33,9 +33,6 @@ class BroydenSolver(NonlinearSolver):
 
     Attributes
     ----------
-    cite : str
-        Listing of relevant citataions that should be referenced when
-        publishing work that uses this class.
     delta_fxm : ndarray
         Most recent change in residual vector.
     delta_xm : ndarray
