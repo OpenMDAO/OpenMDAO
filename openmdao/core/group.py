@@ -68,8 +68,7 @@ class Group(System):
         mode is 'fwd' or 'rev' and isub is the subsystem index among allprocs subsystems
         or isub can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata
-        Key is (mode, pathname) where mode is 'fwd' or 'rev' and pathname is the
-        subsystem pathname, or pathname can be None for the full, simultaneous transfer.
+        Key is system pathname or None for the full, simultaneous transfer.
     """
 
     def __init__(self, **kwargs):
@@ -546,8 +545,6 @@ class Group(System):
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
 
-        # prefix = self.pathname + '.' if self.pathname else ''
-
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -718,7 +715,7 @@ class Group(System):
                             owns[name] = rank
                             break
 
-                if self._var_discrete[type_]:
+                if self._var_allprocs_discrete[type_]:
                     local = list(self._var_discrete[type_])
                     for i, names in enumerate(self.comm.allgather(local)):
                         for n in names:
@@ -1183,7 +1180,7 @@ class Group(System):
 
     def _discrete_transfer(self, isub):
         """
-        Perform a discrete vector transfer.  This only occurs in fwd mode.
+        Transfer discrete variables between components.  This only occurs in fwd mode.
 
         Parameters
         ----------
@@ -1207,22 +1204,22 @@ class Group(System):
 
         else:  # MPI
             iproc = comm.rank
-            allprocs_recv = self._allprocs_discrete_recv
+            allprocs_recv = self._allprocs_discrete_recv[key]
             discrete_out = self._var_discrete['output']
             if key in self._discrete_transfers:
-                xfers, send, recv = self._discrete_transfers[key]
-                if send or recv:
-                    sendvars = [(n, discrete_out[n]['value']) for n in send]
+                xfers, remote_send = self._discrete_transfers[key]
+                if allprocs_recv:
+                    sendvars = [(n, discrete_out[n]['value']) for n in remote_send]
                     allprocs_send = comm.gather(sendvars, root=0)
                     if comm.rank == 0:
                         allprocs_dict = {}
                         for i in range(comm.size):
                             allprocs_dict.update(allprocs_send[i])
                         recvs = [{} for i in range(comm.size)]
-                        for r, ranks in iteritems(allprocs_recv[key]):
-                            val = allprocs_dict[r]
+                        for rname, ranks in iteritems(allprocs_recv):
+                            val = allprocs_dict[rname]
                             for i in ranks:
-                                recvs[i][r] = val
+                                recvs[i][rname] = val
                         data = comm.scatter(recvs, root=0)
                     else:
                         data = comm.scatter(None, root=0)

@@ -439,18 +439,18 @@ class Component(System):
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
-            var_rel2data_io = self._static_var_rel2meta
+            var_rel2meta = self._static_var_rel2meta
             var_rel_names = self._static_var_rel_names
         else:
-            var_rel2data_io = self._var_rel2meta
+            var_rel2meta = self._var_rel2meta
             var_rel_names = self._var_rel_names
 
         # Disallow dupes
-        if name in var_rel2data_io:
+        if name in var_rel2meta:
             msg = "Variable name '{}' already exists.".format(name)
             raise ValueError(msg)
 
-        var_rel2data_io[name] = metadata
+        var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
 
         return metadata
@@ -479,24 +479,23 @@ class Component(System):
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
 
-        metadata = {}
-
-        # value, shape: based on args, making sure they are compatible
-        metadata['value'] = val
-        metadata['type'] = type(val)
-        metadata['desc'] = desc
+        metadata = {
+            'value': val,
+            'type': type(val),
+            'desc': desc,
+        }
 
         if self._static_mode:
-            var_rel2data_io = self._static_var_rel2meta
+            var_rel2meta = self._static_var_rel2meta
         else:
-            var_rel2data_io = self._var_rel2meta
+            var_rel2meta = self._var_rel2meta
 
         # Disallow dupes
-        if name in var_rel2data_io:
+        if name in var_rel2meta:
             msg = "Variable name '{}' already exists.".format(name)
             raise ValueError(msg)
 
-        var_rel2data_io[name] = self._var_discrete['input'][name] = metadata
+        var_rel2meta[name] = self._var_discrete['input'][name] = metadata
 
         return metadata
 
@@ -642,18 +641,18 @@ class Component(System):
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
-            var_rel2data_io = self._static_var_rel2meta
+            var_rel2meta = self._static_var_rel2meta
             var_rel_names = self._static_var_rel_names
         else:
-            var_rel2data_io = self._var_rel2meta
+            var_rel2meta = self._var_rel2meta
             var_rel_names = self._var_rel_names
 
         # Disallow dupes
-        if name in var_rel2data_io:
+        if name in var_rel2meta:
             msg = "Variable name '{}' already exists.".format(name)
             raise ValueError(msg)
 
-        var_rel2data_io[name] = metadata
+        var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
 
         return metadata
@@ -689,16 +688,16 @@ class Component(System):
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
-            var_rel2data_io = self._static_var_rel2meta
+            var_rel2meta = self._static_var_rel2meta
         else:
-            var_rel2data_io = self._var_rel2meta
+            var_rel2meta = self._var_rel2meta
 
         # Disallow dupes
-        if name in var_rel2data_io:
+        if name in var_rel2meta:
             msg = "Variable name '{}' already exists.".format(name)
             raise ValueError(msg)
 
-        var_rel2data_io[name] = self._var_discrete['output'][name] = metadata
+        var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
         return metadata
 

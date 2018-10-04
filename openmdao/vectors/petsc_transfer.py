@@ -268,9 +268,10 @@ class PETScTransfer(DefaultTransfer):
         total_send = total_send.intersection(allprocs_recv)
 
         for tgt_sys in transfers:
-            xfers, send, recv = transfers[tgt_sys]
-            # update send list to remove any vars that don't have a remote receiver.
-            transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]), recv)
+            xfers, send, _ = transfers[tgt_sys]
+            # update send list to remove any vars that don't have a remote receiver,
+            # and get rid of recv list because allprocs_recv has the necessary info.
+            transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]))
 
     def _initialize_transfer(self, in_vec, out_vec):
         """
