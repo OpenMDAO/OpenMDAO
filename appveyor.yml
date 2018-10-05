@@ -4,8 +4,8 @@ image:
 
 environment:
   matrix:
-    - PY=2.7 NUMPY=1.13 SCIPY=1.1 PETSc=3.8.1
-    - PY=3.6 NUMPY=1.14 SCIPY=1.0.1 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY:2.7, NUMPY: 1.13, SCIPY: 1.1, PETSc: 3.8.1
+    - PY: 3.6, NUMPY: 1.14, SCIPY: 1.0.1, PETSc: 3.8.1, UPLOAD_DOCS: 1
 
 install:
   -if ($isLinux) {
