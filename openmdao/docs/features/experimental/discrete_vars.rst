@@ -7,10 +7,7 @@ Discrete Variables
 
 There may be times when it's necessary to pass variables that are not floats or float arrays
 between components.  These variables can be declared as discrete variables.  A discrete variable
-can be any picklable python object.  It must be picklable in order to pass it between processes under
-MPI.  If you never intend to use MPI with your model, you could get away with using
-unpicklable discrete variables, but this isn't recommended, since it's difficult to know with
-certainty that a given component will never be reused in an MPI context in the future.
+can be any picklable python object.
 
 In explicit and implicit components, the user must call :code:`add_discrete_input` and
 :code:`add_discrete_output` to declare discrete variables in the :code:`setup` method.
