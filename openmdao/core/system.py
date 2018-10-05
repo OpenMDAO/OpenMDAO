@@ -102,6 +102,14 @@ class System(object):
         ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+    _var_discrete : dict
+        Dictionary of discrete var metadata and values local to this process.
+    _var_allprocs_discrete : dict
+        Dictionary of discrete var metadata and values for all processes.
+    _discrete_inputs : dict-like or None
+        Storage for discrete input values.
+    _discrete_outputs : dict-like or None
+        Storage for discrete output values.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
@@ -294,6 +302,8 @@ class System(object):
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {}
 
@@ -1261,7 +1271,7 @@ class System(object):
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
-            asm_jac._initialize()
+            asm_jac._initialize(self)
             asm_jac._init_view(self)
 
     def set_initial_values(self):
@@ -1599,21 +1609,6 @@ class System(object):
                 offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
-
-    @contextmanager
-    def jacobian_context(self, jac):
-        """
-        Context manager that yields the Jacobian assigned to this system in this system's context.
-
-        Yields
-        ------
-        <Jacobian>
-            The current system's jacobian with its _system set to self.
-        """
-        oldsys = jac._system
-        jac._system = self
-        yield jac
-        jac._system = oldsys
 
     @property
     def nonlinear_solver(self):
@@ -2206,7 +2201,10 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if name in abs2idx:
+                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    else:
+                        out[name]['size'] = 0  # discrete var, don't know size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2258,7 +2256,10 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if name in abs2idx:
+                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    else:
+                        out[name]['size'] = 0  # discrete var, we don't know the size
 
         if recurse:
             for subsys in self._subsystems_myproc:

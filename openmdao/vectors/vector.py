@@ -162,7 +162,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[name][self._typ][self._iproc, :])
+        self._length = np.sum(system._var_sizes[name][self._typ][self._iproc, :])
 
         self.read_only = False
 
@@ -232,10 +232,11 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        path = self._system.pathname
+        system = self._system
+        path = system.pathname
         idx = len(path) + 1 if path else 0
 
-        return (n[idx:] for n in self._system._var_abs_names[self._typ] if n in self._names)
+        return (n[idx:] for n in system._var_abs_names[self._typ] if n in self._names)
 
     def __contains__(self, name):
         """

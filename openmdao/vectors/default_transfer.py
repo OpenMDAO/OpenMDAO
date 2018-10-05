@@ -3,6 +3,7 @@
 from __future__ import division
 
 from itertools import product, chain
+from collections import defaultdict
 from six import iteritems, itervalues
 
 import numpy as np
@@ -171,6 +172,28 @@ class DefaultTransfer(Transfer):
 
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
+
+    @staticmethod
+    def _setup_discrete_transfers(group, recurse=True):
+        """
+        Compute all transfers that are owned by our parent group.
+
+        Parameters
+        ----------
+        group : <Group>
+            Parent group.
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        group._discrete_transfers = transfers = defaultdict(list)
+        offset = len(group.pathname) + 1 if group.pathname else 0
+
+        for tgt, src in iteritems(group._conn_discrete_in2out):
+            src_sys, src_var = src[offset:].split('.', 1)
+            tgt_sys, tgt_var = tgt[offset:].split('.', 1)
+            xfer = (src_sys, src_var, tgt_sys, tgt_var)
+            transfers[tgt_sys].append(xfer)
+            transfers[None].append(xfer)
 
     def _initialize_transfer(self, in_vec, out_vec):
         """
