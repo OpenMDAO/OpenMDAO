@@ -1080,11 +1080,6 @@ class _TotalJacInfo(object):
 
         # PETScVector
         else:
-
-            if self.output_vec[mode][vecname]._alloc_complex:
-                solution = self.soln_petsc[mode][vecname]
-                solution[0].array = solution[1]
-
             self.jac_petsc[mode].array[:] = 0.
             scatter.scatter(self.soln_petsc[mode][vecname][0],
                             self.jac_petsc[mode], addv=False, mode=False)
