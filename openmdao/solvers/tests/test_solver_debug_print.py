@@ -2,8 +2,11 @@
 
 from __future__ import division, print_function
 
+from six import StringIO
+
 import os
 import re
+import sys
 import shutil
 import tempfile
 
@@ -12,9 +15,9 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.core.problem import Problem
-from openmdao.core.indepvarcomp import IndepVarComp
+from openmdao.api import Problem, IndepVarComp, ExecComp, Group, BalanceComp
 
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
@@ -173,6 +176,53 @@ class TestNonlinearSolvers(unittest.TestCase):
         with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
+    def test_debug_after_raised_error(self):
+        prob = Problem()
+        model = prob.model
+
+        comp = IndepVarComp()
+        comp.add_output('dXdt:TAS', val=1.0)
+        comp.add_output('accel_target', val=2.0)
+        model.add_subsystem('des_vars', comp, promotes=['*'])
+
+        teg = model.add_subsystem('thrust_equilibrium_group', subsys=Group())
+        teg.add_subsystem('dynamics', ExecComp('z = 2.0*thrust'), promotes=['*'])
+
+        thrust_bal = BalanceComp()
+        thrust_bal.add_balance(name='thrust', val=1207.1, lhs_name='dXdt:TAS',
+                               rhs_name='accel_target', eq_units='m/s**2', lower=-10.0, upper=10000.0)
+
+        teg.add_subsystem(name='thrust_bal', subsys=thrust_bal,
+                          promotes_inputs=['dXdt:TAS', 'accel_target'],
+                          promotes_outputs=['thrust'])
+
+        teg.linear_solver = DirectSolver()
+
+        teg.nonlinear_solver = NewtonSolver()
+        teg.nonlinear_solver.options['solve_subsystems'] = True
+        teg.nonlinear_solver.options['max_sub_solves'] = 1
+        teg.nonlinear_solver.options['atol'] = 1e-4
+        teg.nonlinear_solver.options['debug_print'] = True
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        sys.stdout = stdout
+
+        output = strout.getvalue()
+        target = "'thrust_equilibrium_group.thrust_bal.thrust'"
+        self.assertTrue( target in output, msg=target + "NOT FOUND IN" + output)
+
+        # Make sure exception is unchanged.
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
+        self.assertEqual(expected_msg, str(cm.exception))
 
 if __name__ == "__main__":
     unittest.main()

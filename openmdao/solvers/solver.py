@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-from six import iteritems
+from six import iteritems, reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -614,7 +614,13 @@ class NonlinearSolver(Solver):
         float
             relative error.
         """
-        fail, abs_err, rel_err = self._run_iterator()
+        raised = False
+        try:
+            fail, abs_err, rel_err = self._run_iterator()
+        except Exception:
+            fail = True
+            raised = True
+            exc = sys.exc_info()
 
         if fail and self.options['debug_print']:
             coord = recording_iteration.get_formatted_iteration_coordinate()
@@ -635,6 +641,9 @@ class NonlinearSolver(Solver):
                 print("Inputs and outputs at start of iteration have been "
                       "saved to '%s'." % filename)
                 sys.stdout.flush()
+
+        if raised:
+            reraise(*exc)
 
         return fail, abs_err, rel_err
 
