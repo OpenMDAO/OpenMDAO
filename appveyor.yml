@@ -15,45 +15,38 @@ environment:
       UPLOAD_DOCS: 1
 
 install:
-  -if ($isLinux) {
-      echo "Building python environment...";
-      wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
-      chmod +x miniconda.sh;
-      ./miniconda.sh -b  -p $HOME/miniconda;
-      export PATH=$HOME/miniconda/bin:$PATH;
+    echo "Building python environment...";
+    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p $HOME/miniconda;
+    export PATH=$HOME/miniconda/bin:$PATH;
 
-      conda create --yes -n PY$PY python=$PY;
-      source $HOME/miniconda/bin/activate PY$PY;
+    conda create --yes -n PY$PY python=$PY;
+    source $HOME/miniconda/bin/activate PY$PY;
 
-      conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
 
-      pip install --upgrade pip;
-      pip install redbaron;
-      pip install git+https://github.com/OpenMDAO/testflo.git;
-      pip install coverage;
-      pip install git+https://github.com/swryan/coveralls-python@work;
+    pip install --upgrade pip;
+    pip install redbaron;
+    pip install git+https://github.com/OpenMDAO/testflo.git;
+    pip install coverage;
+    pip install git+https://github.com/swryan/coveralls-python@work;
 
-      git clone https://github.com/OpenMDAO/pyoptsparse.git;
-      cd pyoptsparse;
+    git clone https://github.com/OpenMDAO/pyoptsparse.git;
+    cd pyoptsparse;
 
-      if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
-        cd pyoptsparse/pySNOPT;
-        scp -r "$SNOPT_LOCATION" .;
-        cd ../..;
-      fi
+    python setup.py install;
+    cd ..;
 
-      python setup.py install;
-      cd ..;
+    if [ "$PETSc" ]; then
+      pip install mpi4py petsc4py==$PETSc;
+    fi
 
-      if [ "$PETSc" ]; then
-        pip install mpi4py petsc4py==$PETSc;
-      fi
+    conda install --yes matplotlib;
+    fi
 
-      conda install --yes matplotlib;
-      fi
+    pip install .;
+    conda list
 
-      pip install .;
-      conda list
-  }
 test_script:
   - testflo . -n 1
