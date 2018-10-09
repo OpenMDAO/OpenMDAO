@@ -149,6 +149,10 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
+        if system.under_complex_step:
+            msg = "Nested Complex Step is not supported in system '%s'" % system.pathname
+            raise RuntimeError(msg)
+
         if len(self._exec_list) == 0:
             return
 
