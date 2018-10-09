@@ -54,5 +54,7 @@ install:
     pip install .;
     conda list
 
+build: off
+
 test_script:
   - testflo . -n 1
