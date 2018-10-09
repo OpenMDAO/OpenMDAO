@@ -84,8 +84,4 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        if self._under_complex_step:
-            return self._system.comm.allreduce(np.sum(self._data.real**2) +
-                                               np.sum(self._data.imag**2)) ** 0.5
-        else:
-            return self._system.comm.allreduce(np.sum(self._data**2)) ** 0.5
+        return self._system.comm.allreduce(np.linalg.norm(self._data))

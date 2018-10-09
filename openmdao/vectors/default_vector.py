@@ -332,10 +332,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        if self._under_complex_step:
-            return (np.sum(self._data.real**2) + np.sum(self._data.imag**2))**0.5
-        else:
-            return np.sum(self._data**2) ** 0.5
+        return np.linalg.norm(self._data)
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
