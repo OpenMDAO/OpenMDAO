@@ -63,12 +63,11 @@ class NonlinearBlockGS(NonlinearSolver):
             self._aitken_work4 = outputs._clone()
             self._theta_n_1 = 1.
 
-            cs_active = outputs._under_complex_step
-            if cs_active:
-                self._aitken_work1.set_complex_step_mode(cs_active)
-                self._aitken_work2.set_complex_step_mode(cs_active)
-                self._aitken_work3.set_complex_step_mode(cs_active)
-                self._aitken_work4.set_complex_step_mode(cs_active)
+            if outputs._under_complex_step:
+                self._aitken_work1.set_complex_step_mode(True)
+                self._aitken_work2.set_complex_step_mode(True)
+                self._aitken_work3.set_complex_step_mode(True)
+                self._aitken_work4.set_complex_step_mode(True)
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
