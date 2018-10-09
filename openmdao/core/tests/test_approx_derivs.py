@@ -1127,6 +1127,9 @@ class TestGroupComplexStep(unittest.TestCase):
     def test_newton_with_direct_solver(self, vec_class):
         # Basic sellar test.
 
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
         prob = Problem()
         model = prob.model = Group()
         sub = model.add_subsystem('sub', Group(), promotes=['*'])
@@ -1174,6 +1177,9 @@ class TestGroupComplexStep(unittest.TestCase):
                           'test_newton_with_krylov_solver'+'_'.join(title(a) for a in p.args))
     def test_newton_with_krylov_solver(self, vec_class):
         # Basic sellar test.
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
 
         prob = Problem()
         model = prob.model = Group()
