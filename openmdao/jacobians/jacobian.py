@@ -248,8 +248,8 @@ class Jacobian(object):
         """
         Turn on or off complex stepping mode.
 
-        When turned on, the default real ndarray is replaced with a complex ndarray and all
-        pointers are updated to point to it.
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
 
         Parameters
         ----------
