@@ -14,6 +14,18 @@ environment:
       PETSc: 3.8.1
       UPLOAD_DOCS: 1
 
+addons:
+  apt:
+    update: true
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - gfortran
+    - libblas-dev
+    - liblapack-dev
+    - libopenmpi-dev
+    - openmpi-bin
+
 install:
     echo "Building python environment...";
     wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
@@ -43,7 +55,6 @@ install:
     fi
 
     conda install --yes matplotlib;
-    fi
 
     pip install .;
     conda list
