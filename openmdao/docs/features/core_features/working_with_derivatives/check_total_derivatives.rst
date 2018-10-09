@@ -17,6 +17,8 @@ constraints, objectives, and des_vars.
 .. automethod:: openmdao.core.problem.Problem.check_totals
     :noindex:
 
+Please check out the :ref:`Complex Step Guidelines <cs_guidelines>` for more information on how to use it on a model.
+
 Examples
 --------
 

@@ -452,11 +452,11 @@ def check_allocate_complex_ln(model, under_cs):
     bool
         True if linear vector should be complex.
     """
+    under_cs |= 'cs' in model._approx_schemes
+
     if under_cs and model.nonlinear_solver is not None and \
        model.nonlinear_solver.supports['gradients']:
         return True
-
-    under_cs |= 'cs' in model._approx_schemes
 
     for sub in model._subsystems_allprocs:
         chk = check_allocate_complex_ln(sub, under_cs)

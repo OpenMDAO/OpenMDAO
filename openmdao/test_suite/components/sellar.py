@@ -94,7 +94,7 @@ class SellarDis1withDerivatives(SellarDis1):
         Jacobian for Sellar discipline 1.
         """
         partials['y1', 'y2'] = -0.2
-        partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
+        partials['y1', 'z'][:] = np.array([[2.0 * inputs['z'][0], 1.0]])
         partials['y1', 'x'] = 1.0
 
 
