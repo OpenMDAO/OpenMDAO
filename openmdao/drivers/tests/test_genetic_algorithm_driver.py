@@ -161,6 +161,72 @@ class TestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
         # Material 3 can be anything
 
+    def test_mixed_integer_3bar_default_bits(self):
+        # Tests bug where letting openmdao calcualate the bits didn't preserve integer status unless range
+        # was a power of 2.
+
+        np.random.seed(1)
+
+        class ObjPenalty(ExplicitComponent):
+            """
+            Weight objective with penalty on stress constraint.
+            """
+
+            def setup(self):
+                self.add_input('obj', 0.0)
+                self.add_input('stress', val=np.zeros((3, )))
+
+                self.add_output('weighted', 0.0)
+
+            def compute(self, inputs, outputs):
+                obj = inputs['obj']
+                stress = inputs['stress']
+
+                pen = 0.0
+                for j in range(len(stress)):
+                    if stress[j] > 1.0:
+                        pen += 10.0*(stress[j] - 1.0)**2
+
+                outputs['weighted'] = obj + pen
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0, units='cm**2'), promotes=['*'])
+        model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0, units='cm**2'), promotes=['*'])
+        model.add_subsystem('xc_a3', IndepVarComp('area3', 5.0, units='cm**2'), promotes=['*'])
+        model.add_subsystem('xi_m1', IndepVarComp('mat1', 1), promotes=['*'])
+        model.add_subsystem('xi_m2', IndepVarComp('mat2', 1), promotes=['*'])
+        model.add_subsystem('xi_m3', IndepVarComp('mat3', 1), promotes=['*'])
+        model.add_subsystem('comp', ThreeBarTruss(), promotes=['*'])
+        model.add_subsystem('obj_with_penalty', ObjPenalty(), promotes=['*'])
+
+        model.add_design_var('area1', lower=1.2, upper=1.3)
+        model.add_design_var('area2', lower=2.0, upper=2.1)
+        model.add_design_var('mat1', lower=1, upper=4)
+        model.add_design_var('mat2', lower=1, upper=5)
+        model.add_design_var('mat3', lower=1, upper=4)
+        model.add_objective('weighted')
+
+        prob.driver = SimpleGADriver()
+        prob.driver.options['bits'] = {'area1': 6,
+                                       'area2': 6}
+        prob.driver.options['max_gen'] = 75
+
+        prob.driver._randomstate = 1
+
+        prob.setup(check=False)
+        prob['area3'] = 0.0005
+        prob.run_driver()
+
+        # Note, GA doesn't do so well with the continuous vars, naturally, so we reduce the space
+        # as much as we can. Objective is still rather random, but it is close. GA does a great job
+        # of picking the correct values for the integer desvars though.
+        self.assertLess(prob['mass'], 6.0)
+        assert_rel_error(self, prob['mat1'], 3, 1e-5)
+        assert_rel_error(self, prob['mat2'], 3, 1e-5)
+        # Material 3 can be anything
+
     def test_analysis_error(self):
         np.random.seed(1)
 
