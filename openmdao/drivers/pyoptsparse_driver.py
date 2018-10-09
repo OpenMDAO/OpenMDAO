@@ -482,7 +482,7 @@ class pyOptSparseDriver(Driver):
                                                  return_format='dict')
             # Let the optimizer try to handle the error
             except AnalysisError:
-                self._problem.model._clear_iprint()
+                prob.model._clear_iprint()
                 fail = 1
 
                 # We need to cobble together a sens_dict of the correct size.

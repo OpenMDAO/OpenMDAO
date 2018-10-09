@@ -36,6 +36,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.name_maps import abs_key2rel_key
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -83,8 +84,6 @@ class Problem(object):
     _mode : 'fwd' or 'rev'
         Derivatives calculation mode, 'fwd' for forward, and 'rev' for
         reverse (adjoint).
-    _use_ref_vector : bool
-        If True, allocate vectors to store ref. values.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
     _initial_condition_cache : dict
@@ -108,7 +107,7 @@ class Problem(object):
 
     _post_setup_func = None
 
-    def __init__(self, model=None, driver=None, comm=None, use_ref_vector=True, root=None):
+    def __init__(self, model=None, driver=None, comm=None, root=None):
         """
         Initialize attributes.
 
@@ -120,8 +119,6 @@ class Problem(object):
             The driver for the problem. If not specified, a simple "Run Once" driver will be used.
         comm : MPI.Comm or <FakeComm> or None
             The global communicator.
-        use_ref_vector : bool
-            If True, allocate vectors to store ref. values.
         root : <System> or None
             Deprecated kwarg for `model`.
         """
@@ -160,7 +157,6 @@ class Problem(object):
 
         self.comm = comm
 
-        self._use_ref_vector = use_ref_vector
         self._solver_print_cache = []
 
         self._mode = None  # mode is assigned in setup()
@@ -216,6 +212,8 @@ class Problem(object):
             the requested output/input variable.
         """
         # Caching only needed if vectors aren't allocated yet.
+        proms = self.model._var_allprocs_prom2abs_list
+
         if self._setup_status == 1:
 
             # We have set and cached already
@@ -268,8 +266,20 @@ class Problem(object):
             val = self.model._inputs[name]
 
         else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+            if name in proms['input']:
+                abs_name = prom_name2abs_name(self.model, name, 'input')
+            else:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+
+            if self.model._discrete_outputs and name in self.model._discrete_outputs:
+                val = self.model._discrete_outputs[name]
+
+            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
+                val = self.model._discrete_inputs[name]
+
+            else:
+                msg = 'Variable name "{}" not found.'
+                raise KeyError(msg.format(name))
 
         # Need to cache the "get" in case the user calls in-place numpy operations.
         self._initial_condition_cache[name] = val
@@ -389,8 +399,12 @@ class Problem(object):
         else:
             if self.model._outputs and name in self.model._outputs:
                 self.model._outputs[name] = value
+            elif self.model._discrete_outputs and name in self.model._discrete_outputs:
+                self.model._discrete_outputs[name] = value
             elif self.model._inputs and name in self.model._inputs:
                 self.model._inputs[name] = value
+            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
+                self.model._discrete_inputs[name] = value
             else:
                 msg = 'Variable name "{}" not found.'
                 raise KeyError(msg.format(name))
@@ -736,7 +750,7 @@ class Problem(object):
 
         When `setup` is called, the model hierarchy is assembled, the processors are allocated
         (for MPI), and variables and connections are all assigned. This method traverses down
-        the model hierarchy to call `setup` on each subsystem, and then traverses up te model
+        the model hierarchy to call `setup` on each subsystem, and then traverses up the model
         hierarchy to call `configure` on each subsystem.
 
         Parameters
@@ -1216,8 +1230,8 @@ class Problem(object):
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
-            for rel_key, partial in iteritems(approx_jac):
-                abs_key = rel_key2abs_key(comp, rel_key)
+            for abs_key, partial in iteritems(approx_jac):
+                rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
 
         # Conversion of defaultdict to dicts

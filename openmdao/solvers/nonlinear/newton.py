@@ -93,6 +93,8 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
 
+        self._disallow_discrete_outputs()
+
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system, self._depth + 1)
         else:

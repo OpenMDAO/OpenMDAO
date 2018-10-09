@@ -93,6 +93,8 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.recorders.case_reader import CaseReader
 
+# Visualizations
+from openmdao.utils.visualization import partial_deriv_plot
 
 # set up tracing or memory profiling if env vars are set.
 import os

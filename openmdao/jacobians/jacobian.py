@@ -187,12 +187,6 @@ class Jacobian(object):
         else:
             subjacs_info['value'] = subjac
 
-    def _initialize(self):
-        """
-        Allocate the global matrices.
-        """
-        pass
-
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
@@ -204,12 +198,14 @@ class Jacobian(object):
         """
         pass
 
-    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
 
         Parameters
         ----------
+        system : System
+            System that is updating this jacobian.
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector

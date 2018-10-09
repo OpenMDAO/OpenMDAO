@@ -210,13 +210,12 @@ class ComplexStep(ApproximationScheme):
                         subjac[:, i] = result
 
                 subjac *= fact
-                rel_key = abs_key2rel_key(system, key)
                 if uses_src_indices:
                     jac._override_checks = True
-                    jac[rel_key] = subjac
+                    jac[key] = subjac
                     jac._override_checks = False
                 else:
-                    jac[rel_key] = subjac
+                    jac[key] = subjac
 
         # Turn off complex step.
         system._set_complex_step_mode(False)

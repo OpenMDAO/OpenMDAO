@@ -84,14 +84,17 @@ class AssembledJacobian(Jacobian):
         self._has_overlapping_partials = False
 
         self._subjac_iters = defaultdict(lambda: None)
-        self._init_ranges()
+        self._init_ranges(system)
 
-    def _init_ranges(self):
+    def _init_ranges(self, system):
         """
         Compute row/col ranges for variables of the owning system.
-        """
-        system = self._system
 
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
+        """
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
         sizes = system._var_sizes['nonlinear']['output']
@@ -110,12 +113,15 @@ class AssembledJacobian(Jacobian):
             in_ranges[name] = (start, end)
             start = end
 
-    def _initialize(self):
+    def _initialize(self, system):
         """
         Allocate the global matrices.
-        """
-        system = self._system
 
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
+        """
         # var_indices are the *global* indices for variables on this proc
         is_top = system.pathname == ''
 
@@ -229,15 +235,15 @@ class AssembledJacobian(Jacobian):
         ext_mtx = self._matrix_class(system.comm)
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
-        iproc = self._system.comm.rank
-        sizes = self._system._var_sizes['nonlinear']['input']
-        abs2idx = self._system._var_allprocs_abs2idx['nonlinear']
+        iproc = system.comm.rank
+        sizes = system._var_sizes['nonlinear']['input']
+        abs2idx = system._var_allprocs_abs2idx['nonlinear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
                      system._var_abs_names['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
-        sizes = self._system._var_sizes['nonlinear']['output']
+        sizes = system._var_sizes['nonlinear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
@@ -357,12 +363,14 @@ class AssembledJacobian(Jacobian):
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, subjacs[key]['value'])
 
-    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
 
         Parameters
         ----------
+        system : System
+            System that is updating this jacobian.
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector
@@ -372,7 +380,6 @@ class AssembledJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        system = self._system
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
 
