@@ -247,6 +247,10 @@ class SimpleGADriver(Driver):
                 val = user_bits[prom_name]
 
             else:
+                # If the user does not declare a bits for this variable, we assume they want it to
+                # be encoded as an integer. Encoding requires a power of 2 in the range, so we need
+                # to pad additional values above the upper range, and adjust accordingly. Design
+                # points with values above the upper bound will be discarded by the GA.
                 log_range = np.log2(upper_bound[i:j] - lower_bound[i:j] + 1)
                 if log_range % 2 > 0:
                     val = np.ceil(log_range)
