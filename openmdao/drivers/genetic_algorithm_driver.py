@@ -232,14 +232,20 @@ class SimpleGADriver(Driver):
 
         # Bits of resolution
         bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
-        prom2abs = model._var_allprocs_prom2abs_list['output']
+        abs2prom = model._var_abs2prom['output']
 
-        for name, val in iteritems(user_bits):
-            try:
-                i, j = self._desvar_idx[name]
-            except KeyError:
-                abs_name = prom2abs[name][0]
-                i, j = self._desvar_idx[abs_name]
+        for name, meta in iteritems(desvars):
+            i, j = self._desvar_idx[name]
+            prom_name = abs2prom[name]
+
+            if name in user_bits:
+                val = user_bits[name]
+
+            elif prom_name in user_bits:
+                val = user_bits[prom_name]
+
+            else:
+                continue
 
             bits[i:j] = val
 

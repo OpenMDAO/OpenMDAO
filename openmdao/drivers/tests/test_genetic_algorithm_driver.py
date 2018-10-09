@@ -203,9 +203,9 @@ class TestSimpleGA(unittest.TestCase):
 
         model.add_design_var('area1', lower=1.2, upper=1.3)
         model.add_design_var('area2', lower=2.0, upper=2.1)
-        model.add_design_var('mat1', lower=1, upper=4)
-        model.add_design_var('mat2', lower=1, upper=5)
-        model.add_design_var('mat3', lower=1, upper=4)
+        model.add_design_var('mat1', lower=2, upper=4)
+        model.add_design_var('mat2', lower=2, upper=4)
+        model.add_design_var('mat3', lower=2, upper=4)
         model.add_objective('weighted')
 
         prob.driver = SimpleGADriver()
