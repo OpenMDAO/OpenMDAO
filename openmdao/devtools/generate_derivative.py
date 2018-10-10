@@ -3,6 +3,7 @@ from collections import Iterable
 import sys
 import tangent
 from inspect import signature, getsourcelines, getmodule
+from collections import OrderedDict
 import inspect
 from os import remove
 from importlib import reload
@@ -96,16 +97,12 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
     # ignore blank lines, useful for detecting indentation later
     src = [line for line in getsourcelines(compute_method)[0] if line.strip()]
 
-    # source code of generated AD per-output
-    source_funcs = {}
     # lists of local names of inputs and outputs to code generate
     pnames = []
     onames = []
     # mapping to rename variables within the compute method
-    to_replace = {}
-    # for lname in local_vars:
-    #     to_replace[lname] = str(local_vars[lname])
-    output_name_map = {}
+    to_replace = OrderedDict()
+
     # gather transformed input and output names
     for pname in inputs:
         new_name = pname.replace(":", "_")
@@ -113,12 +110,17 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
         to_replace["inputs['%s']" % pname] = new_name
         to_replace['inputs["%s"]' % pname] = new_name
 
+        # remove lines of the form 'x = x'
+        to_replace[' %s = %s\n' % (new_name, new_name)] = ' \n'
+
     for oname in outputs:
         new_name = oname.replace(":", "_")
         onames.append(new_name)
         to_replace["outputs['%s']" % oname] = new_name
         to_replace['outputs["%s"]' % oname] = new_name
-        output_name_map[new_name] = oname
+
+        # remove lines of the form 'x = x'
+        to_replace[' %s = %s\n' % (new_name, new_name)] = ' \n'
 
     # # find any blocks that parameterize by iterating over metadata
     # # these need to be explicitly flattened
@@ -219,20 +221,9 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
 
     # start construction of partial derivative functions
     indent = "       "
-    s = "    def compute_partials(self, inputs, J):\n"
-    final_code.append(s)
 
-    # unpack all inputs at top of generated compute_partials()
-    for i, name in enumerate(inputs):
-        s = indent + " %s = inputs['%s']\n" % (pnames[i], name)
-        final_code.append(s)
-    final_code.append("\n")
-
-    # now for each output, generate gradient functions and partial
-    # derivative assignments
-    gradient_funcs = {}
     fname = 'compute_outputs'
-    #for oname in onames:
+
     # generate string of function to be analyzed by the tangent library
     source = "import numpy as np\ndef %s(" % fname
     source += ", ".join(pnames) + "):\n"
@@ -242,26 +233,8 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
 
     # gather generated gradient source code
     dsrc, df = generate_gradient(source, fname, mode)
-    gradient_funcs[oname] = df
+
     return source, dsrc, df
-
-
-def _vec2name_map(vec):
-    """
-    Convert invalid python names to valid ones and return a dict that maps invalid to valid.
-    """
-    name_map = {}
-    for name in vec:
-        new_name = name.replace(":", "_")
-        if new_name != name:
-            new_name = '_%s__' % new_name
-        name_map[name] = new_name
-    return name_map
-
-
-def _vec2args(vec):
-    """Return a list of values from vec."""
-    return [vec[k] for k in vec]
 
 
 def _ad_setup_parser(parser):
