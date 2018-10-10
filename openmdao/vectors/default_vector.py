@@ -332,7 +332,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.sum(self._data.real**2) ** 0.5
+        return np.linalg.norm(self._data)
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """

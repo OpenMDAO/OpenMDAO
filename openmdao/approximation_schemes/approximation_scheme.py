@@ -12,6 +12,9 @@ class ApproximationScheme(object):
     ----------
     _approx_groups : list
         A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
+    _approx_groups_cached_under_cs : bool
+        Flag indicates whether approx_groups was generated under complex step from higher in the
+        model hieararchy.
     """
 
     def __init__(self):
@@ -19,10 +22,30 @@ class ApproximationScheme(object):
         Initialize the ApproximationScheme.
         """
         self._approx_groups = None
+        self._approx_groups_cached_under_cs = False
 
-    def _get_approx_groups(self, system):
-        if self._approx_groups is None:
+    def _get_approx_groups(self, system, under_cs=False):
+        """
+        Retrieve data structure that contains all the approximations.
+
+        This data structure is regenerated if we transition to or from being under a complex step
+        from higher in the model hierarchy.
+
+        Parameters
+        ----------
+        system : <System>
+            Group or component instance.
+        under_cs : bool
+            Flag that indicates if we are under complex step.
+
+        Returns
+        -------
+        Tuple
+            Contains wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs.
+        """
+        if self._approx_groups is None or under_cs != self._approx_groups_cached_under_cs:
             self._init_approximations(system)
+            self._approx_groups_cached_under_cs = under_cs
         return self._approx_groups
 
     def add_approximation(self, abs_key, kwargs):

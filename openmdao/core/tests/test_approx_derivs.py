@@ -244,7 +244,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 3 outputs x 2 inputs
         self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
 
-    def test_arrray_comp(self):
+    def test_array_comp(self):
 
         class DoubleArrayFD(DoubleArrayComp):
 
@@ -867,8 +867,8 @@ class TestGroupComplexStep(unittest.TestCase):
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
-                          'test_arrray_comp_'+'_'.join(title(a) for a in p.args))
-    def test_arrray_comp(self, vec_class):
+                          'test_array_comp_'+'_'.join(title(a) for a in p.args))
+    def test_array_comp(self, vec_class):
 
         if not vec_class:
             raise unittest.SkipTest("PETSc is not installed")
@@ -980,9 +980,10 @@ class TestGroupComplexStep(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver.options['atol'] = 1e-50
+        prob.model.nonlinear_solver.options['rtol'] = 1e-50
 
-        # Had to make this step larger so that solver would reconverge adequately.
-        model.approx_totals(method='cs', step=1.0e-1)
+        model.approx_totals(method='cs')
 
         prob.setup(check=False, local_vector_class=vec_class)
         prob.set_solver_print(level=0)
@@ -997,6 +998,9 @@ class TestGroupComplexStep(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+        self.assertFalse(model._vectors['output']['linear']._alloc_complex,
+                         msg="Linear vector should not be allocated as complex.")
 
     def test_desvar_and_response_with_indices(self):
 
@@ -1116,6 +1120,252 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['y1', 'x1'][0][1], Jbase[0, 3], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][2][1], Jbase[2, 3], 1e-8)
+
+    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+                          testcase_func_name=lambda f, n, p:
+                          'test_newton_with_direct_solver'+'_'.join(title(a) for a in p.args))
+    def test_newton_with_direct_solver(self, vec_class):
+        # Basic sellar test.
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
+        prob = Problem()
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver.options['atol'] = 1e-10
+        sub.nonlinear_solver.options['rtol'] = 1e-10
+
+        model.approx_totals(method='cs')
+
+        prob.setup(check=False, local_vector_class=vec_class)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
+    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+                          testcase_func_name=lambda f, n, p:
+                          'test_newton_with_krylov_solver'+'_'.join(title(a) for a in p.args))
+    def test_newton_with_krylov_solver(self, vec_class):
+        # Basic sellar test.
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
+        prob = Problem()
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.linear_solver = ScipyKrylov()
+        sub.nonlinear_solver.options['atol'] = 1e-10
+        sub.nonlinear_solver.options['rtol'] = 1e-10
+        sub.linear_solver.options['atol'] = 1e-15
+
+        model.approx_totals(method='cs', step=1e-14)
+
+        prob.setup(check=False, local_vector_class=vec_class)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
+    def test_newton_with_cscjac_under_cs(self):
+        # Basic sellar test.
+
+        prob = Problem()
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.linear_solver = ScipyKrylov(assemble_jac=True)
+        sub.nonlinear_solver.options['atol'] = 1e-20
+        sub.nonlinear_solver.options['rtol'] = 1e-20
+
+        model.approx_totals(method='cs', step=1e-12)
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
+    def test_newton_with_fd_group(self):
+        # Basic sellar test.
+
+        prob = Problem()
+        model = prob.model = Group()
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        subfd = sub.add_subsystem('subfd', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        subfd.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        subfd.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        # Finite difference for the Newton linear solve only
+        subfd.approx_totals(method='fd')
+
+        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver.options['maxiter'] = 12
+        sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver.options['atol'] = 1e-20
+        sub.nonlinear_solver.options['rtol'] = 1e-20
+
+        # Complex Step for top derivatives
+        model.approx_totals(method='cs', step=1e-14)
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
+    def test_nested_complex_step_unsupported(self):
+        # Basic sellar test.
+
+        prob = self.prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.linear_solver = DirectSolver()
+
+        prob.model.approx_totals(method='cs')
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z']
+        of = ['obj']
+
+        #with self.assertRaises(RuntimeError) as cm:
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+
+        msg = "Nested Complex Step is not supported in system 'd1'"
+        #self.assertEqual(str(cm.exception), msg)
+
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+        outs = prob.model.list_outputs(residuals=True, out_stream=None)
+        for j in range(len(outs)):
+            val = np.linalg.norm(outs[j][1]['resids'])
+            self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
 
 class TestComponentComplexStep(unittest.TestCase):

@@ -353,6 +353,10 @@ class PETScKrylov(LinearSolver):
         system = self._system
         options = self.options
 
+        if self._system.under_complex_step:
+            msg = 'PETScKrylov solver is not supported under complex step.'
+            raise RuntimeError(msg)
+
         maxiter = options['maxiter']
         atol = options['atol']
         rtol = options['rtol']

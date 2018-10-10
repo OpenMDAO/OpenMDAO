@@ -56,7 +56,7 @@ class Vector(object):
     _root_vector : Vector
         Pointer to the vector owned by the root system.
     _alloc_complex : Bool
-        If True, then space for the imaginary part is also allocated.
+        If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
     _cplx_data : ndarray
@@ -207,6 +207,7 @@ class Vector(object):
         """
         vec = self.__class__(self._name, self._kind, self._system, self._root_vector,
                              alloc_complex=self._alloc_complex, ncol=self._ncol)
+        vec._under_complex_step = self._under_complex_step
         vec._clone_data()
         if initialize_views:
             vec._initialize_views()
