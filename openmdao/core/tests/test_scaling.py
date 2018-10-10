@@ -26,6 +26,7 @@ class PassThroughLength(ExplicitComponent):
         length_m = length_cm * 1e-2
         length_km = length_m * 1e-3
         outputs['new_length'] = length_km
+        return locals()
 
 
 class ScalingExample1(ImplicitComponent):
