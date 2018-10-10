@@ -297,6 +297,81 @@ def _ad_setup_parser(parser):
                         help='Specify component class to run AD on.')
 
 
+def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
+    src, dsrc, df, foutput_name_map = generate_gradient_code(comp, mode)
+
+    if show_orig:
+        print("ORIG function:", file=out)
+        print(''.join(src), file=out)
+
+    print("%s grad function:" % mode, file=out)
+    print(''.join(getsourcelines(df)[0]), file=out)
+
+    prefix = comp.pathname + '.' if comp.pathname else ''
+
+    J = {}
+    inputs = comp._inputs
+    outputs = comp._outputs
+
+    if mode == 'forward':
+        array = comp._vectors['output']['linear']._data
+        vec = inputs
+    else:  # reverse
+        array = comp._vectors['output']['linear']._data
+        vec = outputs
+
+    idx2output = [None] * array.size  # map array index to output name
+    idx2loc = np.zeros(array.size, dtype=int)
+    views = []
+    start = end = 0
+    for n in vec:
+        end += vec[n].size
+        views.append(array[start:end])
+        for i in range(start, end):
+            idx2output[i] = n
+        idx2loc[start:end] = np.arange(start, end, dtype=int) - start
+        start = end
+
+    if mode == 'forward':
+        params = [inputs[name] for name in inputs] + views
+        for idx in range(array.size):
+            array[:] = 0.0
+            array[idx] = 1.0
+            iname = idx2output[idx]
+            locidx = idx2loc[idx]
+            abs_in = prefix + iname
+
+            grad = df(*params)
+            for i, oname in enumerate(outputs):
+                abs_out = prefix + oname
+                key = (abs_out, abs_in)
+                if key in comp._subjacs_info:
+                    if key not in J:
+                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
+                    J[key][:, locidx] = grad[i]
+
+    else:  # reverse
+        params = [inputs[name] for name in inputs] + [views]
+
+        for oidx in range(array.size):
+            array[:] = 0.0
+            array[oidx] = 1.0
+            oname = idx2output[oidx]
+            locidx = idx2loc[oidx]
+            abs_out = prefix + oname
+
+            grad = df(*params)
+            for i, iname in enumerate(inputs):
+                abs_in = prefix + iname
+                key = (abs_out, abs_in)
+                if key in comp._subjacs_info:
+                    if key not in J:
+                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
+                    J[key][locidx:] = grad[i]
+
+    import pprint
+    pprint.pprint(J, stream=out)
+
 def _ad_cmd(options):
     """
     Return the post_setup hook function for 'openmdao ad'.
@@ -320,71 +395,12 @@ def _ad_cmd(options):
         for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
             if s.__class__.__name__ == options.class_:
                 inst = s
-                prefix = s.pathname + '.' if s.pathname else ''
                 break
         else:
             raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
 
-        #src, dsrc, df = generate_gradient_code(inst, options.mode)
-        src, dsrc, df, output_name_map = generate_gradient_code(inst, 'forward')
-
-        print("ORIG function:", file=out)
-        print(''.join(src), file=out)
-
-        print("FORWARD grad function:", file=out)
-        print(''.join(getsourcelines(df)[0]), file=out)
-
-        src, dsrc, df, _ = generate_gradient_code(inst, 'reverse')
-
-        print("REVERSE grad function:", file=out)
-        print(''.join(getsourcelines(df)[0]), file=out)
-
-        # now create a replace compute_partials
-        J = {}
-        inputs = s._inputs
-        outputs = s._outputs
-        ovec = s._vectors['output']['linear']._data
-        idx2output = [None] * ovec.size  # map vec index to output name
-        idx2loc = np.zeros(ovec.size, dtype=int)
-        oviews = []
-        start = end = 0
-        for n in outputs:
-            end += outputs[n].size
-            oviews.append(ovec[start:end])
-            for i in range(start, end):
-                idx2output[i] = n
-            idx2loc[start:end] = np.arange(start, end, dtype=int) - start
-            start = end
-
-        print(idx2output, file=out)
-
-        params = [inputs[name] for name in inputs] + [oviews]
-        for oidx in range(ovec.size):
-            ovec[:] = 0.0
-            ovec[oidx] = 1.0
-            oname = idx2output[oidx]
-            locidx = idx2loc[oidx]
-            abs_out = prefix + oname
-
-            print(oname, oidx, file=out)
-            print(ovec, file=out)
-            print(oviews, file=out)
-            grad = df(*params)
-            print(grad, file=out)
-            for i, iname in enumerate(inputs):
-                #print()
-                #print(var, pname, self._declared)
-                #if ("*", "*") in s._declared or (var, "*") in s._declared or (var, pname) in s._declared:
-                abs_in = prefix + iname
-                key = (abs_out, abs_in)
-                if key in s._subjacs_info:
-                    if key not in J:
-                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
-                    #print(var, pname)
-                    J[key][locidx:] = grad[i]
-
-        import pprint
-        pprint.pprint(J, stream=out)
+        _do_grad_check(s, 'forward', show_orig=True, out=out)
+        _do_grad_check(s, 'reverse', show_orig=False, out=out)
 
         exit()
 
