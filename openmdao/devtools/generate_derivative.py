@@ -74,18 +74,7 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
         compute_method = comp.apply_nonlinear
 
     # get the name of the component type
-
-    # declared = []
-    # for outp in comp._declared_partials:
-    #     #print(outp)
-    #     if isinstance(outp[1], str):
-    #         declared.append((outp[0], outp[1]))
-    #     else:
-    #         for inp in outp[1]:
-    #             declared.append((outp[0], inp))
-    # comp._declared = declared
-    comp_class = comp.__class__
-    class_type = comp_class.__name__
+    class_name = comp.__class__.__name__
 
     # AD code to be written out to file/augment original component
     final_code = []
@@ -96,10 +85,10 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
     # instantiation. AD can only generate partial derivative code for
     # fixed-sized versions of these components.
     s = "import tangent\n"
-    s += "class %sAD(%s):\n" % (class_type, class_type)
+    s += "class %sAD(%s):\n" % (class_name, class_name)
     final_code.append(s)
     s = "    def setup(self):\n"
-    s += "        super(%sAD, self).setup()\n" % class_type
+    s += "        super(%sAD, self).setup()\n" % class_name
     s += "        self.declare_partials('*', '*')\n\n"
     final_code.append(s)
 
@@ -248,13 +237,13 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
     source = "import numpy as np\ndef %s(" % fname
     source += ", ".join(pnames) + "):\n"
     source += src + "\n"
-    outs = str(tuple(outputs))
+    outs = str(tuple(onames))
     source += "%s return %s\n" % (indent, outs.replace("'", ""))
 
     # gather generated gradient source code
     dsrc, df = generate_gradient(source, fname, mode)
     gradient_funcs[oname] = df
-    return source, dsrc, df, output_name_map
+    return source, dsrc, df
 
 
 def _vec2name_map(vec):
@@ -273,10 +262,6 @@ def _vec2name_map(vec):
 def _vec2args(vec):
     """Return a list of values from vec."""
     return [vec[k] for k in vec]
-
-
-def _gen_ad_deriv(comp, mode, stream=sys.stdout):
-    return generate_gradient_code(comp, mode)
 
 
 def _ad_setup_parser(parser):
@@ -298,7 +283,7 @@ def _ad_setup_parser(parser):
 
 
 def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
-    src, dsrc, df, foutput_name_map = generate_gradient_code(comp, mode)
+    src, dsrc, df = generate_gradient_code(comp, mode)
 
     if show_orig:
         print("ORIG function:", file=out)
@@ -394,7 +379,6 @@ def _ad_cmd(options):
     def _ad(prob):
         for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
             if s.__class__.__name__ == options.class_:
-                inst = s
                 break
         else:
             raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
