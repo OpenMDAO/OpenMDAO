@@ -168,7 +168,8 @@ class ComplexStep(ApproximationScheme):
                 for item in self._exec_list:
                     fd.add_approximation(item[0:2], {})
 
-            return self._fd.compute_approximations(system, jac, total=total)
+            self._fd.compute_approximations(system, jac, total=total)
+            return
 
         if len(self._exec_list) == 0:
             return
