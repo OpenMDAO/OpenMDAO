@@ -16,11 +16,11 @@ environment:
 install:
     sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
     sudo apt-get update;
-    sudo apt-get gfortran;
-    sudo apt-get libblas-dev;
-    sudo apt-get liblapack-dev;
-    sudo apt-get libopenmpi-dev;
-    sudo apt-get openmpi-bin;
+    sudo apt-get install gfortran;
+    sudo apt-get install libblas-dev;
+    sudo apt-get install liblapack-dev;
+    sudo apt-get install libopenmpi-dev;
+    sudo apt-get install openmpi-bin;
 
     echo "Building python environment...";
     wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
