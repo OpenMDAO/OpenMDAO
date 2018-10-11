@@ -109,6 +109,8 @@ class Component(System):
         self._approximated_partials = []
         self._declared_partial_checks = []
 
+        self._ad_partials_func = None
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -1059,3 +1061,115 @@ class Component(System):
         Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass
+
+    def _compute_ad_partials(self, inputs, partials):
+        """
+        Compute our partials using automatic differentiation (AD).
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        # TODO: coloring
+        if self._ad_partials_func is None:
+            from openmdao.devtools.generate_derivative import generate_gradient_code
+
+            if self._inputs._data.size > self._outputs._data.size:
+                self._ad_mode = 'reverse'
+            else:
+                self._ad_mode = 'forward'
+            _, _, df = generate_gradient_code(self, self._ad_mode)
+            self._ad_partials_func = df
+
+        if self._ad_mode == 'forward':
+            self._eval_ad_fwd(partials, self._ad_partials_func)
+        else:
+            self._eval_ad_rev(partials, self._ad_partials_func)
+
+    def _eval_ad_fwd(self, partials, ad_func):
+        prefix = self.pathname + '.' if self.pathname else ''
+
+        J = {}
+        inputs = self._inputs
+        outputs = self._outputs
+
+        array = self._vectors['output']['linear']._data
+        vec = inputs
+
+        idx2output = [None] * array.size  # map array index to output name
+        idx2loc = np.zeros(array.size, dtype=int)
+        views = []
+        start = end = 0
+        for n in vec:
+            end += vec[n].size
+            views.append(array[start:end])
+            for i in range(start, end):
+                idx2output[i] = n
+            idx2loc[start:end] = np.arange(start, end, dtype=int) - start
+            start = end
+
+        params = [inputs[name] for name in inputs] + views
+        for idx in range(array.size):
+            array[:] = 0.0
+            array[idx] = 1.0
+            iname = idx2output[idx]
+            locidx = idx2loc[idx]
+            abs_in = prefix + iname
+
+            grad = ad_func(*params)
+            for i, oname in enumerate(outputs):
+                abs_out = prefix + oname
+                key = (abs_out, abs_in)
+                if key in self._subjacs_info:
+                    if key not in J:
+                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
+                    J[key][:, locidx] = grad[i]
+
+        for key in J:
+            partials[key] = J[key]
+
+    def _eval_ad_rev(self, partials, ad_func):
+        prefix = self.pathname + '.' if comp.pathname else ''
+
+        J = {}
+        inputs = self._inputs
+        outputs = self._outputs
+
+        array = self._vectors['output']['linear']._data
+        vec = outputs
+
+        idx2output = [None] * array.size  # map array index to output name
+        idx2loc = np.zeros(array.size, dtype=int)
+        views = []
+        start = end = 0
+        for n in vec:
+            end += vec[n].size
+            views.append(array[start:end])
+            for i in range(start, end):
+                idx2output[i] = n
+            idx2loc[start:end] = np.arange(start, end, dtype=int) - start
+            start = end
+
+        params = [inputs[name] for name in inputs] + [views]
+
+        for oidx in range(array.size):
+            array[:] = 0.0
+            array[oidx] = 1.0
+            oname = idx2output[oidx]
+            locidx = idx2loc[oidx]
+            abs_out = prefix + oname
+
+            grad = df(*params)
+            for i, iname in enumerate(inputs):
+                abs_in = prefix + iname
+                key = (abs_out, abs_in)
+                if key in self._subjacs_info:
+                    if key not in J:
+                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
+                    J[key][locidx:] = grad[i]
+
+        for key in J:
+            partials[key] = J[key]
