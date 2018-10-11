@@ -480,6 +480,7 @@ class SqliteCaseReader(BaseCaseReader):
                     cases.append(driver_coord)
                 return cases
             else:
+                # return nested dicts of cases and child cases
                 cases = OrderedDict()
                 driver_cases = self._driver_cases.list_cases()
                 for driver_coord in driver_cases:
@@ -525,16 +526,32 @@ class SqliteCaseReader(BaseCaseReader):
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
         """
-        print(source, 'in', self._solver_cases.list_sources(), '?',
-              source in self._solver_cases.list_sources())
-
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
-        elif source == 'driver' and not recurse:
-            # return driver cases only
-            for case in self._driver_cases.cases():
-                yield case
+        elif source == 'driver':
+            if not recurse:
+                # return driver cases only
+                for case in self._driver_cases.cases():
+                    yield case
+            elif flat:
+                # return driver cases and child cases
+                cases = self.list_cases('driver', recurse, flat)
+                for case_id in cases:
+                    yield self.get_case(case_id)
+            else:
+                # return nested dicts of cases and child cases
+                cases = OrderedDict()
+                driver_cases = self._driver_cases.list_cases()
+                for driver_coord in driver_cases:
+                    driver_case = cases[driver_coord] = OrderedDict()
+                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
+                    for system_case in system_cases:
+                        driver_case[system_case] = self.get_case(system_cases[system_case])
+                    solver_cases = self._solver_cases.list_cases(driver_coord, recurse=True)
+                    for solver_case in solver_cases:
+                        driver_case[solver_case] = self.get_case(solver_cases[solver_case])
+                return cases
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -553,49 +570,28 @@ class SqliteCaseReader(BaseCaseReader):
                 yield self._solver_cases.get_case(case_id)
 
         else:
-            # source is driver with recurse=True or an iteration coordinate
-            if source == 'driver':
-                iter_coord = ''
-            else:
-                iter_coord = source
+            # source is an iteration coordinate
+            iter_coord = source
 
-            driver_iter = []
-            solver_iter = []
+            driver_cases = self._driver_cases.list_cases(iter_coord)
+            if driver_cases:
+                if flat:
+                    for driver_coord in driver_cases:
+                        # first the child system cases
+                        for case in self._system_cases.get_cases(driver_coord, recurse, flat):
+                            yield case
 
-            with sqlite3.connect(self._filename) as con:
-                cur = con.cursor()
-                cur.execute("SELECT iteration_coordinate FROM driver_iterations "
-                            "ORDER BY id ASC")
-                driver_iter = cur.fetchall()
+                        # then the child solver cases
+                        for case in self._solver_cases.get_cases(driver_coord, recurse, flat):
+                            yield case
 
-                cur.execute("SELECT iteration_coordinate, counter FROM solver_iterations "
-                            "ORDER BY id ASC")
-                solver_iter = cur.fetchall()
-
-            con.close()
-
-            split_iter_coord = _coord_split_re.split(iter_coord) if iter_coord is not '' else []
-
-            # grab an array of possible lengths of coordinates
-            coord_lengths = [2]  # start with 2 because that is the length of driver iter coords
-
-            for s in solver_iter:
-                s_len = len(_coord_split_re.split(s[0]))
-                if s_len not in coord_lengths:
-                    coord_lengths.append(s_len)
-
-            coord_lengths = sorted(coord_lengths)
-
-            # grab full set of cases to iterate over
-            iter_set = self._find_child_cases(iter_coord, split_iter_coord, driver_iter,
-                                              solver_iter, recurse, coord_lengths)
-
-            # iterate over set of cases
-            for iteration in iter_set:
-                if iteration[1] is 'driver':
-                    yield self._driver_cases.get_case(iteration[0])
+                        # and finally the driver case itself
+                        yield self._driver_cases.get_case(driver_coord)
                 else:
-                    yield self._solver_cases.get_case(iteration[0])
+                    # return nested dicts of cases and child cases
+                    raise RuntimeError('TODO: implement nested dicts')
+            else:
+                raise RuntimeError('No driver cases for coord %s' % iter_coord)
 
     def get_case(self, case_id, recurse=False):
         """
@@ -1021,6 +1017,65 @@ class CaseTable(object):
                 return [row[0] for row in rows
                         if self._get_source(row[0]) == source]
 
+    def get_cases(self, source=None, recurse=False, flat=False):
+        """
+        Get list of case names for cases in the table.
+
+        Parameters
+        ----------
+        source : str, optional
+            If not None, only cases that have the specified source will be returned
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy
+        flat : bool, optional
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
+
+        Returns
+        -------
+        list or dict
+            The cases from the table that have the specified source.
+        """
+        with sqlite3.connect(self._filename) as con:
+            cur = con.cursor()
+            cur.execute("SELECT %s FROM %s ORDER BY id ASC" %
+                        (self._index_name, self._table_name))
+            rows = cur.fetchall()
+
+        con.close()
+
+        if not source:
+            # return all cases
+            return [self.get_case(row[0]) for row in rows]
+        elif '|' in source:
+            # source is a coordinate
+            if recurse and not flat:
+                cases = OrderedDict()
+                for row in rows:
+                    if len(row[0]) > len(source) and row[0].startswith(source):
+                        cases[row[0]] = self.get_cases(row[0], recurse, flat)
+                return cases
+            else:
+                return [self.get_case(row[0]) for row in rows if row[0].startswith(source)]
+        else:
+            # source is a system or solver
+            if recurse:
+                if flat:
+                    # return all cases under the source system
+                    source_sys = source.replace('.nonlinear_solver', '')
+                    return [self.get_case(row[0]) for row in rows
+                            if self._get_source(row[0]).startswith(source_sys)]
+                else:
+                    cases = OrderedDict()
+                    for row in rows:
+                        row_source = self._get_source(row[0])
+                        if row_source == source:
+                            cases[row[0]] = self.get_cases(row[0], recurse, flat)
+                    return cases
+            else:
+                return [self.get_case(row[0]) for row in rows
+                        if self._get_source(row[0]) == source]
+
     def get_case(self, case_id, cache=False):
         """
         Get a case from the database.
@@ -1294,6 +1349,7 @@ class DriverCases(CaseTable):
         if isinstance(case_id, int):
             case_id = self._get_iteration_coordinate(case_id)
 
+        print(self, 'get_case()', case_id)
         # return cached case if present, else fetch it
         if case_id in self._cases:
             return self._cases[case_id]

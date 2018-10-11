@@ -410,34 +410,58 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
         self.assertEqual(i+1, len(expected_coords))
 
-        # check driver cases with recursion
+        # check driver cases with recursion, flat
+        # (system records first, followed by solver, then driver)
         expected_coords = [
-            'rank0:SLSQP|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
-            'rank0:SLSQP|1',
+            'rank0:SLSQP|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1',
             'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
-            'rank0:SLSQP|2',
+            'rank0:SLSQP|1',
+            'rank0:SLSQP|2|root._solve_nonlinear|2',
             'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
-            'rank0:SLSQP|3',
+            'rank0:SLSQP|2',
+            'rank0:SLSQP|3|root._solve_nonlinear|3',
             'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
-            'rank0:SLSQP|4',
+            'rank0:SLSQP|3',
+            'rank0:SLSQP|4|root._solve_nonlinear|4',
             'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
-            'rank0:SLSQP|5',
+            'rank0:SLSQP|4',
+            'rank0:SLSQP|5|root._solve_nonlinear|5',
             'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|5',
+            'rank0:SLSQP|6|root._solve_nonlinear|6',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
             'rank0:SLSQP|6',
-            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
         ]
-        for i, c in enumerate(cr.get_cases(recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+        for i, case in enumerate(cr.get_cases(recurse=True, flat=True)):
+            self.assertEqual(case.iteration_coordinate, expected_coords[i])
         self.assertEqual(i+1, len(expected_coords))
 
-        # check child cases
+        # check child cases with recursion, flat
         expected_coords = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0'
+            'rank0:SLSQP|0|root._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|0',
         ]
         for i, c in enumerate(cr.get_cases('rank0:SLSQP|0', recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
         self.assertEqual(i+1, len(expected_coords))
+
+        # check child cases with recursion, nested
+        expected_coords = {
+            'rank0:SLSQP|0': {
+                'rank0:SLSQP|0|root._solve_nonlinear|0',
+                'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            }
+        }
+        count = 0
+        for case in cr.get_cases('rank0:SLSQP|0', recurse=True, flat=False):
+            print(case)
+            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            count += 1
+        self.assertEqual(count, 3)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
     @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
@@ -1546,8 +1570,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         all_driver_cases = cr.list_cases('driver', recurse=True, flat=True)
 
         expected_cases = driver_cases + \
-            [case for case in system_cases if case.startswith('rank0:SLSQP')] + \
-            [case for case in all_solver_cases if case.startswith('rank0:SLSQP')]
+            [sys_case for sys_case in system_cases if sys_case.startswith('rank0:SLSQP')] + \
+            [slv_case for slv_case in all_solver_cases if slv_case.startswith('rank0:SLSQP')]
 
         self.assertEqual(len(all_driver_cases), len(expected_cases))
         for case in expected_cases:
