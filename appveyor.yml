@@ -1,6 +1,5 @@
 image:
-- Ubuntu
-
+  ubuntu1804
 
 environment:
   matrix:
@@ -42,13 +41,11 @@ install:
 
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
-
     python setup.py install;
     cd ..;
 
-    if [ "$PETSc" ]; then
-      pip install mpi4py petsc4py==$PETSc;
-    fi
+    pip install mpi4py
+    pip install petsc4py==$PETSc;
 
     conda install --yes matplotlib;
 
