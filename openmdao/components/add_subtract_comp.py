@@ -31,7 +31,7 @@ class AddSubtractComp(ExplicitComponent):
     Attributes
     ----------
     _add_systems : list
-    List of equation systems to be initialized with the system.
+        List of equation systems to be initialized with the system.
     """
 
     def __init__(self, output_name=None, input_names=None, vec_size=1, length=1,

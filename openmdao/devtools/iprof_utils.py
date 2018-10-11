@@ -158,7 +158,6 @@ def _setup_func_group():
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
             ('_set_partials_meta', (System, Jacobian)),
-            ('jacobian_context', (System,)),
             ('_linearize', (System, Solver)),
             # include NewtonSolver to provide some context
             ('solve', (LinearSolver, NewtonSolver)),

@@ -23,7 +23,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
@@ -42,7 +42,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
 
@@ -64,7 +64,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
@@ -89,7 +89,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
@@ -114,7 +114,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
@@ -165,7 +165,7 @@ class TestProblem(unittest.TestCase):
 
         from openmdao.api import Problem, IndepVarComp, Group
 
-        prob = Problem(model=Group())
+        prob = Problem()
         model = prob.model
         model.add_subsystem(name='indeps',
                             subsys=IndepVarComp(name='X_c', shape=(3, 1)))
@@ -239,7 +239,7 @@ class TestProblem(unittest.TestCase):
         # Basic test for the method using default solvers on simple model.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -269,7 +269,7 @@ class TestProblem(unittest.TestCase):
         # Make sure 'dict' return_format works.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -339,7 +339,7 @@ class TestProblem(unittest.TestCase):
 
         prob = Problem()
 
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -356,7 +356,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -386,7 +386,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -526,8 +526,11 @@ class TestProblem(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        # check derivatives with complex step and a larger step size.
-        prob.check_totals(method='cs', step=1.0e-1)
+        prob.model.nonlinear_solver.options['atol'] = 1e-15
+        prob.model.nonlinear_solver.options['rtol'] = 1e-15
+
+        # check derivatives with complex step
+        prob.check_totals(method='cs')
 
     def test_check_totals_user_detect(self):
 
@@ -553,7 +556,6 @@ class TestProblem(unittest.TestCase):
 
 
         prob = Problem()
-        prob.model = Group()
         prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
         prob.model.add_subsystem('comp', SimpleComp())
         prob.model.connect('px.x', 'comp.x')
@@ -592,7 +594,6 @@ class TestProblem(unittest.TestCase):
 
 
         prob = Problem()
-        prob.model = Group()
         prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
         prob.model.connect('px.x', 'comp.x')
@@ -612,8 +613,8 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizeDriver
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
+        model = prob.model
         model.nonlinear_solver = NonlinearBlockGS()
 
         prob.driver = ScipyOptimizeDriver()
@@ -639,8 +640,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
@@ -657,8 +657,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivativesConnected
 
-        prob = Problem()
-        prob.model = SellarDerivativesConnected()
+        prob = Problem(model= SellarDerivativesConnected())
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
@@ -675,8 +674,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
@@ -881,8 +879,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
@@ -914,8 +911,7 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         prob.setup()
@@ -1228,8 +1224,7 @@ class TestProblem(unittest.TestCase):
                 self.sub.nonlinear_solver = NewtonSolver()
                 self.sub.linear_solver = ScipyKrylov()
 
-        top = Problem()
-        top.model = Super()
+        top = Problem(model=Super())
 
         top.setup(check=False)
 
@@ -1271,8 +1266,7 @@ class TestProblem(unittest.TestCase):
             def setup(self):
                 self.add_subsystem('sub', Sub())
 
-        top = Problem()
-        top.model = Super()
+        top = Problem(model=Super())
 
         top.setup(check=False)
 
@@ -1319,8 +1313,7 @@ class TestProblem(unittest.TestCase):
                 self.sub.nonlinear_solver = NewtonSolver()
                 self.sub.linear_solver = ScipyKrylov()
 
-        top = Problem()
-        top.model = Super()
+        top = Problem(model=Super())
 
         top.setup(check=False)
 
@@ -1362,8 +1355,7 @@ class TestProblem(unittest.TestCase):
             def setup(self):
                 self.add_subsystem('sub', Sub())
 
-        top = Problem()
-        top.model = Super()
+        top = Problem(model=Super())
 
         top.setup(check=False)
 
@@ -1400,8 +1392,8 @@ class TestProblem(unittest.TestCase):
 
     def test_list_problem_vars(self):
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
+        model = prob.model
         model.nonlinear_solver = NonlinearBlockGS()
 
         prob.driver = ScipyOptimizeDriver()
@@ -1516,8 +1508,8 @@ class TestProblem(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
-        model = prob.model = SellarDerivatives()
+        prob = Problem(model=SellarDerivatives())
+        model = prob.model
         model.nonlinear_solver = NonlinearBlockGS()
 
         prob.driver = ScipyOptimizeDriver()

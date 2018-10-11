@@ -17,6 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
+from openmdao.core.tests.test_discrete import InternalDiscreteGroup
 
 class TestNewton(unittest.TestCase):
 

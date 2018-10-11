@@ -70,7 +70,7 @@ class System(object):
         Int that holds the number of times this system has iterated
         in a recording run.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
     _full_comm : MPI.Comm or None
         MPI communicator object used when System's comm is split for parallel FD.
@@ -83,8 +83,6 @@ class System(object):
         (i.e. among _subsystems_allprocs).
     _subsystems_proc_range : (int, int)
         List of ranges of each myproc subsystem's processors relative to those of this system.
-    _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
-        List of ranges of each myproc subsystem's allprocs variables relative to this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -104,6 +102,14 @@ class System(object):
         ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+    _var_discrete : dict
+        Dictionary of discrete var metadata and values local to this process.
+    _var_allprocs_discrete : dict
+        Dictionary of discrete var metadata and values for all processes.
+    _discrete_inputs : dict-like or None
+        Storage for discrete input values.
+    _discrete_outputs : dict-like or None
+        Storage for discrete output values.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
@@ -218,8 +224,6 @@ class System(object):
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
-    _norm0: float
-        Normalization factor
     _vector_class : class
         Class to use for data vectors.  After setup will contain the value of either
         _distributed_vector_class or _local_vector_class.
@@ -298,6 +302,8 @@ class System(object):
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {}
 
@@ -375,6 +381,10 @@ class System(object):
         self._assembled_jac = None
 
         self._par_fd_id = 0
+
+        self._filtered_vars_to_record = {}
+        self._owning_rank = {}
+        self._lin_vec_names = []
 
     def _declare_options(self):
         """
@@ -518,6 +528,13 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
+            # Linear vectors allocated complex only if subsolvers require derivatives.
+            if nl_alloc_complex:
+                from openmdao.error_checking.check_config import check_allocate_complex_ln
+                ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
+            else:
+                ln_alloc_complex = False
+
             if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
                 self._scale_factors = self._compute_root_scale_factors()
             else:
@@ -532,7 +549,7 @@ class System(object):
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                 else:
-                    alloc_complex = force_alloc_complex
+                    alloc_complex = ln_alloc_complex
 
                     if vec_name != 'linear':
                         voi = vois[vec_name]
@@ -1092,11 +1109,15 @@ class System(object):
         vector_class = self._vector_class
 
         for vec_name in self._rel_vec_name_list:
+
+            # Only allocate complex in the vectors we need.
+            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, resize=resize,
-                    alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
+                    alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -1261,7 +1282,7 @@ class System(object):
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
-            asm_jac._initialize()
+            asm_jac._initialize(self)
             asm_jac._init_view(self)
 
     def set_initial_values(self):
@@ -1599,21 +1620,6 @@ class System(object):
                 offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
-
-    @contextmanager
-    def jacobian_context(self, jac):
-        """
-        Context manager that yields the Jacobian assigned to this system in this system's context.
-
-        Yields
-        ------
-        <Jacobian>
-            The current system's jacobian with its _system set to self.
-        """
-        oldsys = jac._system
-        jac._system = self
-        yield jac
-        jac._system = oldsys
 
     @property
     def nonlinear_solver(self):
@@ -2206,7 +2212,10 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if name in abs2idx:
+                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    else:
+                        out[name]['size'] = 0  # discrete var, don't know size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2258,7 +2267,10 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if name in abs2idx:
+                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    else:
+                        out[name]['size'] = 0  # discrete var, we don't know the size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2923,6 +2935,14 @@ class System(object):
             sub._inputs.set_complex_step_mode(active)
             sub._outputs.set_complex_step_mode(active)
             sub._residuals.set_complex_step_mode(active)
+
+            if sub._vectors['output']['linear']._alloc_complex:
+                sub._vectors['output']['linear'].set_complex_step_mode(active)
+                sub._vectors['input']['linear'].set_complex_step_mode(active)
+                sub._vectors['residual']['linear'].set_complex_step_mode(active)
+
+                if sub._owns_approx_jac:
+                    sub._jacobian.set_complex_step_mode(active)
 
     def cleanup(self):
         """

@@ -5,7 +5,7 @@ from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
-from six import itervalues
+from six import itervalues, iteritems
 
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
@@ -28,6 +28,8 @@ class Jacobian(object):
         If we are approximating a jacobian at the top level and we have specified indices on the
         functions or designvars, then we need to disable the size checking temporarily so that we
         can assign a jacobian with less rows or columns than the variable sizes.
+    _under_complex_step : bool
+        When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : defaultdict
         A cache dict for key to absolute key.
     _randomize : bool
@@ -46,6 +48,7 @@ class Jacobian(object):
         self._system = system
         self._subjacs_info = system._subjacs_info
         self._override_checks = False
+        self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
 
@@ -184,12 +187,6 @@ class Jacobian(object):
         else:
             subjacs_info['value'] = subjac
 
-    def _initialize(self):
-        """
-        Allocate the global matrices.
-        """
-        pass
-
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
@@ -201,12 +198,14 @@ class Jacobian(object):
         """
         pass
 
-    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
 
         Parameters
         ----------
+        system : System
+            System that is updating this jacobian.
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector
@@ -244,3 +243,23 @@ class Jacobian(object):
         Zero out internal matrices if needed.
         """
         pass
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for key, meta in iteritems(self._subjacs_info):
+            if active:
+                meta['value'] = meta['value'].astype(np.complex)
+            else:
+                meta['value'] = meta['value'].real
+
+        self._under_complex_step = active

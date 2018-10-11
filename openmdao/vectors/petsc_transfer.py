@@ -5,6 +5,7 @@ import numpy as np
 from petsc4py import PETSc
 from six import iteritems, itervalues
 from itertools import product, chain
+from collections import defaultdict
 
 from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer
@@ -198,6 +199,80 @@ class PETScTransfer(DefaultTransfer):
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
 
+    @staticmethod
+    def _setup_discrete_transfers(group, recurse=True):
+        """
+        Compute all transfers that are owned by our parent group.
+
+        Parameters
+        ----------
+        group : <Group>
+            Parent group.
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        group._discrete_transfers = transfers = defaultdict(list)
+        name_offset = len(group.pathname) + 1 if group.pathname else 0
+
+        iproc = group.comm.rank
+        owns = group._owning_rank
+
+        # collect all xfers for each tgt system
+        for tgt, src in iteritems(group._conn_discrete_in2out):
+            src_sys, src_var = src[name_offset:].split('.', 1)
+            tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
+            xfer = (src_sys, src_var, tgt_sys, tgt_var)
+            transfers[tgt_sys].append(xfer)
+
+        total_send = set()
+        total_recv = []
+        total_xfers = []
+
+        for tgt_sys, xfers in iteritems(transfers):
+            send = set()
+            recv = []
+            for src_sys, src_var, tgt_sys, tgt_var in xfers:
+                if group.pathname:
+                    src_abs = '.'.join([group.pathname, src_sys, src_var])
+                else:
+                    src_abs = '.'.join([src_sys, src_var])
+                tgt_rel = '.'.join((tgt_sys, tgt_var))
+                src_rel = '.'.join((src_sys, src_var))
+                if iproc == owns[src_abs]:
+                    # we own this var, so we'll send it out to others
+                    send.add(src_rel)
+                if (tgt_rel in group._var_discrete['input'] and
+                        src_rel not in group._var_discrete['output']):
+                    # we have the target locally, but not the source, so we need someone
+                    # to send it to us.
+                    recv.append(src_rel)
+
+            transfers[tgt_sys] = (xfers, send, recv)
+            total_xfers.extend(xfers)
+            total_send.update(send)
+            total_recv.extend(recv)
+
+        transfers[None] = (total_xfers, total_send, total_recv)
+
+        # find out all ranks that need to receive each discrete source var
+        allproc_xfers = group.comm.allgather(transfers)
+        allprocs_recv = defaultdict(lambda: defaultdict(list))
+        for rank, rank_transfers in enumerate(allproc_xfers):
+            for tgt_sys, (_, _, recvs) in iteritems(rank_transfers):
+                for recv in recvs:
+                    allprocs_recv[tgt_sys][recv].append(rank)
+
+        group._allprocs_discrete_recv = allprocs_recv
+
+        # if we own a src var but it's local for every rank, we don't need to send it to anyone.
+        total_send = total_send.intersection(allprocs_recv)
+
+        for tgt_sys in transfers:
+            xfers, send, _ = transfers[tgt_sys]
+            # update send list to remove any vars that don't have a remote receiver,
+            # and get rid of recv list because allprocs_recv has the necessary info.
+            transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]))
+
     def _initialize_transfer(self, in_vec, out_vec):
         """
         Set up the transfer; do any necessary pre-computation.
@@ -233,47 +308,47 @@ class PETScTransfer(DefaultTransfer):
         mode : str
             'fwd' or 'rev'.
         """
-        if mode == 'fwd':
+        flag = False
+        if mode == 'rev':
+            flag = True
+            in_vec, out_vec = out_vec, in_vec
 
-            in_petsc = in_vec._petsc
-            out_petsc = out_vec._petsc
+        in_petsc = in_vec._petsc
+        out_petsc = out_vec._petsc
 
-            # For Complex Step, need to disassemble real and imag parts, transfer them separately,
-            # then reassemble them.
-            if in_vec._under_complex_step and out_vec._alloc_complex:
+        # For Complex Step, need to disassemble real and imag parts, transfer them separately,
+        # then reassemble them.
+        if in_vec._under_complex_step and out_vec._alloc_complex:
 
-                # Real
-                in_petsc.array = in_vec._data.real
-                out_petsc.array = out_vec._data.real
-                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+            # Real
+            in_petsc.array = in_vec._data.real
+            out_petsc.array = out_vec._data.real
+            self._transfer.scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
-                # Imaginary
-                in_petsc_imag = in_vec._imag_petsc
-                out_petsc_imag = out_vec._imag_petsc
-                in_petsc_imag.array = in_vec._data.imag
-                out_petsc_imag.array = out_vec._data.imag
-                self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=False, mode=False)
+            # Imaginary
+            in_petsc_imag = in_vec._imag_petsc
+            out_petsc_imag = out_vec._imag_petsc
+            in_petsc_imag.array = in_vec._data.imag
+            out_petsc_imag.array = out_vec._data.imag
+            self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=flag, mode=flag)
 
-                in_vec._data[:] = in_petsc.array + in_petsc_imag.array * 1j
+            in_vec._data[:] = in_petsc.array + in_petsc_imag.array * 1j
 
-            else:
+        else:
 
-                # Anything that has been allocated complex requires an additional step because
-                # the petsc vector does not directly reference the _data.
+            # Anything that has been allocated complex requires an additional step because
+            # the petsc vector does not directly reference the _data.
 
-                if in_vec._alloc_complex:
-                    in_petsc.array = in_vec._data
+            if in_vec._alloc_complex:
+                in_petsc.array = in_vec._data
 
-                if out_vec._alloc_complex:
-                    out_petsc.array = out_vec._data
+            if out_vec._alloc_complex:
+                out_petsc.array = out_vec._data
 
-                self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+            self._transfer.scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
-                if in_vec._alloc_complex:
-                    in_vec._data[:] = in_petsc.array
-
-        else:  # rev
-            self._transfer.scatter(in_vec._petsc, out_vec._petsc, addv=True, mode=True)
+            if in_vec._alloc_complex:
+                in_vec._data[:] = in_petsc.array
 
     def multi_transfer(self, in_vec, out_vec, mode='fwd'):
         """
