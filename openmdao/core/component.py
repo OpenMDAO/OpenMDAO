@@ -1162,14 +1162,14 @@ class Component(System):
         """
         # TODO: coloring
         if self._ad_partials_func is None:
-            from openmdao.devtools.generate_derivative import generate_gradient_code
+            from openmdao.devtools.generate_derivative import generate_component_gradient
 
             if self._inputs._data.size > self._outputs._data.size:
                 self._ad_mode = 'reverse'
             else:
                 self._ad_mode = 'forward'
-            _, _, df = generate_gradient_code(self, self._ad_mode)
-            self._ad_partials_func = df
+            compute_src, grad_src, grad_func = generate_component_gradient(self, self._ad_mode)
+            self._ad_partials_func = grad_func
 
         if self._ad_mode == 'forward':
             self._eval_ad_fwd(partials, self._ad_partials_func)

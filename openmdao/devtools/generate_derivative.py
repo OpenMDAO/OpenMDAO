@@ -10,14 +10,17 @@ from importlib import reload
 import types
 import time
 import numpy as np
+import ast
 
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
+from openmdao.devtools.ast_tools import ImportScanner
 
-def generate_gradient(src, method_name, mode):
+def generate_gradient(comp, src, method_name, mode):
     """
     Given the string representing the source code of a python function,
     use the tangent library to generate source code of its gradient.
 
+    comp: Component instance
     src: str, the source code to be analyzed
     method_name: str, the name of the function
 
@@ -27,21 +30,18 @@ def generate_gradient(src, method_name, mode):
     # needs to be read in as a proper module for tangent to work
     # in case we're doing this several times, need to reload
     # need to know the number of parameters to the loaded function
-    method = None
-    while method == None:
-        try:
-            del sys.modules['_temp']
-        except:
-            pass
-        try:
-            with open("_temp.py", "w") as f:
-                f.write(src)
-            import _temp
-            method = getattr(_temp, method_name)
-        except AttributeError as e:
-            #print(e, method_name)
-            time.sleep(0.1)
-            _temp = reload(_temp)
+
+    try:
+        del sys.modules['_temp']
+    except:
+        pass
+
+    with open("_temp.py", "w") as f:
+        f.write(src)
+    import _temp
+    mod = sys.modules['_temp']
+    mod.self = comp  # add self to global namespace of module
+    method = getattr(_temp, method_name)
 
     sig = signature(method)
     params = sig.parameters
@@ -49,23 +49,22 @@ def generate_gradient(src, method_name, mode):
     # generate AD code for the method for each parameter
     #print(method)
     df = tangent.autodiff(method, wrt=range(len(params)), mode=mode,
-                          # motion='split',
                           verbose=0, check_dims=False)
     src = getsourcelines(df)[0]
 
     # cleanup temp file
     #remove("_temp.py")
     # give it a more friendly method name
-    longname = src[0][4:-2]
+    # longname = src[0][4:-2]
 
-    src[0] = src[0].replace(longname, "d%0s" % method_name)
+    # src[0] = src[0].replace(longname, "d%0s" % method_name)
 
     # return the generated source as a list of strings
     #print(''.join(src))
     return src, df
 
 
-def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_method):
+def generate_component_gradient(comp, mode):
     inputs = comp._inputs
     outputs = comp._outputs
 
@@ -76,22 +75,6 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
 
     # get the name of the component type
     class_name = comp.__class__.__name__
-
-    # AD code to be written out to file/augment original component
-    final_code = []
-
-    # start by generating code for a sub-class of the original component
-    # this is useful in case the original component was general to the
-    # point of having variable number if inputs/outputs determined on
-    # instantiation. AD can only generate partial derivative code for
-    # fixed-sized versions of these components.
-    s = "import tangent\n"
-    s += "class %sAD(%s):\n" % (class_name, class_name)
-    final_code.append(s)
-    s = "    def setup(self):\n"
-    s += "        super(%sAD, self).setup()\n" % class_name
-    s += "        self.declare_partials('*', '*')\n\n"
-    final_code.append(s)
 
     # get source code of original compute() method
     # ignore blank lines, useful for detecting indentation later
@@ -222,17 +205,28 @@ def generate_gradient_code(comp, mode): #, inputs, outputs, local_vars, compute_
     # start construction of partial derivative functions
     indent = "       "
 
-    fname = 'compute_outputs'
+    funcname = 'compute_outputs'
+
+    source = []
+
+    # get imports from component source file
+    comp_file = sys.modules[comp.__class__.__module__].__file__
+    with open(comp_file, "r") as f:
+        node = ast.parse(f.read(), comp_file)
+        imp_scan = ImportScanner()
+        imp_scan.visit(node)
+        source.extend(imp_scan.get_import_lines())
 
     # generate string of function to be analyzed by the tangent library
-    source = "import numpy as np\ndef %s(" % fname
-    source += ", ".join(pnames) + "):\n"
-    source += src + "\n"
-    outs = str(tuple(onames))
-    source += "%s return %s\n" % (indent, outs.replace("'", ""))
+    source.append("def %s(%s):" % (funcname, ', '.join(pnames)))
+    source.append(src)
+    source.append("%s return %s" % (indent, ', '.join(onames)))
+    source = '\n'.join(source)
+
+    print(source)
 
     # gather generated gradient source code
-    dsrc, df = generate_gradient(source, fname, mode)
+    dsrc, df = generate_gradient(comp, source, funcname, mode)
 
     return source, dsrc, df
 
@@ -256,7 +250,7 @@ def _ad_setup_parser(parser):
 
 
 def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
-    src, dsrc, df = generate_gradient_code(comp, mode)
+    src, dsrc, df = generate_component_gradient(comp, mode)
 
     if show_orig:
         print("ORIG function:", file=out)
