@@ -1,5 +1,7 @@
 """Define the NonlinearBlockGS class."""
 
+import numpy as np
+
 from openmdao.solvers.solver import NonlinearSolver
 
 
@@ -38,6 +40,9 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='lower limit for Aitken relaxation factor')
         self.options.declare('aitken_max_factor', default=1.5,
                              desc='upper limit for Aitken relaxation factor')
+        self.options.declare('cs_reconverge', default=True,
+                             desc='When True, when this driver solves under a complex step, nudge '
+                             'the Solution vector by a small amount so that it reconverges.')
 
     def _iter_initialize(self):
         """
@@ -51,11 +56,24 @@ class NonlinearBlockGS(NonlinearSolver):
             error at the first iteration.
         """
         if self.options['use_aitken']:
-            self._aitken_work1 = self._system._outputs._clone()
-            self._aitken_work2 = self._system._outputs._clone()
-            self._aitken_work3 = self._system._outputs._clone()
-            self._aitken_work4 = self._system._outputs._clone()
+            outputs = self._system._outputs
+            self._aitken_work1 = outputs._clone()
+            self._aitken_work2 = outputs._clone()
+            self._aitken_work3 = outputs._clone()
+            self._aitken_work4 = outputs._clone()
             self._theta_n_1 = 1.
+
+            if outputs._under_complex_step:
+                self._aitken_work1.set_complex_step_mode(True)
+                self._aitken_work2.set_complex_step_mode(True)
+                self._aitken_work3.set_complex_step_mode(True)
+                self._aitken_work4.set_complex_step_mode(True)
+
+        # When under a complex step from higher in the hierarchy, sometimes the step is too small
+        # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
+        # one iteration.
+        if self._system.under_complex_step and self.options['cs_reconverge']:
+            self._system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
@@ -67,6 +85,7 @@ class NonlinearBlockGS(NonlinearSolver):
         use_aitken = self.options['use_aitken']
 
         if use_aitken:
+
             outputs = self._system._outputs
             aitken_min_factor = self.options['aitken_min_factor']
             aitken_max_factor = self.options['aitken_max_factor']
@@ -77,8 +96,10 @@ class NonlinearBlockGS(NonlinearSolver):
             outputs_n = self._aitken_work3
             temp = self._aitken_work4
             theta_n_1 = self._theta_n_1
+
             # store a copy of the outputs, used to compute the change in outputs later
             delta_outputs_n.set_vec(outputs)
+
             # store a copy of the outputs
             outputs_n.set_vec(outputs)
 
@@ -106,8 +127,10 @@ class NonlinearBlockGS(NonlinearSolver):
                 if temp_norm == 0.:
                     temp_norm = 1e-12  # prevent division by 0 in the next line
                 theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
+
                 # limit relaxation factor to the specified range
                 theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
+
                 # save relaxation factor for the next iteration
                 theta_n_1 = theta_n
             else:

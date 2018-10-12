@@ -381,6 +381,39 @@ class TestPETScKrylov(unittest.TestCase):
         # Should take less iterations when starting from previous solution.
         self.assertTrue(icount2 < icount1)
 
+    def test_error_under_cs(self):
+        """Verify that PETScKrylov abides by the 'maxiter' option."""
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = PETScKrylov()
+
+        model.approx_totals(method='cs')
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            J = prob.compute_totals(of=['obj'], wrt=['z'])
+
+        msg = 'PETScKrylov solver is not supported under complex step.'
+        self.assertEqual(str(cm.exception), msg)
+
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class TestPETScKrylovSolverFeature(unittest.TestCase):

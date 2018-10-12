@@ -4,6 +4,8 @@ from __future__ import print_function
 
 from copy import deepcopy
 
+import numpy as np
+
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
 from openmdao.utils.general_utils import warn_deprecation
@@ -71,6 +73,9 @@ class NewtonSolver(NonlinearSolver):
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
+        self.options.declare('cs_reconverge', default=True,
+                             desc='When True, when this driver solves under a complex step, nudge '
+                             'the Solution vector by a small amount so that it reconverges.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -185,6 +190,12 @@ class NewtonSolver(NonlinearSolver):
             self._err_cache['outputs'] = deepcopy(self._system._outputs)
 
         system = self._system
+
+        # When under a complex step from higher in the hierarchy, sometimes the step is too small
+        # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
+        # one iteration of Newton.
+        if system.under_complex_step and self.options['cs_reconverge']:
+            system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
