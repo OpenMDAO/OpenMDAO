@@ -17,7 +17,6 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NonlinearRunOnc
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -35,8 +34,6 @@ if OPTIMIZER:
 class TestSqliteCaseReader(unittest.TestCase):
 
     def setUp(self):
-        recording_iteration.stack = []  # reset to avoid problems from earlier tests
-
         self.orig_dir = os.getcwd()
         self.temp_dir = mkdtemp()
         os.chdir(self.temp_dir)
@@ -1409,7 +1406,6 @@ def _assert_model_matches_case(case, system):
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def setUp(self):
-        recording_iteration.stack = []  # reset to avoid problems from earlier tests
         self.dir = mkdtemp()
         self.original_path = os.getcwd()
         os.chdir(self.dir)

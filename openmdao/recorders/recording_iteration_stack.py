@@ -67,9 +67,6 @@ class _RecIteration(object):
         return prefix + separator.join(coord_list)
 
 
-recording_iteration = _RecIteration()
-
-
 class Recording(object):
     """
     A class that acts as a context manager.
@@ -109,6 +106,7 @@ class Recording(object):
         self.name = name
         self.iter_count = iter_count
         self.recording_requester = recording_requester
+        self.stack = self.recording_requester._recording_iter.stack
         self.abs = 0
         self.rel = 0
 
@@ -124,7 +122,7 @@ class Recording(object):
         self : object
             self
         """
-        recording_iteration.stack.append((self.name, self.iter_count))
+        self.stack.append((self.name, self.iter_count))
         return self
 
     def __exit__(self, *args):
@@ -139,7 +137,7 @@ class Recording(object):
         # Determine if recording is justified.
         do_recording = True
 
-        for stack_item in recording_iteration.stack:
+        for stack_item in self.stack:
             if stack_item[0] in ('_run_apply', '_compute_totals'):
                 do_recording = False
                 break
@@ -150,9 +148,9 @@ class Recording(object):
             else:
                 self.recording_requester.record_iteration()
 
-        self.recording_requester = None
-
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 
-        recording_iteration.stack.pop()
+        self.stack.pop()
+
+        self.recording_requester = None
