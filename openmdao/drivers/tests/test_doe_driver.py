@@ -1051,6 +1051,7 @@ class TestParallelDOE(unittest.TestCase):
         # total number of cases recorded across all requested procs
         num_cases = prob.comm.allgather(num_cases)
         self.assertEqual(sum(num_cases), len(expected))
+        print("DONE!")
 
     def test_fan_in_grouped_serial(self):
         # run cases on all procs (parallel model will run on single proc)

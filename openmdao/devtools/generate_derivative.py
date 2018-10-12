@@ -15,6 +15,8 @@ import ast
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 from openmdao.devtools.ast_tools import ImportScanner
 
+
+
 def generate_gradient(comp, src, method_name, mode):
     """
     Given the string representing the source code of a python function,
@@ -29,7 +31,7 @@ def generate_gradient(comp, src, method_name, mode):
 
     # needs to be read in as a proper module for tangent to work
     # in case we're doing this several times, need to reload
-    # need to know the number of parameters to the loaded function
+    # need to know the number of inputs to the loaded function
 
     try:
         del sys.modules['_temp']
@@ -46,7 +48,7 @@ def generate_gradient(comp, src, method_name, mode):
     sig = signature(method)
     params = sig.parameters
 
-    # generate AD code for the method for each parameter
+    # generate AD code for the method for all inputs
     #print(method)
     df = tangent.autodiff(method, wrt=range(len(params)), mode=mode,
                           verbose=0, check_dims=False)
@@ -54,10 +56,6 @@ def generate_gradient(comp, src, method_name, mode):
 
     # cleanup temp file
     #remove("_temp.py")
-    # give it a more friendly method name
-    # longname = src[0][4:-2]
-
-    # src[0] = src[0].replace(longname, "d%0s" % method_name)
 
     # return the generated source as a list of strings
     #print(''.join(src))
@@ -228,6 +226,7 @@ def generate_component_gradient(comp, mode):
     # gather generated gradient source code
     dsrc, df = generate_gradient(comp, source, funcname, mode)
 
+    print(''.join(dsrc))
     return source, dsrc, df
 
 
