@@ -188,6 +188,27 @@ class TestExternalCodeComp(unittest.TestCase):
         else:
             self.fail("RuntimeError expected")
 
+    def test_disallowed_very_large_return_code(self):
+        self.extcode.options['command'] = [
+            'python', 'extcode_example.py', 'extcode.out', '--return_code', str(2**64)
+        ]
+
+        self.extcode.options['external_input_files'] = ['extcode_example.py']
+
+        self.prob.setup(check=True)
+        try:
+            self.prob.run_model()
+        except RuntimeError as err:
+            if sys.platform == 'win32':
+                self.assertTrue("Process exited with unknown return code" in str(err),
+                                "expected 'Process exited with unknown return code' to be in '%s'"
+                                % str(err))
+            else:
+                self.assertTrue("return_code = 255" in str(err),
+                                "expected 'return_code = 255' to be in '%s'" % str(err))
+        else:
+            self.fail("RuntimeError expected")
+
     def test_badcmd(self):
         # Set command to nonexistant path.
         self.extcode.options['command'] = ['no-such-command']
