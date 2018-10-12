@@ -13,6 +13,9 @@ environment:
       PETSc: 3.8.1
       UPLOAD_DOCS: 1
 
+    - APPVEYOR_SSH_KEY: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDPY5HTjnVdsLGMLjfE1l1e01iMxSSHXjLySDpoS+EOM9sXUwhfYPHMRrLiU9Ifzhv52/zLjdJZhmUlfE/x07N7zWGZFY8kjmSA7ifjAK2zoZpk2Uj10CEvKJ9ZFQPv0m9sWjdw2fUxRqCijjg9ifz8SbuwqhUgi1ueBQg5BIodC77+6FpE3r8eSkuJLvvx0/AVafPkEYYMYUKIU2mPj4+mOUqZuXx3MQIJA0w+hzzaVMnc7qrA94K0UCt33Gaj4skvFUYFc4HSZaCY5SSk8+r0PKxWtlSe6+AfTzMCyY0K8wdthAtG0jJXeHM+rKWWw7hUc3NkYNlUSYQWHH80s54J kmarstel@GRSLA40016878
+
+
 install:
     sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
     sudo apt-get update;
@@ -52,7 +55,9 @@ install:
     pip install .;
     conda list
 
+    curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
+
 build: off
 
 test_script:
-  - testflo -v --pre_announce .
+  - testflo -v --pre_announce . -n 1
