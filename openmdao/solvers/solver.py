@@ -141,11 +141,12 @@ class Solver(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     """
 
     # Object to store some formatting for iprint that is shared across all solvers.
     SOLVER = 'base_solver'
-    _solver_info = SolverInfo()
 
     def __init__(self, **kwargs):
         """
@@ -161,6 +162,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
+        self._solver_info = None
 
         # Solver options
         self.options = OptionsDictionary()
@@ -254,6 +256,7 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._solver_info = system._solver_info
 
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return

@@ -19,6 +19,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
+from openmdao.solvers.solver import SolverInfo
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.group import System
@@ -809,6 +810,9 @@ class Problem(object):
             raise ValueError(msg)
 
         self._mode = self._orig_mode = mode
+
+        # this will be shared by all Solvers in the model
+        model._solver_info = SolverInfo()
 
         model_comm = self.driver._setup_comm(comm)
 
