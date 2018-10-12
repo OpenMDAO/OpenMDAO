@@ -33,7 +33,7 @@ class DictionaryJacobian(Jacobian):
 
         self._iter_keys = {}
 
-    def _iter_abs_keys(self, vec_name):
+    def _iter_abs_keys(self, system, vec_name):
         """
         Iterate over subjacs keyed by absolute names.
 
@@ -41,6 +41,8 @@ class DictionaryJacobian(Jacobian):
 
         Parameters
         ----------
+        system : System
+            System that is updating this jacobian.
         vec_name : str
             The name of the current RHS vector.
 
@@ -49,7 +51,6 @@ class DictionaryJacobian(Jacobian):
         list
             List of keys matching this jacobian for the current system.
         """
-        system = self._system
         entry = (system.pathname, vec_name)
 
         if entry not in self._iter_keys:
@@ -66,12 +67,14 @@ class DictionaryJacobian(Jacobian):
 
         return self._iter_keys[entry]
 
-    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
 
         Parameters
         ----------
+        system : System
+            System that is updating this jacobian.
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector
@@ -97,9 +100,12 @@ class DictionaryJacobian(Jacobian):
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             ncol = d_residuals._ncol
             subjacs_info = self._subjacs_info
-            for abs_key in self._iter_abs_keys(d_residuals._name):
+            for abs_key in self._iter_abs_keys(system, d_residuals._name):
                 subjac_info = subjacs_info[abs_key]
-                subjac = subjac_info['value']
+                if self._randomize:
+                    subjac = self._randomize_subjac(subjac_info['value'])
+                else:
+                    subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
                     rows = subjac_info['rows']

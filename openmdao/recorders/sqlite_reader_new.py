@@ -97,8 +97,7 @@ class BaseCaseReader(object):
             Identifies which cases to return. 'iteration_coordinate' can refer to
             a system or a solver hierarchy location. Defaults to 'problem'.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children. Defaults to True.
+            If True, will enable iterating over all successors in case hierarchy.
         flat : bool
             If True, return a flat dictionary rather than a nested dictionary.
 
@@ -118,8 +117,7 @@ class BaseCaseReader(object):
         id : str
             The unique identifier of the case to return.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children. Defaults to True.
+            If True, will enable iterating over all successors in case hierarchy.
 
         Returns
         -------
@@ -448,8 +446,7 @@ class SqliteCaseReader(BaseCaseReader):
         source : {'problem', 'driver', component pathname, solver pathname}
             Identifies which cases to return.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children. Defaults to False.
+            If True, will enable iterating over all successors in case hierarchy.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
@@ -521,10 +518,14 @@ class SqliteCaseReader(BaseCaseReader):
             Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
-            rather than just the direct children.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
+
+        Returns
+        -------
+        iterable or dict
+            The cases identified by source
         """
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")

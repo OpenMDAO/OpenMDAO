@@ -167,4 +167,33 @@ True. This applies to both :code:`compact_print` :code:`True` and :code:`False`.
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_show_only_incorrect
     :layout: interleave
 
+Plotting Check Partials Results
+-------------------------------
+
+The function :code:`partial_deriv_plot` lets you see a visual representation of the values
+returned by :code:`check_partials`.
+
+.. autofunction:: openmdao.utils.visualization.partial_deriv_plot
+    :noindex:
+
+Here are two examples of its use. Note that in these examples, the :code:`compute_partials` method intentionally
+computes the incorrect value so that the plots show how this function can be used to detect such errors.
+
+With the default value :code:`binary` equal to :code:`True`, the plots
+will only show the presence of a non-zero derivative, not the value.
+
+.. embed-code::
+    openmdao.utils.tests.test_visualization.TestFeatureVisualization.test_partial_deriv_plot
+    :layout: code, plot
+    :scale: 90
+    :align: center
+
+With the value :code:`binary` equal to :code:`False`, the plots show the actual value.
+
+.. embed-code::
+    openmdao.utils.tests.test_visualization.TestFeatureVisualization.test_partial_deriv_non_binary_plot
+    :layout: code, plot
+    :scale: 90
+    :align: center
+
 .. tags:: Derivatives

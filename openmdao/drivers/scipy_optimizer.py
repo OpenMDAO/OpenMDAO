@@ -68,15 +68,9 @@ class ScipyOptimizeDriver(Driver):
         Cached result of constraint evaluations because scipy asks for them in a separate function.
     _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
-    _cons : dict
-        Contains all constraint info.
-    _designvars : dict
-        Contains all design variable info.
     _grad_cache : OrderedDict
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _objs : dict
-        Contains all objective info.
     _exc_info : 3 item tuple
         Storage for exception and traceback information.
     _obj_and_nlcons : list

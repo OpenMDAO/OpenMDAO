@@ -64,11 +64,11 @@ class Component(System):
     ----------
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
-    _var_rel2data_io : dict
-        Dictionary mapping relative names to dicts with keys (prom, rel, my_idx, type_, metadata).
+    _var_rel2meta : dict
+        Dictionary mapping relative names to metadata.
         This is only needed while adding inputs and outputs. During setup, these are used to
         build the dictionaries of metadata.
-    _static_var_rel2data_io : dict
+    _static_var_rel2meta : dict
         Static version of above - stores data for variables added outside of setup.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
@@ -98,10 +98,10 @@ class Component(System):
         self._approx_schemes = OrderedDict()
 
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2data_io = {}
+        self._var_rel2meta = {}
 
         self._static_var_rel_names = {'input': [], 'output': []}
-        self._static_var_rel2data_io = {}
+        self._static_var_rel2meta = {}
 
         self._declared_partials = []
         self._approximated_partials = []
@@ -190,12 +190,12 @@ class Component(System):
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
-        self._var_rel2data_io = {}
+        self._var_rel2meta = {}
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
 
         self._static_mode = False
-        self._var_rel2data_io.update(self._static_var_rel2data_io)
+        self._var_rel2meta.update(self._static_var_rel2meta)
         for type_ in ['input', 'output']:
             self._var_rel_names[type_].extend(self._static_var_rel_names[type_])
         self._design_vars.update(self._static_design_vars)
@@ -237,26 +237,21 @@ class Component(System):
         global global_meta_names
         super(Component, self)._setup_var_data()
         allprocs_abs_names = self._var_allprocs_abs_names
-        abs_names = self._var_abs_names
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_abs2prom
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
 
         # Compute the prefix for turning rel/prom names into abs names
-        if self.pathname:
-            prefix = self.pathname + '.'
-        else:
-            prefix = ''
+        prefix = self.pathname + '.' if self.pathname else ''
 
         for type_ in ['input', 'output']:
             for prom_name in self._var_rel_names[type_]:
                 abs_name = prefix + prom_name
-                metadata = self._var_rel2data_io[prom_name]['metadata']
+                metadata = self._var_rel2meta[prom_name]
 
                 # Compute allprocs_abs_names, abs_names
                 allprocs_abs_names[type_].append(abs_name)
-                abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
@@ -271,6 +266,18 @@ class Component(System):
                 # Compute abs2meta
                 abs2meta[abs_name] = metadata
 
+            for prom_name, val in iteritems(self._var_discrete[type_]):
+                abs_name = prefix + prom_name
+                allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                self._var_allprocs_discrete[type_][abs_name] = val
+
+        self._var_abs_names = self._var_allprocs_abs_names
+        if self._var_discrete['input'] or self._var_discrete['output']:
+            self._discrete_inputs = _DictValues(self._var_discrete['input'])
+            self._discrete_outputs = _DictValues(self._var_discrete['output'])
+        else:
+            self._discrete_inputs = self._discrete_outputs = None
+
     def _setup_var_sizes(self, recurse=True):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
@@ -284,30 +291,47 @@ class Component(System):
 
         iproc = self.comm.rank
         nproc = self.comm.size
-        vec_names = self._lin_rel_vec_name_list
 
         sizes = self._var_sizes
-        relnames = self._var_allprocs_relevant_names
         abs2meta = self._var_abs2meta
+
+        if self._use_derivatives:
+            vec_names = self._lin_rel_vec_name_list
+        else:
+            vec_names = self._vec_names
 
         # Initialize empty arrays
         for vec_name in vec_names:
-            sizes[vec_name] = {}
+            # at component level, _var_allprocs_* is the same as var_* since all vars exist in all
+            # procs for a given component, so we don't have to mess with figuring out what vars are
+            # local.
+            if self._use_derivatives:
+                relnames = self._var_allprocs_relevant_names[vec_name]
+            else:
+                relnames = self._var_allprocs_abs_names
 
+            sizes[vec_name] = {}
             for type_ in ('input', 'output'):
-                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[vec_name][type_])), int)
+                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[type_])), int)
 
                 # Compute _var_sizes
-                for idx, abs_name in enumerate(relnames[vec_name][type_]):
+                for idx, abs_name in enumerate(relnames[type_]):
                     sz[iproc, idx] = abs2meta[abs_name]['size']
 
-        if self.comm.size > 1:
+        if nproc > 1:
             for vec_name in vec_names:
                 sizes = self._var_sizes[vec_name]
-                for type_ in ['input', 'output']:
-                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                if self.options['distributed']:
+                    for type_ in ['input', 'output']:
+                        self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                else:
+                    # if component isn't distributed, we don't need to allgather sizes since
+                    # they'll all be the same.
+                    for type_ in ['input', 'output']:
+                        sizes[type_] = np.tile(sizes[type_][iproc], (nproc, 1))
 
-        self._var_sizes['nonlinear'] = self._var_sizes['linear']
+        if self._use_derivatives:
+            self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._setup_global_shapes()
 
@@ -413,24 +437,63 @@ class Component(System):
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
-            var_rel2data_io = self._static_var_rel2data_io
+            var_rel2meta = self._static_var_rel2meta
             var_rel_names = self._static_var_rel_names
         else:
-            var_rel2data_io = self._var_rel2data_io
+            var_rel2meta = self._var_rel2meta
             var_rel_names = self._var_rel_names
 
         # Disallow dupes
-        if name in var_rel2data_io:
+        if name in var_rel2meta:
             msg = "Variable name '{}' already exists.".format(name)
             raise ValueError(msg)
 
-        var_rel2data_io[name] = {
-            'prom': name, 'rel': name,
-            'my_idx': len(self._var_rel_names['input']),
-            'type': 'input',
-            'metadata': metadata
-        }
+        var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
+
+        return metadata
+
+    def add_discrete_input(self, name, val, desc=''):
+        """
+        Add a discrete input variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            name of the variable in this component's namespace.
+        val : a picklable object
+            The initial value of the variable being added.
+        desc : str
+            description of the variable
+
+        Returns
+        -------
+        dict
+            metadata for added variable
+        """
+        # First, type check all arguments
+        if not isinstance(name, str):
+            raise TypeError('The name argument should be a string')
+        if not _valid_var_name(name):
+            raise NameError("'%s' is not a valid input name." % name)
+
+        metadata = {
+            'value': val,
+            'type': type(val),
+            'desc': desc,
+        }
+
+        if self._static_mode:
+            var_rel2meta = self._static_var_rel2meta
+        else:
+            var_rel2meta = self._var_rel2meta
+
+        # Disallow dupes
+        if name in var_rel2meta:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
+
+        var_rel2meta[name] = self._var_discrete['input'][name] = metadata
 
         return metadata
 
@@ -490,7 +553,6 @@ class Component(System):
                              name)
             units = None
 
-        # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('The name argument should be a string')
         if not _valid_var_name(name):
@@ -577,24 +639,63 @@ class Component(System):
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
-            var_rel2data_io = self._static_var_rel2data_io
+            var_rel2meta = self._static_var_rel2meta
             var_rel_names = self._static_var_rel_names
         else:
-            var_rel2data_io = self._var_rel2data_io
+            var_rel2meta = self._var_rel2meta
             var_rel_names = self._var_rel_names
 
         # Disallow dupes
-        if name in var_rel2data_io:
+        if name in var_rel2meta:
             msg = "Variable name '{}' already exists.".format(name)
             raise ValueError(msg)
 
-        var_rel2data_io[name] = {
-            'prom': name, 'rel': name,
-            'my_idx': len(self._var_rel_names['output']),
-            'type': 'output',
-            'metadata': metadata
-        }
+        var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
+
+        return metadata
+
+    def add_discrete_output(self, name, val, desc=''):
+        """
+        Add an output variable to the component.
+
+        Parameters
+        ----------
+        name : str
+            name of the variable in this component's namespace.
+        val : a picklable object
+            The initial value of the variable being added.
+        desc : str
+            description of the variable.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
+        """
+        if not isinstance(name, str):
+            raise TypeError('The name argument should be a string')
+        if not _valid_var_name(name):
+            raise NameError("'%s' is not a valid output name." % name)
+
+        metadata = {
+            'value': val,
+            'type': type(val),
+            'desc': desc
+        }
+
+        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
+        if self._static_mode:
+            var_rel2meta = self._static_var_rel2meta
+        else:
+            var_rel2meta = self._var_rel2meta
+
+        # Disallow dupes
+        if name in var_rel2meta:
+            msg = "Variable name '{}' already exists.".format(name)
+            raise ValueError(msg)
+
+        var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
         return metadata
 
@@ -1040,3 +1141,24 @@ class Component(System):
         Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass
+
+
+class _DictValues(object):
+    """
+    A dict-like wrapper for a dict of metadata, where getitem returns 'value' from metadata.
+    """
+
+    def __init__(self, dct):
+        self._dict = dct
+
+    def __getitem__(self, key):
+        return self._dict[key]['value']
+
+    def __setitem__(self, key, value):
+        self._dict[key]['value'] = value
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    def __len__(self):
+        return len(self._dict)

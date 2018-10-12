@@ -509,7 +509,7 @@ class LintTestCase(unittest.TestCase):
 
                     # Loop over classes
                     classes = [x for x in dir(mod)
-                               if inspect.isclass(getattr(mod, x)) and
+                               if not x.startswith('_') and inspect.isclass(getattr(mod, x)) and
                                getattr(mod, x).__module__ == module_name]
 
                     for class_name in classes:

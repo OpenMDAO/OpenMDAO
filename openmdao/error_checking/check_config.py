@@ -429,3 +429,37 @@ def _check_config_cmd(options):
         exit()
 
     return _check_config
+
+
+def check_allocate_complex_ln(model, under_cs):
+    """
+    Return True if linear vector should be complex.
+
+    This happens when a solver needs derivatives under complex step.
+
+    Parameters
+    ----------
+    model : <Group>
+        Model to be checked, usually the root model.
+    under_cs : bool
+        Flag indicates if complex vectors were allocated in a containing Group or were force
+        allocated in setup.
+
+    Returns
+    -------
+    bool
+        True if linear vector should be complex.
+    """
+    under_cs |= 'cs' in model._approx_schemes
+
+    if under_cs and model.nonlinear_solver is not None and \
+       model.nonlinear_solver.supports['gradients']:
+        return True
+
+    for sub in model._subsystems_allprocs:
+        chk = check_allocate_complex_ln(sub, under_cs)
+
+        if chk:
+            return True
+
+    return False

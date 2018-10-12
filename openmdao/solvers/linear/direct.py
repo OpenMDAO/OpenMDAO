@@ -199,7 +199,7 @@ class DirectSolver(LinearSolver):
 
         nmtx = x_data.size
         eye = np.eye(nmtx)
-        mtx = np.empty((nmtx, nmtx))
+        mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_scope()
         vnames = ['linear']
 

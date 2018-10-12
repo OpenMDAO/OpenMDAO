@@ -9,6 +9,7 @@ import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import Vector
 
@@ -38,6 +39,8 @@ class ComplexStep(ApproximationScheme):
         A list of which derivatives (in execution order) to compute.
         The entries are of the form (of, wrt, options), where of and wrt are absolute names
         and options is a dictionary.
+    _fd : <FiniteDifference>
+        When nested complex step is detected, we swtich to Finite Difference.
     """
 
     def __init__(self):
@@ -46,6 +49,9 @@ class ComplexStep(ApproximationScheme):
         """
         super(ComplexStep, self).__init__()
         self._exec_list = []
+
+        # Only used when nested under complex step.
+        self._fd = None
 
     def add_approximation(self, abs_key, kwargs):
         """
@@ -149,6 +155,22 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
+        if system.under_complex_step:
+
+            # If we are nested under another complex step, then warn and swap to FD.
+            if not self._fd:
+                from openmdao.approximation_schemes.finite_difference import FiniteDifference
+
+                msg = "Nested complex step detected. Finite difference will be used for '%s'."
+                simple_warning(msg % system.pathname)
+
+                fd = self._fd = FiniteDifference()
+                for item in self._exec_list:
+                    fd.add_approximation(item[0:2], {})
+
+            self._fd.compute_approximations(system, jac, total=total)
+            return
+
         if len(self._exec_list) == 0:
             return
 
@@ -210,13 +232,12 @@ class ComplexStep(ApproximationScheme):
                         subjac[:, i] = result
 
                 subjac *= fact
-                rel_key = abs_key2rel_key(system, key)
                 if uses_src_indices:
                     jac._override_checks = True
-                    jac[rel_key] = subjac
+                    jac[key] = subjac
                     jac._override_checks = False
                 else:
-                    jac[rel_key] = subjac
+                    jac[key] = subjac
 
         # Turn off complex step.
         system._set_complex_step_mode(False)

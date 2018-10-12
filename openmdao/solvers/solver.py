@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-from six import iteritems
+from six import iteritems, reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -125,8 +125,6 @@ class Solver(object):
         Number of iterations for the current invocation of the solver.
     _rec_mgr : <RecordingManager>
         object that manages all recorders added to this solver
-    _solver_info : <SolverInfo>
-        Object to store some formatting for iprint that is shared across all solvers.
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
@@ -143,6 +141,7 @@ class Solver(object):
         Normalization factor
     """
 
+    # Object to store some formatting for iprint that is shared across all solvers.
     SOLVER = 'base_solver'
     _solver_info = SolverInfo()
 
@@ -253,6 +252,10 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+
+        if isinstance(self, LinearSolver) and not system._use_derivatives:
+            return
+
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
@@ -262,25 +265,25 @@ class Solver(object):
 
         if self.recording_options['record_solver_residuals']:
             if isinstance(self, NonlinearSolver):
-                residuals = self._system._residuals
+                residuals = system._residuals
             else:  # it's a LinearSolver
-                residuals = self._system._vectors['residual']['linear']
+                residuals = system._vectors['residual']['linear']
 
             myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_outputs']:
             if isinstance(self, NonlinearSolver):
-                outputs = self._system._outputs
+                outputs = system._outputs
             else:  # it's a LinearSolver
-                outputs = self._system._vectors['output']['linear']
+                outputs = system._vectors['output']['linear']
 
             myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_inputs']:
             if isinstance(self, NonlinearSolver):
-                inputs = self._system._inputs
+                inputs = system._inputs
             else:
-                inputs = self._system._vectors['input']['linear']
+                inputs = system._vectors['input']['linear']
 
             myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
 
@@ -512,14 +515,15 @@ class Solver(object):
         else:
             data['rel'] = None
 
+        system = self._system
         if isinstance(self, NonlinearSolver):
-            outputs = self._system._outputs
-            inputs = self._system._inputs
-            residuals = self._system._residuals
+            outputs = system._outputs
+            inputs = system._inputs
+            residuals = system._residuals
         else:  # it's a LinearSolver
-            outputs = self._system._vectors['output']['linear']
-            inputs = self._system._vectors['input']['linear']
-            residuals = self._system._vectors['residual']['linear']
+            outputs = system._vectors['output']['linear']
+            inputs = system._vectors['input']['linear']
+            residuals = system._vectors['residual']['linear']
 
         if self.recording_options['record_outputs']:
             data['o'] = {}
@@ -570,36 +574,8 @@ class NonlinearSolver(Solver):
 
     Attributes
     ----------
-    _system : <System>
-        Pointer to the owning system.
-    _depth : int
-        How many subsolvers deep this solver is (0 means not a subsolver).
-    _vec_names : [str, ...]
-        List of right-hand-side (RHS) vector names.
-    _mode : str
-        'fwd' or 'rev', applicable to linear solvers only.
-    _iter_count : int
-        Number of iterations for the current invocation of the solver.
-    _rec_mgr : <RecordingManager>
-        object that manages all recorders added to this solver
-    _solver_info : <SolverInfo>
-        Object to store some formatting for iprint that is shared across all solvers.
     _err_cache : dict
         Dictionary holding input and output vectors at start of iteration, if requested.
-    cite : str
-        Listing of relevant citations that should be referenced when
-        publishing work that uses this class.
-    options : <OptionsDictionary>
-        Options dictionary.
-    recording_options : <OptionsDictionary>
-        Recording options dictionary.
-    supports : <OptionsDictionary>
-        Options dictionary describing what features are supported by this
-        solver.
-    _filtered_vars_to_record: Dict
-        Dict of list of var names to record
-    _norm0: float
-        Normalization factor
     """
 
     def __init__(self, **kwargs):
@@ -636,7 +612,13 @@ class NonlinearSolver(Solver):
         float
             relative error.
         """
-        fail, abs_err, rel_err = self._run_iterator()
+        raised = False
+        try:
+            fail, abs_err, rel_err = self._run_iterator()
+        except Exception:
+            fail = True
+            raised = True
+            exc = sys.exc_info()
 
         if fail and self.options['debug_print']:
             coord = recording_iteration.get_formatted_iteration_coordinate()
@@ -657,6 +639,9 @@ class NonlinearSolver(Solver):
                 print("Inputs and outputs at start of iteration have been "
                       "saved to '%s'." % filename)
                 sys.stdout.flush()
+
+        if raised:
+            reraise(*exc)
 
         return fail, abs_err, rel_err
 
@@ -703,6 +688,17 @@ class NonlinearSolver(Solver):
             norm.
         """
         return self._system._residuals.get_norm()
+
+    def _disallow_discrete_outputs(self):
+        """
+        Raise an exception if any discrete outputs exist in our System.
+        """
+        system = self._system
+
+        if system._var_allprocs_discrete['output']:
+            raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
+                               (system.pathname, type(self).__name__,
+                                sorted(system._var_allprocs_discrete['output'])))
 
 
 class LinearSolver(Solver):
@@ -771,17 +767,19 @@ class LinearSolver(Solver):
         super(LinearSolver, self)._setup_solvers(system, depth)
 
         if self._mode == 'fwd':
-            b_vecs = self._system._vectors['residual']
+            b_vecs = system._vectors['residual']
         else:  # rev
-            b_vecs = self._system._vectors['output']
+            b_vecs = system._vectors['output']
 
         self._rhs_vecs = {}
-        for vec_name in self._system._rel_vec_names:
-            self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
+
+        if system._use_derivatives:
+            for vec_name in system._lin_rel_vec_name_list:
+                self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
 
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                               "jacobians." % (self.SOLVER, self._system.pathname))
+                               "jacobians." % (self.SOLVER, system.pathname))
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

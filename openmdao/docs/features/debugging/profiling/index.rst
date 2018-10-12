@@ -10,17 +10,15 @@ Profiling and Tracing
     inst_call_tracing
 
 
-All of the tools mentioned above have a similar programmatic interface, even though most of the
-time they will only be used in command-line mode.  However, if you really want to customize the
-set of methods that are to be profiled or traced, see the following example.
+The profiling and call tracing tools mentioned above have a similar programmatic interface,
+even though most of the time they will only be used in command-line mode.  However, if you really
+want to customize the set of methods that are to be profiled or traced, see the following example.
 
 
 .. testcode:: tool_programatic_interface
 
     # for performance profiling
     from openmdao.devtools import iprofile as tool
-    # OR for memory profiling
-    # from openmdao.devtools import iprof_mem as tool
     # OR for call tracing
     # from openmdao.devtools import itrace as tool
 

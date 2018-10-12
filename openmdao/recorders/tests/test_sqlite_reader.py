@@ -1412,6 +1412,18 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def setUp(self):
         recording_iteration.stack = []  # reset to avoid problems from earlier tests
+        self.dir = mkdtemp()
+        self.original_path = os.getcwd()
+        os.chdir(self.dir)
+
+    def tearDown(self):
+        os.chdir(self.original_path)
+        try:
+            rmtree(self.dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
 
     def test_driver_v3(self):
         """

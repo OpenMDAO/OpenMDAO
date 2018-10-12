@@ -73,7 +73,11 @@ class ImplicitComponent(Component):
             with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
                 self._inputs.read_only = self._outputs.read_only = True
                 try:
-                    self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
+                                             self._discrete_inputs, self._discrete_outputs)
+                    else:
+                        self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
                 finally:
                     self._inputs.read_only = self._outputs.read_only = False
 
@@ -102,7 +106,12 @@ class ImplicitComponent(Component):
             else:
                 with self._unscaled_context(outputs=[self._outputs]):
                     with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-                        result = self.solve_nonlinear(self._inputs, self._outputs)
+                        if self._discrete_inputs or self._discrete_outputs:
+                            result = self.solve_nonlinear(self._inputs, self._outputs,
+                                                          self._discrete_inputs,
+                                                          self._discrete_outputs)
+                        else:
+                            result = self.solve_nonlinear(self._inputs, self._outputs)
         finally:
             self._inputs.read_only = False
 
@@ -157,8 +166,7 @@ class ImplicitComponent(Component):
                 d_inputs, d_outputs, d_residuals = vecs
 
                 # Jacobian and vectors are all scaled, unitless
-                with self.jacobian_context(jac):
-                    jac._apply(d_inputs, d_outputs, d_residuals, mode)
+                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
                 # if we're not matrix free, we can skip the bottom of
                 # this loop because apply_linear does nothing.
@@ -292,6 +300,9 @@ class ImplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        if self._assembled_jac is not None:
+            self._assembled_jac._reset_mats()
+
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.

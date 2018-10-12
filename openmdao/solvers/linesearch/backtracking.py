@@ -53,8 +53,6 @@ class BoundsEnforceLS(NonlinearSolver):
     _do_subsolve : bool
         Flag used by parent solver to tell the line search whether to solve subsystems while
         backtracking.
-    _iter_count : int
-        Number of iterations for the current invocation of the solver.
     """
 
     SOLVER = 'LS: BCHK'
@@ -159,8 +157,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
     _do_subsolve : bool
         Flag used by parent solver to tell the line search whether to solve subsystems while
         backtracking.
-    _iter_count : int
-        Number of iterations for the current invocation of the solver.
     """
 
     SOLVER = 'LS: AG'

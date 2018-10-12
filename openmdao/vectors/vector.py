@@ -56,7 +56,7 @@ class Vector(object):
     _root_vector : Vector
         Pointer to the vector owned by the root system.
     _alloc_complex : Bool
-        If True, then space for the imaginary part is also allocated.
+        If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
     _cplx_data : ndarray
@@ -80,15 +80,13 @@ class Vector(object):
         True if this vector performs scaling.
     _scaling : dict
         Contains scale factors to convert data arrays.
-    cite : str
-        Listing of relevant citataions that should be referenced when
-        publishing work that uses this class.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
         When True, self._data is replaced with self._cplx_data.
     """
 
+    # Listing of relevant citations that should be referenced when
     cite = ""
 
     def __init__(self, name, kind, system, root_vector=None, resize=False, alloc_complex=False,
@@ -164,7 +162,7 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(self._system._var_sizes[name][self._typ][self._iproc, :])
+        self._length = np.sum(system._var_sizes[name][self._typ][self._iproc, :])
 
         self.read_only = False
 
@@ -209,6 +207,7 @@ class Vector(object):
         """
         vec = self.__class__(self._name, self._kind, self._system, self._root_vector,
                              alloc_complex=self._alloc_complex, ncol=self._ncol)
+        vec._under_complex_step = self._under_complex_step
         vec._clone_data()
         if initialize_views:
             vec._initialize_views()
@@ -234,10 +233,11 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        path = self._system.pathname
+        system = self._system
+        path = system.pathname
         idx = len(path) + 1 if path else 0
 
-        return (n[idx:] for n in self._system._var_abs_names[self._typ] if n in self._names)
+        return (n[idx:] for n in system._var_abs_names[self._typ] if n in self._names)
 
     def __contains__(self, name):
         """
