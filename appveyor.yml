@@ -55,4 +55,4 @@ install:
 build: off
 
 test_script:
-  - testflo -v --pre_announce . -n 1
+  - testflo -v --pre_announce .
