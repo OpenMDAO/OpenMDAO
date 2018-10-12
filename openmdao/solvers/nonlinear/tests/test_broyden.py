@@ -388,6 +388,47 @@ class TestBryoden(unittest.TestCase):
         # Jacobian.
         self.assertTrue(model.nonlinear_solver._iter_count < 4)
 
+    def test_simple_sellar_jacobian_assembled(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        model.nonlinear_solver.linear_solver = DirectSolver(assemble_jac=True)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Normally takes about 4 iters, but takes around 3 if you calculate an initial
+        # Jacobian.
+        self.assertTrue(model.nonlinear_solver._iter_count < 4)
+
+    def test_simple_sellar_jacobian_assembled_dense(self):
+        # Test top level Sellar (i.e., not grouped).
+
+        prob = Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
+                                                   linear_solver=LinearRunOnce())
+
+        prob.setup(check=False)
+
+        model.options['assembled_jac_type'] = 'dense'
+        model.nonlinear_solver.linear_solver = DirectSolver(assemble_jac=True)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
+
+        # Normally takes about 4 iters, but takes around 3 if you calculate an initial
+        # Jacobian.
+        self.assertTrue(model.nonlinear_solver._iter_count < 4)
+
     def test_simple_sellar_full(self):
         # Test top level Sellar (i.e., not grouped).
 
