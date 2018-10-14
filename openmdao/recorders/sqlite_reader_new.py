@@ -19,7 +19,7 @@ from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array,
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 from openmdao.utils.write_outputs import write_outputs
 
-# from pprint import pprint
+from pprint import pprint
 # import json
 
 if PY2:
@@ -578,21 +578,39 @@ class SqliteCaseReader(BaseCaseReader):
             if driver_cases:
                 if flat:
                     for driver_coord in driver_cases:
-                        # first the child system cases
-                        for case in self._system_cases.get_cases(driver_coord, recurse, flat):
-                            yield case
-
-                        # then the child solver cases
+                        # first the child solver cases
                         for case in self._solver_cases.get_cases(driver_coord, recurse, flat):
                             yield case
 
-                        # and finally the driver case itself
-                        yield self._driver_cases.get_case(driver_coord)
+                        # then the child system cases
+                        for case in self._system_cases.get_cases(driver_coord, recurse, flat):
+                            yield case
                 else:
                     # return nested dicts of cases and child cases
                     raise RuntimeError('TODO: implement nested dicts')
             else:
-                raise RuntimeError('No driver cases for coord %s' % iter_coord)
+                system_cases = self._system_cases.list_cases(iter_coord)
+                pprint(system_cases)
+                if flat:
+                    for system_coord in system_cases:
+                        # first the child solver cases
+                        for case in self._solver_cases.get_cases(system_coord, recurse, flat):
+                            # print(case)
+                            # print()
+                            yield case
+
+                        # print('----- ^^ solver ^^----------')
+
+                        # then the system cases
+                        for case in self._system_cases.get_cases(system_coord, recurse, flat):
+                            # print(case)
+                            # print()
+                            yield case
+
+                        # print('----- ^^ system ^^----------')
+                else:
+                    # return nested dicts of cases and child cases
+                    raise RuntimeError('TODO: implement nested dicts')
 
     def get_case(self, case_id, recurse=False):
         """

@@ -482,19 +482,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        for c in cr.get_cases(recurse=True, flat=True):
-            print(c.iteration_coordinate, c.source)
-
         parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear'
 
-        print('============================')
-        for c in cr.get_cases(source=parent_coord, recurse=True, flat=True):
-            print(c.iteration_coordinate, c.source)
-
-        print('============================')
-
-        coords = [
-            parent_coord + '|0|NLRunOnce|0',
+        expected_coords = [
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
@@ -502,12 +492,57 @@ class TestSqliteCaseReader(unittest.TestCase):
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
             parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
+            parent_coord + '|0|NLRunOnce|0',
+            parent_coord + '|0',
         ]
         ind = 0
         for c in cr.get_cases(source=parent_coord, recurse=True, flat=True):
-            self.assertEqual(c.iteration_coordinate, coords[ind])
+            self.assertEqual(c.iteration_coordinate, expected_coords[ind])
             ind += 1
-        self.assertEqual(ind, len(coords))
+        self.assertEqual(ind, len(expected_coords))
+
+    def test_get_child_cases_nested_systems(self):
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        prob.driver.opt_settings['ACC'] = 1e-9
+        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.setup()
+
+        model = prob.model
+        model.add_recorder(self.recorder)
+        model.mda.add_recorder(self.recorder)
+        model.nonlinear_solver.add_recorder(self.recorder)
+        model.mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear'
+
+        expected_coords = [
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
+            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
+            parent_coord + '|0|NLRunOnce|0',
+            parent_coord + '|0',
+        ]
+        ind = 0
+        last_timestamp = 0
+        for c in cr.get_cases(source=parent_coord, recurse=True, flat=True):
+            print(c.timestamp, c.iteration_coordinate)
+            # self.assertEqual(c.iteration_coordinate, expected_coords[ind])
+            if (c.timestamp < last_timestamp):
+                print('ERROR: timetsamps out of order')
+            # self.assertTrue(c.timestamp > last_timestamp)
+            last_timestamp = c.timestamp
+            ind += 1
+        self.assertEqual(ind, len(expected_coords))
 
     def test_list_outputs(self):
         prob = SellarProblem()
