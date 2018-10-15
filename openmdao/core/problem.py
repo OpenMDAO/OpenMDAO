@@ -19,13 +19,14 @@ from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
+from openmdao.solvers.solver import SolverInfo
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.group import System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
-from openmdao.recorders.recording_iteration_stack import recording_iteration
+from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
@@ -160,8 +161,6 @@ class Problem(object):
         self._solver_print_cache = []
 
         self._mode = None  # mode is assigned in setup()
-
-        recording_iteration.stack = []
 
         self._initial_condition_cache = {}
 
@@ -511,9 +510,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError("The 'case_prefix' argument should be a string.")
-            recording_iteration.prefix = case_prefix
+            self._recording_iter.prefix = case_prefix
         else:
-            recording_iteration.prefix = None
+            self._recording_iter.prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -546,9 +545,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError("The 'case_prefix' argument should be a string.")
-            recording_iteration.prefix = case_prefix
+            self._recording_iter.prefix = case_prefix
         else:
-            recording_iteration.prefix = None
+            self._recording_iter.prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -809,6 +808,11 @@ class Problem(object):
             raise ValueError(msg)
 
         self._mode = self._orig_mode = mode
+
+        # this will be shared by all Solvers in the model
+        model._solver_info = SolverInfo()
+        self._recording_iter = _RecIteration()
+        model._recording_iter = self._recording_iter
 
         model_comm = self.driver._setup_comm(comm)
 

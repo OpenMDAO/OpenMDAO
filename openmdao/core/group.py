@@ -398,6 +398,8 @@ class Group(System):
             subsys._distributed_vector_class = self._distributed_vector_class
             subsys.force_alloc_complex = self.force_alloc_complex
             subsys._use_derivatives = self._use_derivatives
+            subsys._solver_info = self._solver_info
+            subsys._recording_iter = self._recording_iter
 
             if self.pathname:
                 subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode)

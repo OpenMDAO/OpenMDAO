@@ -7,7 +7,7 @@ from copy import deepcopy
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -136,7 +136,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        recording_iteration.stack.append(('_run_apply', 0))
+        self._recording_iter.stack.append(('_run_apply', 0))
 
         system = self._system
 
@@ -147,7 +147,7 @@ class NewtonSolver(NonlinearSolver):
         try:
             system._apply_nonlinear()
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status
