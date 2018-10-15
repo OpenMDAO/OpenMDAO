@@ -1545,7 +1545,7 @@ class NestedProblemTestCase(unittest.TestCase):
 
         class _ProblemSolver(NonlinearRunOnce):
             def solve(self):
-                # create a sill subproblem and run it to test for global solver_info bug
+                # create a simple subproblem and run it to test for global solver_info bug
                 p = Problem()
                 p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
                 p.model.add_subsystem('comp', ExecComp('y=2*x'))

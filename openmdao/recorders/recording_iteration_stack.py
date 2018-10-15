@@ -82,6 +82,8 @@ class Recording(object):
         Current counter of iterations completed.
     recording_requester : object
         The object that wants to be recorded.
+    stack : list
+        Stack containing names and iteration counts.
     abs : float
         Absolute error.
     rel : float
@@ -106,7 +108,7 @@ class Recording(object):
         self.name = name
         self.iter_count = iter_count
         self.recording_requester = recording_requester
-        self.stack = self.recording_requester._recording_iter.stack
+        self.stack = recording_requester._recording_iter.stack
         self.abs = 0
         self.rel = 0
 
