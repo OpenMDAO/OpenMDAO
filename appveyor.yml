@@ -12,11 +12,11 @@ environment:
       SCIPY: 1.0.1
       PETSc: 3.8.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       PYTHON: 2.7
       CONDA: "C:\\Miniconda-x64"
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
 
