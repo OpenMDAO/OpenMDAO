@@ -76,7 +76,7 @@ build: off
 test_script:
 
 - sh:
-   testflo -v . -n 1;
+    testflo -v . -n 1;
 
 - cmd:
-  testflo . -n 1;
+    testflo . -n 1;
