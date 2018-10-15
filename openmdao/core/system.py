@@ -16,7 +16,6 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -148,6 +147,8 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -1033,8 +1034,6 @@ class System(object):
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
-        use_derivs = self._use_derivatives
 
         self._rel_vec_name_list = []
         for vec_name in self._vec_names:
@@ -2827,7 +2826,7 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = recording_iteration.stack[-1][0]
+            stack_top = self._recording_iter.stack[-1][0]
             method = stack_top.split('.')[-1]
 
             if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',

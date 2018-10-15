@@ -21,7 +21,6 @@ except ImportError:
     PETSc = None
 
 from openmdao.vectors.vector import INT_DTYPE
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
@@ -122,6 +121,7 @@ class _TotalJacInfo(object):
         self.responses = responses = driver._responses
         self.debug_print = debug_print
         self.par_deriv = {}
+        self._recording_iter = driver._recording_iter
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -1486,7 +1486,7 @@ class _TotalJacInfo(object):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        recording_iteration.stack.append((requester._get_name(), requester.iter_count))
+        self._recording_iter.stack.append((requester._get_name(), requester.iter_count))
 
         try:
             totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
@@ -1494,7 +1494,7 @@ class _TotalJacInfo(object):
             requester._rec_mgr.record_derivatives(requester, totals, metadata)
 
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):
