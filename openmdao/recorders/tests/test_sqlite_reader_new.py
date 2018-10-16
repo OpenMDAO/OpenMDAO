@@ -438,8 +438,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check child cases with recursion, flat
         expected_coords = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0',
         ]
         for i, c in enumerate(cr.get_cases('rank0:SLSQP|0', recurse=True, flat=True)):

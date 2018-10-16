@@ -575,6 +575,7 @@ class SqliteCaseReader(BaseCaseReader):
             iter_coord = source
 
             driver_cases = self._driver_cases.list_cases(iter_coord)
+            pprint(driver_cases)
             if driver_cases:
                 if flat:
                     for driver_coord in driver_cases:
@@ -585,6 +586,9 @@ class SqliteCaseReader(BaseCaseReader):
                         # then the child system cases
                         for case in self._system_cases.get_cases(driver_coord, recurse, flat):
                             yield case
+
+                        # and finally the driver case itself
+                        yield self._driver_cases.get_case(driver_coord)
                 else:
                     # return nested dicts of cases and child cases
                     raise RuntimeError('TODO: implement nested dicts')
