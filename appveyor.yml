@@ -81,4 +81,4 @@ install:
 
 test_script:
 
-- testflo -v . -n 1;
+- testflo . -n 1;
