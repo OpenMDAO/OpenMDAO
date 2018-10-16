@@ -15,9 +15,8 @@ from six.moves import range
 # from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case_new import Case, PromotedToAbsoluteMap
 
-from openmdao.utils.record_util import check_valid_sqlite3_db, json_to_np_array, convert_to_np_array
-from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
-from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_array
+from openmdao.recorders.sqlite_recorder import format_version
 
 from pprint import pprint
 # import json
@@ -251,16 +250,16 @@ class SqliteCaseReader(BaseCaseReader):
 
         # create helper objects for accessing cases from the four iteration tables and
         # the problem cases table
+        voi_meta = self.problem_metadata['variables']
         self._driver_cases = DriverCases(filename, self._format_version,
-                                         self._abs2prom, self._abs2meta, self._prom2abs,
-                                         self.problem_metadata['variables'])
+                                         self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
         self._system_cases = SystemCases(filename, self._format_version,
-                                         self._abs2prom, self._abs2meta, self._prom2abs)
+                                         self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
         self._solver_cases = SolverCases(filename, self._format_version,
-                                         self._abs2prom, self._abs2meta, self._prom2abs)
+                                         self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
         if self._format_version >= 2:
             self._problem_cases = ProblemCases(filename, self._format_version,
-                                               self._abs2prom, self._abs2meta, self._prom2abs)
+                                               self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
 
         # if requested, load all the iteration data into memory
         if pre_load:
@@ -464,16 +463,16 @@ class SqliteCaseReader(BaseCaseReader):
                 return self._driver_cases.list_cases()
             elif flat:
                 cases = []
-                system_cases = self._system_cases.list_cases()
                 solver_cases = self._solver_cases.list_cases()
+                system_cases = self._system_cases.list_cases()
                 driver_cases = self._driver_cases.list_cases()
                 for driver_coord in driver_cases:
-                    for system_coord in system_cases:
-                        if system_coord.startswith(driver_coord):
-                            cases.append(system_coord)
                     for solver_coord in solver_cases:
                         if solver_coord.startswith(driver_coord):
                             cases.append(solver_coord)
+                    for system_coord in system_cases:
+                        if system_coord.startswith(driver_coord):
+                            cases.append(system_coord)
                     cases.append(driver_coord)
                 return cases
             else:
@@ -482,12 +481,12 @@ class SqliteCaseReader(BaseCaseReader):
                 driver_cases = self._driver_cases.list_cases()
                 for driver_coord in driver_cases:
                     driver_case = cases[driver_coord] = OrderedDict()
-                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
-                    for system_case in system_cases:
-                        driver_case[system_case] = system_cases[system_case]
                     solver_cases = self._solver_cases.list_cases(driver_coord, recurse=True)
                     for solver_case in solver_cases:
                         driver_case[solver_case] = solver_cases[solver_case]
+                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
+                    for system_case in system_cases:
+                        driver_case[system_case] = system_cases[system_case]
                 return cases
 
         elif source == 'problem':
@@ -546,12 +545,12 @@ class SqliteCaseReader(BaseCaseReader):
                 driver_cases = self._driver_cases.list_cases()
                 for driver_coord in driver_cases:
                     driver_case = cases[driver_coord] = OrderedDict()
-                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
-                    for system_case in system_cases:
-                        driver_case[system_case] = self.get_case(system_cases[system_case])
                     solver_cases = self._solver_cases.list_cases(driver_coord, recurse=True)
                     for solver_case in solver_cases:
                         driver_case[solver_case] = self.get_case(solver_cases[solver_case])
+                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
+                    for system_case in system_cases:
+                        driver_case[system_case] = self.get_case(system_cases[system_case])
                 return cases
 
         elif source == 'problem':
@@ -575,7 +574,6 @@ class SqliteCaseReader(BaseCaseReader):
             iter_coord = source
 
             driver_cases = self._driver_cases.list_cases(iter_coord)
-            pprint(driver_cases)
             if driver_cases:
                 if flat:
                     for driver_coord in driver_cases:
@@ -594,24 +592,15 @@ class SqliteCaseReader(BaseCaseReader):
                     raise RuntimeError('TODO: implement nested dicts')
             else:
                 system_cases = self._system_cases.list_cases(iter_coord)
-                pprint(system_cases)
                 if flat:
                     for system_coord in system_cases:
                         # first the child solver cases
                         for case in self._solver_cases.get_cases(system_coord, recurse, flat):
-                            # print(case)
-                            # print()
                             yield case
-
-                        # print('----- ^^ solver ^^----------')
 
                         # then the system cases
                         for case in self._system_cases.get_cases(system_coord, recurse, flat):
-                            # print(case)
-                            # print()
                             yield case
-
-                        # print('----- ^^ system ^^----------')
                 else:
                     # return nested dicts of cases and child cases
                     raise RuntimeError('TODO: implement nested dicts')
@@ -646,263 +635,6 @@ class SqliteCaseReader(BaseCaseReader):
         else:
             raise RuntimeError('Case not found:', case_id)
 
-    def _find_child_cases(self, parent_iter_coord, split_parent_iter_coord, driver_iter,
-                          solver_iter, recursive, coord_lengths):
-        """
-        Find all children of a given parent case.
-
-        Parameters
-        ----------
-        parent_iter_coord : str
-            Iteration coordinate of the parent case. If empty string, assumes root is parent.
-        split_parent_iter_coord : [str]
-            The split parent iteration coordinate.
-        driver_iter : [(str)]
-            The ordered list of driver iteration coordinates.
-        solver_iter : [(str)]
-            The ordered list of solver iteration coordinates.
-        recursive : bool
-            If True, will grab all successors recursively. Otherwise, will only return direct
-            children.
-        coord_lengths : [int]
-            Sorted array of possible coordinate lengths. Used to determine if case is child
-            of another case.
-
-        Returns
-        -------
-        list of tuples
-            List of tuples of the form ('iteration_coordinate', 'type of iteration')
-        """
-        ret = []
-
-        par_len = len(split_parent_iter_coord)
-
-        par_len_idx = coord_lengths.index(par_len if par_len is not 0 else 2)
-
-        expected_child_length = coord_lengths[par_len_idx + 1] \
-            if par_len_idx < len(coord_lengths) - 1 else -1
-
-        if parent_iter_coord is '':  # CASE: grabbing children of 'root'
-            if len(driver_iter) > 0:  # grabbing all driver cases
-                for d in driver_iter:
-                    ret.append((d[0], 'driver'))
-                    if recursive:
-                        ret += self._find_child_cases(d[0], _coord_split_re.split(d[0]),
-                                                      driver_iter, solver_iter, recursive,
-                                                      coord_lengths)
-            elif len(solver_iter) > 0:  # grabbing first layer of solver iterations
-                # find the iteration coordinate length of the first layer of solver iterations
-                min_iter_len = -1
-                if len(coord_lengths) > 1:
-                    min_iter_len = coord_lengths[1]
-
-                for s in solver_iter:
-                    split_coord = _coord_split_re.split(s[0])
-                    if len(split_coord) is min_iter_len:
-                        ret.append((s[0], 'solver'))
-                        if recursive:
-                            ret += self._find_child_cases(s[0], split_coord, driver_iter,
-                                                          solver_iter, recursive, coord_lengths)
-        else:  # CASE: grabbing children of a case
-            for s in solver_iter:
-                if self._is_case_child(parent_iter_coord, s[0], expected_child_length):
-                    ret.append((s[0], 'solver'))
-                    if recursive:
-                        ret += self._find_child_cases(s[0], _coord_split_re.split(s[0]),
-                                                      driver_iter, solver_iter, recursive,
-                                                      coord_lengths)
-
-        return ret
-
-    def _is_case_child(self, parent_coordinate, coordinate, expected_child_length=0):
-        """
-        Tell if the given case is a child case of the parent.
-
-        Parameters
-        ----------
-        parent_coordinate : str
-            The iteration coordinate of the potential parent.
-        coordinate : str
-            Iteration coordinate of the case we want to test.
-        expected_child_length : int
-            Expected length of the split child iteration coordinate
-
-        Returns
-        -------
-        bool
-            True if the given coordinate indicates that the case is a child of the
-            given parent case. False otherwise.
-        """
-        split_coord = _coord_split_re.split(coordinate)
-        if coordinate.startswith(parent_coordinate) and len(split_coord) >= expected_child_length:
-            return True
-
-        return False
-
-    def _get_case_sysvars(self, case, get_outputs=True):
-        """
-        Get the set of output or input variables and their values for a given case.
-
-        Parameters
-        ----------
-        case : Case
-            The case whose variables will be returned.
-        get_outputs : bool, optional
-            indicates if the returned set should contain outputs. If false, returns inputs.
-
-        Returns
-        -------
-        dictionary
-            dictionary of global variable names to their values. None if no system iterations
-            were recorded.
-        """
-        variables = {}
-        if get_outputs and case.outputs is None:
-            return variables
-
-        if get_outputs:
-            for abs_name in case.outputs.absolute_names():
-                variables[abs_name] = {'value': case.outputs[abs_name]}
-                if case.residuals and abs_name in case.residuals.absolute_names():
-                    variables[abs_name]['residuals'] = case.residuals[abs_name]
-                else:
-                    variables[abs_name]['residuals'] = 'Not Recorded'
-        elif case.inputs is not None:
-            for abs_name in case.inputs.absolute_names():
-                if abs_name not in variables:
-                    variables[abs_name] = {'value': case.inputs[abs_name]}
-
-        return variables
-
-    def _get_all_sysvars(self, get_outputs=True):
-        """
-        Get the set of output or input variables and their values.
-
-        Parameters
-        ----------
-        get_outputs : bool, optional
-            indicates if the returned set should contain outputs. If false, returns inputs.
-
-        Returns
-        -------
-        dictionary
-            dictionary of global variable names to their values. None if no system iterations
-            were recorded.
-        """
-        coords = self._system_cases.keys
-
-        # store the iteration coordinates without iteration numbers.
-        # coord_map intializes each iter_key to False, indicating we haven't
-        # grabbed values from this system
-        coord_map = {}
-        for c in coords:
-            split_iter = _coord_split_re.split(c)
-            iter_key = ':'.join(split_iter)
-            coord_map[iter_key] = False
-
-        # didn't record any system iterations, return None
-        if len(coord_map) is 0:
-            return None
-
-        variables = {}
-        iteration_num = -1
-        # iterate over cases from end to start, unless we've grabbed values from
-        # every system
-        while not self._has_all_values(coord_map):
-            iteration = self._system_cases.keys[iteration_num]
-            iteration_num -= 1
-            split_iter = _coord_split_re.split(iteration)
-            iter_key = ':'.join(split_iter)
-
-            # if coord_map[iter_key] is False, we haven't grabbed variable values
-            # from this system
-            if not coord_map[iter_key]:
-                coord_map[iter_key] = True
-                case = self._system_cases.get_case(iteration)
-                if get_outputs and case.outputs is None:
-                    continue
-                if not get_outputs and case.inputs is None:
-                    continue
-
-                if get_outputs:
-                    for abs_name in case.outputs.absolute_names():
-                        if abs_name not in variables:
-                            variables[abs_name] = {'value': case.outputs[abs_name]}
-                            if case.residuals and abs_name in case.residuals.absolute_names():
-                                variables[abs_name]['residuals'] = case.residuals[abs_name]
-                            else:
-                                variables[abs_name]['residuals'] = 'Not Recorded'
-                elif case.inputs is not None:
-                    for abs_name in case.inputs.absolute_names():
-                        if abs_name not in variables:
-                            variables[abs_name] = {'value': case.inputs[abs_name]}
-
-        return variables
-
-    def _has_all_values(self, coord_map):
-        """
-        Tell if all variables from every recorded system have been iterated over.
-
-        Parameters
-        ----------
-        coord_map : dict
-            maps stripped iteration coordinates to a bool indicating whether or not the system(s)
-            associated with that iteration coordinate have been iterated over.
-
-        Returns
-        -------
-        bool
-            True if coord_map is True for each key, False otherwise.
-        """
-        for coord in coord_map:
-            if not coord_map[coord]:
-                return False
-        return True
-
-    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream):
-        """
-        Write table of variable names, values, residuals, and metadata to out_stream.
-
-        The output values could actually represent input variables.
-        In this context, outputs refers to the data that is being logged to an output stream.
-
-        Parameters
-        ----------
-        in_or_out : str, 'input' or 'output'
-            indicates whether the values passed in are from inputs or output variables.
-        comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the output values.
-        outputs : list
-            list of (name, dict of vals and metadata) tuples.
-        hierarchical : bool
-            When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool
-            When False, in the columnar display, just display norm of any ndarrays with size > 1.
-            The norm is surrounded by vertical bars to indicate that it is a norm.
-            When True, also display full values of the ndarray below the row. Format  is affected
-            by the values set with numpy.set_printoptions
-            Default is False.
-        out_stream : file-like object
-            Where to send human readable output.
-            Set to None to suppress.
-        """
-        if out_stream is None:
-            return
-
-        # Make a dict of outputs. Makes it easier to work with in this method
-        dict_of_outputs = OrderedDict()
-        for name, vals in outputs:
-            dict_of_outputs[name] = vals
-
-        allprocs_abs_names = {
-            'input': dict_of_outputs.keys(),
-            'output': dict_of_outputs.keys()
-        }
-
-        write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
-                      'model', allprocs_abs_names)
-
 
 class CaseTable(object):
     """
@@ -924,13 +656,15 @@ class CaseTable(object):
         Dictionary mapping absolute variable names to variable metadata.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
+    _voi_meta : dict
+        Dictionary mapping absolute variable names to variable settings.
     _keys : list
         List of keys of cases in the table.
     _cases : dict
         Dictionary mapping keys to cases that have already been loaded.
     """
 
-    def __init__(self, filename, format_version, table, index, abs2prom, abs2meta, prom2abs):
+    def __init__(self, filename, format_version, table, index, prom2abs, abs2prom, abs2meta, voi_meta=None):
         """
         Initialize.
 
@@ -950,14 +684,17 @@ class CaseTable(object):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        voi_meta : dict
+            Dictionary mapping absolute variable names to variable settings (relevant to driver cases).
         """
         self._filename = filename
         self._format_version = format_version
         self._table_name = table
         self._index_name = index
+        self._prom2abs = prom2abs
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
-        self._prom2abs = prom2abs
+        self._voi_meta = voi_meta
 
         # cached keys/cases
         self._keys = []
@@ -1125,6 +862,7 @@ class CaseTable(object):
 
         # we don't have it, so fetch it
         with sqlite3.connect(self._filename) as con:
+            con.row_factory = sqlite3.Row
             cur = con.cursor()
             cur.execute("SELECT * FROM %s WHERE %s='%s'" %
                         (self._table_name, self._index_name, case_id))
@@ -1134,7 +872,10 @@ class CaseTable(object):
 
         # if found, extract the data and optionally cache the Case
         if row is not None:
-            case = self._extract_case_from_row(row)
+            source = self._get_source(row[self._index_name])
+            case = Case(source, row,
+                        self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                        self._format_version)
 
             # cache it if requested
             if cache:
@@ -1174,13 +915,20 @@ class CaseTable(object):
             If True, cases will be cached for faster access by key.
         """
         with sqlite3.connect(self._filename) as con:
+            con.row_factory = sqlite3.Row
             cur = con.cursor()
             cur.execute("SELECT * FROM %s ORDER BY id ASC" % self._table_name)
             # rows = cur.fetchall()
             for row in cur:
-                case = self._extract_case_from_row(row)
+                case_id = row[self._index_name]
+                source = self._get_source(case_id)
+                # print('cases()', source)
+                # pprint(dict(zip(row.keys(), row)))
+                case = Case(source, row,
+                            self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                            self._format_version)
                 if cache:
-                    self._cases[case.iteration_coordinate] = case
+                    self._cases[case_id] = case
                 yield case
 
         con.close()
@@ -1256,11 +1004,11 @@ class DriverCases(CaseTable):
 
     Attributes
     ----------
-    _var_settings : dict
+    _voi_meta : dict
         Dictionary mapping absolute variable names to variable settings.
     """
 
-    def __init__(self, filename, format_version, abs2prom, abs2meta, prom2abs, var_settings):
+    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1276,48 +1024,13 @@ class DriverCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        var_settings : dict
+        voi_meta : dict
             Dictionary mapping absolute variable names to variable settings.
         """
         super(DriverCases, self).__init__(filename, format_version,
                                           'driver_iterations', 'iteration_coordinate',
-                                          abs2prom, abs2meta, prom2abs)
-        self._var_settings = var_settings
-
-    def _extract_case_from_row(self, row, deriv_row=None):
-        """
-        Pull data out of a queried SQLite row.
-
-        Parameters
-        ----------
-        row : sqlite3.Row
-            Row from driver table.
-
-        deriv_row : sqlite3.Row
-            Matching row from driver_derivatives table.
-
-        Returns
-        -------
-        Case
-            Case for associated row.
-        """
-        if self._format_version >= 3:
-            inputs_array = json_to_np_array(row['inputs'], self._abs2meta)
-            outputs_array = json_to_np_array(row['outputs'], self._abs2meta)
-        elif self._format_version in (1, 2):
-            inputs_array = blob_to_array(row['inputs'])
-            outputs_array = blob_to_array(row['outputs'])
-
-        if deriv_row:
-            totals_array = blob_to_array(deriv_row['derivatives'])
-        else:
-            totals_array = None
-
-        return Case('driver', iteration_coordinate=row['iteration_coordinate'],
-                    timestamp=row['timestamp'], success=row['success'], msg=row['msg'],
-                    outputs=outputs_array, inputs=inputs_array, jacobian=totals_array,
-                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta,
-                    voi_meta=self._var_settings)
+                                          prom2abs, abs2prom, abs2meta, voi_meta)
+        self._voi_meta = voi_meta
 
     def cases(self, cache=False):
         """
@@ -1341,13 +1054,20 @@ class DriverCases(CaseTable):
                     # fetch associated derivative data, if available
                     cur.execute("SELECT * FROM driver_derivatives WHERE iteration_coordinate='%s'"
                                 % row['iteration_coordinate'])
-                    deriv_row = cur.fetchone()
-                else:
-                    deriv_row = None
+                    derivs_row = cur.fetchone()
 
-                case = self._extract_case_from_row(row, deriv_row)
+                    if derivs_row:
+                        # convert row to a regular dict and add jacobian
+                        row = dict(zip(row.keys(), row))
+                        row['jacobian'] =  derivs_row['derivatives']
+
+                case = Case('driver', row,
+                            self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                            self._format_version)
+
                 if cache:
                     self._cases[case.iteration_coordinate] = case
+
                 yield case
 
         con.close()
@@ -1372,7 +1092,6 @@ class DriverCases(CaseTable):
         if isinstance(case_id, int):
             case_id = self._get_iteration_coordinate(case_id)
 
-        print(self, 'get_case()', case_id)
         # return cached case if present, else fetch it
         if case_id in self._cases:
             return self._cases[case_id]
@@ -1386,22 +1105,26 @@ class DriverCases(CaseTable):
             cur.execute("SELECT * FROM driver_iterations WHERE "
                         "iteration_coordinate=:iteration_coordinate",
                         {"iteration_coordinate": case_id})
-            driver_row = cur.fetchone()
+            row = cur.fetchone()
 
             # fetch associated derivative data, if available
-            if driver_row and self._format_version > 1:
+            if row and self._format_version > 1:
                 cur.execute("SELECT * FROM driver_derivatives WHERE "
                             "iteration_coordinate=:iteration_coordinate",
                             {"iteration_coordinate": case_id})
-                deriv_row = cur.fetchone()
-            else:
-                deriv_row = None
+                derivs_row = cur.fetchone()
 
+                if derivs_row:
+                    # convert row to a regular dict and add jacobian
+                    row = dict(zip(row.keys(), row))
+                    row['jacobian'] =  derivs_row['derivatives']
         con.close()
 
         # if found, create Case object (and cache it if requested) else return None
-        if driver_row:
-            case = self._extract_case_from_row(driver_row, deriv_row)
+        if row:
+            case = Case('driver', row,
+                        self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                        self._format_version)
             if cache:
                 self._cases[case_id] = case
             return case
@@ -1441,7 +1164,7 @@ class ProblemCases(CaseTable):
     Case specific to the entries that might be recorded in a Driver iteration.
     """
 
-    def __init__(self, filename, format_version, abs2prom, abs2meta, prom2abs):
+    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1460,33 +1183,7 @@ class ProblemCases(CaseTable):
         """
         super(ProblemCases, self).__init__(filename, format_version,
                                            'problem_cases', 'case_name',
-                                           abs2prom, abs2meta, prom2abs)
-
-    def _extract_case_from_row(self, row):
-        """
-        Pull data out of a queried SQLite row.
-
-        Parameters
-        ----------
-        row : (id, counter, iter_coordinate, timestamp, success, msg, outputs)
-            Queried SQLite problems table row.
-
-        Returns
-        -------
-        Case
-            Case for associated row.
-        """
-        idx, counter, case_name, timestamp, success, msg, \
-            outputs_text, = row
-
-        if self._format_version >= 3:
-            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
-        elif self._format_version in (1, 2):
-            outputs_array = blob_to_array(outputs_text)
-
-        case = Case('problem', case_name, timestamp, success, msg, outputs=outputs_array,
-                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
-        return case
+                                           prom2abs, abs2prom, abs2meta, voi_meta)
 
     def list_sources(self):
         """
@@ -1521,7 +1218,7 @@ class SystemCases(CaseTable):
     Case specific to the entries that might be recorded in a System iteration.
     """
 
-    def __init__(self, filename, format_version, abs2prom, abs2meta, prom2abs):
+    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1540,41 +1237,7 @@ class SystemCases(CaseTable):
         """
         super(SystemCases, self).__init__(filename, format_version,
                                           'system_iterations', 'iteration_coordinate',
-                                          abs2prom, abs2meta, prom2abs)
-
-    def _extract_case_from_row(self, row):
-        """
-        Pull data out of a queried SQLite row.
-
-        Parameters
-        ----------
-        row : (id, counter, iter_coordinate, timestamp, success, msg, inputs, outputs, residuals)
-            Queried SQLite systems table row.
-
-        Returns
-        -------
-        Case
-            Case for associated row.
-        """
-        idx, counter, iter_coord, timestamp, success, msg, inputs_text,\
-            outputs_text, residuals_text = row
-
-        if self._format_version >= 3:
-            inputs_array = json_to_np_array(inputs_text, self._abs2meta)
-            outputs_array = json_to_np_array(outputs_text, self._abs2meta)
-            residuals_array = json_to_np_array(residuals_text, self._abs2meta)
-        elif self._format_version in (1, 2):
-            inputs_array = blob_to_array(inputs_text)
-            outputs_array = blob_to_array(outputs_text)
-            residuals_array = blob_to_array(residuals_text)
-
-        source = self._get_source(iter_coord)
-
-        case = Case(source, iter_coord, timestamp, success, msg,
-                    inputs=inputs_array, outputs=outputs_array, residuals=residuals_array,
-                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
-
-        return case
+                                          prom2abs, abs2prom, abs2meta, voi_meta)
 
 
 class SolverCases(CaseTable):
@@ -1582,7 +1245,7 @@ class SolverCases(CaseTable):
     Case specific to the entries that might be recorded in a Solver iteration.
     """
 
-    def __init__(self, filename, format_version, abs2prom, abs2meta, prom2abs):
+    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1601,43 +1264,7 @@ class SolverCases(CaseTable):
         """
         super(SolverCases, self).__init__(filename, format_version,
                                           'solver_iterations', 'iteration_coordinate',
-                                          abs2prom, abs2meta, prom2abs)
-
-    def _extract_case_from_row(self, row):
-        """
-        Pull data out of a queried SQLite row.
-
-        Parameters
-        ----------
-        row : (id, counter, iter_coordinate, timestamp, success, msg, abs_err, rel_err,
-               inputs, outputs, residuals)
-            Queried SQLite solvers table row.
-
-        Returns
-        -------
-        Case
-            Case for associated row.
-        """
-        idx, counter, iter_coord, timestamp, success, msg, abs_err, rel_err, \
-            input_text, output_text, residuals_text = row
-
-        if self._format_version >= 3:
-            input_array = json_to_np_array(input_text, self._abs2meta)
-            output_array = json_to_np_array(output_text, self._abs2meta)
-            residuals_array = json_to_np_array(residuals_text, self._abs2meta)
-        elif self._format_version in (1, 2):
-            input_array = blob_to_array(input_text)
-            output_array = blob_to_array(output_text)
-            residuals_array = blob_to_array(residuals_text)
-
-        source = self._get_source(iter_coord)
-
-        case = Case(source, iter_coord, timestamp, success, msg,
-                    inputs=input_array, outputs=output_array, residuals=residuals_array,
-                    abs_err=abs_err, rel_err=rel_err,
-                    prom2abs=self._prom2abs, abs2prom=self._abs2prom, abs2meta=self._abs2meta)
-
-        return case
+                                          prom2abs, abs2prom, abs2meta, voi_meta)
 
     def _get_source(self, iteration_coordinate):
         """

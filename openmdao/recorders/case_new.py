@@ -7,8 +7,12 @@ import re
 import itertools
 
 from collections import OrderedDict
+from pprint import pprint
 
 import numpy as np
+
+from openmdao.utils.record_util import json_to_np_array
+from openmdao.recorders.sqlite_recorder import blob_to_array
 
 from openmdao.utils.write_outputs import write_outputs
 
@@ -57,10 +61,7 @@ class Case(object):
         Dictionary mapping absolute names of variables of interest to variable metadata.
     """
 
-    def __init__(self, source, iteration_coordinate, timestamp, success, msg,
-                 outputs=None, inputs=None, residuals=None, jacobian=None,
-                 parent=None, children=None, abs_err=None, rel_err=None,
-                 prom2abs=None, abs2prom=None, abs2meta=None, voi_meta=None):
+    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, voi_meta, data_format=None):
         """
         Initialize.
 
@@ -68,30 +69,8 @@ class Case(object):
         ----------
         source : str
             The unique id of the system/solver/driver/problem that did the recording.
-        iteration_coordinate : str
-            The full unique identifier for this iteration.
-        timestamp : float
-            Time of execution of the case.
-        success : str
-            Success flag for the case.
-        msg : str
-            Message associated with the case.
-        inputs : array
-            Inputs as read from the recording file.
-        outputs : array
-            Outputs as read from the recording file.
-        residuals : PromotedToAbsoluteMap or None
-            Map of outputs to residuals recorded (None if not recorded).
-        jacobian : PromotedToAbsoluteMap or None
-            Map of (output, input) to derivatives recorded (None if not recorded).
-        parent : str
-            The full unique identifier for the parent this iteration.
-        children : list
-            The full unique identifiers for children of this iteration.
-        abs_err : float or None
-            Absolute error for solver. (Solver cases only, None if not recorded).
-        rel_err : float or None
-            Relative error for solver. (Solver cases only, None if not recorded).
+        data : dict-like
+            Dictionary of data for a case
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names of all variables to absolute names.
         abs2prom : {'input': dict, 'output': dict}
@@ -100,20 +79,37 @@ class Case(object):
             Dictionary mapping absolute names of all variables to variable metadata.
         voi_meta : dict
             Dictionary mapping absolute names of variables of interest to variable metadata.
+        data_format : int
+            A version number specifying the format of array data, if not numpy arrays.
         """
         self.source = source
-        self.iteration_coordinate = iteration_coordinate
+        self._format_version = data_format
 
-        self.timestamp = timestamp
-        self.success = success
-        self.msg = msg
+        if 'iteration_coordinate' in data.keys():
+            self.iteration_coordinate = data['iteration_coordinate']
+        elif 'case_name' in data.keys():
+            self.iteration_coordinate = data['case_name']  # problem cases
+        else:
+            self.iteration_coordinate = None
 
-        self.parent = parent
-        self.children = children
+        self.timestamp = data['timestamp']
+        self.success = data['success']
+        self.msg = data['msg']
+
+        # self.parent = parent
+        # self.children = children
 
         # for a solver case
-        self.abs_err = abs_err
-        self.rel_err = rel_err
+        self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
+        self.rel_err = data['abs_err'] if 'rel_err' in data.keys() else None
+
+        # rename solver keys
+        if 'solver_inputs' in data.keys():
+            if not isinstance(data, dict):
+                data = dict(zip(data.keys(), data))
+            data['inputs'] = data.pop('solver_inputs')
+            data['outputs'] = data.pop('solver_output')
+            data['residuals'] = data.pop('solver_residuals')
 
         # default properties to None
         self.inputs = None
@@ -121,15 +117,51 @@ class Case(object):
         self.residuals = None
         self.jacobian = None
 
-        # if provided, convert to properties allowing access via either promoted or absolute name
-        if inputs is not None and inputs.dtype.names:
-            self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
-        if outputs is not None and outputs.dtype.names:
-            self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs, abs2prom)
-        if residuals is not None and residuals.dtype.names:
-            self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs, abs2prom)
-        if jacobian is not None and jacobian.dtype.names:
-            self.jacobian = PromotedToAbsoluteMap(jacobian[0], prom2abs, abs2prom, output=True)
+        if 'inputs' in data.keys():
+            if data_format >= 3:
+                inputs = json_to_np_array(data['inputs'], abs2meta)
+            elif data_format in (1, 2):
+                inputs = blob_to_array(data['inputs'])
+                if str(inputs) == 'None':
+                    inputs = None
+            else:
+                inputs = data['inputs']
+            if inputs is not None:
+                self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
+
+        if 'outputs' in data.keys():
+            if data_format >= 3:
+                outputs = json_to_np_array(data['outputs'], abs2meta)
+            elif self._format_version in (1, 2):
+                outputs = blob_to_array(data['outputs'])
+                if str(outputs) == 'None':
+                    outputs = None
+            else:
+                outputs = data['outputs']
+            if outputs is not None:
+                self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs, abs2prom)
+
+        if 'residuals' in data.keys():
+            if data_format >= 3:
+                residuals = json_to_np_array(data['residuals'], abs2meta)
+            elif data_format in (1, 2):
+                residuals = blob_to_array(data['residuals'])
+                if str(residuals) == 'None':
+                    residuals = None
+            else:
+                residuals = data['residuals']
+            if residuals is not None:
+                self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs, abs2prom)
+
+        if 'jacobian' in data.keys():
+            if data_format >= 2:
+                jacobian = blob_to_array(data['jacobian'])
+                if str(jacobian) == 'None':
+                    jacobian = None
+            else:
+                jacobian = data['jacobian']
+            if jacobian is not None:
+                self.jacobian = PromotedToAbsoluteMap(jacobian[0], prom2abs, abs2prom, output=True)
 
         # save var name & meta dict references for use by self._get_variables_of_type()
         self._prom2abs = prom2abs
