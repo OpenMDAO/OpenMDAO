@@ -74,7 +74,7 @@ install:
 - cmd: conda install python=%PYTHON% numpy scipy=1.0.1 mkl==2018.0.2 nose sphinx mock pip --quiet
 - cmd: pip install matplotlib
 - cmd: pip install testflo
-- cmd: cd C:\projects\blue*
+- cmd: cd C:\projects\OpenMDAO*
 - cmd: pip install -e .
 - cmd: conda list
 
