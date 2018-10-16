@@ -1,5 +1,8 @@
 build: off
 
+cache:
+  - sh: $HOME/miniconda
+
 environment:
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
@@ -80,4 +83,5 @@ install:
 
 test_script:
 
-- testflo . -n 1;
+- sh: testflo . -n 1;
+- cmd: testflo . -n 1
