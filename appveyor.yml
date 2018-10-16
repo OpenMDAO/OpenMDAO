@@ -1,8 +1,8 @@
 build: off
 
 init:
-- sh: CACHE_DIR="$HOME/miniconda"
-- cmd: CACHE=DIR=""
+- sh: CACHE_DIR="home/appveyor/miniconda"
+- cmd: CACHE_DIR=""
 
 cache:
   - '$CACHE_DIR'
