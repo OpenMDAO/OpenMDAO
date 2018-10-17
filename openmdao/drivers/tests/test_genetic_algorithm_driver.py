@@ -774,6 +774,38 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
                          "processors that is a multiple of 3, or specify a number "
                          "of processors per model that divides into 4.")
 
+    def test_concurrent_eval_padded(self):
+        # This test only makes sure we don't lock up if we overallocate our integer desvar space
+        # to the next power of 2.
+
+        class GAGroup(Group):
+
+            def setup(self):
+
+                self.add_subsystem('p1', IndepVarComp('x', 1.0))
+                self.add_subsystem('p2', IndepVarComp('y', 1.0))
+                self.add_subsystem('p3', IndepVarComp('z', 1.0))
+
+                self.add_subsystem('comp', ExecComp(['f = x + y + z']))
+
+                self.add_design_var('p1.x', lower=-100, upper=100)
+                self.add_design_var('p2.y', lower=-100, upper=100)
+                self.add_design_var('p3.z', lower=-100, upper=100)
+                self.add_objective('comp.f')
+
+        prob = Problem()
+        prob.model = GAGroup()
+
+        driver = prob.driver = SimpleGADriver()
+        driver.options['max_gen'] = 5
+        driver.options['pop_size'] = 40
+        driver.options['run_parallel'] = True
+
+        prob.setup()
+
+        # No meaningful result from a short run; just make sure we don't hang.
+        prob.run_driver()
+
 
 class TestFeatureSimpleGA(unittest.TestCase):
 
