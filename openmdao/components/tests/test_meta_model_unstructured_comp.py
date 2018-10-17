@@ -7,7 +7,7 @@ import unittest
 import warnings
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
-    FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel
+    FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel, NearestNeighbor
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.logger_utils import TestLogger
@@ -1008,7 +1008,7 @@ class MetaModelTestCase(unittest.TestCase):
             prob = no_surrogate_test_setup(trig)
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
         expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
-        "OpenMDAO will use finite differences to compute derivates. Some of the derivatives will be computed\n" \
+        "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
         "using default finite difference options because they were not explicitly declared.\n" \
         "The derivatives computed using the defaults are:\n" \
         "    trig.sin_x, trig.x\n"
@@ -1078,7 +1078,7 @@ class MetaModelTestCase(unittest.TestCase):
             prob.run_model()
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
         expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
-        "OpenMDAO will use finite differences to compute derivates. Some of the derivatives will be computed\n" \
+        "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
         "using default finite difference options because they were not explicitly declared.\n" \
         "The derivatives computed using the defaults are:\n" \
         "    trig.sin_x, trig.x2\n"
@@ -1126,6 +1126,93 @@ class MetaModelTestCase(unittest.TestCase):
         J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
         deriv_using_fd = J[('trig.sin_x', 'indep.x')]
         assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
+
+    def test_metamodel_setup_called_twice_bug(self):
+        class Trig(MetaModelUnStructuredComp):
+            def setup(self):
+                surrogate = NearestNeighbor()
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0, 10, 20))
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=.5 * np.sin(np.linspace(0, 10, 20)))
+
+        # Check to make sure bug reported in story 160200719 is fixed
+        prob = Problem()
+
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+
+        prob.model.add_subsystem('indep', indep)
+        prob.model.add_subsystem('trig', Trig())
+
+        prob.model.connect('indep.x', 'trig.x')
+
+        prob.model.add_design_var('indep.x', lower=4, upper=7)
+        prob.model.add_objective('trig.sin_x')
+
+        prob.setup(check=False)
+        prob['indep.x'] = 5.0
+        prob.run_model()
+        J = prob.compute_totals()
+        # First value.
+        deriv_first_time = J[('trig.sin_x', 'indep.x')]
+
+        # Setup and run a second time
+        prob.setup(check=False)
+        prob['indep.x'] = 5.0
+        prob.run_model()
+        J = prob.compute_totals()
+        # Second time.
+        deriv_second_time = J[('trig.sin_x', 'indep.x')]
+
+        assert_rel_error(self, deriv_first_time, deriv_second_time, 1e-4)
+
+
+    def test_metamodel_setup_called_twice_bug_called_outside_setup(self):
+        class Trig(MetaModelUnStructuredComp):
+            def __init__(self):
+                super(Trig, self).__init__()
+                self.add_input('x', 0.,
+                               training_data=np.linspace(0, 10, 20))
+
+            def setup(self):
+                surrogate = NearestNeighbor()
+                self.add_output('sin_x', 0.,
+                                surrogate=surrogate,
+                                training_data=.5 * np.sin(np.linspace(0, 10, 20)))
+
+        prob = Problem()
+
+        indep = IndepVarComp()
+        indep.add_output('x', 5.)
+
+        prob.model.add_subsystem('indep', indep)
+        trig = Trig()
+        prob.model.add_subsystem('trig', trig)
+
+        prob.model.connect('indep.x', 'trig.x')
+
+        prob.model.add_design_var('indep.x', lower=4, upper=7)
+        prob.model.add_objective('trig.sin_x')
+
+        # Check to make sure bug reported in story 160200719 is fixed
+        prob.setup(check=False)
+        prob['indep.x'] = 5.0
+        prob.run_model()
+        J = prob.compute_totals()
+        # First value.
+        deriv_first_time = J[('trig.sin_x', 'indep.x')]
+
+        # Setup and run a second time
+        prob.setup(check=False)
+        prob['indep.x'] = 5.0
+        prob.run_model()
+        J = prob.compute_totals()
+        # Second time.
+        deriv_second_time = J[('trig.sin_x', 'indep.x')]
+
+        assert_rel_error(self, deriv_first_time, deriv_second_time, 1e-4)
 
 
 if __name__ == "__main__":
