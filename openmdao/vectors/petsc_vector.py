@@ -84,4 +84,4 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        return self._system.comm.allreduce(np.sum(self._data.real**2)) ** 0.5
+        return self._system.comm.allreduce(np.linalg.norm(self._data))

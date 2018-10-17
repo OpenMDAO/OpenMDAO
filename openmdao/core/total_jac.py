@@ -21,7 +21,6 @@ except ImportError:
     PETSc = None
 
 from openmdao.vectors.vector import INT_DTYPE
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
@@ -122,6 +121,7 @@ class _TotalJacInfo(object):
         self.responses = responses = driver._responses
         self.debug_print = debug_print
         self.par_deriv = {}
+        self._recording_iter = driver._recording_iter
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -1084,6 +1084,8 @@ class _TotalJacInfo(object):
         vecname, _, _ = self.in_idx_map[mode][i]
 
         scatter = self.jac_scatters[mode][vecname]
+
+        # DefaultVector
         if scatter is None:
             deriv_idxs, jac_idxs = self.solvec_map[mode]
             deriv_val = self.output_vec[mode][vecname]._data
@@ -1091,6 +1093,8 @@ class _TotalJacInfo(object):
                 self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
             else:  # rev
                 self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+
+        # PETScVector
         else:
             self.jac_petsc[mode].array[:] = 0.
             scatter.scatter(self.soln_petsc[mode][vecname][0],
@@ -1482,7 +1486,7 @@ class _TotalJacInfo(object):
         metadata : dict
             Dictionary containing execution metadata.
         """
-        recording_iteration.stack.append((requester._get_name(), requester.iter_count))
+        self._recording_iter.stack.append((requester._get_name(), requester.iter_count))
 
         try:
             totals = self._get_dict_J(self.J, self.wrt, self.prom_wrt, self.of, self.prom_of,
@@ -1490,7 +1494,7 @@ class _TotalJacInfo(object):
             requester._rec_mgr.record_derivatives(requester, totals, metadata)
 
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
 
 def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx):

@@ -16,7 +16,6 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -148,6 +147,8 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -528,6 +529,13 @@ class System(object):
                 if nl_alloc_complex:
                     break
 
+            # Linear vectors allocated complex only if subsolvers require derivatives.
+            if nl_alloc_complex:
+                from openmdao.error_checking.check_config import check_allocate_complex_ln
+                ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
+            else:
+                ln_alloc_complex = False
+
             if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
                 self._scale_factors = self._compute_root_scale_factors()
             else:
@@ -542,7 +550,7 @@ class System(object):
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                 else:
-                    alloc_complex = force_alloc_complex
+                    alloc_complex = ln_alloc_complex
 
                     if vec_name != 'linear':
                         voi = vois[vec_name]
@@ -1102,11 +1110,15 @@ class System(object):
         vector_class = self._vector_class
 
         for vec_name in self._rel_vec_name_list:
+
+            # Only allocate complex in the vectors we need.
+            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, resize=resize,
-                    alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
+                    alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -2816,7 +2828,7 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = recording_iteration.stack[-1][0]
+            stack_top = self._recording_iter.stack[-1][0]
             method = stack_top.split('.')[-1]
 
             if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
@@ -2924,6 +2936,14 @@ class System(object):
             sub._inputs.set_complex_step_mode(active)
             sub._outputs.set_complex_step_mode(active)
             sub._residuals.set_complex_step_mode(active)
+
+            if sub._vectors['output']['linear']._alloc_complex:
+                sub._vectors['output']['linear'].set_complex_step_mode(active)
+                sub._vectors['input']['linear'].set_complex_step_mode(active)
+                sub._vectors['residual']['linear'].set_complex_step_mode(active)
+
+                if sub._owns_approx_jac:
+                    sub._jacobian.set_complex_step_mode(active)
 
     def cleanup(self):
         """

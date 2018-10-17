@@ -15,7 +15,6 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, SqliteRecorder,
     BoundsEnforceLS, ArmijoGoldsteinLS, CaseReader, PETScVector, AnalysisError
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
@@ -61,8 +60,6 @@ class ParaboloidProblem(Problem):
 class TestSqliteRecorder(unittest.TestCase):
 
     def setUp(self):
-        recording_iteration.stack = []  # reset to avoid problems from earlier tests
-
         self.orig_dir = os.getcwd()
         self.temp_dir = mkdtemp()
         os.chdir(self.temp_dir)
@@ -966,7 +963,7 @@ class TestSqliteRecorder(unittest.TestCase):
         except AnalysisError:
             pass
 
-        self.assertTrue(len(recording_iteration.stack) == 0)
+        self.assertTrue(len(prob._recording_iter.stack) == 0)
 
     def test_record_solver_nonlinear_block_gs(self):
         prob = SellarProblem(linear_solver=LinearBlockGS, nonlinear_solver=NonlinearBlockGS)

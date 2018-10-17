@@ -13,6 +13,9 @@ The number of bits you choose should be equal to the base-2 logarithm of the num
 want between the min and max value.  A higher value means more accuracy for this variable, but it also increases
 the number of generations (and hence total evaluations) that will be required to find the minimum. If you do not
 specify a value for bits for a continuous variable, then the variable is assumed to be integer, and encoded as such.
+Note that if the range between the upper and lower bounds is not a power of two, then the the variable is discretized
+beyond the upper bound, but those points that the GA generates which exceed the declared upper bound are discarded
+before evaluation.
 
 The SimpleGADriver supports both constrained and unconstrained optimization.
 

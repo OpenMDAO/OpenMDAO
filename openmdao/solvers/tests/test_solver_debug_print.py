@@ -176,6 +176,13 @@ class TestNonlinearSolvers(unittest.TestCase):
         with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
+
+class TestNonlinearSolversBugFixes(unittest.TestCase):
+    """
+    Got some odd intermittent failures with this, so moved it to a separate test object. It is
+    unrelated to the tests in that test object, and doesn't need all the setup/teardown tempfile
+    creation and deletion.
+    """
     def test_debug_after_raised_error(self):
         prob = Problem()
         model = prob.model

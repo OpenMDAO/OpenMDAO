@@ -7,7 +7,6 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
 from openmdao.core.problem import Problem
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
@@ -169,7 +168,8 @@ class BaseRecorder(object):
 
         self._counter += 1
 
-        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
+        self._iteration_coordinate = \
+            recording_requester._recording_iter.get_formatted_iteration_coordinate()
 
         if isinstance(recording_requester, Driver):
             self.record_iteration_driver(recording_requester, data, metadata)
@@ -261,7 +261,8 @@ class BaseRecorder(object):
             if MPI and MPI.COMM_WORLD.rank > 0:
                 raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
 
-        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
+        self._iteration_coordinate = \
+            recording_requester._recording_iter.get_formatted_iteration_coordinate()
 
         self.record_derivatives_driver(recording_requester, data, metadata)
 
