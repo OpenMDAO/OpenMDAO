@@ -586,7 +586,6 @@ class GeneticAlgorithm(object):
                         # Print the traceback if it fails
                         print('A case failed:')
                         print(traceback)
-                print(fitness)
 
             else:
                 # Serial
