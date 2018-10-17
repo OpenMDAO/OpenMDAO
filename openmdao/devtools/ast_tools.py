@@ -101,9 +101,11 @@ class FunctionDefVisitor(ast.NodeVisitor):
         self.lhs_set = set()
         self.vset = self.rhs_set
         self.visit(node.value)
+
         self.vset = self.lhs_set
         for target in node.targets:
             self.visit(target)
+
         self.vset = None
 
         for rhs in self.rhs_set:
@@ -139,7 +141,8 @@ class FunctionDefVisitor(ast.NodeVisitor):
             long_name = _get_long_name(node.value)
             if long_name is not None:
                 if isinstance(node.slice, ast.Index):
-                    self.vset.add(astunparse.unparse(node).strip())
+                    long_name = astunparse.unparse(node).strip()
+                    self.vset.add(long_name)
                 else:
                     self.vset.add(long_name)
                     self.visit(node.slice)
@@ -147,6 +150,10 @@ class FunctionDefVisitor(ast.NodeVisitor):
                 self.generic_visit(node)
         else:
             self.generic_visit(node)
+
+    def get_constants(self):
+        g = self.graph
+        return [node for node in g if node not in self.lhs_set and node not in g.successors(node)]
 
 
 class NameTransformer(ast.NodeTransformer):
@@ -167,15 +174,26 @@ class NameTransformer(ast.NodeTransformer):
     def visit_Subscript(self, node):
         long_name = _get_long_name(node.value)
         xform = self.mapping.get(long_name)
+        full_replace = False
+        if xform is None:
+            full_replace = True
+            # look for transform of the full subscript, e.g.  foo['x']
+            full = astunparse.unparse(node).rstrip()
+            xform = self.mapping.get(full)
+
         if xform is not None:
-            node.value = _get_attr_node(xform.split('.'), node.value.ctx)
+            if full_replace:
+                node = _get_attr_node(xform.split('.'), node.value.ctx)
+            else:
+                node.value = _get_attr_node(xform.split('.'), node.value.ctx)
             return node
+
         return super(NameTransformer, self).generic_visit(node)
 
 
-def transform_ast_names(node, mapping, global_ns):
+def transform_ast_names(node, mapping):
     """
-    Returns a new expression string with the names transformed based on mapping.
+    Returns a new source string with the names transformed based on mapping.
 
     Note that this transforms only from the beginning of a name, so for example, if you have
     abc.xyz.abc and a mapping of { 'abc': 'XXX' }, you'll get 'XXX.xyz.abc', not 'XXX.xyz.XXX'.
@@ -186,8 +204,6 @@ def transform_ast_names(node, mapping, global_ns):
         Top node of the original AST.
     mapping : dict
         Dict mapping original name to new name.
-    global_ns : dict
-        Global namespace dict.
 
     """
     new_ast = NameTransformer(mapping).visit(node)
@@ -195,6 +211,18 @@ def transform_ast_names(node, mapping, global_ns):
 
     return new_ast
 
+
+def function_static_analysis(funcsrc):
+    from openmdao.utils.graph_utils import all_connected_nodes
+
+    f_ast = ast.parse(funcsrc, mode='exec')
+    fdvis = FunctionDefVisitor()
+    fdvis.visit(f_ast)
+
+    for node in fdvis.graph:
+        print(node, list(set(list(all_connected_nodes(fdvis.graph, node))[1:])))
+
+    return fdvis, f_ast
 
 
 if __name__ == '__main__':
@@ -254,22 +282,12 @@ def compute_foo(self, inputs, outputs):
     outputs['rho'] = P/(n_moles*R_UNIVERSAL_SI*T)*100  # 1 Bar is 100 Kpa
     """
 
-    from openmdao.utils.graph_utils import all_connected_nodes
-
     global_ns = globals().copy()
     pre = set(global_ns)
-    orig_ast = ast.parse(funcsrc, mode='exec')
-    fdvis = FunctionDefVisitor()
-    deps_ast = fdvis.visit(orig_ast)
-    print(fdvis.graph.edges())
+    fdvis, f_ast = function_static_analysis(funcsrc)
 
-    for node in fdvis.graph:
-        print(node, list(all_connected_nodes(fdvis.graph, node))[1:])
-
-
-    print("\nCalls:")
-    for call in sorted(fdvis.calls):
-        print(call)
+    for c in fdvis.get_constants():
+        print("constant:", c)
 
     # new_ast = transform_ast_names(orig_ast, mapping, global_ns)
     # cod = compile(new_ast, "<string>", mode='exec')

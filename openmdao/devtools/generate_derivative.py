@@ -2,64 +2,155 @@ from collections import Iterable
 
 import sys
 import tangent
-from inspect import signature, getsourcelines, getmodule
-from collections import OrderedDict
+from inspect import signature, getsourcelines, getsource, getmodule
+from collections import OrderedDict, defaultdict
 import inspect
 from os import remove
-from importlib import reload
+from importlib import import_module, invalidate_caches
 import types
 import time
 import numpy as np
 import ast
+import astunparse
 
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
-from openmdao.devtools.ast_tools import ImportScanner
+from openmdao.devtools.ast_tools import transform_ast_names, function_static_analysis
 
 
-
-def generate_gradient(comp, src, method_name, mode):
+def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
     """
     Given the string representing the source code of a python function,
     use the tangent library to generate source code of its gradient.
 
     comp: Component instance
     src: str, the source code to be analyzed
-    method_name: str, the name of the function
+    func_name: str, the name of the function
 
-    Returns: [str], list of strings of the generated derivative function.
+    Returns: the generated derivative function.
     """
+
+    comp_mod = sys.modules[comp.__class__.__module__]
+    namespace = comp_mod.__dict__.copy()
+    namespace['self'] = comp
+
+    # exec function body in namespace to define all of the variables
+
+    header = ''.join(["%s = self._inputs['%s']\n" % (n.replace(':', '_'), n) for n in comp._inputs])
+    header += ''.join(["%s = self._outputs['%s']\n" % (n.replace(':', '_'), n) for n in comp._outputs])
+    header += ''.join(["resid__%s = self._vectors['residual']['linear']['%s']\n" %
+                       (n.replace(':', '_'), n) for n in comp._vectors['residual']['linear']])
+    header += ''.join(["_opt__%s = self.options['%s']\n" %
+                       (n.replace(':', '_'), n) for n in comp.options])
+    lines = header[:]
+    lines += '\nif True:\n'  # body src is indented, so put in conditional block
+    lines += nofunc_src
+
+    pre = set(namespace)
+
+    # print("exec'ing the following source:")
+    # for l in lines.split('\n'):
+    #     print(l)
+
+    exec(lines, namespace)
+
+    post = set(namespace)
+
+    new_attrs = post - pre
+
+    fdviz, f_ast = function_static_analysis(src)
+
+    fmap = {}
+    modules = set()
+
+    # this allows us to substitute defined non-member functions with tangent adjoints/tangents
+    # for member functions
+    for s in fdviz.calls:
+        if s.startswith('np.') or s.startswith('numpy.'):
+            continue
+        parts = s.split('.')
+        obj = namespace[parts[0]]
+        for p in parts[1:]:
+            obj = getattr(obj, p)
+
+        if type(obj) is types.MethodType:
+            klass = obj.__self__.__class__
+            # look for AD mappings in method's module
+            mod = sys.modules[klass.__module__]
+            name = klass.__name__
+        elif type(obj) is types.FunctionType:
+            mod = sys.modules[obj.__module__]
+            name = obj.__name__
+        else:
+            mod = None
+
+        if mod is not None and hasattr(mod, '_tangent_ad_mapping'):
+            mapping = getattr(mod, '_tangent_ad_mapping', None)
+            if mapping is not None and name in mapping:
+                tan_func = mapping[name]
+                if isinstance(tan_func, dict):
+                    tan_func = tan_func[parts[-1]]
+                fmap[s] = '.'.join([tan_func.__module__, tan_func.__name__])
+                modules.add(tan_func.__module__)
+
+    lines = []
+    for modname in modules:
+        lines.append('import %s' % modname)
+
+    lines.append(src)
+
+    new_src = '\n'.join(lines)
+
+    ast2 = ast.parse(new_src)
+
+    new_ast = transform_ast_names(ast2, fmap)
+    new_src = astunparse.unparse(new_ast)
+
+    # print("NEW SRC:")
+    # for l in new_src.split('\n'):
+    #     print(l)
 
     # needs to be read in as a proper module for tangent to work
     # in case we're doing this several times, need to reload
     # need to know the number of inputs to the loaded function
 
-    try:
-        del sys.modules['_temp']
-    except:
-        pass
+    temp_mod_name = '_temp_' + comp.pathname.replace('.', '_')
+    temp_file_name = temp_mod_name + '.py'
 
-    with open("_temp.py", "w") as f:
-        f.write(src)
-    import _temp
-    mod = sys.modules['_temp']
-    mod.self = comp  # add self to global namespace of module
-    method = getattr(_temp, method_name)
+    with open(temp_file_name, "w") as f:
+        f.write(new_src)
 
-    sig = signature(method)
+    #invalidate_caches()
+    import_module(temp_mod_name)
+    mod = sys.modules[temp_mod_name]
+
+    # populate module with globals from component's module
+    comp_mod = sys.modules[comp.__class__.__module__]
+    new_glob = set(comp_mod.__dict__) - set(mod.__dict__)
+    for name in new_glob:
+        setattr(mod, name, getattr(comp_mod, name))
+
+    mod.self = comp
+
+    # now set other comp values in globals that we've replaced with non-member variables
+    for rhs, name in to_replace.items():
+        setattr(mod, name, eval(rhs, mod.__dict__))
+
+    func = getattr(mod, func_name)
+    sig = signature(func)
     params = sig.parameters
 
     # generate AD code for the method for all inputs
-    #print(method)
-    df = tangent.autodiff(method, wrt=range(len(params)), mode=mode,
+    #print(func)
+    df = tangent.autodiff(func, wrt=tuple(range(len(params))), mode=mode,
                           verbose=0, check_dims=False)
-    src = getsourcelines(df)[0]
 
-    # cleanup temp file
-    #remove("_temp.py")
+    # cleanup temp file and module
+    remove(temp_file_name)
+    del sys.modules[temp_mod_name]
 
     # return the generated source as a list of strings
     #print(''.join(src))
-    return src, df
+    return df
 
 
 def generate_component_gradient(comp, mode):
@@ -71,6 +162,8 @@ def generate_component_gradient(comp, mode):
     else:
         compute_method = comp.apply_nonlinear
 
+    params = list(signature(compute_method).parameters)
+
     # get the name of the component type
     class_name = comp.__class__.__name__
 
@@ -78,30 +171,38 @@ def generate_component_gradient(comp, mode):
     # ignore blank lines, useful for detecting indentation later
     src = [line for line in getsourcelines(compute_method)[0] if line.strip()]
 
-    # lists of local names of inputs and outputs to code generate
+    # lists of local names of inputs and outputs (and maybe resids) to code generate
     pnames = []
     onames = []
+    rnames = []
+
     # mapping to rename variables within the compute method
-    to_replace = OrderedDict()
+    to_replace = {}
+    to_revert = {}
 
     # gather transformed input and output names
     for pname in inputs:
         new_name = pname.replace(":", "_")
         pnames.append(new_name)
-        to_replace["inputs['%s']" % pname] = new_name
-        to_replace['inputs["%s"]' % pname] = new_name
-
-        # remove lines of the form 'x = x'
-        to_replace[' %s = %s\n' % (new_name, new_name)] = ' \n'
+        to_replace["%s['%s']" % (params[0], pname)] = new_name
+        to_replace['%s["%s"]' % (params[0], pname)] = new_name
 
     for oname in outputs:
         new_name = oname.replace(":", "_")
         onames.append(new_name)
-        to_replace["outputs['%s']" % oname] = new_name
-        to_replace['outputs["%s"]' % oname] = new_name
+        to_replace["%s['%s']" % (params[1], oname)] = new_name
+        to_replace['%s["%s"]' % (params[1], oname)] = new_name
 
-        # remove lines of the form 'x = x'
-        to_replace[' %s = %s\n' % (new_name, new_name)] = ' \n'
+    for name in comp.options:
+        to_replace["self.options['%s']" % name] = '_opt__%s' % name
+        to_revert["self.options['%s']" % name] = '_opt__%s' % name
+
+    if not isinstance(comp, ExplicitComponent):
+        for rname in comp._vectors['residual']['linear']:
+            new_name = 'resid__' + rname.replace(":", "_")
+            rnames.append(new_name)
+            to_replace["%s['%s']" % (params[2], rname)] = new_name
+            to_replace['%s["%s"]' % (params[2], rname)] = new_name
 
     # # find any blocks that parameterize by iterating over metadata
     # # these need to be explicitly flattened
@@ -192,41 +293,65 @@ def generate_component_gradient(comp, mode):
     #         # add in all unravelled iterations to source
     #         src[k] = ''.join(unravelled)
 
-    # remove the original compute() call signature
-    src = ''.join(src).split(":", 1)[1]
-
     # replace all input references with local vars
     # e.g. change inputs['x'] to x and inputs['x:y'] to x_y
-    for pattern in to_replace:
-        src = src.replace(pattern, to_replace[pattern])
+    # for pattern in to_replace:
+    #     print("replacing '%s' with '%s'" % (pattern, to_replace[pattern]))
+    #     src = src.replace(pattern, to_replace[pattern])
+
+    # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
+    src[0] = src[0].lstrip()
+
+    src = ''.join(src)
+
+    ast2 = ast.parse(src)
+    new_ast = transform_ast_names(ast2, to_replace)
+    src = astunparse.unparse(new_ast)
+    indent = '    '
+
+    # remove the original compute() call signature
+    src = src.split(":", 1)[1]
 
     # start construction of partial derivative functions
-    indent = "       "
 
-    funcname = 'compute_outputs'
+    funcname = 'compute_ad'
 
     source = []
-
-    # get imports from component source file
-    comp_file = sys.modules[comp.__class__.__module__].__file__
-    with open(comp_file, "r") as f:
-        node = ast.parse(f.read(), comp_file)
-        imp_scan = ImportScanner()
-        imp_scan.visit(node)
-        source.extend(imp_scan.get_import_lines())
 
     # generate string of function to be analyzed by the tangent library
     source.append("def %s(%s):" % (funcname, ', '.join(pnames)))
     source.append(src)
-    source.append("%s return %s" % (indent, ', '.join(onames)))
+    source.append("%sreturn %s" % (indent, ', '.join(onames + rnames)))
     source = '\n'.join(source)
 
-    print(source)
+    # print("Function source:")
+    # print(source)
 
     # gather generated gradient source code
-    dsrc, df = generate_gradient(comp, source, funcname, mode)
+    df = generate_gradient(comp, source, funcname, mode, src, to_revert)
+    dsrc = getsource(df)
 
-    print(''.join(dsrc))
+    # now translate back the member vars we substituted for earlier
+    d_ast = ast.parse(dsrc)
+    # reverse the to_revert dict
+    revert = {}
+    for key, val in to_revert.items():
+        revert[val] = key
+    final_ast = transform_ast_names(d_ast, revert)
+    dsrc = astunparse.unparse(final_ast)
+    dlines = dsrc.split('\n')
+    for i, line in enumerate(dlines):
+        if line.startswith('def '):
+            dlines[i] = _fix_func_def(line)
+            break
+
+    comp_mod = sys.modules[comp.__class__.__module__]
+    namespace = comp_mod.__dict__.copy()
+    namespace['tangent'] = tangent
+    dsrc = '\n'.join(dlines)
+    exec(dsrc, namespace)
+    df = namespace['_compute_derivs_ad']
+
     return source, dsrc, df
 
 
@@ -253,10 +378,10 @@ def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
 
     if show_orig:
         print("ORIG function:", file=out)
-        print(''.join(src), file=out)
+        print(src, file=out)
 
     print("%s grad function:" % mode, file=out)
-    print(''.join(getsourcelines(df)[0]), file=out)
+    print(dsrc, file=out)
 
     prefix = comp.pathname + '.' if comp.pathname else ''
 
@@ -265,7 +390,7 @@ def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
     outputs = comp._outputs
 
     if mode == 'forward':
-        array = comp._vectors['output']['linear']._data
+        array = comp._vectors['input']['linear']._data
         vec = inputs
     else:  # reverse
         array = comp._vectors['output']['linear']._data
@@ -292,7 +417,7 @@ def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
             locidx = idx2loc[idx]
             abs_in = prefix + iname
 
-            grad = df(*params)
+            grad = df(comp, *params)
             for i, oname in enumerate(outputs):
                 abs_out = prefix + oname
                 key = (abs_out, abs_in)
@@ -311,7 +436,7 @@ def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
             locidx = idx2loc[oidx]
             abs_out = prefix + oname
 
-            grad = df(*params)
+            grad = df(comp, *params)
             for i, iname in enumerate(inputs):
                 abs_in = prefix + iname
                 key = (abs_out, abs_in)
@@ -322,6 +447,7 @@ def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
 
     import pprint
     pprint.pprint(J, stream=out)
+
 
 def _ad_cmd(options):
     """
@@ -355,3 +481,11 @@ def _ad_cmd(options):
         exit()
 
     return _ad
+
+
+def _fix_func_def(line):
+    # line is assumed to be of the form   def foo(a, b, c)
+    # it will be converted to  def _compute_derivs_ad(self, a, b, c)
+    parts = line.split('(', 1)
+
+    return 'def _compute_derivs_ad(' + 'self, ' + parts[1]
