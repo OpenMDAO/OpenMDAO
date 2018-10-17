@@ -92,6 +92,7 @@ class Case(object):
         else:
             self.iteration_coordinate = None
 
+        self.counter = data['counter']
         self.timestamp = data['timestamp']
         self.success = data['success']
         self.msg = data['msg']

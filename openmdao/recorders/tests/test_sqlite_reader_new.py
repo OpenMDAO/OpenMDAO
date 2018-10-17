@@ -166,10 +166,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # Get derivatives associated with the first iteration.
-        deriv_case = cr.get_case('rank0:SLSQP|1')
-
-        # Get all derivatives from that case.
-        derivs = deriv_case.jacobian
+        derivs = cr.get_case('rank0:SLSQP|1').jacobian
 
         # check that derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([
@@ -403,39 +400,42 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|5',
             'rank0:SLSQP|6'
         ]
+        last_counter = 0
         for i, c in enumerate(cr.get_cases()):
-            print(i, c.iteration_coordinate)
-            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertTrue(c.counter > last_counter)
+            last_counter = c.counter
         self.assertEqual(i+1, len(expected_coords))
 
         # check driver cases with recursion, flat
-        # (system records first, followed by solver, then driver)
         expected_coords = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|1',
             'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1',
             'rank0:SLSQP|1',
-            'rank0:SLSQP|2|root._solve_nonlinear|2',
             'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|2',
             'rank0:SLSQP|2',
-            'rank0:SLSQP|3|root._solve_nonlinear|3',
             'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|3',
             'rank0:SLSQP|3',
-            'rank0:SLSQP|4|root._solve_nonlinear|4',
             'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|4',
             'rank0:SLSQP|4',
-            'rank0:SLSQP|5|root._solve_nonlinear|5',
             'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|5',
             'rank0:SLSQP|5',
-            'rank0:SLSQP|6|root._solve_nonlinear|6',
             'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
+            'rank0:SLSQP|6|root._solve_nonlinear|6',
             'rank0:SLSQP|6',
         ]
+        last_counter = 0
         for i, c in enumerate(cr.get_cases(recurse=True, flat=True)):
-            print(i,  c.iteration_coordinate)
-            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertTrue(c.counter > last_counter)
+            last_counter = c.counter
         self.assertEqual(i+1, len(expected_coords))
 
         # check child cases with recursion, flat
@@ -444,15 +444,18 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0',
         ]
+        last_counter = 0
         for i, c in enumerate(cr.get_cases('rank0:SLSQP|0', recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertTrue(c.counter > last_counter)
+            last_counter = c.counter
         self.assertEqual(i+1, len(expected_coords))
 
         # check child cases with recursion, nested
         expected_coords = {
             'rank0:SLSQP|0': {
-                'rank0:SLSQP|0|root._solve_nonlinear|0',
                 'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+                'rank0:SLSQP|0|root._solve_nonlinear|0',
             }
         }
         count = 0
@@ -494,17 +497,20 @@ class TestSqliteCaseReader(unittest.TestCase):
             parent_coord + '|0|NLRunOnce|0',
             parent_coord + '|0',
         ]
-        ind = 0
-        for c in cr.get_cases(source=parent_coord, recurse=True, flat=True):
-            self.assertEqual(c.iteration_coordinate, expected_coords[ind])
-            ind += 1
-        self.assertEqual(ind, len(expected_coords))
+        last_counter = 0
+        for i, c in enumerate(cr.get_cases(source=parent_coord, recurse=True, flat=True)):
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertTrue(c.counter > last_counter)
+            last_counter = c.counter
+            i += 1
+        self.assertEqual(i, len(expected_coords))
 
     def test_get_child_cases_nested_systems(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
         prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         prob.driver.opt_settings['ACC'] = 1e-9
-        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver.add_recorder(self.recorder)
         prob.setup()
 
         model = prob.model
@@ -518,6 +524,17 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
+        # first do a recursive list of all cases
+        cases = cr.list_cases(recurse=True, flat=True)
+
+        last_counter = 0
+        for i, c in enumerate(cr.get_case(case) for case in cases):
+            print(i, c.counter, c.iteration_coordinate)
+            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertTrue(c.counter > last_counter)
+            last_counter = c.counter
+
+        # now do a recursive list of child cases
         parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear'
 
         expected_coords = [
@@ -531,17 +548,18 @@ class TestSqliteCaseReader(unittest.TestCase):
             parent_coord + '|0|NLRunOnce|0',
             parent_coord + '|0',
         ]
-        ind = 0
-        last_timestamp = 0
-        for c in cr.get_cases(source=parent_coord, recurse=True, flat=True):
-            print(c.timestamp, c.iteration_coordinate)
-            # self.assertEqual(c.iteration_coordinate, expected_coords[ind])
-            if (c.timestamp < last_timestamp):
-                print('ERROR: timetsamps out of order')
-            # self.assertTrue(c.timestamp > last_timestamp)
-            last_timestamp = c.timestamp
-            ind += 1
-        self.assertEqual(ind, len(expected_coords))
+
+        last_counter = 0
+        print('*******************************')
+        cases = list(cr.get_cases(source=parent_coord, recurse=True, flat=True))
+        print('*******************************')
+        pprint(cases)
+        for i, c in enumerate(cases):
+            print(i, c.counter, c.iteration_coordinate)
+            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertTrue(c.counter > last_counter)
+            last_counter = c.counter
+        self.assertEqual(i+1, len(expected_coords))
 
     def test_list_outputs(self):
         prob = SellarProblem()

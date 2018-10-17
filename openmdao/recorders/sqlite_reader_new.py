@@ -664,15 +664,15 @@ class CaseTable(object):
         Dictionary mapping keys to cases that have already been loaded.
     """
 
-    def __init__(self, filename, format_version, table, index, prom2abs, abs2prom, abs2meta, voi_meta=None):
+    def __init__(self, fname, version, table, index, prom2abs, abs2prom, abs2meta, voi_meta=None):
         """
         Initialize.
 
         Parameters
         ----------
-        filename : str
+        fname : str
             The name of the recording file from which to instantiate the case reader.
-        format_version : int
+        version : int
             The version of the format assumed when loading the file.
         table : str
             The name of the table in the database.
@@ -685,10 +685,10 @@ class CaseTable(object):
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
         voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings (relevant to driver cases).
+            Dictionary mapping absolute variable names to variable settings.
         """
-        self._filename = filename
-        self._format_version = format_version
+        self._filename = fname
+        self._format_version = version
         self._table_name = table
         self._index_name = index
         self._prom2abs = prom2abs
@@ -697,7 +697,7 @@ class CaseTable(object):
         self._voi_meta = voi_meta
 
         # cached keys/cases
-        self._keys = []
+        self._keys = None
         self._cases = {}
 
     def count(self):
@@ -745,37 +745,40 @@ class CaseTable(object):
 
         con.close()
 
+        # cache case list for future use
+        self._keys = [row[0] for row in rows]
+
         if not source:
             # return all cases
-            return [row[0] for row in rows]
+            return self._keys
         elif '|' in source:
             # source is a coordinate
             if recurse and not flat:
                 cases = OrderedDict()
-                for row in rows:
-                    if len(row[0]) > len(source) and row[0].startswith(source):
-                        cases[row[0]] = self.list_cases(row[0], recurse, flat)
+                for key in self._keys:
+                    if len(key) > len(source) and key.startswith(source):
+                        cases[key] = self.list_cases(key, recurse, flat)
                 return cases
             else:
-                return [row[0] for row in rows if row[0].startswith(source)]
+                return [key for key in self._keys if key.startswith(source)]
         else:
             # source is a system or solver
             if recurse:
                 if flat:
                     # return all cases under the source system
                     source_sys = source.replace('.nonlinear_solver', '')
-                    return [row[0] for row in rows
-                            if self._get_source(row[0]).startswith(source_sys)]
+                    return [key for key in self._keys
+                            if self._get_source(key).startswith(source_sys)]
                 else:
                     cases = OrderedDict()
-                    for row in rows:
-                        row_source = self._get_source(row[0])
-                        if row_source == source:
-                            cases[row[0]] = self.list_cases(row[0], recurse, flat)
+                    for key in self._keys:
+                        case_source = self._get_source(key)
+                        if case_source == source:
+                            cases[key] = self.list_cases(key, recurse, flat)
                     return cases
             else:
-                return [row[0] for row in rows
-                        if self._get_source(row[0]) == source]
+                return [key for key in self._keys
+                        if self._get_source(key) == source]
 
     def get_cases(self, source=None, recurse=False, flat=False):
         """
@@ -796,45 +799,44 @@ class CaseTable(object):
         list or dict
             The cases from the table that have the specified source.
         """
-        with sqlite3.connect(self._filename) as con:
-            cur = con.cursor()
-            cur.execute("SELECT %s FROM %s ORDER BY id ASC" %
-                        (self._index_name, self._table_name))
-            rows = cur.fetchall()
-
-        con.close()
+        print("==> get_cases()", source, recurse, flat)
+        if self._keys is None:
+            self.list_cases(recurse=True, flat=True)
 
         if not source:
             # return all cases
-            return [self.get_case(row[0]) for row in rows]
+            return [self._keys]
         elif '|' in source:
             # source is a coordinate
             if recurse and not flat:
                 cases = OrderedDict()
-                for row in rows:
-                    if len(row[0]) > len(source) and row[0].startswith(source):
-                        cases[row[0]] = self.get_cases(row[0], recurse, flat)
+                for key in self._keys:
+                    if len(key) > len(source) and key.startswith(source):
+                        cases[key] = self.get_cases(key, recurse, flat)
                 return cases
             else:
-                return [self.get_case(row[0]) for row in rows if row[0].startswith(source)]
+                print(self.__class__.__name__, recurse, flat)
+                pprint(list([key for key in self._keys if key.startswith(source)]))
+                print('============================')
+                return list([self.get_case(key) for key in self._keys if key.startswith(source)])
         else:
             # source is a system or solver
             if recurse:
                 if flat:
                     # return all cases under the source system
                     source_sys = source.replace('.nonlinear_solver', '')
-                    return [self.get_case(row[0]) for row in rows
-                            if self._get_source(row[0]).startswith(source_sys)]
+                    return list([self.get_case(key) for key in self._keys
+                                 if self._get_source(key).startswith(source_sys)])
                 else:
                     cases = OrderedDict()
-                    for row in rows:
-                        row_source = self._get_source(row[0])
-                        if row_source == source:
-                            cases[row[0]] = self.get_cases(row[0], recurse, flat)
+                    for key in self._keys:
+                        case_source = self._get_source(key)
+                        if case_source == source:
+                            cases[key] = self.get_cases(key, recurse, flat)
                     return cases
             else:
-                return [self.get_case(row[0]) for row in rows
-                        if self._get_source(row[0]) == source]
+                return [self.get_case(key) for key in self._keys
+                        if self._get_source(key) == source]
 
     def get_case(self, case_id, cache=False):
         """
@@ -900,8 +902,8 @@ class CaseTable(object):
             The iteration coordinate.
         """
         # if keys have not been cached yet, get them now
-        if not self._keys:
-            self._keys = self.list_cases(recurse=True, flat=True)
+        if self._keys is None:
+            self.list_cases(recurse=True, flat=True)
 
         return self._keys[case_idx]
 
@@ -1001,11 +1003,6 @@ class CaseTable(object):
 class DriverCases(CaseTable):
     """
     Case specific to the entries that might be recorded in a Driver iteration.
-
-    Attributes
-    ----------
-    _voi_meta : dict
-        Dictionary mapping absolute variable names to variable settings.
     """
 
     def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
@@ -1059,7 +1056,7 @@ class DriverCases(CaseTable):
                     if derivs_row:
                         # convert row to a regular dict and add jacobian
                         row = dict(zip(row.keys(), row))
-                        row['jacobian'] =  derivs_row['derivatives']
+                        row['jacobian'] = derivs_row['derivatives']
 
                 case = Case('driver', row,
                             self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
@@ -1117,7 +1114,7 @@ class DriverCases(CaseTable):
                 if derivs_row:
                     # convert row to a regular dict and add jacobian
                     row = dict(zip(row.keys(), row))
-                    row['jacobian'] =  derivs_row['derivatives']
+                    row['jacobian'] = derivs_row['derivatives']
         con.close()
 
         # if found, create Case object (and cache it if requested) else return None
