@@ -29,11 +29,38 @@ elif PY3:
     from json import loads as json_loads
 
 
+# regular expression used to determine if a node in an iteration coordinate represents a system
+_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear|_solve_linear|_apply_linear)$')
+
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\|\\d+\|*')
 
-# regular expression used to determine if a node in an iteration coordinate represents a system
-_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear|_solve_linear|_apply_linear)$')
+
+def _get_source_system(iteration_coordinate):
+    """
+    Get pathname of system that is the source of the iteration.
+
+    Parameters
+    ----------
+    iteration_coordinate : str
+        The full unique identifier for this iteration.
+
+    Returns
+    -------
+    str
+        The pathname of the system that is the source of the iteration.
+    """
+    path = []
+    parts = _coord_split_re.split(iteration_coordinate)
+    for part in parts:
+        if (_coord_system_re.search(part) is not None):
+            if ':' in part:
+                # get rid of 'rank#:'
+                part = part.split(':')[1]
+            path.append(part.split('.')[0])
+
+    # return pathname of the system
+    return '.'.join(path)
 
 
 def CaseReader(filename, pre_load=True):
@@ -192,6 +219,8 @@ class SqliteCaseReader(BaseCaseReader):
         Helper object for accessing cases from the solver_iterations table.
     _problem_cases : ProblemCases
         Helper object for accessing cases from the problem_cases table.
+    _global_index : list
+        List of iteration cases and the table and row in which they are found.
     """
 
     def __init__(self, filename, pre_load=False):
@@ -217,6 +246,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._abs2meta = None
         self._output2meta = None
         self._input2meta = None
+        self._global_iterations = None
 
         # collect metadata from database
         with sqlite3.connect(filename) as con:
@@ -401,6 +431,25 @@ class SqliteCaseReader(BaseCaseReader):
                 'solver_class': solver_class,
             }
 
+    def _get_global_iterations(self):
+        """
+        Get the global iterations table.iterations
+
+        Returns
+        -------
+        list
+            List of global iterations and the table and row where the associated case is found.
+        """
+        if self._global_iterations is None:
+            with sqlite3.connect(self._filename) as con:
+                cur = con.cursor()
+                cur.execute('select * from global_iterations')
+                self._global_iterations = cur.fetchall()
+
+            con.close()
+
+        return self._global_iterations
+
     def _load_cases(self):
         """
         Load all driver, solver, and system cases into memory.
@@ -436,9 +485,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def list_cases(self, source='driver', recurse=False, flat=False):
         """
-        Iterate over the driver and solver cases.
-
-        Generator giving Driver and/or Solver cases in order.
+        Iterate over Driver, Solver and System cases in order.
 
         Parameters
         ----------
@@ -458,37 +505,6 @@ class SqliteCaseReader(BaseCaseReader):
         if not isinstance(source, str):
             raise TypeError("'source' parameter must be a string.")
 
-        elif source == 'driver':
-            if not recurse:
-                return self._driver_cases.list_cases()
-            elif flat:
-                cases = []
-                solver_cases = self._solver_cases.list_cases()
-                system_cases = self._system_cases.list_cases()
-                driver_cases = self._driver_cases.list_cases()
-                for driver_coord in driver_cases:
-                    for solver_coord in solver_cases:
-                        if solver_coord.startswith(driver_coord):
-                            cases.append(solver_coord)
-                    for system_coord in system_cases:
-                        if system_coord.startswith(driver_coord):
-                            cases.append(system_coord)
-                    cases.append(driver_coord)
-                return cases
-            else:
-                # return nested dicts of cases and child cases
-                cases = OrderedDict()
-                driver_cases = self._driver_cases.list_cases()
-                for driver_coord in driver_cases:
-                    driver_case = cases[driver_coord] = OrderedDict()
-                    solver_cases = self._solver_cases.list_cases(driver_coord, recurse=True)
-                    for solver_case in solver_cases:
-                        driver_case[solver_case] = solver_cases[solver_case]
-                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
-                    for system_case in system_cases:
-                        driver_case[system_case] = system_cases[system_case]
-                return cases
-
         elif source == 'problem':
             if self._format_version >= 2:
                 return self._problem_cases.list_cases(recurse, flat)
@@ -502,8 +518,156 @@ class SqliteCaseReader(BaseCaseReader):
         elif source in self._solver_cases.list_sources():
             return self._solver_cases.list_cases(source, recurse, flat)
 
+        elif source == 'driver':
+            if not recurse:
+                # return list of driver cases
+                return self._driver_cases.list_cases()
+            elif flat:
+                # return list of all cases in iteration order
+                cases = []
+                driver_cases = self._driver_cases.get_cases()
+                for driver_case in driver_cases:
+                    cases += self._list_cases_recurse_flat(driver_case.iteration_coordinate)
+                return cases
+            else:
+                # return nested dicts of cases and child cases
+                cases = OrderedDict()
+                driver_cases = self._driver_cases.get_cases()
+                for driver_case in driver_cases:
+                    cases.update(self._list_cases_recurse_nested(driver_case.iteration_coordinate))
+                return cases
         else:
-            raise RuntimeError('Source not found: %s.' % source)
+            # source is a coord
+            if recurse:
+                if flat:
+                    return self._list_cases_recurse_flat(source)
+                else:
+                    return self._list_cases_recurse_nested(source)
+            else:
+                raise RuntimeError('Source not found: %s.' % source)
+
+    def _list_cases_recurse_flat(self, coord):
+        """
+        Iterate recursively over Driver, Solver and System cases in order.
+
+        Parameters
+        ----------
+        coord : an iteration coordinate
+            Identifies the parent of the cases to return.
+
+        Returns
+        -------
+        dict
+            A nested dictionary of identified cases.
+        """
+        solver_cases = self._solver_cases.list_cases()
+        system_cases = self._system_cases.list_cases()
+        driver_cases = self._driver_cases.list_cases()
+        global_iters = self._get_global_iterations()
+
+        # print(coord, 'in', driver_cases, '?')
+        if coord in driver_cases:
+            parent_case = self._driver_cases.get_case(coord)
+        elif coord in system_cases:
+            parent_case = self._system_cases.get_case(coord)
+        elif coord in solver_cases:
+            parent_case = self._solver_cases.get_case(coord)
+        else:
+            raise RuntimeError('Case not found for coordinate:', coord)
+
+        cases = []
+
+        # return all cases in the global iteration table that precede the given case
+        # and whose coordinate is prefixed by the given coordinate
+        for iter_num in range(0, parent_case.counter):
+            _, table, row = global_iters[iter_num]
+            if table == 'solver':
+                case_coord = solver_cases[row-1]
+            elif table == 'system':
+                case_coord = system_cases[row-1]
+            elif table == 'driver':
+                case_coord = driver_cases[row-1]
+            else:
+                raise RuntimeError('Unexpected table name in global iterations:', table)
+
+            if case_coord.startswith(coord):
+                cases.append(case_coord)
+
+        # print('parent:', coord)
+        # pprint(cases)
+        # print('------------')
+        return cases
+
+    def _list_cases_recurse_nested(self, coord):
+        """
+        Iterate recursively over Driver, Solver and System cases in order.
+
+        Parameters
+        ----------
+        coord : an iteration coordinate
+            Identifies the parent of the cases to return.
+
+        Returns
+        -------
+        dict
+            A nested dictionary of identified cases.
+        """
+        solver_cases = self._solver_cases.list_cases()
+        system_cases = self._system_cases.list_cases()
+        driver_cases = self._driver_cases.list_cases()
+        global_iters = self._get_global_iterations()
+
+        # print(coord, 'in', driver_cases, '?', coord in driver_cases)
+
+        if coord in driver_cases:
+            parent_case = self._driver_cases.get_case(coord)
+        elif coord in system_cases:
+            parent_case = self._system_cases.get_case(coord)
+        elif coord in solver_cases:
+            parent_case = self._solver_cases.get_case(coord)
+        else:
+            raise RuntimeError('Case not found for coordinate:', coord)
+
+        cases = OrderedDict()
+
+        print('------------------\n', parent_case.counter, coord, '\n------------------')
+
+        # return all cases in the global iteration table that precede the given case
+        # and whose coordinate is prefixed by the given coordinate
+        for iter_num in range(0, parent_case.counter-1):
+            _, table, row = global_iters[iter_num]
+            if table == 'solver':
+                case_coord = solver_cases[row-1]
+                if case_coord.startswith(coord):
+                    # case_source = self._solver_cases._get_source(case_coord)
+                    # print(iter_num, table, row, case_coord)
+                    # print('sources:', parent_source, case_source)
+                    parent_coord = '|'.join(case_coord.split('|')[:-2])
+                    print('coords', case_coord, parent_coord)
+                    if parent_coord == coord:
+                        # this case is a child of the parent case
+                        print('recursing on', case_coord)
+                        cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+            elif table == 'system':
+                case_coord = system_cases[row-1]
+                if case_coord.startswith(coord):
+                    parent_coord = '|'.join(case_coord.split('|')[:-2])
+                    print('coords', coord, parent_coord)
+                    if parent_coord == coord:
+                        # this case is a child of the parent case
+                        print('recursing on', case_coord)
+                        cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+            elif table == 'driver':
+                case_coord = driver_cases[row-1]
+                if case_coord == coord:
+                    print('recursing on', case_coord)
+                    cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+
+        # print('parent:', coord)
+        # pprint(dict(cases))
+        # print('------------')
+
+        return cases
 
     def get_cases(self, source='driver', recurse=False, flat=False):
         """
@@ -658,6 +822,8 @@ class CaseTable(object):
         Dictionary mapping promoted names to absolute names.
     _voi_meta : dict
         Dictionary mapping absolute variable names to variable settings.
+    _sources : list
+        List of sources of cases in the table.
     _keys : list
         List of keys of cases in the table.
     _cases : dict
@@ -697,6 +863,7 @@ class CaseTable(object):
         self._voi_meta = voi_meta
 
         # cached keys/cases
+        self._sources = None
         self._keys = None
         self._cases = {}
 
@@ -768,7 +935,7 @@ class CaseTable(object):
                     # return all cases under the source system
                     source_sys = source.replace('.nonlinear_solver', '')
                     return [key for key in self._keys
-                            if self._get_source(key).startswith(source_sys)]
+                            if _get_source_system(key).startswith(source_sys)]
                 else:
                     cases = OrderedDict()
                     for key in self._keys:
@@ -799,13 +966,13 @@ class CaseTable(object):
         list or dict
             The cases from the table that have the specified source.
         """
-        print("==> get_cases()", source, recurse, flat)
+        # print("==> get_cases()", source, recurse, flat)
         if self._keys is None:
             self.list_cases(recurse=True, flat=True)
 
         if not source:
             # return all cases
-            return [self._keys]
+            return [self.get_case(key) for key in self._keys]
         elif '|' in source:
             # source is a coordinate
             if recurse and not flat:
@@ -815,9 +982,9 @@ class CaseTable(object):
                         cases[key] = self.get_cases(key, recurse, flat)
                 return cases
             else:
-                print(self.__class__.__name__, recurse, flat)
-                pprint(list([key for key in self._keys if key.startswith(source)]))
-                print('============================')
+                # print(self.__class__.__name__, recurse, flat)
+                # pprint(list([key for key in self._keys if key.startswith(source)]))
+                # print('============================')
                 return list([self.get_case(key) for key in self._keys if key.startswith(source)])
         else:
             # source is a system or solver
@@ -826,7 +993,7 @@ class CaseTable(object):
                     # return all cases under the source system
                     source_sys = source.replace('.nonlinear_solver', '')
                     return list([self.get_case(key) for key in self._keys
-                                 if self._get_source(key).startswith(source_sys)])
+                                 if _get_source_system(key).startswith(source_sys)])
                 else:
                     cases = OrderedDict()
                     for key in self._keys:
@@ -951,11 +1118,14 @@ class CaseTable(object):
         list
             List of sources.
         """
-        return set([self._get_source(case) for case in self.list_cases()])
+        if self._sources is None:
+            self._sources = set([self._get_source(case) for case in self.list_cases()])
+
+        return self._sources
 
     def _get_source(self, iteration_coordinate):
         """
-        Get pathname of system that is the source of the iteration.
+        Get  the source of the iteration.
 
         Parameters
         ----------
@@ -965,19 +1135,9 @@ class CaseTable(object):
         Returns
         -------
         str
-            The pathname of the system that is the source of the iteration.
+            The source of the iteration.
         """
-        path = []
-        parts = _coord_split_re.split(iteration_coordinate)
-        for part in parts:
-            if (_coord_system_re.search(part) is not None):
-                if ':' in part:
-                    # get rid of 'rank#:'
-                    part = part.split(':')[1]
-                path.append(part.split('.')[0])
-
-        # return pathname of the system
-        return '.'.join(path)
+        return _get_source_system(iteration_coordinate)
 
     def _get_first(self, source):
         """
@@ -1002,7 +1162,7 @@ class CaseTable(object):
 
 class DriverCases(CaseTable):
     """
-    Case specific to the entries that might be recorded in a Driver iteration.
+    Cases specific to the entries that might be recorded in a Driver iteration.
     """
 
     def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
@@ -1158,7 +1318,7 @@ class DriverCases(CaseTable):
 
 class ProblemCases(CaseTable):
     """
-    Case specific to the entries that might be recorded in a Driver iteration.
+    Cases specific to the entries that might be recorded in a Driver iteration.
     """
 
     def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
@@ -1212,7 +1372,7 @@ class ProblemCases(CaseTable):
 
 class SystemCases(CaseTable):
     """
-    Case specific to the entries that might be recorded in a System iteration.
+    Cases specific to the entries that might be recorded in a System iteration.
     """
 
     def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
@@ -1239,7 +1399,7 @@ class SystemCases(CaseTable):
 
 class SolverCases(CaseTable):
     """
-    Case specific to the entries that might be recorded in a Solver iteration.
+    Cases specific to the entries that might be recorded in a Solver iteration.
     """
 
     def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):

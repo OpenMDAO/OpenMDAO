@@ -5,8 +5,10 @@ import errno
 import os
 import unittest
 import warnings
+
 from shutil import rmtree
 from tempfile import mkdtemp, mkstemp
+from collections import OrderedDict
 
 import numpy as np
 from six import iteritems, assertRaisesRegex
@@ -529,8 +531,32 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_case(case) for case in cases):
+            # print(c.counter, c.iteration_coordinate)
+            self.assertTrue(c.counter > last_counter)
+            self.assertEqual(c.counter, last_counter+1)
+            last_counter = c.counter
+
+        # print(1/0)
+
+        # now do a recursive dict of all cases
+        cases = cr.list_cases(recurse=True, flat=False)
+        # pprint(dict(cases))
+
+        def print_keys(d, indent=0):
+            if len(d.keys()) > 0:
+                for key in d.keys():
+                    print(' '*indent, d)
+                    print_keys(d[key], indent+2)
+            else:
+                print(' '*indent, d)
+
+        print_keys(cases)
+
+        print(1/0)
+
+        last_counter = 0
+        for i, c in enumerate(cr.get_case(case) for case in cases):
             print(i, c.counter, c.iteration_coordinate)
-            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
 
