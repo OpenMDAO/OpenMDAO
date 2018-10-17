@@ -28,13 +28,6 @@ environment:
       PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
 
-init:
-- sh: CACHE_DIR="/home/appveyor/miniconda"
-
-cache:
-  - sh: '$CACHE_DIR'
-  - cmd: '%CONDA%'
-
 install:
 - sh:
     sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
