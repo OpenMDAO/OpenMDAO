@@ -562,6 +562,13 @@ class GeneticAlgorithm(object):
                 cases = [((item, ii), None) for ii, item in enumerate(x_pop)
                          if np.all(item - vob <= 0)]
 
+                # Pad the cases with some dummy cases to make the cases divisible amongst the procs.
+                # TODO: Add a load balancing option to this driver.
+                extra = len(cases) % comm.size
+                if extra > 0:
+                    for j in range(comm.size - extra):
+                        cases.append(cases[-1])
+
                 results = concurrent_eval(self.objfun, cases, comm, allgather=True,
                                           model_mpi=self.model_mpi)
 
@@ -579,6 +586,7 @@ class GeneticAlgorithm(object):
                         # Print the traceback if it fails
                         print('A case failed:')
                         print(traceback)
+                print(fitness)
 
             else:
                 # Serial
