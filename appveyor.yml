@@ -1,12 +1,5 @@
 build: off
 
-init:
-- sh: CACHE_DIR="home/appveyor/miniconda"
-- cmd: CACHE_DIR=""
-
-cache:
-  - '$CACHE_DIR'
-
 environment:
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
@@ -34,6 +27,13 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
+
+init:
+- sh: CACHE_DIR="/home/appveyor/miniconda"
+
+cache:
+  - sh: '$CACHE_DIR'
+  - cmd: '%CONDA%'
 
 install:
 - sh:
