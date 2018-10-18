@@ -703,84 +703,38 @@ class SqliteCaseReader(BaseCaseReader):
         iterable or dict
             The cases identified by source
         """
-        if not isinstance(source, str):
-            raise TypeError("'source' parameter must be a string.")
-
-        elif source == 'driver':
-            if not recurse:
-                # return driver cases only
-                for case in self._driver_cases.cases():
-                    yield case
-            elif flat:
-                # return driver cases and child cases
-                cases = self.list_cases('driver', recurse, flat)
-                for case_id in cases:
-                    yield self.get_case(case_id)
-            else:
-                # return nested dicts of cases and child cases
-                cases = OrderedDict()
-                driver_cases = self._driver_cases.list_cases()
-                for driver_coord in driver_cases:
-                    driver_case = cases[driver_coord] = OrderedDict()
-                    solver_cases = self._solver_cases.list_cases(driver_coord, recurse=True)
-                    for solver_case in solver_cases:
-                        driver_case[solver_case] = self.get_case(solver_cases[solver_case])
-                    system_cases = self._system_cases.list_cases(driver_coord, recurse=True)
-                    for system_case in system_cases:
-                        driver_case[system_case] = self.get_case(system_cases[system_case])
-                return cases
-
-        elif source == 'problem':
-            if self._format_version >= 2:
-                for case in self._problem_cases.cases():
-                    yield case
-            else:
-                raise RuntimeError('No problem cases recorded (data format = %d).' %
-                                   self._format_version)
-
-        elif source in self._system_cases.list_sources():
-            for case_id in self._system_cases.list_cases(source, recurse, flat):
-                yield self._system_cases.get_case(case_id)
-
-        elif source in self._solver_cases.list_sources():
-            for case_id in self._solver_cases.list_cases(source, recurse, flat):
-                yield self._solver_cases.get_case(case_id)
-
+        case_ids = self.list_cases(source, recurse, flat)
+        if isinstance(case_ids, list):
+            return [self.get_case(case_id) for case_id in case_ids]
         else:
-            # source is an iteration coordinate
-            iter_coord = source
+            return self._copy_cases(case_ids, OrderedDict())
 
-            driver_cases = self._driver_cases.list_cases(iter_coord)
-            if driver_cases:
-                if flat:
-                    for driver_coord in driver_cases:
-                        # first the child solver cases
-                        for case in self._solver_cases.get_cases(driver_coord, recurse, flat):
-                            yield case
+    def _copy_cases(self, case_ids, cases):
+        """
+        Copy case IDs dict, replacing all case IDs with the case itself.
 
-                        # then the child system cases
-                        for case in self._system_cases.get_cases(driver_coord, recurse, flat):
-                            yield case
-
-                        # and finally the driver case itself
-                        yield self._driver_cases.get_case(driver_coord)
-                else:
-                    # return nested dicts of cases and child cases
-                    raise RuntimeError('TODO: implement nested dicts')
+        Parameters
+        ----------
+        case_ids : OrderedDict
+            The nested dictionary of case IDs.
+        cases : OrderedDict
+            The nested dictionary of cases.
+        """
+        for case_id in case_ids:
+            print('copying', case_id, dict(case_ids[case_id]))
+            print()
+            case = self.get_case(case_id)
+            children = case_ids[case_id]
+            if len(children.keys()) > 0:
+                print('copying children...')
+                cases[case] = self._copy_cases(children, OrderedDict())
             else:
-                system_cases = self._system_cases.list_cases(iter_coord)
-                if flat:
-                    for system_coord in system_cases:
-                        # first the child solver cases
-                        for case in self._solver_cases.get_cases(system_coord, recurse, flat):
-                            yield case
+                cases[case] = OrderedDict()
+            print
+            print("new case:", cases[case])
+            print()
 
-                        # then the system cases
-                        for case in self._system_cases.get_cases(system_coord, recurse, flat):
-                            yield case
-                else:
-                    # return nested dicts of cases and child cases
-                    raise RuntimeError('TODO: implement nested dicts')
+        return cases
 
     def get_case(self, case_id, recurse=False):
         """
