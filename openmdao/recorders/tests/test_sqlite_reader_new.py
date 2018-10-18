@@ -542,7 +542,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         #
-        # first get a recursive list of all cases (flat)
+        # get a recursive list of all cases (flat)
         #
         cases = cr.list_cases(recurse=True, flat=True)
 
@@ -556,7 +556,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(c.counter, counter)
 
         #
-        # now get a recursive dict of all cases (nested)
+        # get a recursive dict of all cases (nested)
         #
         cases = cr.list_cases(recurse=True, flat=False)
 
@@ -573,7 +573,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(counter, len(cr._get_global_iterations()))
 
         #
-        # now do a recursive list of child cases
+        # get a recursive list of child cases
         #
         parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear|0'
 
@@ -598,7 +598,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(c, expected_coords[i])
 
         #
-        # now get a list of cases for each source
+        # get a list of cases for each source
         #
         sources = cr.list_sources()
         self.assertEqual(sorted(sources), [
@@ -614,14 +614,40 @@ class TestSqliteCaseReader(unittest.TestCase):
             'root.mda.nonlinear_solver': r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d\|NonlinearBlockGS\|\d',
         }
         counter = 0
+        mda_counter = 0
+        root_counter = 0
         for source in sources:
-            expected_format = expected_format[source]
-            cases = cr.list_cases(source, recurse=True)
+            expected = expected_format[source]
+            cases = cr.list_cases(source, recurse=False)
             for case in cases:
                 counter += 1
-                self.assertRegexpMatches(case, expected_format)
+                if source.startswith('root.mda'):  # count all cases for/under mda system
+                    mda_counter += 1
+                if source.startswith('root.'):     # count all cases for/under root solver
+                    root_counter += 1
+                self.assertRegexpMatches(case, expected)
 
         self.assertEqual(counter, len(cr._get_global_iterations()))
+
+        #
+        # get a recursive list of child cases for the mda system
+        #
+        counter = 0
+        cases = cr.list_cases('root.mda', recurse=True, flat=True)
+        for case in cases:
+            counter += 1
+
+        self.assertEqual(counter, mda_counter)
+
+        #
+        # get a recursive list of child cases for the root solver
+        #
+        counter = 0
+        cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
+        for case in cases:
+            counter += 1
+
+        self.assertEqual(counter, root_counter)
 
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)

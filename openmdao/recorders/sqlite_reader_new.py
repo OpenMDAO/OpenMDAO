@@ -513,17 +513,49 @@ class SqliteCaseReader(BaseCaseReader):
                                    self._format_version)
 
         elif source in self._system_cases.list_sources():
-            return self._system_cases.list_cases(source, recurse, flat)
+            if not recurse:
+                # return list of system cases
+                return self._system_cases.list_cases(source)
+            elif flat:
+                # return list of cases and child cases
+                cases = []
+                system_cases = self._system_cases.get_cases(source)
+                for case in system_cases:
+                    cases += self._list_cases_recurse_flat(case.iteration_coordinate)
+                return cases
+            else:
+                # return nested dicts of cases and child cases
+                cases = OrderedDict()
+                system_cases = self._system_cases.get_cases()
+                for case in system_cases:
+                    cases[case.iteration_coordinate] = self._list_cases_recurse_nested(case.iteration_coordinate)
+                return cases
 
         elif source in self._solver_cases.list_sources():
-            return self._solver_cases.list_cases(source, recurse, flat)
+            if not recurse:
+                # return list of solver cases
+                return self._solver_cases.list_cases(source)
+            elif flat:
+                # return list of cases and child cases
+                cases = []
+                solver_cases = self._solver_cases.get_cases(source)
+                for case in solver_cases:
+                    cases += self._list_cases_recurse_flat(case.iteration_coordinate)
+                return cases
+            else:
+                # return nested dicts of cases and child cases
+                cases = OrderedDict()
+                solver_cases = self._solver_cases.get_cases()
+                for case in solver_cases:
+                    cases[case.iteration_coordinate] = self._list_cases_recurse_nested(case.iteration_coordinate)
+                return cases
 
         elif source == 'driver':
             if not recurse:
                 # return list of driver cases
                 return self._driver_cases.list_cases()
             elif flat:
-                # return list of all cases in iteration order
+                # return list of all cases
                 cases = []
                 driver_cases = self._driver_cases.get_cases()
                 for driver_case in driver_cases:
@@ -868,7 +900,7 @@ class CaseTable(object):
 
     def list_cases(self, source=None, recurse=False, flat=False):
         """
-        Get list of case names for cases in the table.
+        Get list of case IDs for cases in the table.
 
         Parameters
         ----------
