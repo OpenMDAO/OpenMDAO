@@ -36,6 +36,21 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
+def convert_all(d):
+    """
+    Convert all OrderedDict instances in dict d to a regular dict.
+
+    Parameters
+    ----------
+    d : dict-like
+        The dictionary to be converted.
+    """
+    for k in d:
+        if isinstance(d[k], OrderedDict):
+            d[k] = dict(d[k])
+            convert_all(d[k])
+
+
 class TestSqliteCaseReader(unittest.TestCase):
 
     def setUp(self):
@@ -507,7 +522,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             i += 1
         self.assertEqual(i, len(expected_coords))
 
-    def test_get_child_cases_nested_systems(self):
+    def test_list_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
         # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
         prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
@@ -526,66 +541,163 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        # first do a recursive list of all cases
+        #
+        # first get a recursive list of all cases (flat)
+        #
         cases = cr.list_cases(recurse=True, flat=True)
 
-        last_counter = 0
+        # verify the cases are all there
+        self.assertEqual(len(cases), len(cr._get_global_iterations()))
+
+        # verify the cases are in proper order
+        counter = 0
         for i, c in enumerate(cr.get_case(case) for case in cases):
-            # print(c.counter, c.iteration_coordinate)
-            self.assertTrue(c.counter > last_counter)
-            self.assertEqual(c.counter, last_counter+1)
-            last_counter = c.counter
+            counter += 1
+            self.assertEqual(c.counter, counter)
 
-        # print(1/0)
-
-        # now do a recursive dict of all cases
+        #
+        # now get a recursive dict of all cases (nested)
+        #
         cases = cr.list_cases(recurse=True, flat=False)
-        # pprint(dict(cases))
 
-        def print_keys(d, indent=0):
-            if len(d.keys()) > 0:
-                for key in d.keys():
-                    print(' '*indent, d)
-                    print_keys(d[key], indent+2)
-            else:
-                print(' '*indent, d)
+        # convert to convenient format for inspection
+        case_dict = dict(cases)
+        convert_all(case_dict)
+        nested_txt = json.dumps(dict(case_dict), indent=4)
 
-        print_keys(cases)
+        # verify the cases are all there
+        counter = 0
+        for line in nested_txt.split():
+            if line.strip().startswith('"rank0:'):
+                counter += 1
+        self.assertEqual(counter, len(cr._get_global_iterations()))
 
-        print(1/0)
-
-        last_counter = 0
-        for i, c in enumerate(cr.get_case(case) for case in cases):
-            print(i, c.counter, c.iteration_coordinate)
-            self.assertTrue(c.counter > last_counter)
-            last_counter = c.counter
-
+        #
         # now do a recursive list of child cases
-        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear'
+        #
+        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear|0'
 
         expected_coords = [
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
-            parent_coord + '|0|NLRunOnce|0',
-            parent_coord + '|0',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0',
+            parent_coord + '|NLRunOnce|0',
+            parent_coord
         ]
 
-        last_counter = 0
-        print('*******************************')
-        cases = list(cr.get_cases(source=parent_coord, recurse=True, flat=True))
-        print('*******************************')
-        pprint(cases)
+        cases = cr.list_cases(parent_coord, recurse=True, flat=True)
+
+        # verify the cases are all there and are as expected
+        self.assertEqual(len(cases), len(expected_coords))
         for i, c in enumerate(cases):
-            print(i, c.counter, c.iteration_coordinate)
-            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
-            self.assertTrue(c.counter > last_counter)
-            last_counter = c.counter
-        self.assertEqual(i+1, len(expected_coords))
+            self.assertEqual(c, expected_coords[i])
+
+        #
+        # now get a list of cases for each source
+        #
+        sources = cr.list_sources()
+        self.assertEqual(sorted(sources), [
+            'driver', 'root', 'root.mda', 'root.mda.nonlinear_solver', 'root.nonlinear_solver'
+        ])
+
+        # verify the coordinates of the returned cases are as expected and that the cases are all there
+        expected_format = {
+            'driver':                    r'rank0:SLSQP\|\d',
+            'root':                      r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d',
+            'root.nonlinear_solver':     r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
+            'root.mda':                  r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d',
+            'root.mda.nonlinear_solver': r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d\|NonlinearBlockGS\|\d',
+        }
+        counter = 0
+        for source in sources:
+            cases = cr.list_cases(source, recurse=False)
+            print("source:", source)
+            for case in cases:
+                counter += 1
+                self.assertRegexpMatches(case, expected_format[source])
+
+        self.assertEqual(counter, len(cr._get_global_iterations()))
+
+    def test_get_cases_recurse(self):
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.add_recorder(self.recorder)
+        prob.setup()
+
+        model = prob.model
+        model.add_recorder(self.recorder)
+        model.mda.add_recorder(self.recorder)
+        model.nonlinear_solver.add_recorder(self.recorder)
+        model.mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        #
+        # first get a recursive list of all cases (flat)
+        #
+        cases = cr.get_cases(recurse=True, flat=True)
+
+        # verify the cases are all there
+        self.assertEqual(len(cases), len(cr._get_global_iterations()))
+
+        # verify the cases are in proper order
+        counter = 0
+        for i, c in enumerate(cases):
+            counter += 1
+            self.assertEqual(c.counter, counter)
+
+        #
+        # now get a recursive dict of all cases (nested)
+        #
+        cases = cr.get_cases(recurse=True, flat=False)
+
+        # convert to convenient format for inspection
+        case_dict = dict(cases)
+        convert_all(case_dict)
+        nested_txt = json.dumps(dict(case_dict), indent=4)
+        # print(nested_txt)
+
+        # verify the cases are all there
+        counter = 0
+        for line in nested_txt.split():
+            if line.strip().startswith('"rank0:'):
+                counter += 1
+        self.assertEqual(counter, len(cr._get_global_iterations()))
+
+        #
+        # now do a recursive list of child cases
+        #
+        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear|0'
+
+        expected_coords = [
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0',
+            parent_coord + '|NLRunOnce|0',
+            parent_coord
+        ]
+
+        cases = cr.get_cases(parent_coord, recurse=True, flat=True)
+
+        # verify the cases are all there and are as expected
+        self.assertEqual(len(cases), len(expected_coords))
+        for i, c in enumerate(cases):
+            self.assertEqual(c.iteration_coordinate, expected_coords[i])
 
     def test_list_outputs(self):
         prob = SellarProblem()

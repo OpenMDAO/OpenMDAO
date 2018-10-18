@@ -533,8 +533,8 @@ class SqliteCaseReader(BaseCaseReader):
                 # return nested dicts of cases and child cases
                 cases = OrderedDict()
                 driver_cases = self._driver_cases.get_cases()
-                for driver_case in driver_cases:
-                    cases.update(self._list_cases_recurse_nested(driver_case.iteration_coordinate))
+                for case in driver_cases:
+                    cases[case.iteration_coordinate] = self._list_cases_recurse_nested(case.iteration_coordinate)
                 return cases
         else:
             # source is a coord
@@ -565,7 +565,6 @@ class SqliteCaseReader(BaseCaseReader):
         driver_cases = self._driver_cases.list_cases()
         global_iters = self._get_global_iterations()
 
-        # print(coord, 'in', driver_cases, '?')
         if coord in driver_cases:
             parent_case = self._driver_cases.get_case(coord)
         elif coord in system_cases:
@@ -593,9 +592,6 @@ class SqliteCaseReader(BaseCaseReader):
             if case_coord.startswith(coord):
                 cases.append(case_coord)
 
-        # print('parent:', coord)
-        # pprint(cases)
-        # print('------------')
         return cases
 
     def _list_cases_recurse_nested(self, coord):
@@ -617,8 +613,6 @@ class SqliteCaseReader(BaseCaseReader):
         driver_cases = self._driver_cases.list_cases()
         global_iters = self._get_global_iterations()
 
-        # print(coord, 'in', driver_cases, '?', coord in driver_cases)
-
         if coord in driver_cases:
             parent_case = self._driver_cases.get_case(coord)
         elif coord in system_cases:
@@ -630,8 +624,6 @@ class SqliteCaseReader(BaseCaseReader):
 
         cases = OrderedDict()
 
-        print('------------------\n', parent_case.counter, coord, '\n------------------')
-
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
         for iter_num in range(0, parent_case.counter-1):
@@ -639,33 +631,22 @@ class SqliteCaseReader(BaseCaseReader):
             if table == 'solver':
                 case_coord = solver_cases[row-1]
                 if case_coord.startswith(coord):
-                    # case_source = self._solver_cases._get_source(case_coord)
-                    # print(iter_num, table, row, case_coord)
-                    # print('sources:', parent_source, case_source)
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
-                    print('coords', case_coord, parent_coord)
                     if parent_coord == coord:
                         # this case is a child of the parent case
-                        print('recursing on', case_coord)
                         cases[case_coord] = self._list_cases_recurse_nested(case_coord)
             elif table == 'system':
                 case_coord = system_cases[row-1]
                 if case_coord.startswith(coord):
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
-                    print('coords', coord, parent_coord)
                     if parent_coord == coord:
                         # this case is a child of the parent case
-                        print('recursing on', case_coord)
                         cases[case_coord] = self._list_cases_recurse_nested(case_coord)
             elif table == 'driver':
                 case_coord = driver_cases[row-1]
                 if case_coord == coord:
-                    print('recursing on', case_coord)
+                    # driver cases have no parent
                     cases[case_coord] = self._list_cases_recurse_nested(case_coord)
-
-        # print('parent:', coord)
-        # pprint(dict(cases))
-        # print('------------')
 
         return cases
 
@@ -785,19 +766,19 @@ class SqliteCaseReader(BaseCaseReader):
         dict
             The case identified by case_id
         """
+        if recurse:
+            return self.get_cases(case_id, recurse=True)
+
         tables = [self._driver_cases, self._system_cases, self._solver_cases]
         if self._format_version >= 2:
             tables.append(self._problem_cases)
 
         for table in tables:
             case = table.get_case(case_id)
-            if case and not recurse:
+            if case:
                 return case
 
-        if case and recurse:
-            raise RuntimeError('TODO: return nested case:', case_id)
-        else:
-            raise RuntimeError('Case not found:', case_id)
+        raise RuntimeError('Case not found:', case_id)
 
 
 class CaseTable(object):
