@@ -615,11 +615,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         }
         counter = 0
         for source in sources:
-            cases = cr.list_cases(source, recurse=False)
-            print("source:", source)
+            expected_format = expected_format[source]
+            cases = cr.list_cases(source, recurse=True)
             for case in cases:
                 counter += 1
-                self.assertRegexpMatches(case, expected_format[source])
+                self.assertRegexpMatches(case, expected_format)
 
         self.assertEqual(counter, len(cr._get_global_iterations()))
 
