@@ -355,25 +355,7 @@ def generate_component_gradient(comp, mode):
     return source, dsrc, df
 
 
-def _ad_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao ad' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default=None, action='store', dest='outfile',
-                        help='Output file name. By default, output goes to stdout.')
-    # parser.add_argument('-m', '--mode', default='forward', action='store', dest='mode',
-    #                     help='AD mode (forward, reverse).')
-    parser.add_argument('-c', '--class', action='store', dest='class_',
-                        help='Specify component class to run AD on.')
-
-
-def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
+def _get_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
     src, dsrc, df = generate_component_gradient(comp, mode)
 
     if show_orig:
@@ -445,8 +427,25 @@ def _do_grad_check(comp, mode, show_orig=True, out=sys.stdout):
                         J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
                     J[key][locidx:] = grad[i]
 
-    import pprint
-    pprint.pprint(J, stream=out)
+    return J
+
+
+def _ad_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao ad' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Output file name. By default, output goes to stdout.')
+    # parser.add_argument('-m', '--mode', default='forward', action='store', dest='mode',
+    #                     help='AD mode (forward, reverse).')
+    parser.add_argument('-c', '--class', action='store', dest='class_',
+                        help='Specify component class to run AD on.')
 
 
 def _ad_cmd(options):
@@ -475,8 +474,15 @@ def _ad_cmd(options):
         else:
             raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
 
-        _do_grad_check(s, 'forward', show_orig=True, out=out)
-        _do_grad_check(s, 'reverse', show_orig=False, out=out)
+        Jfwd = _get_ad_jac(s, 'forward', show_orig=True, out=out)
+        Jrev = _get_ad_jac(s, 'reverse', show_orig=False, out=out)
+
+        import pprint
+
+        print("Forward J:")
+        pprint.pprint(Jfwd)
+        print("\n\nReverse J:")
+        pprint.pprint(Jrev)
 
         exit()
 
