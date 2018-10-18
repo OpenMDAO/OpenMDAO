@@ -15,12 +15,11 @@ from copy import deepcopy
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 _emptyset = set()
 
@@ -141,11 +140,12 @@ class Solver(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     """
 
     # Object to store some formatting for iprint that is shared across all solvers.
     SOLVER = 'base_solver'
-    _solver_info = SolverInfo()
 
     def __init__(self, **kwargs):
         """
@@ -161,6 +161,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
+        self._solver_info = None
 
         # Solver options
         self.options = OptionsDictionary()
@@ -254,6 +255,8 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._solver_info = system._solver_info
+        self._recording_iter = system._recording_iter
 
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
@@ -623,7 +626,7 @@ class NonlinearSolver(Solver):
             exc = sys.exc_info()
 
         if fail and self.options['debug_print']:
-            coord = recording_iteration.get_formatted_iteration_coordinate()
+            coord = self._recording_iter.get_formatted_iteration_coordinate()
 
             out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
             for vec_type, vec in iteritems(self._err_cache):
@@ -674,11 +677,11 @@ class NonlinearSolver(Solver):
         """
         Run the apply_nonlinear method on the system.
         """
-        recording_iteration.stack.append(('_run_apply', 0))
+        self._recording_iter.stack.append(('_run_apply', 0))
         try:
             self._system._apply_nonlinear()
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -832,7 +835,7 @@ class LinearSolver(Solver):
         """
         Run the apply_linear method on the system.
         """
-        recording_iteration.stack.append(('_run_apply', 0))
+        self._recording_iter.stack.append(('_run_apply', 0))
 
         system = self._system
         scope_out, scope_in = system._get_scope()
@@ -841,7 +844,7 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
     def _iter_get_norm(self):
         """

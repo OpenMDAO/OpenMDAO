@@ -37,7 +37,7 @@ Complex Step
 ------------
 
 If you have a pure python component (or an external code that can support complex inputs and outputs), then you can also choose to use
-complex step to calculate the Jacobian of that component. This will give more accurate derivatives that are insensitive to the step size.
+complex step to calculate the Jacobian of that component. This will give more accurate derivatives that are less sensitive to the step size.
 Like finite difference, complex step runs your component using the :code:`apply_nonlinear` or :code:`solve_nonlinear` functions, but it applies a step
 in the complex direction. You can activate it using the :code:`declare_partials` method inside :code:`setup` and giving it a method of 'cs'.
 In many cases, this will require no other changes to your code, as long as all of the calculation in your :code:`solve_nonlinear` and

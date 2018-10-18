@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
-    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent
+    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, NonlinearRunOnce
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
@@ -526,8 +526,11 @@ class TestProblem(unittest.TestCase):
         # actually want the optimizer to run
         prob.run_model()
 
-        # check derivatives with complex step and a larger step size.
-        prob.check_totals(method='cs', step=1.0e-1)
+        prob.model.nonlinear_solver.options['atol'] = 1e-15
+        prob.model.nonlinear_solver.options['rtol'] = 1e-15
+
+        # check derivatives with complex step
+        prob.check_totals(method='cs')
 
     def test_check_totals_user_detect(self):
 
@@ -1535,6 +1538,33 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs',
                                           'cache_linear_solution'],
                                )
+
+class NestedProblemTestCase(unittest.TestCase):
+
+    def test_nested_prob(self):
+
+        class _ProblemSolver(NonlinearRunOnce):
+            def solve(self):
+                # create a simple subproblem and run it to test for global solver_info bug
+                p = Problem()
+                p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+                p.model.add_subsystem('comp', ExecComp('y=2*x'))
+                p.model.connect('indep.x', 'comp.x')
+                p.setup()
+                p.run_model()
+
+                return super(_ProblemSolver, self).solve()
+
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+        G = p.model.add_subsystem('G', Group())
+        G.add_subsystem('comp', ExecComp('y=2*x'))
+        G.nonlinear_solver = _ProblemSolver()
+        p.model.connect('indep.x', 'G.comp.x')
+        p.setup()
+        p.run_model()
+
+
 
 
 if __name__ == "__main__":

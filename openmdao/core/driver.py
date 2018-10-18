@@ -18,7 +18,6 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 
@@ -236,6 +235,7 @@ class Driver(object):
             Pointer to the containing problem.
         """
         self._problem = problem
+        self._recording_iter = problem._recording_iter
         model = problem.model
         mode = problem._mode
 
@@ -732,7 +732,7 @@ class Driver(object):
             print(len(header) * '-' + '\n')
 
         if problem.model._owns_approx_jac:
-            recording_iteration.stack.append(('_compute_totals_approx', 0))
+            self._recording_iter.stack.append(('_compute_totals_approx', 0))
 
             try:
                 if total_jac is None:
@@ -743,7 +743,7 @@ class Driver(object):
                 else:
                     totals = total_jac.compute_totals_approx()
             finally:
-                recording_iteration.stack.pop()
+                self._recording_iter.stack.pop()
 
         else:
             if total_jac is None:
@@ -754,12 +754,12 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            recording_iteration.stack.append(('_compute_totals', 0))
+            self._recording_iter.stack.append(('_compute_totals', 0))
 
             try:
                 totals = total_jac.compute_totals()
             finally:
-                recording_iteration.stack.pop()
+                self._recording_iter.stack.pop()
 
         if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
             metadata = create_local_meta(self._get_name())
@@ -1029,7 +1029,7 @@ class Driver(object):
 
         if not MPI or MPI.COMM_WORLD.rank == 0:
             header = 'Driver debug print for iter coord: {}'.format(
-                recording_iteration.get_formatted_iteration_coordinate())
+                self._recording_iter.get_formatted_iteration_coordinate())
             print(header)
             print(len(header) * '-')
 
