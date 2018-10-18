@@ -471,15 +471,33 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check child cases with recursion, nested
         expected_coords = {
             'rank0:SLSQP|0': {
-                'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
-                'rank0:SLSQP|0|root._solve_nonlinear|0',
+                'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0': {},
+                'rank0:SLSQP|0|root._solve_nonlinear|0': {},
             }
         }
+
+        print('---------')
+        cases = cr.get_cases('rank0:SLSQP|0', recurse=True, flat=False)
+        pprint(cases)
+        print('---------')
+        keys = list(cases.keys())
+        print(keys)
+        print([case.iteration_coordinate for case in keys])
+        print('---------')
+
+        self.assertEqual(len(cases.keys()), len(expected_coords.keys()))
+
         count = 0
-        for case in cr.get_cases('rank0:SLSQP|0', recurse=True, flat=False):
-            print(case)
-            # self.assertEqual(c.iteration_coordinate, expected_coords[i])
+        for i, case in enumerate(cases):
             count += 1
+            coord = case.iteration_coordinate
+            print(coord, 'in', list(expected_coords.keys()))
+            self.assertTrue(coord in list(expected_coords.keys()))
+            for j, child_case in enumerate(cases[case]):
+                count += 1
+                child_coord = child_case.iteration_coordinate
+                self.assertTrue(child_coord in expected_coords[coord].keys())
+
         self.assertEqual(count, 3)
 
     @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
@@ -609,7 +627,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ])
 
         # verify the coordinates of the returned cases are as expected and that the cases are all there
-        expected_format = {
+        expected_coord = {
             'driver':                    r'rank0:SLSQP\|\d',
             'root':                      r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d',
             'root.nonlinear_solver':     r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
@@ -620,7 +638,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         mda_counter = 0
         root_counter = 0
         for source in sources:
-            expected = expected_format[source]
+            expected = expected_coord[source]
             cases = cr.list_cases(source, recurse=False)
             for case in cases:
                 counter += 1
@@ -761,7 +779,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ])
 
         # verify the coordinates of the returned cases are as expected and that the cases are all there
-        expected_format = {
+        expected_coord = {
             'driver':                    r'rank0:SLSQP\|\d',
             'root':                      r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d',
             'root.nonlinear_solver':     r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
@@ -772,7 +790,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         mda_counter = 0
         root_counter = 0
         for source in sources:
-            expected = expected_format[source]
+            expected = expected_coord[source]
             cases = cr.get_cases(source, recurse=False)
             for case in cases:
                 counter += 1
@@ -1795,13 +1813,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
 
-        # check that the recurse option returns both root and mda solver cases
+        # check that the recurse option returns root and mda solver cases plus child system cases
         all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
-        self.assertEqual(len(all_solver_cases), len(root_solver_cases) + len(mda_solver_cases))
-
-        # tree = cr.list_cases('root.nonlinear_solver', recurse=True, flat=False)
-        # pprint(json.loads(json.dumps(tree)))
-        # import sys; sys.exit(0)
+        self.assertEqual(len(all_solver_cases),
+                         len(root_solver_cases) + len(mda_solver_cases) + len(system_cases))
 
         #
         # check driver cases
@@ -1861,20 +1876,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         for key in expected_outputs:
             np.testing.assert_almost_equal(case.outputs[key], expected_outputs[key])
 
-        # check that the recurse option also returns system and solver cases
+        # check that the recurse option also returns system and solver cases (all_solver_cases)
         all_driver_cases = cr.list_cases('driver', recurse=True, flat=True)
 
         expected_cases = driver_cases + \
-            [sys_case for sys_case in system_cases if sys_case.startswith('rank0:SLSQP')] + \
-            [slv_case for slv_case in all_solver_cases if slv_case.startswith('rank0:SLSQP')]
+            [c for c in all_solver_cases if c.startswith('rank0:SLSQP')]
 
         self.assertEqual(len(all_driver_cases), len(expected_cases))
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
-
-        # check nested version of recurse option
-        all_driver_cases = cr.list_cases('driver', recurse=True, flat=False)
-        pprint(json.loads(json.dumps(all_driver_cases)))
 
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):

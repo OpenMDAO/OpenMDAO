@@ -19,7 +19,23 @@ from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_arr
 from openmdao.recorders.sqlite_recorder import format_version
 
 from pprint import pprint
-# import json
+import json
+
+
+def convert_all(d):
+    """
+    Convert all OrderedDict instances in dict d to a regular dict.
+
+    Parameters
+    ----------
+    d : dict-like
+        The dictionary to be converted.
+    """
+    for k in d:
+        if isinstance(d[k], OrderedDict):
+            d[k] = dict(d[k])
+            convert_all(d[k])
+
 
 if PY2:
     import cPickle as pickle
@@ -512,71 +528,45 @@ class SqliteCaseReader(BaseCaseReader):
                 raise RuntimeError('No problem cases recorded (data format = %d).' %
                                    self._format_version)
 
-        elif source in self._system_cases.list_sources():
-            if not recurse:
-                # return list of system cases
-                return self._system_cases.list_cases(source)
-            elif flat:
-                # return list of cases and child cases
-                cases = []
-                system_cases = self._system_cases.get_cases(source)
-                for case in system_cases:
-                    cases += self._list_cases_recurse_flat(case.iteration_coordinate)
-                return cases
-            else:
-                # return nested dicts of cases and child cases
-                cases = OrderedDict()
-                system_cases = self._system_cases.get_cases()
-                for case in system_cases:
-                    cases[case.iteration_coordinate] = self._list_cases_recurse_nested(case.iteration_coordinate)
-                return cases
-
-        elif source in self._solver_cases.list_sources():
-            if not recurse:
-                # return list of solver cases
-                return self._solver_cases.list_cases(source)
-            elif flat:
-                # return list of cases and child cases
-                cases = []
-                solver_cases = self._solver_cases.get_cases(source)
-                for case in solver_cases:
-                    cases += self._list_cases_recurse_flat(case.iteration_coordinate)
-                return cases
-            else:
-                # return nested dicts of cases and child cases
-                cases = OrderedDict()
-                solver_cases = self._solver_cases.get_cases()
-                for case in solver_cases:
-                    cases[case.iteration_coordinate] = self._list_cases_recurse_nested(case.iteration_coordinate)
-                return cases
-
-        elif source == 'driver':
-            if not recurse:
-                # return list of driver cases
-                return self._driver_cases.list_cases()
-            elif flat:
-                # return list of all cases
-                cases = []
-                driver_cases = self._driver_cases.get_cases()
-                for driver_case in driver_cases:
-                    cases += self._list_cases_recurse_flat(driver_case.iteration_coordinate)
-                return cases
-            else:
-                # return nested dicts of cases and child cases
-                cases = OrderedDict()
-                driver_cases = self._driver_cases.get_cases()
-                for case in driver_cases:
-                    cases[case.iteration_coordinate] = self._list_cases_recurse_nested(case.iteration_coordinate)
-                return cases
         else:
-            # source is a coord
-            if recurse:
-                if flat:
-                    return self._list_cases_recurse_flat(source)
-                else:
-                    return self._list_cases_recurse_nested(source)
+            # figure out which table has cases from the source
+            if source == 'driver':
+                case_table = self._driver_cases
+            elif source in self._system_cases.list_sources():
+                case_table = self._system_cases
+            elif source in self._solver_cases.list_sources():
+                case_table = self._solver_cases
             else:
-                raise RuntimeError('Source not found: %s.' % source)
+                case_table = None
+
+            if case_table is not None:
+                if not recurse:
+                    # return list of cases from the source alone
+                    return case_table.list_cases(source)
+                elif flat:
+                    # return list of cases from the source plus child cases
+                    cases = []
+                    source_cases = case_table.get_cases(source)
+                    for case in source_cases:
+                        cases += self._list_cases_recurse_flat(case.iteration_coordinate)
+                    return cases
+                else:
+                    # return nested dict of cases from the source and child cases
+                    cases = OrderedDict()
+                    source_cases = case_table.get_cases()
+                    for case in source_cases:
+                        case_coord = case.iteration_coordinate
+                        cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+                    return cases
+            else:
+                # source must be a coordinate
+                if recurse:
+                    if flat:
+                        return self._list_cases_recurse_flat(source)
+                    else:
+                        return self._list_cases_recurse_nested(source)
+                else:
+                    raise RuntimeError('Source not found: %s.' % source)
 
     def _list_cases_recurse_flat(self, coord):
         """
@@ -655,6 +645,10 @@ class SqliteCaseReader(BaseCaseReader):
             raise RuntimeError('Case not found for coordinate:', coord)
 
         cases = OrderedDict()
+        # children = OrderedDict()
+        # print('adding parent case:', coord)
+        # cases[parent_case.iteration_coordinate] = children
+        children = cases
 
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
@@ -663,22 +657,17 @@ class SqliteCaseReader(BaseCaseReader):
             if table == 'solver':
                 case_coord = solver_cases[row-1]
                 if case_coord.startswith(coord):
+                    print('adding solver case:', case_coord)
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
                     if parent_coord == coord:
-                        # this case is a child of the parent case
-                        cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+                        children[case_coord] = self._list_cases_recurse_nested(case_coord)
             elif table == 'system':
                 case_coord = system_cases[row-1]
                 if case_coord.startswith(coord):
+                    print('adding system case:', case_coord)
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
                     if parent_coord == coord:
-                        # this case is a child of the parent case
-                        cases[case_coord] = self._list_cases_recurse_nested(case_coord)
-            elif table == 'driver':
-                case_coord = driver_cases[row-1]
-                if case_coord == coord:
-                    # driver cases have no parent
-                    cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+                        children[case_coord] = self._list_cases_recurse_nested(case_coord)
 
         return cases
 
@@ -707,11 +696,11 @@ class SqliteCaseReader(BaseCaseReader):
         if isinstance(case_ids, list):
             return [self.get_case(case_id) for case_id in case_ids]
         else:
-            return self._copy_cases(case_ids, OrderedDict())
+            return self._get_cases_nested(case_ids, OrderedDict())
 
-    def _copy_cases(self, case_ids, cases):
+    def _get_cases_nested(self, case_ids, cases):
         """
-        Copy case IDs dict, replacing all case IDs with the case itself.
+        Populate a nested dictionary of cases matching the provided dictionary of case IDs.
 
         Parameters
         ----------
@@ -721,18 +710,12 @@ class SqliteCaseReader(BaseCaseReader):
             The nested dictionary of cases.
         """
         for case_id in case_ids:
-            print('copying', case_id, dict(case_ids[case_id]))
-            print()
             case = self.get_case(case_id)
             children = case_ids[case_id]
             if len(children.keys()) > 0:
-                print('copying children...')
-                cases[case] = self._copy_cases(children, OrderedDict())
+                cases[case] = self._get_cases_nested(children, OrderedDict())
             else:
                 cases[case] = OrderedDict()
-            print
-            print("new case:", cases[case])
-            print()
 
         return cases
 
