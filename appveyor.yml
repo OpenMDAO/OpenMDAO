@@ -35,6 +35,7 @@ for:
         - image: Ubuntu
     cache:
      - '/home/appveyor/miniconda' # need this only on Linux
+     - '/home/appveyor/.cache/pip/wheels/'
 
 install:
 - sh:
