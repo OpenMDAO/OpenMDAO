@@ -523,7 +523,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         elif source == 'problem':
             if self._format_version >= 2:
-                return self._problem_cases.list_cases(recurse, flat)
+                return self._problem_cases.list_cases()
             else:
                 raise RuntimeError('No problem cases recorded (data format = %d).' %
                                    self._format_version)
@@ -830,7 +830,7 @@ class CaseTable(object):
 
         return rows[0][0]
 
-    def list_cases(self, source=None, recurse=False, flat=False):
+    def list_cases(self, source=None):
         """
         Get list of case IDs for cases in the table.
 
@@ -865,32 +865,10 @@ class CaseTable(object):
             return self._keys
         elif '|' in source:
             # source is a coordinate
-            if recurse and not flat:
-                cases = OrderedDict()
-                for key in self._keys:
-                    if len(key) > len(source) and key.startswith(source):
-                        cases[key] = self.list_cases(key, recurse, flat)
-                return cases
-            else:
-                return [key for key in self._keys if key.startswith(source)]
+            return [key for key in self._keys if key.startswith(source)]
         else:
             # source is a system or solver
-            if recurse:
-                if flat:
-                    # return all cases under the source system
-                    source_sys = source.replace('.nonlinear_solver', '')
-                    return [key for key in self._keys
-                            if _get_source_system(key).startswith(source_sys)]
-                else:
-                    cases = OrderedDict()
-                    for key in self._keys:
-                        case_source = self._get_source(key)
-                        if case_source == source:
-                            cases[key] = self.list_cases(key, recurse, flat)
-                    return cases
-            else:
-                return [key for key in self._keys
-                        if self._get_source(key) == source]
+            return [key for key in self._keys if self._get_source(key) == source]
 
     def get_cases(self, source=None, recurse=False, flat=False):
         """
@@ -912,7 +890,7 @@ class CaseTable(object):
             The cases from the table that have the specified source.
         """
         if self._keys is None:
-            self.list_cases(recurse=True, flat=True)
+            self.list_cases()
 
         if not source:
             # return all cases
@@ -1011,7 +989,7 @@ class CaseTable(object):
         """
         # if keys have not been cached yet, get them now
         if self._keys is None:
-            self.list_cases(recurse=True, flat=True)
+            self.list_cases()
 
         return self._keys[case_idx]
 
