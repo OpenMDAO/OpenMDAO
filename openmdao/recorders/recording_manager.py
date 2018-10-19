@@ -15,7 +15,7 @@ class RecordingManager(object):
 
     Attributes
     ----------
-    _recorders : list of BaseRecorder
+    _recorders : list of CaseRecorder
         All of the recorders attached to the current object.
     rank : int
         Rank of the iteration coordinate.
@@ -46,7 +46,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
             a recorder from _recorders
         """
         return self._recorders[index]
@@ -57,7 +57,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        iter : BaseRecorder
+        iter : CaseRecorder
             a recorder from _recorders.
         """
         return iter(self._recorders)
@@ -68,7 +68,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            Recorder instance to be added to the manager.
         """
         self._recorders.append(recorder)

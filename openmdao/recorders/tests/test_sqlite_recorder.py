@@ -437,13 +437,13 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         assertMetadataRecorded(self, prom2abs, abs2prom)
-        expected_driver_metadata = {
+        expected_problem_metadata = {
             'connections_list_length': 11,
             'tree_length': 4,
             'tree_children_length': 7,
             'abs2prom': abs2prom,
         }
-        assertDriverMetadataRecorded(self, expected_driver_metadata)
+        assertDriverMetadataRecorded(self, expected_problem_metadata)
 
     def test_system_records_no_metadata(self):
         prob = Problem(model=SellarDerivatives())
@@ -1623,12 +1623,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader(case_recorder_filename)
-        case = cr.driver_cases.get_case('rank0:SLSQP|3')
+        case = cr.get_case('rank0:SLSQP|3')
 
         assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
         assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
 
-    def test_feature_driver_metadata(self):
+    def test_feature_problem_metadata(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -1659,7 +1659,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # access list of connections stored in metadata
-        connections = cr.driver_metadata['connections_list']
+        connections = cr.problem_metadata['connections_list']
         self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
                          '\n'.join(["d1.y1\tcon_cmp1.y1",
                                     "d2.y2\tcon_cmp2.y2",
@@ -1675,12 +1675,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # access the model tree stored in metadata
         # Quick check to see that keys and values were recorded
-        self.assertEqual(set(cr.driver_metadata['tree'].keys()),
+        self.assertEqual(set(cr.problem_metadata['tree'].keys()),
                          {'name', 'type', 'subsystem_type', 'children'})
-        self.assertEqual(cr.driver_metadata['tree']['name'], 'root')
-        self.assertEqual(cr.driver_metadata['tree']['type'], 'root')
-        self.assertEqual(cr.driver_metadata['tree']['subsystem_type'], 'group')
-        self.assertEqual(len(cr.driver_metadata['tree']['children']), 7)
+        self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
+        self.assertEqual(cr.problem_metadata['tree']['type'], 'root')
+        self.assertEqual(cr.problem_metadata['tree']['subsystem_type'], 'group')
+        self.assertEqual(len(cr.problem_metadata['tree']['children']), 7)
 
         # access the metadata for all the systems in the model
         # Quick check to see that keys and values were recorded
@@ -1775,7 +1775,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        first_system_case = cr.system_cases.get_case(0)
+
+        system_cases = cr.list_cases('root.obj_cmp')
+        first_system_case = cr.get_case(system_cases[0])
         recorded_inputs = first_system_case.inputs.keys()
         self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
 
@@ -1807,10 +1809,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        first_driver_case = cr.driver_cases.get_case(0)
+
+        driver_cases = cr.list_cases('driver')
+        first_driver_case = cr.get_case(driver_cases[0])
         recorded_objectives = first_driver_case.get_objectives().keys()
         recorded_constraints = first_driver_case.get_constraints().keys()
-        recorded_desvars = first_driver_case.get_desvars().keys()
+        recorded_desvars = first_driver_case.get_design_vars().keys()
 
         self.assertEqual(set(recorded_objectives), {'obj'})
         self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
@@ -1833,7 +1837,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        first_solver_case = cr.solver_cases.get_case(0)
+
+        solver_cases = cr.list_cases('root.nonlinear_solver')
+        first_solver_case = cr.get_case(solver_cases[0])
 
         self.assertAlmostEqual(first_solver_case.abs_err, 2.2545141)
 
@@ -1892,7 +1898,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # grab the data recorded in the first driver iteration
-        first_driver_case = cr.driver_cases.get_case(0)
+        driver_cases = cr.list_cases('driver')
+        first_driver_case = cr.get_case(driver_cases[0])
 
         self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90830282)
         self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908303)
@@ -1930,11 +1937,13 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        first_driver_case = cr.driver_cases.get_case(0)
+
+        driver_cases = cr.list_cases('driver')
+        first_driver_case = cr.get_case(driver_cases[0])
 
         objs = first_driver_case.get_objectives()
         cons = first_driver_case.get_constraints()
-        dvs = first_driver_case.get_desvars()
+        dvs = first_driver_case.get_design_vars()
 
         # keys() will give you the promoted variable names
         self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
@@ -2017,7 +2026,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader('cases.sql')
 
         # Load the last case written
-        last_case = cr.system_cases.get_case(-1)
+        last_case = cr.get_case(-1)
         prob.load_case(last_case)
 
         prob.run_driver()
@@ -2043,14 +2052,16 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        model_cases = cr.system_cases.list_cases()
+
+        model_cases = cr.list_cases('root', recurse=False)
         self.assertEqual('\n'.join(model_cases), '\n'.join([
             'Model_Run1_rank0:root._solve_nonlinear|0',
             'Driver_Run1_rank0:Driver|0|root._solve_nonlinear|0',
             'Model_Run2_rank0:root._solve_nonlinear|0',
             'Driver_Run2_rank0:Driver|0|root._solve_nonlinear|0'
         ]))
-        driver_cases = cr.driver_cases.list_cases()
+
+        driver_cases = cr.list_cases('driver', recurse=False)
         self.assertEqual('\n'.join(driver_cases), '\n'.join([
             'Driver_Run1_rank0:Driver|0',
             'Driver_Run2_rank0:Driver|0'
@@ -2093,9 +2104,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
 
-        self.assertEqual(cr.problem_cases.num_cases, 1)
-        final_case = cr.problem_cases.get_case('final')
-        desvars = final_case.get_desvars()
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        final_case = cr.get_case('final')
+        desvars = final_case.get_design_vars()
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
@@ -2138,8 +2151,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
-        final_case = cr.problem_cases.get_case('final')
-        desvars = final_case.get_desvars()
+
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        final_case = cr.get_case('final')
+        desvars = final_case.get_design_vars()
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
@@ -2186,12 +2203,16 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # Test values from one case, the last case
-        last_case = cr.driver_cases.get_case(-1, scaled=False)
-        unscaled_x = last_case.outputs['x'][0]
-        unscaled_y = last_case.outputs['y'][0]
-        last_case = cr.driver_cases.get_case(-1, scaled=True)
-        scaled_x = last_case.outputs['x'][0]
-        scaled_y = last_case.outputs['y'][0]
+        driver_cases = cr.list_cases('driver')
+        last_case = cr.get_case(driver_cases[-1])
+
+        des_vars = last_case.get_design_vars(scaled=False)
+        unscaled_x = des_vars['x'][0]
+        unscaled_y = des_vars['y'][0]
+
+        des_vars = last_case.get_design_vars(scaled=True)
+        scaled_x = des_vars['x'][0]
+        scaled_y = des_vars['y'][0]
 
         adder, scaler = determine_adder_scaler(ref0, ref, None, None)
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)

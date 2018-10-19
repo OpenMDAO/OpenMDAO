@@ -236,7 +236,7 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         # keep track of recorders so we can flag them as parallel

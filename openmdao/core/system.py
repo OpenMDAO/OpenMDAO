@@ -2803,7 +2803,7 @@ class System(object):
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance.
         recurse : boolean
             Flag indicating if the recorder should be added to all the subsystems.

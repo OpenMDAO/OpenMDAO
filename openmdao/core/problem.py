@@ -7,7 +7,6 @@ import sys
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
-import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -671,7 +670,7 @@ class Problem(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)

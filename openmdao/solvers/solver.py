@@ -225,7 +225,7 @@ class Solver(object):
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance to be added to RecManager.
         """
         if MPI:
@@ -743,7 +743,7 @@ class LinearSolver(Solver):
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance to be added to RecManager.
         """
         raise RuntimeError('Recording is not supported on Linear Solvers.')

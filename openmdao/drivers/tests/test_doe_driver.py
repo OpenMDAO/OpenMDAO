@@ -3,8 +3,6 @@ Test DOE Driver and Generators.
 """
 from __future__ import print_function, division
 
-from six import PY3
-
 import unittest
 
 import os
@@ -116,9 +114,10 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 0)
+        self.assertEqual(len(cases), 0)
 
     def test_list(self):
         prob = Problem()
@@ -159,12 +158,13 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 9)
+        self.assertEqual(len(cases), 9)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['x'], expected[n]['x'])
             self.assertEqual(outputs['y'], expected[n]['y'])
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
@@ -291,12 +291,13 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 9)
+        self.assertEqual(len(cases), 9)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['x'], expected[n]['x'])
             self.assertEqual(outputs['y'], expected[n]['y'])
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
@@ -361,12 +362,13 @@ class TestDOEDriver(unittest.TestCase):
             15: {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 16)
+        self.assertEqual(len(cases), 16)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['p1.x'][0], expected[n]['p1.x'][0])
             self.assertEqual(outputs['p2.y'][0], expected[n]['p2.y'][0])
             self.assertEqual(outputs['p1.x'][1], expected[n]['p1.x'][1])
@@ -482,12 +484,13 @@ class TestDOEDriver(unittest.TestCase):
             4: {'x': np.array([ 9.27325521]), 'y': np.array([-2.33116962])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 5)
+        self.assertEqual(len(cases), 5)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             assert_rel_error(self, outputs['x'], expected[n]['x'], 1e-4)
             assert_rel_error(self, outputs['y'], expected[n]['y'], 1e-4)
 
@@ -524,12 +527,13 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 9)
+        self.assertEqual(len(cases), 9)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['x'], expected[n]['x'])
             self.assertEqual(outputs['y'], expected[n]['y'])
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
@@ -563,12 +567,13 @@ class TestDOEDriver(unittest.TestCase):
             8: {'xy': np.array([ 50.,  50.])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 9)
+        self.assertEqual(len(cases), 9)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['xy'][0], expected[n]['xy'][0])
             self.assertEqual(outputs['xy'][1], expected[n]['xy'][1])
 
@@ -598,12 +603,13 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 4)
+        self.assertEqual(len(cases), 4)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['x'], expected[n]['x'])
             self.assertEqual(outputs['y'], expected[n]['y'])
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
@@ -635,13 +641,14 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
         # which 2 factors are varied thru the 4 possible combinations of high & low.
         # It also includes centre points (all factors at their central values).
         # ref: https://en.wikipedia.org/wiki/Box-Behnken_design
-        self.assertEqual(cases.num_cases, (3*4)+center)
+        self.assertEqual(len(cases), (3*4)+center)
 
         expected = {
             0:  {'x': np.array([ 0.]), 'y': np.array([ 0.]), 'z': np.array([ 5.])},
@@ -662,8 +669,8 @@ class TestDOEDriver(unittest.TestCase):
             12: {'x': np.array([ 5.]), 'y': np.array([ 5.]), 'z': np.array([ 5.])},
         }
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             self.assertEqual(outputs['x'], expected[n]['x'])
             self.assertEqual(outputs['y'], expected[n]['y'])
             self.assertEqual(outputs['z'], expected[n]['z'])
@@ -720,12 +727,13 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([-0.72559325]), 'y': np.array([-2.27558409])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 4)
+        self.assertEqual(len(cases), 4)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             x = outputs['x']
             y = outputs['y']
 
@@ -787,12 +795,13 @@ class TestDOEDriver(unittest.TestCase):
             3: {'xy': np.array([-7.25593248, -11.37792043])},
         }
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 4)
+        self.assertEqual(len(cases), 4)
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             x = outputs['xy'][0]
             y = outputs['xy'][1]
 
@@ -836,9 +845,10 @@ class TestDOEDriver(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, samples)
+        self.assertEqual(len(cases), samples)
 
         # the sample space for each variable (0 to upper) should be divided into
         # equal size buckets and each variable should have a value in each bucket
@@ -851,8 +861,8 @@ class TestDOEDriver(unittest.TestCase):
         # with criterion of 'center', each value should be in the center of it's bucket
         valid_values = [round(bucket_size*(bucket + 1/2), 3) for bucket in all_buckets]
 
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             x = float(outputs['indep.x'])
             y = float(outputs['indep.y'])
 
@@ -963,14 +973,15 @@ class TestParallelDOE(unittest.TestCase):
         expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
         self.assertTrue(expect_msg in output)
 
-        cases = CaseReader(filename).driver_cases
+        cr = CaseReader(filename)
+        cases = cr.list_cases('driver')
 
         # cases recorded on this proc
-        num_cases = cases.num_cases
+        num_cases = len(cases)
         self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
         for n in range(num_cases):
-            outputs = cases.get_case(n).outputs
+            outputs = cr.get_case(cases[n]).outputs
             idx = n * size + rank  # index of expected case
 
             self.assertEqual(outputs['x'], expected[idx]['x'])
@@ -1031,16 +1042,17 @@ class TestParallelDOE(unittest.TestCase):
             expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
             self.assertTrue(expect_msg in output)
 
-            cases = CaseReader(filename).driver_cases
+            cr = CaseReader(filename)
+            cases = cr.list_cases('driver')
 
             # cases recorded on this proc
-            num_cases = cases.num_cases
+            num_cases = len(cases)
             self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
             for n in range(num_cases):
                 idx = n * size + rank  # index of expected case
 
-                outputs = cases.get_case(n).outputs
+                outputs = cr.get_case(cases[n]).outputs
 
                 self.assertEqual(outputs['iv.x1'], expected[idx]['iv.x1'])
                 self.assertEqual(outputs['iv.x2'], expected[idx]['iv.x2'])
@@ -1101,16 +1113,17 @@ class TestParallelDOE(unittest.TestCase):
         expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
         self.assertTrue(expect_msg in output)
 
-        cases = CaseReader(filename).driver_cases
+        cr = CaseReader(filename)
+        cases = cr.list_cases('driver')
 
         # cases recorded on this proc
-        num_cases = cases.num_cases
+        num_cases = len(cases)
         self.assertEqual(num_cases, len(expected)//size+(rank<len(expected)%size))
 
         for n in range(num_cases):
             idx = n * size + rank  # index of expected case
 
-            outputs = cases.get_case(n).outputs
+            outputs = cr.get_case(cases[n]).outputs
 
             self.assertEqual(outputs['iv.x1'], expected[idx]['iv.x1'])
             self.assertEqual(outputs['iv.x2'], expected[idx]['iv.x2'])
@@ -1206,13 +1219,14 @@ class TestDOEDriverFeature(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
-        self.assertEqual(cases.num_cases, 5)
+        self.assertEqual(len(cases), 5)
 
         values = []
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
         print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
@@ -1247,11 +1261,12 @@ class TestDOEDriverFeature(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
         values = []
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
         self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
@@ -1299,11 +1314,12 @@ class TestDOEDriverFeature(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        cases = CaseReader("cases.sql").driver_cases
+        cr = CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
 
         values = []
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
         self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
@@ -1392,16 +1408,18 @@ class TestParallelDOEFeature(unittest.TestCase):
         filename = "cases.sql_%d" % rank
         self.assertEqual(filename, "cases.sql_%d" % rank)
 
-        cases = CaseReader(filename).driver_cases
-        self.assertEqual(cases.num_cases, 5 if rank == 0 else 4)
+        cr = CaseReader(filename)
+        cases = cr.list_cases('driver')
+        self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
         values = []
-        for n in range(cases.num_cases):
-            outputs = cases.get_case(n).outputs
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
-            self.expect_text)
+        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy)
+                                         for x, y, f_xy in values]),
+                         self.expect_text)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -1483,11 +1501,12 @@ class TestParallelDOEFeature2(unittest.TestCase):
         if rank < doe_parallel:
             filename = "cases.sql_%d" % rank
 
-            cases = CaseReader(filename).driver_cases
+            cr = CaseReader(filename)
+            cases = cr.list_cases('driver')
 
             values = []
-            for n in range(cases.num_cases):
-                outputs = cases.get_case(n).outputs
+            for n in range(len(cases)):
+                outputs = cr.get_case(cases[n]).outputs
                 values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
 
             self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),

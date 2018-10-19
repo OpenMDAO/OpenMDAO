@@ -1,58 +1,104 @@
 """
 Base class for all CaseReaders.
 """
-from abc import ABCMeta
 
 
 class BaseCaseReader(object):
     """
-    Abstract base class of all CaseReader implementations.
+    Base class of all CaseReader implementations.
 
     Attributes
     ----------
-    format_version : int
-        An integer representation of the format version in the recorded file.
-    filename : str
-        The name of the file from which the recorded cases are to be loaded.
-    driver_cases : list
-        The list of driver cases to be loaded.
-    system_cases : list
-        The list of system cases to be loaded.
-    solver_cases : list
-        The list of solver cases to be loaded.
-    problem_cases : list
-        The list of problem cases to be loaded.
-    driver_derivative_cases : list
-        The list of driver derivative cases to be loaded.
-    driver_metadata : dict
-        The dictionary of driver metadata to be loaded.
-    system_metadata : dict
-        The dictionary of system metadata to be loaded.
+    _format_version : int
+        The version of the format assumed when loading the file.
+    problem_metadata : dict
+        Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
-        The dictionary of solver metadata to be loaded..
+        The solver options for each solver in the recorded model.
+    system_metadata : dict
+        Metadata about each system in the recorded model, including options and scaling factors.
     """
 
-    __metaclass__ = ABCMeta
-
-    def __init__(self, filename):
+    def __init__(self, filename, pre_load=False):
         """
         Initialize.
 
         Parameters
         ----------
         filename : str
-            The name of the file from which to instantiate the case reader.
+            The path to the file containing the recorded data.
+        pre_load : bool
+            If True, load all the data into memory during initialization.
         """
-        self.format_version = None
-        self.filename = filename
-
-        self.driver_cases = None
-        self.system_cases = None
-        self.solver_cases = None
-        self.problem_cases = None
-
-        self.driver_derivative_cases = None
-
-        self.driver_metadata = {}
-        self.system_metadata = {}
+        self._format_version = None
+        self.problem_metadata = {}
         self.solver_metadata = {}
+        self.system_metadata = {}
+
+    def get_cases(self, source, recurse=True, flat=False):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', iteration_coordinate}
+            Identifies which cases to return. 'iteration_coordinate' can refer to
+            a system or a solver hierarchy location. Defaults to 'problem'.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy.
+        flat : bool
+            If True, return a flat dictionary rather than a nested dictionary.
+
+        Returns
+        -------
+        dict
+            The cases identified by the source
+        """
+        pass
+
+    def get_case(self, id, recurse=True):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        id : str
+            The unique identifier of the case to return.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy.
+
+        Returns
+        -------
+        dict
+            The case identified by the is
+        """
+        pass
+
+    def list_sources(self):
+        """
+        List of all the different recording sources for which there is recorded data.
+
+        Returns
+        -------
+        list
+            One or more of: `problem`, `driver`, `<component hierarchy location>`,
+            `<solver hierarchy location>`
+        """
+        pass
+
+    def list_source_vars(self, source):
+        """
+        List of all the different recording sources for which there is recorded data.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', iteration_coordinate}
+            Identifies which cases to return. 'iteration_coordinate' can refer to
+            a system or a solver hierarchy location. Defaults to 'problem'.
+
+        Returns
+        -------
+        dict
+            {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+        """
+        pass

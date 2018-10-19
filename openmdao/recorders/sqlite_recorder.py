@@ -13,7 +13,7 @@ import numpy as np
 
 from six.moves import cPickle as pickle
 
-from openmdao.recorders.base_recorder import BaseRecorder
+from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import values_to_array
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -108,7 +108,7 @@ def convert_to_list(vals):
         return vals
 
 
-class SqliteRecorder(BaseRecorder):
+class SqliteRecorder(CaseRecorder):
     """
     Recorder that saves cases in a sqlite db.
 
