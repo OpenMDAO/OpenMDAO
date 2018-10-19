@@ -1,5 +1,14 @@
 build: off
 
+for:
+  -
+    matrix:
+      only:
+        - image: Ubuntu
+    cache:
+     - '/home/appveyor/miniconda' # need this only on Linux
+     - '/home/appveyor/.cache/pip/wheels/'
+
 environment:
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
@@ -27,15 +36,6 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
-
-for:
-  -
-    matrix:
-      only:
-        - image: Ubuntu
-    cache:
-     - '/home/appveyor/miniconda' # need this only on Linux
-     - '/home/appveyor/.cache/pip/wheels/'
 
 install:
 - sh:
