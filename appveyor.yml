@@ -1,26 +1,83 @@
-build: false
-version: 2.3.1.{build}-{branch}
-platform: x64
+build: off
 
 environment:
   matrix:
-    - PYTHON: 2.7
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      PY: 3.7
+      NUMPY: 1.15
+      SCIPY: 1.0.1
+      PETSc: 3.9.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      PY: 3.6
+      NUMPY: 1.14
+      SCIPY: 1.0.1
+      PETSc: 3.8.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      PY: 2.7
+      NUMPY: 1.14
+      SCIPY: 1.0.1
+      PETSc: 3.8.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PYTHON: 2.7
       CONDA: "C:\\Miniconda-x64"
 
-    - PYTHON: 3.6
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
 
 install:
-  - set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
-  - conda config --set always_yes yes
-  - conda update conda
-  - conda install python=%PYTHON% numpy scipy=1.0.1 mkl==2018.0.2 nose sphinx mock pip --quiet
-  - pip install matplotlib
-  - pip install git+https://github.com/OpenMDAO/testflo.git
-  - cd C:\projects\blue*
-  - pip install -e .
-  - pip list
-  - conda list
+- sh:
+    sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
+    sudo apt-get update;
+    sudo apt-get -y install gfortran;
+    sudo apt-get -y install libblas-dev;
+    sudo apt-get -y install liblapack-dev;
+    sudo apt-get -y install libopenmpi-dev;
+    sudo apt-get -y install openmpi-bin;
+
+    echo "Building python environment...";
+    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p $HOME/miniconda;
+    export PATH=$HOME/miniconda/bin:$PATH;
+
+    conda create --yes -n PY$PY python=$PY;
+    source $HOME/miniconda/bin/activate PY$PY;
+
+    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+
+    pip install --upgrade pip;
+    pip install redbaron;
+    pip install git+https://github.com/OpenMDAO/testflo.git;
+    pip install coverage;
+    pip install git+https://github.com/swryan/coveralls-python@work;
+
+    git clone https://github.com/OpenMDAO/pyoptsparse.git;
+    cd pyoptsparse;
+    python setup.py install;
+    cd ..;
+
+    pip install mpi4py;
+    pip install petsc4py==$PETSc;
+
+    conda install --yes matplotlib;
+
+    pip install .;
+    conda list
+
+- cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
+- cmd: conda config --set always_yes yes
+- cmd: conda update conda
+- cmd: conda install python=%PYTHON% numpy scipy=1.0.1 mkl==2018.0.2 nose sphinx mock pip --quiet
+- cmd: pip install matplotlib
+- cmd: pip install testflo
+- cmd: cd C:\projects\blue*
+- cmd: pip install -e .
+- cmd: conda list
 
 test_script:
-  - testflo . -n 1
+- sh: testflo . -n 1;
+- cmd: testflo . -n 1
