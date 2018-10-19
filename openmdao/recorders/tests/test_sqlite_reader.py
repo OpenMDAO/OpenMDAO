@@ -13,9 +13,6 @@ from collections import OrderedDict
 import numpy as np
 from six import iteritems, assertRaisesRegex
 
-from pprint import pprint
-import json
-
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     NonlinearRunOnce, NonlinearBlockGS, LinearBlockGS, ScipyOptimizeDriver
 from openmdao.recorders.sqlite_recorder import SqliteRecorder, format_version
@@ -36,19 +33,23 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
-def convert_all(d):
+def count_keys(d):
     """
-    Convert all OrderedDict instances in dict d to a regular dict.
+    Count the number of keys in the nested dictionary.
 
     Parameters
     ----------
-    d : dict-like
-        The dictionary to be converted.
+    d : nested OrderedDict
+        The dictionary of cases to be counted.
     """
+    count = 0
+
     for k in d:
+        count += 1
         if isinstance(d[k], OrderedDict):
-            d[k] = dict(d[k])
-            convert_all(d[k])
+            count += count_keys(d[k])
+
+    return count
 
 
 class TestSqliteCaseReader(unittest.TestCase):
@@ -581,17 +582,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         cases = cr.list_cases(recurse=True, flat=False)
 
-        # convert to convenient format for inspection
-        case_dict = dict(cases)
-        convert_all(case_dict)
-        nested_txt = json.dumps(dict(case_dict), indent=4)
+        num_cases = count_keys(cases)
 
-        # verify the cases are all there
-        counter = 0
-        for line in nested_txt.split():
-            if line.strip().startswith('"rank0:'):
-                counter += 1
-        self.assertEqual(counter, global_iterations)
+        self.assertEqual(num_cases, global_iterations)
 
         #
         # get a recursive list of child cases
@@ -626,7 +619,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             'driver', 'root', 'root.mda', 'root.mda.nonlinear_solver', 'root.nonlinear_solver'
         ])
 
-        # verify the coordinates of the returned cases are as expected and that the cases are all there
+        # verify the coordinates of the returned cases are all there as expected
         expected_coord = {
             'driver':                    r'rank0:SLSQP\|\d',
             'root':                      r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d',
@@ -695,7 +688,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # get total iteration count to check against
         global_iterations = len(cr._get_global_iterations())
-        print('global_iterations:', global_iterations)
 
         #
         # get a recursive list of all cases (flat)
@@ -716,34 +708,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         cases = cr.get_cases(recurse=True, flat=False)
 
-        # convert to convenient format for inspection
-        case_dict = dict(cases)
-        convert_all(case_dict)
-        pprint(case_dict)
+        num_cases = count_keys(cases)
 
-        # def convert_all(d):
-        #     """
-        #     Convert all OrderedDict instances in dict d to a regular dict.
-
-        #     Parameters
-        #     ----------
-        #     d : dict-like
-        #         The dictionary to be converted.
-        #     """
-        #     for k in d:
-        #         if isinstance(d[k], OrderedDict):
-        #             d[k] = dict(d[k])
-        #             convert_all(d[k])
-
-        # nested_txt = json.dumps(dict(case_dict), indent=4)
-        # print(nested_txt)
-
-        # # verify the cases are all there
-        # counter = 0
-        # for line in nested_txt.split():
-        #     if line.strip().startswith('"rank0:'):
-        #         counter += 1
-        # self.assertEqual(counter, global_iterations)
+        self.assertEqual(num_cases, global_iterations)
 
         #
         # get a recursive list of child cases
@@ -1874,7 +1841,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_outputs.update(expected_obj)
         expected_outputs.update(expected_con)
 
-        self.assertEqual(case.outputs.keys(), expected_outputs.keys())
+        self.assertEqual(set(case.outputs.keys()), set(expected_outputs.keys()))
         for key in expected_outputs:
             np.testing.assert_almost_equal(case.outputs[key], expected_outputs[key])
 

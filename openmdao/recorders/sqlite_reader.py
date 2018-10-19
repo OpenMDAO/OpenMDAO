@@ -7,7 +7,8 @@ import re
 import sqlite3
 from collections import OrderedDict
 
-from six import PY2, PY3, iteritems
+from six import PY2, PY3, iteritems, string_types
+
 from six.moves import range
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
@@ -394,8 +395,8 @@ class SqliteCaseReader(BaseCaseReader):
                                        'driver was not recorded. Please specify another source '
                                        '(system or solver) for the cases you want to see.')
 
-        if not isinstance(source, str):
-            raise TypeError("'source' parameter must be a string.")
+        if not isinstance(source, string_types):
+            raise TypeError("'source' parameter must be a string,", source, "is a", type(source))
 
         if not source:
             return self._list_cases_recurse_flat()

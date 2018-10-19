@@ -1111,9 +1111,17 @@ class TestSqliteRecorder(unittest.TestCase):
         ]
 
         for solver in linear_solvers:
-            ln = nl.linear_solver = solver()
+            try:
+                ln = nl.linear_solver = solver()
+            except RuntimeError as err:
+                if str(err) == 'PETSc is not available.':
+                    continue
+                else:
+                    raise err
+
             with self.assertRaises(RuntimeError) as cm:
                 ln.add_recorder(self.recorder)
+
             self.assertEqual(str(cm.exception), 'Recording is not supported on Linear Solvers.')
 
     def test_record_driver_system_solver(self):
