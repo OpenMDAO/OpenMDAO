@@ -29,6 +29,8 @@ class Case(object):
         The unique id of the system/solver/driver/problem that did the recording.
     iteration_coordinate : str
         The full unique identifier for this iteration.
+    counter : int
+        The unique sequential index of this case in the recording.
     timestamp : float
         Time of execution of the case.
     success : str
@@ -59,6 +61,8 @@ class Case(object):
         Dictionary mapping absolute names of all variables to variable metadata.
     _voi_meta : dict
         Dictionary mapping absolute names of variables of interest to variable metadata.
+    _format_version : int
+        A version number specifying the format of array data, if not numpy arrays.
     """
 
     def __init__(self, source, data, prom2abs, abs2prom, abs2meta, voi_meta, data_format=None):

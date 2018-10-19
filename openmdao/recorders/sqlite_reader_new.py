@@ -235,7 +235,7 @@ class SqliteCaseReader(BaseCaseReader):
         Helper object for accessing cases from the solver_iterations table.
     _problem_cases : ProblemCases
         Helper object for accessing cases from the problem_cases table.
-    _global_index : list
+    _global_iterations : list
         List of iteration cases and the table and row in which they are found.
     """
 
@@ -305,7 +305,8 @@ class SqliteCaseReader(BaseCaseReader):
                                          self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
         if self._format_version >= 2:
             self._problem_cases = ProblemCases(filename, self._format_version,
-                                               self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
+                                               self._prom2abs, self._abs2prom, self._abs2meta,
+                                               voi_meta)
 
         # if requested, load all the iteration data into memory
         if pre_load:
@@ -449,7 +450,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def _get_global_iterations(self):
         """
-        Get the global iterations table.iterations
+        Get the global iterations table.
 
         Returns
         -------
@@ -602,11 +603,11 @@ class SqliteCaseReader(BaseCaseReader):
         for iter_num in range(0, parent_case.counter):
             _, table, row = global_iters[iter_num]
             if table == 'solver':
-                case_coord = solver_cases[row-1]
+                case_coord = solver_cases[row - 1]
             elif table == 'system':
-                case_coord = system_cases[row-1]
+                case_coord = system_cases[row - 1]
             elif table == 'driver':
-                case_coord = driver_cases[row-1]
+                case_coord = driver_cases[row - 1]
             else:
                 raise RuntimeError('Unexpected table name in global iterations:', table)
 
@@ -649,16 +650,16 @@ class SqliteCaseReader(BaseCaseReader):
 
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
-        for iter_num in range(0, parent_case.counter-1):
+        for iter_num in range(0, parent_case.counter - 1):
             _, table, row = global_iters[iter_num]
             if table == 'solver':
-                case_coord = solver_cases[row-1]
+                case_coord = solver_cases[row - 1]
                 if case_coord.startswith(coord):
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
                     if parent_coord == coord:
                         children.update(self._list_cases_recurse_nested(case_coord))
             elif table == 'system':
-                case_coord = system_cases[row-1]
+                case_coord = system_cases[row - 1]
                 if case_coord.startswith(coord):
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
                     if parent_coord == coord:
@@ -703,6 +704,11 @@ class SqliteCaseReader(BaseCaseReader):
             The nested dictionary of case IDs.
         cases : OrderedDict
             The nested dictionary of cases.
+
+        Returns
+        -------
+        OrderedDict
+            The nested dictionary of cases with cases added from case_ids.
         """
         for case_id in case_ids:
             case = self.get_case(case_id)
@@ -837,16 +843,12 @@ class CaseTable(object):
         Parameters
         ----------
         source : str, optional
-            If not None, only cases that have the specified source will be returned
-        recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
-        flat : bool, optional
-            If False and there are child cases, then a nested ordered dictionary
-            is returned rather than an iterator.
+            Source or iteration coordinate.
+            If not None, only cases originating from the specified source or case are returned.
 
         Returns
         -------
-        list or dict
+        list
             The cases from the table that have the specified source.
         """
         with sqlite3.connect(self._filename) as con:
@@ -1254,6 +1256,8 @@ class ProblemCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        voi_meta : dict
+            Dictionary mapping absolute variable names to variable settings.
         """
         super(ProblemCases, self).__init__(filename, format_version,
                                            'problem_cases', 'case_name',
@@ -1308,6 +1312,8 @@ class SystemCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        voi_meta : dict
+            Dictionary mapping absolute variable names to variable settings.
         """
         super(SystemCases, self).__init__(filename, format_version,
                                           'system_iterations', 'iteration_coordinate',
@@ -1335,6 +1341,8 @@ class SolverCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
+        voi_meta : dict
+            Dictionary mapping absolute variable names to variable settings.
         """
         super(SolverCases, self).__init__(filename, format_version,
                                           'solver_iterations', 'iteration_coordinate',
