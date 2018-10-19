@@ -417,11 +417,13 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|5',
             'rank0:SLSQP|6'
         ]
+
         last_counter = 0
         for i, c in enumerate(cr.get_cases()):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
+
         self.assertEqual(i+1, len(expected_coords))
 
         # check driver cases with recursion, flat
@@ -448,11 +450,13 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|6|root._solve_nonlinear|6',
             'rank0:SLSQP|6',
         ]
+
         last_counter = 0
         for i, c in enumerate(cr.get_cases(recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
+
         self.assertEqual(i+1, len(expected_coords))
 
         # check child cases with recursion, flat
@@ -461,52 +465,45 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|0|root._solve_nonlinear|0',
             'rank0:SLSQP|0',
         ]
+
         last_counter = 0
         for i, c in enumerate(cr.get_cases('rank0:SLSQP|0', recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
+
         self.assertEqual(i+1, len(expected_coords))
 
         # check child cases with recursion, nested
         expected_coords = {
             'rank0:SLSQP|0': {
-                'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0': {},
-                'rank0:SLSQP|0|root._solve_nonlinear|0': {},
+                'rank0:SLSQP|0|root._solve_nonlinear|0': {
+                    'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0': {}
+                },
             }
         }
 
-        print('---------')
         cases = cr.get_cases('rank0:SLSQP|0', recurse=True, flat=False)
-        pprint(cases)
-        print('---------')
-        keys = list(cases.keys())
-        print(keys)
-        print([case.iteration_coordinate for case in keys])
-        print('---------')
-
-        self.assertEqual(len(cases.keys()), len(expected_coords.keys()))
 
         count = 0
-        for i, case in enumerate(cases):
+        for case in cases:
             count += 1
             coord = case.iteration_coordinate
-            print(coord, 'in', list(expected_coords.keys()))
             self.assertTrue(coord in list(expected_coords.keys()))
-            for j, child_case in enumerate(cases[case]):
+            for child_case in cases[case]:
                 count += 1
                 child_coord = child_case.iteration_coordinate
                 self.assertTrue(child_coord in expected_coords[coord].keys())
+                for grandchild_case in cases[case][child_case]:
+                    count += 1
+                    grandchild_coord = grandchild_case.iteration_coordinate
+                    self.assertTrue(grandchild_coord in expected_coords[coord][child_coord].keys())
 
         self.assertEqual(count, 3)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_get_child_cases_system(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-9
-        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
 
         model = prob.model
@@ -519,25 +516,28 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear'
+        parent_coord = 'rank0:SLSQP|1|root._solve_nonlinear|2'
 
         expected_coords = [
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|1',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|2',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|3',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|4',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|5',
-            parent_coord + '|0|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|6',
-            parent_coord + '|0|NLRunOnce|0',
-            parent_coord + '|0',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|0',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|1',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|2',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|3',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|4',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|5',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|6',
+            parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|7',
+            parent_coord + '|NLRunOnce|0',
+            parent_coord
         ]
+
         last_counter = 0
         for i, c in enumerate(cr.get_cases(source=parent_coord, recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
             i += 1
+
         self.assertEqual(i, len(expected_coords))
 
     def test_list_cases_recurse(self):

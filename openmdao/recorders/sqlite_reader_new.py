@@ -553,10 +553,9 @@ class SqliteCaseReader(BaseCaseReader):
                 else:
                     # return nested dict of cases from the source and child cases
                     cases = OrderedDict()
-                    source_cases = case_table.get_cases()
+                    source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        case_coord = case.iteration_coordinate
-                        cases[case_coord] = self._list_cases_recurse_nested(case_coord)
+                        cases.update(self._list_cases_recurse_nested(case.iteration_coordinate))
                     return cases
             else:
                 # source must be a coordinate
@@ -645,10 +644,8 @@ class SqliteCaseReader(BaseCaseReader):
             raise RuntimeError('Case not found for coordinate:', coord)
 
         cases = OrderedDict()
-        # children = OrderedDict()
-        # print('adding parent case:', coord)
-        # cases[parent_case.iteration_coordinate] = children
-        children = cases
+        children = OrderedDict()
+        cases[parent_case.iteration_coordinate] = children
 
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
@@ -657,17 +654,15 @@ class SqliteCaseReader(BaseCaseReader):
             if table == 'solver':
                 case_coord = solver_cases[row-1]
                 if case_coord.startswith(coord):
-                    print('adding solver case:', case_coord)
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
                     if parent_coord == coord:
-                        children[case_coord] = self._list_cases_recurse_nested(case_coord)
+                        children.update(self._list_cases_recurse_nested(case_coord))
             elif table == 'system':
                 case_coord = system_cases[row-1]
                 if case_coord.startswith(coord):
-                    print('adding system case:', case_coord)
                     parent_coord = '|'.join(case_coord.split('|')[:-2])
                     if parent_coord == coord:
-                        children[case_coord] = self._list_cases_recurse_nested(case_coord)
+                        children.update(self._list_cases_recurse_nested(case_coord))
 
         return cases
 
@@ -916,7 +911,6 @@ class CaseTable(object):
         list or dict
             The cases from the table that have the specified source.
         """
-        # print("==> get_cases()", source, recurse, flat)
         if self._keys is None:
             self.list_cases(recurse=True, flat=True)
 
@@ -932,9 +926,6 @@ class CaseTable(object):
                         cases[key] = self.get_cases(key, recurse, flat)
                 return cases
             else:
-                # print(self.__class__.__name__, recurse, flat)
-                # pprint(list([key for key in self._keys if key.startswith(source)]))
-                # print('============================')
                 return list([self.get_case(key) for key in self._keys if key.startswith(source)])
         else:
             # source is a system or solver
@@ -1041,8 +1032,6 @@ class CaseTable(object):
             for row in cur:
                 case_id = row[self._index_name]
                 source = self._get_source(case_id)
-                # print('cases()', source)
-                # pprint(dict(zip(row.keys(), row)))
                 case = Case(source, row,
                             self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
                             self._format_version)
