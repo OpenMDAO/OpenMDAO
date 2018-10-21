@@ -1151,98 +1151,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         _assert_model_matches_case(case, model)
 
-    def test_feature_recording_option_precedence_driver_cases(self):
-        from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
-            SqliteRecorder
-        from openmdao.recorders.case_reader import CaseReader
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = Problem()
-        model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
-
-        prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', lower=15.0)
-
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['includes'] = []
-        prob.driver.recording_options['excludes'] = ['p2.y']
-
-        prob.set_solver_print(0)
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        # First case with record_desvars = True and includes = []
-        cr = CaseReader(self.filename)
-
-        driver_cases = cr.list_cases('driver')
-        case = cr.get_case(driver_cases[0])
-
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
-
-        # Second case with record_desvars = False and includes = []
-        self.recorder = SqliteRecorder(self.filename)
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = False
-        prob.driver.recording_options['includes'] = []
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        driver_cases = cr.list_cases('driver')
-        case = cr.get_case(driver_cases[-1])
-
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
-
-        # Third case with record_desvars = True and includes = ['*']
-        self.recorder = SqliteRecorder(self.filename)
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['includes'] = ['*']
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        driver_cases = cr.list_cases('driver')
-        case = cr.get_case(driver_cases[-1])
-
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
-
-        # Fourth case with record_desvars = False and includes = ['*']
-        self.recorder = SqliteRecorder(self.filename)
-        prob.driver.add_recorder(self.recorder)
-        prob.driver.recording_options['record_desvars'] = False
-        prob.driver.recording_options['includes'] = ['*']
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        driver_cases = cr.list_cases('driver')
-        case = cr.get_case(driver_cases[-1])
-
-        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
-
     def test_load_driver_cases(self):
         prob = Problem()
         model = prob.model
@@ -1854,6 +1762,186 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(all_driver_cases), len(expected_cases))
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
+
+
+class TestFeatureSqliteReader(unittest.TestCase):
+
+    def test_feature_recording_option_precedence(self):
+        from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+            SqliteRecorder
+        from openmdao.recorders.case_reader import CaseReader
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=15.0)
+
+        filename = "cases.sql"
+        recorder = SqliteRecorder(filename)
+
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['includes'] = []
+        prob.driver.recording_options['excludes'] = ['p2.y']
+
+        prob.set_solver_print(0)
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # First case with record_desvars = True and includes = []
+        cr = CaseReader(filename)
+        case = cr.get_case(-1)
+
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+
+        # Second case with record_desvars = False and includes = []
+        recorder = SqliteRecorder(filename)
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['includes'] = []
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(filename)
+        case = cr.get_case(0)
+
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
+
+        # Third case with record_desvars = True and includes = ['*']
+        recorder = SqliteRecorder(filename)
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['includes'] = ['*']
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(filename)
+        case = cr.get_case(0)
+
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x'])
+
+        # Fourth case with record_desvars = False and includes = ['*']
+        recorder = SqliteRecorder(filename)
+        prob.driver.add_recorder(recorder)
+        prob.driver.recording_options['record_desvars'] = False
+        prob.driver.recording_options['includes'] = ['*']
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(filename)
+        case = cr.get_case(0)
+
+        self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy'])
+
+    def test_feature_driver_options_with_values(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver = ScipyOptimizeDriver()
+        driver = prob.driver
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-9
+        driver.options['disp'] = False
+
+        recorder = SqliteRecorder("cases.sql")
+        driver.add_recorder(recorder)
+
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        driver_cases = cr.list_cases('driver')
+        first_driver_case = cr.get_case(driver_cases[0])
+
+        objs = first_driver_case.get_objectives()
+        cons = first_driver_case.get_constraints()
+        dvs = first_driver_case.get_design_vars()
+
+        # keys() will give you the promoted variable names
+        self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
+                         (['obj'], ['con1', 'con2'], ['x', 'z']))
+
+        # alternatively, you can get the absolute names
+        self.assertEqual((sorted(objs.absolute_names()), sorted(cons.absolute_names()), sorted(dvs.absolute_names())),
+                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['px.x', 'pz.z']))
+
+        # you can access variable values using either the promoted or the absolute name
+        self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
+        self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
+
+    def test_feature_list_inputs_outputs(self):
+        prob = SellarProblem()
+
+        recorder = SqliteRecorder("cases.sql")
+
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_residuals'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        case = cr.get_case(-1)  # last case
+
+        case.list_inputs(values=True, hierarchical=True)
+        case.list_outputs(values=True, hierarchical=True)
+
+    def test_feature_preload(self):
+        prob = SellarProblem()
+
+        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
+        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.setup()
+
+        prob['x'] = 0.
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql", pre_load=True)
+
+        for case in cr.get_cases():
+            print(case.get_design_vars())
 
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):

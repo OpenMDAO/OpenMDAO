@@ -1,3 +1,5 @@
+.. _getting_values:
+
 ***********************************
 Getting Values with the Case Reader
 ***********************************
@@ -12,12 +14,12 @@ Here is some simple code showing how to use the `CaseReader` class.
 
     from openmdao.recorders.case_reader import CaseReader
 
-    cr = CaseReader(case_recorder_filename)
+    cr = CaseReader(filename)
 
 Depending on how the cases were recorded and what options were set on the recorder, the case recorder file could contain
 any of the following:
 
-    #. Driver metadata
+    #. Problem metadata
     #. System metadata
     #. Solver metadata
     #. Driver iterations
@@ -28,47 +30,40 @@ any of the following:
 Retrieving Cases
 ----------------
 
-Assume that a recorder was attached to the `Driver` for the `Problem`. To find out how many cases were recorded:
+Assume that a recorder was attached to the `Driver`. You can get a list of the case IDs using the :code:`list_cases` method:
 
 .. code-block:: console
 
-    print('Number of driver cases recorded =', cr.driver_cases.num_cases )
-
-You can get a list of the case IDs using the :code:`list_cases` method:
-
-.. code-block:: console
-
-    case_keys = cr.driver_cases.list_cases()
+    case_keys = cr.list_cases()
     for case_key in case_keys:
         print('Case:', case_key)
 
 The :code:`get_case` method provides a way to get at individual cases.
 
-.. automethod:: openmdao.recorders.sqlite_reader.DriverCases.get_case
+.. automethod:: openmdao.recorders.base_case_reader.BaseCaseReader.get_case
     :noindex:
 
 The argument to this method can either be:
 
+    #. String - in which case the argument is one of the case keys.
     #. Integer - in which case the argument is an index into the cases. Negative numbers can be used as indices just
             as is normally done in Python.
-    #. String - in which case the argument is one of the case keys.
 
-For example, in the common situation where the user wants to see the last case, they can do:
+For example, in the common situation where you want to see the last case, you can do:
 
 .. code-block:: console
 
-    last_case = cr.driver_cases.get_case(-1)
-    print('Last value of pz.z =', last_case.desvars['z'])
+    last_case = cr.get_case(-1)
+    print('Last value of z =', last_case.outputs['z'])
 
 Or, if the case key is known:
 
 .. code-block:: console
 
     seventh_slsqp_iteration_case = cr.driver_cases.get_case('rank0:SLSQP|6')
-    print('Value of pz.z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.desvars['z'])
+    print('Value of z after 7th iteration of SLSQP =', seventh_slsqp_iteration_case.outputs['z'])
 
-Note that we access variables in the case reader through the promoted names instead of the absolute variable name.
-If we had not promoted `pz.z`, we would use:
+Note that we can access variables in the case via the either the absolute or promoted names.
 
 .. code-block:: console
 
@@ -77,49 +72,33 @@ If we had not promoted `pz.z`, we would use:
 
 Getting Variables and Values
 ----------------------------
-Both the CaseReader and cases themselves have a number of methods to retrieve types of variables. On Case objects 
-there are the methods :code:`get_desvars()`, :code:`get_objectives()`, :code:`get_constraints()`,
-and :code:`get_responses()` which, as their names imply, will return the corresponding variables and their
-values for that case.  Note that you can use either the promoted or absolute names when accessing the
-returned variables.
+Case objects have a number of attributes and methods to for accessing variables and their values.
 
-Here's an example that shows how to use these methods to see what variables were recorded on the first driver iteration and get their values.
+.. autoclass:: openmdao.recorders.case.Case
+    :members:
+    :noindex:
+
+Note that you can use either the promoted or absolute names when accessing the variables.
+
+Example of Using VOI Methods
+----------------------------
+
+This example shows how to use the methods to easily see check the variables of interest from the first driver iteration.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_options_with_values
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_driver_options_with_values
     :layout: interleave
 
-Additionally, just like :ref:`listing variables <listing-variables>` on System objects, there is a :code:`list_inputs` method and a :code:`list_outputs` method on the CaseReader.
 
-.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.list_inputs
-    :noindex:
+Example of Using List Methods
+-----------------------------
 
-.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.list_outputs
-    :noindex:
+This example shows how to use the list methods to view the inputs and outputs for a system case.
 
-These methods default to using System cases if no specific case is supplied. If the user does supply a Case then the output will only reflect the variables recorded within that case. For example, if we wanted to get the inputs and outputs recorded in the last driver case we would use:
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_outputs
+    :layout: interleave
 
-.. code-block:: console
-
-    last_driver_case = cr.driver_cases.get_case(-1)
-    inputs = cr.list_inputs(last_driver_case)
-    outputs = cr.list_outputs(last_driver_case)
-
-By default, both methods will give all inputs or outputs recorded in system iterations and, if the `values` parameter is set to True, the last recorded value of each variable. Grabbing all recorded inputs and outputs is as simple as:
-
-.. code-block:: console
-
-    all_outputs = cr.list_outputs()
-    all_inputs = cr.list_inputs()
-
-Additionally, for quick access to values recorded there are :code:`inputs` and :code:`outputs` dictionaries on every Case and :code:`residuals` on System and Solver cases. If you wanted to quickly grab the value and residual of output `x`
-on the last solver iteration you would use:
-
-.. code-block:: console
-
-    last_solver_case = cr.solver_cases.get_case(-1)
-    x_val = last_solver_case.outputs['x']
-    x_residual = last_solver_case.residuals['x']
 
 Loading Cases into Problems
 ---------------------------
@@ -142,29 +121,12 @@ runs of the model.
 Loading a DataBase into Memory
 ------------------------------
 
-Every time the `get_case` method is used, the case reader is making a new query
-to the database (with the exception of recurring requests, which are cached). This doesn't
-pose a problem when you only intend to access a small subset of the cases or the database is
-already small, but can be very slow when you're requesting many cases from a large
-recording. To increase efficiency in this scenario you should use the CaseReader's
-:code:`load_cases` method, which loads all driver, solver, system, and problem cases into memory
-with minimal queries.
-
-To use this method, simply create the CaseReader, call the `load_cases` method, and use the
-reader as you normally would.
+Every time the `get_case` method is used, the case reader is making a new query to the database 
+This doesn't pose a problem when you only intend to access a small subset of the cases or the
+database is already small, but can be very slow when you're requesting many cases from a large
+recording. To increase efficiency in this scenario you can specify `pre_load=True` when instantiating
+the CaseReader, which will load all cases into memory so that subsequent accesses will be fast.
 
 .. code-block:: console
 
-    cr = CaseReader('cases.sql')
-    cr.load_cases()
-    ...
-
-Alternatively, if you only intend to iterate over one or two types of cases (driver, solver, system, or problem)
-then you can avoid pulling the entire recording into memory by using the :code:`load_cases` method on
-the CaseReader's `driver_cases`, `solver_cases`, `system_cases`, or `problem_cases` individually.
-
-.. code-block:: console
-
-    cr = CaseReader('cases.sql')
-    cr.driver_cases.load_cases()
-    ...
+    cr = CaseReader("cases.sql", pre_load=True)

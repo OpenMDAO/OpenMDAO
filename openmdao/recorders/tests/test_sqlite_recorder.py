@@ -1682,20 +1682,28 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                                     "pz.z\tobj_cmp.z"]))
 
         # access the model tree stored in metadata
-        # Quick check to see that keys and values were recorded
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
                          {'name', 'type', 'subsystem_type', 'children'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
-        self.assertEqual(cr.problem_metadata['tree']['type'], 'root')
-        self.assertEqual(cr.problem_metadata['tree']['subsystem_type'], 'group')
         self.assertEqual(len(cr.problem_metadata['tree']['children']), 7)
 
-        # access the metadata for all the systems in the model
-        # Quick check to see that keys and values were recorded
-        for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_metadata.keys())
-            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        # metadata for all the systems in the model
+        self.assertEqual(sorted(cr.system_metadata.keys()),
+                         sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+
+        self.assertEqual(cr.system_metadata['d1']['component_options'],
+            "================== ======= ================= ================ ======================================"
+            "Option             Default Acceptable Values Acceptable Types Description                           "
+            "================== ======= ================= ================ ======================================"
+            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi"
+            "                                                              ng an assembled jacobian, will use thi"
+            "                                                              s type."
+            "distributed        False   N/A               N/A              True if the component has variables th"
+            "                                                              at are distributed across multiple pro"
+            "                                                              cesses."
+            "================== ======= ================= ================ ======================================")
+
+        self.assertEqual(cr.system_metadata['d1']['component_options']['assembled_jac_type'], 'csc')
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1787,7 +1795,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         system_cases = cr.list_cases('root.obj_cmp')
         first_system_case = cr.get_case(system_cases[0])
         recorded_inputs = first_system_case.inputs.keys()
-        self.assertEqual(set(recorded_inputs), {'y2', 'y1', 'z'})
+        self.assertEqual(sorted(recorded_inputs), ['y1', 'y2', 'z'])
 
     def test_feature_driver_options(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
@@ -1824,9 +1832,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         recorded_constraints = first_driver_case.get_constraints().keys()
         recorded_desvars = first_driver_case.get_design_vars().keys()
 
-        self.assertEqual(set(recorded_objectives), {'obj'})
-        self.assertEqual(set(recorded_constraints), {'con1', 'con2'})
-        self.assertEqual(set(recorded_desvars), {'x', 'z'})
+        self.assertEqual(sorted(recorded_objectives), ['obj'])
+        self.assertEqual(sorted(recorded_constraints), ['con1', 'con2'])
+        self.assertEqual(sorted(recorded_desvars), ['x', 'z'])
 
     def test_feature_solver_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1911,59 +1919,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90830282)
         self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908303)
-
-    def test_feature_driver_options_with_values(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = Problem(model=SellarDerivatives())
-
-        model = prob.model
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                  upper=np.array([10.0, 10.0]))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', upper=0.0)
-        model.add_constraint('con2', upper=0.0)
-
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
-
-        recorder = SqliteRecorder("cases.sql")
-        driver.add_recorder(recorder)
-
-        driver.recording_options['includes'] = []
-        driver.recording_options['record_objectives'] = True
-        driver.recording_options['record_constraints'] = True
-        driver.recording_options['record_desvars'] = True
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader("cases.sql")
-
-        driver_cases = cr.list_cases('driver')
-        first_driver_case = cr.get_case(driver_cases[0])
-
-        objs = first_driver_case.get_objectives()
-        cons = first_driver_case.get_constraints()
-        dvs = first_driver_case.get_design_vars()
-
-        # keys() will give you the promoted variable names
-        self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
-                         (['obj'], ['con1', 'con2'], ['x', 'z']))
-
-        # alternatively, you can get the absolute names
-        self.assertEqual((sorted(objs.absolute_names()), sorted(cons.absolute_names()), sorted(dvs.absolute_names())),
-                         (['obj_cmp.obj'], ['con_cmp1.con1', 'con_cmp2.con2'], ['px.x', 'pz.z']))
-
-        # you can access variable values using either the promoted or the absolute name
-        self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
 
     def test_feature_load_system_case_for_restart(self):
         #######################################################################
@@ -2061,6 +2016,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = CaseReader("cases.sql")
 
+        # all cases recorded by the root system
         model_cases = cr.list_cases('root', recurse=False)
         self.assertEqual('\n'.join(model_cases), '\n'.join([
             'Model_Run1_rank0:root._solve_nonlinear|0',
@@ -2069,6 +2025,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             'Driver_Run2_rank0:Driver|0|root._solve_nonlinear|0'
         ]))
 
+        # all cases recorded by the driver
         driver_cases = cr.list_cases('driver', recurse=False)
         self.assertEqual('\n'.join(driver_cases), '\n'.join([
             'Driver_Run1_rank0:Driver|0',
@@ -2113,7 +2070,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         problem_cases = cr.list_cases('problem')
-        self.assertEqual(len(problem_cases), 1)
+        self.assertEqual(problem_cases, ['final'])
 
         final_case = cr.get_case('final')
         desvars = final_case.get_design_vars()

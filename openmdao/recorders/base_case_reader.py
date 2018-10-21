@@ -62,8 +62,8 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        id : str
-            The unique identifier of the case to return.
+        id : str or int
+            The unique identifier of the case to return or an index into all cases.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
 

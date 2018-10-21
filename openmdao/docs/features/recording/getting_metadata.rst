@@ -4,24 +4,14 @@ Getting Metadata and Options with the Case Reader
 
 Metadata will be recorded on every object that has a recorder attached as long
 as the 'record_metadata' recording option is set to `True`. This metadata can be
-accessed via :code:`driver_metadata`, :code:`solver_metadata`, and :code:`system_metadata`
+accessed via :code:`problem_metadata`, :code:`solver_metadata`, and :code:`system_metadata`
 on the case reader. Additionally, user-defined options stored in System objects
 are also recorded and can be accessed via :code:`system_metadata`.
-
-*Driver Metadata*
-~~~~~~~~~~~~~~~~~
-
-The Driver records model viewer data in 'connections_list' and 'tree' within its metadata, which
-is primaily used for the N^2 viewer.
-
-.. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_metadata
-    :layout: interleave
 
 *Solver Metadata*
 ~~~~~~~~~~~~~~~~~
 
-Solvers record the solver options in their metadata. Note that, because more than
+Solvers record the solver options as metadata. Note that, because more than
 one solver's metadata may be recorded, each solver's metadata must be accessed through
 its absolute name within :code:`solver_metadata`, as shown in the example below.
 
@@ -48,19 +38,13 @@ to record, they can be excluded using the 'options_excludes' recording option on
 .. note::
     Each system object must have a recorder explicitly attached in order for its metadata and options to be recorded.
 
-Variable Metadata
------------------
 
-Variable metadata is also made available through the CaseReader in :code:`output2meta` and :code:`input2meta`.
-For each variable the 'units', 'type', 'explicit', 'lower', and 'upper' are stored. Note that this is recorded
-for all variables, independent of the objects which have the recorder attached.
+*Problem Metadata*
+~~~~~~~~~~~~~~~~~~
 
-For example, if we had an output variable 'z' we could access its metadata with:
+The Driver optionally records all system options to :code:`system_metadata` as well as model viewer data, 
+which is saved to the :code:`problem_metata` dictionary.
 
-.. code-block:: console
-
-    z_units = cr.output2meta['z']['units']
-    z_type = cr.output2meta['z']['type']
-    z_explicit = cr.output2meta['z']['explicit']
-    z_lower = cr.output2meta['z']['lower]
-    z_upper = cr.output2meta['z']['upper']
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_problem_metadata
+    :layout: interleave

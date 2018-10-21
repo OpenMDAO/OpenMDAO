@@ -39,11 +39,11 @@ class Case(object):
     outputs : PromotedToAbsoluteMap
         Map of outputs to values recorded.
     inputs : PromotedToAbsoluteMap or None
-        Map of inputs to values recorded (None if not recorded).
+        Map of inputs to values recorded, None if not recorded.
     residuals : PromotedToAbsoluteMap or None
-        Map of outputs to residuals recorded (None if not recorded).
+        Map of outputs to residuals recorded, None if not recorded.
     jacobian : PromotedToAbsoluteMap or None
-        Map of (output, input) to derivatives recorded (None if not recorded).
+        Map of (output, input) to derivatives recorded, None if not recorded.
     parent : str
         The full unique identifier for the parent this iteration.
     children : list

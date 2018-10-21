@@ -552,9 +552,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def get_cases(self, source=None, recurse=True, flat=False):
         """
-        Iterate over the driver and solver cases.
-
-        Generator giving Driver and/or Solver cases in order.
+        Iterate over the driver, system and solver cases.
 
         Parameters
         ----------
@@ -568,7 +566,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Returns
         -------
-        iterable or dict
+        list or dict
             The cases identified by source
         """
         case_ids = self.list_cases(source, recurse, flat)

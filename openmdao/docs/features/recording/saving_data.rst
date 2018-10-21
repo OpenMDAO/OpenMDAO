@@ -1,8 +1,8 @@
 .. _saving_data:
 
-**********************************
-Saving Data with the Case Recorder
-**********************************
+**************
+Case Recording
+**************
 
 In OpenMDAO, you can instantiate recorder objects and attach them to the System, Driver or Solver
 instance(s) of your choice.
@@ -70,6 +70,7 @@ is empty but objectives, constraints, and desvars are still recorded.
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_options
     :layout: interleave
 
+
 Recording on Solver Objects
 ---------------------------
 
@@ -113,7 +114,6 @@ complete list of values after the run.
     :layout: interleave
 
 
-
 Specifying a Case Prefix
 ------------------------
 
@@ -121,10 +121,10 @@ It is possible to record data from multiple executions by specifying a prefix th
 cases.  This prefix can be specified when calling `run_model` or `run_driver` and will be prepended to the case ID
 in the recorded case data:
 
-
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_record_with_prefix
     :layout: interleave
+
 
 Recording Options Precedence
 ----------------------------
@@ -132,7 +132,6 @@ Recording Options Precedence
 The recording options that determine what gets recorded can sometime be a little confusing. Here is an example
 that might help. The code shows how the `record_desvars` and `includes` variables interact.
 
-
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestSqliteCaseReader.test_recording_option_precedence_driver_cases
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteCaseReader.test_feature_recording_option_precedence
     :layout: interleave
