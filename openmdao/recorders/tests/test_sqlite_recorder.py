@@ -1691,16 +1691,16 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(sorted(cr.system_metadata.keys()),
                          sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
-        self.assertEqual(cr.system_metadata['d1']['component_options'],
-            "================== ======= ================= ================ ======================================"
-            "Option             Default Acceptable Values Acceptable Types Description                           "
-            "================== ======= ================= ================ ======================================"
-            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi"
-            "                                                              ng an assembled jacobian, will use thi"
-            "                                                              s type."
-            "distributed        False   N/A               N/A              True if the component has variables th"
-            "                                                              at are distributed across multiple pro"
-            "                                                              cesses."
+        self.assertEqual(str(cr.system_metadata['d1']['component_options']),
+            "================== ======= ================= ================ ======================================\n"
+            "Option             Default Acceptable Values Acceptable Types Description                           \n"
+            "================== ======= ================= ================ ======================================\n"
+            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi\n"
+            "                                                              ng an assembled jacobian, will use thi\n"
+            "                                                              s type.\n"
+            "distributed        False   N/A               N/A              True if the component has variables th\n"
+            "                                                              at are distributed across multiple pro\n"
+            "                                                              cesses.\n"
             "================== ======= ================= ================ ======================================")
 
         self.assertEqual(cr.system_metadata['d1']['component_options']['assembled_jac_type'], 'csc')
