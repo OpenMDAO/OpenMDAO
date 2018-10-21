@@ -133,5 +133,5 @@ The recording options that determine what gets recorded can sometime be a little
 that might help. The code shows how the `record_desvars` and `includes` variables interact.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteCaseReader.test_feature_recording_option_precedence
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_recording_option_precedence
     :layout: interleave
