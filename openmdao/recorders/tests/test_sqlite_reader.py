@@ -27,6 +27,11 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.general_utils import determine_adder_scaler
 
+from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
+from openmdao.solvers.nonlinear.newton import NewtonSolver
+from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
+from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
+
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
@@ -1762,6 +1767,80 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(all_driver_cases), len(expected_cases))
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
+
+    def test_linesearch_bounds_vector(self):
+        prob = Problem()
+
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0))
+        model.add_subsystem('comp', ImplCompTwoStates())
+        model.connect('px.x', 'comp.x')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['maxiter'] = 3
+        model.linear_solver = ScipyKrylov()
+
+        ls = model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['maxiter'] = 3
+        ls.options['alpha'] = 1.0
+
+        # add recorder to nonlinear solver and linesearch solver
+        model.nonlinear_solver.add_recorder(self.recorder)
+        model.nonlinear_solver.linesearch.add_recorder(self.recorder)
+        model.comp.add_recorder(self.recorder)
+        model.add_recorder(self.recorder)
+
+        prob.setup(check=False)
+
+        # Test lower bound: should go to the lower bound and stall
+        prob['px.x'] = 2.0
+        prob['comp.y'] = 0.0
+        prob['comp.z'] = 1.6
+        prob.run_model()
+        assert_rel_error(self, prob['comp.z'], 1.5, 1e-8)
+
+        # TODO: source is currently not properly determined for this apply call:
+        # model.comp.run_apply_nonlinear()
+
+        expected = [
+            'rank0:root._solve_nonlinear|0|Newton_subsolve|0',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|0|root._apply_linear|0',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|0|root._apply_linear|1',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|0',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1|root._apply_linear|2',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1|root._apply_linear|3',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1|root._apply_linear|4',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1|ArmijoGoldsteinLS|0',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1|ArmijoGoldsteinLS|1',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1|ArmijoGoldsteinLS|2',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|1',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2|root._apply_linear|5',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2|root._apply_linear|6',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2|root._apply_linear|7',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2|ArmijoGoldsteinLS|0',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2|ArmijoGoldsteinLS|1',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2|ArmijoGoldsteinLS|2',
+            'rank0:root._solve_nonlinear|0|NewtonSolver|2',
+            'rank0:root._solve_nonlinear|0'
+        ]
+
+        cr = CaseReader(self.filename)
+        for i, c in enumerate(cr.list_cases()):
+            case = cr.get_case(c)
+
+            coord = case.iteration_coordinate
+            self.assertEqual(coord, expected[i])
+
+            # check the source
+            if 'root._apply_linear' in coord:
+                self.assertEqual(case.source, 'root')
+            elif 'ArmijoGoldsteinLS' in coord:
+                self.assertEqual(case.source, 'root.nonlinear_solver.linesearch')
+            elif 'Newton' in coord:
+                self.assertEqual(case.source, 'root.nonlinear_solver')
+            else:
+                self.assertEqual(case.source, 'root')
 
 
 class TestFeatureSqliteReader(unittest.TestCase):

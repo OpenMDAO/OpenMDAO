@@ -26,7 +26,10 @@ elif PY3:
 
 
 # regular expression used to determine if a node in an iteration coordinate represents a system
-_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear|_solve_linear|_apply_linear)$')
+# _coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear|_solve_linear|_apply_linear)$')
+# FIXME: currently just looking for _solve_nonlinear, which won't work for implicit components, etc.
+#        ultimate solution is to probably to record the source in the global iterations table
+_coord_system_re = re.compile('(_solve_nonlinear)$')
 
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\|\\d+\|*')
@@ -942,7 +945,7 @@ class CaseTable(object):
 
     def _get_source(self, iteration_coordinate):
         """
-        Get  the source of the iteration.
+        Get the source of the iteration.
 
         Parameters
         ----------
@@ -1260,4 +1263,16 @@ class SolverCases(CaseTable):
         str
             The pathname of the solver that is the source of the iteration.
         """
-        return super(SolverCases, self)._get_source(iteration_coordinate) + '.nonlinear_solver'
+        source_system = _get_source_system(iteration_coordinate)
+
+        system_solve = source_system.split('.')[-1] + '._solve_nonlinear'
+        system_coord_len = iteration_coordinate.index(system_solve) + len(system_solve)
+        system_coord_nodes = len(iteration_coordinate[:system_coord_len].split('|')) + 1
+        iter_coord_nodes = len(iteration_coordinate.split('|'))
+
+        if iter_coord_nodes == system_coord_nodes + 2:
+            return source_system + '.nonlinear_solver'
+        elif iter_coord_nodes == system_coord_nodes + 4:
+            return source_system + '.nonlinear_solver.linesearch'
+        else:
+            raise RuntimeError("Can't parse solver iteration coordinate: %s" % iteration_coordinate)
