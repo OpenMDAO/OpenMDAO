@@ -441,10 +441,10 @@ class SqliteCaseReader(BaseCaseReader):
                 else:
                     # if there are no driver or model cases, then we need
                     # another starting point to build the nested dict.
-                    raise RuntimeError('A nested dictionary of all cases was requested, but '
-                                       'neither the driver or the model was recorded. Please '
-                                       'specify another source (system or solver) for the cases '
-                                       'you want to see.')
+                    raise RuntimeError("A nested dictionary of all cases was requested, but "
+                                       "neither the driver or the model was recorded. Please "
+                                       "specify another source (system or solver) for the cases "
+                                       "you want to see.")
 
         if not isinstance(source, string_types):
             raise TypeError("Source parameter must be a string, %s is type %s." %

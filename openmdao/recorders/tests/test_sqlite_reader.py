@@ -734,6 +734,93 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(counter, root_counter)
 
+    def test_list_cases_nested_model(self):
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.setup()
+
+        model = prob.model
+        model.add_recorder(self.recorder)
+        model.mda.add_recorder(self.recorder)
+        model.nonlinear_solver.add_recorder(self.recorder)
+        model.mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        # get total iteration count to check against
+        global_iterations = len(cr._get_global_iterations())
+
+        #
+        # get a recursive list of all cases (flat)
+        #
+        cases = cr.list_cases(recurse=True, flat=True)
+
+        # verify the cases are all there
+        self.assertEqual(len(cases), global_iterations)
+
+        # verify the cases are in proper order
+        counter = 0
+        for i, c in enumerate(cr.get_case(case) for case in cases):
+            counter += 1
+            self.assertEqual(c.counter, counter)
+
+        #
+        # get a recursive dict of all cases (nested)
+        #
+        cases = cr.list_cases(recurse=True, flat=False)
+
+        num_cases = count_keys(cases)
+
+        self.assertEqual(num_cases, global_iterations)
+
+    def test_list_cases_nested_no_source(self):
+        prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
+        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.setup()
+
+        model = prob.model
+        model.mda.add_recorder(self.recorder)
+        model.nonlinear_solver.add_recorder(self.recorder)
+        model.mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        # get total iteration count to check against
+        global_iterations = len(cr._get_global_iterations())
+
+        #
+        # get a recursive list of all cases (flat)
+        #
+        cases = cr.list_cases(recurse=True, flat=True)
+
+        # verify the cases are all there
+        self.assertEqual(len(cases), global_iterations)
+
+        # verify the cases are in proper order
+        counter = 0
+        for i, c in enumerate(cr.get_case(case) for case in cases):
+            counter += 1
+            self.assertEqual(c.counter, counter)
+
+        #
+        # try to get a recursive dict of all cases (nested), without driver or model
+        #
+        expected_err = ("A nested dictionary of all cases was requested, but "
+                        "neither the driver or the model was recorded. Please "
+                        "specify another source (system or solver) for the cases "
+                        "you want to see.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            cases = cr.list_cases(recurse=True, flat=False)
+
+        self.assertEqual(str(cm.exception), expected_err)
+
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
         # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
