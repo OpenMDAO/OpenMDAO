@@ -2046,14 +2046,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
 
-        recorder = SqliteRecorder("cases.sql")
-        prob.add_recorder(recorder)
+        prob.add_recorder(SqliteRecorder("cases.sql"))
 
         prob.recording_options['includes'] = []
         prob.recording_options['record_objectives'] = True
@@ -2062,17 +2057,22 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-
         prob.record_iteration('final')
-
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
 
+        # get list of cases recorded on problem
         problem_cases = cr.list_cases('problem')
         self.assertEqual(problem_cases, ['final'])
 
+        # get list of variables recorded on problem
+        problem_vars = cr.list_source_vars('problem')
+        self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
+
+        # get the recorded case and check values
         final_case = cr.get_case('final')
+
         desvars = final_case.get_design_vars()
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()

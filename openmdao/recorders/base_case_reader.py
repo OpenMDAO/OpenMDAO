@@ -88,13 +88,12 @@ class BaseCaseReader(object):
 
     def list_source_vars(self, source):
         """
-        List of all the different recording sources for which there is recorded data.
+        List of all inputs and outputs recorded by the specified source.
 
         Parameters
         ----------
-        source : {'problem', 'driver', iteration_coordinate}
-            Identifies which cases to return. 'iteration_coordinate' can refer to
-            a system or a solver hierarchy location. Defaults to 'problem'.
+        source : {'problem', 'driver', component pathname, solver pathname}
+            Identifies the source for which to return information.
 
         Returns
         -------

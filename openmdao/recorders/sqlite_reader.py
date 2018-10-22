@@ -364,13 +364,59 @@ class SqliteCaseReader(BaseCaseReader):
 
         return sources
 
+    def list_source_vars(self, source):
+        """
+        List of all inputs and outputs recorded by the specified source.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', component pathname, solver pathname}
+            Identifies the source for which to return information.
+
+        Returns
+        -------
+        dict
+            {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+        """
+        dct = {
+            'inputs': [],
+            'outputs': [],
+        }
+
+        case = None
+
+        if source == 'problem':
+            if self._problem_cases.count() > 0:
+                case = self._problem_cases.get_case(0)
+        elif source == 'driver':
+            if self._driver_cases.count() > 0:
+                case = self._driver_cases.get_case(0)
+        elif source in self._system_cases.list_sources():
+            source_cases = self._system_cases.list_cases(source)
+            case = self._system_cases.get_case(source_cases[0])
+        elif source in self._solver_cases.list_sources():
+            source_cases = self._solver_cases.list_cases(source)
+            case = self._solver_cases.get_case(source_cases[0])
+        else:
+            raise RuntimeError('Source not found: %s.' % source)
+
+        if case is None:
+            raise RuntimeError('No cases recorded for %s.' % source)
+
+        if case.inputs:
+            dct['inputs'] = list(case.inputs.keys())
+        if case.outputs:
+            dct['outputs'] = list(case.outputs.keys())
+
+        return dct
+
     def list_cases(self, source=None, recurse=True, flat=True):
         """
         Iterate over Driver, Solver and System cases in order.
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname}
+        source : {'problem', 'driver', component pathname, solver pathname, iteration_ coordinate}
             Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
@@ -390,16 +436,19 @@ class SqliteCaseReader(BaseCaseReader):
             else:
                 if self._driver_cases.count() > 0:
                     source = 'driver'
+                elif 'root' in self._system_cases.list_sources():
+                    source = 'root'
                 else:
-                    # TODO: if there are no driver cases, then we need another starting point
-                    #       to build the nested dict. There may be systems and/or solvers at
-                    #       the top of the hierarchy and we have to figure that out.
-                    raise RuntimeError('A nested dictionary of all cases was requested, but the '
-                                       'driver was not recorded. Please specify another source '
-                                       '(system or solver) for the cases you want to see.')
+                    # if there are no driver or model cases, then we need
+                    # another starting point to build the nested dict.
+                    raise RuntimeError('A nested dictionary of all cases was requested, but '
+                                       'neither the driver or the model was recorded. Please '
+                                       'specify another source (system or solver) for the cases '
+                                       'you want to see.')
 
         if not isinstance(source, string_types):
-            raise TypeError("'source' parameter must be a string,", source, "is a", type(source))
+            raise TypeError("Source parameter must be a string, %s is type %s." %
+                            (source, type(source).__name__))
 
         if not source:
             return self._list_cases_recurse_flat()

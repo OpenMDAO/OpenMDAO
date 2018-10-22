@@ -119,6 +119,49 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(cr, SqliteCaseReader),
                         msg='CaseReader not returning the correct subclass.')
 
+    def test_invalid_source(self):
+        """ Tests that the reader returns params correctly. """
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        driver = prob.driver
+
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_responses'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['record_derivatives'] = False
+        driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader(self.filename)
+
+        # check that driver is our only source
+        self.assertEqual(cr.list_sources(), ['driver'])
+
+        # check source vars
+        source_vars = cr.list_source_vars('driver')
+        self.assertEqual(sorted(source_vars['inputs']), [])
+        self.assertEqual(sorted(source_vars['outputs']), [])
+
+        with assertRaisesRegex(self, RuntimeError, "No cases recorded for problem."):
+            cr.list_source_vars('problem')
+
+        with assertRaisesRegex(self, RuntimeError, "Source not found: root."):
+            cr.list_source_vars('root')
+
+        with assertRaisesRegex(self, RuntimeError, "Source not found: root.nonlinear_solver"):
+            cr.list_source_vars('root.nonlinear_solver')
+
+        # check list cases
+        with assertRaisesRegex(self, RuntimeError, "Source not found: foo."):
+            cr.list_cases('foo')
+
+        with assertRaisesRegex(self, TypeError, "Source parameter must be a string, 999 is type int"):
+            cr.list_cases(999)
+
     def test_reading_driver_cases(self):
         """ Tests that the reader returns params correctly. """
         prob = SellarProblem(SellarDerivativesGrouped)
@@ -140,6 +183,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that we only have driver cases
         self.assertEqual(cr.list_sources(), ['driver'])
+
+        # check source vars
+        source_vars = cr.list_source_vars('driver')
+        self.assertEqual(sorted(source_vars['inputs']), [])
+        self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
 
         # check that we got the correct number of cases
         driver_cases = cr.list_cases('driver')
@@ -224,14 +272,23 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check that we only have the three system sources
         self.assertEqual(sorted(cr.list_sources()), ['root', 'root.d1', 'root.obj_cmp'])
 
+        # check source vars
+        source_vars = cr.list_source_vars('root')
+        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
+
+        source_vars = cr.list_source_vars('root.d1')
+        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['outputs']), ['y1'])
+
+        source_vars = cr.list_source_vars('root.obj_cmp')
+        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['outputs']), ['obj'])
+
         # Test to see if we got the correct number of cases
         self.assertEqual(len(cr.list_cases('root', recurse=False)), 1)
         self.assertEqual(len(cr.list_cases('root.d1', recurse=False)), 7)
         self.assertEqual(len(cr.list_cases('root.obj_cmp', recurse=False)), 7)
-
-        # TODO: move this check to it's own test
-        with assertRaisesRegex(self, RuntimeError, "Source not found: foo."):
-            cr.list_cases('foo')
 
         # Test values from cases
         second_last_case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
@@ -268,6 +325,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check that we only have the one solver source
         self.assertEqual(sorted(cr.list_sources()), ['root.nonlinear_solver'])
+
+        # check source vars
+        source_vars = cr.list_source_vars('root.nonlinear_solver')
+        self.assertEqual(sorted(source_vars['inputs']), ['x', 'y1', 'y2', 'z'])
+        self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # Test to see if we got the correct number of cases
         solver_cases = cr.list_cases('root.nonlinear_solver')
@@ -1837,7 +1899,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             case = cr.get_case(c)
 
             coord = case.iteration_coordinate
-            # print(i, case.counter, coord)
+            print(i, case.counter, coord, case.source)
             # self.assertEqual(coord, expected[i])
 
             # check the source
