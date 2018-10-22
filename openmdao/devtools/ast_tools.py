@@ -78,9 +78,9 @@ def _get_long_name(node):
     return '.'.join(parts[::-1])
 
 
-class FunctionDefVisitor(ast.NodeVisitor):
+class DependencyVisitor(ast.NodeVisitor):
     def __init__(self):
-        super(FunctionDefVisitor, self).__init__()
+        super(DependencyVisitor, self).__init__()
         self.graph = nx.DiGraph()
         self.rhs_set = set()
         self.lhs_set = set()
@@ -129,7 +129,7 @@ class FunctionDefVisitor(ast.NodeVisitor):
         if self.vset is not None:
             self.vset.add(node.id)
 
-    def visit_Attribute(self, node):
+    def visit_Attribute(self, node):  # (value, attr)
         long_name = _get_long_name(node)
         if long_name is None:
             return self.generic_visit(node)
@@ -174,12 +174,13 @@ class NameTransformer(ast.NodeTransformer):
     def visit_Subscript(self, node):
         long_name = _get_long_name(node.value)
         xform = self.mapping.get(long_name)
-        full_replace = False
         if xform is None:
             full_replace = True
             # look for transform of the full subscript, e.g.  foo['x']
             full = astunparse.unparse(node).rstrip()
             xform = self.mapping.get(full)
+        else:
+            full_replace = False
 
         if xform is not None:
             if full_replace:
@@ -212,15 +213,14 @@ def transform_ast_names(node, mapping):
     return new_ast
 
 
-def function_static_analysis(funcsrc):
-    from openmdao.utils.graph_utils import all_connected_nodes
-
-    f_ast = ast.parse(funcsrc, mode='exec')
-    fdvis = FunctionDefVisitor()
+def dependency_analysis(src):
+    f_ast = ast.parse(src, mode='exec')
+    fdvis = DependencyVisitor()
     fdvis.visit(f_ast)
 
-    for node in fdvis.graph:
-        print(node, list(set(list(all_connected_nodes(fdvis.graph, node))[1:])))
+    # from openmdao.utils.graph_utils import all_connected_nodes
+    # for node in fdvis.graph:
+    #     print(node, list(set(list(all_connected_nodes(fdvis.graph, node))[1:])))
 
     return fdvis, f_ast
 
@@ -284,7 +284,7 @@ def compute_foo(self, inputs, outputs):
 
     global_ns = globals().copy()
     pre = set(global_ns)
-    fdvis, f_ast = function_static_analysis(funcsrc)
+    fdvis, f_ast = dependency_analysis(funcsrc)
 
     for c in fdvis.get_constants():
         print("constant:", c)

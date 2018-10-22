@@ -14,50 +14,55 @@ import ast
 import astunparse
 
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
-from openmdao.devtools.ast_tools import transform_ast_names, function_static_analysis
+from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis
+from openmdao.utils.general_utils import str2valid_python_name, unique_name
 
 
-def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
+def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     """
     Given the string representing the source code of a python function,
     use the tangent library to generate source code of its gradient.
 
-    comp: Component instance
-    src: str, the source code to be analyzed
-    func_name: str, the name of the function
+    Parameters
+    ----------
+    comp: Component
+        The component we're AD'ing.
+    mode : str
+        Derivative direction ('forward' or 'reverse')
+    body_src : str
+        The source code of the body of the compute/apply_nonlinear function, converted
+        into non-member form.
 
-    Returns: the generated derivative function.
+    Returns
+    -------
+    function
+        The generated derivative function.
+    str
+        The source of the function actually being AD'd.
     """
+    lines = ["%s = self._inputs['%s']\n" % (str2valid_python_name(n), n) for n in comp._inputs]
+    lines.extend(["%s = self._outputs['%s']\n" %
+                  (str2valid_python_name(n), n) for n in comp._outputs])
+    lines.extend(["resid__%s = self._vectors['residual']['nonlinear']['%s']\n" %
+                  (str2valid_python_name(n), n) for n in comp._vectors['residual']['nonlinear']])
+    lines.extend(["_opt__%s = self.options['%s']\n" %
+                  (str2valid_python_name(n), n) for n in comp.options])
+
+    lines.append('\nif True:\n')  # body src is indented, so put in conditional block
+    lines.append(body_src)
+
+    full_src = ''.join(lines)
 
     comp_mod = sys.modules[comp.__class__.__module__]
     namespace = comp_mod.__dict__.copy()
     namespace['self'] = comp
 
     # exec function body in namespace to define all of the variables
+    exec(full_src, namespace)
 
-    header = ''.join(["%s = self._inputs['%s']\n" % (n.replace(':', '_'), n) for n in comp._inputs])
-    header += ''.join(["%s = self._outputs['%s']\n" % (n.replace(':', '_'), n) for n in comp._outputs])
-    header += ''.join(["resid__%s = self._vectors['residual']['linear']['%s']\n" %
-                       (n.replace(':', '_'), n) for n in comp._vectors['residual']['linear']])
-    header += ''.join(["_opt__%s = self.options['%s']\n" %
-                       (n.replace(':', '_'), n) for n in comp.options])
-    lines = header[:]
-    lines += '\nif True:\n'  # body src is indented, so put in conditional block
-    lines += nofunc_src
-
-    pre = set(namespace)
-
-    # print("exec'ing the following source:")
-    # for l in lines.split('\n'):
-    #     print(l)
-
-    exec(lines, namespace)
-
-    post = set(namespace)
-
-    new_attrs = post - pre
-
-    fdviz, f_ast = function_static_analysis(src)
+    # to avoid having to unindent all of the body_src, just put it in an 'if True' block to keep ast happy
+    if_body_src = 'if True:\n' + body_src
+    fdviz, f_ast = dependency_analysis(if_body_src)
 
     fmap = {}
     modules = set()
@@ -65,7 +70,7 @@ def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
     # this allows us to substitute defined non-member functions with tangent adjoints/tangents
     # for member functions
     for s in fdviz.calls:
-        if s.startswith('np.') or s.startswith('numpy.'):
+        if s.startswith('np.') or s.startswith('numpy.') or s in __builtins__:
             continue
         parts = s.split('.')
         obj = namespace[parts[0]]
@@ -92,11 +97,17 @@ def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
                 fmap[s] = '.'.join([tan_func.__module__, tan_func.__name__])
                 modules.add(tan_func.__module__)
 
-    lines = []
-    for modname in modules:
-        lines.append('import %s' % modname)
+    funcname = 'compute_ad'
 
-    lines.append(src)
+    # generate string of function to be differentiated by the tangent library
+    func_source = '\n'.join([
+        "def %s(%s):" % (funcname, ', '.join(pnames)),
+        body_src,
+        "    return %s" % ', '.join(onames + rnames)
+        ])
+
+    lines = ['import %s' % modname for modname in modules]
+    lines.append(func_source)
 
     new_src = '\n'.join(lines)
 
@@ -105,13 +116,7 @@ def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
     new_ast = transform_ast_names(ast2, fmap)
     new_src = astunparse.unparse(new_ast)
 
-    # print("NEW SRC:")
-    # for l in new_src.split('\n'):
-    #     print(l)
-
-    # needs to be read in as a proper module for tangent to work
-    # in case we're doing this several times, need to reload
-    # need to know the number of inputs to the loaded function
+    # needs to have an associated source file for tangent's use of inspect functions to work
 
     temp_mod_name = '_temp_' + comp.pathname.replace('.', '_')
     temp_file_name = temp_mod_name + '.py'
@@ -119,7 +124,6 @@ def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
     with open(temp_file_name, "w") as f:
         f.write(new_src)
 
-    #invalidate_caches()
     import_module(temp_mod_name)
     mod = sys.modules[temp_mod_name]
 
@@ -135,12 +139,11 @@ def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
     for rhs, name in to_replace.items():
         setattr(mod, name, eval(rhs, mod.__dict__))
 
-    func = getattr(mod, func_name)
+    func = getattr(mod, funcname)
     sig = signature(func)
     params = sig.parameters
 
     # generate AD code for the method for all inputs
-    #print(func)
     df = tangent.autodiff(func, wrt=tuple(range(len(params))), mode=mode,
                           verbose=0, check_dims=False)
 
@@ -148,12 +151,22 @@ def generate_gradient(comp, src, func_name, mode, nofunc_src, to_replace):
     remove(temp_file_name)
     del sys.modules[temp_mod_name]
 
-    # return the generated source as a list of strings
-    #print(''.join(src))
-    return df
+    return df, func_source
 
 
-def generate_component_gradient(comp, mode):
+def _get_arg_replacement_map(comp):
+    """
+    Return a mapping of names or subscript expressions to be replaced with simple var names.
+
+    Parameters
+    ----------
+    comp : Component
+        Component that is being AD'd.
+
+    Returns
+    -------
+
+    """
     inputs = comp._inputs
     outputs = comp._outputs
 
@@ -164,13 +177,6 @@ def generate_component_gradient(comp, mode):
 
     params = list(signature(compute_method).parameters)
 
-    # get the name of the component type
-    class_name = comp.__class__.__name__
-
-    # get source code of original compute() method
-    # ignore blank lines, useful for detecting indentation later
-    src = [line for line in getsourcelines(compute_method)[0] if line.strip()]
-
     # lists of local names of inputs and outputs (and maybe resids) to code generate
     pnames = []
     onames = []
@@ -178,32 +184,247 @@ def generate_component_gradient(comp, mode):
 
     # mapping to rename variables within the compute method
     to_replace = {}
-    to_revert = {}
 
     # gather transformed input and output names
     for pname in inputs:
-        new_name = pname.replace(":", "_")
+        new_name = str2valid_python_name(pname)
         pnames.append(new_name)
         to_replace["%s['%s']" % (params[0], pname)] = new_name
         to_replace['%s["%s"]' % (params[0], pname)] = new_name
 
     for oname in outputs:
-        new_name = oname.replace(":", "_")
+        new_name = str2valid_python_name(oname)
         onames.append(new_name)
         to_replace["%s['%s']" % (params[1], oname)] = new_name
         to_replace['%s["%s"]' % (params[1], oname)] = new_name
 
-    for name in comp.options:
-        to_replace["self.options['%s']" % name] = '_opt__%s' % name
-        to_revert["self.options['%s']" % name] = '_opt__%s' % name
-
     if not isinstance(comp, ExplicitComponent):
         for rname in comp._vectors['residual']['linear']:
-            new_name = 'resid__' + rname.replace(":", "_")
+            new_name = 'resid__' + str2valid_python_name(rname)
             rnames.append(new_name)
             to_replace["%s['%s']" % (params[2], rname)] = new_name
             to_replace['%s["%s"]' % (params[2], rname)] = new_name
 
+    return to_replace, pnames, onames, rnames
+
+
+def generate_component_gradient(comp, mode):
+
+    if isinstance(comp, ExplicitComponent):
+        compute_method = comp.compute
+    else:
+        compute_method = comp.apply_nonlinear
+
+    # mapping to rename variables within the compute method
+    to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
+    to_revert = {
+        "self.options['%s']" % name: '_opt__%s' % name for name in comp.options
+    }
+
+    # get source code of original compute() method
+    # ignore blank lines, useful for detecting indentation later
+    srclines = [line for line in getsourcelines(compute_method)[0] if line.strip()]
+
+    # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
+    srclines[0] = srclines[0].lstrip()
+
+    src = ''.join(srclines)
+
+    ast2 = ast.parse(src)
+    # combine all mappings
+    mapping = to_replace.copy()
+    mapping.update(to_revert)
+    ast3 = transform_ast_names(ast2, mapping)
+    src = astunparse.unparse(ast3)
+
+    # remove the original compute() call signature
+    src = src.split(":\n", 1)[1]
+
+    # start construction of partial derivative functions
+
+    # gather generated gradient source code
+    df, func_source = generate_gradient(comp, mode, src, to_revert, pnames, onames, rnames)
+    deriv_src = getsource(df)
+
+    # now translate back the member vars we substituted for earlier
+    deriv_ast = ast.parse(deriv_src)
+
+    # reverse the to_revert dict
+    revert = {val: key for key, val in to_revert.items()}
+
+    deriv_ast = transform_ast_names(deriv_ast, revert)
+    deriv_src = astunparse.unparse(deriv_ast)
+    deriv_lines = deriv_src.split('\n')
+
+    # convert function signature to def _compute_derivs_ad(self, ...)
+    for i, line in enumerate(deriv_lines):
+        if line.startswith('def '):
+            deriv_lines[i] = _fix_func_def(line)
+            break
+
+    comp_mod = sys.modules[comp.__class__.__module__]
+    namespace = comp_mod.__dict__.copy()
+    namespace['tangent'] = tangent
+    deriv_src = '\n'.join(deriv_lines)
+
+    # create an actual function object by exec'ing the source
+    exec(deriv_src, namespace)
+
+    return func_source, deriv_src, namespace['_compute_derivs_ad']
+
+
+def _get_tangent_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
+    src, dsrc, df = generate_component_gradient(comp, mode)
+
+    if show_orig:
+        print("ORIG function:", file=out)
+        print(src, file=out)
+
+    print("%s grad function:" % mode, file=out)
+    print(dsrc, file=out)
+
+    return _get_ad_jac(comp, mode, df)
+
+
+def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
+    pass
+
+
+def _get_ad_jac(comp, mode, deriv_func):
+    prefix = comp.pathname + '.' if comp.pathname else ''
+
+    J = {}
+    inputs = comp._inputs
+    outputs = comp._outputs
+
+    if mode == 'forward':
+        array = comp._vectors['input']['linear']._data
+        vec = inputs
+    else:  # reverse
+        array = comp._vectors['output']['linear']._data
+        vec = outputs
+
+    idx2output = [None] * array.size  # map array index to output name
+    idx2loc = np.zeros(array.size, dtype=int)
+    views = []
+    start = end = 0
+    for n in vec:
+        end += vec[n].size
+        views.append(array[start:end])
+        for i in range(start, end):
+            idx2output[i] = n
+        idx2loc[start:end] = np.arange(start, end, dtype=int) - start
+        start = end
+
+    if mode == 'forward':
+        params = [inputs[name] for name in inputs] + views
+        for idx in range(array.size):
+            array[:] = 0.0
+            array[idx] = 1.0
+            iname = idx2output[idx]
+            locidx = idx2loc[idx]
+            abs_in = prefix + iname
+
+            grad = deriv_func(comp, *params)
+            for i, oname in enumerate(outputs):
+                abs_out = prefix + oname
+                key = (abs_out, abs_in)
+                if key in comp._subjacs_info:
+                    if key not in J:
+                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
+                    J[key][:, locidx] = grad[i]
+
+    else:  # reverse
+        params = [inputs[name] for name in inputs] + [views]
+
+        for oidx in range(array.size):
+            array[:] = 0.0
+            array[oidx] = 1.0
+            oname = idx2output[oidx]
+            locidx = idx2loc[oidx]
+            abs_out = prefix + oname
+
+            grad = deriv_func(comp, *params)
+            for i, iname in enumerate(inputs):
+                abs_in = prefix + iname
+                key = (abs_out, abs_in)
+                if key in comp._subjacs_info:
+                    if key not in J:
+                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
+                    J[key][locidx:] = grad[i]
+
+    return J
+
+
+def _ad_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao ad' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', default=None, action='store', dest='outfile',
+                        help='Output file name. By default, output goes to stdout.')
+    # parser.add_argument('-m', '--mode', default='forward', action='store', dest='mode',
+    #                     help='AD mode (forward, reverse).')
+    parser.add_argument('-c', '--class', action='store', dest='class_',
+                        help='Specify component class to run AD on.')
+
+
+def _ad_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao ad'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    if options.outfile is None:
+        out = sys.stdout
+    else:
+        out = open(options.outfile, 'w')
+
+    def _ad(prob):
+        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
+            if s.__class__.__name__ == options.class_:
+                break
+        else:
+            raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
+
+        Jrev = _get_tangent_ad_jac(s, 'reverse', show_orig=True, out=out)
+        Jfwd = _get_tangent_ad_jac(s, 'forward', show_orig=False, out=out)
+
+        import pprint
+
+        print("\n\nReverse J:")
+        pprint.pprint(Jrev)
+        print("Forward J:")
+        pprint.pprint(Jfwd)
+
+        exit()
+
+    return _ad
+
+
+def _fix_func_def(line):
+    # line is assumed to be of the form   def foo(a, b, c)
+    # it will be converted to  def _compute_derivs_ad(self, a, b, c)
+    parts = line.split('(', 1)
+
+    return 'def _compute_derivs_ad(' + 'self, ' + parts[1]
+
+
+def _translate_vars_from_meta(srclines):
+    pass
     # # find any blocks that parameterize by iterating over metadata
     # # these need to be explicitly flattened
     # for k, line in enumerate(src):
@@ -292,206 +513,3 @@ def generate_component_gradient(comp, mode):
     #             src[i] = ''
     #         # add in all unravelled iterations to source
     #         src[k] = ''.join(unravelled)
-
-    # replace all input references with local vars
-    # e.g. change inputs['x'] to x and inputs['x:y'] to x_y
-    # for pattern in to_replace:
-    #     print("replacing '%s' with '%s'" % (pattern, to_replace[pattern]))
-    #     src = src.replace(pattern, to_replace[pattern])
-
-    # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
-    src[0] = src[0].lstrip()
-
-    src = ''.join(src)
-
-    ast2 = ast.parse(src)
-    new_ast = transform_ast_names(ast2, to_replace)
-    src = astunparse.unparse(new_ast)
-    indent = '    '
-
-    # remove the original compute() call signature
-    src = src.split(":", 1)[1]
-
-    # start construction of partial derivative functions
-
-    funcname = 'compute_ad'
-
-    source = []
-
-    # generate string of function to be analyzed by the tangent library
-    source.append("def %s(%s):" % (funcname, ', '.join(pnames)))
-    source.append(src)
-    source.append("%sreturn %s" % (indent, ', '.join(onames + rnames)))
-    source = '\n'.join(source)
-
-    # print("Function source:")
-    # print(source)
-
-    # gather generated gradient source code
-    df = generate_gradient(comp, source, funcname, mode, src, to_revert)
-    dsrc = getsource(df)
-
-    # now translate back the member vars we substituted for earlier
-    d_ast = ast.parse(dsrc)
-    # reverse the to_revert dict
-    revert = {}
-    for key, val in to_revert.items():
-        revert[val] = key
-    final_ast = transform_ast_names(d_ast, revert)
-    dsrc = astunparse.unparse(final_ast)
-    dlines = dsrc.split('\n')
-    for i, line in enumerate(dlines):
-        if line.startswith('def '):
-            dlines[i] = _fix_func_def(line)
-            break
-
-    comp_mod = sys.modules[comp.__class__.__module__]
-    namespace = comp_mod.__dict__.copy()
-    namespace['tangent'] = tangent
-    dsrc = '\n'.join(dlines)
-    exec(dsrc, namespace)
-    df = namespace['_compute_derivs_ad']
-
-    return source, dsrc, df
-
-
-def _get_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
-    src, dsrc, df = generate_component_gradient(comp, mode)
-
-    if show_orig:
-        print("ORIG function:", file=out)
-        print(src, file=out)
-
-    print("%s grad function:" % mode, file=out)
-    print(dsrc, file=out)
-
-    prefix = comp.pathname + '.' if comp.pathname else ''
-
-    J = {}
-    inputs = comp._inputs
-    outputs = comp._outputs
-
-    if mode == 'forward':
-        array = comp._vectors['input']['linear']._data
-        vec = inputs
-    else:  # reverse
-        array = comp._vectors['output']['linear']._data
-        vec = outputs
-
-    idx2output = [None] * array.size  # map array index to output name
-    idx2loc = np.zeros(array.size, dtype=int)
-    views = []
-    start = end = 0
-    for n in vec:
-        end += vec[n].size
-        views.append(array[start:end])
-        for i in range(start, end):
-            idx2output[i] = n
-        idx2loc[start:end] = np.arange(start, end, dtype=int) - start
-        start = end
-
-    if mode == 'forward':
-        params = [inputs[name] for name in inputs] + views
-        for idx in range(array.size):
-            array[:] = 0.0
-            array[idx] = 1.0
-            iname = idx2output[idx]
-            locidx = idx2loc[idx]
-            abs_in = prefix + iname
-
-            grad = df(comp, *params)
-            for i, oname in enumerate(outputs):
-                abs_out = prefix + oname
-                key = (abs_out, abs_in)
-                if key in comp._subjacs_info:
-                    if key not in J:
-                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
-                    J[key][:, locidx] = grad[i]
-
-    else:  # reverse
-        params = [inputs[name] for name in inputs] + [views]
-
-        for oidx in range(array.size):
-            array[:] = 0.0
-            array[oidx] = 1.0
-            oname = idx2output[oidx]
-            locidx = idx2loc[oidx]
-            abs_out = prefix + oname
-
-            grad = df(comp, *params)
-            for i, iname in enumerate(inputs):
-                abs_in = prefix + iname
-                key = (abs_out, abs_in)
-                if key in comp._subjacs_info:
-                    if key not in J:
-                        J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
-                    J[key][locidx:] = grad[i]
-
-    return J
-
-
-def _ad_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao ad' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default=None, action='store', dest='outfile',
-                        help='Output file name. By default, output goes to stdout.')
-    # parser.add_argument('-m', '--mode', default='forward', action='store', dest='mode',
-    #                     help='AD mode (forward, reverse).')
-    parser.add_argument('-c', '--class', action='store', dest='class_',
-                        help='Specify component class to run AD on.')
-
-
-def _ad_cmd(options):
-    """
-    Return the post_setup hook function for 'openmdao ad'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
-    """
-    if options.outfile is None:
-        out = sys.stdout
-    else:
-        out = open(options.outfile, 'w')
-
-    def _ad(prob):
-        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
-            if s.__class__.__name__ == options.class_:
-                break
-        else:
-            raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
-
-        Jfwd = _get_ad_jac(s, 'forward', show_orig=True, out=out)
-        Jrev = _get_ad_jac(s, 'reverse', show_orig=False, out=out)
-
-        import pprint
-
-        print("Forward J:")
-        pprint.pprint(Jfwd)
-        print("\n\nReverse J:")
-        pprint.pprint(Jrev)
-
-        exit()
-
-    return _ad
-
-
-def _fix_func_def(line):
-    # line is assumed to be of the form   def foo(a, b, c)
-    # it will be converted to  def _compute_derivs_ad(self, a, b, c)
-    parts = line.split('(', 1)
-
-    return 'def _compute_derivs_ad(' + 'self, ' + parts[1]

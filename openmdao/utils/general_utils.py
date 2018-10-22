@@ -610,3 +610,48 @@ def json_loads_byteified(json_str):
         return _byteify(json.loads(json_str, object_hook=_byteify), ignore_dicts=True)
     else:
         return json.loads(json_str)
+
+
+_badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
+_transtab = "".maketrans(_badtab, '_'*len(_badtab))
+
+
+def str2valid_python_name(s):
+    """
+    Translate a given string into a valid python variable name.
+
+    Parameters
+    ----------
+    s : str
+        The string to be translated.
+
+    Returns
+    -------
+    str
+        The valid python name string.
+    """
+    return s.translate(_transtab)
+
+
+def unique_name(name, dct):
+    """
+    Make given name unique within the given dictionary.
+
+    Parameters
+    ----------
+    name : str
+        Name to be made unique.
+    dct : dict
+        Dictionary to search for matching names.
+
+    Returns
+    -------
+    str
+        The unique name.
+    """
+    unique = name
+    for i in range(len(dct) + 1):
+        if unique not in dct:
+            return name
+        unique = name + str(i)
+    return unique
