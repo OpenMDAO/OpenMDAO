@@ -1798,6 +1798,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob['comp.y'] = 0.0
         prob['comp.z'] = 1.6
         prob.run_model()
+        prob.cleanup()
 
         # TODO: source is currently not properly determined for this apply call:
         # model.comp.run_apply_nonlinear()
@@ -1827,10 +1828,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         root_subsolve = 0
         root_apply = 0
         root_linesearch = 0
-        root_solve = 0
+        root_solve_nl = 0
         root_sys = 0
 
         cr = CaseReader(self.filename)
+
         for i, c in enumerate(cr.list_cases()):
             case = cr.get_case(c)
 
@@ -1849,7 +1851,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 if 'subsolve' in coord:
                     root_subsolve += 1
                 else:
-                    root_solve += 1
+                    root_solve_nl += 1
                 self.assertEqual(case.source, 'root.nonlinear_solver')
             else:
                 root_sys += 1
@@ -1858,7 +1860,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(root_subsolve == 1)
         self.assertTrue(root_apply > 6)
         self.assertTrue(root_linesearch == 6)
-        self.assertTrue(root_solve == 3)
+        self.assertTrue(root_solve_nl == 3)
         self.assertTrue(root_sys == 1)
 
 
