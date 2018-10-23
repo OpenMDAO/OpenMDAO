@@ -15,7 +15,8 @@ import astunparse
 from six import itervalues
 
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
-from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis
+from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
+    StringSubscriptVisitor
 from openmdao.utils.general_utils import str2valid_python_name, unique_name
 
 
@@ -210,7 +211,7 @@ def _get_arg_replacement_map(comp):
     return to_replace, pnames, onames, rnames
 
 
-def translate_compute_source(comp, reverts=False):
+def translate_compute_source_tangent(comp):
     """
     Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
@@ -221,8 +222,6 @@ def translate_compute_source(comp, reverts=False):
     ----------
     comp : Component
         The component being AD'd.
-    reverts : bool
-        If True, convert all 'self.options[...]' strings to simple var names and revert later.
 
     Returns
     -------
@@ -245,10 +244,7 @@ def translate_compute_source(comp, reverts=False):
     # mapping to rename variables within the compute method
     to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
 
-    if reverts:
-        to_revert = {"self.options['%s']" % name: '_opt__%s' % name for name in comp.options}
-    else:
-        to_revert = {}
+    to_revert = {"self.options['%s']" % name: '_opt__%s' % name for name in comp.options}
 
     # get source code of original compute() method
     # ignore blank lines, useful for detecting indentation later
@@ -268,15 +264,89 @@ def translate_compute_source(comp, reverts=False):
     # remove the original compute() call signature
     src = src.split(":\n", 1)[1]
 
-    if reverts is None:
-        # generate string of function to be differentiated
-        src = '\n'.join([
-            "def %s(self, %s):" % (compute_method.__name__ + '_trans', ', '.join(pnames)),
-            src,
-            "    return %s" % ', '.join(onames + rnames)
-            ])
-
     return src, pnames, onames, rnames, to_revert
+
+
+def translate_compute_source_autograd(comp):
+    """
+    Convert a compute or apply_nonlinear method into a function with individual args for each var.
+
+    Converts  def compute(self, inputs, outputs) to def kompute(self, a, b, c)
+    and translated function returns all output values as a tuple.
+
+    Parameters
+    ----------
+    comp : Component
+        The component being AD'd.
+
+    Returns
+    -------
+    str
+        Converted source code.
+    list of str
+        Input names.
+    list of str
+        Output names.
+    list of str
+        Residual names.
+    dict
+        Translation map for self.options if revert is True, else empty dict.
+    """
+    if isinstance(comp, ExplicitComponent):
+        compute_method = comp.compute
+    else:
+        compute_method = comp.apply_nonlinear
+
+    # mapping to rename variables within the compute method
+    to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
+
+    # get source code of original compute() method
+    # ignore blank lines, useful for detecting indentation later
+    srclines = [line for line in getsourcelines(compute_method)[0] if line.strip()]
+
+    # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
+    srclines[0] = srclines[0].lstrip()
+    src = ''.join(srclines)
+    ast2 = ast.parse(src)
+
+    # visitor = StringSubscriptVisitor()
+    # visitor.visit(ast2)
+    # print("found", visitor.subscripts.items())
+
+    # combine all mappings
+    mapping = to_replace.copy()
+    ast3 = transform_ast_names(ast2, mapping)
+    src = astunparse.unparse(ast3)
+
+    # add section of code to equate internal vars to views of input vec
+    pre_lines = []
+    start = end = 0
+    for n in comp._inputs:
+        end += comp._inputs[n].size
+        val = comp._inputs[n]
+        if isinstance(val, np.ndarray):
+            if len(val.shape) > 1:
+                pre_lines.append('    %s = _invec_[%d:%d].reshape(%s)' %
+                                 (str2valid_python_name(n), start, end, val.shape))
+            else:
+                pre_lines.append('    %s = _invec_[%d:%d]' % (str2valid_python_name(n), start, end))
+        else:
+            pre_lines.append('    %s = _invec_[%d]' % (str2valid_python_name(n), start))
+        start = end
+
+    # remove the original compute() call signature
+    src = src.split(":\n", 1)[1]
+
+    # generate string of function to be differentiated
+    src = '\n'.join([
+        "def %s_trans(_invec_):" % compute_method.__name__,
+        '\n'.join(pre_lines),
+        src,
+        "    return tuple([%s])" % ', '.join(onames + rnames)
+        ])
+
+    print(src)
+    return src, pnames, onames, rnames
 
 
 def revert_deriv_source(deriv_func, to_revert):
@@ -302,7 +372,7 @@ def revert_deriv_source(deriv_func, to_revert):
 
 def generate_component_gradient(comp, mode, reverts=False):
 
-    src, pnames, onames, rnames, to_revert = translate_compute_source(comp, reverts)
+    src, pnames, onames, rnames, to_revert = translate_compute_source_tangent(comp)
 
     # start construction of partial derivative functions
 
@@ -340,6 +410,7 @@ def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
     import autograd.numpy as agnp
     from autograd import make_jvp, make_vjp
     from autograd.differential_operators import make_jvp_reversemode
+    from autograd import grad
 
     output_names = list(comp._outputs.keys())
     if isinstance(comp, ExplicitComponent):
@@ -348,22 +419,41 @@ def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
         compute_method = comp.apply_nonlinear
 
     input_names = list(comp._inputs.keys())
-    input_args = [v for v in itervalues(comp._inputs)]
+    input_args = [comp._inputs[n] for n in input_names]
 
-    funcstr = """
-def _deriv_func_(self, %s):
-    self.%s(self._inputs, self._outputs)
+    funcname = compute_method.__name__ + '_trans'
+#     funcstr = """
+# def %s(invec):
+#     self.%s(self._inputs, self._outputs)
+#     return %s
+#     """ % (funcname, compute_method.__name__,
+#            ', '.join(["self._outputs['%s']" % n for n in output_names]))
+    funcstr, pnames, onames, rnames = translate_compute_source_autograd(comp)
 
-    """ % (', '.join(input_names), compute_method.__name__, ', '.join(output_names))
+    comp_mod = sys.modules[comp.__class__.__module__]
+    namespace = comp_mod.__dict__.copy()
+    namespace['self'] = comp
+    import autograd.numpy as agnp
+    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict
+    namespace['numpy'] = agnp
+    namespace['np'] = agnp
+    namespace['tuple'] = agtuple
+    namespace['list'] = aglist
+    namespace['dict'] = agdict
+
+    exec(funcstr, namespace)
+
+    func = namespace[funcname]
+    g = grad(func)
 
     # JVP - forward
     # VJP - reverse
     if mode == 'forward':
-        deriv_func = make_jvp(compute_method)(comp._inputs, comp._outputs)
+        deriv_func = make_jvp(func)(agnp.array(comp._inputs._data))
     else:
-        deriv_func = make_vjp(compute_method)(comp._inputs, comp._outputs)
+        deriv_func = make_vjp(func)(agnp.array(comp._inputs._data))
 
-    return _get_ad_jac(comp, mode, deriv_func)
+    return _get_ad_jac(comp, mode, deriv_func[0])
 
 
 def _get_ad_jac(comp, mode, deriv_func):
@@ -374,10 +464,10 @@ def _get_ad_jac(comp, mode, deriv_func):
     outputs = comp._outputs
 
     if mode == 'forward':
-        array = comp._vectors['input']['linear']._data
+        array = comp._vectors['input']['nonlinear']._data
         vec = inputs
     else:  # reverse
-        array = comp._vectors['output']['linear']._data
+        array = comp._vectors['output']['nonlinear']._data
         vec = outputs
 
     idx2output = [None] * array.size  # map array index to output name
@@ -420,7 +510,7 @@ def _get_ad_jac(comp, mode, deriv_func):
             locidx = idx2loc[oidx]
             abs_out = prefix + oname
 
-            grad = deriv_func(comp, *params)
+            grad = deriv_func(array) # comp, *params)
             for i, iname in enumerate(inputs):
                 abs_in = prefix + iname
                 key = (abs_out, abs_in)
@@ -476,17 +566,17 @@ def _ad_cmd(options):
         else:
             raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
 
-        Jrev = _get_tangent_ad_jac(s, 'reverse', show_orig=True, out=out)
-        Jfwd = _get_tangent_ad_jac(s, 'forward', show_orig=False, out=out)
-        # Jrev = _get_autograd_ad_jac(s, 'reverse', show_orig=True, out=out)
+        # Jrev = _get_tangent_ad_jac(s, 'reverse', show_orig=True, out=out)
+        # Jfwd = _get_tangent_ad_jac(s, 'forward', show_orig=False, out=out)
+        Jrev = _get_autograd_ad_jac(s, 'reverse', show_orig=True, out=out)
         # Jfwd = _get_autograd_ad_jac(s, 'forward', show_orig=False, out=out)
 
         import pprint
 
         print("\n\nReverse J:")
         pprint.pprint(Jrev)
-        print("Forward J:")
-        pprint.pprint(Jfwd)
+        # print("Forward J:")
+        # pprint.pprint(Jfwd)
 
         exit()
 

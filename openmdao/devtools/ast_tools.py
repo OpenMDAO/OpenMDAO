@@ -1,6 +1,7 @@
 import ast
 import astunparse
 import networkx as nx
+from collections import defaultdict
 
 class ImportScanner(ast.NodeVisitor):
     """
@@ -76,6 +77,26 @@ def _get_long_name(node):
         else:  # it's more than just a simple dotted name
             return None
     return '.'.join(parts[::-1])
+
+
+class StringSubscriptVisitor(ast.NodeVisitor):
+    """
+    A visitor that collects all string subscipted names so we can swap them out later.
+    """
+
+    def __init__(self):
+        super(StringSubscriptVisitor, self).__init__()
+        self.subscripts = defaultdict(list)
+
+    def visit_Subscript(self, node):  # (value, slice, ctx)
+        long_name = _get_long_name(node.value)
+        if long_name is not None:
+            if isinstance(node.slice, ast.Index) and isinstance(node.slice.value, ast.Str):
+                self.subscripts[long_name].append(astunparse.unparse(node.slice).strip())
+            else:
+                self.visit(node.slice)
+        else:
+            self.generic_visit(node)
 
 
 class DependencyVisitor(ast.NodeVisitor):
