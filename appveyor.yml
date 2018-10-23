@@ -39,7 +39,7 @@ environment:
 
 install:
 - sh:
-    if [ ! -d $HOME/miniconda/envs/PY$PY ]; then
+    if [ ! -d /home/appveyor/miniconda/envs/PY$PY ]; then
 
       sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
       sudo apt-get update;
