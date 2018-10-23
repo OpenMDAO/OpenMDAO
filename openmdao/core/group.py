@@ -4,7 +4,6 @@ from __future__ import division
 from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 from numbers import Number
-import warnings
 import inspect
 
 from six import iteritems, string_types, itervalues
@@ -581,7 +580,6 @@ class Group(System):
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
                 # Assemble allprocs_prom2abs_list
-                sub_allprocs_prom2abs_list_t = subsys._var_allprocs_prom2abs_list[type_]
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
                     prom_name = var_maps[type_][sub_prom]
                     if prom_name not in allprocs_prom2abs_list[type_]:
@@ -922,7 +920,6 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         abs_in2out = self._conn_abs_in2out = {}
-        discrete_in2out = self._conn_discrete_in2out = {}
         global_abs_in2out = self._conn_global_abs_in2out
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
@@ -1207,7 +1204,6 @@ class Group(System):
                 tgt_sys._discrete_inputs[tgt] = src_sys._discrete_outputs[src]
 
         else:  # MPI
-            iproc = comm.rank
             allprocs_recv = self._allprocs_discrete_recv[key]
             discrete_out = self._var_discrete['output']
             if key in self._discrete_transfers:
@@ -1625,45 +1621,42 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        name = self.pathname if self.pathname else 'root'
-
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
-        with Recording(name + '._apply_linear', self.iter_count, self):
-            if self._owns_approx_jac:
-                jac = self._jacobian
-            elif jac is None and self._assembled_jac is not None:
-                jac = self._assembled_jac
-            if jac is not None:
+        if self._owns_approx_jac:
+            jac = self._jacobian
+        elif jac is None and self._assembled_jac is not None:
+            jac = self._assembled_jac
+        if jac is not None:
+            for vec_name in vec_names:
+                with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
+                    d_inputs, d_outputs, d_residuals = vecs
+                    jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+        # Apply recursion
+        else:
+            if rel_systems is not None:
+                irrelevant_subs = [s for s in self._subsystems_myproc
+                                   if s.pathname not in rel_systems]
+            if mode == 'fwd':
                 for vec_name in vec_names:
-                    with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                        d_inputs, d_outputs, d_residuals = vecs
-                        jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
-            # Apply recursion
-            else:
+                    self._transfer(vec_name, mode)
                 if rel_systems is not None:
-                    irrelevant_subs = [s for s in self._subsystems_myproc
-                                       if s.pathname not in rel_systems]
-                if mode == 'fwd':
-                    for vec_name in vec_names:
-                        self._transfer(vec_name, mode)
+                    for s in irrelevant_subs:
+                        # zero out dvecs of irrelevant subsystems
+                        s._vectors['residual']['linear'].set_const(0.0)
+
+            for subsys in self._subsystems_myproc:
+                if rel_systems is None or subsys.pathname in rel_systems:
+                    subsys._apply_linear(jac, vec_names, rel_systems, mode,
+                                         scope_out, scope_in)
+
+            if mode == 'rev':
+                for vec_name in vec_names:
+                    self._transfer(vec_name, mode)
                     if rel_systems is not None:
                         for s in irrelevant_subs:
                             # zero out dvecs of irrelevant subsystems
-                            s._vectors['residual']['linear'].set_const(0.0)
-
-                for subsys in self._subsystems_myproc:
-                    if rel_systems is None or subsys.pathname in rel_systems:
-                        subsys._apply_linear(jac, vec_names, rel_systems, mode,
-                                             scope_out, scope_in)
-
-                if mode == 'rev':
-                    for vec_name in vec_names:
-                        self._transfer(vec_name, mode)
-                        if rel_systems is not None:
-                            for s in irrelevant_subs:
-                                # zero out dvecs of irrelevant subsystems
-                                s._vectors['output']['linear'].set_const(0.0)
+                            s._vectors['output']['linear'].set_const(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -1687,12 +1680,9 @@ class Group(System):
         float
             absolute error.
         """
-        name = self.pathname if self.pathname else 'root'
-
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
-        with Recording(name + '._solve_linear', self.iter_count, self):
-            result = self._linear_solver.solve(vec_names, mode, rel_systems)
+        result = self._linear_solver.solve(vec_names, mode, rel_systems)
 
         return result
 
@@ -1820,7 +1810,7 @@ class Group(System):
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
-            self._jacobian = J = DictionaryJacobian(system=self)
+            self._jacobian = DictionaryJacobian(system=self)
 
             method = list(self._approx_schemes.keys())[0]
             approx = self._approx_schemes[method]

@@ -25,18 +25,20 @@ from openmdao.solvers.solver import Solver
 
 
 """
-SQL case output format version history.
----------------------------------------
+SQL case database version history.
+----------------------------------
+5 -- OpenMDAO 2.5
+     Added source column (driver name, system/solver pathname) to global iterations table.
 4 -- OpenMDAO 2.4
-    Added variable settings metadata that contains scaling info.
+     Added variable settings metadata that contains scaling info.
 3 -- OpenMDAO 2.4
-    Storing most data as JSON rather than binary numpy arrays.
+     Storing most data as JSON rather than binary numpy arrays.
 2 -- OpenMDAO 2.4, merged 20 July 2018.
-    Added support for recording derivatives from driver, resulting in a new table.
+     Added support for recording derivatives from driver, resulting in a new table.
 1 -- Through OpenMDAO 2.3
-    Original implementation.
+     Original implementation.
 """
-format_version = 4
+format_version = 5
 
 
 def array_to_blob(array):
@@ -199,7 +201,7 @@ class SqliteRecorder(CaseRecorder):
 
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
-                          "record_type TEXT, rowid INT)")
+                          "record_type TEXT, rowid INT, source TEXT)")
 
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
@@ -405,8 +407,8 @@ class SqliteRecorder(CaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            inputs_text, outputs_text))
 
-                c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                          ('driver', c.lastrowid))
+                c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
+                          ('driver', c.lastrowid, recording_requester._get_name()))
 
     def record_iteration_problem(self, recording_requester, data, metadata):
         """
@@ -479,8 +481,8 @@ class SqliteRecorder(CaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            inputs_text, outputs_text, residuals_text))
 
-                c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                          ('system', c.lastrowid))
+                c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
+                          ('system', c.lastrowid, recording_requester.pathname))
 
     def record_iteration_solver(self, recording_requester, data, metadata):
         """
@@ -524,8 +526,18 @@ class SqliteRecorder(CaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            abs, rel, inputs_text, outputs_text, residuals_text))
 
-                c.execute("INSERT INTO global_iterations(record_type, rowid) VALUES(?,?)",
-                          ('solver', c.lastrowid))
+                # determine solver type from SOLVER class attribute
+                solver_type = recording_requester.SOLVER[0:2]
+                if solver_type == 'NL':
+                    source = recording_requester._system.pathname + '.nonlinear_solver'
+                elif solver_type == 'LS':
+                    source = recording_requester._system.pathname + '.nonlinear_solver.linesearch'
+                else:
+                    raise RuntimeError("Solver type '%s' not recognized during recording. "
+                                       "Expecting NL or LS" % recording_requester.SOLVER)
+
+                c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
+                          ('solver', c.lastrowid, source))
 
     def record_metadata_driver(self, recording_requester):
         """

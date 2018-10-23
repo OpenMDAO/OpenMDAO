@@ -1,9 +1,6 @@
 """Define the LinearRunOnce class."""
-from six import iteritems
 
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
-from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian
 
 
 class LinearRunOnce(LinearBlockGS):
@@ -50,12 +47,8 @@ class LinearRunOnce(LinearBlockGS):
             if vec_name in system._rel_vec_names:
                 self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
 
-        with Recording('LinearRunOnce', 0, self) as rec:
-            # Single iteration of GS
-            self._iter_execute()
-
-            rec.abs = 0.0
-            rec.rel = 0.0
+        # Single iteration of GS
+        self._iter_execute()
 
         return False, 0.0, 0.0
 

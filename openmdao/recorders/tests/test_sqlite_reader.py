@@ -1934,7 +1934,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ls.options['maxiter'] = 3
         ls.options['alpha'] = 1.0
 
-        # add recorder to nonlinear solver and linesearch solver
+        # add recorder to nonlinear solver, linesearch solver and model
         model.nonlinear_solver.add_recorder(self.recorder)
         model.nonlinear_solver.linesearch.add_recorder(self.recorder)
         model.comp.add_recorder(self.recorder)
@@ -1942,43 +1942,25 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.setup(check=False)
 
-        # Test lower bound: should go to the lower bound and stall
         prob['px.x'] = 2.0
         prob['comp.y'] = 0.0
         prob['comp.z'] = 1.6
         prob.run_model()
         prob.cleanup()
 
-        # TODO: source is currently not properly determined for this apply call:
-        # model.comp.run_apply_nonlinear()
-
         expected = [
             'rank0:root._solve_nonlinear|0|Newton_subsolve|0',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|0|root._apply_linear|0',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|0|root._apply_linear|1',
             'rank0:root._solve_nonlinear|0|NewtonSolver|0',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|1|root._apply_linear|2',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|1|root._apply_linear|3',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|1|root._apply_linear|4',
             'rank0:root._solve_nonlinear|0|NewtonSolver|1|ArmijoGoldsteinLS|0',
             'rank0:root._solve_nonlinear|0|NewtonSolver|1|ArmijoGoldsteinLS|1',
             'rank0:root._solve_nonlinear|0|NewtonSolver|1|ArmijoGoldsteinLS|2',
             'rank0:root._solve_nonlinear|0|NewtonSolver|1',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|2|root._apply_linear|5',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|2|root._apply_linear|6',
-            'rank0:root._solve_nonlinear|0|NewtonSolver|2|root._apply_linear|7',
             'rank0:root._solve_nonlinear|0|NewtonSolver|2|ArmijoGoldsteinLS|0',
             'rank0:root._solve_nonlinear|0|NewtonSolver|2|ArmijoGoldsteinLS|1',
             'rank0:root._solve_nonlinear|0|NewtonSolver|2|ArmijoGoldsteinLS|2',
             'rank0:root._solve_nonlinear|0|NewtonSolver|2',
             'rank0:root._solve_nonlinear|0'
         ]
-
-        root_subsolve = 0
-        root_apply = 0
-        root_linesearch = 0
-        root_solve_nl = 0
-        root_sys = 0
 
         cr = CaseReader(self.filename)
 
@@ -1987,30 +1969,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 
             coord = case.iteration_coordinate
             print(i, case.counter, coord, case.source)
-            # self.assertEqual(coord, expected[i])
+            self.assertEqual(coord, expected[i])
 
             # check the source
-            if 'root._apply_linear' in coord:
-                root_apply += 1
-                self.assertEqual(case.source, 'root')
-            elif 'ArmijoGoldsteinLS' in coord:
-                root_linesearch += 1
+            if 'ArmijoGoldsteinLS' in coord:
                 self.assertEqual(case.source, 'root.nonlinear_solver.linesearch')
             elif 'Newton' in coord:
-                if 'subsolve' in coord:
-                    root_subsolve += 1
-                else:
-                    root_solve_nl += 1
                 self.assertEqual(case.source, 'root.nonlinear_solver')
             else:
-                root_sys += 1
                 self.assertEqual(case.source, 'root')
-
-        self.assertTrue(root_subsolve == 1)
-        self.assertTrue(root_apply > 6)
-        self.assertTrue(root_linesearch == 6)
-        self.assertTrue(root_solve_nl == 3)
-        self.assertTrue(root_sys == 1)
 
 
 class TestFeatureSqliteReader(unittest.TestCase):

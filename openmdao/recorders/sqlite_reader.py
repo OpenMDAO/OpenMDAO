@@ -26,10 +26,7 @@ elif PY3:
 
 
 # regular expression used to determine if a node in an iteration coordinate represents a system
-# _coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear|_solve_linear|_apply_linear)$')
-# FIXME: currently just looking for _solve_nonlinear, which won't work for implicit components, etc.
-#        ultimate solution is to probably to record the source in the global iterations table
-_coord_system_re = re.compile('(_solve_nonlinear)$')
+_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
 
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
 _coord_split_re = re.compile('\|\\d+\|*')
@@ -416,8 +413,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, iteration_ coordinate}
-            Identifies which cases to return.
+        source : {'problem', 'driver', component pathname, solver pathname, iteration_coordinate}
+            If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
         flat : bool, optional
@@ -536,7 +533,8 @@ class SqliteCaseReader(BaseCaseReader):
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
         for i in range(0, parent_case_counter):
-            _, table, row = global_iters[i]
+            global_iter = global_iters[i]
+            table, row = global_iter[1], global_iter[2]
             if table == 'solver':
                 case_coord = solver_cases[row - 1]
             elif table == 'system':
@@ -585,8 +583,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
-        for iter_num in range(0, parent_case.counter - 1):
-            _, table, row = global_iters[iter_num]
+        for i in range(0, parent_case.counter - 1):
+            global_iter = global_iters[i]
+            table, row = global_iter[1], global_iter[2]
             if table == 'solver':
                 case_coord = solver_cases[row - 1]
                 if case_coord.startswith(coord):
@@ -674,7 +673,8 @@ class SqliteCaseReader(BaseCaseReader):
             global_iters = self._get_global_iterations()
             if case_id > len(global_iters) - 1:
                 raise IndexError("Invalid index into available cases:", case_id)
-            _, table, row = global_iters[case_id]
+            global_iter = global_iters[case_id]
+            table, row = global_iter[1], global_iter[2]
             if table == 'solver':
                 solver_cases = self._solver_cases.list_cases()
                 case_id = solver_cases[row - 1]
@@ -730,7 +730,7 @@ class CaseTable(object):
         Dictionary mapping keys to cases that have already been loaded.
     """
 
-    def __init__(self, fname, version, table, index, prom2abs, abs2prom, abs2meta, voi_meta=None):
+    def __init__(self, fname, version, table, index, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -792,13 +792,13 @@ class CaseTable(object):
         Parameters
         ----------
         source : str, optional
-            Source or iteration coordinate.
+            A source of cases or the iteration coordinate of a case.
             If not None, only cases originating from the specified source or case are returned.
 
         Returns
         -------
         list
-            The cases from the table that have the specified source.
+            The cases from the table from the specified source or parent case.
         """
         if not self._keys:
             with sqlite3.connect(self._filename) as con:
