@@ -112,9 +112,18 @@ class reset_warning_registry(object):
                     reg.clear()
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         """
         Exit the runtime context related to this object.
+
+        Parameters
+        ----------
+        exc_type : Exception class
+            The type of the exception.
+        exc_value : Exception instance
+            The exception instance raised.
+        traceback : regex pattern
+            Traceback object.
         """
         # restore warning registry from backup
         modules = sys.modules
