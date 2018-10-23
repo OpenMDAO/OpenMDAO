@@ -628,7 +628,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # get total iteration count to check against
-        global_iterations = len(cr._get_global_iterations())
+        global_iterations = len(cr._global_iterations)
 
         #
         # get a recursive list of all cases (flat)
@@ -751,7 +751,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # get total iteration count to check against
-        global_iterations = len(cr._get_global_iterations())
+        global_iterations = len(cr._global_iterations)
 
         #
         # get a recursive list of all cases (flat)
@@ -792,7 +792,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # get total iteration count to check against
-        global_iterations = len(cr._get_global_iterations())
+        global_iterations = len(cr._global_iterations)
 
         #
         # get a recursive list of all cases (flat)
@@ -841,7 +841,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         # get total iteration count to check against
-        global_iterations = len(cr._get_global_iterations())
+        global_iterations = len(cr._global_iterations)
 
         #
         # get a recursive list of all cases (flat)

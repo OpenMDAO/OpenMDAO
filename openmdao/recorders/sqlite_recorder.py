@@ -481,8 +481,13 @@ class SqliteRecorder(CaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            inputs_text, outputs_text, residuals_text))
 
+                # get the pathname of the source system
+                source_system = recording_requester.pathname
+                if source_system == '':
+                    source_system = 'root'
+
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
-                          ('system', c.lastrowid, recording_requester.pathname))
+                          ('system', c.lastrowid, source_system))
 
     def record_iteration_solver(self, recording_requester, data, metadata):
         """
@@ -526,18 +531,23 @@ class SqliteRecorder(CaseRecorder):
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            abs, rel, inputs_text, outputs_text, residuals_text))
 
-                # determine solver type from SOLVER class attribute
+                # get the pathname of the source system
+                source_system = recording_requester._system.pathname
+                if source_system == '':
+                    source_system = 'root'
+
+                # get solver type from SOLVER class attribute to determine the solver pathname
                 solver_type = recording_requester.SOLVER[0:2]
                 if solver_type == 'NL':
-                    source = recording_requester._system.pathname + '.nonlinear_solver'
+                    source_solver = source_system + '.nonlinear_solver'
                 elif solver_type == 'LS':
-                    source = recording_requester._system.pathname + '.nonlinear_solver.linesearch'
+                    source_solver = source_system + '.nonlinear_solver.linesearch'
                 else:
                     raise RuntimeError("Solver type '%s' not recognized during recording. "
                                        "Expecting NL or LS" % recording_requester.SOLVER)
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
-                          ('solver', c.lastrowid, source))
+                          ('solver', c.lastrowid, source_solver))
 
     def record_metadata_driver(self, recording_requester):
         """

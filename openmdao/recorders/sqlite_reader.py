@@ -14,6 +14,7 @@ from six.moves import range
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case, PromotedToAbsoluteMap
 
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_array
 from openmdao.recorders.sqlite_recorder import format_version
 
@@ -149,6 +150,9 @@ class SqliteCaseReader(BaseCaseReader):
             #   solver class and options for each solver, which is saved as an attribute
             self._collect_solver_metadata(cur)
 
+            # get the global iterations table, and save it as an attribute
+            self._global_iterations = self._get_global_iterations(cur)
+
         con.close()
 
         # create maps to facilitate accessing variable metadata using absolute or promoted name
@@ -158,14 +162,16 @@ class SqliteCaseReader(BaseCaseReader):
         # create helper objects for accessing cases from the four iteration tables and
         # the problem cases table
         voi_meta = self.problem_metadata['variables']
-        self._driver_cases = DriverCases(filename, self._format_version,
+        self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
-        self._system_cases = SystemCases(filename, self._format_version,
+        self._system_cases = SystemCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
-        self._solver_cases = SolverCases(filename, self._format_version,
+        self._solver_cases = SolverCases(filename, self._format_version, self._global_iterations,
                                          self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
         if self._format_version >= 2:
-            self._problem_cases = ProblemCases(filename, self._format_version,
+            self._problem_cases = ProblemCases(filename,
+                                               self._format_version,
+                                               self._global_iterations,
                                                self._prom2abs, self._abs2prom, self._abs2meta,
                                                voi_meta)
 
@@ -309,24 +315,22 @@ class SqliteCaseReader(BaseCaseReader):
                 'solver_class': solver_class,
             }
 
-    def _get_global_iterations(self):
+    def _get_global_iterations(self, cur):
         """
         Get the global iterations table.
+
+        Parameters
+        ----------
+        cur : sqlite3.Cursor
+            Database cursor to use for reading the data.
 
         Returns
         -------
         list
             List of global iterations and the table and row where the associated case is found.
         """
-        if self._global_iterations is None:
-            with sqlite3.connect(self._filename) as con:
-                cur = con.cursor()
-                cur.execute('select * from global_iterations')
-                self._global_iterations = cur.fetchall()
-
-            con.close()
-
-        return self._global_iterations
+        cur.execute('select * from global_iterations')
+        return cur.fetchall()
 
     def _load_cases(self):
         """
@@ -513,7 +517,7 @@ class SqliteCaseReader(BaseCaseReader):
         solver_cases = self._solver_cases.list_cases()
         system_cases = self._system_cases.list_cases()
         driver_cases = self._driver_cases.list_cases()
-        global_iters = self._get_global_iterations()
+        global_iters = self._global_iterations
 
         if not coord:
             # will return all cases
@@ -566,7 +570,7 @@ class SqliteCaseReader(BaseCaseReader):
         solver_cases = self._solver_cases.list_cases()
         system_cases = self._system_cases.list_cases()
         driver_cases = self._driver_cases.list_cases()
-        global_iters = self._get_global_iterations()
+        global_iters = self._global_iterations
 
         if coord in driver_cases:
             parent_case = self._driver_cases.get_case(coord)
@@ -670,7 +674,7 @@ class SqliteCaseReader(BaseCaseReader):
         """
         if isinstance(case_id, int):
             # it's a global index rather than a coordinate
-            global_iters = self._get_global_iterations()
+            global_iters = self._global_iterations
             if case_id > len(global_iters) - 1:
                 raise IndexError("Invalid index into available cases:", case_id)
             global_iter = global_iters[case_id]
@@ -730,7 +734,7 @@ class CaseTable(object):
         Dictionary mapping keys to cases that have already been loaded.
     """
 
-    def __init__(self, fname, version, table, index, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, fname, ver, table, index, giter, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -738,12 +742,14 @@ class CaseTable(object):
         ----------
         fname : str
             The name of the recording file from which to instantiate the case reader.
-        version : int
+        ver : int
             The version of the format assumed when loading the file.
         table : str
             The name of the table in the database.
         index : str
             The name of the case index column in the table.
+        giter : list of tuple
+            The global iterations table.
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         abs2meta : dict
@@ -754,9 +760,10 @@ class CaseTable(object):
             Dictionary mapping absolute variable names to variable settings.
         """
         self._filename = fname
-        self._format_version = version
+        self._format_version = ver
         self._table_name = table
         self._index_name = index
+        self._global_iterations = giter
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
@@ -912,7 +919,18 @@ class CaseTable(object):
 
         # if found, extract the data and optionally cache the Case
         if row is not None:
-            source = self._get_source(row[self._index_name])
+            if self._format_version >= 5:
+                source = self._get_row_source(row['id'])
+
+                # TODO: this check is for catching situations where parsing the iter coord
+                #       does not work. remove before flight.
+                iter_source = self._get_source(row[self._index_name])
+                if iter_source != source:
+                    raise RuntimeError('Mismatched source for %d: %s = %s vs %s' %
+                                       (row['id'], row[self._index_name], iter_source, source))
+            else:
+                source = self._get_source(row[self._index_name])
+
             case = Case(source, row,
                         self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
                         self._format_version)
@@ -1008,6 +1026,29 @@ class CaseTable(object):
         """
         return _get_source_system(iteration_coordinate)
 
+    def _get_row_source(self, row_id):
+        """
+        Get the source of the case at the specified row of this table.
+
+        Parameters
+        ----------
+        row_id : int
+            The row_id of the case in the table.
+
+        Returns
+        -------
+        str
+            The source of the case.
+        """
+        table = self._table_name.split('_')[0]  # remove "_iterations" from table name
+
+        for global_iter in self._global_iterations:
+            record_type, row, source = global_iter[1], global_iter[2], global_iter[3]
+            if record_type == table and row == row_id:
+                return source
+
+        return None
+
     def _get_first(self, source):
         """
         Get the first case from the specified source.
@@ -1034,7 +1075,7 @@ class DriverCases(CaseTable):
     Cases specific to the entries that might be recorded in a Driver iteration.
     """
 
-    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1044,6 +1085,8 @@ class DriverCases(CaseTable):
             The name of the recording file from which to instantiate the case reader.
         format_version : int
             The version of the format assumed when loading the file.
+        giter : list of tuple
+            The global iterations table.
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         abs2meta : dict
@@ -1054,7 +1097,7 @@ class DriverCases(CaseTable):
             Dictionary mapping absolute variable names to variable settings.
         """
         super(DriverCases, self).__init__(filename, format_version,
-                                          'driver_iterations', 'iteration_coordinate',
+                                          'driver_iterations', 'iteration_coordinate', giter,
                                           prom2abs, abs2prom, abs2meta, voi_meta)
         self._voi_meta = voi_meta
 
@@ -1184,61 +1227,21 @@ class DriverCases(CaseTable):
         """
         return 'driver'
 
-
-class ProblemCases(CaseTable):
-    """
-    Cases specific to the entries that might be recorded in a Driver iteration.
-    """
-
-    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
+    def _get_row_source(self, row_id):
         """
-        Initialize.
+        Get the source of the case at the specified row of this table.
 
         Parameters
         ----------
-        filename : str
-            The name of the recording file from which to instantiate the case reader.
-        format_version : int
-            The version of the format assumed when loading the file.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings.
-        """
-        super(ProblemCases, self).__init__(filename, format_version,
-                                           'problem_cases', 'case_name',
-                                           prom2abs, abs2prom, abs2meta, voi_meta)
-
-    def list_sources(self):
-        """
-        Get the list of sources that recorded data in this table (just the problem).
-
-        Returns
-        -------
-        list
-            List of sources.
-        """
-        return ['problem']
-
-    def _get_source(self, iteration_coordinate):
-        """
-        Get the source of the iteration.
-
-        Parameters
-        ----------
-        iteration_coordinate : str
-            The full unique identifier for this iteration.
+        row_id : int
+            The row_id of the case in the table.
 
         Returns
         -------
         str
-            'problem' (all cases in this table come from the problem).
+            The source of the case.
         """
-        return 'problem'
+        return 'driver'
 
 
 class SystemCases(CaseTable):
@@ -1246,7 +1249,7 @@ class SystemCases(CaseTable):
     Cases specific to the entries that might be recorded in a System iteration.
     """
 
-    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1256,6 +1259,8 @@ class SystemCases(CaseTable):
             The name of the recording file from which to instantiate the case reader.
         format_version : int
             The version of the format assumed when loading the file.
+        giter : list of tuple
+            The global iterations table.
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         abs2meta : dict
@@ -1266,7 +1271,7 @@ class SystemCases(CaseTable):
             Dictionary mapping absolute variable names to variable settings.
         """
         super(SystemCases, self).__init__(filename, format_version,
-                                          'system_iterations', 'iteration_coordinate',
+                                          'system_iterations', 'iteration_coordinate', giter,
                                           prom2abs, abs2prom, abs2meta, voi_meta)
 
 
@@ -1275,7 +1280,7 @@ class SolverCases(CaseTable):
     Cases specific to the entries that might be recorded in a Solver iteration.
     """
 
-    def __init__(self, filename, format_version, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
         """
         Initialize.
 
@@ -1285,6 +1290,8 @@ class SolverCases(CaseTable):
             The name of the recording file from which to instantiate the case reader.
         format_version : int
             The version of the format assumed when loading the file.
+        giter : list of tuple
+            The global iterations table.
         abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
         abs2meta : dict
@@ -1295,7 +1302,7 @@ class SolverCases(CaseTable):
             Dictionary mapping absolute variable names to variable settings.
         """
         super(SolverCases, self).__init__(filename, format_version,
-                                          'solver_iterations', 'iteration_coordinate',
+                                          'solver_iterations', 'iteration_coordinate', giter,
                                           prom2abs, abs2prom, abs2meta, voi_meta)
 
     def _get_source(self, iteration_coordinate):
@@ -1325,3 +1332,77 @@ class SolverCases(CaseTable):
             return source_system + '.nonlinear_solver.linesearch'
         else:
             raise RuntimeError("Can't parse solver iteration coordinate: %s" % iteration_coordinate)
+
+
+class ProblemCases(CaseTable):
+    """
+    Cases specific to the entries that might be recorded in a Driver iteration.
+    """
+
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the recording file from which to instantiate the case reader.
+        format_version : int
+            The version of the format assumed when loading the file.
+        giter : list of tuple
+            The global iterations table.
+        abs2prom : {'input': dict, 'output': dict}
+            Dictionary mapping absolute names to promoted names.
+        abs2meta : dict
+            Dictionary mapping absolute variable names to variable metadata.
+        prom2abs : {'input': dict, 'output': dict}
+            Dictionary mapping promoted names to absolute names.
+        voi_meta : dict
+            Dictionary mapping absolute variable names to variable settings.
+        """
+        super(ProblemCases, self).__init__(filename, format_version,
+                                           'problem_cases', 'case_name', giter,
+                                           prom2abs, abs2prom, abs2meta, voi_meta)
+
+    def list_sources(self):
+        """
+        Get the list of sources that recorded data in this table (just the problem).
+
+        Returns
+        -------
+        list
+            List of sources.
+        """
+        return ['problem']
+
+    def _get_source(self, iteration_coordinate):
+        """
+        Get the source of the iteration.
+
+        Parameters
+        ----------
+        iteration_coordinate : str
+            The full unique identifier for this iteration.
+
+        Returns
+        -------
+        str
+            'problem' (all cases in this table come from the problem).
+        """
+        return 'problem'
+
+    def _get_row_source(self, row_id):
+        """
+        Get the source of the case at the specified row of this table.
+
+        Parameters
+        ----------
+        row_id : int
+            The row_id of the case in the table.
+
+        Returns
+        -------
+        str
+            The source of the case.
+        """
+        return 'problem'
