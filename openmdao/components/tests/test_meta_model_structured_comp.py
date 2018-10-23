@@ -1011,6 +1011,61 @@ class TestRegularGridMap(unittest.TestCase):
         assert_rel_error(self, prob['g'], val1, tol)
         self.run_and_check_derivs(prob)
 
+    def test_training_gradient_setup_called_twice(self):
+        model = Group()
+        ivc = IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
+        ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
+        ivc.add_output('z', np.array([-2.11, -1.2, 2.01]))
+
+        ivc.add_output('f_train', outs[0]['values'])
+        ivc.add_output('g_train', outs[1]['values'])
+
+        comp = MetaModelStructuredComp(training_data_gradients=True,
+                                       method='cubic',
+                                       vec_size=3)
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+
+        prob = Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        val0 = np.array([ 50.26787317,  49.76106232,  19.66117913])
+        val1 = np.array([-32.62094041, -31.67449135, -27.46959668])
+
+        tol = 1e-5
+        assert_rel_error(self, prob['f'], val0, tol)
+        assert_rel_error(self, prob['g'], val1, tol)
+        self.run_and_check_derivs(prob)
+
+        # Setup and run again
+        prob.setup()
+        prob.run_model()
+
+        val0 = np.array([ 50.26787317,  49.76106232,  19.66117913])
+        val1 = np.array([-32.62094041, -31.67449135, -27.46959668])
+
+        tol = 1e-5
+        assert_rel_error(self, prob['f'], val0, tol)
+        assert_rel_error(self, prob['g'], val1, tol)
+        self.run_and_check_derivs(prob)
+
     def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
         """Runs check_partials and compares to analytic derivatives."""
 
