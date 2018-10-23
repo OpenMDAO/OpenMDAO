@@ -93,11 +93,11 @@ class PETScVector(DefaultVector):
         Parameters
         ----------
         vec : <Vector>
-        The incoming vector being dotted with self.
+            The incoming vector being dotted with self.
 
         Returns
         -------
         float
-            The computed dot product.
+            The computed dot product value.
         """
         return self._system.comm.allreduce(np.dot(self._data, vec._data))
