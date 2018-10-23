@@ -10,6 +10,7 @@ from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp
     FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel, NearestNeighbor
 
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import reset_warning_registry
 from openmdao.utils.logger_utils import TestLogger
 
 class MetaModelTestCase(unittest.TestCase):
@@ -1005,7 +1006,8 @@ class MetaModelTestCase(unittest.TestCase):
         # Test with user not explicitly setting fd
         trig = Trig()
         with warnings.catch_warnings(record=True) as w:
-            prob = no_surrogate_test_setup(trig)
+            with reset_warning_registry():
+                prob = no_surrogate_test_setup(trig)
         self.assertTrue(issubclass(w[0].category, RuntimeWarning))
         expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
         "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
@@ -1167,7 +1169,6 @@ class MetaModelTestCase(unittest.TestCase):
         deriv_second_time = J[('trig.sin_x', 'indep.x')]
 
         assert_rel_error(self, deriv_first_time, deriv_second_time, 1e-4)
-
 
     def test_metamodel_setup_called_twice_bug_called_outside_setup(self):
         class Trig(MetaModelUnStructuredComp):
