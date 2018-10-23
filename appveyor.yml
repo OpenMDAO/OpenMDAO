@@ -4,9 +4,9 @@ for:
   -
     matrix:
       only:
-        - image: Ubuntu
+        - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
     cache:
-     - '/home/appveyor/miniconda' # need this only on Linux
+     - '/home/appveyor/miniconda'
      - '/home/appveyor/.cache/pip/wheels/'
 
 environment:
@@ -68,6 +68,7 @@ install:
 
       git clone https://github.com/OpenMDAO/pyoptsparse.git;
       cd pyoptsparse;
+
       python setup.py install;
       cd ..;
 
