@@ -12,6 +12,7 @@ import time
 import numpy as np
 import ast
 import astunparse
+from six import itervalues
 
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis
@@ -49,6 +50,7 @@ def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
                   (str2valid_python_name(n), n) for n in comp.options])
 
     lines.append('\nif True:\n')  # body src is indented, so put in conditional block
+
     lines.append(body_src)
 
     full_src = ''.join(lines)
@@ -208,8 +210,33 @@ def _get_arg_replacement_map(comp):
     return to_replace, pnames, onames, rnames
 
 
-def generate_component_gradient(comp, mode):
+def translate_compute_source(comp, reverts=False):
+    """
+    Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
+    Converts  def compute(self, inputs, outputs) to def kompute(self, a, b, c)
+    and translated function returns all output values as a tuple.
+
+    Parameters
+    ----------
+    comp : Component
+        The component being AD'd.
+    reverts : bool
+        If True, convert all 'self.options[...]' strings to simple var names and revert later.
+
+    Returns
+    -------
+    str
+        Converted source code.
+    list of str
+        Input names.
+    list of str
+        Output names.
+    list of str
+        Residual names.
+    dict
+        Translation map for self.options if revert is True, else empty dict.
+    """
     if isinstance(comp, ExplicitComponent):
         compute_method = comp.compute
     else:
@@ -217,9 +244,11 @@ def generate_component_gradient(comp, mode):
 
     # mapping to rename variables within the compute method
     to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
-    to_revert = {
-        "self.options['%s']" % name: '_opt__%s' % name for name in comp.options
-    }
+
+    if reverts:
+        to_revert = {"self.options['%s']" % name: '_opt__%s' % name for name in comp.options}
+    else:
+        to_revert = {}
 
     # get source code of original compute() method
     # ignore blank lines, useful for detecting indentation later
@@ -227,10 +256,9 @@ def generate_component_gradient(comp, mode):
 
     # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
     srclines[0] = srclines[0].lstrip()
-
     src = ''.join(srclines)
-
     ast2 = ast.parse(src)
+
     # combine all mappings
     mapping = to_replace.copy()
     mapping.update(to_revert)
@@ -240,14 +268,21 @@ def generate_component_gradient(comp, mode):
     # remove the original compute() call signature
     src = src.split(":\n", 1)[1]
 
-    # start construction of partial derivative functions
+    if reverts is None:
+        # generate string of function to be differentiated
+        src = '\n'.join([
+            "def %s(self, %s):" % (compute_method.__name__ + '_trans', ', '.join(pnames)),
+            src,
+            "    return %s" % ', '.join(onames + rnames)
+            ])
 
-    # gather generated gradient source code
-    df, func_source = generate_gradient(comp, mode, src, to_revert, pnames, onames, rnames)
-    deriv_src = getsource(df)
+    return src, pnames, onames, rnames, to_revert
+
+
+def revert_deriv_source(deriv_func, to_revert):
 
     # now translate back the member vars we substituted for earlier
-    deriv_ast = ast.parse(deriv_src)
+    deriv_ast = ast.parse(getsource(deriv_func))
 
     # reverse the to_revert dict
     revert = {val: key for key, val in to_revert.items()}
@@ -259,13 +294,28 @@ def generate_component_gradient(comp, mode):
     # convert function signature to def _compute_derivs_ad(self, ...)
     for i, line in enumerate(deriv_lines):
         if line.startswith('def '):
-            deriv_lines[i] = _fix_func_def(line)
+            deriv_lines[i] = _fix_func_def(line, '_compute_derivs_ad')
             break
+
+    return deriv_lines
+
+
+def generate_component_gradient(comp, mode, reverts=False):
+
+    src, pnames, onames, rnames, to_revert = translate_compute_source(comp, reverts)
+
+    # start construction of partial derivative functions
 
     comp_mod = sys.modules[comp.__class__.__module__]
     namespace = comp_mod.__dict__.copy()
-    namespace['tangent'] = tangent
-    deriv_src = '\n'.join(deriv_lines)
+
+    if reverts:
+        # gather generated gradient source code
+        df, func_source = generate_gradient(comp, mode, src, to_revert, pnames, onames, rnames)
+
+        deriv_src = '\n'.join(revert_deriv_source(df, to_revert))
+
+        namespace['tangent'] = tangent
 
     # create an actual function object by exec'ing the source
     exec(deriv_src, namespace)
@@ -274,7 +324,7 @@ def generate_component_gradient(comp, mode):
 
 
 def _get_tangent_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
-    src, dsrc, df = generate_component_gradient(comp, mode)
+    src, dsrc, df = generate_component_gradient(comp, mode, reverts=True)
 
     if show_orig:
         print("ORIG function:", file=out)
@@ -287,7 +337,33 @@ def _get_tangent_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
 
 
 def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
-    pass
+    import autograd.numpy as agnp
+    from autograd import make_jvp, make_vjp
+    from autograd.differential_operators import make_jvp_reversemode
+
+    output_names = list(comp._outputs.keys())
+    if isinstance(comp, ExplicitComponent):
+        compute_method = comp.compute
+    else:
+        compute_method = comp.apply_nonlinear
+
+    input_names = list(comp._inputs.keys())
+    input_args = [v for v in itervalues(comp._inputs)]
+
+    funcstr = """
+def _deriv_func_(self, %s):
+    self.%s(self._inputs, self._outputs)
+
+    """ % (', '.join(input_names), compute_method.__name__, ', '.join(output_names))
+
+    # JVP - forward
+    # VJP - reverse
+    if mode == 'forward':
+        deriv_func = make_jvp(compute_method)(comp._inputs, comp._outputs)
+    else:
+        deriv_func = make_vjp(compute_method)(comp._inputs, comp._outputs)
+
+    return _get_ad_jac(comp, mode, deriv_func)
 
 
 def _get_ad_jac(comp, mode, deriv_func):
@@ -402,6 +478,8 @@ def _ad_cmd(options):
 
         Jrev = _get_tangent_ad_jac(s, 'reverse', show_orig=True, out=out)
         Jfwd = _get_tangent_ad_jac(s, 'forward', show_orig=False, out=out)
+        # Jrev = _get_autograd_ad_jac(s, 'reverse', show_orig=True, out=out)
+        # Jfwd = _get_autograd_ad_jac(s, 'forward', show_orig=False, out=out)
 
         import pprint
 
@@ -415,10 +493,14 @@ def _ad_cmd(options):
     return _ad
 
 
-def _fix_func_def(line):
+def _fix_func_def(line, rename=None):
     # line is assumed to be of the form   def foo(a, b, c)
     # it will be converted to  def _compute_derivs_ad(self, a, b, c)
     parts = line.split('(', 1)
+    if rename:
+        fstart = 'def %s(' % rename
+    else:
+        fstart = parts[0]
 
     return 'def _compute_derivs_ad(' + 'self, ' + parts[1]
 
