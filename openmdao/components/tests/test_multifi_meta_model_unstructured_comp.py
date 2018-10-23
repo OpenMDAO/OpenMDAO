@@ -147,6 +147,41 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
+    def test_one_dim_one_fidelity_training_run_setup_twice(self):
+        mm = MultiFiMetaModelUnStructuredComp()
+        surr = MockSurrogate()
+
+        mm.add_input('x', 0.)
+        mm.add_output('y', 0., surrogate=surr)
+
+        prob = Problem(Group())
+        prob.model.add_subsystem('mm', mm)
+        prob.setup(check=False)
+
+        mm.options['train:x'] = [0.0, 0.4, 1.0]
+        mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
+
+        expected_xtrain=[np.array([[0.0], [0.4], [1.0]])]
+        expected_ytrain=[np.array([[3.02720998], [0.11477697], [15.82973195]])]
+
+        prob.run_model()
+        np.testing.assert_array_equal(surr.xtrain, expected_xtrain)
+        np.testing.assert_array_equal(surr.ytrain, expected_ytrain)
+
+        expected_xpredict=0.5
+        prob['mm.x'] = expected_xpredict
+        prob.run_model()
+
+        np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
+
+        # Setup and run second time
+        prob.setup(check=False)
+        expected_xpredict=0.5
+        prob['mm.x'] = expected_xpredict
+        prob.run_model()
+        np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
+
+
     def test_one_dim_bi_fidelity_training(self):
         mm = MultiFiMetaModelUnStructuredComp(nfi=2)
         surr = MockSurrogate()
