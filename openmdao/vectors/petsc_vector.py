@@ -87,17 +87,17 @@ class PETScVector(DefaultVector):
         return self._system.comm.allreduce(np.linalg.norm(self._data))
 
     def dot(self, vec):
-        """                                                                                                                                                                      
+        """
         Compute the dot product of the real parts of the current vec and the incoming vec.
 
         Parameters
         ----------
         vec : <Vector>
         The incoming vector being dotted with self.
-                                                                                                                                                                                 
-        Returns                                                                                                                                                                  
-        -------                                                                                                                                                                   
-        float                                                                                                                                                                    
+
+        Returns
+        -------
+        float
             The computed dot product.
         """
         return self._system.comm.allreduce(np.dot(self._data, vec._data))
