@@ -718,6 +718,8 @@ class CaseTable(object):
         The name of the table in the database.
     _index_name : str
         The name of the case index column in the table.
+    _global_iterations : list
+        List of iteration cases and the table and row in which they are found.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _abs2meta : dict
