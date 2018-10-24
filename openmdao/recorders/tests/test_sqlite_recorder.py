@@ -65,7 +65,7 @@ class TestSqliteRecorder(unittest.TestCase):
         os.chdir(self.temp_dir)
 
         self.filename = os.path.join(self.temp_dir, "sqlite_test")
-        self.recorder = SqliteRecorder(self.filename)
+        self.recorder = SqliteRecorder(self.filename, record_viewer_data=False)
 
         self.eps = 1e-3
 
@@ -384,9 +384,11 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_driver_records_metadata(self):
         prob = SellarProblem()
 
+        recorder = SqliteRecorder(self.filename)
+
         driver = prob.driver
         driver.recording_options['includes'] = ["p1.x"]
-        driver.add_recorder(self.recorder)
+        driver.add_recorder(recorder)
 
         prob.setup()
         prob.final_setup()  # Conclude setup but don't run model.

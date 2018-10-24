@@ -65,7 +65,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         os.chdir(self.temp_dir)
 
         self.filename = os.path.join(self.temp_dir, "sqlite_test")
-        self.recorder = SqliteRecorder(self.filename)
+        self.recorder = SqliteRecorder(self.filename, record_viewer_data=False)
 
     def tearDown(self):
         os.chdir(self.orig_dir)
@@ -1392,10 +1392,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = SellarProblem()
         prob.setup()
 
-        prob.add_recorder(self.recorder)
-        prob.driver.add_recorder(self.recorder)
-        prob.model.add_recorder(self.recorder)
-        prob.model.nonlinear_solver.add_recorder(self.recorder)
+        recorder = SqliteRecorder(self.filename)
+
+        prob.add_recorder(recorder)
+        prob.driver.add_recorder(recorder)
+        prob.model.add_recorder(recorder)
+        prob.model.nonlinear_solver.add_recorder(recorder)
 
         prob.run_driver()
         prob.record_iteration('c_1')
