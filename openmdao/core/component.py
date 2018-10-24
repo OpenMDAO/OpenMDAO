@@ -1149,7 +1149,7 @@ class Component(System):
         """
         pass
 
-    def _compute_ad_partials(self, inputs, partials):
+    def _compute_ad_partials(self, inputs, partials, ad_method):
         """
         Compute our partials using automatic differentiation (AD).
 
@@ -1159,16 +1159,18 @@ class Component(System):
             unscaled, dimensional input variables read via inputs[key]
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
+        ad_method : str
+            Method used to comput automatic derivatives ('autograd', 'tangent').
         """
         # TODO: coloring
         if self._ad_partials_func is None:
-            from openmdao.devtools.generate_derivative import generate_component_gradient
+            from openmdao.devtools.generate_derivative import generate_tangent_gradient
 
             if self._inputs._data.size > self._outputs._data.size:
                 self._ad_mode = 'reverse'
             else:
                 self._ad_mode = 'forward'
-            compute_src, grad_src, grad_func = generate_component_gradient(self, self._ad_mode)
+            compute_src, grad_src, grad_func = generate_tangent_gradient(self, self._ad_mode)
             self._ad_partials_func = grad_func
 
         if self._ad_mode == 'forward':
