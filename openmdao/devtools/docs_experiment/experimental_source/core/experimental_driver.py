@@ -310,11 +310,6 @@ class ExperimentalDriver(object):
         }
 
         self._rec_mgr.startup(self)
-        if self._rec_mgr._recorders:
-            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-            self._model_viewer_data = _get_viewer_data(problem)
-        if self.recording_options['record_metadata']:
-            self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
         if self._simul_coloring_info and self.supports['simultaneous_derivatives']:

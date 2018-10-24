@@ -28,6 +28,8 @@ class Case(object):
         The unique id of the system/solver/driver/problem that did the recording.
     iteration_coordinate : str
         The full unique identifier for this iteration.
+    parent : str
+        The iteration coordinate of the parent case for this iteration if any, else None.
     counter : int
         The unique sequential index of this case in the recording.
     timestamp : float
@@ -90,18 +92,22 @@ class Case(object):
 
         if 'iteration_coordinate' in data.keys():
             self.iteration_coordinate = data['iteration_coordinate']
+            parts = self.iteration_coordinate.split('|')
+            if len(parts) > 2:
+                self.parent = '|'.join(parts[:-2])
+            else:
+                self.parent = None
         elif 'case_name' in data.keys():
             self.iteration_coordinate = data['case_name']  # problem cases
+            self.parent = None
         else:
             self.iteration_coordinate = None
+            self.parent = None
 
         self.counter = data['counter']
         self.timestamp = data['timestamp']
         self.success = data['success']
         self.msg = data['msg']
-
-        # self.parent = parent
-        # self.children = children
 
         # for a solver case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None

@@ -732,6 +732,8 @@ class CaseTable(object):
         List of keys of cases in the table.
     _cases : dict
         Dictionary mapping keys to cases that have already been loaded.
+    _global_iterations : list
+        List of iteration cases and the table and row in which they are found.
     """
 
     def __init__(self, fname, ver, table, index, giter, prom2abs, abs2prom, abs2meta, voi_meta):

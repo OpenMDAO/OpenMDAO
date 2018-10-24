@@ -522,6 +522,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         last_counter = 0
         for i, c in enumerate(cr.get_cases(recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            if len(c.iteration_coordinate.split('|')) > 2:
+                self.assertEqual(c.parent, expected_coords[i+1])
+            else:
+                self.assertEqual(c.parent, None)
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
 
@@ -585,6 +589,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = CaseReader(self.filename)
 
         parent_coord = 'rank0:SLSQP|1|root._solve_nonlinear|2'
+        coord = parent_coord + '|NLRunOnce|0'
+
+        # user scenario: given a case (with coord), get all cases with same parent
+        case = cr.get_case(coord)
+        self.assertEqual(case.parent, parent_coord)
 
         expected_coords = [
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|2|NonlinearBlockGS|0',
@@ -600,7 +609,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         last_counter = 0
-        for i, c in enumerate(cr.get_cases(source=parent_coord, recurse=True, flat=True)):
+        for i, c in enumerate(cr.get_cases(source=case.parent, recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
@@ -1694,7 +1703,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
 
         # driver
-        driver.recording_options['record_metadata'] = True
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -1917,7 +1925,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
 
-    def test_linesearch_bounds_vector(self):
+    def test_linesearch(self):
         prob = Problem()
 
         model = prob.model
@@ -1968,7 +1976,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             case = cr.get_case(c)
 
             coord = case.iteration_coordinate
-            print(i, case.counter, coord, case.source)
             self.assertEqual(coord, expected[i])
 
             # check the source

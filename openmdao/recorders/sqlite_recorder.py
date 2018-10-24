@@ -116,8 +116,8 @@ class SqliteRecorder(CaseRecorder):
 
     Attributes
     ----------
-    model_viewer_data : dict
-        Dict that holds the data needed to generate N2 diagram.
+    _record_viewer_data : bool
+        Flag indicating whether to record data needed to generate N2 diagram.
     connection : sqlite connection object
         Connection to the sqlite3 database.
     _abs2prom : {'input': dict, 'output': dict}
@@ -137,7 +137,7 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether to record on this processor when running in parallel.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=2):
+    def __init__(self, filepath, append=False, pickle_version=2, record_viewer_data=True):
         """
         Initialize the SqliteRecorder.
 
@@ -145,16 +145,18 @@ class SqliteRecorder(CaseRecorder):
         ----------
         filepath : str
             Path to the recorder file.
-        append : bool
+        append : bool, optional
             Optional. If True, append to an existing case recorder file.
-        pickle_version : int
-            Optional. The pickle protocol version to use when pickling metadata.
+        pickle_version : int, optional
+            The pickle protocol version to use when pickling metadata.
+        record_viewer_data : bool, optional
+            If True, record data needed for visualization.
         """
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
 
         self.connection = None
-        self.model_viewer_data = None
+        self._record_viewer_data = record_viewer_data
 
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
@@ -166,7 +168,7 @@ class SqliteRecorder(CaseRecorder):
         # default to record on all procs when running in parallel
         self._record_on_proc = True
 
-        super(SqliteRecorder, self).__init__()
+        super(SqliteRecorder, self).__init__(record_viewer_data)
 
     def _initialize_database(self):
         """
@@ -549,25 +551,27 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('solver', c.lastrowid, source_solver))
 
-    def record_metadata_driver(self, recording_requester):
+    def record_viewer_data(self, model_viewer_data, key='Driver'):
         """
-        Record driver metadata.
+        Record model viewer data.
 
         Parameters
         ----------
-        recording_requester : Driver
-            The Driver that would like to record its metadata.
+        model_viewer_data : dict
+            Data required to visualize the model.
+        key : str, optional
+            The unique ID to use for this data in the table.
         """
         if self.connection:
-            driver_class = type(recording_requester).__name__
-            model_viewer_data = json.dumps(recording_requester._model_viewer_data)
+            model_viewer_data = json.dumps(model_viewer_data)
 
+            # Note: recorded to 'driver_metadata' table for legacy/compatibility reasons.
             try:
                 with self.connection as c:
                     c.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
-                              "VALUES(?,?)", (driver_class, model_viewer_data))
+                              "VALUES(?,?)", (key, model_viewer_data))
             except sqlite3.IntegrityError:
-                print("Metadata has already been recorded for %s." % driver_class)
+                print("Model viewer data has already has already been recorded for %s." % key)
 
     def record_metadata_system(self, recording_requester):
         """

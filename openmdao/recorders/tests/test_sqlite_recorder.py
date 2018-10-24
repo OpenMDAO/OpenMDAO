@@ -23,7 +23,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
-    assertDriverMetadataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
+    assertViewerDataRecorded, assertSystemMetadataIdsRecorded, assertSystemIterCoordsRecorded, \
     assertDriverDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
@@ -386,7 +386,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['includes'] = ["p1.x"]
-        driver.recording_options['record_metadata'] = True
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -443,7 +442,7 @@ class TestSqliteRecorder(unittest.TestCase):
             'tree_children_length': 7,
             'abs2prom': abs2prom,
         }
-        assertDriverMetadataRecorded(self, expected_problem_metadata)
+        assertViewerDataRecorded(self, expected_problem_metadata)
 
     def test_system_records_no_metadata(self):
         prob = Problem(model=SellarDerivatives())
@@ -529,29 +528,18 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
         self.assertEqual(len(cr.system_metadata.keys()), 0)
 
-    def test_driver_without_n2_data(self):
+    def test_without_n2_data(self):
         prob = SellarProblem()
 
-        prob.driver.recording_options['record_n2_data'] = False
-        prob.driver.add_recorder(self.recorder)
+        recorder = SqliteRecorder(self.filename, record_viewer_data=False)
+
+        prob.driver.add_recorder(recorder)
 
         prob.setup()
         prob.final_setup()  # Conclude setup but don't run model.
         prob.cleanup()
 
-        assertDriverMetadataRecorded(self, None, True)
-
-    def test_driver_doesnt_record_metadata(self):
-        prob = SellarProblem()
-
-        prob.driver.recording_options['record_metadata'] = False
-        prob.driver.add_recorder(self.recorder)
-
-        prob.setup()
-        prob.final_setup()  # Conclude setup but don't run model.
-        prob.cleanup()
-
-        assertDriverMetadataRecorded(self, None)
+        assertViewerDataRecorded(self, None)
 
     def test_record_system(self):
         prob = SellarProblem()
@@ -1137,7 +1125,6 @@ class TestSqliteRecorder(unittest.TestCase):
         #
 
         # Driver
-        driver.recording_options['record_metadata'] = True
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -1490,7 +1477,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = SellarProblem()
 
         driver = prob.driver
-        driver.recording_options['record_metadata'] = True
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
@@ -1506,7 +1492,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = SellarProblem()
 
         driver = prob.driver
-        driver.recording_options['record_metadata'] = True
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
@@ -1650,9 +1635,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.model.add_constraint('con2', upper=0.0)
 
         prob.driver = ScipyOptimizeDriver()
-
-        # make sure we record metadata
-        prob.driver.recording_options['record_metadata'] = True
 
         # also record the metadata for all systems in the model
         prob.driver.recording_options['record_model_metadata'] = True
