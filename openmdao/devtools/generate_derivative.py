@@ -395,12 +395,12 @@ def _get_tangent_ad_jac(comp, mode, J):
     src, dsrc, df = generate_tangent_gradient(comp, mode)
 
     if mode == 'forward':
-        return _get_ad_jac_fwd(comp, df, ad_method='tangent', J=J)
+        return _get_ad_jac_fwd(comp, df, ad_method='tangent', partials=J)
     else:
-        return _get_ad_jac_rev(comp, df, ad_method='tangent', J=J)
+        return _get_ad_jac_rev(comp, df, ad_method='tangent', partials=J)
 
 
-def _get_autograd_ad_jac(comp, mode, J):
+def _get_autograd_ad_func(comp, mode):
     import autograd.numpy as agnp
     from autograd import make_jvp, make_vjp
     from autograd.differential_operators import make_jvp_reversemode
@@ -411,11 +411,11 @@ def _get_autograd_ad_jac(comp, mode, J):
         compute_method = comp.compute
     else:
         compute_method = comp.apply_nonlinear
+    funcname = compute_method.__name__ + '_trans'
 
     input_names = list(comp._inputs.keys())
     input_args = [comp._inputs[n] for n in input_names]
 
-    funcname = compute_method.__name__ + '_trans'
     funcstr, pnames, onames, rnames = translate_compute_source_autograd(comp)
 
     comp_mod = sys.modules[comp.__class__.__module__]
@@ -435,14 +435,19 @@ def _get_autograd_ad_jac(comp, mode, J):
     # JVP - forward
     # VJP - reverse
     if mode == 'forward':
-        deriv_func = make_jvp(func)(agnp.array(comp._inputs._data))
-        return _get_ad_jac_fwd(comp, deriv_func, ad_method='autograd', J=J)
+        return make_jvp(func)(agnp.array(comp._inputs._data))
     else:
-        deriv_func = make_vjp(func)(agnp.array(comp._inputs._data))[0]
-        return _get_ad_jac_rev(comp, deriv_func, ad_method='autograd', J=J)
+        return make_vjp(func)(agnp.array(comp._inputs._data))[0]
 
 
-def _get_ad_jac_fwd(comp, deriv_func, ad_method, J):
+def _get_autograd_ad_jac(comp, mode, deriv_func, J):
+    if mode == 'forward':
+        return _get_ad_jac_fwd(comp, deriv_func, ad_method='autograd', partials=J)
+    else:
+        return _get_ad_jac_rev(comp, deriv_func, ad_method='autograd', partials=J)
+
+
+def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
     prefix = comp.pathname + '.' if comp.pathname else ''
 
     inputs = comp._inputs
@@ -456,6 +461,7 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, J):
     idx2arrname = [None] * array.size  # map array index to array var name
     idx2loc = np.zeros(array.size, dtype=int)
 
+    J = {}
     views = []
     start = end = 0
     for n in vec:
@@ -488,10 +494,11 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, J):
                     J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
                 J[key][:, locidx] = grad[i]
 
-    return J
+    for key in J:
+        partials[key] = J[key]
 
 
-def _get_ad_jac_rev(comp, deriv_func, ad_method, J):
+def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
     prefix = comp.pathname + '.' if comp.pathname else ''
 
     inputs = comp._inputs
@@ -503,6 +510,7 @@ def _get_ad_jac_rev(comp, deriv_func, ad_method, J):
     idx2arrname = [None] * array.size  # map array index to array var name
     idx2loc = np.zeros(array.size, dtype=int)
 
+    J = {}
     views = []
     start = end = 0
     for n in vec:
@@ -535,7 +543,8 @@ def _get_ad_jac_rev(comp, deriv_func, ad_method, J):
                     J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
                 J[key][locidx:] = grad[i]
 
-    return J
+    for key in J:
+        partials[key] = J[key]
 
 
 def _ad_setup_parser(parser):
@@ -576,6 +585,9 @@ def _ad_cmd(options):
         out = open(options.outfile, 'w')
 
     def _ad(prob):
+        """
+        Compute the fwd and rev AD for the compute or apply_nonlinear method of the given class.
+        """
         for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
             if s.__class__.__name__ == options.class_:
                 break
@@ -589,9 +601,11 @@ def _ad_cmd(options):
             _get_tangent_ad_jac(s, 'forward', Jfwd)
         elif options.ad_method == 'autograd':
             Jrev = {}
-            _get_autograd_ad_jac(s, 'reverse', Jrev)
+            func = _get_autograd_ad_func(s, 'reverse')
+            _get_autograd_ad_jac(s, 'reverse', func, Jrev)
             Jfwd = {}
-            _get_autograd_ad_jac(s, 'forward', Jfwd)
+            func = _get_autograd_ad_func(s, 'forward')
+            _get_autograd_ad_jac(s, 'forward', func, Jfwd)
 
         import pprint
 
