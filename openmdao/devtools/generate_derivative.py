@@ -369,7 +369,7 @@ def revert_deriv_source(deriv_func, to_revert):
     return deriv_lines
 
 
-def generate_tangent_gradient(comp, mode):
+def _get_tangent_ad_func(comp, mode):
 
     src, pnames, onames, rnames, to_revert = translate_compute_source_tangent(comp)
 
@@ -388,11 +388,11 @@ def generate_tangent_gradient(comp, mode):
     # create an actual function object by exec'ing the source
     exec(deriv_src, namespace)
 
-    return func_source, deriv_src, namespace['_compute_derivs_ad']
+    return namespace['_compute_derivs_ad']
 
 
 def _get_tangent_ad_jac(comp, mode, J):
-    src, dsrc, df = generate_tangent_gradient(comp, mode)
+    df = _get_tangent_ad_func(comp, mode)
 
     if mode == 'forward':
         return _get_ad_jac_fwd(comp, df, ad_method='tangent', partials=J)

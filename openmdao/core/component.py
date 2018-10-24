@@ -1164,19 +1164,17 @@ class Component(System):
         """
         # TODO: coloring
         if self._ad_partials_func is None:
-            from openmdao.devtools.generate_derivative import generate_tangent_gradient
+            from openmdao.devtools.generate_derivative import _get_tangent_ad_func, \
+                _get_ad_jac_fwd, _get_ad_jac_rev, _get_autograd_ad_func
 
-            if self._inputs._data.size > self._outputs._data.size:
-                self._ad_mode = 'reverse'
-            else:
-                self._ad_mode = 'forward'
+            ad_mode = 'reverse' if inputs._data.size > self._outputs._data.size else 'forward'
+
             if ad_method == 'tangent':
-                _, _, grad_func = generate_tangent_gradient(self, self._ad_mode)
+                self._ad_partials_func = _get_tangent_ad_func(self, ad_mode)
             elif ad_method == 'autograd':
-                grad_func = _get_autograd_ad_func(self, self._ad_mode, partials)
-            self._ad_partials_func = grad_func
+                self._ad_partials_func = _get_autograd_ad_func(self, ad_mode)
 
-        if self._ad_mode == 'forward':
+        if ad_mode == 'forward':
             _get_ad_jac_fwd(self, self._ad_partials_func, ad_method, partials)
         else:
             _get_ad_jac_rev(self, self._ad_partials_func, ad_method, partials)
