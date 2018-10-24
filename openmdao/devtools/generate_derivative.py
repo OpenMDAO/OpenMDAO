@@ -114,10 +114,10 @@ def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
 
     new_src = '\n'.join(lines)
 
-    ast2 = ast.parse(new_src)
-
-    new_ast = transform_ast_names(ast2, fmap)
-    new_src = astunparse.unparse(new_ast)
+    if fmap:
+        ast2 = ast.parse(new_src)
+        new_ast = transform_ast_names(ast2, fmap)
+        new_src = astunparse.unparse(new_ast)
 
     # needs to have an associated source file for tangent's use of inspect functions to work
 
@@ -345,7 +345,6 @@ def translate_compute_source_autograd(comp):
         "    return tuple([%s])" % ', '.join(onames + rnames)
         ])
 
-    print(src)
     return src, pnames, onames, rnames
 
 
@@ -370,7 +369,7 @@ def revert_deriv_source(deriv_func, to_revert):
     return deriv_lines
 
 
-def generate_component_gradient(comp, mode, reverts=False):
+def generate_component_gradient(comp, mode):
 
     src, pnames, onames, rnames, to_revert = translate_compute_source_tangent(comp)
 
@@ -379,13 +378,12 @@ def generate_component_gradient(comp, mode, reverts=False):
     comp_mod = sys.modules[comp.__class__.__module__]
     namespace = comp_mod.__dict__.copy()
 
-    if reverts:
-        # gather generated gradient source code
-        df, func_source = generate_gradient(comp, mode, src, to_revert, pnames, onames, rnames)
+    # gather generated gradient source code
+    df, func_source = generate_gradient(comp, mode, src, to_revert, pnames, onames, rnames)
 
-        deriv_src = '\n'.join(revert_deriv_source(df, to_revert))
+    deriv_src = '\n'.join(revert_deriv_source(df, to_revert))
 
-        namespace['tangent'] = tangent
+    namespace['tangent'] = tangent
 
     # create an actual function object by exec'ing the source
     exec(deriv_src, namespace)
@@ -394,7 +392,7 @@ def generate_component_gradient(comp, mode, reverts=False):
 
 
 def _get_tangent_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
-    src, dsrc, df = generate_component_gradient(comp, mode, reverts=True)
+    src, dsrc, df = generate_component_gradient(comp, mode)
 
     if show_orig:
         print("ORIG function:", file=out)
@@ -403,14 +401,14 @@ def _get_tangent_ad_jac(comp, mode, show_orig=True, out=sys.stdout):
     print("%s grad function:" % mode, file=out)
     print(dsrc, file=out)
 
-    return _get_ad_jac(comp, mode, df)
+    return _get_ad_jac(comp, mode, df, ad_method='tangent')
 
 
 def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
     import autograd.numpy as agnp
     from autograd import make_jvp, make_vjp
     from autograd.differential_operators import make_jvp_reversemode
-    from autograd import grad
+    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict
 
     output_names = list(comp._outputs.keys())
     if isinstance(comp, ExplicitComponent):
@@ -422,19 +420,12 @@ def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
     input_args = [comp._inputs[n] for n in input_names]
 
     funcname = compute_method.__name__ + '_trans'
-#     funcstr = """
-# def %s(invec):
-#     self.%s(self._inputs, self._outputs)
-#     return %s
-#     """ % (funcname, compute_method.__name__,
-#            ', '.join(["self._outputs['%s']" % n for n in output_names]))
     funcstr, pnames, onames, rnames = translate_compute_source_autograd(comp)
 
     comp_mod = sys.modules[comp.__class__.__module__]
     namespace = comp_mod.__dict__.copy()
     namespace['self'] = comp
-    import autograd.numpy as agnp
-    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict
+
     namespace['numpy'] = agnp
     namespace['np'] = agnp
     namespace['tuple'] = agtuple
@@ -444,19 +435,18 @@ def _get_autograd_ad_jac(comp, mode, show_orig=False, out=sys.stdout):
     exec(funcstr, namespace)
 
     func = namespace[funcname]
-    g = grad(func)
 
     # JVP - forward
     # VJP - reverse
     if mode == 'forward':
         deriv_func = make_jvp(func)(agnp.array(comp._inputs._data))
     else:
-        deriv_func = make_vjp(func)(agnp.array(comp._inputs._data))
+        deriv_func = make_vjp(func)(agnp.array(comp._inputs._data))[0]
 
-    return _get_ad_jac(comp, mode, deriv_func[0])
+    return _get_ad_jac(comp, mode, deriv_func, ad_method='autograd')
 
 
-def _get_ad_jac(comp, mode, deriv_func):
+def _get_ad_jac(comp, mode, deriv_func, ad_method):
     prefix = comp.pathname + '.' if comp.pathname else ''
 
     J = {}
@@ -464,21 +454,24 @@ def _get_ad_jac(comp, mode, deriv_func):
     outputs = comp._outputs
 
     if mode == 'forward':
-        array = comp._vectors['input']['nonlinear']._data
         vec = inputs
     else:  # reverse
-        array = comp._vectors['output']['nonlinear']._data
         vec = outputs
 
-    idx2output = [None] * array.size  # map array index to output name
+    array = vec._data
+
+    agrad = ad_method == 'autograd'
+
+    idx2arrname = [None] * array.size  # map array index to array var name
     idx2loc = np.zeros(array.size, dtype=int)
+
     views = []
     start = end = 0
     for n in vec:
         end += vec[n].size
         views.append(array[start:end])
         for i in range(start, end):
-            idx2output[i] = n
+            idx2arrname[i] = n
         idx2loc[start:end] = np.arange(start, end, dtype=int) - start
         start = end
 
@@ -487,11 +480,14 @@ def _get_ad_jac(comp, mode, deriv_func):
         for idx in range(array.size):
             array[:] = 0.0
             array[idx] = 1.0
-            iname = idx2output[idx]
+            iname = idx2arrname[idx]
             locidx = idx2loc[idx]
             abs_in = prefix + iname
 
-            grad = deriv_func(comp, *params)
+            if agrad:
+                grad = deriv_func(array)[1]
+            else:
+                grad = deriv_func(comp, *params)
             for i, oname in enumerate(outputs):
                 abs_out = prefix + oname
                 key = (abs_out, abs_in)
@@ -501,16 +497,20 @@ def _get_ad_jac(comp, mode, deriv_func):
                     J[key][:, locidx] = grad[i]
 
     else:  # reverse
-        params = [inputs[name] for name in inputs] + [views]
+        if not agrad:
+            params = [inputs[name] for name in inputs] + [views]
 
         for oidx in range(array.size):
             array[:] = 0.0
             array[oidx] = 1.0
-            oname = idx2output[oidx]
+            oname = idx2arrname[oidx]
             locidx = idx2loc[oidx]
             abs_out = prefix + oname
 
-            grad = deriv_func(array) # comp, *params)
+            if agrad:
+                grad = deriv_func(array)
+            else:
+                grad = deriv_func(comp, *params)
             for i, iname in enumerate(inputs):
                 abs_in = prefix + iname
                 key = (abs_out, abs_in)
@@ -534,8 +534,8 @@ def _ad_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
-    # parser.add_argument('-m', '--mode', default='forward', action='store', dest='mode',
-    #                     help='AD mode (forward, reverse).')
+    parser.add_argument('-m', '--method', default='autograd', action='store', dest='ad_method',
+                        help='AD method (autograd, tangent).')
     parser.add_argument('-c', '--class', action='store', dest='class_',
                         help='Specify component class to run AD on.')
 
@@ -566,17 +566,19 @@ def _ad_cmd(options):
         else:
             raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
 
-        # Jrev = _get_tangent_ad_jac(s, 'reverse', show_orig=True, out=out)
-        # Jfwd = _get_tangent_ad_jac(s, 'forward', show_orig=False, out=out)
-        Jrev = _get_autograd_ad_jac(s, 'reverse', show_orig=True, out=out)
-        # Jfwd = _get_autograd_ad_jac(s, 'forward', show_orig=False, out=out)
+        if options.ad_method == 'tangent':
+            Jrev = _get_tangent_ad_jac(s, 'reverse', show_orig=True, out=out)
+            Jfwd = _get_tangent_ad_jac(s, 'forward', show_orig=False, out=out)
+        elif options.ad_method == 'autograd':
+            Jrev = _get_autograd_ad_jac(s, 'reverse', show_orig=True, out=out)
+            Jfwd = _get_autograd_ad_jac(s, 'forward', show_orig=False, out=out)
 
         import pprint
 
         print("\n\nReverse J:")
         pprint.pprint(Jrev)
-        # print("Forward J:")
-        # pprint.pprint(Jfwd)
+        print("Forward J:")
+        pprint.pprint(Jfwd)
 
         exit()
 
