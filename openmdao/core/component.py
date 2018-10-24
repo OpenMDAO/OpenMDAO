@@ -23,7 +23,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 from openmdao.utils.mpi import MPI
-
+import openmdao.utils.mod_wrapper as mod_wrapper
 
 # Suppored methods for derivatives
 _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
@@ -1163,21 +1163,28 @@ class Component(System):
             Method used to comput automatic derivatives ('autograd', 'tangent').
         """
         # TODO: coloring
-        if self._ad_partials_func is None:
-            from openmdao.devtools.generate_derivative import _get_tangent_ad_func, \
-                _get_ad_jac_fwd, _get_ad_jac_rev, _get_autograd_ad_func
+        try:
+            if ad_method == 'autograd':
+                import autograd.numpy as agnp
+                mod_wrapper.np = mod_wrapper.numpy = agnp
 
-            ad_mode = 'reverse' if inputs._data.size > self._outputs._data.size else 'forward'
+            if self._ad_partials_func is None:
+                from openmdao.devtools.generate_derivative import _get_tangent_ad_func, \
+                    _get_ad_jac_fwd, _get_ad_jac_rev, _get_autograd_ad_func
 
-            if ad_method == 'tangent':
-                self._ad_partials_func = _get_tangent_ad_func(self, ad_mode)
-            elif ad_method == 'autograd':
-                self._ad_partials_func = _get_autograd_ad_func(self, ad_mode)
+                ad_mode = 'reverse' if inputs._data.size > self._outputs._data.size else 'forward'
 
-        if ad_mode == 'forward':
-            _get_ad_jac_fwd(self, self._ad_partials_func, ad_method, partials)
-        else:
-            _get_ad_jac_rev(self, self._ad_partials_func, ad_method, partials)
+                if ad_method == 'tangent':
+                    self._ad_partials_func = _get_tangent_ad_func(self, ad_mode)
+                elif ad_method == 'autograd':
+                    self._ad_partials_func = _get_autograd_ad_func(self, ad_mode)
+
+            if ad_mode == 'forward':
+                _get_ad_jac_fwd(self, self._ad_partials_func, ad_method, partials)
+            else:
+                _get_ad_jac_rev(self, self._ad_partials_func, ad_method, partials)
+        finally:
+            mod_wrapper.np = mod_wrapper.numpy = np
 
 
 class _DictValues(object):

@@ -1,6 +1,7 @@
 from collections import Iterable
 
 import sys
+import traceback
 import tangent
 from inspect import signature, getsourcelines, getsource, getmodule
 from collections import OrderedDict, defaultdict
@@ -424,6 +425,9 @@ def _get_autograd_ad_func(comp, mode):
 
     namespace['numpy'] = agnp
     namespace['np'] = agnp
+    for key in dir(agnp):
+        if not key.startswith('_'):
+            namespace[key] = getattr(agnp, key)
     namespace['tuple'] = agtuple
     namespace['list'] = aglist
     namespace['dict'] = agdict
@@ -561,8 +565,8 @@ def _ad_setup_parser(parser):
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('-m', '--method', default='autograd', action='store', dest='ad_method',
                         help='AD method (autograd, tangent).')
-    parser.add_argument('-c', '--class', action='store', dest='class_',
-                        help='Specify component class to run AD on.')
+    parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
+                        help='Specify component class(es) to run AD on.')
 
 
 def _ad_cmd(options):
@@ -588,31 +592,52 @@ def _ad_cmd(options):
         """
         Compute the fwd and rev AD for the compute or apply_nonlinear method of the given class.
         """
-        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
-            if s.__class__.__name__ == options.class_:
-                break
-        else:
-            raise RuntimeError("Couldn't find an instance of class '%s'." % options.class_)
-
-        if options.ad_method == 'tangent':
-            Jrev = {}
-            _get_tangent_ad_jac(s, 'reverse', Jrev)
-            Jfwd = {}
-            _get_tangent_ad_jac(s, 'forward', Jfwd)
-        elif options.ad_method == 'autograd':
-            Jrev = {}
-            func = _get_autograd_ad_func(s, 'reverse')
-            _get_autograd_ad_jac(s, 'reverse', func, Jrev)
-            Jfwd = {}
-            func = _get_autograd_ad_func(s, 'forward')
-            _get_autograd_ad_jac(s, 'forward', func, Jfwd)
-
         import pprint
+        classes = set(options.classes)
+        seen = set()
 
-        print("\n\nReverse J:")
-        pprint.pprint(Jrev)
-        print("Forward J:")
-        pprint.pprint(Jfwd)
+        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
+            cname = s.__class__.__name__
+            if cname in classes and cname not in seen:
+                seen.add(cname)
+                if cname in ('IndepVarComp', 'ExecComp'):
+                    continue
+
+                print("\nClass:", cname)
+                try:
+                    if options.ad_method == 'tangent':
+                        Jrev = {}
+                        _get_tangent_ad_jac(s, 'reverse', Jrev)
+                        Jfwd = {}
+                        _get_tangent_ad_jac(s, 'forward', Jfwd)
+                    elif options.ad_method == 'autograd':
+                        import autograd.numpy as agnp
+                        import openmdao.utils.mod_wrapper as mod_wrapper
+                        mod_wrapper.np = mod_wrapper.numpy = agnp
+                        try:
+                            Jrev = {}
+                            func = _get_autograd_ad_func(s, 'reverse')
+                            _get_autograd_ad_jac(s, 'reverse', func, Jrev)
+                            Jfwd = {}
+                            func = _get_autograd_ad_func(s, 'forward')
+                            _get_autograd_ad_jac(s, 'forward', func, Jfwd)
+                        finally:
+                            mod_wrapper.np = mod_wrapper.numpy = np
+
+                    print("\n\nReverse J:")
+                    pprint.pprint(Jrev)
+                    print("Forward J:")
+                    pprint.pprint(Jfwd)
+                    if len(seen) == len(classes):
+                        break
+                except:
+                    traceback.print_exc(file=sys.stdout)
+                    print("\n")
+
+        not_found = classes - seen
+        if not_found:
+            raise RuntimeError("Couldn't find an instance of the following classes: %s." %
+                               not_found)
 
         exit()
 
