@@ -1016,7 +1016,7 @@ class CaseTable(object):
                     record_type, source = global_iter[1], global_iter[3]
                     if record_type == table:
                         if not source.startswith('root'):
-                            sources.add('root.'+source)
+                            sources.add('root.' + source)
                         else:
                             sources.add(source)
                 self._sources = sources
