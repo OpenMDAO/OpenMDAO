@@ -1410,7 +1410,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(compact_print=True)
+        data = prob.check_partials()
 
         x1_error = data['comp']['y', 'x1']['abs error']
 
@@ -1610,32 +1610,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.run_model()
 
         prob.check_partials(step_calc='rel', compact_print=True)
-
-    def test_feature_compact_print_formatting(self):
-        from openmdao.api import Problem, Group, IndepVarComp
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
-
-        prob = Problem()
-        prob.model = Group()
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
-        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
-        prob.model.add_subsystem('comp2', ParaboloidMatVec())
-
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
-        prob.model.connect('comp.f_xy', 'comp2.x')
-
-        prob.set_solver_print(level=0)
-
-        comp.set_check_partial_options(wrt='*', step_calc='rel')
-
-        prob.setup()
-        prob.run_model()
-
-        prob.check_partials(compact_print=True)
 
     def test_feature_check_partials_show_only_incorrect(self):
         from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent

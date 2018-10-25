@@ -33,7 +33,7 @@ Basic Usage
 
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_incorrect_jacobian
-    :layout: interleave
+    :layout: code, output
 
 ----
 
@@ -41,23 +41,8 @@ Basic Usage
 
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_suppress
-    :layout: output
+    :layout: code, output
 
-
-Compact Printing Option
------------------------
-
-For a more compact display, set :code:`compact_print` to True. Notice that if any of the absolute tolerances are
-exceeded, `>ABS_TOL` is printed at the end of the line. Similarly, if any of the relative tolerances are
-exceeded, `>REL_TOL` is printed at the end of the line.
-
-In the compact form, the reverse derivative values are only shown for matrix-free components.
-
-Also, notice that at the bottom of the output, the partial derivative calculation with the largest relative error is given.
-
-.. embed-code::
-    openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_compact_print_formatting
-    :layout: output
 
 Show Only Incorrect Printing Option
 -----------------------------------
@@ -67,6 +52,6 @@ True. This applies to both :code:`compact_print` :code:`True` and :code:`False`.
 
 .. embed-code::
     openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_feature_check_partials_show_only_incorrect
-    :layout: output
+    :layout: code, output
 
 
