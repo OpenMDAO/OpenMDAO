@@ -146,17 +146,17 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['outputs']), [])
 
-        with assertRaisesRegex(self, RuntimeError, "No cases recorded for problem."):
+        with assertRaisesRegex(self, RuntimeError, "No cases recorded for problem"):
             cr.list_source_vars('problem')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root."):
+        with assertRaisesRegex(self, RuntimeError, "Source not found: root"):
             cr.list_source_vars('root')
 
         with assertRaisesRegex(self, RuntimeError, "Source not found: root.nonlinear_solver"):
             cr.list_source_vars('root.nonlinear_solver')
 
         # check list cases
-        with assertRaisesRegex(self, RuntimeError, "Source not found: foo."):
+        with assertRaisesRegex(self, RuntimeError, "Source not found: foo"):
             cr.list_cases('foo')
 
         with assertRaisesRegex(self, TypeError, "Source parameter must be a string, 999 is type int"):

@@ -399,10 +399,10 @@ class SqliteCaseReader(BaseCaseReader):
             source_cases = self._solver_cases.list_cases(source)
             case = self._solver_cases.get_case(source_cases[0])
         else:
-            raise RuntimeError('Source not found: %s.' % source)
+            raise RuntimeError('Source not found: %s' % source)
 
         if case is None:
-            raise RuntimeError('No cases recorded for %s.' % source)
+            raise RuntimeError('No cases recorded for %s' % source)
 
         if case.inputs:
             dct['inputs'] = list(case.inputs.keys())
@@ -498,7 +498,7 @@ class SqliteCaseReader(BaseCaseReader):
                     else:
                         return self._list_cases_recurse_nested(source)
             else:
-                raise RuntimeError('Source not found: %s.' % source)
+                raise RuntimeError('Source not found: %s' % source)
 
     def _list_cases_recurse_flat(self, coord=None):
         """
@@ -926,12 +926,11 @@ class CaseTable(object):
             if self._format_version >= 5:
                 source = self._get_row_source(row['id'])
 
-                # TODO: this check is for catching situations where parsing the iter coord
-                #       does not work. remove before flight.
+                # check for situations where parsing the iter coord doesn't work correctly
                 iter_source = self._get_source(row[self._index_name])
                 if iter_source != source:
-                    raise RuntimeError('Mismatched source for %d: %s = %s vs %s' %
-                                       (row['id'], row[self._index_name], iter_source, source))
+                    simple_warning('Mismatched source for %d: %s = %s vs %s' %
+                                   (row['id'], row[self._index_name], iter_source, source))
             else:
                 source = self._get_source(row[self._index_name])
 
@@ -1010,7 +1009,19 @@ class CaseTable(object):
             List of sources.
         """
         if self._sources is None:
-            self._sources = set([self._get_source(case) for case in self.list_cases()])
+            if self._format_version >= 5:
+                table = self._table_name.split('_')[0]  # remove "_iterations" from table name
+                sources = set()
+                for global_iter in self._global_iterations:
+                    record_type, source = global_iter[1], global_iter[3]
+                    if record_type == table:
+                        if not source.startswith('root'):
+                            sources.add('root.'+source)
+                        else:
+                            sources.add(source)
+                self._sources = sources
+            else:
+                self._sources = set([self._get_source(case) for case in self.list_cases()])
 
         return self._sources
 
