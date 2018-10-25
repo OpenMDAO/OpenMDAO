@@ -681,6 +681,10 @@ class Problem(object):
         """
         Clean up resources prior to exit.
         """
+        # shut down all recorders
+        self._rec_mgr.shutdown()
+
+        # clean up driver and model resources
         self.driver.cleanup()
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
