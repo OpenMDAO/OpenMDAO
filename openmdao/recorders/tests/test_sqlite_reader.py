@@ -1530,9 +1530,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         # the following were randomly generated using np.random.random(10)*2-1 to randomly
         # disperse them within a unit circle centered at the origin.
         # Also converted this array to > 1D array to test that capability of case recording
-        x_vals = np.array([0.55994437, -0.95923447, 0.21798656, -0.02158783, 0.62183717,
-                           0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886]).reshape(
-            (-1, 1))
+        x_vals = np.array([
+            0.55994437, -0.95923447, 0.21798656, -0.02158783, 0.62183717,
+            0.04007379, 0.46044942, -0.10129622, 0.27720413, -0.37107886
+        ]).reshape((-1, 1))
+
         indeps.add_output('x', x_vals)
         indeps.add_output('y', np.array([
             0.52577864, 0.30894559, 0.8420792, 0.35039912, -0.67290778,
@@ -1569,7 +1571,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_constraint('r_con.g', equals=0)
 
         IND = np.arange(SIZE, dtype=int)
-        EVEN_IND = IND[0::2]  # all odd indices
+        EVEN_IND = IND[0::2]  # all even indices
         model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
         model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
@@ -1585,21 +1587,32 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        # Add one to all the inputs just to change the model
-        #   so we can see if loading the case values really changes the model
+        # get the case we recorded
+        cr = CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        # check 'use_indices' option, default is to use indices
+        dvs = case.get_design_vars()
+        assert_rel_error(self, dvs['x'], x_vals[[0, 3]], 1e-12)
+
+        dvs = case.get_design_vars(use_indices=False)
+        assert_rel_error(self, dvs['x'], x_vals, 1e-12)
+
+        cons = case.get_constraints()
+        self.assertEqual(len(cons['theta_con.g']), len(EVEN_IND))
+
+        cons = case.get_constraints(use_indices=False)
+        self.assertEqual(len(cons['theta_con.g']), SIZE)
+
+        # add one to all the inputs just to change the model, so we
+        # can see if loading the case values really changes the model
         for name in prob.model._inputs:
             model._inputs[name] += 1.0
         for name in prob.model._outputs:
             model._outputs[name] += 1.0
 
-        # Now load in the case we recorded
-        cr = CaseReader(self.filename)
-
-        driver_cases = cr.list_cases('driver')
-        case = cr.get_case(driver_cases[0])
-
+        # load in the case we recorded and check that the model then matches
         prob.load_case(case)
-
         _assert_model_matches_case(case, model)
 
     def test_multidimensional_arrays(self):

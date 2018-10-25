@@ -210,7 +210,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('desvar')
         if scaled:
-            return self._scale(vals)
+            return self._apply_voi_meta(vals, scaled, use_indices)
         else:
             return vals
 
@@ -232,7 +232,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('objective')
         if scaled:
-            return self._scale(vals)
+            return self._apply_voi_meta(vals, scaled, use_indices)
         else:
             return vals
 
@@ -254,7 +254,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('constraint')
         if scaled:
-            return self._scale(vals)
+            return self._apply_voi_meta(vals, scaled, use_indices)
         else:
             return vals
 
@@ -276,7 +276,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('response')
         if scaled:
-            return self._scale(vals)
+            return self._apply_voi_meta(vals, scaled, use_indices)
         else:
             return vals
 
@@ -538,14 +538,18 @@ class Case(object):
 
         return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
 
-    def _scale(self, vals):
+    def _apply_voi_meta(self, vals, scaled=True, use_indices=True):
         """
-        Scale the values array using adder and scaler from _voi_meta.
+        Scale the values array and apply indices from _voi_meta per the arguments.
 
         Parameters
         ----------
         vals : PromotedToAbsoluteMap
             Map of variables to their values.
+        scaled : bool
+            The unique id of the system/solver/driver/problem that did the recording.
+        use_indices : bool
+            The full unique identifier for this iteration.
 
         Returns
         -------
@@ -554,11 +558,16 @@ class Case(object):
         """
         for name in vals.absolute_names():
             if name in self._voi_meta:
-                # physical to scaled
-                if self._voi_meta[name]['adder'] is not None:
-                    vals[name] += self._voi_meta[name]['adder']
-                if self._voi_meta[name]['scaler'] is not None:
-                    vals[name] *= self._voi_meta[name]['scaler']
+                meta = self._voi_meta[name]
+                if scaled:
+                    # physical to scaled
+                    if meta['adder'] is not None:
+                        vals[name] += meta['adder']
+                    if meta['scaler'] is not None:
+                        vals[name] *= meta['scaler']
+                if use_indices:
+                    if meta['indices'] is not None:
+                        vals[name] = vals[name][meta['indices']]
 
         return vals
 
