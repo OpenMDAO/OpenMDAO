@@ -1581,6 +1581,45 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_feature_basic_recording(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        driver = prob.driver = ScipyOptimizeDriver()
+        driver.recording_options['includes'] = []
+        driver.recording_options['record_objectives'] = True
+        driver.recording_options['record_constraints'] = True
+        driver.recording_options['record_desvars'] = True
+
+        recorder = SqliteRecorder("cases.sql")
+        driver.add_recorder(recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        driver_cases = cr.list_cases('driver')
+        first_driver_case = cr.get_case(driver_cases[0])
+        recorded_objectives = first_driver_case.get_objectives().keys()
+        recorded_constraints = first_driver_case.get_constraints().keys()
+        recorded_desvars = first_driver_case.get_design_vars().keys()
+
+        self.assertEqual(sorted(recorded_objectives), ['obj'])
+        self.assertEqual(sorted(recorded_constraints), ['con1', 'con2'])
+        self.assertEqual(sorted(recorded_desvars), ['x', 'z'])
+
     def test_feature_simple_driver_recording(self):
         from openmdao.api import Problem, IndepVarComp, ExecComp, \
             ScipyOptimizeDriver, SqliteRecorder, CaseReader
@@ -2166,6 +2205,96 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         adder, scaler = determine_adder_scaler(ref0, ref, None, None)
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
         self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+
+
+class TestFeatureBasicRecording(unittest.TestCase):
+    def setUp(self):
+        self.dir = mkdtemp()
+        self.original_path = os.getcwd()
+        os.chdir(self.dir)
+
+        self.record_cases()
+
+    def tearDown(self):
+        os.chdir(self.original_path)
+        try:
+            rmtree(self.dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
+    def record_cases(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        # create our Sellar problem
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver = ScipyOptimizeDriver(disp=False)
+
+        # create a case recorder
+        recorder = SqliteRecorder('cases.sql')
+
+        # add the recorder to the driver so driver iterations will be recorded
+        prob.driver.add_recorder(recorder)
+
+        # add the recorder to the problem so we can manually save a case
+        prob.add_recorder(recorder)
+
+        # perform setup and run the problem
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        # record the final state of the problem
+        prob.record_iteration('final')
+
+        # clean up and shut down
+        prob.cleanup()
+
+    def test_read_cases(self):
+        from openmdao.api import CaseReader
+
+        # open database of previously saved cases
+        cr = CaseReader("cases.sql")
+
+        # get a list of cases that were recorded by the driver
+        driver_cases = cr.list_cases('driver')
+        self.assertEqual(len(driver_cases), 10)
+
+        # get the first driver case and inspect the variables of interest
+        case = cr.get_case(driver_cases[0])
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        assert_rel_error(self, objectives['obj'], 28.58, 1e-1)
+
+        print(design_vars)
+        print(constraints)
+
+        # get a list of cases that we manually recorded
+        self.assertEqual(cr.list_cases('problem'), ['final'])
+
+        # get the final case and inspect the variables of interest
+        case = cr.get_case('final')
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        assert_rel_error(self, objectives['obj'], 3.18, 1e-1)
+
+        print(design_vars)
+        print(constraints)
 
 
 if __name__ == "__main__":
