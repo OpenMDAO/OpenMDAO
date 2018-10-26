@@ -48,8 +48,6 @@ class Case(object):
         Map of (output, input) to derivatives recorded, None if not recorded.
     parent : str
         The full unique identifier for the parent this iteration.
-    children : list
-        The full unique identifiers for children of this iteration.
     abs_err : float or None
         Absolute tolerance (None if not recorded).
     rel_err : float or None

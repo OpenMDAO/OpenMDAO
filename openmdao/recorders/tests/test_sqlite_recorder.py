@@ -1719,18 +1719,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         prob = Problem(SellarDerivatives())
 
-        prob.model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                       upper=np.array([10.0, 10.0]))
-        prob.model.add_design_var('x', lower=0.0, upper=10.0)
-        prob.model.add_objective('obj')
-        prob.model.add_constraint('con1', upper=0.0)
-        prob.model.add_constraint('con2', upper=0.0)
-
-        prob.driver = ScipyOptimizeDriver()
-
-        # also record the metadata for all systems in the model
-        prob.driver.recording_options['record_model_metadata'] = True
-
         recorder = SqliteRecorder("cases.sql")
         prob.driver.add_recorder(recorder)
 
@@ -1759,25 +1747,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
                          {'name', 'type', 'subsystem_type', 'children'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
-        self.assertEqual(len(cr.problem_metadata['tree']['children']), 7)
-
-        # metadata for all the systems in the model
-        self.assertEqual(sorted(cr.system_metadata.keys()),
-                         sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
-
-        self.assertEqual(str(cr.system_metadata['d1']['component_options']),
-            "================== ======= ================= ================ ======================================\n"
-            "Option             Default Acceptable Values Acceptable Types Description                           \n"
-            "================== ======= ================= ================ ======================================\n"
-            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi\n"
-            "                                                              ng an assembled jacobian, will use thi\n"
-            "                                                              s type.\n"
-            "distributed        False   N/A               N/A              True if the component has variables th\n"
-            "                                                              at are distributed across multiple pro\n"
-            "                                                              cesses.\n"
-            "================== ======= ================= ================ ======================================")
-
-        self.assertEqual(cr.system_metadata['d1']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
+                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
 
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1817,35 +1788,49 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem(model=SellarDerivatives())
+
+        # also record the metadata for all systems in the model
+        prob.driver.recording_options['record_model_metadata'] = True
+
         prob.setup()
 
-        d1 = prob.model.d1  # SellarDis1withDerivatives
-        d1.nonlinear_solver = NonlinearBlockGS()
-        d1.nonlinear_solver.options['maxiter'] = 5
-
         # declare two options
+        d1 = prob.model.d1
         d1.options.declare('options value 1', 1)
         d1.options.declare('options value to ignore', 2)
 
-        # create recorder and attach to d1
-        recorder = SqliteRecorder("cases.sql")
-        d1.add_recorder(recorder)
-
         # don't record the second option on d1
         d1.recording_options['options_excludes'] = ['options value to ignore']
+
+        # create recorder and attach to driver and d1
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        d1.add_recorder(recorder)
 
         prob.run_model()
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
 
-        d1_options = cr.system_metadata['d1']['component_options']
+        # metadata for all the systems in the model
+        self.assertEqual(sorted(cr.system_metadata.keys()),
+                         sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
-        # option 1 is recorded
-        self.assertEqual(d1_options['options value 1'], 1)
+        # options for system 'd1', with second option excluded
+        self.assertEqual(str(cr.system_metadata['d1']['component_options']),
+            "================== ======= ================= ================ ======================================\n"
+            "Option             Default Acceptable Values Acceptable Types Description                           \n"
+            "================== ======= ================= ================ ======================================\n"
+            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi\n"
+            "                                                              ng an assembled jacobian, will use thi\n"
+            "                                                              s type.\n"
+            "distributed        False   N/A               N/A              True if the component has variables th\n"
+            "                                                              at are distributed across multiple pro\n"
+            "                                                              cesses.\n"
+            "options value 1    1       N/A               N/A                                                    \n"
+            "================== ======= ================= ================ ======================================")
 
-        # option 2 is not recorded
-        self.assertFalse('options value to ignore' in d1_options)
+        self.assertEqual(cr.system_metadata['d1']['component_options']['assembled_jac_type'], 'csc')
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader

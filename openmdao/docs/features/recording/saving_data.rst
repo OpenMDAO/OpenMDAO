@@ -58,8 +58,8 @@ Problem Recording Example
 System and Solver Recording
 ---------------------------
 
-If you need to focus on a particular part of your model, it may be useful to attach a case recorder
-to a particular System or Solver. There are slightly different options when recording from these objects.
+If you need to focus on a smaller part of your model, it may be useful to attach a case recorder to
+a particular System or Solver. There are slightly different options when recording from these objects.
 
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,9 +97,9 @@ Solver Recording Example
 Specifying a Case Prefix
 ------------------------
 
-It is possible to record data from multiple executions by specifying a prefix that will be used to differentiate the
-cases.  This prefix can be specified when calling `run_model` or `run_driver` and will be prepended to the case ID
-in the recorded case data:
+It is possible to record data from multiple executions by specifying a prefix that will be used to
+differentiate the cases.  This prefix can be specified when calling :code:`run_model` or
+:code:`run_driver` and will be prepended to the case ID in the recorded case data:
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_record_with_prefix
@@ -117,8 +117,8 @@ in the recorded case data:
 Recording Options Precedence
 ----------------------------
 
-The recording options that determine what gets recorded can sometime be a little confusing. Here is an example
-that might help. The code shows how the `record_desvars` and `includes` options interact.
+The recording options that determine what gets recorded can sometime be a little confusing. Here is
+an example that might help. The code shows how the `record_desvars` and `includes` options interact.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_recording_option_precedence
