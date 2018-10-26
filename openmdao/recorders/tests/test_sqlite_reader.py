@@ -223,31 +223,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, iter_coord in enumerate(driver_cases):
             self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
 
-    def test_feature_reading_derivatives(self):
-        prob = SellarProblem(SellarDerivativesGrouped)
-
-        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP')
-        driver.recording_options['record_derivatives'] = True
-        driver.add_recorder(self.recorder)
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader(self.filename)
-
-        # Get derivatives associated with the first iteration.
-        derivs = cr.get_case('rank0:SLSQP|1').jacobian
-
-        # check that derivatives have been recorded.
-        self.assertEqual(set(derivs.keys()), set([
-            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
-            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
-        ]))
-
-        # Get specific derivative.
-        assert_rel_error(self, derivs['obj', 'z'], [[9.61001056, 1.78448534]], 1e-4)
-
     def test_reading_system_cases(self):
         prob = SellarProblem()
         model = prob.model
@@ -2004,6 +1979,153 @@ class TestSqliteCaseReader(unittest.TestCase):
 
 class TestFeatureSqliteReader(unittest.TestCase):
 
+    def test_feature_list_cases(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        driver = prob.driver = ScipyOptimizeDriver(tol=1e-9)
+        driver.add_recorder(SqliteRecorder('cases.sql'))
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader('cases.sql')
+
+        case_ids = cr.list_cases()
+
+        self.assertEqual(len(case_ids), driver.iter_count)
+        self.assertEqual(case_ids, case_ids)
+
+        for case_id in case_ids:
+            case = cr.get_case(case_id)
+            self.assertEqual(case, case)
+
+    def test_feature_get_cases(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        driver = prob.driver = ScipyOptimizeDriver(tol=1e-9)
+        driver.add_recorder(SqliteRecorder('cases.sql'))
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader('cases.sql')
+
+        cases = cr.get_cases()
+
+        self.assertEqual(len(cases), driver.iter_count)
+
+        for case in cases:
+            self.assertEqual(case, case)
+
+    def test_feature_get_cases_nested(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
+
+        # add recorder to the driver, model and solver
+        recorder = SqliteRecorder('cases.sql')
+
+        prob.driver.add_recorder(recorder)
+        model.add_recorder(recorder)
+        model.nonlinear_solver.add_recorder(recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader('cases.sql')
+
+        # get the last driver case
+        driver_cases = cr.list_cases('driver')
+        last_driver_case = driver_cases[-1]
+
+        # get a recursive dict of all child cases of the last driver case
+        cases = cr.get_cases(last_driver_case, recurse=True, flat=False)
+
+        # access the last driver case and it's children
+        for case in cases:
+            self.assertEqual(case, case)
+            for child_case in cases[case]:
+                self.assertEqual(child_case, child_case)
+                for grandchild in cases[case][child_case]:
+                    self.assertEqual(grandchild, grandchild)
+
+    def test_feature_reading_derivatives(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        driver = prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
+        driver.recording_options['record_derivatives'] = True
+
+        driver.add_recorder(SqliteRecorder('cases.sql'))
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader('cases.sql')
+
+        # Get derivatives associated with the first iteration.
+        derivs = cr.get_case('rank0:SLSQP|1').jacobian
+
+        # check that derivatives have been recorded.
+        self.assertEqual(set(derivs.keys()), set([
+            ('obj', 'z'), ('con2', 'z'), ('con1', 'x'),
+            ('obj', 'x'), ('con2', 'x'), ('con1', 'z')
+        ]))
+
+        # Get specific derivative.
+        assert_rel_error(self, derivs['obj', 'z'], derivs['obj', 'z'])
+
     def test_feature_recording_option_precedence(self):
         from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
             SqliteRecorder
@@ -2120,17 +2242,20 @@ class TestFeatureSqliteReader(unittest.TestCase):
         driver.recording_options['record_desvars'] = True
 
         prob.setup()
+        prob.set_solver_print(0)
         prob.run_driver()
         prob.cleanup()
 
         cr = CaseReader("cases.sql")
 
         driver_cases = cr.list_cases('driver')
-        first_driver_case = cr.get_case(driver_cases[0])
+        case = cr.get_case(driver_cases[0])
 
-        objs = first_driver_case.get_objectives()
-        cons = first_driver_case.get_constraints()
-        dvs = first_driver_case.get_design_vars()
+        self.assertEqual(sorted(case.outputs.keys()), ['con1', 'con2', 'obj', 'x', 'z'])
+
+        objs = case.get_objectives()
+        cons = case.get_constraints()
+        dvs = case.get_design_vars()
 
         # keys() will give you the promoted variable names
         self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),

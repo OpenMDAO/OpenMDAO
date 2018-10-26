@@ -607,7 +607,7 @@ class SqliteCaseReader(BaseCaseReader):
 
     def get_cases(self, source=None, recurse=True, flat=False):
         """
-        Iterate over the driver, system and solver cases.
+        Iterate over the cases.
 
         Parameters
         ----------
@@ -658,12 +658,12 @@ class SqliteCaseReader(BaseCaseReader):
 
     def get_case(self, case_id, recurse=False):
         """
-        Initialize.
+        Get case identified by case_id.
 
         Parameters
         ----------
-        case_id : str
-            The unique identifier of the case to return.
+        case_id : str or int
+            The unique identifier of the case to return or an index into all cases.
         recurse : bool, optional
             If True, will return all successors to the case as well.
 

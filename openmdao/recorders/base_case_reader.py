@@ -37,40 +37,40 @@ class BaseCaseReader(object):
 
     def get_cases(self, source, recurse=True, flat=False):
         """
-        Initialize.
+        Iterate over the cases.
 
         Parameters
         ----------
-        source : {'problem', 'driver', iteration_coordinate}
-            Identifies which cases to return. 'iteration_coordinate' can refer to
-            a system or a solver hierarchy location. Defaults to 'problem'.
+        source : {'problem', 'driver', component pathname, solver pathname, iteration_coordinate}
+            Identifies which cases to return.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy.
-        flat : bool
-            If True, return a flat dictionary rather than a nested dictionary.
+            If True, will enable iterating over all successors in case hierarchy
+        flat : bool, optional
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
 
         Returns
         -------
-        dict
-            The cases identified by the source
+        list or dict
+            The cases identified by source
         """
         pass
 
-    def get_case(self, id, recurse=True):
+    def get_case(self, case_id, recurse=True):
         """
-        Initialize.
+        Get case identified by case_id.
 
         Parameters
         ----------
-        id : str or int
+        case_id : str or int
             The unique identifier of the case to return or an index into all cases.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy.
+            If True, will return all successors to the case as well.
 
         Returns
         -------
         dict
-            The case identified by the is
+            The case identified by case_id
         """
         pass
 
