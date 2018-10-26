@@ -1272,6 +1272,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
 
+        self.assertFalse(prob.driver.supports['multiple_objectives'])
         prob.driver.options['debug_print'] = ['nl_cons', 'objs']
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
