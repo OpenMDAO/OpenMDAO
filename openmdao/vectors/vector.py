@@ -224,6 +224,9 @@ class Vector(object):
         """
         return self.__iter__() if PY3 else list(self.__iter__())
 
+    def values(self):
+        return [v for n, v in iteritems(self._views) if n in self._names]
+
     def __iter__(self):
         """
         Yield an iterator over variables involved in the current mat-vec product (relative names).

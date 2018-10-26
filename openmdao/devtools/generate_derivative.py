@@ -20,6 +20,59 @@ from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis
     StringSubscriptVisitor
 from openmdao.utils.general_utils import str2valid_python_name, unique_name
 
+try:
+    import autograd.numpy as agnp
+    from autograd import make_jvp, make_vjp
+    from autograd.differential_operators import make_jvp_reversemode
+    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict
+except ImportError:
+    pass
+else:
+    class AutogradVectorWrapper(object):
+        """
+        """
+        def __init__(self, vec):
+            self.vec = vec
+            self._views = agdict()
+            offset = len(vec._system.pathname) + 1 if vec._system.pathname else 0
+
+            for name in vec._views:
+                self._views[name[offset:]] = agnp.asarray(vec._views[name])
+            self._data = agnp.asarray(vec._data)
+
+        def __getitem__(self, name):
+            """
+            Get the variable value.
+
+            Parameters
+            ----------
+            name : str
+                Relative variable name in the owning component's namespace.
+
+            Returns
+            -------
+            float or ndarray
+                Variable value.
+            """
+            return self._views[name]
+
+        def __setitem__(self, key, value):
+            """
+            Set the variable value.
+
+            Parameters
+            ----------
+            name : str
+                Relative variable name in the owning component's namespace.
+            value : float or list or tuple or ndarray
+                Variable value to set.
+            """
+            self._views[key] = value
+            #self.vec[key] = value._value
+
+        def values(self):
+            return self._views.values()
+
 
 def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     """
@@ -298,8 +351,8 @@ def translate_compute_source_autograd(comp):
     else:
         compute_method = comp.apply_nonlinear
 
-    # mapping to rename variables within the compute method
-    to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
+    # # mapping to rename variables within the compute method
+    # to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
 
     # get source code of original compute() method
     # ignore blank lines, useful for detecting indentation later
@@ -308,32 +361,46 @@ def translate_compute_source_autograd(comp):
     # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
     srclines[0] = srclines[0].lstrip()
     src = ''.join(srclines)
-    ast2 = ast.parse(src)
+    # ast2 = ast.parse(src)
 
-    # visitor = StringSubscriptVisitor()
-    # visitor.visit(ast2)
-    # print("found", visitor.subscripts.items())
+    # # visitor = StringSubscriptVisitor()
+    # # visitor.visit(ast2)
+    # # print("found", visitor.subscripts.items())
 
-    # combine all mappings
-    mapping = to_replace.copy()
-    ast3 = transform_ast_names(ast2, mapping)
-    src = astunparse.unparse(ast3)
+    # # combine all mappings
+    # mapping = to_replace.copy()
+    # ast3 = transform_ast_names(ast2, mapping)
 
-    # add section of code to equate internal vars to views of input vec
+    # make sure indenting is 4
+    src = astunparse.unparse(ast.parse(src))
+
+    params = list(signature(compute_method).parameters)
+
+    # add section of code to create a boxed version of the input dict from the input array
     pre_lines = []
-    start = end = 0
-    for n in comp._inputs:
-        end += comp._inputs[n].size
-        val = comp._inputs[n]
-        if isinstance(val, np.ndarray):
-            if len(val.shape) > 1:
-                pre_lines.append('    %s = _invec_[%d:%d].reshape(%s)' %
-                                 (str2valid_python_name(n), start, end, val.shape))
+
+    vecnames = ['_invec_', '_outvec_', '_residvec_']
+    self_vnames = ['_comp_ivec_', '_comp_ovec_', '_comp_rvec_']
+    vecs = [comp._inputs, comp._outputs, comp._vectors['residual']['nonlinear']]
+    groups = [(i, pname, vecnames[i], self_vnames[i], vecs[i]) for i, pname in enumerate(params)]
+
+    for i, pname, vecname, self_vname, vec in groups:
+        if i > 0:
+            pre_lines.append('    %s = AutogradVectorWrapper(%s)' % (pname, self_vname))
+            continue
+
+        pre_lines.append('    %s = dict()' % pname)
+
+        start = end = 0
+        for n in vec:
+            val = vec[n]
+            end += val.size
+            if isinstance(val, np.ndarray) and len(val.shape) > 1:
+                pre_lines.append('    %s["%s"] = %s[%d:%d].reshape(%s)' %
+                                (pname, n, vecname, start, end, val.shape))
             else:
-                pre_lines.append('    %s = _invec_[%d:%d]' % (str2valid_python_name(n), start, end))
-        else:
-            pre_lines.append('    %s = _invec_[%d]' % (str2valid_python_name(n), start))
-        start = end
+                pre_lines.append('    %s["%s"] = %s[%d:%d]' % (pname, n, vecname, start, end))
+            start = end
 
     # remove the original compute() call signature
     src = src.split(":\n", 1)[1]
@@ -343,10 +410,12 @@ def translate_compute_source_autograd(comp):
         "def %s_trans(_invec_):" % compute_method.__name__,
         '\n'.join(pre_lines),
         src,
-        "    return tuple([%s])" % ', '.join(onames + rnames)
+        #"    return tuple([%s])" % ', '.join(onames + rnames)
+        "    return tuple(%s.values())" % params[1]
         ])
 
-    return src, pnames, onames, rnames
+    print(src)
+    return src #, pnames, onames, rnames
 
 
 def revert_deriv_source(deriv_func, to_revert):
@@ -402,10 +471,6 @@ def _get_tangent_ad_jac(comp, mode, J):
 
 
 def _get_autograd_ad_func(comp, mode):
-    import autograd.numpy as agnp
-    from autograd import make_jvp, make_vjp
-    from autograd.differential_operators import make_jvp_reversemode
-    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict
 
     output_names = list(comp._outputs.keys())
     if isinstance(comp, ExplicitComponent):
@@ -417,7 +482,7 @@ def _get_autograd_ad_func(comp, mode):
     input_names = list(comp._inputs.keys())
     input_args = [comp._inputs[n] for n in input_names]
 
-    funcstr, pnames, onames, rnames = translate_compute_source_autograd(comp)
+    funcstr = translate_compute_source_autograd(comp)
 
     comp_mod = sys.modules[comp.__class__.__module__]
     namespace = comp_mod.__dict__.copy()
@@ -431,6 +496,10 @@ def _get_autograd_ad_func(comp, mode):
     namespace['tuple'] = agtuple
     namespace['list'] = aglist
     namespace['dict'] = agdict
+    namespace['_comp_ivec_'] = comp._inputs
+    namespace['_comp_ovec_'] = comp._outputs
+    namespace['_comp_rvec_'] = comp._vectors['residual']['nonlinear']
+    namespace['AutogradVectorWrapper'] = AutogradVectorWrapper
 
     exec(funcstr, namespace)
 
@@ -461,6 +530,8 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
     array = comp._vectors['input']['linear']._data
 
     agrad = ad_method == 'autograd'
+    if agrad:
+        array = agnp.asarray(inputs._data)
 
     idx2arrname = [None] * array.size  # map array index to array var name
     idx2loc = np.zeros(array.size, dtype=int)
@@ -488,8 +559,11 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
 
         if agrad:
             grad = deriv_func(array)[1]
+            print("outputs:", comp._outputs._data)
+            print("doutputs:", comp._vectors['output']['linear']._data)
         else:
             grad = deriv_func(comp, *params)
+        print("grad:", grad)
         for i, oname in enumerate(outputs):
             abs_out = prefix + oname
             key = (abs_out, abs_in)
@@ -537,8 +611,11 @@ def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
 
         if agrad:
             grad = deriv_func(array)
+            print("outputs:", comp._outputs._data)
+            print("doutputs:", comp._vectors['output']['linear']._data)
         else:
             grad = deriv_func(comp, *params)
+        print("grad:", grad)
         for i, iname in enumerate(inputs):
             abs_in = prefix + iname
             key = (abs_out, abs_in)
@@ -604,6 +681,7 @@ def _ad_cmd(options):
                     continue
 
                 print("\nClass:", cname)
+                print("Instance:", s.pathname)
                 try:
                     if options.ad_method == 'tangent':
                         Jrev = {}
