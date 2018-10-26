@@ -179,8 +179,6 @@ class Problem(object):
         # Case recording options
         self.recording_options = OptionsDictionary()
 
-        self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'problem level')
@@ -661,8 +659,6 @@ class Problem(object):
         }
 
         self._rec_mgr.startup(self)
-        if self.recording_options['record_metadata']:
-            self._rec_mgr.record_metadata(self)
 
         record_viewer_data(self)
 

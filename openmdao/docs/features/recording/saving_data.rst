@@ -4,55 +4,12 @@
 Case Recording
 **************
 
-In OpenMDAO, you can instantiate recorder objects and attach them to the System, Driver or Solver
-instance(s) of your choice.
+Driver Recording
+----------------
 
-Instantiating a Recorder
-++++++++++++++++++++++++
-
-Instantiating a recorder is easy.  Simply give it a name, choose which type of recorder you want (currently only
-SqliteRecorder exists), and name the output file that you would like to write to.
-
-.. code-block:: console
-
-    my_recorder = SqliteRecorder("filename")
-
-.. note::
-    Currently, appending to an existing DB file is not supported; the SQLite recorder
-    will automatically write over an existing file if it carries the same name.
-
-
-Setting Recording Options
-+++++++++++++++++++++++++
-
-There are many recording options that can be set. This affects the amount of information retained by the recorders.
-These options are associated with the System, Driver or Solver that is being recorded.
-
-
-The following examples use the :ref:`Sellar <sellar>` model and demonstrate setting the recording options on
-each of these types.
-
-
-Recording on System Objects
----------------------------
-
-System Recording Options
-^^^^^^^^^^^^^^^^^^^^^^^^
-.. embed-options::
-    openmdao.core.system
-    System
-    recording_options
-
-To record on a System object, simply add the recorder to the System and set the recording options.
-Note that the 'excludes' option takes precedence over the 'includes' option, as shown in the example
-below where we exclude `obj_cmp.x` and see that it isn't in the set of recorded inputs.
-
-.. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_options
-    :layout: interleave
-
-Recording on Driver Objects
----------------------------
+A case recorder is commonly attached to the problem's Driver in order to gain insight into the
+convergence of the model as the driver finds a solution.  By default, a recorder attached to
+a driver will record the design variables, constraints and objectives.
 
 Driver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -61,39 +18,25 @@ Driver Recording Options
     Driver
     recording_options
 
-Recording on a Driver is very similar to recording on a System, though it has a few additional recording options.
-The options 'record_objectives', 'record_constraints', 'record_desvars', and 'record_responses' are all still limited by
-'excludes', but they do take precedence over 'includes', as shown below where 'includes'
-is empty but objectives, constraints, and desvars are still recorded.
+.. note::
+    Note that the 'excludes' option takes precedence over the 'includes' option.
 
+Driver Recording Example
+^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_options
     :layout: interleave
 
 
-Recording on Solver Objects
----------------------------
+Problem Recording
+-----------------
 
-Solver Recording Options
-^^^^^^^^^^^^^^^^^^^^^^^^
-.. embed-options::
-    openmdao.solvers.solver
-    Solver
-    recording_options
+You might also want to attach a recorder to the Problem itself. This allows you to record an 
+arbitrary case at a point of your choosing.  This feature can be useful if you only record a
+limited number of variables during the run but would like to see a more complete list of values
+after the run.
 
-Recording on Solvers is nearly identical to recording on Systems with the addition of options for recording absolute and relative
-error. Below is a basic example of adding a recorder to a solver object and recording absolute error.
-
-.. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_options
-    :layout: interleave
-
-.. note::
-    A recorder can be attached to more than one object. Also, more than one recorder can be attached to an object.
-
-
-Recording on Problem Objects
-----------------------------
+The options are a subset of those for driver recording.
 
 Problem Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -102,15 +45,52 @@ Problem Recording Options
     Problem
     recording_options
 
-Recording on Problems is different from recording other objects because nothing is recorded automatically. The
-user must explicitly call the `Problem.record_iteration` method to record the current values from the `Problem`.
-Below is a basic example of adding a recorder to a `Problem` object and then recording it after a run.
+.. note::
+    Note that the 'excludes' option takes precedence over the 'includes' option.
 
-This feature can be useful if you only record a limited number of variables during the run but would like to see a more
-complete list of values after the run.
-
+Problem Recording Example
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_problem_record
+    :layout: interleave
+
+
+System and Solver Recording
+---------------------------
+
+If you need to focus on a particular part of your model, it may be useful to attach a case recorder
+to a particular System or Solver. There are slightly different options when recording from these objects.
+
+System Recording Options
+^^^^^^^^^^^^^^^^^^^^^^^^
+.. embed-options::
+    openmdao.core.system
+    System
+    recording_options
+
+.. note::
+    Note that the 'excludes' option takes precedence over the 'includes' option.
+
+System Recording Example
+^^^^^^^^^^^^^^^^^^^^^^^^
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_system_options
+    :layout: interleave
+
+Solver Recording Options
+^^^^^^^^^^^^^^^^^^^^^^^^
+.. embed-options::
+    openmdao.solvers.solver
+    Solver
+    recording_options
+
+.. note::
+    Note that the 'excludes' option takes precedence over the 'includes' option.
+
+Solver Recording Example
+^^^^^^^^^^^^^^^^^^^^^^^^
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_options
     :layout: interleave
 
 
@@ -125,12 +105,20 @@ in the recorded case data:
     openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_record_with_prefix
     :layout: interleave
 
+.. note::
+    A recorder can be attached to more than one object. Also, more than one recorder can be 
+    attached to an object.
+
+.. note::
+    In this example, we have disabled the saving of data needed by the standalone :math:`N^2` 
+    visualizer and debugging tool.
+
 
 Recording Options Precedence
 ----------------------------
 
 The recording options that determine what gets recorded can sometime be a little confusing. Here is an example
-that might help. The code shows how the `record_desvars` and `includes` variables interact.
+that might help. The code shows how the `record_desvars` and `includes` options interact.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_recording_option_precedence
