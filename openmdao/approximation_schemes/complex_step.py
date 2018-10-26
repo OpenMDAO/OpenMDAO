@@ -3,17 +3,23 @@ from __future__ import division, print_function
 
 from itertools import groupby
 from six.moves import range
+from collections import defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
+    _gather_jac_results
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.name_maps import abs_key2rel_key
+from openmdao.vectors.vector import Vector
 
 
 DEFAULT_CS_OPTIONS = {
     'step': 1e-40,
     'form': 'forward',
 }
+
+_full_slice = slice(None)
 
 
 class ComplexStep(ApproximationScheme):
@@ -33,6 +39,8 @@ class ComplexStep(ApproximationScheme):
         A list of which derivatives (in execution order) to compute.
         The entries are of the form (of, wrt, options), where of and wrt are absolute names
         and options is a dictionary.
+    _fd : <FiniteDifference>
+        When nested complex step is detected, we swtich to Finite Difference.
     """
 
     def __init__(self):
@@ -41,6 +49,9 @@ class ComplexStep(ApproximationScheme):
         """
         super(ComplexStep, self).__init__()
         self._exec_list = []
+
+        # Only used when nested under complex step.
+        self._fd = None
 
     def add_approximation(self, abs_key, kwargs):
         """
@@ -57,6 +68,7 @@ class ComplexStep(ApproximationScheme):
         options = DEFAULT_CS_OPTIONS.copy()
         options.update(kwargs)
         self._exec_list.append((of, wrt, options))
+        self._approx_groups = None
 
     @staticmethod
     def _key_fun(approx_tuple):
@@ -77,17 +89,60 @@ class ComplexStep(ApproximationScheme):
         options = approx_tuple[2]
         return (approx_tuple[1], options['form'], options['step'])
 
-    def _init_approximations(self):
+    def _init_approximations(self, system):
         """
         Prepare for later approximations.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
         """
+        global _full_slice
+
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
 
-        # TODO: Automatic sparse FD by constructing a graph of variable dependence?
+        # groupby (along with this key function) will group all 'of's that have the same wrt and
+        # step size.
+        # Note: Since access to `approximations` is required multiple times, we need to
+        # throw it in a list. The groupby iterator only works once.
+        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                        self._key_fun)]
 
-    def compute_approximations(self, system, jac=None, deriv_type='partial'):
+        self._approx_groups = [None] * len(approx_groups)
+        for i, (key, approx) in enumerate(approx_groups):
+            wrt, form, delta = key
+            if form == 'reverse':
+                delta *= -1.0
+            fact = 1.0 / delta
+            delta *= 1j
+
+            if wrt in system._owns_approx_wrt_idx:
+                in_idx = system._owns_approx_wrt_idx[wrt]
+                in_size = len(in_idx)
+            else:
+                in_size = system._var_allprocs_abs2meta[wrt]['size']
+                in_idx = range(in_size)
+
+            outputs = []
+
+            for approx_tuple in approx:
+                of = approx_tuple[0]
+                # TODO: Sparse derivatives
+                if of in system._owns_approx_of_idx:
+                    out_idx = system._owns_approx_of_idx[of]
+                    out_size = len(out_idx)
+                else:
+                    out_size = system._var_allprocs_abs2meta[of]['size']
+                    out_idx = _full_slice
+
+                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
+
+            self._approx_groups[i] = (wrt, delta, fact, in_idx, in_size, outputs)
+
+    def compute_approximations(self, system, jac, total=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -95,20 +150,31 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are
-            being approximated.
+        jac : dict-like
+            Approximations are stored in the given dict-like object.
+        total : bool
+            If True total derivatives are being approximated, else partials.
         """
+        if system.under_complex_step:
+
+            # If we are nested under another complex step, then warn and swap to FD.
+            if not self._fd:
+                from openmdao.approximation_schemes.finite_difference import FiniteDifference
+
+                msg = "Nested complex step detected. Finite difference will be used for '%s'."
+                simple_warning(msg % system.pathname)
+
+                fd = self._fd = FiniteDifference()
+                for item in self._exec_list:
+                    fd.add_approximation(item[0:2], {})
+
+            self._fd.compute_approximations(system, jac, total=total)
+            return
+
         if len(self._exec_list) == 0:
             return
 
-        if jac is None:
-            jac = system._jacobian
-
-        if deriv_type == 'total':
+        if total:
             current_vec = system._outputs
         else:
             current_vec = system._residuals
@@ -125,63 +191,58 @@ class ComplexStep(ApproximationScheme):
         uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
-        for key, approximations in groupby(self._exec_list, self._key_fun):
-            # groupby (along with this key function) will group all 'of's that have the same wrt and
-            # step size.
-            wrt, form, delta = key
-            if form == 'reverse':
-                delta *= -1.0
-            fact = 1.0 / delta
-            delta *= 1j
+        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
+                                                      system._full_comm.size > 1)
+        num_par_fd = system._num_par_fd if use_parallel_fd else 1
+        is_parallel = use_parallel_fd or system.comm.size > 1
 
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                if wrt in system._var_abs2meta:
-                    in_size = system._var_abs2meta[wrt]['size']
+        results = defaultdict(list)
+        iproc = system.comm.rank
+        owns = system._owning_rank
+        mycomm = system._full_comm if use_parallel_fd else system.comm
 
-                in_idx = range(in_size)
-
-            outputs = []
-
-            # Note: If access to `approximations` is required again in the future, we will need to
-            # throw it in a list first. The groupby iterator only works once.
-            for approx_tuple in approximations:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
-                else:
-                    out_size = system._var_abs2meta[of]['size']
-
-                outputs.append((of, np.zeros((out_size, in_size))))
-
+        fd_count = 0
+        approx_groups = self._get_approx_groups(system)
+        for tup in approx_groups:
+            wrt, delta, fact, in_idx, in_size, outputs = tup
             for i_count, idx in enumerate(in_idx):
-                # Run the Finite Difference
-                input_delta = [(wrt, idx, delta)]
-                result = self._run_point_complex(system, input_delta, results_clone, deriv_type)
+                if fd_count % num_par_fd == system._par_fd_id:
+                    # Run the Finite Difference
+                    result = self._run_point_complex(system, wrt, idx, delta, results_clone, total)
 
-                for of, subjac in outputs:
-                    if of in system._owns_approx_of_idx:
-                        out_idx = system._owns_approx_of_idx[of]
-                        subjac[:, i_count] = (result._views_flat[of][out_idx] * fact).imag
+                    if is_parallel:
+                        for of, _, out_idx in outputs:
+                            if owns[of] == iproc:
+                                results[(of, wrt)].append(
+                                    (i_count, result._views_flat[of][out_idx].imag.copy()))
                     else:
-                        subjac[:, i_count] = (result._views_flat[of] * fact).imag
+                        for of, subjac, out_idx in outputs:
+                            subjac[:, i_count] = result._views_flat[of][out_idx].imag
 
-            for of, subjac in outputs:
-                rel_key = abs_key2rel_key(system, (of, wrt))
+                fd_count += 1
+
+        if is_parallel:
+            results = _gather_jac_results(mycomm, results)
+
+        for wrt, _, fact, _, _, outputs in approx_groups:
+            for of, subjac, _ in outputs:
+                key = (of, wrt)
+                if is_parallel:
+                    for i, result in results[key]:
+                        subjac[:, i] = result
+
+                subjac *= fact
                 if uses_src_indices:
                     jac._override_checks = True
-                jac[rel_key] = subjac
-                if uses_src_indices:
+                    jac[key] = subjac
                     jac._override_checks = False
+                else:
+                    jac[key] = subjac
 
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, input_deltas, result_clone, deriv_type='partial'):
+    def _run_point_complex(self, system, in_name, idxs, delta, result_clone, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -189,45 +250,44 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        input_deltas : list
-            List of (input name, indices, delta) tuples, where input name is an absolute name.
+        in_name : str
+            Input name.
+        idxs : ndarray
+            Input indices.
+        delta : complex
+            Perturbation amount.
         result_clone : Vector
             A vector cloned from the outputs vector. Used to store the results.
-        deriv_type : str
-            One of 'total' or 'partial', indicating if total or partial derivatives are being
-            approximated.
+        total : bool
+            If True total derivatives are being approximated, else partials.
 
         Returns
         -------
         Vector
             Copy of the results from running the perturbed system.
         """
-        # TODO: MPI
-
         inputs = system._inputs
         outputs = system._outputs
 
-        if deriv_type == 'total':
+        if total:
             run_model = system.run_solve_nonlinear
             results_vec = outputs
         else:
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] += delta
-            else:
-                inputs._views_flat[in_name][idxs] += delta
+        if in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] += delta
+        elif in_name in inputs._views_flat:
+            inputs._views_flat[in_name][idxs] += delta
 
         run_model()
 
         result_clone.set_vec(results_vec)
 
-        for in_name, idxs, delta in input_deltas:
-            if in_name in outputs._views_flat:
-                outputs._views_flat[in_name][idxs] -= delta
-            else:
-                inputs._views_flat[in_name][idxs] -= delta
+        if in_name in outputs._views_flat:
+            outputs._views_flat[in_name][idxs] -= delta
+        elif in_name in inputs._views_flat:
+            inputs._views_flat[in_name][idxs] -= delta
 
         return result_clone

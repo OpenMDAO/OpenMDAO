@@ -198,7 +198,7 @@ class Diamond(Group):
 class ConvergeDivergeFlat(Group):
     """
     Topology one - two - one - two - one. This model was critical in
-    testing parallel reverse scatters. Thi version is perfectly flat.
+    testing parallel reverse scatters. This version is perfectly flat.
     """
 
     def __init__(self):

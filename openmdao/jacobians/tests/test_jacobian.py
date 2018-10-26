@@ -197,7 +197,7 @@ class TestJacobian(unittest.TestCase):
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize
-        ), testcase_func_name=_test_func_name
+        ), name_func=_test_func_name
     )
     def test_src_indices(self, assembled_jac, comp_jac_class, nested, lincalls):
 
@@ -301,7 +301,7 @@ class TestJacobian(unittest.TestCase):
          (3, 3))
     ]
 
-    @parameterized.expand(itertools.product(dtypes, shapes), testcase_func_name=
+    @parameterized.expand(itertools.product(dtypes, shapes), name_func=
     lambda f, n, p: '_'.join(['test_jacobian_set_item', p.args[0][0], p.args[1][0]]))
     def test_jacobian_set_item(self, dtypes, shapes):
 
@@ -434,9 +434,9 @@ class TestJacobian(unittest.TestCase):
         prob = Problem()
         prob.model = Group(assembled_jac_type='dense')
         prob.model.add_subsystem('indep', IndepVarComp('x', 1.0))
-        prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b'))
-        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c'))
-        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0'))
+        prob.model.add_subsystem('C1', ExecComp('c=a*2.0+b', a=0., b=0., c=0.))
+        c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
+        c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
 
         prob.model.nonlinear_solver = NewtonSolver()
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
@@ -489,7 +489,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        #prob.model.nonlinear_solver = NewtonSolver()
+        # prob.model.nonlinear_solver = NewtonSolver()
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         G1.linear_solver = DirectSolver(assemble_jac=True)
@@ -739,7 +739,8 @@ class TestJacobian(unittest.TestCase):
                          "Keys [('G1.C1.z', 'G1.C1.x'), ('G1.C1.z', 'G1.C1.y')] map to the same "
                          "sub-jacobian of a CSC or CSR partial jacobian and at least one of them "
                          "is either not dense or uses src_indices.  This can occur when multiple "
-                         "inputs on the same component are connected to the same output.")
+                         "inputs on the same component are connected to the same output. Try using"
+                         " a dense jacobian instead.")
 
     def test_one_src_2_tgts_csc_error(self):
         size = 10

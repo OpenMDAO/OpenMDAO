@@ -10,6 +10,9 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_rel_error
 
+import warnings
+warnings.simplefilter('always')
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -235,6 +238,41 @@ class NonDistribGatherComp(ExplicitComponent):
         outputs['outvec'] = inputs['invec']
 
 
+@unittest.skipIf(PETScVector is not None, "Only runs when PETSc is not available")
+class NOMPITests(unittest.TestCase):
+
+    def test_distrib_idx_in_full_out(self):
+        size = 11
+
+        p = Problem(model=Group())
+        top = p.model
+        C1 = top.add_subsystem("C1", InOutArrayComp(size))
+        C2 = top.add_subsystem("C2", DistribInputComp(size))
+        top.connect('C1.outvec', 'C2.invec')
+
+        with warnings.catch_warnings(record=True) as w:
+            p.setup(check=False)
+
+        expected = ("The 'distributed' option is set to True for Component C2, "
+                    "but there is no distributed vector implementation (MPI/PETSc) "
+                    "available. The default non-distributed vectors will be used.")
+
+        for warn in w:
+            if str(warn.message) == expected:
+                break
+        else:
+            self.fail("Did not see expected warning: %s" % expected)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+
+        p.run_model()
+
+        self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
+
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MPITests(unittest.TestCase):
 
@@ -268,6 +306,7 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(size))
         C2 = top.add_subsystem("C2", DistribInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
+
         p.setup(check=False)
 
         # Conclude setup but don't run model.
@@ -407,6 +446,94 @@ class MPITests(unittest.TestCase):
 
         if MPI and self.comm.rank == 0:
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
+
+class DeprecatedMPITests(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_distrib_idx_in_full_out_deprecated(self):
+
+        class DeprecatedDistribInputComp(ExplicitComponent):
+            """Deprecated version of DistribInputComp, uses attribute instead of option."""
+
+            def __init__(self, arr_size=11):
+                super(DeprecatedDistribInputComp, self).__init__()
+                self.arr_size = arr_size
+                self.distributed = True
+
+            def compute(self, inputs, outputs):
+                if MPI:
+                    self.comm.Allgatherv(inputs['invec']*2.0,
+                                         [outputs['outvec'], self.sizes,
+                                          self.offsets, MPI.DOUBLE])
+                else:
+                    outputs['outvec'] = inputs['invec'] * 2.0
+
+            def setup(self):
+                comm = self.comm
+                rank = comm.rank
+
+                self.sizes, self.offsets = evenly_distrib_idxs(comm.size, self.arr_size)
+                start = self.offsets[rank]
+                end = start + self.sizes[rank]
+
+                self.add_input('invec', np.ones(self.sizes[rank], float),
+                               src_indices=np.arange(start, end, dtype=int))
+                self.add_output('outvec', np.ones(self.arr_size, float),
+                                shape=np.int32(self.arr_size))
+
+        size = 11
+
+        p = Problem()
+        top = p.model
+
+        C1 = top.add_subsystem("C1", InOutArrayComp(size))
+
+        # check deprecation on setter
+        msg = "The 'distributed' property provides backwards compatibility " \
+              "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead."
+
+        with warnings.catch_warnings(record=True) as w:
+            C2 = top.add_subsystem("C2", DeprecatedDistribInputComp(size))
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
+
+        # check deprecation on getter
+        with warnings.catch_warnings(record=True) as w:
+            C2.distributed
+
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+        self.assertEqual(str(w[0].message), msg)
+
+        # continue to make sure everything still works with the deprecation
+        top.connect('C1.outvec', 'C2.invec')
+
+        # Conclude setup but don't run model.
+        with warnings.catch_warnings(record=True) as w:
+            p.setup(check=False)
+
+        if PETScVector is None:
+            expected = ("The 'distributed' option is set to True for Component C2, "
+                        "but there is no distributed vector implementation (MPI/PETSc) "
+                        "available. The default non-distributed vectors will be used.")
+
+            for warn in w:
+                if str(warn.message) == expected:
+                    break
+            else:
+                self.fail("Did not see expected warning: %s" % expected)
+
+        p.final_setup()
+
+        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+
+        p.run_model()
+
+        self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

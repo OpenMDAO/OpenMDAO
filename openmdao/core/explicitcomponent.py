@@ -7,6 +7,7 @@ from six import itervalues, iteritems
 from six.moves import range
 
 from openmdao.core.component import Component
+from openmdao.vectors.vector import Vector
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 
@@ -152,6 +153,7 @@ class ExplicitComponent(Component):
         """
         for abs_key, meta in iteritems(self._subjacs_info):
 
+            # if there isn't a declared partial value, set it to a dense matrix
             if meta['value'] is None:
                 meta['value'] = np.zeros(meta['shape'])
 
@@ -161,9 +163,6 @@ class ExplicitComponent(Component):
                 if (method is not None and method in self._approx_schemes and abs_key[1]
                         not in self._outputs._views_flat):
                     self._approx_schemes[method].add_approximation(abs_key, meta)
-
-        for approx in itervalues(self._approx_schemes):
-            approx._init_approximations()
 
     def _apply_nonlinear(self):
         """
@@ -180,7 +179,11 @@ class ExplicitComponent(Component):
 
                 self._inputs.read_only = True
                 try:
-                    self.compute(self._inputs, outputs)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                     self._discrete_outputs)
+                    else:
+                        self.compute(self._inputs, self._outputs)
                 finally:
                     self._inputs.read_only = False
 
@@ -207,7 +210,11 @@ class ExplicitComponent(Component):
                 self._residuals.set_const(0.0)
                 self._inputs.read_only = True
                 try:
-                    failed = self.compute(self._inputs, self._outputs)
+                    if self._discrete_inputs or self._discrete_outputs:
+                        failed = self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                              self._discrete_outputs)
+                    else:
+                        failed = self.compute(self._inputs, self._outputs)
                 finally:
                     self._inputs.read_only = False
 
@@ -245,8 +252,7 @@ class ExplicitComponent(Component):
                     d_inputs, d_outputs, d_residuals = vecs
 
                     # Jacobian and vectors are all scaled, unitless
-                    with self.jacobian_context(J):
-                        J._apply(d_inputs, d_outputs, d_residuals, mode)
+                    J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
                     # if we're not matrix free, we can skip the bottom of
                     # this loop because compute_jacvec_product does nothing.
@@ -346,7 +352,7 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
+            Ignored.
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
@@ -362,13 +368,17 @@ class ExplicitComponent(Component):
             if self._has_compute_partials:
                 self._inputs.read_only = True
 
+                # We don't need to set the _system attribute on jac here because jac (if not None)
+                # shares the _subjacs_info metadata with our _jacobian, and our _jacobian knows
+                # how to properly convert relative names (used by the component in compute_partials)
+                # to absolute names (used by all jacobians internally).
                 try:
                     # We used to negate the jacobian here, and then re-negate after the hook.
                     self.compute_partials(self._inputs, self._jacobian)
                 finally:
                     self._inputs.read_only = False
 
-    def compute(self, inputs, outputs):
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
@@ -378,6 +388,10 @@ class ExplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
 
         Returns
         -------

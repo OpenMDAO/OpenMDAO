@@ -16,7 +16,7 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.core.analysis_error import AnalysisError
 
 
@@ -189,7 +189,7 @@ class _RegularGridInterp(object):
         if not make_interp_spline:
             msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
-            warnings.warn(msg)
+            simple_warning(msg)
 
         configs = _RegularGridInterp._interp_methods()
         self._all_methods, self._interp_config = configs
@@ -625,7 +625,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         if not make_interp_spline:
             msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
                   " installed version is %s." % scipy_version
-            warnings.warn(msg)
+            simple_warning(msg)
 
         self.options.declare('extrapolate', types=bool, default=False,
                              desc='Sets whether extrapolation should be performed '
@@ -683,7 +683,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
 
-    def _setup_vars(self, recurse=True):
+    def _setup_var_data(self, recurse=True):
         """
         Instantiate surrogates for the output variables that use the default surrogate.
 
@@ -705,7 +705,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         if self.options['training_data_gradients']:
             self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
-        super(MetaModelStructuredComp, self)._setup_vars()
+        super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
 
     def _setup_partials(self, recurse=True):
         """

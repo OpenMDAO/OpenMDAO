@@ -83,8 +83,8 @@ class COOMatrix(Matrix):
                                        "CSR partial jacobian and at least one of them is either "
                                        "not dense or uses src_indices.  This can occur when "
                                        "multiple inputs on the same "
-                                       "component are connected to the same output." %
-                                       sorted((key, otherkey)))
+                                       "component are connected to the same output. Try using "
+                                       "a dense jacobian instead." % sorted((key, otherkey)))
             else:
                 ind1 = counter
                 counter += delta
@@ -218,14 +218,17 @@ class COOMatrix(Matrix):
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
-            val = jac.flatten()
+            if factor is None:
+                val = jac.flat
+            else:
+                val = (jac * factor).flat
         else:  # sparse
-            val = jac.data
+            if factor is None:
+                val = jac.data
+            else:
+                val = jac.data * factor
 
-        if factor is not None:
-            self._matrix.data[idxs] += val * factor
-        else:
-            self._matrix.data[idxs] += val
+        self._matrix.data[idxs] += val
 
     def _prod(self, in_vec, mode, ranges, mask=None):
         """

@@ -83,6 +83,17 @@ in the case of unconnected inputs, or just an empty array with the correct size.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_array
     :layout: interleave
 
+If all of your ExecComp's array inputs and array outputs are the same size and happen to have
+diagonal partials, you can create a vectorized ExecComp by specifying a `vectorize=True` arg
+to `__init__`.  This will cause the ExecComp to solve for its partials by complex stepping
+all entries of an array input at once instead of looping over each entry individually.  Here's
+a simple example:
+
+
+.. embed-code::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_vectorize
+    :layout: interleave
+
 
 Functions from the math library are available for use in the expression strings.
 
@@ -90,12 +101,6 @@ Functions from the math library are available for use in the expression strings.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_math
     :layout: interleave
 
-
-You can also access built-in Numpy functions by using the prefix "numpy." with the function name.
-
-.. embed-code::
-    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_numpy
-    :layout: interleave
 
 You can also declare options like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
 where we declare all our inputs to be inches to trigger conversion from a variable expressed in feet in one

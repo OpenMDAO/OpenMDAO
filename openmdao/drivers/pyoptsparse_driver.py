@@ -79,24 +79,12 @@ class pyOptSparseDriver(Driver):
         Optional file to hot start the optimization.
     opt_settings : dict
         Dictionary for setting optimizer-specific options.
-    problem : <Problem>
-        Pointer to the containing problem.
-    supports : <OptionsDictionary>
-        Provides a consistant way for drivers to declare what features they support.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
-    _cons : dict
-        Contains all constraint info.
-    _designvars : dict
-        Contains all design variable info.
     _indep_list : list
         List of design variables.
-    _objs : dict
-        Contains all objective info.
     _quantities : list
         Contains the objectives plus nonlinear constraints.
-    _responses : dict
-        Contains all response info.
     """
 
     def __init__(self, **kwargs):
@@ -220,7 +208,8 @@ class pyOptSparseDriver(Driver):
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_sparsity:
             if self.options['dynamic_simul_derivs']:
-                coloring_mod.dynamic_simul_coloring(self, do_sparsity=True)
+                coloring_mod.dynamic_simul_coloring(self, run_model=optimizer not in run_required,
+                                                    do_sparsity=True)
             elif self.options['dynamic_derivs_sparsity']:
                 coloring_mod.dynamic_sparsity(self)
 
@@ -370,8 +359,7 @@ class pyOptSparseDriver(Driver):
         # framework is left in the right final state
         dv_dict = sol.getDVs()
         for name in indep_list:
-            val = dv_dict[name]
-            self.set_design_var(name, val)
+            self.set_design_var(name, dv_dict[name])
 
         with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
             model._solve_nonlinear()
@@ -494,7 +482,7 @@ class pyOptSparseDriver(Driver):
                                                  return_format='dict')
             # Let the optimizer try to handle the error
             except AnalysisError:
-                self._problem.model._clear_iprint()
+                prob.model._clear_iprint()
                 fail = 1
 
                 # We need to cobble together a sens_dict of the correct size.

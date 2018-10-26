@@ -7,7 +7,6 @@ from openmdao.core.system import System
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
 from openmdao.core.problem import Problem
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
@@ -23,22 +22,6 @@ class BaseRecorder(object):
         Output to the recorder.
     _counter : int
         A global counter for execution order, used in iteration coordinate.
-    _filtered_driver : dict
-        Filtered subset of driver variables to record, based on includes/excludes.
-    _filtered_system_outputs_driver_recording : dict
-        Filtered subset of System outputs to record during Driver recording.
-    _filtered_solver : dict
-        Filtered subset of solver variables to record, based on includes/excludes.
-    _filtered_system : dict
-        Filtered subset of system variables to record, based on includes/excludes.
-    _desvars_values : dict
-        Driver desvar values, post-filtering, to be used by a derived recorder.
-    _responses_values : dict
-        Driver response values, post-filtering, to be used by a derived recorder.
-    _objectives_values : dict
-        Driver objectives values, post-filtering, to be used by a derived recorder.
-    _constraints_values : dict
-        Driver constraints values, post-filtering, to be used by a derived recorder.
     _inputs : dict
         System inputs values, post-filtering, to be used by a derived recorder.
     _outputs : dict
@@ -185,7 +168,8 @@ class BaseRecorder(object):
 
         self._counter += 1
 
-        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
+        self._iteration_coordinate = \
+            recording_requester._recording_iter.get_formatted_iteration_coordinate()
 
         if isinstance(recording_requester, Driver):
             self.record_iteration_driver(recording_requester, data, metadata)
@@ -277,7 +261,8 @@ class BaseRecorder(object):
             if MPI and MPI.COMM_WORLD.rank > 0:
                 raise RuntimeError("Non-parallel recorders should not be recording on ranks > 0")
 
-        self._iteration_coordinate = recording_iteration.get_formatted_iteration_coordinate()
+        self._iteration_coordinate = \
+            recording_requester._recording_iter.get_formatted_iteration_coordinate()
 
         self.record_derivatives_driver(recording_requester, data, metadata)
 

@@ -92,9 +92,9 @@ class ExplicitCycleComp(ExplicitComponent):
         self.options.declare('connection_type', default='explicit',
                               values=['explicit', 'implicit'],
                               desc='How to connect variables.')
-        self.options.declare('finite_difference', default=False,
-                              types=bool,
-                              desc='If the derivatives should be finite differenced.')
+        self.options.declare('partial_method', default='exact',
+                              values=('exact', 'fd', 'cs'),
+                              desc='How derivatives should be solved (exact, fd, or cs)')
         self.options.declare('num_comp', types=int, default=2,
                               desc='Total number of components')
 
@@ -140,12 +140,12 @@ class ExplicitCycleComp(ExplicitComponent):
 
         pd_type = self.options['partial_type']
 
-        if self.options['finite_difference']:
+        if self.options['partial_method'] != 'exact':
             if self.options['jacobian_type'] == 'matvec':
                 raise unittest.SkipTest('not testing FD and matvec')
             if pd_type != 'array':
                 raise unittest.SkipTest('only dense FD supported')
-            self.declare_partials('*', '*', method='fd')
+            self.declare_partials('*', '*', method=self.options['partial_method'])
 
         elif self.options['jacobian_type'] != 'matvec' and pd_type != 'array':
             num_var = self.num_var
@@ -167,13 +167,13 @@ class ExplicitCycleComp(ExplicitComponent):
                     Aij = A[array_idx(out_idx, var_size), array_idx(in_idx, var_size)]
 
                     self.declare_partials(out_var, in_var,
-                                          **self._array2kwargs(Aij, pd_type))
+                                          **self._array2kwargs(Aij, pd_type, 'exact'))
                     self.declare_partials(out_var, angle_param,
                                           **self._array2kwargs(dA_x[array_idx(out_idx, var_size)],
-                                                               pd_type))
+                                                               pd_type, 'exact'))
 
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['theta'],
-                                  **self._array2kwargs(dtheta, pd_type))
+                                  **self._array2kwargs(dtheta, pd_type, 'exact'))
 
         else:
             # Declare everything
@@ -269,15 +269,15 @@ class ExplicitCycleComp(ExplicitComponent):
 
         raise ValueError('Unknown partial_type: {}'.format(pd_type))
 
-    def _array2kwargs(self, arr, pd_type):
+    def _array2kwargs(self, arr, pd_type, method):
         jac = self.make_sub_jacobian(arr, pd_type)
         if pd_type == 'aij':
-            return {'val': jac[0], 'rows': jac[1], 'cols': jac[2]}
+            return {'val': jac[0], 'rows': jac[1], 'cols': jac[2], 'method': method}
         else:
-            return {'val': jac}
+            return {'val': jac, 'method': method}
 
     def compute_partials(self, inputs, partials):
-        if self.options['jacobian_type'] != 'matvec' and not self.options['finite_difference']:
+        if self.options['jacobian_type'] != 'matvec' and self.options['partial_method'] == 'exact':
             angle_param = self._cycle_names[self.angle_param]
             angle = inputs[angle_param]
             num_var = self.num_var
@@ -343,15 +343,16 @@ class ExplicitLastComp(ExplicitFirstComp):
         # Setup partials
 
         pd_type = self.options['partial_type']
+        method = self.options['partial_method']
         if self.options['jacobian_type'] != 'matvec' and pd_type != 'array':
             x = np.ones(self.var_shape)
             for i in range(self.options['num_var']):
                 in_var = self._cycle_names['x'].format(i)
                 self.declare_partials('x_norm2', in_var,
-                                      **self._array2kwargs(x.flatten(), pd_type))
+                                      **self._array2kwargs(x.flatten(), pd_type, method))
 
             self.declare_partials(self._cycle_names['theta_out'], self._cycle_names['psi'],
-                                  **self._array2kwargs(np.array([1.]), pd_type))
+                                  **self._array2kwargs(np.array([1.]), pd_type, method))
 
     def compute(self, inputs, outputs):
         theta = inputs[self._cycle_names['theta']]
@@ -365,7 +366,7 @@ class ExplicitLastComp(ExplicitFirstComp):
         outputs[self._cycle_names['theta_out']] = theta / 2 + (self._n * 2 * np.pi - psi) / (2 * k - 2)
 
     def compute_partials(self, inputs, partials):
-        if self.options['jacobian_type'] != 'matvec' and not self.options['finite_difference']:
+        if self.options['jacobian_type'] != 'matvec' and self.options['partial_method'] == 'exact':
             pd_type = self.options['partial_type']
             for i in range(self.options['num_var']):
                 in_var = self._cycle_names['x'].format(i)

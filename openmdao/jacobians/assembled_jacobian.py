@@ -52,6 +52,9 @@ class AssembledJacobian(Jacobian):
         Column ranges for inputs.
     _out_ranges : dict
         Row ranges for outputs.
+    _has_overlapping_partials : bool
+        If True, this jacobian contains subjacobians that overlap, which happens when a single
+        source connects to multiple inputs on the same component.
     """
 
     def __init__(self, matrix_class, system):
@@ -78,16 +81,20 @@ class AssembledJacobian(Jacobian):
         self._matrix_class = matrix_class
         self._in_ranges = None
         self._out_ranges = None
+        self._has_overlapping_partials = False
 
         self._subjac_iters = defaultdict(lambda: None)
-        self._init_ranges()
+        self._init_ranges(system)
 
-    def _init_ranges(self):
+    def _init_ranges(self, system):
         """
         Compute row/col ranges for variables of the owning system.
-        """
-        system = self._system
 
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
+        """
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
         sizes = system._var_sizes['nonlinear']['output']
@@ -106,12 +113,15 @@ class AssembledJacobian(Jacobian):
             in_ranges[name] = (start, end)
             start = end
 
-    def _initialize(self):
+    def _initialize(self, system):
         """
         Allocate the global matrices.
-        """
-        system = self._system
 
+        Parameters
+        ----------
+        system : System
+            Parent system to this jacobian.
+        """
         # var_indices are the *global* indices for variables on this proc
         is_top = system.pathname == ''
 
@@ -225,15 +235,15 @@ class AssembledJacobian(Jacobian):
         ext_mtx = self._matrix_class(system.comm)
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
-        iproc = self._system.comm.rank
-        sizes = self._system._var_sizes['nonlinear']['input']
-        abs2idx = self._system._var_allprocs_abs2idx['nonlinear']
+        iproc = system.comm.rank
+        sizes = system._var_sizes['nonlinear']['input']
+        abs2idx = system._var_allprocs_abs2idx['nonlinear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
                      system._var_abs_names['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
-        sizes = self._system._var_sizes['nonlinear']['output']
+        sizes = system._var_sizes['nonlinear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name in s._var_abs_names['output']:
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
@@ -277,7 +287,6 @@ class AssembledJacobian(Jacobian):
                 global_conns = system._conn_global_abs_in2out
 
             output_names = set(system._var_abs_names['output'])
-            input_names = set(system._var_abs_names['input'])
 
             rev_conns = defaultdict(list)
             for tgt, src in iteritems(global_conns):
@@ -294,7 +303,7 @@ class AssembledJacobian(Jacobian):
                 _, wrtname = abs_key
                 if wrtname in output_names:
                     if abs_key in int_mtx._submats:
-                        iters.append((abs_key, abs_key, False))
+                        iters.append((abs_key, False))
                     else:
                         # This happens when the src is an indepvarcomp that is
                         # contained in the system.
@@ -302,15 +311,16 @@ class AssembledJacobian(Jacobian):
                         if wrt in rev_conns:
                             for tgt in rev_conns[wrt]:
                                 if (of, tgt) in int_mtx._submats:
-                                    iters.append((of, tgt), abs_key, False)
+                                    iters.append(abs_key, False)
                                     break
                 else:  # wrt is an input
                     if wrtname in global_conns:
                         mapped = keymap[abs_key]
                         if mapped in seen:
-                            iters.append((mapped, abs_key, True))
+                            iters.append((abs_key, True))
+                            self._has_overlapping_partials = True
                         else:
-                            iters.append((mapped, abs_key, False))
+                            iters.append((abs_key, False))
                             seen.add(mapped)
                     elif ext_mtx is not None:
                         iters_in_ext.append(abs_key)
@@ -334,21 +344,33 @@ class AssembledJacobian(Jacobian):
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
-        for _, key, do_add in iters:
-            if do_add:
-                int_mtx._update_add_submat(key, subjacs[key]['value'])
-            else:
-                int_mtx._update_submat(key, subjacs[key]['value'])
+        if self._randomize:
+            for key, do_add in iters:
+                if do_add:
+                    int_mtx._update_add_submat(key, self._randomize_subjac(subjacs[key]['value']))
+                else:
+                    int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
 
-        for key in iters_in_ext:
-            ext_mtx._update_submat(key, subjacs[key]['value'])
+            for key in iters_in_ext:
+                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
+        else:
+            for key, do_add in iters:
+                if do_add:
+                    int_mtx._update_add_submat(key, subjacs[key]['value'])
+                else:
+                    int_mtx._update_submat(key, subjacs[key]['value'])
 
-    def _apply(self, d_inputs, d_outputs, d_residuals, mode):
+            for key in iters_in_ext:
+                ext_mtx._update_submat(key, subjacs[key]['value'])
+
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
 
         Parameters
         ----------
+        system : System
+            System that is updating this jacobian.
         d_inputs : Vector
             inputs linear vector.
         d_outputs : Vector
@@ -358,18 +380,11 @@ class AssembledJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        system = self._system
         int_mtx = self._int_mtx
-        if system.pathname in self._ext_mtx:
-            ext_mtx = self._ext_mtx[system.pathname]
-        else:
-            ext_mtx = None
+        ext_mtx = self._ext_mtx[system.pathname]
 
-        if system.pathname in self._view_ranges:
-            ranges = self._view_ranges[system.pathname]
-            int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
-        else:
-            int_ranges = None
+        ranges = self._view_ranges[system.pathname]
+        int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
 
         # TODO: remove the _unscaled_context call here (and in DictionaryJacobian)
         # and do it outside so that we can avoid an unnecessary extra unscaling/rescaling
@@ -423,6 +438,15 @@ class DenseJacobian(AssembledJacobian):
             Parent system to this jacobian.
         """
         super(DenseJacobian, self).__init__(DenseMatrix, system=system)
+
+    def _reset_mats(self):
+        """
+        Zero out internal matrices if needed.
+        """
+        if self._has_overlapping_partials:
+            self._int_mtx._matrix[:] = 0.0
+            for key in self._ext_mtx:
+                self._ext_mtx[key]._matrix[:] = 0.0
 
 
 class COOJacobian(AssembledJacobian):

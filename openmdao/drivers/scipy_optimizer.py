@@ -12,6 +12,7 @@ from six.moves import range
 import numpy as np
 from scipy.optimize import minimize
 
+import openmdao
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
 import openmdao.utils.coloring as coloring_mod
@@ -67,15 +68,9 @@ class ScipyOptimizeDriver(Driver):
         Cached result of constraint evaluations because scipy asks for them in a separate function.
     _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
-    _cons : dict
-        Contains all constraint info.
-    _designvars : dict
-        Contains all design variable info.
     _grad_cache : OrderedDict
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _objs : dict
-        Contains all objective info.
     _exc_info : 3 item tuple
         Storage for exception and traceback information.
     _obj_and_nlcons : list
@@ -182,8 +177,8 @@ class ScipyOptimizeDriver(Driver):
             for name, meta in iteritems(self._designvars):
                 lower = meta['lower']
                 upper = meta['upper']
-                if isinstance(lower, np.ndarray) or lower != - sys.float_info.max \
-                        or isinstance(upper, np.ndarray) or upper != sys.float_info.max:
+                if isinstance(lower, np.ndarray) or lower >= -openmdao.INF_BOUND \
+                        or isinstance(upper, np.ndarray) or upper <= openmdao.INF_BOUND:
                     d = OrderedDict()
                     d['lower'] = lower
                     d['upper'] = upper
@@ -297,7 +292,7 @@ class ScipyOptimizeDriver(Driver):
                     if isinstance(lower, np.ndarray):
                         lower = lower[j]
 
-                    dblcon = (upper < sys.float_info.max) and (lower > -sys.float_info.max)
+                    dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
 
                     # Add extra constraint if double-sided
                     if dblcon:
@@ -324,7 +319,7 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
-            coloring_mod.dynamic_simul_coloring(self, do_sparsity=False)
+            coloring_mod.dynamic_simul_coloring(self, run_model=False, do_sparsity=False)
 
         # optimize
         try:
@@ -459,7 +454,7 @@ class ScipyOptimizeDriver(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if dbl or (lower == -sys.float_info.max):
+        if dbl or (lower <= -openmdao.INF_BOUND):
             return upper - cons[name][idx]
         else:
             return cons[name][idx] - lower
@@ -543,7 +538,7 @@ class ScipyOptimizeDriver(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if dbl or (lower == -sys.float_info.max):
+        if dbl or (lower <= -openmdao.INF_BOUND):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]

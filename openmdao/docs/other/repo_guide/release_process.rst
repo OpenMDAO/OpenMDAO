@@ -1,8 +1,12 @@
 .. _`release_process`:
 
 
-Release Process to Make Your Project Pip-Installable
-====================================================
+Release Your Project on pypi
+============================
+
+Releasing your project's versions on the Python Packaging Index is a great way to keep your users up-to-date, and
+a convenient way to make your project installable with one easy `pip install <yourproject>` command. Here are the instructions
+to make that release happen.
 
 git
 ---

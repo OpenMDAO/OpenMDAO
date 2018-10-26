@@ -86,4 +86,24 @@ to be the same size as specified in the ``vec_size`` argument.
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature_vector2d
     :layout: code, output
 
+
+Using Surrogates That Do Not Define Linearize Method
+----------------------------------------------------
+
+In some cases, you might define surrogates but not define a `linearize` method. In this case, the
+`MetaModelUnStructuredComp` derivatives will be computed using finite differences for the output variables that use that
+surrogate. By default, the default options for the finite differencing method will be used.
+
+If you would like to specify finite differencing options, you can do so by calling the `declare_partials`
+method in the component's `setup` or in a parent group's configure method. This example, which uses a surrogate with no
+`linearize` method and no training for simplicity, shows `declare_partials` called in `setup`.
+
+.. embed-code::
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_feature_metamodel_use_fd_if_no_surrogate_linearize
+    :layout: code, output
+
+
+Complex step has not been tested with `MetaModelUnStructuredComp` and will result in an exception if used.
+
+
 .. tags:: MetaModelUnStructuredComp, Component

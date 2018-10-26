@@ -9,6 +9,7 @@ import unittest
 
 import numpy as np
 
+import openmdao
 from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import printoptions
@@ -166,6 +167,31 @@ class TestDriver(unittest.TestCase):
         con_base = np.array([ (prob['comp.y2'][0]-1.2)/(2.0-1.2), (prob['comp.y2'][1]-2.3)/(4.0-2.3) ])
         assert_rel_error(self, con['comp.y2'], con_base, 1.0e-3)
 
+    def test_vector_bounds_inf(self):
+
+        # make sure no overflow when there is no specified upper/lower bound and significatn scaling
+        prob = Problem()
+        prob.model = model = Group()
+
+        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        comp = model.add_subsystem('comp', DoubleArrayComp())
+        model.connect('px.x', 'comp.x1')
+
+        model.add_design_var('px.x', ref=np.array([.1, 1e-6]))
+        model.add_constraint('comp.y2', ref=np.array([.2, 2e-6]))
+
+        prob.setup()
+
+        desvars = model.get_design_vars()
+
+        self.assertFalse(np.any(np.isinf(desvars['px.x']['upper'])))
+        self.assertFalse(np.any(np.isinf(-desvars['px.x']['lower'])))
+
+        responses = prob.model.get_responses()
+
+        self.assertFalse(np.any(np.isinf(responses['comp.y2']['upper'])))
+        self.assertFalse(np.any(np.isinf(-responses['comp.y2']['lower'])))
+
     def test_vector_scaled_derivs_diff_sizes(self):
 
         prob = Problem()
@@ -250,7 +276,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.driver.options['debug_print'] = ['bad_option']
         self.assertEqual(str(context.exception),
-                         "Function is_valid(['bad_option']) returns False for option 'debug_print'.")
+                         "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = Problem()

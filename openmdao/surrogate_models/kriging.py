@@ -20,11 +20,11 @@ class KrigingSurrogate(SurrogateModel):
     Attributes
     ----------
     alpha : ndarray
-        Reduced likelyhood parameter: alpha
+        Reduced likelihood parameter: alpha
     eval_rmse : bool
         When true, calculate the root mean square prediction error.
     L : ndarray
-        Reduced likelyhood parameter: L
+        Reduced likelihood parameter: L
     n_dims : int
         Number of independents in the surrogate
     n_samples : int
@@ -34,7 +34,7 @@ class KrigingSurrogate(SurrogateModel):
         of the input values. If nugget is an ndarray, it must be of the same length
         as the number of training points. Default: 10. * Machine Epsilon
     sigma2 : ndarray
-        Reduced likelyhood parameter: sigma squared
+        Reduced likelihood parameter: sigma squared
     thetas : ndarray
         Kriging hyperparameters.
     X : ndarray

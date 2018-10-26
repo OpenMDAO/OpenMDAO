@@ -12,8 +12,6 @@ import numpy as np
 from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.vectors.default_transfer import DefaultTransfer
 
-real_types = (numbers.Real, np.float32, np.float64)
-
 
 class DefaultVector(Vector):
     """
@@ -70,6 +68,9 @@ class DefaultVector(Vector):
             np.zeros(new_sizes[1]),
             root_vec._data[old_sizes[0] + old_sizes[1]:],
         ])
+
+        if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
+            root_vec._cplx_data = np.zeros(root_vec._data.size, dtype=complex)
 
         root_vec._initialize_views()
 
@@ -129,21 +130,17 @@ class DefaultVector(Vector):
             if self._do_scaling:
                 self._scaling = {}
                 data = self._data
-                if self._name == 'linear':
+                if self._name == 'nonlinear':
+                    self._scaling['phys'] = (np.zeros(data.size), np.ones(data.size))
+                    self._scaling['norm'] = (np.zeros(data.size), np.ones(data.size))
+                elif self._name == 'linear':
                     # reuse the nonlinear scaling vecs since they're the same as ours
                     nlvec = self._system._root_vecs[self._kind]['nonlinear']
                     self._scaling['phys'] = (None, nlvec._scaling['phys'][1])
                     self._scaling['norm'] = (None, nlvec._scaling['norm'][1])
                 else:
-                    dphys1 = np.ones(data.size)
-                    dnorm1 = np.ones(data.size)
-                    if self._name == 'nonlinear':
-                        dphys0 = np.zeros(data.size)
-                        dnorm0 = np.zeros(data.size)
-                    else:
-                        dphys0 = dnorm0 = None
-                    self._scaling['phys'] = (dphys0, dphys1)
-                    self._scaling['norm'] = (dnorm0, dnorm1)
+                    self._scaling['phys'] = (None, np.ones(data.size))
+                    self._scaling['norm'] = (None, np.ones(data.size))
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
@@ -335,7 +332,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.sum(self._data.real**2) ** 0.5
+        return np.linalg.norm(self._data)
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """

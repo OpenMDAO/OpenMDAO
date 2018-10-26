@@ -10,18 +10,19 @@ import warnings
 from collections import OrderedDict, defaultdict
 from itertools import combinations
 from distutils.version import LooseVersion
+from contextlib import contextmanager
 
 from six import iteritems
 from six.moves import range
 
 import numpy as np
-from numpy.random import rand
 from scipy.sparse.compressed import get_index_dtype
 from scipy.sparse import coo_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 
 # If this is True, then IF simul coloring/sparsity is specified, use it.
@@ -49,68 +50,6 @@ else:
             return np.count_nonzero(arr)
 
         return count
-
-
-class _SubjacRandomizer(object):
-    """
-    A replacement for Jacobian._set_abs that replaces subjac with random numbers.
-
-    Attributes
-    ----------
-    _orig_set_abs : bound function
-        Original _set_abs function for the given Jacobian.
-    _jac : Jacobian
-        The jacobian having its _set_abs replaced.
-    _tol : float
-        Tolerance used to shift random numbers away from 0.
-    """
-
-    def __init__(self, jac, tol):
-        """
-        Initialize the function replacement.
-
-        Parameters
-        ----------
-        jac : Jacobian
-            The Jacobian having its _set_abs method replaced.
-        tol : float
-            Values between -tol and tol will be shifted away from 0.
-        """
-        self._orig_set_abs = jac._set_abs
-        self._jac = jac
-        self._tol = tol
-
-    def __call__(self, key, subjac):
-        """
-        Call this function replacement.
-
-        Parameters
-        ----------
-        key : (str, str)
-            Tuple of (response_name, dv_name)
-        subjac : array-like
-            Value of the subjacobian being assigned to key.
-        """
-        jac = self._jac
-        tol = self._tol
-
-        if key in jac._subjacs_info:
-            info = jac._subjacs_info[key]
-            rows = info['rows']
-        else:
-            rows = None
-
-        if rows is not None:  # list form
-            subjac = rand(rows.size) + 1.0
-        elif isinstance(subjac, sparse_types):  # sparse
-            subjac = subjac.copy()
-            subjac.data = rand(subjac.data.size) + 1.0
-        elif isinstance(subjac, np.ndarray):   # dense array
-            subjac = rand(*(subjac.shape)) + 1.0
-        else:  # scalar
-            subjac = rand() + 1.0
-
-        self._orig_set_abs(key, subjac)
 
 
 def _order_by_ID(col_matrix):
@@ -381,7 +320,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_row_nonzeros[r] = ncols  # make sure we don't pick this one again
+            M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
             M_col_nonzeros[Jc_rows[r]] -= 1
 
             r = M_row_nonzeros.argmin()
@@ -396,7 +335,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_col_nonzeros[c] = nrows  # make sure we don't pick this one again
+            M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
 
             c = M_col_nonzeros.argmin()
@@ -483,6 +422,37 @@ def _tol_sweep(arr, tol=1e-15, orders=5):
     return good_tol, len(sorted_items[0][1]), n_tested, sorted_items[0][0]
 
 
+@contextmanager
+def _computing_coloring_context(top):
+    """
+    Context manager for computing total jac sparsity for simultaneous coloring.
+
+    Parameters
+    ----------
+    top : System
+        Top of the system hierarchy where coloring will be done.
+    """
+    for system in top.system_iter(recurse=True, include_self=True):
+        if system.matrix_free:
+            raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
+                               "components." % system.pathname)
+
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
+        if jac is not None:
+            jac._randomize = True
+
+    yield
+
+    for system in top.system_iter(recurse=True, include_self=True):
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
+        if jac is not None:
+            jac._randomize = False
+
+
 def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
@@ -526,16 +496,6 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     if run_model:
         prob.run_model()
 
-    seen = set()
-    for system in prob.model.system_iter(recurse=True, include_self=True):
-        jac = system._assembled_jac
-        if jac is None:
-            jac = system._jacobian
-        if jac is not None and jac not in seen:
-            # replace jacobian set_abs with one that replaces all subjacs with random numbers
-            jac._set_abs = _SubjacRandomizer(jac, tol)
-            seen.add(jac)
-
     wrt = list(prob.driver._designvars)
 
     # get responses in order used by the driver
@@ -545,15 +505,16 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
         raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
                            "variables and responses.")
 
-    start_time = time.time()
-    fullJ = None
-    for i in range(repeats):
-        J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
-        if fullJ is None:
-            fullJ = np.abs(J)
-        else:
-            fullJ += np.abs(J)
-    elapsed = time.time() - start_time
+    with _computing_coloring_context(prob.model):
+        start_time = time.time()
+        fullJ = None
+        for i in range(repeats):
+            J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+            if fullJ is None:
+                fullJ = np.abs(J)
+            else:
+                fullJ += np.abs(J)
+        elapsed = time.time() - start_time
 
     # normalize the full J by dividing by the max value
     fullJ /= np.max(fullJ)
@@ -566,22 +527,11 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     print("Full total jacobian was computed %d times, taking %f seconds." % (repeats, elapsed))
     print("Total jacobian shape:", fullJ.shape, "\n")
 
-    # now revert the _jacobian _set_abs methods back to their original values
-    seen = set()
-    for system in prob.model.system_iter(recurse=True, include_self=True):
-        jac = system._assembled_jac
-        if jac is None:
-            jac = system._jacobian
-        if jac is not None and jac not in seen:
-            randomizer = jac._set_abs
-            jac._set_abs = randomizer._orig_set_abs
-            seen.add(jac)
-
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
 
-    # with open("array_viz.out", "w") as f:
-    #     array_viz(boolJ, stream=f)
+    # with open("array_viz%d.out" % system.comm.rank, "w") as f:
+    #     array_viz(boolJ, prob=prob, stream=f)
 
     return boolJ
 
@@ -649,10 +599,12 @@ def _write_sparsity(sparsity, stream):
     stream.write("{\n")
 
     last_res_idx = len(sparsity) - 1
-    for i, (out, out_dict) in enumerate(iteritems(sparsity)):
+    for i, out in enumerate(sorted(sparsity)):
+        out_dict = sparsity[out]
         stream.write('"%s": {\n' % out)
         last_dv_idx = len(out_dict) - 1
-        for j, (inp, subjac) in enumerate(iteritems(out_dict)):
+        for j, inp in enumerate(sorted(out_dict)):
+            subjac = out_dict[inp]
             rows, cols, shape = subjac
             if len(rows) > 15:
                 stream.write('   "%s": [\n' % inp)
@@ -1124,6 +1076,10 @@ def dynamic_sparsity(driver):
         The driver performing the optimization.
     """
     problem = driver._problem
+    if not problem.model._use_derivatives:
+        simple_warning("Derivatives have been turned off. Skipping dynamic sparsity computation.")
+        return
+
     driver._total_jac = None
     repeats = driver.options['dynamic_derivs_repeats']
 
@@ -1135,7 +1091,7 @@ def dynamic_sparsity(driver):
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
+def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=False):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1143,16 +1099,18 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
     ----------
     driver : <Driver>
         The driver performing the optimization.
+    run_model : bool
+        If True, call run_model before computing coloring.
     do_sparsity : bool
         If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
     show_jac : bool
         If True, display a visualization of the colored jacobian.
     """
-    # for now, raise an exception when MPI is used with simul_coloring
-    if MPI:
-        raise RuntimeError("simul coloring currently does not work under MPI.")
-
     problem = driver._problem
+    if not problem.model._use_derivatives:
+        simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
+        return
+
     driver._total_jac = None
 
     # save the coloring.json file for later inspection
@@ -1160,11 +1118,13 @@ def dynamic_simul_coloring(driver, do_sparsity=False, show_jac=False):
         coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=do_sparsity,
-                                  setup=False, run_model=False, show_jac=show_jac, stream=f)
+                                  setup=False, run_model=run_model, show_jac=show_jac, stream=f)
     driver.set_simul_deriv_color(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:
         driver._setup_tot_jac_sparsity()
+
+    simul_coloring_summary(coloring, stream=sys.stdout)
 
 
 def _simul_coloring_setup_parser(parser):
@@ -1218,19 +1178,21 @@ def _simul_coloring_cmd(options):
             outfile = sys.stdout
         else:
             outfile = open(options.outfile, 'w')
-        Problem._post_setup_func = None  # avoid recursive loop
+        if prob.model._use_derivatives:
+            Problem._post_setup_func = None  # avoid recursive loop
 
-        with profiling('coloring_profile.out') if options.profile else do_nothing_context():
-            color_info = get_simul_meta(prob,
-                                        repeats=options.num_jacs, tol=options.tolerance,
-                                        show_jac=options.show_jac,
-                                        include_sparsity=not options.no_sparsity,
-                                        setup=True, run_model=True,
-                                        stream=outfile)
+            with profiling('coloring_profile.out') if options.profile else do_nothing_context():
+                color_info = get_simul_meta(prob,
+                                            repeats=options.num_jacs, tol=options.tolerance,
+                                            show_jac=options.show_jac,
+                                            include_sparsity=not options.no_sparsity,
+                                            setup=False, run_model=True,
+                                            stream=outfile)
 
-        if sys.stdout.isatty():
-            simul_coloring_summary(color_info, stream=sys.stdout)
-
+            if sys.stdout.isatty():
+                simul_coloring_summary(color_info, stream=sys.stdout)
+        else:
+            print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
     return _simul_coloring
 

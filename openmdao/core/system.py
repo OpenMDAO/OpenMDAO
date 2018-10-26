@@ -11,16 +11,17 @@ from six import iteritems, string_types
 
 import numpy as np
 
+import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.array_utils import evenly_distrib_idxs
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -68,8 +69,10 @@ class System(object):
         Int that holds the number of times this system has iterated
         in a recording run.
     cite : str
-        Listing of relevant citataions that should be referenced when
+        Listing of relevant citations that should be referenced when
         publishing work that uses this class.
+    _full_comm : MPI.Comm or None
+        MPI communicator object used when System's comm is split for parallel FD.
     _subsystems_allprocs : [<System>, ...]
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
@@ -79,10 +82,6 @@ class System(object):
         (i.e. among _subsystems_allprocs).
     _subsystems_proc_range : (int, int)
         List of ranges of each myproc subsystem's processors relative to those of this system.
-    _subsystems_var_range : {'input': list of (int, int), 'output': list of (int, int)}
-        List of ranges of each myproc subsystem's allprocs variables relative to this system.
-    _num_var : {<vec_name>: {'input': int, 'output': int}, ...}
-        Number of allprocs variables owned by this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
@@ -102,6 +101,14 @@ class System(object):
         ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
     _var_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
+    _var_discrete : dict
+        Dictionary of discrete var metadata and values local to this process.
+    _var_allprocs_discrete : dict
+        Dictionary of discrete var metadata and values for all processes.
+    _discrete_inputs : dict-like or None
+        Storage for discrete input values.
+    _discrete_outputs : dict-like or None
+        Storage for discrete output values.
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
@@ -140,6 +147,8 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -216,8 +225,6 @@ class System(object):
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
-    _norm0: float
-        Normalization factor
     _vector_class : class
         Class to use for data vectors.  After setup will contain the value of either
         _distributed_vector_class or _local_vector_class.
@@ -227,14 +234,23 @@ class System(object):
         Class to use for local data vectors.
     _assembled_jac : AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
+    _num_par_fd : int
+        If FD is active, and the value is > 1, turns on parallel FD and specifies the number of
+        concurrent FD solves.
+    _par_fd_id : int
+        ID used to determine which columns in the jacobian will be computed when using parallel FD.
+    _use_derivatives : bool
+        If True, perform any memory allocations necessary for derivative computation.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, num_par_fd=1, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
+        num_par_fd : int
+            If FD is active, number of concurrent FD solves.
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the System options.
         """
@@ -280,8 +296,6 @@ class System(object):
         self._subsystems_myproc_inds = []
         self._subsystems_proc_range = []
 
-        self._num_var = {'input': 0, 'output': 0}
-
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
@@ -289,11 +303,15 @@ class System(object):
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+        self._var_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
         self._var_offsets = None
+
+        self._full_comm = None
 
         self._ext_num_vars = {'input': (0, 0), 'output': (0, 0)}
         self._ext_sizes = {'input': (0, 0), 'output': (0, 0)}
@@ -344,8 +362,11 @@ class System(object):
 
         self._scope_cache = {}
 
+        self._num_par_fd = num_par_fd
+
         self._declare_options()
         self.initialize()
+
         self.options.update(kwargs)
 
         self._has_guess = False
@@ -356,8 +377,15 @@ class System(object):
         self._vector_class = None
         self._local_vector_class = None
         self._distributed_vector_class = None
+        self._use_derivatives = True
 
         self._assembled_jac = None
+
+        self._par_fd_id = 0
+
+        self._filtered_vars_to_record = {}
+        self._owning_rank = {}
+        self._lin_vec_names = []
 
     def _declare_options(self):
         """
@@ -448,15 +476,18 @@ class System(object):
             ext_num_vars = {}
             ext_sizes = {}
 
-            for vec_name in self._lin_rel_vec_name_list:
+            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
+            for vec_name in vec_names:
                 ext_num_vars[vec_name] = {}
                 ext_sizes[vec_name] = {}
                 for type_ in ['input', 'output']:
                     ext_num_vars[vec_name][type_] = (0, 0)
                     ext_sizes[vec_name][type_] = (0, 0)
 
-            ext_num_vars['nonlinear'] = ext_num_vars['linear']
-            ext_sizes['nonlinear'] = ext_sizes['linear']
+            if self._use_derivatives:
+                ext_num_vars['nonlinear'] = ext_num_vars['linear']
+                ext_sizes['nonlinear'] = ext_sizes['linear']
 
             return ext_num_vars, ext_sizes
 
@@ -486,7 +517,7 @@ class System(object):
 
         if initial:
             relevant = self._relevant
-            vec_names = self._rel_vec_name_list
+            vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
             vois = self._vois
             abs2idx = self._var_allprocs_abs2idx
 
@@ -497,6 +528,13 @@ class System(object):
                 nl_alloc_complex |= 'cs' in sub._approx_schemes
                 if nl_alloc_complex:
                     break
+
+            # Linear vectors allocated complex only if subsolvers require derivatives.
+            if nl_alloc_complex:
+                from openmdao.error_checking.check_config import check_allocate_complex_ln
+                ln_alloc_complex = check_allocate_complex_ln(self, force_alloc_complex)
+            else:
+                ln_alloc_complex = False
 
             if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
                 self._scale_factors = self._compute_root_scale_factors()
@@ -512,7 +550,7 @@ class System(object):
                 if vec_name == 'nonlinear':
                     alloc_complex = nl_alloc_complex
                 else:
-                    alloc_complex = force_alloc_complex
+                    alloc_complex = ln_alloc_complex
 
                     if vec_name != 'linear':
                         voi = vois[vec_name]
@@ -575,10 +613,13 @@ class System(object):
         """
         self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
                     distributed_vector_class=self._distributed_vector_class,
-                    local_vector_class=self._local_vector_class)
-        self._final_setup(self.comm, setup_mode=setup_mode)
+                    local_vector_class=self._local_vector_class,
+                    use_derivatives=self._use_derivatives)
+        self._final_setup(self.comm, setup_mode=setup_mode,
+                          force_alloc_complex=self._outputs._alloc_complex)
 
-    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class):
+    def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
+               use_derivatives):
         """
         Perform setup for this system and its descendant systems.
 
@@ -601,6 +642,8 @@ class System(object):
         local_vector_class : type
             Reference to the <Vector> class or factory function used to instantiate vectors
             and associated transfers involved in intraprocess communication.
+        use_derivatives : bool
+            If True, perform any memory allocations necessary for derivative computation.
         """
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -611,6 +654,7 @@ class System(object):
             self._relevant = None
             self._distributed_vector_class = distributed_vector_class
             self._local_vector_class = local_vector_class
+            self._use_derivatives = use_derivatives
         # 2. Partial setup called in the system initiating the reconfiguration.
         elif setup_mode == 'reconf':
             recurse = True
@@ -635,11 +679,47 @@ class System(object):
         self._setup_vec_names(mode, self._vec_names, self._vois)
         self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
-        self._setup_vars(recurse=recurse)
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _setup_par_fd_procs(self, comm):
+        """
+        Split up the comm for use in parallel FD.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm>
+            MPI communicator object.
+        """
+        num_par_fd = self._num_par_fd
+        if comm.size < num_par_fd:
+            raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
+                             (self.pathname, comm.size))
+
+        self._full_comm = comm
+
+        if num_par_fd > 1:
+            sizes, offsets = evenly_distrib_idxs(num_par_fd, comm.size)
+
+            # a 'color' is assigned to each subsystem, with
+            # an entry for each processor it will be given
+            # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+            color = np.empty(comm.size, dtype=int)
+            for i in range(num_par_fd):
+                color[offsets[i]:offsets[i] + sizes[i]] = i
+
+            self._par_fd_id = color[comm.rank]
+
+            comm = self._full_comm.Split(self._par_fd_id)
+
+        return comm
 
     def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
@@ -727,8 +807,9 @@ class System(object):
         # Same situation with solvers, partials, and Jacobians.
         # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers(recurse=recurse)
-        self._setup_partials(recurse=recurse)
-        self._setup_jacobians(recurse=recurse)
+        if self._use_derivatives:
+            self._setup_partials(recurse=recurse)
+            self._setup_jacobians(recurse=recurse)
 
         self._setup_recording(recurse=recurse)
 
@@ -746,17 +827,6 @@ class System(object):
         if self.recording_options['record_model_metadata']:
             for sub in self.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
-
-    def _setup_vars(self, recurse=True):
-        """
-        Count total variables.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        self._num_var = {}
 
     def _setup_var_index_ranges(self, recurse=True):
         """
@@ -796,13 +866,16 @@ class System(object):
         """
         self._var_allprocs_abs2idx = abs2idx = {}
 
-        for vec_name in self._lin_rel_vec_name_list:
+        vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
+        for vec_name in vec_names:
             abs2idx[vec_name] = abs2idx_t = {}
             for type_ in ['input', 'output']:
                 for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][type_]):
                     abs2idx_t[abs_name] = i
 
-        abs2idx['nonlinear'] = abs2idx['linear']
+        if self._use_derivatives:
+            abs2idx['nonlinear'] = abs2idx['linear']
 
         # Recursion
         if recurse:
@@ -898,15 +971,19 @@ class System(object):
 
         self._vois = vois
         if vec_names is None:  # should only occur at top level on full setup
-            vec_names = ['nonlinear', 'linear']
-            if mode == 'fwd':
-                desvars = self.get_design_vars(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(_filter_names(desvars)))
-                self._vois = vois = desvars
-            else:  # rev
-                responses = self.get_responses(recurse=True, get_sizes=False)
-                vec_names.extend(sorted(_filter_names(responses)))
-                self._vois = vois = responses
+            if self._use_derivatives:
+                vec_names = ['nonlinear', 'linear']
+                if mode == 'fwd':
+                    desvars = self.get_design_vars(recurse=True, get_sizes=False)
+                    vec_names.extend(sorted(_filter_names(desvars)))
+                    self._vois = vois = desvars
+                else:  # rev
+                    responses = self.get_responses(recurse=True, get_sizes=False)
+                    vec_names.extend(sorted(_filter_names(responses)))
+                    self._vois = vois = responses
+            else:
+                vec_names = ['nonlinear']
+                self._vois = {}
 
         self._vec_names = vec_names
         self._lin_vec_names = vec_names[1:]  # only linear vec names
@@ -933,7 +1010,8 @@ class System(object):
         relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
                                            'output': ContainsAll()},
                                           ContainsAll())}
-        relevant['linear'] = relevant['nonlinear']
+        if self._use_derivatives:
+            relevant['linear'] = relevant['nonlinear']
         return relevant
 
     def _setup_relevance(self, mode, relevant=None):
@@ -956,6 +1034,8 @@ class System(object):
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
+
+        use_derivs = self._use_derivatives
 
         self._rel_vec_name_list = []
         for vec_name in self._vec_names:
@@ -1030,11 +1110,15 @@ class System(object):
         vector_class = self._vector_class
 
         for vec_name in self._rel_vec_name_list:
+
+            # Only allocate complex in the vectors we need.
+            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, resize=resize,
-                    alloc_complex=alloc_complex and vec_name == 'nonlinear', ncol=rootvec._ncol)
+                    alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -1159,6 +1243,9 @@ class System(object):
         recurse : bool
             If True, setup jacobians in all descendants.
         """
+        if not self._use_derivatives:
+            return
+
         asm_jac_solvers = set()
         if self._linear_solver is not None:
             asm_jac_solvers.update(self._linear_solver._assembled_jac_solver_iter())
@@ -1196,7 +1283,7 @@ class System(object):
 
         # allocate internal matrices now that we have all of the subjac metadata
         if asm_jac is not None:
-            asm_jac._initialize()
+            asm_jac._initialize(self)
             asm_jac._init_view(self)
 
     def set_initial_values(self):
@@ -1357,12 +1444,10 @@ class System(object):
         yield
 
         for vec in outputs:
-
             if self._has_output_scaling:
                 vec.scale('norm')
 
         for vec in residuals:
-
             if self._has_resid_scaling:
                 vec.scale('norm')
 
@@ -1518,37 +1603,24 @@ class System(object):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            for vec_name in self._lin_rel_vec_name_list:
+            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
+
+            for vec_name in vec_names:
                 offsets[vec_name] = off_vn = {}
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]
                     if vsizes.size > 0:
-                        csum = np.cumsum(vsizes)
-                        # shift the cumsum forward by one and set first entry to 0 to get
-                        # the correct offset.
-                        csum[1:] = csum[:-1]
+                        csum = np.empty(vsizes.size, dtype=int)
                         csum[0] = 0
+                        csum[1:] = np.cumsum(vsizes)[:-1]
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
                         off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
-            offsets['nonlinear'] = offsets['linear']
+
+            if self._use_derivatives:
+                offsets['nonlinear'] = offsets['linear']
 
         return self._var_offsets
-
-    @contextmanager
-    def jacobian_context(self, jac):
-        """
-        Context manager that yields the Jacobian assigned to this system in this system's context.
-
-        Yields
-        ------
-        <Jacobian>
-            The current system's jacobian with its _system set to self.
-        """
-        oldsys = jac._system
-        jac._system = self
-        yield jac
-        jac._system = oldsys
 
     @property
     def nonlinear_solver(self):
@@ -1743,11 +1815,11 @@ class System(object):
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+        lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
                                          flatten=True)
 
         # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+        upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
                                          flatten=True)
 
         # Apply scaler/adder to lower and upper
@@ -1901,11 +1973,11 @@ class System(object):
 
         if type_ == 'con':
             # Convert lower to ndarray/float as necessary
-            lower = format_as_float_or_array('lower', lower, val_if_none=-sys.float_info.max,
+            lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
                                              flatten=True)
 
             # Convert upper to ndarray/float as necessary
-            upper = format_as_float_or_array('upper', upper, val_if_none=sys.float_info.max,
+            upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
                                              flatten=True)
 
             # Convert equals to ndarray/float as necessary
@@ -2141,7 +2213,10 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if name in abs2idx:
+                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    else:
+                        out[name]['size'] = 0  # discrete var, don't know size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2193,7 +2268,10 @@ class System(object):
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             for name in out:
                 if 'size' not in out[name]:
-                    out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    if name in abs2idx:
+                        out[name]['size'] = sizes[self._owning_rank[name], abs2idx[name]]
+                    else:
+                        out[name]['size'] = 0  # discrete var, we don't know the size
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -2750,7 +2828,7 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = recording_iteration.stack[-1][0]
+            stack_top = self._recording_iter.stack[-1][0]
             method = stack_top.split('.')[-1]
 
             if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
@@ -2858,6 +2936,14 @@ class System(object):
             sub._inputs.set_complex_step_mode(active)
             sub._outputs.set_complex_step_mode(active)
             sub._residuals.set_complex_step_mode(active)
+
+            if sub._vectors['output']['linear']._alloc_complex:
+                sub._vectors['output']['linear'].set_complex_step_mode(active)
+                sub._vectors['input']['linear'].set_complex_step_mode(active)
+                sub._vectors['residual']['linear'].set_complex_step_mode(active)
+
+                if sub._owns_approx_jac:
+                    sub._jacobian.set_complex_step_mode(active)
 
     def cleanup(self):
         """

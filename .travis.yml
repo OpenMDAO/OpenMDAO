@@ -2,6 +2,8 @@ branches:
   only:
   - master
 
+sudo: false
+
 group: deprecated-2017Q4
 
 filter_secrets: false
@@ -12,15 +14,12 @@ os:
 language: generic
 
 env:
-  global:
-    - secure: Rx/uHnF0j1Cp/Ume9lQE5Wu2oM6aA41oFI22+oXmw798vmyeqHAocL6hqva0navjqx9FWLdPHn1LTAjLsHop+tavpMR1Qzu3P/5FEcvr/qDi68osWZq3oCs2WRJLo0BFaG8jQvmMd+RxkczVxWj+D2K+ywgkNb1KABP5Xv6lnTtwfTH0lteCMkFcnTnC4jcan1VGdvLyxewzMbdbuvTNVukAdrVxbwZMJrDyPPf7aEZ+t50C/pkRYSVf/2/YyFq5hgywqZZe2RInO7UeyHWhP+giyQsVkL0nWpA5zcgKjvYKnZbAt95uzTmwabs4e6BpipvbcX2M7aMyqMaz6OD36cDScMeOFn/FIQC3UalkvwEH0yvzI3CDncTjWy4xkxnfort7XKeQbrSqrX0AcDu462ke95JHZsIfL402lgtcW4aLcPUPs2MPrin1ENLBK29Jm+5LIM+22ISWd4anhpjE70SgOhsXrHrzL4n4kfxb4rsm483aeXEszlxWu56QNQ5EYCHpLY+aF9XOkFdAMM/FBRwlxhTySscPOANfd4GiZxSPxDOEHoEHKoy/CPo4jkUlFrqZIe+VnHmNPgGH/eU2nCNMhVeH/zJ5kOx7wns0SdorUSuQIywg07BBJtizzSUtzofd8kYRdVMyH4RTAfoBeGPUeFV45N5i07N6ucagL3s=
   matrix:
-    - PY=2.7 NUMPY=1.12
-    - PY=2.7 NUMPY=1.12 PETSc=3.8.1
-    - PY=2.7 NUMPY=1.12 PETSc=3.9.1
-    - PY=3.6 NUMPY=1.12
-    - PY=3.6 NUMPY=1.14 PETSc=3.8.1 UPLOAD_DOCS=1
-    - PY=3.6 NUMPY=1.14 PETSc=3.9.1
+    - PY=2.7 NUMPY=1.12 SCIPY=1.1
+    - PY=2.7 NUMPY=1.13 SCIPY=1.1 PETSc=3.8.1
+    - PY=3.6 NUMPY=1.12 SCIPY=1.1
+    - PY=3.6 NUMPY=1.14 SCIPY=1.0.1 PETSc=3.8.1 UPLOAD_DOCS=1
+    - PY=3.7 NUMPY=1.15 SCIPY=1.1 PETSc=3.9.1
 
 git:
   depth: 99999
@@ -41,43 +40,27 @@ addons:
 
 cache:
   apt: true
+  timeout: 300
   directories:
     - $HOME/.cache/pip
-    - $HOME/pyoptsparse
     - $HOME/miniconda
-    - $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse
 
 notifications:
   slack:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
-
 # Check for existence of files to determine if cache exists
 # If the dir doesn't exist, but is slated to be cached later,
 # Travis unhelpfully creates it, which then causes "dir already exists"
 # errors when you go to actually install the thing, so we must non-intuitively
 # delete the file before re-creating it later.
-- if [ -f $HOME/miniconda/bin/python$PY ]; then
-    echo "cached miniconda found -- nothing to do";
+- if [ -d $HOME/miniconda/envs/PY$PY ]; then
+    echo "cached miniconda environment found";
+    CACHED_ENV=1;
   else
-    NOT_CACHED_CONDA=1;
+    echo "cached miniconda environment not found";
     rm -rf $HOME/miniconda;
-  fi
-
-- if [ -d $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse ]; then
-    echo "cached pyoptsparse found -- nothing to do";
-  else
-    NOT_CACHED_PYOPTSPARSE=1;
-    rm -rf $HOME/pyoptsparse
-    rm -rf $HOME/miniconda/lib/python$PY/site-packages/pyoptsparse;
-  fi
-
-- if [ -f $HOME/.cache/pip ]; then
-    echo "cached pip found -- nothing to do";
-  else
-    NOT_CACHED_PIP=1;
-    rm -rf $HOME/.cache/pip;
   fi
 
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
@@ -86,7 +69,7 @@ before_install:
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
-- if [ "$MASTER_BUILD" ]; then
+- if [ "$encrypted_74d70a284b7d_key" ]; then
     openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
     eval "$(ssh-agent -s)";
     chmod 600 /tmp/travis_deploy_rsa;
@@ -94,59 +77,53 @@ install:
     echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
   fi
 
-- if [ "$NOT_CACHED_CONDA" ]; then
-    wget "https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh" -O miniconda.sh;
+# if we don't have a cached conda environment then build one, otherwise just activate the cached one
+- if [ "$CACHED_ENV" ]; then
+    echo "Using cached environment..."
+    export PATH=$HOME/miniconda/bin:$PATH;
+    source $HOME/miniconda/bin/activate PY$PY;
+  else
+    echo "Building python environment...";
+    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
     chmod +x miniconda.sh;
     ./miniconda.sh -b  -p $HOME/miniconda;
     export PATH=$HOME/miniconda/bin:$PATH;
-    conda install --yes python=$PY;
-    if [ "$UPLOAD_DOCS" ]; then
-      conda install --yes numpy==$NUMPY scipy=1.0.1 nose sphinx mock swig pip;
-    else
-      conda install --yes numpy==$NUMPY scipy=0.19.1 nose sphinx mock swig pip;
-    fi
-  else
-    export PATH=$HOME/miniconda/bin:$PATH;
-  fi
 
-- if [ "$NOT_CACHED_PIP" ]; then
+    conda create --yes -n PY$PY python=$PY;
+    source $HOME/miniconda/bin/activate PY$PY;
+
+    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+
     pip install --upgrade pip;
-
-    if [ "$PETSc" ]; then
-      pip install mpi4py;
-      pip install petsc4py==$PETSc;
-    fi
-
     pip install redbaron;
     pip install git+https://github.com/OpenMDAO/testflo.git;
     pip install coverage;
     pip install git+https://github.com/swryan/coveralls-python@work;
-  fi
 
-- if [ "$NOT_CACHED_PYOPTSPARSE" ]; then
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
 
-    if [ "$MASTER_BUILD" ]; then
-      cd pyoptsparse/pySNOPT/source;
+    if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
+      cd pyoptsparse/pySNOPT;
       scp -r "$SNOPT_LOCATION" .;
-      cd ../../..;
+      cd ../..;
     fi
 
     python setup.py install;
     cd ..;
-  fi
 
-# do this after petsc install to avoid weird petsc install failure
-- if [ "$NOT_CACHED_CONDA" ]; then
+    if [ "$PETSc" ]; then
+      pip install mpi4py petsc4py==$PETSc;
+    fi
+
     conda install --yes matplotlib;
   fi
 
-# finally, install OpenMDAO
-- pip install .;  # Not using -e on purpose here, to catch pkging errors
+# install OpenMDAO (Not using -e on purpose here, to catch pkging errors)
+- pip install .;
 
 # display summary of installed packages and their versions
-- pip list
+- conda list
 
 script:
 # make docs first
