@@ -11,118 +11,71 @@ For example:
 
 .. code-block:: none
 
-   openmdao mem <your_python_script_here>
+   openmdao mem -p openmdao -p openaerostruct --tree run_CRM.py
 
 
 This will generate output to the console that looks like this:
 
 .. code-block:: none
 
-    5312.46  (1 calls)  /Users/jubs/OpenAeroStruct/openaerostruct/examples/run_CRM.py:1:<module>
-        5.68  (1 calls)  /Users/jubs/OpenMDAO/openmdao/api.py:1:<module>
-        1.73  (1 calls)  /Users/jubs/OpenMDAO/openmdao/components/external_code_comp.py:1:<module>
-            1.69  (1 calls)  /Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/distutils/__init__.py:1:<module>
-            1.55  (1 calls)  /Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/distutils/ccompiler.py:1:<module>
-        1.28  (1 calls)  /Users/jubs/OpenMDAO/openmdao/components/meta_model_structured_comp.py:1:<module>
-            1.26  (1 calls)  /Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/scipy/interpolate/__init__.py:173:<module>
-        1.17  (1 calls)  /Users/jubs/OpenMDAO/openmdao/drivers/pyoptsparse_driver.py:7:<module>
-            1.16  (1 calls)  /Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/pyoptsparse/__init__.py:2:<module>
-    3757.77  (1 calls)  Problem.setup Problem#0
-        3757.76  (1 calls)  System._setup Group#0:''
-        3757.12  (1 calls)  Group._setup_procs Group#0:''
-            2.95  (1 calls)  Group._setup_procs Geometry#0:wing
-                2.61  (1 calls)  Group._setup_procs GeometryMesh#0:mesh
-                1.10  (1 calls)  Component._setup_procs Rotate#0:rotate
-                    1.10  (1 calls)  Rotate.setup Rotate#0:wing.mesh.rotate
-            3754.11  (1 calls)  Group._setup_procs AeroPoint#0:aero_point_0
-            3753.10  (1 calls)  Group._setup_procs VLMStates#0:aero_states
-                283.37  (1 calls)  Component._setup_procs GetVectors#0:get_vectors
-                283.37  (1 calls)  GetVectors.setup GetVectors#0:aero_point_0.aero_states.get_vectors
-                    56.66  (3 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:146>.ones
-                    56.72  (1 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:1039>.outer
-                1462.68  (1 calls)  Component._setup_procs EvalVelMtx#0:mtx_assy
-                2112.93  (1 calls)  EvalVelMtx.setup EvalVelMtx#0:aero_point_0.aero_states.mtx_assy
-                    162.56  (5 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/fromnumeric.py:382>.repeat
-                    162.56  (5 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/fromnumeric.py:50>._wrapfunc
-                    812.81  (4 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/lib/shape_base.py:844>.tile
-                    650.38  (4 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/einsumfunc.py:824>.einsum
-                    1372.92  (2 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/lib/function_base.py:4703>.delete
-                        81.29  (2 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:146>.ones
-                    27.09  (1 calls)  ExplicitComponent.add_output EvalVelMtx#0:aero_point_0.aero_states.mtx_assy
-                        27.09  (1 calls)  Component.add_output EvalVelMtx#0:aero_point_0.aero_states.mtx_assy
-                        27.09  (1 calls)  </Users/jubs/OpenMDAO/openmdao/utils/general_utils.py:63>.ensure_compatible
-                            27.09  (1 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:146>.ones
-                207.89  (1 calls)  Component._setup_procs VLMMtxRHSComp#0:mtx_rhs
-                207.89  (1 calls)  VLMMtxRHSComp.setup VLMMtxRHSComp#0:aero_point_0.aero_states.mtx_rhs
-                    27.18  (3 calls)  Component.add_input VLMMtxRHSComp#0:aero_point_0.aero_states.mtx_rhs
-                        27.18  (3 calls)  </Users/jubs/OpenMDAO/openmdao/utils/general_utils.py:63>.ensure_compatible
-                        27.09  (3 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:146>.ones
-                    9.03  (2 calls)  ExplicitComponent.add_output VLMMtxRHSComp#0:aero_point_0.aero_states.mtx_rhs
-                        9.03  (2 calls)  Component.add_output VLMMtxRHSComp#0:aero_point_0.aero_states.mtx_rhs
-                        9.03  (2 calls)  </Users/jubs/OpenMDAO/openmdao/utils/general_utils.py:63>.ensure_compatible
-                            9.03  (2 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:146>.ones
-                    54.19  (4 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/einsumfunc.py:824>.einsum
-                36.14  (1 calls)  Component._setup_procs SolveMatrix#0:solve_matrix
-                    36.14  (1 calls)  SolveMatrix.setup SolveMatrix#0:aero_point_0.aero_states.solve_matrix
-                    9.03  (3 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:1039>.outer
-                170.12  (1 calls)  Component._setup_procs GetVectors#1:get_vectors_force
-                170.12  (1 calls)  GetVectors.setup GetVectors#1:aero_point_0.aero_states.get_vectors_force
-                    56.72  (1 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:1039>.outer
-                1428.43  (1 calls)  Component._setup_procs EvalVelMtx#1:mtx_assy_forces
-                2078.68  (1 calls)  EvalVelMtx.setup EvalVelMtx#1:aero_point_0.aero_states.mtx_assy_forces
-                    162.56  (5 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/fromnumeric.py:382>.repeat
-                    162.56  (5 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/fromnumeric.py:50>._wrapfunc
-                    812.81  (4 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/lib/shape_base.py:844>.tile
-                    650.31  (4 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/einsumfunc.py:824>.einsum
-                    1371.62  (2 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/lib/function_base.py:4703>.delete
-                        81.28  (2 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:146>.ones
-                162.57  (1 calls)  Component._setup_procs EvalVelocities#0:eval_velocities
-                162.57  (1 calls)  EvalVelocities.setup EvalVelocities#0:aero_point_0.aero_states.eval_velocities
-                    54.19  (3 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/einsumfunc.py:824>.einsum
-    1399.38  (1 calls)  Problem.final_setup Problem#0
-        1399.37  (1 calls)  System._final_setup Group#0:''
-        354.37  (1 calls)  System._setup_bounds Group#0:''
-        689.50  (1 calls)  Group._setup_transfers Group#0:''
-            689.50  (1 calls)  DefaultTransfer._setup_transfers
-            688.57  (1 calls)  Group._setup_transfers AeroPoint#0:aero_point_0
-                688.57  (1 calls)  DefaultTransfer._setup_transfers
-                688.32  (1 calls)  Group._setup_transfers VLMStates#0:aero_point_0.aero_states
-                    688.32  (1 calls)  DefaultTransfer._setup_transfers
-                    516.78  (54 calls)  DefaultTransfer._setup_transfers.merge
-        354.32  (1 calls)  System.set_initial_values Group#0:''
-    148.66  (1 calls)  Problem.run_model Problem#0
-        148.65  (1 calls)  System.run_solve_nonlinear Group#0:''
-        148.65  (1 calls)  Group._solve_nonlinear Group#0:''
-            148.65  (1 calls)  NonlinearRunOnce.solve NonlinearRunOnce#0
-            148.35  (1 calls)  Group._solve_nonlinear AeroPoint#0:aero_point_0
-                148.35  (1 calls)  NonlinearRunOnce.solve NonlinearRunOnce#2
-                148.21  (1 calls)  Group._solve_nonlinear VLMStates#0:aero_point_0.aero_states
-                    148.21  (1 calls)  NonlinearRunOnce.solve NonlinearRunOnce#4
-                        8.58  (13 calls)  Group._transfer VLMStates#0:aero_point_0.aero_states
-                        8.51  (1 calls)  DefaultTransfer.transfer DefaultTransfer#41
-                    112.67  (1 calls)  ExplicitComponent._solve_nonlinear GetVectors#0:aero_point_0.aero_states.get_vectors
-                        56.65  (1 calls)  DefaultVector.set_const DefaultVector#68
-                        56.66  (1 calls)  GetVectors.compute GetVectors#0:aero_point_0.aero_states.get_vectors
-                        17.43  (1 calls)  ExplicitComponent._solve_nonlinear VLMMtxRHSComp#0:aero_point_0.aero_states.mtx_rhs
-                        9.04  (1 calls)  DefaultVector.set_const DefaultVector#77
-                        8.39  (1 calls)  VLMMtxRHSComp.compute VLMMtxRHSComp#0:aero_point_0.aero_states.mtx_rhs
-                            9.03  (2 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/einsumfunc.py:824>.einsum
-                        4.84  (1 calls)  ImplicitComponent._solve_nonlinear SolveMatrix#0:aero_point_0.aero_states.solve_matrix
-                        4.84  (1 calls)  SolveMatrix.solve_nonlinear SolveMatrix#0:aero_point_0.aero_states.solve_matrix
-                            4.77  (1 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/scipy/linalg/decomp_lu.py:17>.lu_factor
-                        56.73  (1 calls)  ExplicitComponent._solve_nonlinear GetVectors#1:aero_point_0.aero_states.get_vectors_force
-                        56.65  (1 calls)  DefaultVector.set_const DefaultVector#86
-                        29.45  (1 calls)  ExplicitComponent._solve_nonlinear EvalVelMtx#1:aero_point_0.aero_states.mtx_assy_forces
-                        27.09  (1 calls)  DefaultVector.set_const DefaultVector#89
-                        246.20  (1 calls)  EvalVelMtx.compute EvalVelMtx#1:aero_point_0.aero_states.mtx_assy_forces
-                        429.35  (5 calls)  </Users/jubs/OpenAeroStruct/openaerostruct/aerodynamics/eval_mtx.py:18>._compute_finite_vortex
-                            18.07  (10 calls)  </Users/jubs/OpenAeroStruct/openaerostruct/utils/vector_algebra.py:90>.compute_norm
-                                18.06  (10 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/fromnumeric.py:1778>.sum
-                                18.06  (10 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/_methods.py:31>._sum
-                            18.60  (5 calls)  </Users/jubs/OpenAeroStruct/openaerostruct/utils/vector_algebra.py:39>.compute_cross
-                                18.60  (5 calls)  </Users/jubs/miniconda2/envs/blue3/lib/python3.6/site-packages/numpy/core/numeric.py:1591>.cross
+    3486.46  (1 calls)  Problem.setup
+    |3486.46  (1 calls)  System._setup:(Group)
+    |   |3485.49  (1 calls)  Group._setup_procs
+    |   |   |3481.97  (1 calls)  Group._setup_procs:(AeroPoint)
+    |   |   |   |3479.86  (1 calls)  Group._setup_procs:(VLMStates)
+    |   |   |   |   |2617.19  (2 calls)  Component._setup_procs:(EvalVelMtx)
+    |   |   |   |   |   |3917.41  (2 calls)  EvalVelMtx.setup
+    |   |   |   |   |   |   |  27.19  (2 calls)  ExplicitComponent.add_output:(EvalVelMtx)
+    |   |   |   |   |   |   |   |  27.19  (2 calls)  Component.add_output:(EvalVelMtx)
+    |   |   |   |   |   |   |   |   |  27.09  (2 calls)  </Users/banaylor/dev/blue/openmdao/utils/general_utils.py:151>.ensure_compatible
+    |   |   |   |   | 454.27  (2 calls)  Component._setup_procs:(GetVectors)
+    |   |   |   |   |   | 454.27  (2 calls)  GetVectors.setup
+    |   |   |   |   | 207.82  (1 calls)  Component._setup_procs:(VLMMtxRHSComp)
+    |   |   |   |   |   | 207.82  (1 calls)  VLMMtxRHSComp.setup
+    |   |   |   |   |   |   |  27.09  (3 calls)  Component.add_input:(VLMMtxRHSComp)
+    |   |   |   |   |   |   |   |  27.09  (3 calls)  </Users/banaylor/dev/blue/openmdao/utils/general_utils.py:151>.ensure_compatible
+    |   |   |   |   |   |   |   9.13  (2 calls)  ExplicitComponent.add_output:(VLMMtxRHSComp)
+    |   |   |   |   |   |   |   |   9.12  (2 calls)  Component.add_output:(VLMMtxRHSComp)
+    |   |   |   |   |   |   |   |   |   9.03  (2 calls)  </Users/banaylor/dev/blue/openmdao/utils/general_utils.py:151>.ensure_compatible
+    |   |   |   |   | 162.62  (1 calls)  Component._setup_procs:(EvalVelocities)
+    |   |   |   |   |   | 162.62  (1 calls)  EvalVelocities.setup
+    |   |   |   |   |  36.21  (1 calls)  Component._setup_procs:(SolveMatrix)
+    |   |   |   |   |   |  36.21  (1 calls)  SolveMatrix.setup
+    |   |   |   |   1.31  (1 calls)  Component._setup_procs:(VLMGeometry)
+    |   |   |   |   |   1.31  (1 calls)  VLMGeometry.setup
+    |   |   |   3.35  (1 calls)  Group._setup_procs:(Geometry)
+    |   |   |   |   2.85  (1 calls)  Group._setup_procs:(GeometryMesh)
+    |   |   |   |   |   1.15  (1 calls)  Component._setup_procs:(Rotate)
+    |   |   |   |   |   |   1.15  (1 calls)  Rotate.setup
+    1399.43  (1 calls)  Problem.final_setup
+    |1399.41  (1 calls)  System._final_setup:(Group)
+    |   | 689.68  (1 calls)  Group._setup_transfers
+    |   |   | 689.68  (1 calls)  DefaultTransfer._setup_transfers
+    |   |   |   | 688.50  (1 calls)  Group._setup_transfers:(AeroPoint)
+    |   |   |   |   | 688.50  (1 calls)  DefaultTransfer._setup_transfers
+    |   |   |   |   |   | 688.33  (1 calls)  Group._setup_transfers:(VLMStates)
+    |   |   |   |   |   |   | 688.33  (1 calls)  DefaultTransfer._setup_transfers
+    |   |   |   |   |   |   |   | 516.52  (54 calls)  DefaultTransfer._setup_transfers.merge
+    |   | 354.49  (1 calls)  System._setup_bounds:(Group)
+    |   | 354.33  (1 calls)  System.set_initial_values:(Group)
+    4.27  (1 calls)  /Users/banaylor/dev/blue/openmdao/api.py:1<module>
+    |   1.09  (1 calls)  /Users/banaylor/dev/blue/openmdao/drivers/pyoptsparse_driver.py:7<module>
+    |   1.06  (1 calls)  /Users/banaylor/dev/blue/openmdao/components/meta_model_structured_comp.py:1<module>
+    169.36  (2 calls)  ExplicitComponent._solve_nonlinear:(GetVectors)
+    | 113.30  (2 calls)  DefaultVector.set_const
+    |  56.69  (2 calls)  GetVectors.compute
+    17.88  (1 calls)  ExplicitComponent._solve_nonlinear:(VLMMtxRHSComp)
+    |   9.04  (1 calls)  DefaultVector.set_const
+    |   8.84  (1 calls)  VLMMtxRHSComp.compute
+    8.57  (13 calls)  Group._transfer:(VLMStates)
+    |   8.57  (13 calls)  DefaultTransfer.transfer
+    147.45  (2 calls)  EvalVelMtx.compute
+    | 686.95  (10 calls)  </Users/banaylor/dev/OpenAeroStruct/openaerostruct/aerodynamics/eval_mtx.py:18>._compute_finite_vortex
+    |   |  57.44  (10 calls)  </Users/banaylor/dev/OpenAeroStruct/openaerostruct/utils/vector_algebra.py:10>.compute_dot
+    |   |  21.36  (20 calls)  </Users/banaylor/dev/OpenAeroStruct/openaerostruct/utils/vector_algebra.py:90>.compute_norm
+    54.19  (2 calls)  DefaultVector.set_const
 
-    Max mem usage: 5825.35 MB
+    Max mem usage: 5400.57 MB
 
 
 The memory use is mapped to the call tree structure .  Note that functions are tracked based on
@@ -130,7 +83,72 @@ their full call tree path, so that the same function can appear multiple times i
 called from different places, and the different memory usage for those multiple calls can be
 seen in the tree.
 
-The tree can be filtered by minimum memory usage so that the parts of the tree with memory
+To see a flat listing rather than a tree, don't use the `--tree` arg, and you'll get output like
+this:
+
+.. code-block:: none
+
+    1.06  (225 calls)  Vector.__init__:(DefaultVector)
+    1.06  (1 calls)  /Users/banaylor/dev/blue/openmdao/components/meta_model_structured_comp.py:1<module>
+    1.09  (1 calls)  /Users/banaylor/dev/blue/openmdao/drivers/pyoptsparse_driver.py:7<module>
+    1.15  (1 calls)  Component._setup_procs:(Rotate)
+    1.15  (1 calls)  Rotate.setup
+    1.31  (1 calls)  Component._setup_procs:(VLMGeometry)
+    1.31  (1 calls)  VLMGeometry.setup
+    2.85  (1 calls)  Group._setup_procs:(GeometryMesh)
+    3.35  (1 calls)  Group._setup_procs:(Geometry)
+    4.27  (1 calls)  /Users/banaylor/dev/blue/openmdao/api.py:1<module>
+    8.57  (13 calls)  Group._transfer:(VLMStates)
+    8.58  (43 calls)  DefaultTransfer.transfer
+    8.84  (1 calls)  VLMMtxRHSComp.compute
+    9.12  (2 calls)  Component.add_output:(VLMMtxRHSComp)
+    9.13  (2 calls)  ExplicitComponent.add_output:(VLMMtxRHSComp)
+    17.88  (1 calls)  ExplicitComponent._solve_nonlinear:(VLMMtxRHSComp)
+    21.36  (24 calls)  </Users/banaylor/dev/OpenAeroStruct/openaerostruct/utils/vector_algebra.py:90>.compute_norm
+    27.09  (3 calls)  Component.add_input:(VLMMtxRHSComp)
+    27.19  (2 calls)  Component.add_output:(EvalVelMtx)
+    27.19  (2 calls)  ExplicitComponent.add_output:(EvalVelMtx)
+    36.21  (1 calls)  Component._setup_procs:(SolveMatrix)
+    36.21  (1 calls)  SolveMatrix.setup
+    56.69  (2 calls)  GetVectors.compute
+    57.44  (14 calls)  </Users/banaylor/dev/OpenAeroStruct/openaerostruct/utils/vector_algebra.py:10>.compute_dot
+    64.25  (145 calls)  </Users/banaylor/dev/blue/openmdao/utils/general_utils.py:151>.ensure_compatible
+    147.45  (2 calls)  EvalVelMtx.compute
+    162.62  (1 calls)  Component._setup_procs:(EvalVelocities)
+    162.62  (1 calls)  EvalVelocities.setup
+    169.36  (2 calls)  ExplicitComponent._solve_nonlinear:(GetVectors)
+    177.06  (36 calls)  DefaultVector.set_const
+    207.82  (1 calls)  Component._setup_procs:(VLMMtxRHSComp)
+    207.82  (1 calls)  VLMMtxRHSComp.setup
+    354.33  (1 calls)  System.set_initial_values:(Group)
+    354.49  (1 calls)  System._setup_bounds:(Group)
+    454.27  (2 calls)  Component._setup_procs:(GetVectors)
+    454.27  (2 calls)  GetVectors.setup
+    517.44  (186 calls)  DefaultTransfer._setup_transfers.merge
+    686.95  (10 calls)  </Users/banaylor/dev/OpenAeroStruct/openaerostruct/aerodynamics/eval_mtx.py:18>._compute_finite_vortex
+    688.33  (1 calls)  Group._setup_transfers:(VLMStates)
+    688.50  (1 calls)  Group._setup_transfers:(AeroPoint)
+    689.68  (1 calls)  Group._setup_transfers
+    1399.41  (1 calls)  System._final_setup:(Group)
+    1399.44  (2 calls)  Problem.final_setup
+    2068.28  (7 calls)  DefaultTransfer._setup_transfers
+    2617.19  (2 calls)  Component._setup_procs:(EvalVelMtx)
+    3479.86  (1 calls)  Group._setup_procs:(VLMStates)
+    3481.97  (1 calls)  Group._setup_procs:(AeroPoint)
+    3485.49  (1 calls)  Group._setup_procs
+    3486.46  (1 calls)  System._setup:(Group)
+    3486.46  (1 calls)  Problem.setup
+    3917.41  (2 calls)  EvalVelMtx.setup
+
+    Max mem usage: 5400.57 MB
+
+
+The `-p` argument(s) determine which package(s) will be traced. In the example above, the
+`openmdao` and `openaerostruct` packages were traced.  If no `-p` args are supplied, the
+`openmdao` package is assumed.  Note however that if *any* `-p` args are supplied, then the
+`openmdao` package will not be traced unless explicitly specified.
+
+The output can be filtered by minimum memory usage so that the parts with memory
 usage below a certain amount will not be shown.  The default minimum memory usage is 1 MB.
 If you wanted to set the minimum memory usage to 100 MB, for example, you could do it like this:
 
@@ -142,7 +160,7 @@ If you wanted to set the minimum memory usage to 100 MB, for example, you could 
 
 Running `openmdao mem` generates a raw memory dump file with a default name of `mem_trace.raw`.
 To display the memory profile using a pre-existing memory dump file, you can use the
-`openmdao mempost` command as follows:
+`openmdao mempost` command, for example:
 
 
 .. code-block:: none
@@ -152,6 +170,13 @@ To display the memory profile using a pre-existing memory dump file, you can use
 
 This just allows you to take different looks at the memory profile without having to re-run
 your code.
+
+
+As usual, any additional options for the `openmdao mem` and `openmdao mempost` commands can
+be seen by providing the `-h` argument, for example:
+
+.. embed-shell-cmd::
+    :cmd: openmdao mem -h
 
 
 .. note::
