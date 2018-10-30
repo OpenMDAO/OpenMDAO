@@ -1252,6 +1252,41 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.run_driver()
 
+    def test_multiple_objectives_error(self):
+
+        from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        self.assertFalse(prob.driver.supports['multiple_objectives'])
+        prob.driver.options['debug_print'] = ['nl_cons', 'objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_objective('c')  # Second objective
+        prob.setup(check=False)
+
+        with self.assertRaises(RuntimeError):
+            prob.run_model()
+
+        with self.assertRaises(RuntimeError):
+            prob.run_driver()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -76,6 +76,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     ----------
     _input_sizes : list
         Stores the size of the inputs at each level.
+    _static_input_sizes : list
+        Stores the size of the inputs at each level for inputs added outside of setup.
     _nfi : float
         number of levels of fidelity
     _training_input : dict
@@ -99,6 +101,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         self._training_input = nfi * [np.empty(0)]
         self._input_sizes = nfi * [0]
 
+        self._static_input_sizes = nfi * [0]
+
     def initialize(self):
         """
         Declare options.
@@ -107,6 +111,11 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         self.options.declare('nfi', types=int, default=1, lower=1,
                              desc='Number of levels of fidelity.')
+
+    def _setup_procs(self, pathname, comm, mode):
+        self._input_sizes = list(self._static_input_sizes)
+
+        super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -147,7 +156,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         else:
             input_size = metadata['value'].size
 
-        self._input_sizes[0] = self._input_size
+        if self._static_mode:
+            self._static_input_sizes[0] += input_size
+        else:
+            self._input_sizes[0] += input_size
 
         # Add train:<invar>_fi<n>
         for fi in range(self._nfi):
@@ -155,7 +167,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 name_with_fi = 'train:' + _get_name_fi(name, fi)
                 self.options.declare(
                     name_with_fi, default=None, desc='Training data for %s' % name_with_fi)
-                self._input_sizes[fi] += input_size
+                if self._static_mode:
+                    self._static_input_sizes[fi] += input_size
+                else:
+                    self._input_sizes[fi] += input_size
 
     def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
                    desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):

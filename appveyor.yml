@@ -1,5 +1,14 @@
 build: off
 
+for:
+  -
+    matrix:
+      only:
+        - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+    cache:
+     - '/home/appveyor/miniconda'
+     - '/home/appveyor/.cache/pip/wheels/'
+
 environment:
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
@@ -30,43 +39,48 @@ environment:
 
 install:
 - sh:
-    sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
-    sudo apt-get update;
-    sudo apt-get -y install gfortran;
-    sudo apt-get -y install libblas-dev;
-    sudo apt-get -y install liblapack-dev;
-    sudo apt-get -y install libopenmpi-dev;
-    sudo apt-get -y install openmpi-bin;
+    if [ ! -d /home/appveyor/miniconda/envs/PY$PY ]; then
 
-    echo "Building python environment...";
-    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
-    chmod +x miniconda.sh;
-    ./miniconda.sh -b  -p $HOME/miniconda;
-    export PATH=$HOME/miniconda/bin:$PATH;
+      sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
+      sudo apt-get update;
+      sudo apt-get -y install gfortran;
+      sudo apt-get -y install libblas-dev;
+      sudo apt-get -y install liblapack-dev;
+      sudo apt-get -y install libopenmpi-dev;
+      sudo apt-get -y install openmpi-bin;
 
-    conda create --yes -n PY$PY python=$PY;
-    source $HOME/miniconda/bin/activate PY$PY;
+      echo "Building python environment...";
+      wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
+      chmod +x miniconda.sh;
+      ./miniconda.sh -b  -p $HOME/miniconda;
+      export PATH=$HOME/miniconda/bin:$PATH;
 
-    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+      conda create --yes -n PY$PY python=$PY;
+      source $HOME/miniconda/bin/activate PY$PY;
 
-    pip install --upgrade pip;
-    pip install redbaron;
-    pip install git+https://github.com/OpenMDAO/testflo.git;
-    pip install coverage;
-    pip install git+https://github.com/swryan/coveralls-python@work;
+      conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
 
-    git clone https://github.com/OpenMDAO/pyoptsparse.git;
-    cd pyoptsparse;
-    python setup.py install;
-    cd ..;
+      pip install --upgrade pip;
+      pip install redbaron;
+      pip install git+https://github.com/OpenMDAO/testflo.git;
+      pip install coverage;
+      pip install git+https://github.com/swryan/coveralls-python@work;
 
-    pip install mpi4py;
-    pip install petsc4py==$PETSc;
+      git clone https://github.com/OpenMDAO/pyoptsparse.git;
+      cd pyoptsparse;
 
-    conda install --yes matplotlib;
+      python setup.py install;
+      cd ..;
 
-    pip install .;
-    conda list
+      pip install mpi4py;
+      pip install petsc4py==$PETSc;
+
+      conda install --yes matplotlib;
+
+      pip install .;
+    fi
+
+    conda list;
 
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
