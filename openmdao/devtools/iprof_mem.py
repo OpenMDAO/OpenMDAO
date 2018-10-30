@@ -8,6 +8,7 @@ import gc
 from importlib import import_module
 from collections import defaultdict
 from os.path import abspath, isfile, dirname, join
+from contextlib import contextmanager
 
 from openmdao.devtools.iprof_utils import find_qualified_name, func_group, \
      _collect_methods, _setup_func_group, _get_methods, _Options
@@ -58,21 +59,24 @@ def _setup(options):
         for p in options.packages:
             fileset.update(_list_package_pyfiles(p))
 
-        _out_stream = open(options.outfile, "w", buffering=1024*1024)
+        if options.outfile is sys.stdout:
+            _out_stream = sys.stdout
+        else:
+            _out_stream = open(options.outfile, "w", buffering=1024*1024)
         _trace_memory = _create_profile_callback(depth=[0], fileset=fileset, stream=_out_stream)
         _registered = True
 
 
-def setup(methods=None):
+def setup(**kwargs):
     """
     Setup memory profiling.
 
     Parameters
     ----------
-    methods : list of (glob, (classes...)) or None
-        Methods to be profiled, based on glob patterns and isinstance checks.
+    kwargs : dict
+        Keyword options.
     """
-    _setup(_Options(methods=methods))
+    _setup(_Options(**kwargs))
 
 
 def start():
@@ -174,6 +178,38 @@ def _mem_prof_exec(options):
     else:
         postprocess_memtrace_flat(fname=options.outfile, min_mem=options.min_mem,
                                   show_colors=options.show_colors)
+
+
+@contextmanager
+def memtrace(**kwargs):
+    """
+    Turn on memory tracing within a certain context.
+
+    Parameters
+    ----------
+    kwargs : dict
+        Named options to pass to setup.
+    """
+    options = _Options(**kwargs)
+    if options.outfile is None:
+        options.outfile = 'mem_trace.raw'
+    if options.min_mem is None:
+        options.min_mem = 1.0
+    if options.stream is None:
+        options.stream = sys.stdout
+
+    _setup(options)
+    start()
+    yield
+    stop()
+
+    _file_line2qualname(options.outfile)
+    if options.tree:
+        postprocess_memtrace_tree(fname=options.outfile, min_mem=options.min_mem,
+                                  show_colors=options.show_colors, stream=options.stream)
+    else:
+        postprocess_memtrace_flat(fname=options.outfile, min_mem=options.min_mem,
+                                  show_colors=options.show_colors, stream=options.stream)
 
 
 def _mempost_setup_parser(parser):
