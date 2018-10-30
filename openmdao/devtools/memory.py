@@ -24,7 +24,7 @@ try:
 
 except ImportError:
     resource = None
-    def max_mem_usage(fn):
+    def max_mem_usage():
         raise RuntimeError("The 'max_mem_usage' function requires the 'resource' package.")
 
 try:
@@ -67,10 +67,10 @@ try:
 
 except ImportError:
     psutil = None
-    def mem_usage(fn):
+    def mem_usage(*args, **kwargs):
         raise RuntimeError("The 'mem_usage' function requires the 'psutil' package.  You can "
                            "install it using 'pip install psutil'.")
-    def diff_mem(fn):
+    def diff_mem(*args, **kwargs):
         raise RuntimeError("The 'diff_mem' function requires the 'psutil' package.  You can "
                            "install it using 'pip install psutil'.")
 
