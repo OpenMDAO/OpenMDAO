@@ -165,6 +165,11 @@ class ScipyOptimizeDriver(Driver):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
 
+        # Raises error if multiple objectives are not supported, but more objectives were defined.
+        if not self.supports['multiple_objectives'] and len(self._objs) > 1:
+            msg = '{} currently does not support multiple objectives.'
+            raise RuntimeError(msg.format(self.__class__.__name__))
+
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint

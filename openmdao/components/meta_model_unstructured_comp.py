@@ -34,6 +34,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         List of inputs that are not the training vars.
     _surrogate_output_names : [str, ..]
         List of outputs that are not the training vars.
+    _static_input_size : int
+        Keeps track of the cumulative size of all inputs added outside of setup.
+    _static_surrogate_input_names : [str, ..]
+        List of inputs that are not the training vars and are added outside of setup.
+    _static_surrogate_output_names : [str, ..]
+        List of outputs that are not the training vars and are added outside of setup.
     _training_input : dict
         Training data for inputs.
     _training_output : dict
@@ -61,6 +67,20 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._training_output = {}
 
         self._input_size = 0
+
+        self._static_surrogate_input_names = []
+        self._static_surrogate_output_names = []
+        self._static_input_size = 0
+
+    def _setup_procs(self, pathname, comm, mode):
+        self._surrogate_input_names = []
+        self._surrogate_output_names = []
+
+        self._surrogate_input_names.extend(self._static_surrogate_input_names)
+        self._surrogate_output_names.extend(self._static_surrogate_output_names)
+        self._input_size = self._static_input_size
+
+        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode)
 
     def initialize(self):
         """
@@ -104,8 +124,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         else:
             input_size = metadata['value'].size
 
-        self._surrogate_input_names.append((name, input_size))
-        self._input_size += input_size
+        if self._static_mode:
+            surrogate_input_names = self._static_surrogate_input_names
+            self._static_input_size += input_size
+        else:
+            surrogate_input_names = self._surrogate_input_names
+            self._input_size += input_size
+        surrogate_input_names.append((name, input_size))
 
         train_name = 'train:%s' % name
         self.options.declare(train_name, default=None, desc='Training data for %s' % name)
@@ -150,7 +175,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         else:
             output_shape = metadata['shape']
 
-        self._surrogate_output_names.append((name, output_shape))
+        if self._static_mode:
+            surrogate_output_names = self._static_surrogate_output_names
+        else:
+            surrogate_output_names = self._surrogate_output_names
+        surrogate_output_names.append((name, output_shape))
+
         self._training_output[name] = np.zeros(0)
 
         # Note: the default_surrogate flag is stored in metadata so that we can reconfigure
@@ -248,7 +278,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if non_declared_partials:
                 msg = "Because the MetaModelUnStructuredComp '{}' uses a surrogate " \
                       "which does not define a linearize method,\nOpenMDAO will use " \
-                      "finite differences to compute derivates. Some of the derivatives " \
+                      "finite differences to compute derivatives. Some of the derivatives " \
                       "will be computed\nusing default finite difference " \
                       "options because they were not explicitly declared.\n".format(self.name)
                 msg += "The derivatives computed using the defaults are:\n"
