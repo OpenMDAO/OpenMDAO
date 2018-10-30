@@ -1813,11 +1813,13 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # metadata for all the systems in the model
-        self.assertEqual(sorted(cr.system_metadata.keys()),
+        metadata = cr.system_metadata
+
+        self.assertEqual(sorted(metadata.keys()),
                          sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
         # options for system 'd1', with second option excluded
-        self.assertEqual(str(cr.system_metadata['d1']['component_options']),
+        self.assertEqual(str(metadata['d1']['component_options']),
             "================== ======= ================= ================ ======================================\n"
             "Option             Default Acceptable Values Acceptable Types Description                           \n"
             "================== ======= ================= ================ ======================================\n"
@@ -1830,7 +1832,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             "options value 1    1       N/A               N/A                                                    \n"
             "================== ======= ================= ================ ======================================")
 
-        self.assertEqual(cr.system_metadata['d1']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(metadata['d1']['component_options']['assembled_jac_type'], 'csc')
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
