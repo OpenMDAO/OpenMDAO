@@ -167,9 +167,6 @@ def _mem_prof_exec(options):
 
     stop()
 
-    # convert the output file to use qualified names immediately.  If we do it later,
-    # we risk having mismatches due to changes in source code somewhere between the time we
-    # generated the file and the time we postprocess it.
     _file_line2qualname(options.outfile)
 
     if options.tree:
@@ -244,6 +241,9 @@ def _mempost_exec(options):
 
 
 def _file_line2qualname(fname):
+    # convert the output file to use qualified names immediately.  If we do it later,
+    # we risk having mismatches due to changes in source code somewhere between the time we
+    # generated the file and the time we postprocess it.
     qual_cache = {}
     inname = '_temp_' + fname
 
