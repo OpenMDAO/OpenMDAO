@@ -78,7 +78,7 @@ This will generate output to the console that looks like this:
     Max mem usage: 5400.57 MB
 
 
-The memory use is mapped to the call tree structure .  Note that functions are tracked based on
+The memory use is mapped to the call tree structure.  Note that functions are tracked based on
 their full call tree path, so that the same function can appear multiple times in the tree,
 called from different places, and the different memory usage for those multiple calls can be
 seen in the tree.
