@@ -720,7 +720,7 @@ def import_library(libfilepointer):
     _UNIT_LIB.optionxform = _do_nothing
 
     # New in Python 3.2: read_file() replaces readfp().
-    if sys.version_info[0] >= 3 and sys.version_info[1] >= 2:
+    if sys.version_info >= (3, 2):
         _UNIT_LIB.read_file(libfilepointer)
     else:
         _UNIT_LIB.readfp(libfilepointer)
@@ -780,7 +780,7 @@ def update_library(filename):
         cfg.optionxform = _do_nothing
 
         # New in Python 3.2: read_file() replaces readfp().
-        if sys.version_info[0] >= 3 and sys.version_info[1] >= 2:
+        if sys.version_info >= (3, 2):
             cfg.read_file(inp)
         else:
             cfg.readfp(inp)
