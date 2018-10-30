@@ -805,9 +805,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), expected_err)
 
+    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
+    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
         prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.add_recorder(self.recorder)
