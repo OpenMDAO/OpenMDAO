@@ -52,6 +52,11 @@ class TestProfileMemory(unittest.TestCase):
 
 class TestCmdlineMemory(unittest.TestCase):
     def setUp(self):
+        try:
+            import psutil
+        except ImportError:
+            raise unittest.SkipTest("psutil is not installed")
+
         self.tstfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mem_model.py')
         self.startdir = os.getcwd()
         self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriver-')
