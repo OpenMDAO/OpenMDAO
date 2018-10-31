@@ -2454,6 +2454,122 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
 
+    def test_database_v4(self):
+        # the change between v4 and v5 was the addition of the 'source' information
+        # this tests the proper determination of the case source without that data
+        #
+        # the legacy database was created with the same setup as the above test named
+        # "test_reading_all_case_types" so this is a slimmed down version of that test
+        #
+        # NOTE: ScipyOptimizeDriver did not record its initial run under its own
+        #       recording context prior to V5, so the initial case does not reflect
+        #       the driver as the source
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_database_v4.sql')
+
+        cr = CaseReader(filename)
+
+        #
+        # check sources
+        #
+
+        self.assertEqual(sorted(cr.list_sources()), [
+            'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
+        ])
+
+        #
+        # check system cases
+        #
+
+        system_cases = cr.list_cases('root.pz', recurse=False)
+        expected_cases = [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
+            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
+            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
+            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
+            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
+            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6',
+        ]
+        self.assertEqual(len(system_cases), len(expected_cases))
+        for i, coord in enumerate(system_cases):
+            print(coord)
+            print(expected_cases[i])
+            self.assertEqual(coord, expected_cases[i])
+
+        #
+        # check solver cases
+        #
+
+        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
+        expected_cases = [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0'
+        ]
+        self.assertEqual(len(root_solver_cases), len(expected_cases))
+        for i, coord in enumerate(root_solver_cases):
+            self.assertEqual(coord, expected_cases[i])
+
+        case = cr.get_case(root_solver_cases[-1])
+
+        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_outputs = ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']
+
+        self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
+        self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
+        self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        #
+        # check mda solver cases
+        #
+
+        # check that there are multiple iterations and mda solver is part of the coordinate
+        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver', recurse=False)
+        self.assertTrue(len(mda_solver_cases) > 1)
+        for coord in mda_solver_cases:
+            self.assertTrue('mda._solve_nonlinear' in coord)
+
+        case = cr.get_case(mda_solver_cases[-1])
+
+        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_outputs = ['y1', 'y2']
+
+        self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
+        self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
+        self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
+        np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
+
+        # check that the recurse option returns root and mda solver cases plus child system cases
+        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
+        self.assertEqual(len(all_solver_cases),
+                         len(root_solver_cases) + len(mda_solver_cases) + len(system_cases))
+
+        #
+        # check driver cases
+        #
+
+        driver_cases = cr.list_cases('driver', recurse=False)
+        expected_cases = [
+            'rank0:SLSQP|0',
+            'rank0:SLSQP|1',
+            'rank0:SLSQP|2',
+            'rank0:SLSQP|3',
+            'rank0:SLSQP|4',
+            'rank0:SLSQP|5',
+        ]
+        # check that there are multiple iterations and they have the expected coordinates
+        self.assertTrue(len(driver_cases), len(expected_cases))
+        for i, coord in enumerate(driver_cases):
+            self.assertEqual(coord, expected_cases[i])
+
     def test_driver_v3(self):
         """
         Backwards compatibility version 3.
