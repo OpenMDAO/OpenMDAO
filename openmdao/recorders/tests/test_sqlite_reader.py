@@ -2478,6 +2478,18 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
         ])
 
+        driver_vars = cr.list_source_vars('driver')
+        self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
+                         ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
+
+        model_vars = cr.list_source_vars('root.pz')
+        self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
+                         ('inputs:', [], 'outputs:', ['z']))
+
+        solver_vars = cr.list_source_vars('root.mda.nonlinear_solver')
+        self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
+                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['y1', 'y2']))
+
         #
         # check system cases
         #
@@ -2494,8 +2506,6 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
-            print(coord)
-            print(expected_cases[i])
             self.assertEqual(coord, expected_cases[i])
 
         #
