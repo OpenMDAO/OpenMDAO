@@ -5,34 +5,34 @@ October 31, 2018
 
 New Features:
 --------------
-- list_outputs() method now includes a `prom_name` argument to include the promoted name in the printed output (Thanks John Jasa!)
-- N2 viewer now includes tool tip (hover over) showing the promoted name of any variable
-- Improved error msg when building sparse partials with duplicate col/row entries
-- You can now build the docs without MPI/PETSc installed (you will get warnings, but no longer errors)
-- Major internal refactor to reduce overhead on compute_totals calls (very noticeable on large design spaces but still cheap problems)
-- components now have a `under_complex_step` attribute you can check to see if complex-step is currently active
-- components `distributed` attribute has been moved to an option (old attribute has been deprecated)
-- MetaModelUnstructured will now use FD for partial derivatives of surrogates that don't provide analytic derivatives (user can override the default settings if they wish to use CS or different FD config)
-- Improvements to SimpleGA to make it more stable and added support constraints via penalty functions (Thanks madsmpedersen and onodip)
-- Parallel FD and CS at the component and group level is now supported
-- Can turn off the analytic derivative sub-system if it is not needed via an argument to setup()
-- derivative coloring now works for problems that run under MPI
+- list_outputs() method now includes a `prom_name` argument to include the promoted name in the printed output (Thanks John Jasa!).
+- N2 viewer now includes tool tip (hover over) showing the promoted name of any variable.
+- Improved error msg when building sparse partials with duplicate col/row entries.
+- You can now build the docs without MPI/PETSc installed (you will get warnings, but no longer errors).
+- Major internal refactor to reduce overhead on compute_totals calls (very noticeable on large design spaces but still cheap problems).
+- Components now have a `under_complex_step` attribute you can check to see if complex-step is currently active.
+- Components `distributed` attribute has been moved to an option (old attribute has been deprecated).
+- MetaModelUnstructured will now use FD for partial derivatives of surrogates that don't provide analytic derivatives (user can override the default settings if they wish to use CS or different FD config).
+- Improvements to SimpleGA to make it more stable, and added support constraints via penalty functions (Thanks madsmpedersen and onodip).
+- Parallel FD and CS at the component and group level is now supported.
+- Can turn off the analytic derivative sub-system if it is not needed via an argument to setup().
+- Derivative coloring now works for problems that run under MPI.
 
 - New Components in the standard library:
-    - Mux and Demux components
+    - Mux and Demux components.
 
 - New CaseRecording/CaseReading Features:
-    - DesVar AND output variable bounds are both reordered now
-    - Improved error msg if you try to load a non-existent file with CaseReader
+    - DesVar AND output variable bounds are both reordered now.
+    - Improved error msg if you try to load a non-existent file with CaseReader.
 
-- **Experimental Feature**: Discrete data passing is now supported as an experimental feature... we're still testing it and may change the API!
+- **Experimental Feature**: Discrete data passing is now supported as an experimental feature... we're still testing it, and may change the API!
 
 Backwards Incompatible API Changes:
 ------------------------------------
-- get_objectives method on CaseReader now returns a dict-like object
-- output vector is now locked (read only) when inside the apply_nonlinear method (you shouldn't have been changing it then anyway!)
-- default step size for complex-step has been changed to 1e-40
-- Moderate refactor of the CaseReader api. It was not self-consistent before, but it is now
+- `get_objectives` method on CaseReader now returns a dict-like object.
+- Output vector is now locked (read-only) when inside the `apply_nonlinear` method (you shouldn't have been changing it then anyway!).
+- default step size for complex-step has been changed to 1e-40.
+- Moderate refactor of the CaseReader API. It is now self-consistent.
 
 ################################################################################################
 Release Notes for OpenMDAO 2.4.0
