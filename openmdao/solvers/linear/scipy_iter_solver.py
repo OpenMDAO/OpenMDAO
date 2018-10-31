@@ -7,7 +7,6 @@ from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.recorders.recording_iteration_stack import Recording
 
 _SOLVER_TYPES = {
     # 'bicg': bicg,
@@ -170,12 +169,11 @@ class ScipyKrylov(LinearSolver):
             the current residual vector.
         """
         norm = np.linalg.norm(res)
-        with Recording('ScipyKrylov', self._iter_count, self):
-            if self._iter_count == 0:
-                if norm != 0.0:
-                    self._norm0 = norm
-                else:
-                    self._norm0 = 1.0
+        if self._iter_count == 0:
+            if norm != 0.0:
+                self._norm0 = norm
+            else:
+                self._norm0 = 1.0
 
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1

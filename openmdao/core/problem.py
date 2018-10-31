@@ -7,7 +7,6 @@ import sys
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
-import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -27,7 +26,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import _RecIteration
-from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
@@ -180,8 +179,6 @@ class Problem(object):
         # Case recording options
         self.recording_options = OptionsDictionary()
 
-        self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'problem level')
@@ -662,8 +659,8 @@ class Problem(object):
         }
 
         self._rec_mgr.startup(self)
-        if self.recording_options['record_metadata']:
-            self._rec_mgr.record_metadata(self)
+
+        record_viewer_data(self)
 
     def add_recorder(self, recorder):
         """
@@ -671,7 +668,7 @@ class Problem(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -680,6 +677,10 @@ class Problem(object):
         """
         Clean up resources prior to exit.
         """
+        # shut down all recorders
+        self._rec_mgr.shutdown()
+
+        # clean up driver and model resources
         self.driver.cleanup()
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()

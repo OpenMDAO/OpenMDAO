@@ -50,8 +50,8 @@ class TestConnections(unittest.TestCase):
 
     def test_inp_inp_explicit_conn_w_src(self):
         raise unittest.SkipTest("explicit input-input connections not supported yet")
-        self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x') # connect inputs
-        self.p.model.connect('G1.G2.C2.x', 'G3.G4.C3.x') # connect src to one of connected inputs
+        self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x')  # connect inputs
+        self.p.model.connect('G1.G2.C2.x', 'G3.G4.C3.x')  # connect src to one of connected inputs
         self.p.setup(check=False)
 
         self.p['G1.G2.C2.x'] = 999.
@@ -76,8 +76,8 @@ class TestConnections(unittest.TestCase):
             def solve_nonlinear(self, inputs, outputs, resids):
                 x = inputs['x']
 
-                outputs['y1'] = x * np.array( [1.0, 2.0, 3.0])
-                outputs['y2'] = x * np.array( [1.0, 2.0, 3.0])
+                outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
+                outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
 
         class Tgt(ExplicitComponent):
 
@@ -126,8 +126,8 @@ class TestConnections(unittest.TestCase):
 
                 x = inputs['x']
 
-                outputs['y1'] = x * np.array( [1.0, 2.0, 3.0])
-                outputs['y2'] = x * np.array( [1.0, 2.0, 3.0])
+                outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
+                outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
                 outputs['y3'] = x * 4.0
 
         class Tgt(ExplicitComponent):
@@ -180,8 +180,10 @@ class TestConnections(unittest.TestCase):
         self.assertEqual(self.p.model.G3.G4.C4._inputs['x'], 999.)
 
         content = stream.getvalue()
-        self.assertTrue("The following parameters have no associated unknowns:\nG1.G2.C1.x\nG3.G4.C3.x\nG3.G4.C4.x" in content)
-        self.assertTrue("The following components have no connections:\nG1.G2.C1\nG1.G2.C2\nG3.G4.C3\nG3.G4.C4\n" in content)
+        self.assertTrue("The following parameters have no associated unknowns:\n"
+                        "G1.G2.C1.x\nG3.G4.C3.x\nG3.G4.C4.x" in content)
+        self.assertTrue("The following components have no connections:\n"
+                        "G1.G2.C1\nG1.G2.C2\nG3.G4.C3\nG3.G4.C4\n" in content)
         self.assertTrue("No recorders have been specified, so no data will be saved." in content)
 
     def test_diff_conn_input_vals(self):
@@ -216,7 +218,9 @@ class TestConnections(unittest.TestCase):
         try:
             self.p.setup(check=False)
         except Exception as err:
-            msg = "The following connected inputs have no source and different units: [('G1.G2.C1.x', 'ft'), ('G3.G4.C3.x', 'inch')]. Connect 'G1.G2.C1.x' to a source (such as an IndepVarComp) with defined units."
+            msg = "The following connected inputs have no source and different units: " \
+                  "[('G1.G2.C1.x', 'ft'), ('G3.G4.C3.x', 'inch')]. " \
+                  "Connect 'G1.G2.C1.x' to a source (such as an IndepVarComp) with defined units."
             self.assertTrue(msg in str(err))
         else:
             self.fail("Exception expected")
@@ -233,7 +237,9 @@ class TestConnections(unittest.TestCase):
         try:
             self.p.setup(check=False)
         except Exception as err:
-            msg = "The following connected inputs have no source and different units: [('G1.G2.C1.x', 'ft'), ('G3.G4.C3.x', 'inch')]. Connect 'G3.G4.C3.x' to a source (such as an IndepVarComp) with defined units."
+            msg = "The following connected inputs have no source and different units: " \
+                  "[('G1.G2.C1.x', 'ft'), ('G3.G4.C3.x', 'inch')]. " \
+                  "Connect 'G3.G4.C3.x' to a source (such as an IndepVarComp) with defined units."
             self.assertTrue(msg in str(err))
         else:
             self.fail("Exception expected")
@@ -246,7 +252,7 @@ class TestConnections(unittest.TestCase):
 
         num_comps = 50
 
-        desvars = root.add_subsystem("desvars", IndepVarComp('dvar1', 1.0))
+        root.add_subsystem("desvars", IndepVarComp('dvar1', 1.0))
 
         # add a bunch of comps
         for i in range(num_comps):
@@ -255,11 +261,11 @@ class TestConnections(unittest.TestCase):
             else:
                 units = "m"
 
-            root.add_subsystem("C%d"%i, ExecComp('y=x*2.0', units={'x':units}))
+            root.add_subsystem("C%d" % i, ExecComp('y=x*2.0', units={'x': units}))
 
         # connect all of their inputs (which have different units)
         for i in range(1, num_comps):
-            root.connect("C%d.x"%(i-1), "C%d.x"%i)
+            root.connect("C%d.x" % (i-1), "C%d.x" % i)
 
         try:
             p.setup(check=False)
@@ -287,13 +293,13 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         G1 = root.add_subsystem("G1", Group())
         G2 = G1.add_subsystem("G2", Group())
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0'))
-        C2 = G2.add_subsystem("C2", ExecComp('y=x*2.0'))
+        G2.add_subsystem("C1", ExecComp('y=x*2.0'))
+        G2.add_subsystem("C2", ExecComp('y=x*2.0'))
 
         G3 = root.add_subsystem("G3", Group())
         G4 = G3.add_subsystem("G4", Group(), promotes=['x'])
-        C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
-        C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
+        G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
+        G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
         p.setup()
         p.final_setup()
@@ -302,7 +308,8 @@ class TestConnectionsPromoted(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p['G3.x'] = 999.
         self.assertEqual(str(context.exception),
-                         "The promoted name G3.x is invalid because it refers to multiple inputs: [G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
+                         "The promoted name G3.x is invalid because it refers to multiple inputs: "
+                         "[G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
 
     def test_inp_inp_promoted_w_prom_src(self):
         p = Problem(model=Group())
@@ -310,8 +317,8 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         G1 = root.add_subsystem("G1", Group(), promotes=['x'])
         G2 = G1.add_subsystem("G2", Group(), promotes=['x'])
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0'))
-        C2 = G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['x'])
+        G2.add_subsystem("C1", ExecComp('y=x*2.0'))
+        G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['x'])
 
         G3 = root.add_subsystem("G3", Group(), promotes=['x'])
         G4 = G3.add_subsystem("G4", Group(), promotes=['x'])
@@ -335,8 +342,8 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         G1 = root.add_subsystem("G1", Group())
         G2 = G1.add_subsystem("G2", Group(), promotes=['x'])
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0'))
-        C2 = G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['x'])
+        G2.add_subsystem("C1", ExecComp('y=x*2.0'))
+        G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['x'])
 
         G3 = root.add_subsystem("G3", Group())
         G4 = G3.add_subsystem("G4", Group(), promotes=['x'])
@@ -360,14 +367,16 @@ class TestConnectionsPromoted(unittest.TestCase):
         prob = Problem(model=Group())
         root = prob.model
 
-        root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x':'ft'}), promotes=['x'])
-        root.add_subsystem("C2", ExecComp('y=x*2.0', units={'x':'inch'}), promotes=['x'])
-        root.add_subsystem("C3", ExecComp('y=x*2.0', units={'x':'m'}), promotes=['x'])
+        root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x': 'ft'}), promotes=['x'])
+        root.add_subsystem("C2", ExecComp('y=x*2.0', units={'x': 'inch'}), promotes=['x'])
+        root.add_subsystem("C3", ExecComp('y=x*2.0', units={'x': 'm'}), promotes=['x'])
 
         try:
             prob.setup(check=False)
         except Exception as err:
-            msg = "The following connected inputs are promoted to 'x', but have different units: [('C1.x', 'ft'), ('C2.x', 'inch'), ('C3.x', 'm')]. Connect 'x' to a source (such as an IndepVarComp) with defined units."
+            msg = "The following connected inputs are promoted to 'x', but have different units: " \
+                  "[('C1.x', 'ft'), ('C2.x', 'inch'), ('C3.x', 'm')]. " \
+                  "Connect 'x' to a source (such as an IndepVarComp) with defined units."
             self.assertTrue(msg in str(err))
         else:
             self.fail("Exception expected")
@@ -377,9 +386,9 @@ class TestConnectionsPromoted(unittest.TestCase):
         prob = Problem(model=Group())
         root = prob.model
 
-        root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x':'ft'}), promotes=['x'])
-        root.add_subsystem("C2", ExecComp('y=x*2.0', units={'x':'inch'}), promotes=['x'])
-        root.add_subsystem("C3", ExecComp('y=x*2.0', units={'x':'m'}), promotes=['x'])
+        root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x': 'ft'}), promotes=['x'])
+        root.add_subsystem("C2", ExecComp('y=x*2.0', units={'x': 'inch'}), promotes=['x'])
+        root.add_subsystem("C3", ExecComp('y=x*2.0', units={'x': 'm'}), promotes=['x'])
         root.add_subsystem('p', IndepVarComp('x', 1.0, units='cm'), promotes=['x'])
 
         prob.setup(check=False)
@@ -427,9 +436,9 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = ("The source and target shapes do not match or are ambiguous for the "
-                    "connection 'idvp.blammo' to 'arraycomp.inp'."
-                    " Expected \(2.*,\) but got \(1.*,\).")
+        expected = (r"The source and target shapes do not match or are ambiguous for the "
+                    r"connection 'idvp.blammo' to 'arraycomp.inp'."
+                    r" Expected \(2.*,\) but got \(1.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup(check=False)
@@ -439,9 +448,9 @@ class TestConnectionsIndices(unittest.TestCase):
         # the shape of arraycomp.inp
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
 
-        expected = ("The source indices \[0 1 0\] do not specify a valid shape "
-                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. "
-                    "The target shape is \(2.*,\) but indices are \(3.*,\).")
+        expected = (r"The source indices \[0 1 0\] do not specify a valid shape "
+                    r"for the connection 'idvp.blammo' to 'arraycomp.inp'. "
+                    r"The target shape is \(2.*,\) but indices are \(3.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup(check=False)
@@ -528,7 +537,7 @@ class TestShapes(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x',
                                                     val=np.arange(10)[np.newaxis, :, np.newaxis,
-                                                        np.newaxis]))
+                                                                      np.newaxis]))
         p.model.add_subsystem('C1', ExecComp('y=5*x',
                                              x={'value': np.zeros((1, 1, 1, 10))},
                                              y={'value': np.zeros((1, 1, 1, 10))}))
@@ -541,7 +550,7 @@ class TestShapes(unittest.TestCase):
     def test_connect_incompatible_shapes(self):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.arange(10)[np.newaxis, :,
-                                                             np.newaxis, np.newaxis]))
+                                                                           np.newaxis, np.newaxis]))
         p.model.add_subsystem('C1', ExecComp('y=5*x',
                                              x={'value': np.zeros((5, 2))},
                                              y={'value': np.zeros((5, 2))}))
@@ -555,136 +564,15 @@ class TestShapes(unittest.TestCase):
                          "got (1, 10, 1, 1).")
 
 
-        #class TestUBCS(unittest.TestCase):
-
-    #def test_ubcs(self):
-        #p = Problem(model=Group())
-        #root = p.model
-        #root._linear_solver = ScipyKrylov()
-
-        #self.P1 = root.add_subsystem("P1", IndepVarComp('x', 1.0))
-        #self.C1 = root.add_subsystem("C1", ExecComp('y=x1*2.0+x2*3.0', x2=1.0))
-        #self.C2 = root.add_subsystem("C2", ExecComp('y=x1*2.0+x2'))
-        #self.C3 = root.add_subsystem("C3", ExecComp('y=x*2.0'))
-        #self.C4 = root.add_subsystem("C4", ExecComp('y=x1*2.0 + x2*5.0'))
-        #self.C5 = root.add_subsystem("C5", ExecComp('y=x1*2.0 + x2*7.0'))
-
-        #root.connect("P1.x", "C1.x1")
-        #root.connect("C1.y", ("C2.x1", "C3.x"))
-        #root.connect("C2.y", "C4.x1")
-        #root.connect("C3.y", "C4.x2")
-
-        ## input-input connection
-        #root.connect("C1.x2", "C5.x2")
-
-        ## create a cycle
-        #root.connect("C4.y", "C1.x2")
-
-        ## set a bogus value for C4.y
-        #self.C4._init_unknowns_dict['y']['val'] = -999.
-
-        #p.setup(check=False)
-
-        #ubcs, tgts = p._get_ubc_vars(root.connections)
-
-        #self.assertEqual(ubcs, ['C1.x2'])
-        #self.assertEqual(tgts, set(['C1']))
-
-        #p.run_model()
-
-        ## TODO: for now, we've just decided to force component devs to give proper initial
-        ## values for their outputs.  If later we decide to use push scatters or some other
-        ## means to fix the issue, uncomment this.
-        ##assert_rel_error(self, p['C1.y'], 5.0, 1e-6)
-
-
-#class Sink1(ExplicitComponent):
-    #def setup(self):
-        #self.add_input('x', val=0.0, units='m')
-
-
-#class Sink2(ExplicitComponent):
-    #def setup(self):
-        #self.add_input('x', val=0.0, units='mm')
-
-#class TestConnSetup(unittest.TestCase):
-
-    #def test_setup(self):
-        #top = Problem()
-
-        #root = top.model = Group()
-
-        #root.add_subsystem('src1', IndepVarComp('x', 0.0, units='m'))
-        #root.add_subsystem('sink1', Sink1())
-        #root.add_subsystem('sink2', Sink2())
-
-        #root.connect('src1.x', 'sink1.x')
-        #root.connect('src1.x', 'sink2.x')
-
-        #stream = cStringIO()
-        #results = top.setup(check=True, out_stream=stream)
-
-        ## Not in standard setup anymore
-        #self.assertTrue('unit_diffs' not in results)
-
-
-#class TestSourceIndicesAreInts(unittest.TestCase):
-
-    #def test_src_indices_as_float_array_fails(self):
-        #top = Problem()
-
-        #root = top.model = Group()
-
-        #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
-        #root.add_subsystem('sink1', Sink1())
-
-        #with self.assertRaises(TypeError) as cm:
-            #root.connect('src1.x', 'sink1.x', src_indices=np.zeros(1))
-
-    #def test_src_indices_as_int_array_passes(self):
-        #top = Problem()
-
-        #root = top.model = Group()
-
-        #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
-        #root.add_subsystem('sink1', Sink1())
-
-        #try:
-            #root.connect('src1.x', 'sink1.x', src_indices=np.zeros(1,dtype=int))
-        #except TypeError:
-            #self.fail('Issuing a connection with src_indices as int raised a TypeError')
-
-    #def test_src_indices_as_float_list_fails(self):
-        #top = Problem()
-
-        #root = top.model = Group()
-
-        #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
-        #root.add_subsystem('sink1', Sink1())
-
-        #with self.assertRaises(TypeError) as cm:
-            #root.connect('src1.x', 'sink1.x', src_indices=[1.0])
-
-    #def test_src_indices_as_int_array_passes(self):
-        #top = Problem()
-
-        #root = top.model = Group()
-
-        #root.add_subsystem('src1', IndepVarComp('x', np.zeros(5,), units='m'))
-        #root.add_subsystem('sink1', Sink1())
-
-        #try:
-            #root.connect('src1.x', 'sink1.x', src_indices=np.ones(1,dtype=int))
-        #except TypeError:
-            #self.fail('Issuing a connection with src_indices as int raised a TypeError')
-
 class TestMultiConns(unittest.TestCase):
     def test_mult_conns(self):
 
         class SubGroup(Group):
             def setup(self):
-                self.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y', 'x'])
-                self.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['z', 'y'])
+                self.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)),
+                                   promotes=['y', 'x'])
+                self.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)),
+                                   promotes=['z', 'y'])
 
         prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
@@ -696,12 +584,12 @@ class TestMultiConns(unittest.TestCase):
         prob.model.connect('x', 'sub.x')
         prob.model.connect('y', 'sub.y')
 
-
         with self.assertRaises(Exception) as context:
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "The following inputs have multiple connections: sub.c2.y from ['indeps.y', 'sub.c1.y']")
+                         "The following inputs have multiple connections: "
+                         "sub.c2.y from ['indeps.y', 'sub.c1.y']")
 
     def test_mixed_conns_same_level(self):
 
@@ -710,8 +598,10 @@ class TestMultiConns(unittest.TestCase):
         indeps.add_output('x', 10*np.ones(4))
 
         # c2.y is implicitly connected to c1.y
-        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)), promotes=['y'])
-        prob.model.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)), promotes=['y'])
+        prob.model.add_subsystem('c1', ExecComp('y = 2*x', x=np.ones(4), y=2*np.ones(4)),
+                                 promotes=['y'])
+        prob.model.add_subsystem('c2', ExecComp('z = 2*y', y=np.ones(4), z=2*np.ones(4)),
+                                 promotes=['y'])
 
         # make a second, explicit, connection to y (which is c2.y promoted)
         prob.model.connect('indeps.x', 'y')
@@ -721,7 +611,8 @@ class TestMultiConns(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(context.exception),
-                         "Input 'c2.y' cannot be connected to 'indeps.x' because it's already connected to 'c1.y'")
+                         "Input 'c2.y' cannot be connected to 'indeps.x' "
+                         "because it's already connected to 'c1.y'")
 
 
 if __name__ == "__main__":

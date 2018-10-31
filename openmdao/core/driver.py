@@ -1,12 +1,10 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
-import os
 import json
 from collections import OrderedDict
 import pprint
 import sys
-import warnings
 
 from six import iteritems, itervalues, string_types
 
@@ -124,8 +122,6 @@ class Driver(object):
         # Case recording options
         self.recording_options = OptionsDictionary()
 
-        self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record Driver metadata')
         self.recording_options.declare('record_model_metadata', types=bool, default=True,
                                        desc='Record metadata for all Systems in the model')
         self.recording_options.declare('record_desvars', types=bool, default=True,
@@ -148,9 +144,6 @@ class Driver(object):
                                             'level')
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the driver level')
-        self.recording_options.declare('record_n2_data', types=bool, default=True,
-                                       desc='Set to True to record metadata required for '
-                                       'N^2 viewing')
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -185,7 +178,7 @@ class Driver(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -235,7 +228,6 @@ class Driver(object):
         self._problem = problem
         self._recording_iter = problem._recording_iter
         model = problem.model
-        mode = problem._mode
 
         self._total_jac = None
 
@@ -388,12 +380,6 @@ class Driver(object):
         }
 
         self._rec_mgr.startup(self)
-        if self.recording_options['record_metadata']:
-            if self.recording_options['record_n2_data']:
-                if self._rec_mgr._recorders:
-                    from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-                    self._model_viewer_data = _get_viewer_data(problem)
-            self._rec_mgr.record_metadata(self)
 
         # Also record the system metadata to the recorders attached to this Driver
         if self.recording_options['record_model_metadata']:
@@ -687,7 +673,7 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
             failure_flag, _, _ = self._problem.model._solve_nonlinear()
 
         self.iter_count += 1

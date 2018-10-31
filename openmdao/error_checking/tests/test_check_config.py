@@ -26,13 +26,13 @@ class TestCheckConfig(unittest.TestCase):
 
         G1 = root.add_subsystem("G1", Group(), promotes=['*'])
         G2 = G1.add_subsystem("G2", Group(), promotes=['*'])
-        C2 = G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['*'])
-        C1 = G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
+        G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['*'])
+        G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
 
         G3 = root.add_subsystem("G3", Group())
         G4 = G3.add_subsystem("G4", Group())
-        C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0+u'), promotes=['*'])
-        C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
+        G4.add_subsystem("C3", ExecComp('y=x*2.0+u'), promotes=['*'])
+        G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
@@ -53,11 +53,11 @@ class TestCheckConfig(unittest.TestCase):
         p = Problem()
         root = p.model
 
-        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
-        C1 = root.add_subsystem("C1", MyComp())
-        C2 = root.add_subsystem("C2", MyComp())
-        C3 = root.add_subsystem("C3", MyComp())
-        C4 = root.add_subsystem("C4", MyComp())
+        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("C1", MyComp())
+        root.add_subsystem("C2", MyComp())
+        root.add_subsystem("C3", MyComp())
+        root.add_subsystem("C4", MyComp())
 
         root.connect("C4.y", "C2.a")
         root.connect("C4.y", "C3.a")
@@ -95,15 +95,15 @@ class TestCheckConfig(unittest.TestCase):
         p = Problem()
         root = p.model
 
-        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", IndepVarComp('x', 1.0))
 
         G1 = root.add_subsystem("G1", Group())
 
-        C1 = G1.add_subsystem("C1", MyComp())
-        C2 = G1.add_subsystem("C2", MyComp())
+        G1.add_subsystem("C1", MyComp())
+        G1.add_subsystem("C2", MyComp())
 
-        C3 = root.add_subsystem("C3", MyComp())
-        C4 = root.add_subsystem("C4", MyComp())
+        root.add_subsystem("C3", MyComp())
+        root.add_subsystem("C4", MyComp())
 
         root.connect("C4.y", "G1.C2.a")
         root.connect("C4.y", "C3.a")
@@ -145,9 +145,9 @@ class TestCheckConfig(unittest.TestCase):
 
     def test_out_of_order_repeat_bug_and_dup_inputs(self):
         p = Problem()
-        indep = p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
-        C1 = p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
-        C2 = p.model.add_subsystem("C2", ExecComp("y = 2.0*a"))
+        p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
+        p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
+        p.model.add_subsystem("C2", ExecComp("y = 2.0*a"))
 
         # create 2 out of order connections from C2 to C1
         p.model.connect("C2.y", "C1.a")
@@ -178,7 +178,7 @@ class TestCheckConfig(unittest.TestCase):
         p = Problem()
         root = p.model
 
-        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", IndepVarComp('x', 1.0))
 
         def make_cycle(root, start, end):
             # systems within a cycle will be declared out of order, but
@@ -252,7 +252,8 @@ class TestCheckConfig(unittest.TestCase):
         p = Problem()
         root = p.model
 
-        indep = root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+
         comp1 = root.add_subsystem("comp1", ExplicitComponent())
         comp1.add_input('x', val=0.)
 
@@ -324,18 +325,6 @@ class TestRecorderCheckConfig(unittest.TestCase):
     def test_check_linear_solver_recorder_set(self):
         p = Problem()
         p.model.nonlinear_solver.add_recorder(self.recorder)
-
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        p.final_setup()
-        p.cleanup()
-
-        warnings = testlogger.get('warning')
-        self.assertEqual(len(warnings), 0)
-
-    def test_check_linear_solver_recorder_set(self):
-        p = Problem()
-        p.model.linear_solver.add_recorder(self.recorder)
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)

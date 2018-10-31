@@ -2,11 +2,9 @@
 
 from __future__ import division
 
-import warnings
-
 from collections import OrderedDict, Iterable
 from itertools import product
-from six import string_types, iteritems, itervalues
+from six import string_types, iteritems
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types

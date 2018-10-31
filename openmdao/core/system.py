@@ -16,7 +16,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import Vector, INT_DTYPE
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -1034,8 +1034,6 @@ class System(object):
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
-        use_derivs = self._use_derivatives
 
         self._rel_vec_name_list = []
         for vec_name in self._vec_names:
@@ -2805,7 +2803,7 @@ class System(object):
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance.
         recurse : boolean
             Flag indicating if the recorder should be added to all the subsystems.

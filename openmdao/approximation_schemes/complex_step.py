@@ -10,8 +10,6 @@ import numpy as np
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
 from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.vectors.vector import Vector
 
 
 DEFAULT_CS_OPTIONS = {

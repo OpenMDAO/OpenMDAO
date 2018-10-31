@@ -157,8 +157,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
         # before the bug fix, the following two derivs contained nonzero values even
         # though the variables involved were not dependent on each other.
-        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3,5)), 1e-10)
-        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5,3)), 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3, 5)), 1e-10)
+        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5, 3)), 1e-10)
 
     def test_set_2d_array(self):
         import numpy as np
@@ -596,7 +596,6 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
 
-
         prob = Problem()
         prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
         prob.model.add_subsystem('comp', SimpleComp())
@@ -633,7 +632,6 @@ class TestProblem(unittest.TestCase):
 
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
-
 
         prob = Problem()
         prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
@@ -1433,11 +1431,10 @@ class TestProblem(unittest.TestCase):
             Problem._post_setup_func = None
 
     def test_list_problem_vars(self):
-
-        prob = Problem(model=SellarDerivatives())
-        model = prob.model
+        model = SellarDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
 
+        prob = Problem(model)
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
@@ -1460,12 +1457,12 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEquals(output[1], 'Design Variables')
-        assertRegex(self, output[5], '^pz.z +\|[0-9. e+-]+\| +2')
-        self.assertEquals(output[9], 'Constraints')
-        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
-        self.assertEquals(output[17], 'Objectives')
-        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[1], r'Design Variables')
+        assertRegex(self, output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertEquals(output[9], r'Constraints')
+        assertRegex(self, output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[17], r'Objectives')
+        assertRegex(self, output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
         stdout = sys.stdout
@@ -1476,9 +1473,9 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[5], '^z +\|[0-9. e+-]+\| +2')
-        assertRegex(self, output[14], '^con2 +\[[0-9. e+-]+\] +1')
-        assertRegex(self, output[21], '^obj +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[5], r'^z +\|[0-9. e+-]+\| +2')
+        assertRegex(self, output[14], r'^con2 +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
@@ -1506,12 +1503,12 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         assertRegex(self, output[3],
-                    '^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
-                    'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
-                    'vectorize_derivs\s+cache_linear_solution')
+                    r'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
+                    r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
+                    r'vectorize_derivs\s+cache_linear_solution')
         assertRegex(self, output[5],
-                    '^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
-                    'None\s+None\s+None\s+None\s+None\s+False\s+False')
+                    r'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                    r'None\s+None\s+None\s+None\s+None\s+False\s+False')
 
         # With all the optional columns and print_arrays
         stdout = sys.stdout
@@ -1538,12 +1535,12 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[6], '^\s+value:')
-        assertRegex(self, output[7], '^\s+\[[0-9. e+-]+\]')
-        assertRegex(self, output[9], '^\s+lower:')
-        assertRegex(self, output[10], '^\s+\[[0-9. e+-]+\]')
-        assertRegex(self, output[12], '^\s+upper:')
-        assertRegex(self, output[13], '^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[6], r'^\s+value:')
+        assertRegex(self, output[7], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[9], r'^\s+lower:')
+        assertRegex(self, output[10], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[12], r'^\s+upper:')
+        assertRegex(self, output[13], r'^\s+\[[0-9. e+-]+\]')
 
     def test_feature_list_problem_vars(self):
         import numpy as np

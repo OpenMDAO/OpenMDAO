@@ -1,7 +1,7 @@
 """
-Class definition for BaseRecorder, the base class for all recorders.
+Class definition for CaseRecorder, the base class for all recorders.
 """
-from six import StringIO, iteritems
+from six import iteritems
 
 from openmdao.core.system import System
 from openmdao.core.driver import Driver
@@ -12,14 +12,14 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
 
 
-class BaseRecorder(object):
+class CaseRecorder(object):
     """
     Base class for all case recorders and is not a functioning case recorder on its own.
 
     Attributes
     ----------
-    out : StringIO
-        Output to the recorder.
+    _record_viewer_data : bool
+        Flag indicating whether to record data needed to generate N2 diagram.
     _counter : int
         A global counter for execution order, used in iteration coordinate.
     _inputs : dict
@@ -38,11 +38,16 @@ class BaseRecorder(object):
         Designates if the current recorder is parallel-recording-capable.
     """
 
-    def __init__(self):
+    def __init__(self, record_viewer_data=True):
         """
         Initialize.
+
+        Parameters
+        ----------
+        record_viewer_data : bool, optional
+            If True, record data needed for visualization.
         """
-        self.out = None
+        self._record_viewer_data = record_viewer_data
 
         # global counter that is used in iteration coordinate
         self._counter = 0
@@ -84,23 +89,10 @@ class BaseRecorder(object):
         recording_requester : object
             The object that would like to record its metadata.
         """
-        if isinstance(recording_requester, Driver):
-            self.record_metadata_driver(recording_requester)
-        elif isinstance(recording_requester, System):
+        if isinstance(recording_requester, System):
             self.record_metadata_system(recording_requester)
         elif isinstance(recording_requester, Solver):
             self.record_metadata_solver(recording_requester)
-
-    def record_metadata_driver(self, recording_requester):
-        """
-        Record driver metadata.
-
-        Parameters
-        ----------
-        recording_requester : Driver
-            The Driver that would like to record its metadata.
-        """
-        raise NotImplementedError()
 
     def _get_metadata_system(self, recording_requester):
         # Cannot handle PETScVector yet
@@ -280,6 +272,17 @@ class BaseRecorder(object):
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_derivatives_driver has not been overridden")
+
+    def record_viewer_data(self, model_viewer_data):
+        """
+        Record model viewer data.
+
+        Parameters
+        ----------
+        model_viewer_data : dict
+            Data required to visualize the model.
+        """
+        raise NotImplementedError("record_viewer_data has not been overridden")
 
     def shutdown(self):
         """

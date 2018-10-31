@@ -1,14 +1,5 @@
 build: off
 
-for:
-  -
-    matrix:
-      only:
-        - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
-    cache:
-     - '/home/appveyor/miniconda'
-     - '/home/appveyor/.cache/pip/wheels/'
-
 environment:
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
