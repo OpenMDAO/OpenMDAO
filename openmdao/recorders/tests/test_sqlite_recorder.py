@@ -185,7 +185,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (3, )]
+        coordinate = [0, 'SLSQP', (4, )]
 
         expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
         expected_objectives = {"comp.f_xy": [-27.0833]}
@@ -309,7 +309,7 @@ class TestSqliteRecorder(unittest.TestCase):
         run2_t0, run2_t1 = run_driver(prob, case_prefix='Run2')
         prob.cleanup()
 
-        run1_coord = [0, 'SLSQP', (3, )]  # 1st run, 4 iterations
+        run1_coord = [0, 'SLSQP', (4, )]  # 1st run, 5 iterations
         run2_coord = [0, 'SLSQP', (0, )]  # 2nd run, 1 iteration
 
         expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
@@ -737,7 +737,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         coordinate = [
             0,
-            'SLSQP', (0, ),
+            'SLSQP', (1, ),
             'root._solve_nonlinear', (1, ),
             'NLRunOnce', (0, ),
             'mda._solve_nonlinear', (1, ),
@@ -761,7 +761,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # check data for 'pz'
         #
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1156,7 +1156,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Driver recording test
         #
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
             "pz.z": prob['pz.z'],
@@ -1180,7 +1180,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # System recording test
         #
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1195,7 +1195,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Solver recording test
         #
-        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
         expected_abs_error = 0.0,
@@ -1448,7 +1448,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
             "pz.z": prob['pz.z'],
@@ -1708,7 +1708,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader(case_recorder_filename)
-        case = cr.get_case('rank0:SLSQP|3')
+        case = cr.get_case('rank0:SLSQP|4')
 
         assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
         assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
@@ -2219,7 +2219,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         # get a list of cases that were recorded by the driver
         driver_cases = cr.list_cases('driver')
 
-        self.assertEqual(len(driver_cases), 10)
+        self.assertEqual(len(driver_cases), 11)
 
         # get the first driver case and inspect the variables of interest
         case = cr.get_case(driver_cases[0])

@@ -194,15 +194,16 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(driver_cases, [
             'rank0:SLSQP|0', 'rank0:SLSQP|1', 'rank0:SLSQP|2',
-            'rank0:SLSQP|3', 'rank0:SLSQP|4', 'rank0:SLSQP|5'
+            'rank0:SLSQP|3', 'rank0:SLSQP|4', 'rank0:SLSQP|5',
+            'rank0:SLSQP|6'
         ])
 
         # Test to see if the access by case keys works:
-        seventh_slsqp_iteration_case = cr.get_case('rank0:SLSQP|5')
+        seventh_slsqp_iteration_case = cr.get_case('rank0:SLSQP|6')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
                                        [1.97846296, -2.21388305e-13], decimal=2)
 
-        deriv_case = cr.get_case('rank0:SLSQP|3')
+        deriv_case = cr.get_case('rank0:SLSQP|4')
         np.testing.assert_almost_equal(deriv_case.jacobian['obj', 'pz.z'],
                                        [[3.8178954, 1.73971323]], decimal=2)
 
@@ -563,7 +564,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        parent_coord = 'rank0:SLSQP|1|root._solve_nonlinear|2'
+        parent_coord = 'rank0:SLSQP|2|root._solve_nonlinear|2'
         coord = parent_coord + '|NLRunOnce|0'
 
         # user scenario: given a case (with coord), get all cases with same parent
@@ -594,9 +595,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -805,11 +804,9 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), expected_err)
 
-    @unittest.skipIf(OPT is None, "pyoptsparse is not installed")
-    @unittest.skipIf(OPTIMIZER is None, "pyoptsparse is not providing SNOPT or SLSQP")
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
         prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.add_recorder(self.recorder)
         prob.setup()
@@ -1754,13 +1751,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         system_cases = cr.list_cases('root.pz', recurse=False)
         expected_cases = [
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
-            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
-            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
-            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
-            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
-            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
+            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
+            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
+            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
+            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -1785,13 +1782,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
         expected_cases = [
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0',
-            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0',
-            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0',
-            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0'
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
         for i, coord in enumerate(root_solver_cases):
@@ -1859,7 +1856,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|2',
             'rank0:SLSQP|3',
             'rank0:SLSQP|4',
-            'rank0:SLSQP|5'
+            'rank0:SLSQP|5',
+            'rank0:SLSQP|6'
         ]
         # check that there are multiple iterations and they have the expected coordinates
         self.assertTrue(len(driver_cases), len(expected_cases))
@@ -2166,8 +2164,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         cr = CaseReader('cases.sql')
 
-        # Get derivatives associated with the first iteration.
-        derivs = cr.get_case('rank0:SLSQP|1').jacobian
+        # Get derivatives associated with the last iteration.
+        derivs = cr.get_case(-1).jacobian
 
         # check that derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([

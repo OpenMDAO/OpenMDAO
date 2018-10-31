@@ -205,7 +205,9 @@ class ScipyOptimizeDriver(Driver):
         self._total_jac = None
 
         # Initial Run
-        model._solve_nonlinear()
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
+            model._solve_nonlinear()
+            self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
