@@ -1122,7 +1122,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['y1', 'x1'][2][1], Jbase[2, 3], 1e-8)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_newton_with_direct_solver'+'_'.join(title(a) for a in p.args))
     def test_newton_with_direct_solver(self, vec_class):
         # Basic sellar test.
@@ -1173,7 +1173,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
-                          testcase_func_name=lambda f, n, p:
+                          name_func=lambda f, n, p:
                           'test_newton_with_krylov_solver'+'_'.join(title(a) for a in p.args))
     def test_newton_with_krylov_solver(self, vec_class):
         # Basic sellar test.
