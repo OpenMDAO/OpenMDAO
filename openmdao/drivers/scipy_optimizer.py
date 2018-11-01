@@ -276,9 +276,8 @@ class ScipyOptimizeDriver(Driver):
                     self._con_idx[name] = i
                     i += size
 
-                # Loop over every index separately,
-                # because scipy calls each constraint by index.
-                if opt in ['trust-constr']:
+                # In scipy constraint optimizers take constraints in two separate formats
+                if opt in ['trust-constr']:  # Type of constraints is list of NonlinearConstraint
                     from scipy.optimize import NonlinearConstraint
 
                     if equals is not None:
@@ -286,7 +285,10 @@ class ScipyOptimizeDriver(Driver):
                     else:
                         lb = lower
                         ub = upper
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
                     for j in range(0, size):
+                        # Double-sided constraints are accepted by the algorithm
                         args = [name, False, j]
                         # TODO linear constraint if meta['linear']
                         # TODO add option for Hessian
@@ -294,7 +296,9 @@ class ScipyOptimizeDriver(Driver):
                                                   lb=lb, ub=ub,
                                                   jac=signature_extender(self._congradfunc, args))
                         constraints.append(con)
-                else:
+                else:  # Type of constraints is list of dict
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
                     for j in range(0, size):
                         con_dict = {}
                         if meta['equals'] is not None:
@@ -590,10 +594,14 @@ class ScipyOptimizeDriver(Driver):
 
 def signature_extender(fcn, extra_args):
     """
-    A closure function, which appends extra arguments to th original function call with the
-    design vector.
+    A closure function, which appends extra arguments to the original function call.
+    The first argument is the design vector.
     The possible extra arguments from the callback of :func:`scipy.optimize.minimize` are not
     passed to the function.
+
+    Some algorithms take a sequence of :class:`~scipy.optimize.NonlinearConstraint` as input
+    for the constraints. For this class it is not possible to pass additional arguments.
+    With this function the signature will be correct for both scipy and the driver.
 
     Parameters
     ----------
@@ -604,7 +612,8 @@ def signature_extender(fcn, extra_args):
 
     Returns
     -------
-        callable
+    callable
+        The function with the signature expected by the driver.
     """
     def closure(x, *args):
         return fcn(x, *extra_args)

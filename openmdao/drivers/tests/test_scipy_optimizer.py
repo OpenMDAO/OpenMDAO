@@ -908,7 +908,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver.options['optimizer'] = 'trust-constr'
         prob.driver.options['tol'] = 1e-5
         prob.driver.options['maxiter'] = 2000
-        prob.driver.options['disp'] = True
+        prob.driver.options['disp'] = False
 
         prob.model.add_design_var('x')
         prob.model.add_objective('f', scaler=rosenbrock(x0))
@@ -957,7 +957,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver.options['optimizer'] = 'trust-constr'
         prob.driver.options['tol'] = 1e-5
         prob.driver.options['maxiter'] = 2000
-        prob.driver.options['disp'] = True
+        prob.driver.options['disp'] = False
 
         prob.model.add_design_var('x')
         prob.model.add_objective('f', scaler=rosenbrock(x0))
@@ -998,7 +998,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver.options['optimizer'] = 'trust-constr'
         prob.driver.options['tol'] = 1e-5
         prob.driver.options['maxiter'] = 2000
-        prob.driver.options['disp'] = True
+        prob.driver.options['disp'] = False
 
         prob.model.add_design_var('x')
         prob.model.add_objective('f')
