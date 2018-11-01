@@ -105,7 +105,6 @@ class ScipyOptimizeDriver(Driver):
         self.opt_settings = OrderedDict()
 
         self.result = None
-        self.fail = 0
         self._grad_cache = None
         self._con_cache = None
         self._con_idx = {}
