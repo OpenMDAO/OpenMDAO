@@ -595,10 +595,10 @@ class ScipyOptimizeDriver(Driver):
 
 def signature_extender(fcn, extra_args):
     """
-    A closure function, which appends extra arguments to the original function call.
-    The first argument is the design vector.
-    The possible extra arguments from the callback of :func:`scipy.optimize.minimize` are not
-    passed to the function.
+    Closure function, which appends extra arguments to the original function call.
+
+    The first argument is the design vector. The possible extra arguments from the callback
+    of :func:`scipy.optimize.minimize` are not passed to the function.
 
     Some algorithms take a sequence of :class:`~scipy.optimize.NonlinearConstraint` as input
     for the constraints. For this class it is not possible to pass additional arguments.
