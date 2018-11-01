@@ -266,6 +266,7 @@ class ScipyOptimizeDriver(Driver):
                 size = meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
+                equals = meta['equals']
                 if 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
@@ -279,13 +280,19 @@ class ScipyOptimizeDriver(Driver):
                 # because scipy calls each constraint by index.
                 if opt in ['trust-constr']:
                     from scipy.optimize import NonlinearConstraint
+
+                    if equals is not None:
+                        lb = ub = equals
+                    else:
+                        lb = lower
+                        ub = upper
                     for j in range(0, size):
                         args = [name, False, j]
                         # TODO linear constraint if meta['linear']
-                        con = NonlinearConstraint(fun=signature_extender(self._confunc, args),
-                                                  lb=lower, ub=upper,
-                                                  jac=signature_extender(self._congradfunc, args),
-                                                  hess='2-point')  # TODO make user option (P.O.)
+                        # TODO add option for Hessian
+                        con = NonlinearConstraint(fun=signature_extender(self._con_val_func, args),
+                                                  lb=lb, ub=ub,
+                                                  jac=signature_extender(self._congradfunc, args))
                         constraints.append(con)
                 else:
                     for j in range(0, size):
@@ -434,6 +441,9 @@ class ScipyOptimizeDriver(Driver):
 
         return f_new
 
+    def _con_val_func(self, x_new, name, dbl, idx):
+        return self._con_cache[name][idx]
+
     def _confunc(self, x_new, name, dbl, idx):
         """
         Return the value of the constraint function requested in args.
@@ -468,7 +478,7 @@ class ScipyOptimizeDriver(Driver):
         if equals is not None:
             if isinstance(equals, np.ndarray):
                 equals = equals[idx]
-            return (cons[name][idx] - equals)
+            return cons[name][idx] - equals
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
