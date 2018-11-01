@@ -608,7 +608,7 @@ def signature_extender(fcn, extra_args):
     ----------
     fcn : callable
         Function, which takes the design vector as the first argument.
-    extra_args: tuple or list
+    extra_args : tuple or list
         Extra arguments for the function
 
     Returns
