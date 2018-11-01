@@ -1009,6 +1009,46 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_rel_error(self, prob['c'], 1.0, 1e-2)
 
+    # TODO, add bounds test, when SciPy issue #9043 is resolved
+    # def test_trust_constr_bounds(self):
+    #     class Rosenbrock(ExplicitComponent):
+    #
+    #         def __init__(self, problem):
+    #             super(Rosenbrock, self).__init__()
+    #             self.problem = problem
+    #             self.counter = 0
+    #
+    #         def setup(self):
+    #             self.add_input('x', np.array([1.5, 1.5]))
+    #             self.add_output('f', 0.0)
+    #             self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+    #
+    #         def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+    #             x = inputs['x']
+    #             outputs['f'] = sum(x ** 2)
+    #
+    #     x0 = np.array([-3., -3.])
+    #
+    #     prob = Problem()
+    #     indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+    #     indeps.add_output('x', list(x0))
+    #
+    #     prob.model.add_subsystem('sphere', Rosenbrock(problem=prob), promotes=['*'])
+    #     prob.driver = ScipyOptimizeDriver()
+    #     prob.driver.options['optimizer'] = 'trust-constr'
+    #     prob.driver.options['tol'] = 1e-5
+    #     prob.driver.options['maxiter'] = 2000
+    #     prob.driver.options['disp'] = False
+    #
+    #     prob.model.add_design_var('x', lower=np.array([-4., -4.]), upper=np.array([-1, -1.5]))
+    #     prob.model.add_objective('f')
+    #
+    #     prob.setup()
+    #     prob.run_driver()
+    #
+    #     assert_rel_error(self, prob['x'][0], -1, 1e-2)
+    #     assert_rel_error(self, prob['x'][1], -1.5, 1e-2)
+
     def test_simple_paraboloid_lower_linear(self):
 
         prob = Problem()

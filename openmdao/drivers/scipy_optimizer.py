@@ -23,6 +23,7 @@ _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
                         'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
 _hessian_optimizers = ['trust-constr', 'trust-ncg']
+# TODO, add 'trust-constr' to bounds optimizers, when SciPy issue #9043 is resolved
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
 _constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
 _constraint_grad_optimizers = ['SLSQP']
