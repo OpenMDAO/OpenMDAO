@@ -873,6 +873,53 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
+    def test_rosen_trust_constr(self):
+
+        def rosenbrock(x):
+            x_0 = x[:-1]
+            x_1 = x[1:]
+            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
+
+        class Rosenbrock(ExplicitComponent):
+
+            def __init__(self, problem):
+                super(Rosenbrock, self).__init__()
+                self.problem = problem
+                self.counter = 0
+
+            def setup(self):
+                self.add_input('x', np.array([1.5, 1.5, 1.5]))
+                self.add_output('f', 0.0)
+                self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = rosenbrock(x)
+
+        x0 = np.array([0.5, 0.8, 1.4])
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps.add_output('x', list(x0))
+
+        prob.model.add_subsystem('rosen', Rosenbrock(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(3)), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'trust-constr'
+        prob.driver.options['tol'] = 1e-5
+        prob.driver.options['maxiter'] = 1000
+
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f', scaler=rosenbrock(x0))
+        prob.model.add_constraint('c', upper=10)
+
+        prob.setup()
+        prob.run_driver()
+
+        # TODO lower tolerances, when there will be a user option for 'xtol' for this optimizer
+        assert_rel_error(self, prob['x'][0], 1., 1e-2)
+        assert_rel_error(self, prob['f'], 0., 1e-2)
+
     def test_simple_paraboloid_lower_linear(self):
 
         prob = Problem()

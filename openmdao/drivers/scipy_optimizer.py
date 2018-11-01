@@ -19,13 +19,14 @@ import openmdao.utils.coloring as coloring_mod
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP']
+               'TNC', 'COBYLA', 'SLSQP', 'trust-constr']
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
-                        'SLSQP', 'dogleg', 'trust-ncg']
+                        'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
+_hessian_optimizers = ['trust-constr', 'trust-ncg']
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
-_constraint_optimizers = ['COBYLA', 'SLSQP']
+_constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
 _constraint_grad_optimizers = ['SLSQP']
-_eq_constraint_optimizers = ['SLSQP']
+_eq_constraint_optimizers = ['SLSQP', 'trust', 'trust-constr']
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
@@ -261,33 +262,32 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = list(self._objs)
 
         if opt in _constraint_optimizers:
-            if opt in ['trust-constr', 'trust_ncg']:
-                from scipy.optimize import NonlinearConstraint
-                for name, meta in iteritems(self._cons):
-                    upper = meta['upper']
-                    lower = meta['lower']
-                    args = [name, False, j]
-                    con = NonlinearConstraint(fun=signature_extender(self._confunc, args),
-                                              lb=lower, ub=upper,
-                                              jac=signature_extender(self._congradfunc, args),
-                                              hess='2-point')
-                    constraints.append(con)
-            else:
-                for name, meta in iteritems(self._cons):
-                    size = meta['size']
-                    upper = meta['upper']
-                    lower = meta['lower']
-                    if 'linear' in meta and meta['linear']:
-                        lincons.append(name)
-                        self._con_idx[name] = lin_i
-                        lin_i += size
-                    else:
-                        self._obj_and_nlcons.append(name)
-                        self._con_idx[name] = i
-                        i += size
+            for name, meta in iteritems(self._cons):
+                size = meta['size']
+                upper = meta['upper']
+                lower = meta['lower']
+                if 'linear' in meta and meta['linear']:
+                    lincons.append(name)
+                    self._con_idx[name] = lin_i
+                    lin_i += size
+                else:
+                    self._obj_and_nlcons.append(name)
+                    self._con_idx[name] = i
+                    i += size
 
-                    # Loop over every index separately,
-                    # because scipy calls each constraint by index.
+                # Loop over every index separately,
+                # because scipy calls each constraint by index.
+                if opt in ['trust-constr']:
+                    from scipy.optimize import NonlinearConstraint
+                    for j in range(0, size):
+                        args = [name, False, j]
+                        # TODO linear constraint if meta['linear']
+                        con = NonlinearConstraint(fun=signature_extender(self._confunc, args),
+                                                  lb=lower, ub=upper,
+                                                  jac=signature_extender(self._congradfunc, args),
+                                                  hess='2-point')  # TODO make user option (P.O.)
+                        constraints.append(con)
+                else:
                     for j in range(0, size):
                         con_dict = {}
                         if meta['equals'] is not None:
@@ -331,6 +331,12 @@ class ScipyOptimizeDriver(Driver):
         else:
             jac = None
 
+        if opt in _hessian_optimizers:
+            from scipy.optimize import BFGS  # FIXME temporary, should be option. (P.O.)
+            hess = BFGS()
+        else:
+            hess = None
+
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
             coloring_mod.dynamic_simul_coloring(self, run_model=False, do_sparsity=False)
@@ -341,7 +347,7 @@ class ScipyOptimizeDriver(Driver):
                               # args=(),
                               method=opt,
                               jac=jac,
-                              # hess=None,
+                              hess=hess,
                               # hessp=None,
                               bounds=bounds,
                               constraints=constraints,
@@ -361,15 +367,21 @@ class ScipyOptimizeDriver(Driver):
             self._reraise()
 
         self.result = result
-        self.fail = False if self.result.success else True
 
-        if self.fail:
-            print('Optimization FAILED.')
+        if hasattr(result, 'success'):
+            self.fail = False if result.success else True
+            if self.fail:
+                print('Optimization FAILED.')
+                print(result.message)
+                print('-' * 35)
+
+            elif self.options['disp']:
+                print('Optimization Complete')
+                print('-' * 35)
+        else:
+            self.fail = True  # It is not known, so the worst option is assumed
+            print('Optimization Complete (success not known)')
             print(result.message)
-            print('-' * 35)
-
-        elif self.options['disp']:
-            print('Optimization Complete')
             print('-' * 35)
 
         return self.fail
