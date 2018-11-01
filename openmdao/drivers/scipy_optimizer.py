@@ -262,49 +262,62 @@ class ScipyOptimizeDriver(Driver):
         self._obj_and_nlcons = list(self._objs)
 
         if opt in _constraint_optimizers:
-            for name, meta in iteritems(self._cons):
-                size = meta['size']
-                upper = meta['upper']
-                lower = meta['lower']
-                if 'linear' in meta and meta['linear']:
-                    lincons.append(name)
-                    self._con_idx[name] = lin_i
-                    lin_i += size
-                else:
-                    self._obj_and_nlcons.append(name)
-                    self._con_idx[name] = i
-                    i += size
-
-                # Loop over every index separately, because scipy calls each constraint by index.
-                for j in range(0, size):
-                    con_dict = {}
-                    if meta['equals'] is not None:
-                        con_dict['type'] = 'eq'
+            if opt in ['trust-constr', 'trust_ncg']:
+                from scipy.optimize import NonlinearConstraint
+                for name, meta in iteritems(self._cons):
+                    upper = meta['upper']
+                    lower = meta['lower']
+                    args = [name, False, j]
+                    con = NonlinearConstraint(fun=signature_extender(self._confunc, args),
+                                              lb=lower, ub=upper,
+                                              jac=signature_extender(self._congradfunc, args),
+                                              hess='2-point')
+                    constraints.append(con)
+            else:
+                for name, meta in iteritems(self._cons):
+                    size = meta['size']
+                    upper = meta['upper']
+                    lower = meta['lower']
+                    if 'linear' in meta and meta['linear']:
+                        lincons.append(name)
+                        self._con_idx[name] = lin_i
+                        lin_i += size
                     else:
-                        con_dict['type'] = 'ineq'
-                    con_dict['fun'] = self._confunc
-                    if opt in _constraint_grad_optimizers:
-                        con_dict['jac'] = self._congradfunc
-                    con_dict['args'] = [name, False, j]
-                    constraints.append(con_dict)
+                        self._obj_and_nlcons.append(name)
+                        self._con_idx[name] = i
+                        i += size
 
-                    if isinstance(upper, np.ndarray):
-                        upper = upper[j]
-
-                    if isinstance(lower, np.ndarray):
-                        lower = lower[j]
-
-                    dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
-
-                    # Add extra constraint if double-sided
-                    if dblcon:
-                        dcon_dict = {}
-                        dcon_dict['type'] = 'ineq'
-                        dcon_dict['fun'] = self._confunc
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
+                    for j in range(0, size):
+                        con_dict = {}
+                        if meta['equals'] is not None:
+                            con_dict['type'] = 'eq'
+                        else:
+                            con_dict['type'] = 'ineq'
+                        con_dict['fun'] = self._confunc
                         if opt in _constraint_grad_optimizers:
-                            dcon_dict['jac'] = self._congradfunc
-                        dcon_dict['args'] = [name, True, j]
-                        constraints.append(dcon_dict)
+                            con_dict['jac'] = self._congradfunc
+                        con_dict['args'] = [name, False, j]
+                        constraints.append(con_dict)
+
+                        if isinstance(upper, np.ndarray):
+                            upper = upper[j]
+
+                        if isinstance(lower, np.ndarray):
+                            lower = lower[j]
+
+                        dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
+
+                        # Add extra constraint if double-sided
+                        if dblcon:
+                            dcon_dict = {}
+                            dcon_dict['type'] = 'ineq'
+                            dcon_dict['fun'] = self._confunc
+                            if opt in _constraint_grad_optimizers:
+                                dcon_dict['jac'] = self._congradfunc
+                            dcon_dict['args'] = [name, True, j]
+                            constraints.append(dcon_dict)
 
             # precalculate gradients of linear constraints
             if lincons:
@@ -552,6 +565,30 @@ class ScipyOptimizeDriver(Driver):
         exc = self._exc_info
         self._exc_info = None
         reraise(*exc)
+
+
+def signature_extender(fcn, extra_args):
+    """
+    A closure function, which appends extra arguments to th original function call with the
+    design vector.
+    The possible extra arguments from the callback of :func:`scipy.optimize.minimize` are not
+    passed to the function.
+
+    Parameters
+    ----------
+    fcn : callable
+        Function, which takes the design vector as the first argument.
+    extra_args: tuple or list
+        Extra arguments for the function
+
+    Returns
+    -------
+        callable
+    """
+    def closure(x, *args):
+        return fcn(x, *extra_args)
+
+    return closure
 
 
 class ScipyOptimizer(ScipyOptimizeDriver):
