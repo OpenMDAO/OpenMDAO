@@ -27,7 +27,7 @@ _hessian_optimizers = ['trust-constr', 'trust-ncg']
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
 _constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
 _constraint_grad_optimizers = ['SLSQP']
-_eq_constraint_optimizers = ['SLSQP', 'trust', 'trust-constr']
+_eq_constraint_optimizers = ['SLSQP', 'trust-constr']
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
