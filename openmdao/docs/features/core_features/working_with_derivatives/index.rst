@@ -21,7 +21,17 @@ Providing Analytic Partial Derivatives
 
     specifying_partials.rst
     sparse_partials.rst
-    checking_partials.rst
+
+Verifying Partial Derivatives are Correct
+---------------------------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    basic_check_partials.rst
+    check_partials_settings.rst
+    check_partials_subset.rst
+    partial_derivative_viz.rst
     unit_testing_partials.rst
 
 
