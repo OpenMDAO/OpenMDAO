@@ -28,49 +28,68 @@ environment:
       PYTHON: 3.6
       CONDA: "C:\\Miniconda36-x64"
 
+  encrypted_74d70a284b7d_key:
+    secure: 7u/kPupG0BmwqAJOLeyGMPakwj3lqukKHXsxEP4+6aX+Huu8VH2ZkDNq6GYlaw6HGJHi2JTAal9VDgOpZc9RMlweOrXJiNFWS3Iu0chy+L4=
+
+  encrypted_74d70a284b7d_iv:
+    secure: ZvlRNZ0mVCgCzlscRSABvE8CJUdCU2oAE5AucD0GHz3iGWasTe7k6bBswulzhn18
+
+  SNOPT_LOCATION:
+    secure: BMuN2XRyyMclCtx+SGQCMNgbtSplR5GnBKRZVvotqd1SO6aNpMyh+Hqv+23+vBMFcN7te93hDiAE5+joj4R+H4sGGyeRb+khsu/sILHZaLQ=
+
 install:
 - sh:
-    if [ ! -d /home/appveyor/miniconda/envs/PY$PY ]; then
-
-      sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
-      sudo apt-get update;
-      sudo apt-get -y install gfortran;
-      sudo apt-get -y install libblas-dev;
-      sudo apt-get -y install liblapack-dev;
-      sudo apt-get -y install libopenmpi-dev;
-      sudo apt-get -y install openmpi-bin;
-
-      echo "Building python environment...";
-      wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
-      chmod +x miniconda.sh;
-      ./miniconda.sh -b  -p $HOME/miniconda;
-      export PATH=$HOME/miniconda/bin:$PATH;
-
-      conda create --yes -n PY$PY python=$PY;
-      source $HOME/miniconda/bin/activate PY$PY;
-
-      conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
-
-      pip install --upgrade pip;
-      pip install redbaron;
-      pip install git+https://github.com/OpenMDAO/testflo.git;
-      pip install coverage;
-      pip install git+https://github.com/swryan/coveralls-python@work;
-
-      git clone https://github.com/OpenMDAO/pyoptsparse.git;
-      cd pyoptsparse;
-
-      python setup.py install;
-      cd ..;
-
-      pip install mpi4py;
-      pip install petsc4py==$PETSc;
-
-      conda install --yes matplotlib;
-
-      pip install .;
+    if [ "$encrypted_74d70a284b7d_key" ]; then
+      openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
+      eval "$(ssh-agent -s)";
+      chmod 600 /tmp/travis_deploy_rsa;
+      ssh-add /tmp/travis_deploy_rsa;
+      echo -e "Host web543.webfaction.com\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config;
     fi
 
+    sudo add-apt-repository ppa:ubuntu-toolchain-r/test;
+    sudo apt-get update;
+    sudo apt-get -y install gfortran;
+    sudo apt-get -y install libblas-dev;
+    sudo apt-get -y install liblapack-dev;
+    sudo apt-get -y install libopenmpi-dev;
+    sudo apt-get -y install openmpi-bin;
+
+    echo "Building python environment...";
+    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
+    chmod +x miniconda.sh;
+    ./miniconda.sh -b  -p $HOME/miniconda;
+    export PATH=$HOME/miniconda/bin:$PATH;
+
+    conda create --yes -n PY$PY python=$PY;
+    source $HOME/miniconda/bin/activate PY$PY;
+
+    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+
+    pip install --upgrade pip;
+    pip install redbaron;
+    pip install git+https://github.com/OpenMDAO/testflo.git;
+    pip install coverage;
+    pip install git+https://github.com/swryan/coveralls-python@work;
+
+    git clone https://github.com/OpenMDAO/pyoptsparse.git;
+    cd pyoptsparse;
+
+    if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
+      cd pyoptsparse/pySNOPT;
+      scp -r "$SNOPT_LOCATION" ./source;
+      cd ../..;
+    fi
+
+    python setup.py install;
+    cd ..;
+
+    pip install mpi4py;
+    pip install petsc4py==$PETSc;
+
+    conda install --yes matplotlib;
+
+    pip install .;
     conda list;
 
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
