@@ -3,8 +3,10 @@
 import unittest
 import sys
 import warnings
+from distutils.version import LooseVersion
 
 import numpy as np
+from scipy import __version__ as scipy_version
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
@@ -873,6 +875,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
+                         "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
         def rosenbrock(x):
@@ -922,6 +926,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
+                         "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
 
         def rosenbrock(x):
@@ -968,6 +974,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_rel_error(self, prob['c'], 1., 1e-3)
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
+                         "scipy >= 1.1 is required.")
     def test_trust_constr_inequality_con(self):
 
         class Rosenbrock(ExplicitComponent):

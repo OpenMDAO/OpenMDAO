@@ -11,6 +11,7 @@ from six.moves import range
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy import __version__ as scipy_version
 
 import openmdao
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -20,6 +21,9 @@ import openmdao.utils.coloring as coloring_mod
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
                'TNC', 'COBYLA', 'SLSQP', 'trust-constr']
+if scipy_version == '1.1.0':
+    _optimizers.append('trust-constr')
+
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
                         'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
 _hessian_optimizers = ['trust-constr', 'trust-ncg']
@@ -279,7 +283,12 @@ class ScipyOptimizeDriver(Driver):
 
                 # In scipy constraint optimizers take constraints in two separate formats
                 if opt in ['trust-constr']:  # Type of constraints is list of NonlinearConstraint
-                    from scipy.optimize import NonlinearConstraint
+                    try:
+                        from scipy.optimize import NonlinearConstraint
+                    except ImportError:
+                        msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and'
+                               'above. The installed version is {}')
+                        raise ImportError(msg.format(scipy_version))
 
                     if equals is not None:
                         lb = ub = equals
