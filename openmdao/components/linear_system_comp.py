@@ -106,7 +106,7 @@ class LinearSystemComp(ImplicitComponent):
                 residuals['x'] = np.einsum('jk,ik->ij', inputs['A'], outputs['x']) - inputs['b']
 
         else:
-            residuals['x'] = inputs['A'].dot(outputs['x']) - inputs['b']
+            residuals['x'] = np.dot(inputs['A'], outputs['x']) - inputs['b']
 
     def solve_nonlinear(self, inputs, outputs):
         """

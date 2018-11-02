@@ -105,6 +105,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         self._solver_info.append_subsolver()
         for isub, subsys in enumerate(system._subsystems_myproc):
+            print("xfer to", subsys.pathname)
             system._transfer('nonlinear', 'fwd', isub)
             subsys._solve_nonlinear()
             system._check_reconf_update()

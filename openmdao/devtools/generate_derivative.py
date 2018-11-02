@@ -13,8 +13,9 @@ import time
 import numpy as np
 import ast
 import astunparse
-from six import itervalues
+from six import itervalues, iteritems
 
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
     StringSubscriptVisitor
@@ -22,9 +23,9 @@ from openmdao.utils.general_utils import str2valid_python_name, unique_name
 
 try:
     import autograd.numpy as agnp
-    from autograd import make_jvp, make_vjp
+    from autograd import make_jvp, make_vjp, jacobian
     from autograd.differential_operators import make_jvp_reversemode
-    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict
+    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, DictVSpace
 except ImportError:
     pass
 else:
@@ -73,6 +74,11 @@ else:
         def values(self):
             return self._views.values()
 
+        def items(self):
+            return self._views.items()
+
+    DictBox.register(AutogradVectorWrapper)
+    DictVSpace.register(AutogradVectorWrapper)
 
 def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     """
@@ -321,7 +327,7 @@ def translate_compute_source_tangent(comp):
     return src, pnames, onames, rnames, to_revert
 
 
-def translate_compute_source_autograd(comp):
+def translate_compute_source_autograd(comp, mode):
     """
     Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
@@ -332,6 +338,8 @@ def translate_compute_source_autograd(comp):
     ----------
     comp : Component
         The component being AD'd.
+    mode : str
+        Derivative direction ('fwd', 'rev').
 
     Returns
     -------
@@ -351,9 +359,6 @@ def translate_compute_source_autograd(comp):
     else:
         compute_method = comp.apply_nonlinear
 
-    # # mapping to rename variables within the compute method
-    # to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
-
     # get source code of original compute() method
     # ignore blank lines, useful for detecting indentation later
     srclines = [line for line in getsourcelines(compute_method)[0] if line.strip()]
@@ -361,18 +366,24 @@ def translate_compute_source_autograd(comp):
     # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
     srclines[0] = srclines[0].lstrip()
     src = ''.join(srclines)
-    # ast2 = ast.parse(src)
 
     # # visitor = StringSubscriptVisitor()
     # # visitor.visit(ast2)
     # # print("found", visitor.subscripts.items())
 
-    # # combine all mappings
-    # mapping = to_replace.copy()
-    # ast3 = transform_ast_names(ast2, mapping)
+    if mode == 'rev':
+        # mapping to rename variables within the compute method
+        to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
+        ast2 = ast.parse(src)
+
+        # combine all mappings
+        mapping = to_replace.copy()
+        src_ast = transform_ast_names(ast2, mapping)
+    else:
+        src_ast = ast.parse(src)
 
     # make sure indenting is 4
-    src = astunparse.unparse(ast.parse(src))
+    src = astunparse.unparse(src_ast)
 
     params = list(signature(compute_method).parameters)
 
@@ -380,38 +391,49 @@ def translate_compute_source_autograd(comp):
     pre_lines = []
 
     vecnames = ['_invec_', '_outvec_', '_residvec_']
-    self_vnames = ['_comp_ivec_', '_comp_ovec_', '_comp_rvec_']
+    self_vnames = ['self._inputs_autograd', 'self._outputs_autograd', 'self._resids_autograd']
     vecs = [comp._inputs, comp._outputs, comp._vectors['residual']['nonlinear']]
     groups = [(i, pname, vecnames[i], self_vnames[i], vecs[i]) for i, pname in enumerate(params)]
 
+    input_id = 0
+    output_id = 1
+
     for i, pname, vecname, self_vname, vec in groups:
-        if i > 0:
-            pre_lines.append('    %s = AutogradVectorWrapper(%s)' % (pname, self_vname))
-            continue
-
-        pre_lines.append('    %s = dict()' % pname)
-
-        start = end = 0
-        for n in vec:
-            val = vec[n]
-            end += val.size
-            if isinstance(val, np.ndarray) and len(val.shape) > 1:
-                pre_lines.append('    %s["%s"] = %s[%d:%d].reshape(%s)' %
-                                (pname, n, vecname, start, end, val.shape))
-            else:
-                pre_lines.append('    %s["%s"] = %s[%d:%d]' % (pname, n, vecname, start, end))
-            start = end
+        if mode == 'fwd':
+            if i > 0:
+                pre_lines.append('    %s = dict()' % pname)
+        else:
+            if i > 0:
+                continue
+            start = end = 0
+            for n in vec:
+                val = vec[n]
+                end += val.size
+                if isinstance(val, np.ndarray) and len(val.shape) > 1:
+                    pre_lines.append('    %s = %s[%d:%d].reshape(%s)' %
+                                    (mapping["%s['%s']" % (pname, n)], vecname, start, end,
+                                     val.shape))
+                else:
+                    pre_lines.append('    %s = %s[%d:%d]' % (mapping["%s['%s']" % (pname, n)],
+                                                             vecname, start, end))
+                start = end
 
     # remove the original compute() call signature
     src = src.split(":\n", 1)[1]
 
+    if mode == 'fwd':
+        sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, params[input_id])
+        retstr = "    return tuple(%s.values())" % params[output_id]
+    else:
+        sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, vecnames[input_id])
+        retstr = "    return np.hstack([%s])" % ', '.join(["%s.flatten()" % n for n in onames])
+
     # generate string of function to be differentiated
     src = '\n'.join([
-        "def %s_trans(_invec_):" % compute_method.__name__,
+        sigstr,
         '\n'.join(pre_lines),
         src,
-        #"    return tuple([%s])" % ', '.join(onames + rnames)
-        "    return tuple(%s.values())" % params[1]
+        retstr
         ])
 
     print(src)
@@ -472,17 +494,20 @@ def _get_tangent_ad_jac(comp, mode, J):
 
 def _get_autograd_ad_func(comp, mode):
 
+    funcstr = translate_compute_source_autograd(comp, mode)
+
     output_names = list(comp._outputs.keys())
     if isinstance(comp, ExplicitComponent):
         compute_method = comp.compute
+        argnum = 1
     else:
         compute_method = comp.apply_nonlinear
+        argnum = 1
+
     funcname = compute_method.__name__ + '_trans'
 
     input_names = list(comp._inputs.keys())
     input_args = [comp._inputs[n] for n in input_names]
-
-    funcstr = translate_compute_source_autograd(comp)
 
     comp_mod = sys.modules[comp.__class__.__module__]
     namespace = comp_mod.__dict__.copy()
@@ -496,10 +521,6 @@ def _get_autograd_ad_func(comp, mode):
     namespace['tuple'] = agtuple
     namespace['list'] = aglist
     namespace['dict'] = agdict
-    namespace['_comp_ivec_'] = comp._inputs
-    namespace['_comp_ovec_'] = comp._outputs
-    namespace['_comp_rvec_'] = comp._vectors['residual']['nonlinear']
-    namespace['AutogradVectorWrapper'] = AutogradVectorWrapper
 
     exec(funcstr, namespace)
 
@@ -507,125 +528,95 @@ def _get_autograd_ad_func(comp, mode):
 
     # JVP - forward
     # VJP - reverse
-    if mode == 'forward':
-        return make_jvp(func)(agnp.array(comp._inputs._data))
+    if mode == 'fwd':
+        return make_jvp(func, argnum)(comp, AutogradVectorWrapper(comp._inputs))
     else:
-        return make_vjp(func)(agnp.array(comp._inputs._data))[0]
+        return make_vjp(func, argnum)(comp, comp._inputs._data)[0]
 
 
 def _get_autograd_ad_jac(comp, mode, deriv_func, J):
-    if mode == 'forward':
+    if mode == 'fwd':
         return _get_ad_jac_fwd(comp, deriv_func, ad_method='autograd', partials=J)
     else:
         return _get_ad_jac_rev(comp, deriv_func, ad_method='autograd', partials=J)
 
 
 def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
-    prefix = comp.pathname + '.' if comp.pathname else ''
-
     inputs = comp._inputs
     outputs = comp._outputs
-
-    vec = inputs
     array = comp._vectors['input']['linear']._data
 
     agrad = ad_method == 'autograd'
     if agrad:
-        array = agnp.asarray(inputs._data)
+        array = agnp.asarray(array)
 
-    idx2arrname = [None] * array.size  # map array index to array var name
-    idx2loc = np.zeros(array.size, dtype=int)
-
-    J = {}
-    views = []
-    start = end = 0
-    for n in vec:
-        end += vec[n].size
-        views.append(array[start:end])
-        for i in range(start, end):
-            idx2arrname[i] = n
-        idx2loc[start:end] = np.arange(start, end, dtype=int) - start
-        start = end
-
-    if not agrad:
-        params = [inputs[name] for name in inputs] + views
-
-    for idx in range(array.size):
-        array[:] = 0.0
-        array[idx] = 1.0
-        iname = idx2arrname[idx]
-        locidx = idx2loc[idx]
-        abs_in = prefix + iname
-
-        if agrad:
-            grad = deriv_func(array)[1]
-            print("outputs:", comp._outputs._data)
-            print("doutputs:", comp._vectors['output']['linear']._data)
-        else:
-            grad = deriv_func(comp, *params)
-        print("grad:", grad)
-        for i, oname in enumerate(outputs):
-            abs_out = prefix + oname
-            key = (abs_out, abs_in)
-            if key in comp._subjacs_info:
-                if key not in J:
-                    J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
-                J[key][:, locidx] = grad[i]
-
-    for key in J:
-        partials[key] = J[key]
-
-
-def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
-    prefix = comp.pathname + '.' if comp.pathname else ''
-
-    inputs = comp._inputs
-    vec = outputs = comp._outputs
-    array = comp._vectors['output']['linear']._data
-
-    agrad = ad_method == 'autograd'
-
-    idx2arrname = [None] * array.size  # map array index to array var name
-    idx2loc = np.zeros(array.size, dtype=int)
-
-    J = {}
-    views = []
-    start = end = 0
-    for n in vec:
-        end += vec[n].size
-        views.append(array[start:end])
-        for i in range(start, end):
-            idx2arrname[i] = n
-        idx2loc[start:end] = np.arange(start, end, dtype=int) - start
-        start = end
+    J = np.zeros((outputs._data.size, inputs._data.size))
 
     if not agrad:
         params = [inputs[name] for name in inputs] + [views]
 
-    for oidx in range(array.size):
+    for idx in range(array.size):
         array[:] = 0.0
-        array[oidx] = 1.0
-        oname = idx2arrname[oidx]
-        locidx = idx2loc[oidx]
-        abs_out = prefix + oname
+        array[idx] = 1.0
+
+        if agrad:
+            grad = deriv_func(comp._vectors['input']['linear'])[1]
+            start = end = 0
+            for g in grad:
+                end += g.size
+                J[start:end, idx] = g.flat
+                start = end
+        else:
+            grad = deriv_func(*params)
+            J[:, idx] = grad
+
+    colstart = colend = 0
+    for inp, ival in iteritems(inputs._views):
+        colend += ival.size
+        rowstart = rowend = 0
+        for out, oval in iteritems(outputs._views):
+            rowend += oval.size
+            partials[out, inp] = J[rowstart:rowend, colstart:colend]
+            rowstart = rowend
+
+        colstart = colend
+
+
+def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
+    inputs = comp._inputs
+    outputs = comp._outputs
+    array = comp._vectors['output']['linear']._data
+
+    agrad = ad_method == 'autograd'
+    if agrad:
+        array = agnp.asarray(array)
+
+    J = np.zeros((outputs._data.size, inputs._data.size))
+
+    if not agrad:
+        params = [inputs[name] for name in inputs] + [views]
+
+    for idx in range(array.size):
+        array[:] = 0.0
+        array[idx] = 1.0
 
         if agrad:
             grad = deriv_func(array)
-            print("outputs:", comp._outputs._data)
-            print("doutputs:", comp._vectors['output']['linear']._data)
         else:
             grad = deriv_func(comp, *params)
-        print("grad:", grad)
-        for i, iname in enumerate(inputs):
-            abs_in = prefix + iname
-            key = (abs_out, abs_in)
-            if key in comp._subjacs_info:
-                if key not in J:
-                    J[key] = np.zeros((outputs[oname].size, inputs[iname].size))
-                J[key][locidx:] = grad[i]
 
-    for key in J:
-        partials[key] = J[key]
+        J[idx, :] = grad
+
+    colstart = colend = 0
+    for inp, ival in iteritems(inputs._views):
+        colend += ival.size
+        rowstart = rowend = 0
+        for out, oval in iteritems(outputs._views):
+            rowend += oval.size
+            partials[out, inp] = J[rowstart:rowend, colstart:colend]
+            rowstart = rowend
+
+        colstart = colend
 
 
 def _ad_setup_parser(parser):
@@ -682,6 +673,7 @@ def _ad_cmd(options):
 
                 print("\nClass:", cname)
                 print("Instance:", s.pathname)
+                print("Type:", 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit')
                 try:
                     if options.ad_method == 'tangent':
                         Jrev = {}
@@ -692,13 +684,14 @@ def _ad_cmd(options):
                         import autograd.numpy as agnp
                         import openmdao.utils.mod_wrapper as mod_wrapper
                         mod_wrapper.np = mod_wrapper.numpy = agnp
+
                         try:
                             Jrev = {}
-                            func = _get_autograd_ad_func(s, 'reverse')
-                            _get_autograd_ad_jac(s, 'reverse', func, Jrev)
+                            func = _get_autograd_ad_func(s, 'rev')
+                            _get_autograd_ad_jac(s, 'rev', func, Jrev)
                             Jfwd = {}
-                            func = _get_autograd_ad_func(s, 'forward')
-                            _get_autograd_ad_jac(s, 'forward', func, Jfwd)
+                            func = _get_autograd_ad_func(s, 'fwd')
+                            _get_autograd_ad_jac(s, 'fwd', func, Jfwd)
                         finally:
                             mod_wrapper.np = mod_wrapper.numpy = np
 
@@ -706,6 +699,8 @@ def _ad_cmd(options):
                     pprint.pprint(Jrev)
                     print("Forward J:")
                     pprint.pprint(Jfwd)
+
+                    prob.check_partials(includes=s.pathname, compact_print=True)
                     if len(seen) == len(classes):
                         break
                 except:

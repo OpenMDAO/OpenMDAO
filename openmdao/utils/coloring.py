@@ -25,6 +25,20 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 
+
+CITATIONS = """
+@article{Coleman+VermaSISC1998,
+  author  = {Thomas F. Coleman and Arun Verma},
+  title   = {The Efficient Computation of Sparse Jacobian Matrices Using Automatic Differentiation},
+  journal = {SIAM Journal of Scientific Computing},
+  year    = 1998,
+  number  = 4,
+  pages   = {1210-1233},
+  month   = 7,
+  volume  = 19
+}
+"""
+
 # If this is True, then IF simul coloring/sparsity is specified, use it.
 # If False, don't use it regardless.
 # The command line simul_coloring and sparsity commands make this False when generating a
@@ -835,7 +849,7 @@ def _solves_info(color_info):
     Returns
     -------
     float
-        Total size (minimum chosed based on which mode is better).
+        Total size (minimum chosen based on which mode is better).
     float
         Total solves.
     """

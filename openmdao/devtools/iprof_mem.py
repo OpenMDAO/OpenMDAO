@@ -4,7 +4,6 @@ import sys
 import os
 import argparse
 import time
-from fnmatch import fnmatch
 from collections import defaultdict
 from os.path import abspath, isfile
 
@@ -17,7 +16,7 @@ from openmdao.devtools.debug import _get_color_printer
 _registered = False
 
 
-def _create_profile_callback(stream, globs=None):
+def _create_profile_callback(stream):
 
     from openmdao.core.system import System
     class_insts = defaultdict(dict)
@@ -26,12 +25,6 @@ def _create_profile_callback(stream, globs=None):
         fname = frame.f_code.co_filename
         # exclude any c calls and any builtin python '<func>' functions
         if fname[0] != '<' and (event == 'call' or event == 'return'):
-            if globs:
-                for g in globs:
-                    if fnmatch(fname, g):
-                        break
-                else:
-                    return
             if 'self' in frame.f_locals:
                 self = frame.f_locals['self']
                 class_ = self.__class__.__name__
@@ -54,7 +47,7 @@ def _create_profile_callback(stream, globs=None):
                 class_ = name = '?'
                 inst_num = -1
 
-            print(event, abspath(fname), frame.f_code.co_firstlineno,
+            print(event, abspath(frame.f_code.co_filename), frame.f_code.co_firstlineno,
                     frame.f_code.co_name, mem_usage(), time.time(), class_, name, inst_num,
                     sep='|', file=stream)
 
@@ -67,7 +60,7 @@ def _setup(options):
         from openmdao.devtools.memory import mem_usage
 
         _out_stream = open(options.outfile, "w", buffering=1024*1024)
-        _trace_memory = _create_profile_callback(_out_stream, options.globs)
+        _trace_memory = _create_profile_callback(_out_stream)
         _registered = True
 
 
@@ -113,8 +106,6 @@ def _mem_prof_setup_parser(parser):
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
                         help="Display colors if the terminal supports it.  Requires 'colorama' "
                              "python package.  Use 'pip install colorama' to install it.")
-    parser.add_argument('-g', '--glob', action='append', dest='globs', default=[],
-                        help='Glob patterns to match source files to be traced.')
     parser.add_argument('file', metavar='file', nargs=1, help='Python file to profile.')
 
 
@@ -222,7 +213,7 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
                 if mem > maxmem:
                     maxmem = mem
 
-                if event == 'call':
+                if event in ('call', 'c_call'):
 
                     path_stack.append(call)
                     call_path = '|'.join(path_stack)
@@ -264,7 +255,7 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
 
                     stack.append(parts)
 
-                elif event == 'return':
+                elif event in ('return', 'c_return'):
                     try:
                         c_parts = stack.pop()
                     except IndexError:
@@ -286,9 +277,6 @@ def postprocess_memtrace(fname, min_mem=1.0, show_colors=True, rank=0, stream=sy
                             continue
 
                         c_parts = _process_parts(c_parts)
-                        if len(c_parts) != 10:
-                            print("bad_line:", c_parts)
-                            continue
                         (c_event, c_fpath, c_lineno, c_func, c_mem, c_elapsed, c_class, c_obj,
                          c_instnum, c_call) = c_parts
 

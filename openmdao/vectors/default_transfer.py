@@ -228,9 +228,7 @@ class DefaultTransfer(Transfer):
         out_inds = self._out_inds
 
         if mode == 'fwd':
-
             # this works whether the vecs have multi columns or not due to broadcasting
             in_vec._data[in_inds] = out_vec._data[out_inds]
-
         else:  # rev
             np.add.at(out_vec._data, out_inds, in_vec._data[in_inds])
