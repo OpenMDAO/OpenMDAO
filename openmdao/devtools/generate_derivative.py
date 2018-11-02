@@ -14,6 +14,7 @@ import numpy as np
 import ast
 import astunparse
 from six import itervalues, iteritems
+from itertools import chain
 
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
@@ -354,7 +355,9 @@ def translate_compute_source_autograd(comp, mode):
     dict
         Translation map for self.options if revert is True, else empty dict.
     """
-    if isinstance(comp, ExplicitComponent):
+    explicit = isinstance(comp, ExplicitComponent)
+
+    if explicit:
         compute_method = comp.compute
     else:
         compute_method = comp.apply_nonlinear
@@ -396,11 +399,14 @@ def translate_compute_source_autograd(comp, mode):
     groups = [(i, pname, vecnames[i], self_vnames[i], vecs[i]) for i, pname in enumerate(params)]
 
     input_id = 0
-    output_id = 1
+    if explicit:
+        output_id = 1
+    else:
+        output_id = 2
 
     for i, pname, vecname, self_vname, vec in groups:
         if mode == 'fwd':
-            if i > 0:
+            if (explicit and i > 0) or (i > 1 and not explicit):
                 pre_lines.append('    %s = dict()' % pname)
         else:
             if i > 0:
@@ -422,11 +428,18 @@ def translate_compute_source_autograd(comp, mode):
     src = src.split(":\n", 1)[1]
 
     if mode == 'fwd':
-        sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, params[input_id])
+        if explicit:
+            sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, params[0])
+        else:
+            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, params[0], params[1])
         retstr = "    return tuple(%s.values())" % params[output_id]
     else:
-        sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, vecnames[input_id])
-        retstr = "    return np.hstack([%s])" % ', '.join(["%s.flatten()" % n for n in onames])
+        if explicit:
+            sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, vecnames[0])
+            retstr = "    return np.hstack([%s])" % ', '.join(["%s.flatten()" % n for n in onames])
+        else:
+            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, vecnames[0], vecnames[1])
+            retstr = "    return np.hstack([%s])" % ', '.join(["%s.flatten()" % n for n in rnames])
 
     # generate string of function to be differentiated
     src = '\n'.join([
@@ -502,7 +515,7 @@ def _get_autograd_ad_func(comp, mode):
         argnum = 1
     else:
         compute_method = comp.apply_nonlinear
-        argnum = 1
+        argnum = (1,2)
 
     funcname = compute_method.__name__ + '_trans'
 
@@ -529,9 +542,16 @@ def _get_autograd_ad_func(comp, mode):
     # JVP - forward
     # VJP - reverse
     if mode == 'fwd':
-        return make_jvp(func, argnum)(comp, AutogradVectorWrapper(comp._inputs))
+        if isinstance(comp, ExplicitComponent):
+            return make_jvp(func, argnum)(comp, AutogradVectorWrapper(comp._inputs))
+        else:
+            return make_jvp(func, argnum)(comp, AutogradVectorWrapper(comp._inputs),
+                                          AutogradVectorWrapper(comp._outputs))
     else:
-        return make_vjp(func, argnum)(comp, comp._inputs._data)[0]
+        if isinstance(comp, ExplicitComponent):
+            return make_vjp(func, argnum)(comp, comp._inputs._data)[0]
+        else:
+            return make_vjp(func, argnum)(comp, comp._inputs._data, comp._outputs._data)[0]
 
 
 def _get_autograd_ad_jac(comp, mode, deriv_func, J):
@@ -550,7 +570,12 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
     if agrad:
         array = agnp.asarray(array)
 
-    J = np.zeros((outputs._data.size, inputs._data.size))
+    explicit = isinstance(comp, ExplicitComponent)
+
+    if explicit:
+        J = np.zeros((outputs._data.size, inputs._data.size))
+    else:
+        J = np.zeros((outputs._data.size, inputs._data.size + outputs._data.size))
 
     if not agrad:
         params = [inputs[name] for name in inputs] + [views]
@@ -560,18 +585,31 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
         array[idx] = 1.0
 
         if agrad:
-            grad = deriv_func(comp._vectors['input']['linear'])[1]
+            if explicit:
+                grad = deriv_func(comp._vectors['input']['linear'])[1]
+            else:
+                grad = deriv_func((comp._vectors['input']['linear'],
+                                   comp._vectors['output']['linear']))[1]
             start = end = 0
             for g in grad:
-                end += g.size
-                J[start:end, idx] = g.flat
+                if explicit:
+                    end += g.size
+                    J[start:end, idx] = g.flat
+                else:
+                    end += g.size
+                    J[start:end, idx] = g.flat
                 start = end
         else:
             grad = deriv_func(*params)
             J[:, idx] = grad
 
     colstart = colend = 0
-    for inp, ival in iteritems(inputs._views):
+    if explicit:
+        itr = iteritems(inputs._views)
+    else:
+        itr = chain(iteritems(inputs._views), iteritems(outputs._views))
+
+    for inp, ival in itr:
         colend += ival.size
         rowstart = rowend = 0
         for out, oval in iteritems(outputs._views):
@@ -585,13 +623,18 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
 def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
     inputs = comp._inputs
     outputs = comp._outputs
-    array = comp._vectors['output']['linear']._data
+    array = comp._vectors['residual']['linear']._data
+
+    explicit = isinstance(comp, ExplicitComponent)
 
     agrad = ad_method == 'autograd'
     if agrad:
         array = agnp.asarray(array)
 
-    J = np.zeros((outputs._data.size, inputs._data.size))
+    if explicit:
+        J = np.zeros((outputs._data.size, inputs._data.size))
+    else:
+        J = np.zeros((outputs._data.size, inputs._data.size + outputs._data.size))
 
     if not agrad:
         params = [inputs[name] for name in inputs] + [views]
@@ -602,13 +645,18 @@ def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
 
         if agrad:
             grad = deriv_func(array)
+            J[idx, :] = np.hstack(grad)  # grad has 2 parts, one for each differentiable input arg
         else:
             grad = deriv_func(comp, *params)
+            J[idx, :] = grad
 
-        J[idx, :] = grad
+    if explicit:
+        itr = iteritems(inputs._views)
+    else:
+        itr = chain(iteritems(inputs._views), iteritems(outputs._views))
 
     colstart = colend = 0
-    for inp, ival in iteritems(inputs._views):
+    for inp, ival in itr:
         colend += ival.size
         rowstart = rowend = 0
         for out, oval in iteritems(outputs._views):
