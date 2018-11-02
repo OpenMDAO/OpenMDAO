@@ -18,7 +18,7 @@ environment:
       PY: 2.7
       NUMPY: 1.14
       SCIPY: 1.0.1
-      PETSc: 3.7.7
+      PETSc: 3.9.1
 
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
       PYTHON: 2.7
