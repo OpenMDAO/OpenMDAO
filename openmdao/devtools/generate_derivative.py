@@ -370,10 +370,6 @@ def translate_compute_source_autograd(comp, mode):
     srclines[0] = srclines[0].lstrip()
     src = ''.join(srclines)
 
-    # # visitor = StringSubscriptVisitor()
-    # # visitor.visit(ast2)
-    # # print("found", visitor.subscripts.items())
-
     if mode == 'rev':
         # mapping to rename variables within the compute method
         to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
@@ -409,7 +405,7 @@ def translate_compute_source_autograd(comp, mode):
             if (explicit and i > 0) or (i > 1 and not explicit):
                 pre_lines.append('    %s = dict()' % pname)
         else:
-            if i > 0:
+            if (explicit and i > 0) or (i > 1 and not explicit):
                 continue
             start = end = 0
             for n in vec:
@@ -450,7 +446,7 @@ def translate_compute_source_autograd(comp, mode):
         ])
 
     print(src)
-    return src #, pnames, onames, rnames
+    return src
 
 
 def revert_deriv_source(deriv_func, to_revert):
