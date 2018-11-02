@@ -1978,6 +1978,20 @@ class TestSqliteCaseReader(unittest.TestCase):
 
 class TestFeatureSqliteReader(unittest.TestCase):
 
+    def setUp(self):
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
+
+    def tearDown(self):
+        os.chdir(self.orig_dir)
+        try:
+            rmtree(self.temp_dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
     def test_feature_list_cases(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
