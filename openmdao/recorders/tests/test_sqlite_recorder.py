@@ -1865,6 +1865,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
+        import numpy as np
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -1998,6 +2000,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
+        import numpy as np
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -2109,6 +2113,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.api import Problem, SqliteRecorder, ScipyOptimizeDriver, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
+        import numpy as np
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -2176,6 +2182,8 @@ class TestFeatureBasicRecording(unittest.TestCase):
     def record_cases(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
 
         # create our Sellar problem
         prob = Problem(model=SellarMDA())

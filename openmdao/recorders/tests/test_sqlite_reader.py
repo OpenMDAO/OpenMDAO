@@ -1996,6 +1996,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
+        import numpy as np
+
         prob = Problem(model=SellarMDA())
 
         model = prob.model
@@ -2031,6 +2033,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
+        import numpy as np
+
         prob = Problem(model=SellarMDA())
 
         model = prob.model
@@ -2061,6 +2065,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
     def test_feature_get_cases_nested(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
 
         # define Sellar MDA problem
         prob = Problem(model=SellarMDA())
@@ -2109,6 +2115,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
+        import numpy as np
+
         # define Sellar MDA problem
         prob = Problem(model=SellarMDA())
 
@@ -2155,6 +2163,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
     def test_feature_reading_derivatives(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
 
         prob = Problem(model=SellarMDA())
 
@@ -2277,6 +2287,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
     def test_feature_driver_options_with_values(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        import numpy as np
 
         prob = Problem(model=SellarDerivatives())
 
