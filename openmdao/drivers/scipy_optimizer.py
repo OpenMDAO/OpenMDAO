@@ -220,10 +220,10 @@ class ScipyOptimizeDriver(Driver):
         # maxiter and disp get passsed into scipy with all the other options.
         self.opt_settings['maxiter'] = self.options['maxiter']
         self.opt_settings['disp'] = self.options['disp']
+        # COBYLA specific options passed into scipy
         if opt == 'COBYLA':
             self.opt_settings['rhobeg'] = self.options['initstep']
             self.opt_settings['catol'] = self.options['catol_cob']
-
 
         # Size Problem
         nparam = 0
