@@ -134,6 +134,10 @@ class ScipyOptimizeDriver(Driver):
         self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of compute_totals calls during dynamic computation of '
                                   'simultaneous derivative coloring')
+        self.options.declare('initstep', default=1., types=float,
+                             desc='COBYLA: Reasonable initial changes to the variables')
+        self.options.declare('catol_cob', default=0.0002, types=float,
+                             desc='COBYLA: Tolerance (absolute) for constraint violations')
 
     def _get_name(self):
         """
@@ -216,6 +220,10 @@ class ScipyOptimizeDriver(Driver):
         # maxiter and disp get passsed into scipy with all the other options.
         self.opt_settings['maxiter'] = self.options['maxiter']
         self.opt_settings['disp'] = self.options['disp']
+        if opt == 'COBYLA':
+            self.opt_settings['rhobeg'] = self.options['initstep']
+            self.opt_settings['catol'] = self.options['catol_cob']
+
 
         # Size Problem
         nparam = 0
