@@ -75,10 +75,10 @@ class CacheLinearTestCase(unittest.TestCase):
                 
                 if mode == 'fwd':
                     print("incoming initial guess", d_outputs['states'])
-                    d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'])[0]
+                    d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'], atol='legacy')[0]
 
                 elif mode == 'rev':
-                    d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'])[0]
+                    d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'], atol='legacy')[0]
 
 
         p = Problem()

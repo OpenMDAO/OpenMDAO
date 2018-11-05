@@ -241,7 +241,7 @@ class ScipyKrylov(LinearSolver):
             self._iter_count = 0
             if solver is gmres:
                 x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
                                  callback=self._monitor)
             else:
                 x, info = solver(linop, b_vec._data.copy(), M=M,
