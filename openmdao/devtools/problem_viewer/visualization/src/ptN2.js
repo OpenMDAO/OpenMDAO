@@ -1519,7 +1519,7 @@ function PtN2Diagram(parentDiv, modelData) {
             parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
         }
         for (var i = 2000; i <= 4000; i += 1000) {
-            var newText = (i == height) ? ("<b>"" + i + "px</b>") : (i + "px");
+            var newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
             parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
         }
         ClearArrowsAndConnects();
