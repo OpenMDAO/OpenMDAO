@@ -2,7 +2,9 @@
 
 from __future__ import division, print_function
 
+from distutils.version import LooseVersion
 import numpy as np
+import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
@@ -240,9 +242,14 @@ class ScipyKrylov(LinearSolver):
 
             self._iter_count = 0
             if solver is gmres:
-                x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                 callback=self._monitor)
+                if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
+                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                                     x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                     callback=self._monitor)
+                else:
+                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                                     x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                     callback=self._monitor)
             else:
                 x, info = solver(linop, b_vec._data.copy(), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
