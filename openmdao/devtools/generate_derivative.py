@@ -16,7 +16,10 @@ import astunparse
 from six import itervalues, iteritems
 from itertools import chain
 
-from openmdao.vectors.default_vector import DefaultVector
+from numpy.testing import assert_almost_equal
+from openmdao.core.problem import Problem
+from openmdao.vectors.default_vector import Vector, DefaultVector
+from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
     StringSubscriptVisitor
@@ -26,60 +29,17 @@ try:
     import autograd.numpy as agnp
     from autograd import make_jvp, make_vjp, jacobian
     from autograd.differential_operators import make_jvp_reversemode
-    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, DictVSpace
+    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, DictVSpace, container_take
 except ImportError:
     pass
 else:
-    class AutogradVectorWrapper(object):
-        """
-        """
-        def __init__(self, vec):
-            self.vec = vec
-            self._views = agdict()
-            offset = len(vec._system.pathname) + 1 if vec._system.pathname else 0
+    class VectorBox(DictBox):
+        def get_slice(self, slc): return container_take(self._value._data, slc)
 
-            for name in vec._views:
-                self._views[name[offset:]] = agnp.asarray(vec._views[name])
-            self._data = agnp.asarray(vec._data)
+    VectorBox.register(Vector)
+    VectorBox.register(DefaultVector)
+    VectorBox.register(PETScVector)
 
-        def __getitem__(self, name):
-            """
-            Get the variable value.
-
-            Parameters
-            ----------
-            name : str
-                Relative variable name in the owning component's namespace.
-
-            Returns
-            -------
-            float or ndarray
-                Variable value.
-            """
-            return self._views[name]
-
-        def __setitem__(self, key, value):
-            """
-            Set the variable value.
-
-            Parameters
-            ----------
-            name : str
-                Relative variable name in the owning component's namespace.
-            value : float or list or tuple or ndarray
-                Variable value to set.
-            """
-            self._views[key] = value
-            #self.vec[key] = value._value
-
-        def values(self):
-            return self._views.values()
-
-        def items(self):
-            return self._views.items()
-
-    DictBox.register(AutogradVectorWrapper)
-    DictVSpace.register(AutogradVectorWrapper)
 
 def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     """
@@ -387,7 +347,12 @@ def translate_compute_source_autograd(comp, mode):
     params = list(signature(compute_method).parameters)
 
     # add section of code to create a boxed version of the input dict from the input array
-    pre_lines = []
+    pre_lines = [
+        "    import openmdao.utils.mod_wrapper as mod_wrapper",
+        "    np = mod_wrapper.np",
+        "    numpy = np",
+        "    print('np = ', np)",
+    ]
 
     vecnames = ['_invec_', '_outvec_', '_residvec_']
     self_vnames = ['self._inputs_autograd', 'self._outputs_autograd', 'self._resids_autograd']
@@ -402,8 +367,9 @@ def translate_compute_source_autograd(comp, mode):
 
     for i, pname, vecname, self_vname, vec in groups:
         if mode == 'fwd':
-            if (explicit and i > 0) or (i > 1 and not explicit):
-                pre_lines.append('    %s = dict()' % pname)
+            pass
+            # if (explicit and i > 0) or (i > 1 and not explicit):
+            #     pre_lines.append('    %s = dict()' % pname)
         else:
             if (explicit and i > 0) or (i > 1 and not explicit):
                 continue
@@ -425,7 +391,8 @@ def translate_compute_source_autograd(comp, mode):
 
     if mode == 'fwd':
         if explicit:
-            sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, params[0])
+            # sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, params[0])
+            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, params[0], params[1])
         else:
             sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, params[0], params[1])
         retstr = "    return tuple(%s.values())" % params[output_id]
@@ -538,11 +505,13 @@ def _get_autograd_ad_func(comp, mode):
     # JVP - forward
     # VJP - reverse
     if mode == 'fwd':
+        offset = len(comp.pathname) + 1 if comp.pathname else 0
+        outs = {n[offset:]: v for n, v in iteritems(comp._outputs._views)}
         if isinstance(comp, ExplicitComponent):
-            return make_jvp(func, argnum)(comp, AutogradVectorWrapper(comp._inputs))
+            return make_jvp(func, argnum)(comp, comp._inputs, outs)
         else:
-            return make_jvp(func, argnum)(comp, AutogradVectorWrapper(comp._inputs),
-                                          AutogradVectorWrapper(comp._outputs))
+            resids = {n[offset:]: v for n, v in iteritems(comp._vectors['residual']['linear']._views)}
+            return make_jvp(func, argnum)(comp, comp._inputs, outs, resids)
     else:
         if isinstance(comp, ExplicitComponent):
             return make_vjp(func, argnum)(comp, comp._inputs._data)[0]
@@ -579,6 +548,7 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
     for idx in range(array.size):
         array[:] = 0.0
         array[idx] = 1.0
+        comp._vectors['output']['linear']._data[:] = 0.0
 
         if agrad:
             if explicit:
@@ -708,48 +678,118 @@ def _ad_cmd(options):
         classes = set(options.classes)
         seen = set()
 
+        Problem._post_setup_func = None  # prevent infinite recursion
+        prob.run_model()
+        print("\nChecking partials:")
+        check_dct = prob.check_partials(out_stream=None)
+        prob.run_model()
+
+        summary = {}
+
         for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
             cname = s.__class__.__name__
-            if cname in classes and cname not in seen:
+            if cname not in seen and (cname in classes or not classes):
                 seen.add(cname)
                 if cname in ('IndepVarComp', 'ExecComp'):
                     continue
 
+                summary[cname] = summ = {}
+
+                rel_offset = len(s.pathname) + 1 if s.pathname else 0
+
                 print("\nClass:", cname)
                 print("Instance:", s.pathname)
-                print("Type:", 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit')
-                try:
-                    if options.ad_method == 'tangent':
+                type_ = 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit'
+                summ['type'] = type_
+                print("Type:", type_)
+                if options.ad_method == 'tangent':
+                    try:
                         Jrev = {}
                         _get_tangent_ad_jac(s, 'reverse', Jrev)
                         Jfwd = {}
                         _get_tangent_ad_jac(s, 'forward', Jfwd)
-                    elif options.ad_method == 'autograd':
-                        import autograd.numpy as agnp
-                        import openmdao.utils.mod_wrapper as mod_wrapper
-                        mod_wrapper.np = mod_wrapper.numpy = agnp
+                    except:
+                        traceback.print_exc(file=sys.stdout)
+                        print("\n")
+                elif options.ad_method == 'autograd':
+                    import autograd.numpy as agnp
+                    import openmdao.utils.mod_wrapper as mod_wrapper
+                    mod_wrapper.np = mod_wrapper.numpy = agnp
 
+                    for mode in ('fwd', 'rev'):
+                        summ[mode] = {}
                         try:
-                            Jrev = {}
-                            func = _get_autograd_ad_func(s, 'rev')
-                            _get_autograd_ad_jac(s, 'rev', func, Jrev)
-                            Jfwd = {}
-                            func = _get_autograd_ad_func(s, 'fwd')
-                            _get_autograd_ad_jac(s, 'fwd', func, Jfwd)
+                            J = {}
+                            func = _get_autograd_ad_func(s, mode)
+                            _get_autograd_ad_jac(s, mode, func, J)
+
+                            mx_diff = 0.0
+                            print("\n%s J:" % mode.upper())
+                            for key in sorted(J):
+                                o, i = key
+                                rel_o = o[rel_offset:]
+                                rel_i = i[rel_offset:]
+                                if np.any(J[key]) or (rel_o, rel_i) in check_dct[s.pathname]:
+                                    if (rel_o, rel_i) not in check_dct[s.pathname]:
+                                        check_dct[s.pathname][rel_o, rel_i] = d = {}
+                                        d['J_fwd'] = np.zeros(J[key].shape)
+                                    print("(%s, %s)" % (rel_o, rel_i), end='')
+                                    try:
+                                        assert_almost_equal(J[key], check_dct[s.pathname][rel_o, rel_i]['J_fwd'], decimal=5)
+                                    except:
+                                        max_diff = np.max(np.abs(J[key] - check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
+                                        if max_diff > mx_diff:
+                                            mx_diff = max_diff
+                                        print("  MAX DIFF:", max_diff)
+                                    else:
+                                        print(" ok")
+                            summ[mode]['diff'] = mx_diff
+                            summ[mode]['ran'] = True
+                            print()
+                        except:
+                            traceback.print_exc(file=sys.stdout)
+                            summ[mode]['ran'] = False
+                            summ[mode]['diff'] = float('nan')
+                            print("\n")
                         finally:
                             mod_wrapper.np = mod_wrapper.numpy = np
 
-                    print("\n\nReverse J:")
-                    pprint.pprint(Jrev)
-                    print("Forward J:")
-                    pprint.pprint(Jfwd)
+                if len(seen) == len(classes):
+                    break
 
-                    prob.check_partials(includes=s.pathname, compact_print=True)
-                    if len(seen) == len(classes):
-                        break
-                except:
-                    traceback.print_exc(file=sys.stdout)
-                    print("\n")
+        max_cname = max(len(s) for s in summary) + 2
+        max_diff = 16
+        badrevonly = []
+        bad = []
+
+        toptemplate = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}}{rdiff:<{dwidth}}"
+        template = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}.4}{rdiff:<{dwidth}.4}"
+        print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)', rdiff='Max Diff (rev)', cwidth=max_cname, dwidth=max_diff))
+        print('--------- good derivs ------------')
+        for cname in sorted(summary):
+            s = summary[cname]
+            typ = s['type']
+            fwdran = s['fwd']['ran']
+            fwdmax = s['fwd']['diff']
+            revran = s['rev']['ran']
+            revmax = s['rev']['diff']
+            line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, cwidth=max_cname, dwidth=max_diff)
+            if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:
+                print(line)
+            elif fwdran and fwdmax == 0.0:
+                badrevonly.append(line)
+            else:
+                bad.append(line)
+
+        if badrevonly:
+            print('--------- fwd derivs ok ------------')
+            for b in badrevonly:
+                print(b)
+
+        if bad:
+            print('--------- both derivs bad ------------')
+            for b in bad:
+                print(b)
 
         not_found = classes - seen
         if not_found:

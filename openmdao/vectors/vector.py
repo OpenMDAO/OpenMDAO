@@ -258,6 +258,22 @@ class Vector(object):
         """
         return name2abs_name(self._system, name, self._names, self._typ) is not None
 
+    def get_slice(self, slc):
+        """
+        Return the given slice of the data vector.
+
+        Parameters
+        ----------
+        slc : slice
+            The desired slice of the data vector.
+
+        Returns
+        -------
+        ndarray
+            A view of data vector specified by the given slice.
+        """
+        return self._data[slc]
+
     def __getitem__(self, name):
         """
         Get the unscaled variable value in true units.
