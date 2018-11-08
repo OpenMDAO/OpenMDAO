@@ -299,6 +299,9 @@ class _RegularGridInterp(object):
 
         if self.bounds_error:
             for i, p in enumerate(xi.T):
+                if np.isnan(p):
+                    raise ValueError("One of the requested xi contains a NaN.")
+
                 if not np.logical_and(np.all(self.grid[i][0] <= p),
                                       np.all(p <= self.grid[i][-1])):
                     p1 = np.where(self.grid[i][0] > p)[0]

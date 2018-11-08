@@ -753,6 +753,19 @@ class TestRegularGridInterpolator(unittest.TestCase):
         self.assertRaises(ValueError, _RegularGridInterp,
                           (x, y), values, fill_value=1 + 2j)
 
+    def test_NaN_exception(self):
+        np.random.seed(1234)
+        x = np.linspace(0, 2, 5)
+        y = np.linspace(0, 1, 7)
+        values = np.random.rand(5, 7)
+        interp = _RegularGridInterp((x, y), values)
+
+        with self.assertRaises(ValueError) as cm:
+            interp([1., np.nan])
+
+        msg = ('One of the requested xi contains a NaN.')
+        self.assertTrue(str(cm.exception).startswith(msg))
+
     def test_error_messages(self):
         # For coverage. Most of these errors are probably not reachable in openmdao, but
         # proper unit testing requires them for standalone usage of the Interpolation.
