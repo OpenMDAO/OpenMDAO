@@ -128,10 +128,13 @@ class EmbedShellCmdDirective(Directive):
             # Failed cases raised as a Directive warning (level 2 in docutils).
             # This way, the sphinx build does not terminate if, for example, you are building on
             # an environment where mpi or pyoptsparse are missing.
-            msg = "Running of embedded shell command '{}' in docs failed. " + \
-                  "Output was: \n{}".format(cmdstr, err.output.decode('utf-8'))
+            msg = "Running of embedded shell command '{}' in docs failed. Output was: \n{}" \
+                  .format(cmdstr, err.output.decode('utf-8'))
             raise self.directive_error(2, msg)
-
+        except Exception as err:
+            msg = "Running of embedded shell command '{}' in docs failed. Output was: {}" \
+                  .format(cmdstr, err)
+            raise self.directive_error(2, msg)
         finally:
             os.chdir(startdir)
 

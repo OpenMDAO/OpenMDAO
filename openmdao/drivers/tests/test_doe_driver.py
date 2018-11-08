@@ -1137,6 +1137,10 @@ class TestParallelDOE(unittest.TestCase):
 class TestDOEDriverFeature(unittest.TestCase):
 
     def setUp(self):
+        import os
+        import shutil
+        import tempfile
+
         self.startdir = os.getcwd()
         self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriverFeature-')
         os.chdir(self.tempdir)
@@ -1332,6 +1336,11 @@ class TestParallelDOEFeature(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
+        import os
+        import shutil
+        import tempfile
+
+        from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
 
         expected = {
@@ -1417,8 +1426,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             outputs = cr.get_case(cases[n]).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy)
-                                         for x, y, f_xy in values]),
+        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]),
                          self.expect_text)
 
 
@@ -1428,6 +1436,11 @@ class TestParallelDOEFeature2(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
+        import os
+        import shutil
+        import tempfile
+
+        from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
 
         expected = {
