@@ -1,8 +1,11 @@
 from collections import Iterable
 
 import sys
+import os
 import traceback
 import tangent
+from tangent.utils import register_init_grad
+
 from inspect import signature, getsourcelines, getsource, getmodule
 from collections import OrderedDict, defaultdict
 import inspect
@@ -22,8 +25,9 @@ from openmdao.vectors.default_vector import Vector, DefaultVector
 from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
-    StringSubscriptVisitor
+    StringSubscriptVisitor, transform_ast_slices
 from openmdao.utils.general_utils import str2valid_python_name, unique_name
+import openmdao.utils.mod_wrapper as mod_wrapper
 
 try:
     import autograd.numpy as agnp
@@ -41,6 +45,38 @@ else:
     VectorBox.register(PETScVector)
 
 
+modemap = {
+    'fwd': 'forward',
+    'rev': 'reverse',
+}
+
+
+class Vec(object):
+    def __init__(self, v):
+        self._data = np.zeros_like(v._data)
+        self._views = {}
+        start = end = 0
+        for name, absname in zip(v, v._views):
+            end += v._views[absname].size
+            view = self._data[start:end]
+            view.shape = v._views[absname].shape
+            self._views[name] = view
+            start = end
+
+    def __getitem__(self, name):
+        return self._views[name]
+
+    def __setitem__(self, name, val):
+        self._views[name][:] = val
+
+
+def zero_vector(vec):
+    return Vec(vec)
+
+
+register_init_grad(DefaultVector, zero_vector)
+
+
 def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     """
     Given the string representing the source code of a python function,
@@ -51,7 +87,7 @@ def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     comp: Component
         The component we're AD'ing.
     mode : str
-        Derivative direction ('forward' or 'reverse')
+        Derivative direction ('fwd' or 'rev')
     body_src : str
         The source code of the body of the compute/apply_nonlinear function, converted
         into non-member form.
@@ -142,14 +178,17 @@ def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
 
     # needs to have an associated source file for tangent's use of inspect functions to work
 
-    temp_mod_name = '_temp_' + comp.pathname.replace('.', '_')
+    sys.path.append(os.getcwd())
+    temp_mod_name = '_temp_' + mode + '_' + comp.pathname.replace('.', '_')
     temp_file_name = temp_mod_name + '.py'
 
     with open(temp_file_name, "w") as f:
         f.write(new_src)
 
+    invalidate_caches()  # need this to recognize dynamically created modules
     import_module(temp_mod_name)
     mod = sys.modules[temp_mod_name]
+    sys.path = sys.path[:-1]
 
     # populate module with globals from component's module
     comp_mod = sys.modules[comp.__class__.__module__]
@@ -167,15 +206,13 @@ def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
     sig = signature(func)
     params = sig.parameters
 
+    print("Starting source:")
+    print(getsource(func))
     # generate AD code for the method for all inputs
-    df = tangent.autodiff(func, wrt=tuple(range(len(params))), mode=mode,
+    df = tangent.autodiff(func, wrt=tuple(range(len(params))), mode=modemap[mode],
                           verbose=0, check_dims=False)
 
-    # cleanup temp file and module
-    remove(temp_file_name)
-    del sys.modules[temp_mod_name]
-
-    return df, func_source
+    return df, func_source, mod
 
 
 def _get_arg_replacement_map(comp):
@@ -276,10 +313,13 @@ def translate_compute_source_tangent(comp):
     src = ''.join(srclines)
     ast2 = ast.parse(src)
 
+    # convert any [a:b:c] to slice(a, b, c) else tangent fwd mode will barf
+    astslc = transform_ast_slices(ast2)
+
     # combine all mappings
     mapping = to_replace.copy()
     mapping.update(to_revert)
-    ast3 = transform_ast_names(ast2, mapping)
+    ast3 = transform_ast_names(astslc, mapping)
     src = astunparse.unparse(ast3)
 
     # remove the original compute() call signature
@@ -351,7 +391,6 @@ def translate_compute_source_autograd(comp, mode):
         "    import openmdao.utils.mod_wrapper as mod_wrapper",
         "    np = mod_wrapper.np",
         "    numpy = np",
-        "    print('np = ', np)",
     ]
 
     vecnames = ['_invec_', '_outvec_', '_residvec_']
@@ -366,11 +405,7 @@ def translate_compute_source_autograd(comp, mode):
         output_id = 2
 
     for i, pname, vecname, self_vname, vec in groups:
-        if mode == 'fwd':
-            pass
-            # if (explicit and i > 0) or (i > 1 and not explicit):
-            #     pre_lines.append('    %s = dict()' % pname)
-        else:
+        if mode == 'rev':
             if (explicit and i > 0) or (i > 1 and not explicit):
                 continue
             start = end = 0
@@ -444,28 +479,101 @@ def _get_tangent_ad_func(comp, mode):
     # start construction of partial derivative functions
 
     comp_mod = sys.modules[comp.__class__.__module__]
-    namespace = comp_mod.__dict__.copy()
 
-    # gather generated gradient source code
-    df, func_source = generate_gradient(comp, mode, src, to_revert, pnames, onames, rnames)
+    # # gather generated gradient source code
+    # df, func_source, temp_mod = generate_gradient(comp, mode, src, to_revert,
+    #                                               pnames, onames, rnames)
 
-    deriv_src = '\n'.join(revert_deriv_source(df, to_revert))
+    # # namespace = temp_mod.__dict__
+    # # namespace.update([(k,v) for k,v in comp_mod.__dict__.items() if not k.startswith('__')])
 
-    namespace['tangent'] = tangent
+    # deriv_src = '\n'.join(revert_deriv_source(df, to_revert))
+    # print("Deriv src:")
+    # print(deriv_src)
 
-    # create an actual function object by exec'ing the source
-    exec(deriv_src, namespace)
-
-    return namespace['_compute_derivs_ad']
-
-
-def _get_tangent_ad_jac(comp, mode, J):
-    df = _get_tangent_ad_func(comp, mode)
-
-    if mode == 'forward':
-        return _get_ad_jac_fwd(comp, df, ad_method='tangent', partials=J)
+    if isinstance(comp, ExplicitComponent):
+        func = comp.compute
     else:
-        return _get_ad_jac_rev(comp, df, ad_method='tangent', partials=J)
+        func = comp.apply_nonlinear
+
+    import textwrap
+    src = textwrap.dedent(getsource(func))
+
+
+    deriv_mod_name = temp_mod.__name__ + '_deriv'
+
+    # write the derivative func into a module file so that tracebacks will show us the
+    # correct line of source where the problem occurred, and allow us to step into the
+    # function with a debugger.
+    with open(deriv_mod_name + '.py', "w") as f:
+        # get all of the comp module globals
+        f.write("from %s import *\n" % comp.__class__.__module__)
+        f.write("import tangent\n")
+        f.write(deriv_src)
+
+    sys.path.append(os.getcwd())
+    invalidate_caches()  # need this to recognize dynamically created modules
+    mod = import_module(deriv_mod_name)
+    sys.path = sys.path[:-1]
+
+    # # create an actual function object by exec'ing the source
+    # exec(deriv_src, namespace)
+
+    return getattr(mod, '_compute_derivs_ad'), temp_mod, mod
+
+
+def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
+    inputs = comp._inputs
+    outputs = comp._outputs
+    dinputs = comp._vectors['input']['linear']
+    doutputs = comp._vectors['output']['linear']
+
+    explicit = isinstance(comp, ExplicitComponent)
+
+    if explicit:
+        J = np.zeros((outputs._data.size, inputs._data.size))
+    else:
+        J = np.zeros((outputs._data.size, inputs._data.size + outputs._data.size))
+
+    if mode == 'fwd':
+        array = dinputs._data
+    else:
+        array = doutputs._data
+
+    for idx in range(array.size):
+        doutputs._data[:] = 0.0
+        array[:] = 0.0
+        array[idx] = 1.0
+
+        if mode == 'fwd':
+            grad = deriv_func(comp, inputs, outputs, dinputs)
+            J[:, idx] = grad._data
+        else:
+            grad = deriv_func(comp, inputs, outputs, doutputs)
+            J[idx, :] = grad._data
+
+    colstart = colend = 0
+    if explicit:
+        itr = iteritems(inputs._views)
+    else:
+        itr = chain(iteritems(inputs._views), iteritems(outputs._views))
+
+    for inp, ival in itr:
+        colend += ival.size
+        rowstart = rowend = 0
+        for out, oval in iteritems(outputs._views):
+            rowend += oval.size
+            partials[out, inp] = J[rowstart:rowend, colstart:colend]
+            rowstart = rowend
+
+        colstart = colend
+
+
+# def _get_tangent_ad_jac(comp, mode, df, J):
+#     if mode == 'fwd':
+#         return _get_ad_jac_fwd(comp, df, ad_method='tangent', partials=J)
+#     else:
+#         return _get_ad_jac_rev(comp, df, ad_method='tangent', partials=J)
 
 
 def _get_autograd_ad_func(comp, mode):
@@ -502,8 +610,8 @@ def _get_autograd_ad_func(comp, mode):
 
     func = namespace[funcname]
 
-    # JVP - forward
-    # VJP - reverse
+    # JVP - fwd
+    # VJP - rev
     if mode == 'fwd':
         offset = len(comp.pathname) + 1 if comp.pathname else 0
         outs = {n[offset:]: v for n, v in iteritems(comp._outputs._views)}
@@ -529,7 +637,9 @@ def _get_autograd_ad_jac(comp, mode, deriv_func, J):
 def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
     inputs = comp._inputs
     outputs = comp._outputs
-    array = comp._vectors['input']['linear']._data
+    dinputs = comp._vectors['input']['linear']
+    doutputs = comp._vectors['output']['linear']
+    array = dinputs._data
 
     agrad = ad_method == 'autograd'
     if agrad:
@@ -542,20 +652,16 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
     else:
         J = np.zeros((outputs._data.size, inputs._data.size + outputs._data.size))
 
-    if not agrad:
-        params = [inputs[name] for name in inputs] + [views]
-
     for idx in range(array.size):
+        doutputs._data[:] = 0.0
         array[:] = 0.0
         array[idx] = 1.0
-        comp._vectors['output']['linear']._data[:] = 0.0
 
         if agrad:
             if explicit:
-                grad = deriv_func(comp._vectors['input']['linear'])[1]
+                grad = deriv_func(dinputs)[1]
             else:
-                grad = deriv_func((comp._vectors['input']['linear'],
-                                   comp._vectors['output']['linear']))[1]
+                grad = deriv_func((dinputs, doutputs))[1]
             start = end = 0
             for g in grad:
                 if explicit:
@@ -566,7 +672,8 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
                     J[start:end, idx] = g.flat
                 start = end
         else:
-            grad = deriv_func(*params)
+            params = [inputs[name] for name in inputs] + [dinputs[name] for name in dinputs]
+            grad = deriv_func(comp, *params)
             J[:, idx] = grad
 
     colstart = colend = 0
@@ -589,7 +696,8 @@ def _get_ad_jac_fwd(comp, deriv_func, ad_method, partials):
 def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
     inputs = comp._inputs
     outputs = comp._outputs
-    array = comp._vectors['residual']['linear']._data
+    dresids = comp._vectors['residual']['linear']
+    array = dresids._data
 
     explicit = isinstance(comp, ExplicitComponent)
 
@@ -602,9 +710,6 @@ def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
     else:
         J = np.zeros((outputs._data.size, inputs._data.size + outputs._data.size))
 
-    if not agrad:
-        params = [inputs[name] for name in inputs] + [views]
-
     for idx in range(array.size):
         array[:] = 0.0
         array[idx] = 1.0
@@ -613,6 +718,7 @@ def _get_ad_jac_rev(comp, deriv_func, ad_method, partials):
             grad = deriv_func(array)
             J[idx, :] = np.hstack(grad)  # grad has 2 parts, one for each differentiable input arg
         else:
+            params = [inputs[name] for name in inputs] + list(dresids.values())
             grad = deriv_func(comp, *params)
             J[idx, :] = grad
 
@@ -702,70 +808,76 @@ def _ad_cmd(options):
                 type_ = 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit'
                 summ['type'] = type_
                 print("Type:", type_)
-                if options.ad_method == 'tangent':
-                    try:
-                        Jrev = {}
-                        _get_tangent_ad_jac(s, 'reverse', Jrev)
-                        Jfwd = {}
-                        _get_tangent_ad_jac(s, 'forward', Jfwd)
-                    except:
-                        traceback.print_exc(file=sys.stdout)
-                        print("\n")
-                elif options.ad_method == 'autograd':
+                if options.ad_method == 'autograd':
                     import autograd.numpy as agnp
-                    import openmdao.utils.mod_wrapper as mod_wrapper
                     mod_wrapper.np = mod_wrapper.numpy = agnp
 
-                    for mode in ('fwd', 'rev'):
-                        summ[mode] = {}
-                        try:
-                            J = {}
+                for mode in ('fwd', 'rev'):
+                    summ[mode] = {}
+                    try:
+                        J = {}
+                        if options.ad_method == 'autograd':
                             func = _get_autograd_ad_func(s, mode)
                             _get_autograd_ad_jac(s, mode, func, J)
+                        elif options.ad_method == 'tangent':
+                            func, temp_mod, deriv_mod = _get_tangent_ad_func(s, mode)
+                            _get_tangent_ad_jac(s, mode, func, J)
 
-                            mx_diff = 0.0
-                            print("\n%s J:" % mode.upper())
-                            for key in sorted(J):
-                                o, i = key
-                                rel_o = o[rel_offset:]
-                                rel_i = i[rel_offset:]
-                                if np.any(J[key]) or (rel_o, rel_i) in check_dct[s.pathname]:
-                                    if (rel_o, rel_i) not in check_dct[s.pathname]:
-                                        check_dct[s.pathname][rel_o, rel_i] = d = {}
-                                        d['J_fwd'] = np.zeros(J[key].shape)
-                                    print("(%s, %s)" % (rel_o, rel_i), end='')
-                                    try:
-                                        assert_almost_equal(J[key], check_dct[s.pathname][rel_o, rel_i]['J_fwd'], decimal=5)
-                                    except:
-                                        max_diff = np.max(np.abs(J[key] - check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
-                                        if max_diff > mx_diff:
-                                            mx_diff = max_diff
-                                        print("  MAX DIFF:", max_diff)
-                                    else:
-                                        print(" ok")
-                            summ[mode]['diff'] = mx_diff
-                            summ[mode]['ran'] = True
-                            print()
-                        except:
-                            traceback.print_exc(file=sys.stdout)
-                            summ[mode]['ran'] = False
-                            summ[mode]['diff'] = float('nan')
-                            print("\n")
-                        finally:
+                            del sys.modules[temp_mod.__name__]
+                            del sys.modules[deriv_mod.__name__]
+                            os.remove(temp_mod.__file__)
+                            os.remove(deriv_mod.__file__)
+
+                        mx_diff = 0.0
+                        print("\n%s J:" % mode.upper())
+                        for key in sorted(J):
+                            o, i = key
+                            rel_o = o[rel_offset:]
+                            rel_i = i[rel_offset:]
+                            if np.any(J[key]) or (rel_o, rel_i) in check_dct[s.pathname]:
+                                if (rel_o, rel_i) not in check_dct[s.pathname]:
+                                    check_dct[s.pathname][rel_o, rel_i] = d = {}
+                                    d['J_fwd'] = np.zeros(J[key].shape)
+                                print("(%s, %s)" % (rel_o, rel_i), end='')
+                                try:
+                                    assert_almost_equal(J[key], check_dct[s.pathname][rel_o, rel_i]['J_fwd'], decimal=5)
+                                except:
+                                    max_diff = np.max(np.abs(J[key] - check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
+                                    if max_diff > mx_diff:
+                                        mx_diff = max_diff
+                                    print("  MAX DIFF:", max_diff)
+                                else:
+                                    print(" ok")
+                        summ[mode]['diff'] = mx_diff
+                        summ[mode]['ran'] = True
+                        print()
+                    except:
+                        traceback.print_exc(file=sys.stdout)
+                        summ[mode]['ran'] = False
+                        summ[mode]['diff'] = float('nan')
+                        print("\n")
+                    finally:
+                        if options.ad_method == 'autograd':
                             mod_wrapper.np = mod_wrapper.numpy = np
 
                 if len(seen) == len(classes):
                     break
 
+        not_found = classes - seen
+        if not_found:
+            raise RuntimeError("Couldn't find an instance of the following classes: %s." %
+                               not_found)
+
         max_cname = max(len(s) for s in summary) + 2
         max_diff = 16
-        badrevonly = []
+        fwdgood = []
+        revgood = []
         bad = []
 
         toptemplate = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}}{rdiff:<{dwidth}}"
         template = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}.4}{rdiff:<{dwidth}.4}"
         print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)', rdiff='Max Diff (rev)', cwidth=max_cname, dwidth=max_diff))
-        print('--------- good derivs ------------')
+        print('--------- both derivs ok ------------')
         for cname in sorted(summary):
             s = summary[cname]
             typ = s['type']
@@ -777,24 +889,26 @@ def _ad_cmd(options):
             if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:
                 print(line)
             elif fwdran and fwdmax == 0.0:
-                badrevonly.append(line)
+                fwdgood.append(line)
+            elif revran and revmax == 0.0:
+                revgood.append(line)
             else:
                 bad.append(line)
 
-        if badrevonly:
+        if fwdgood:
             print('--------- fwd derivs ok ------------')
-            for b in badrevonly:
+            for b in fwdgood:
+                print(b)
+
+        if revgood:
+            print('--------- rev derivs ok ------------')
+            for b in revgood:
                 print(b)
 
         if bad:
             print('--------- both derivs bad ------------')
             for b in bad:
                 print(b)
-
-        not_found = classes - seen
-        if not_found:
-            raise RuntimeError("Couldn't find an instance of the following classes: %s." %
-                               not_found)
 
         exit()
 

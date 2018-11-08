@@ -99,6 +99,37 @@ class StringSubscriptVisitor(ast.NodeVisitor):
             self.generic_visit(node)
 
 
+class SliceTransformer(ast.NodeTransformer):
+    def visit_Slice(self, node):
+        new_node = ast.Call(
+          func=ast.Name(id='slice', ctx=ast.Load()),
+          args=[arg if arg else ast.Name(id='None', ctx=ast.Load())
+                for arg in [node.lower, node.upper, node.step]],
+          keywords=[])
+
+        return new_node
+
+
+def transform_ast_slices(node):
+    """
+    Returns an AST with all literal slices transformed to 'slice(start, stop, step)' form.
+
+    Parameters
+    ----------
+    node : ASTNode
+        Root node of the original AST.
+
+    Returns
+    -------
+    ASTNode
+        Root node of the transformed AST.
+    """
+    new_ast = SliceTransformer().visit(node)
+    ast.fix_missing_locations(new_ast)
+
+    return new_ast
+
+
 class DependencyVisitor(ast.NodeVisitor):
     def __init__(self):
         super(DependencyVisitor, self).__init__()
@@ -215,7 +246,7 @@ class NameTransformer(ast.NodeTransformer):
 
 def transform_ast_names(node, mapping):
     """
-    Returns a new source string with the names transformed based on mapping.
+    Returns a new AST with the names transformed based on mapping.
 
     Note that this transforms only from the beginning of a name, so for example, if you have
     abc.xyz.abc and a mapping of { 'abc': 'XXX' }, you'll get 'XXX.xyz.abc', not 'XXX.xyz.XXX'.
@@ -227,6 +258,10 @@ def transform_ast_names(node, mapping):
     mapping : dict
         Dict mapping original name to new name.
 
+    Returns
+    -------
+    ASTNode
+        Root of the transformed AST.
     """
     new_ast = NameTransformer(mapping).visit(node)
     ast.fix_missing_locations(new_ast)
