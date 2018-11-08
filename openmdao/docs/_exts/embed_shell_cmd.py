@@ -132,7 +132,7 @@ class EmbedShellCmdDirective(Directive):
                   .format(cmdstr, err.output.decode('utf-8'))
             raise self.directive_error(2, msg)
         except Exception as err:
-            msg = "Running of embedded shell command '{}' in docs failed. Output was: {}" \
+            msg = "Running of embedded shell command '{}' in docs failed. Output was: \n{}" \
                   .format(cmdstr, err)
             raise self.directive_error(2, msg)
         finally:
