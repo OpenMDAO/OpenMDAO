@@ -24,7 +24,8 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.meta_model_structured_comp import _RegularGridInterp, MetaModelStructuredComp
+    from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp, \
+        _RegularGridInterp, OutOfBoundsError
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985,
                0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -709,11 +710,16 @@ class TestRegularGridInterpolator(unittest.TestCase):
         values = np.random.rand(5, 7)
         interp = _RegularGridInterp((x, y), values)
 
-        with self.assertRaises(ValueError) as cm:
-            interp([1., np.nan])
+        with self.assertRaises(OutOfBoundsError) as cm:
+            interp([1, np.nan])
 
-        msg = ('One of the requested xi contains a NaN.')
-        self.assertTrue(str(cm.exception).startswith(msg))
+        err = cm.exception
+
+        self.assertEqual(str(err), 'One of the requested xi contains a NaN')
+        self.assertEqual(err.idx, 1)
+        self.assertTrue(np.isnan(err.value))
+        self.assertEqual(err.lower, 0)
+        self.assertEqual(err.upper, 1)
 
     def test_error_messages(self):
         # For coverage. Most of these errors are probably not reachable in openmdao, but
