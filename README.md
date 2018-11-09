@@ -66,22 +66,28 @@ Option 1: Install from pypi:
 
 `pip install openmdao`
 
-
 Option 2: Use git to clone the repository:
 
 `git clone http://github.com/OpenMDAO/OpenMDAO`
 
- Then use pip to install openmdao locally:
+Then use pip to install openmdao locally:
 
 `cd OpenMDAO`
 
 `pip install .`
 
+To install the developer dependencies (in development mode):
+
+`pip install -e .[develop]`
+
+To install the documentation making dependencies:
+
+`pip install .[docs]`
 
 Documentation Building Instructions:
 ------------------------------------
 
-If you've cloned the repository, change to the docs directory:
+If you've cloned the repository and installed the documentation dependencies, change to the docs directory:
 
 `cd openmdao/docs`
 
