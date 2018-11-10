@@ -14,3 +14,6 @@ openmdao/docs/_srcdocs/index.rst
 openmdao/docs/tags/
 *.out
 doc_plot_*
+coloring.json
+connections.html
+rank*.dat

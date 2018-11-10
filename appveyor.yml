@@ -89,7 +89,7 @@ install:
 
     conda install --yes matplotlib;
 
-    pip install .;
+    pip install .[develop];
     conda list;
 
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
@@ -99,7 +99,7 @@ install:
 - cmd: pip install matplotlib
 - cmd: pip install testflo
 - cmd: cd C:\projects\blue*
-- cmd: pip install -e .
+- cmd: pip install -e .[develop]
 - cmd: conda list
 
 test_script:
