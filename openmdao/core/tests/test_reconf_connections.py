@@ -69,11 +69,11 @@ class TestReconfConnections(unittest.TestCase):
     def test_promoted_connections(self):
         p = Problem()
 
-        p.model = Group()
-        p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
-        p.model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
-        p.model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'],
-                              promotes_outputs=['f'])
+        p.model = model = Group()
+        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
+        model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'],
+                            promotes_outputs=['f'])
 
         p.setup()
         p['x'] = 3.
@@ -120,10 +120,10 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NewtonSolver()
-        p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
-        p.model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
-        p.model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
-        p.model.connect('c2.y', 'c3.y')
+        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
+        model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
+        model.connect('c2.y', 'c3.y')
         p.setup()
         p['x'] = 3.
 
@@ -146,10 +146,10 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NonlinearBlockGS()
-        p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
-        p.model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
-        p.model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
-        p.model.connect('c2.y', 'c3.y')
+        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
+        model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
+        model.connect('c2.y', 'c3.y')
         p.setup()
         p['x'] = 3.
 
@@ -172,9 +172,9 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NewtonSolver()
-        p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
-        p.model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
-        p.model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
+        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
+        model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
         p.setup()
         p['x'] = 3.
 
@@ -194,9 +194,9 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NonlinearBlockGS()
-        p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
-        p.model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
-        p.model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
+        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
+        model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
         p.setup()
         p['x'] = 3.
 
