@@ -7,9 +7,10 @@ Case Recording
 Driver Recording
 ----------------
 
-A case recorder is commonly attached to the problem's Driver in order to gain insight into the
-convergence of the model as the driver finds a solution.  By default, a recorder attached to
-a driver will record the design variables, constraints and objectives.
+A :class:`CaseRecorder<openmdao.recorders.case_recorder.CaseRecorder>` is commonly attached to
+the problem's Driver in order to gain insight into the convergence of the model as the driver 
+finds a solution.  By default, a recorder attached to a driver will record the design variables, 
+constraints and objectives.
 
 Driver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -19,7 +20,7 @@ Driver Recording Options
     recording_options
 
 .. note::
-    Note that the 'excludes' option takes precedence over the 'includes' option.
+    Note that the :code:`excludes` option takes precedence over the :code:`includes` option.
 
 Driver Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -31,7 +32,7 @@ Driver Recording Example
 Problem Recording
 -----------------
 
-You might also want to attach a recorder to the Problem itself. This allows you to record an 
+You might also want to attach a recorder to the problem itself. This allows you to record an 
 arbitrary case at a point of your choosing.  This feature can be useful if you only record a
 limited number of variables during the run but would like to see a more complete list of values
 after the run.
@@ -46,7 +47,7 @@ Problem Recording Options
     recording_options
 
 .. note::
-    Note that the 'excludes' option takes precedence over the 'includes' option.
+    Note that the :code:`excludes` option takes precedence over the :code:`includes` option.
 
 Problem Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -69,7 +70,7 @@ System Recording Options
     recording_options
 
 .. note::
-    Note that the 'excludes' option takes precedence over the 'includes' option.
+    Note that the :code:`excludes` option takes precedence over the :code:`includes` option.
 
 System Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -85,7 +86,7 @@ Solver Recording Options
     recording_options
 
 .. note::
-    Note that the 'excludes' option takes precedence over the 'includes' option.
+    Note that the :code:`excludes` option takes precedence over the :code:`includes` option.
 
 Solver Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -111,7 +112,7 @@ differentiate the cases.  This prefix can be specified when calling :code:`run_m
 
 .. note::
     In this example, we have disabled the saving of data needed by the standalone :math:`N^2` 
-    visualizer and debugging tool.
+    visualizer and debugging tool by setting :code:`record_viewer_data` to :code:`False`.
 
 
 Recording Options Precedence

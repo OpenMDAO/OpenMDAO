@@ -11,6 +11,7 @@ from six.moves import range
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy import __version__ as scipy_version
 
 import openmdao
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -19,13 +20,18 @@ import openmdao.utils.coloring as coloring_mod
 
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP']
+               'TNC', 'COBYLA', 'SLSQP', 'trust-constr']
+if scipy_version == '1.1.0':
+    _optimizers.append('trust-constr')
+
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
-                        'SLSQP', 'dogleg', 'trust-ncg']
+                        'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
+_hessian_optimizers = ['trust-constr', 'trust-ncg']
+# TODO, add 'trust-constr' to bounds optimizers, when SciPy issue #9043 is resolved
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
-_constraint_optimizers = ['COBYLA', 'SLSQP']
+_constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
 _constraint_grad_optimizers = ['SLSQP']
-_eq_constraint_optimizers = ['SLSQP']
+_eq_constraint_optimizers = ['SLSQP', 'trust-constr']
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
@@ -105,7 +111,6 @@ class ScipyOptimizeDriver(Driver):
         self.opt_settings = OrderedDict()
 
         self.result = None
-        self.fail = 0
         self._grad_cache = None
         self._con_cache = None
         self._con_idx = {}
@@ -165,6 +170,11 @@ class ScipyOptimizeDriver(Driver):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
 
+        # Raises error if multiple objectives are not supported, but more objectives were defined.
+        if not self.supports['multiple_objectives'] and len(self._objs) > 1:
+            msg = '{} currently does not support multiple objectives.'
+            raise RuntimeError(msg.format(self.__class__.__name__))
+
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
@@ -200,7 +210,9 @@ class ScipyOptimizeDriver(Driver):
         self._total_jac = None
 
         # Initial Run
-        model._solve_nonlinear()
+        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
+            model._solve_nonlinear()
+            self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
@@ -259,6 +271,7 @@ class ScipyOptimizeDriver(Driver):
                 size = meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
+                equals = meta['equals']
                 if 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
@@ -268,36 +281,63 @@ class ScipyOptimizeDriver(Driver):
                     self._con_idx[name] = i
                     i += size
 
-                # Loop over every index separately, because scipy calls each constraint by index.
-                for j in range(0, size):
-                    con_dict = {}
-                    if meta['equals'] is not None:
-                        con_dict['type'] = 'eq'
+                # In scipy constraint optimizers take constraints in two separate formats
+                if opt in ['trust-constr']:  # Type of constraints is list of NonlinearConstraint
+                    try:
+                        from scipy.optimize import NonlinearConstraint
+                    except ImportError:
+                        msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and'
+                               'above. The installed version is {}')
+                        raise ImportError(msg.format(scipy_version))
+
+                    if equals is not None:
+                        lb = ub = equals
                     else:
-                        con_dict['type'] = 'ineq'
-                    con_dict['fun'] = self._confunc
-                    if opt in _constraint_grad_optimizers:
-                        con_dict['jac'] = self._congradfunc
-                    con_dict['args'] = [name, False, j]
-                    constraints.append(con_dict)
-
-                    if isinstance(upper, np.ndarray):
-                        upper = upper[j]
-
-                    if isinstance(lower, np.ndarray):
-                        lower = lower[j]
-
-                    dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
-
-                    # Add extra constraint if double-sided
-                    if dblcon:
-                        dcon_dict = {}
-                        dcon_dict['type'] = 'ineq'
-                        dcon_dict['fun'] = self._confunc
+                        lb = lower
+                        ub = upper
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
+                    for j in range(0, size):
+                        # Double-sided constraints are accepted by the algorithm
+                        args = [name, False, j]
+                        # TODO linear constraint if meta['linear']
+                        # TODO add option for Hessian
+                        con = NonlinearConstraint(fun=signature_extender(self._con_val_func, args),
+                                                  lb=lb, ub=ub,
+                                                  jac=signature_extender(self._congradfunc, args))
+                        constraints.append(con)
+                else:  # Type of constraints is list of dict
+                    # Loop over every index separately,
+                    # because scipy calls each constraint by index.
+                    for j in range(0, size):
+                        con_dict = {}
+                        if meta['equals'] is not None:
+                            con_dict['type'] = 'eq'
+                        else:
+                            con_dict['type'] = 'ineq'
+                        con_dict['fun'] = self._confunc
                         if opt in _constraint_grad_optimizers:
-                            dcon_dict['jac'] = self._congradfunc
-                        dcon_dict['args'] = [name, True, j]
-                        constraints.append(dcon_dict)
+                            con_dict['jac'] = self._congradfunc
+                        con_dict['args'] = [name, False, j]
+                        constraints.append(con_dict)
+
+                        if isinstance(upper, np.ndarray):
+                            upper = upper[j]
+
+                        if isinstance(lower, np.ndarray):
+                            lower = lower[j]
+
+                        dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
+
+                        # Add extra constraint if double-sided
+                        if dblcon:
+                            dcon_dict = {}
+                            dcon_dict['type'] = 'ineq'
+                            dcon_dict['fun'] = self._confunc
+                            if opt in _constraint_grad_optimizers:
+                                dcon_dict['jac'] = self._congradfunc
+                            dcon_dict['args'] = [name, True, j]
+                            constraints.append(dcon_dict)
 
             # precalculate gradients of linear constraints
             if lincons:
@@ -312,6 +352,12 @@ class ScipyOptimizeDriver(Driver):
         else:
             jac = None
 
+        if opt in _hessian_optimizers:
+            from scipy.optimize import BFGS  # FIXME temporary, should be option. (P.O.)
+            hess = BFGS()
+        else:
+            hess = None
+
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_sparsity and self.options['dynamic_simul_derivs']:
             coloring_mod.dynamic_simul_coloring(self, run_model=False, do_sparsity=False)
@@ -322,7 +368,7 @@ class ScipyOptimizeDriver(Driver):
                               # args=(),
                               method=opt,
                               jac=jac,
-                              # hess=None,
+                              hess=hess,
                               # hessp=None,
                               bounds=bounds,
                               constraints=constraints,
@@ -342,15 +388,21 @@ class ScipyOptimizeDriver(Driver):
             self._reraise()
 
         self.result = result
-        self.fail = False if self.result.success else True
 
-        if self.fail:
-            print('Optimization FAILED.')
+        if hasattr(result, 'success'):
+            self.fail = False if result.success else True
+            if self.fail:
+                print('Optimization FAILED.')
+                print(result.message)
+                print('-' * 35)
+
+            elif self.options['disp']:
+                print('Optimization Complete')
+                print('-' * 35)
+        else:
+            self.fail = True  # It is not known, so the worst option is assumed
+            print('Optimization Complete (success not known)')
             print(result.message)
-            print('-' * 35)
-
-        elif self.options['disp']:
-            print('Optimization Complete')
             print('-' * 35)
 
         return self.fail
@@ -403,6 +455,9 @@ class ScipyOptimizeDriver(Driver):
 
         return f_new
 
+    def _con_val_func(self, x_new, name, dbl, idx):
+        return self._con_cache[name][idx]
+
     def _confunc(self, x_new, name, dbl, idx):
         """
         Return the value of the constraint function requested in args.
@@ -437,7 +492,7 @@ class ScipyOptimizeDriver(Driver):
         if equals is not None:
             if isinstance(equals, np.ndarray):
                 equals = equals[idx]
-            return (cons[name][idx] - equals)
+            return cons[name][idx] - equals
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
@@ -545,6 +600,35 @@ class ScipyOptimizeDriver(Driver):
         exc = self._exc_info
         self._exc_info = None
         reraise(*exc)
+
+
+def signature_extender(fcn, extra_args):
+    """
+    Closure function, which appends extra arguments to the original function call.
+
+    The first argument is the design vector. The possible extra arguments from the callback
+    of :func:`scipy.optimize.minimize` are not passed to the function.
+
+    Some algorithms take a sequence of :class:`~scipy.optimize.NonlinearConstraint` as input
+    for the constraints. For this class it is not possible to pass additional arguments.
+    With this function the signature will be correct for both scipy and the driver.
+
+    Parameters
+    ----------
+    fcn : callable
+        Function, which takes the design vector as the first argument.
+    extra_args : tuple or list
+        Extra arguments for the function
+
+    Returns
+    -------
+    callable
+        The function with the signature expected by the driver.
+    """
+    def closure(x, *args):
+        return fcn(x, *extra_args)
+
+    return closure
 
 
 class ScipyOptimizer(ScipyOptimizeDriver):

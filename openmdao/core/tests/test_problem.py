@@ -295,6 +295,48 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
 
+    def test_compute_totals_no_args_no_desvar(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_objective('calc.y')
+
+        p.setup()
+        p.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Driver is not providing any design variables for compute_totals.")
+
+    def test_compute_totals_no_args_no_response(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_design_var('des_vars.x')
+
+        p.setup()
+        p.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Driver is not providing any response variables for compute_totals.")
+
     def test_compute_totals_no_args(self):
         p = Problem()
 

@@ -159,7 +159,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 1)
         self._input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 0)
 
-        # create helper objects for accessing cases from the four iteration tables and
+        # create helper objects for accessing cases from the three iteration tables and
         # the problem cases table
         voi_meta = self.problem_metadata['variables']
         self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,

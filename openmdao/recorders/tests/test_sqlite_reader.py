@@ -194,15 +194,16 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(driver_cases, [
             'rank0:SLSQP|0', 'rank0:SLSQP|1', 'rank0:SLSQP|2',
-            'rank0:SLSQP|3', 'rank0:SLSQP|4', 'rank0:SLSQP|5'
+            'rank0:SLSQP|3', 'rank0:SLSQP|4', 'rank0:SLSQP|5',
+            'rank0:SLSQP|6'
         ])
 
         # Test to see if the access by case keys works:
-        seventh_slsqp_iteration_case = cr.get_case('rank0:SLSQP|5')
+        seventh_slsqp_iteration_case = cr.get_case('rank0:SLSQP|6')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
                                        [1.97846296, -2.21388305e-13], decimal=2)
 
-        deriv_case = cr.get_case('rank0:SLSQP|3')
+        deriv_case = cr.get_case('rank0:SLSQP|4')
         np.testing.assert_almost_equal(deriv_case.jacobian['obj', 'pz.z'],
                                        [[3.8178954, 1.73971323]], decimal=2)
 
@@ -563,7 +564,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        parent_coord = 'rank0:SLSQP|1|root._solve_nonlinear|2'
+        parent_coord = 'rank0:SLSQP|2|root._solve_nonlinear|2'
         coord = parent_coord + '|NLRunOnce|0'
 
         # user scenario: given a case (with coord), get all cases with same parent
@@ -594,9 +595,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -807,8 +806,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
-        # prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=True)
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
         prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.add_recorder(self.recorder)
         prob.setup()
@@ -1753,13 +1751,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         system_cases = cr.list_cases('root.pz', recurse=False)
         expected_cases = [
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
-            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
-            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
-            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
-            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
-            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
+            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
+            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
+            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
+            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -1784,13 +1782,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
         expected_cases = [
-            'rank0:root._solve_nonlinear|0|NLRunOnce|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0',
-            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0',
-            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0',
-            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0'
+            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
         for i, coord in enumerate(root_solver_cases):
@@ -1858,7 +1856,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             'rank0:SLSQP|2',
             'rank0:SLSQP|3',
             'rank0:SLSQP|4',
-            'rank0:SLSQP|5'
+            'rank0:SLSQP|5',
+            'rank0:SLSQP|6'
         ]
         # check that there are multiple iterations and they have the expected coordinates
         self.assertTrue(len(driver_cases), len(expected_cases))
@@ -1979,9 +1978,25 @@ class TestSqliteCaseReader(unittest.TestCase):
 
 class TestFeatureSqliteReader(unittest.TestCase):
 
+    def setUp(self):
+        self.orig_dir = os.getcwd()
+        self.temp_dir = mkdtemp()
+        os.chdir(self.temp_dir)
+
+    def tearDown(self):
+        os.chdir(self.orig_dir)
+        try:
+            rmtree(self.temp_dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
     def test_feature_list_cases(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
 
         prob = Problem(model=SellarMDA())
 
@@ -1993,7 +2008,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        driver = prob.driver = ScipyOptimizeDriver(tol=1e-9)
+        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+
         driver.add_recorder(SqliteRecorder('cases.sql'))
 
         prob.setup()
@@ -2006,7 +2022,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         case_ids = cr.list_cases()
 
         self.assertEqual(len(case_ids), driver.iter_count)
-        self.assertEqual(case_ids, case_ids)
+        self.assertEqual(case_ids, ['rank0:SLSQP|%d' % i for i in range(driver.iter_count)])
+        self.assertEqual('', '')
 
         for case_id in case_ids:
             case = cr.get_case(case_id)
@@ -2015,6 +2032,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
     def test_feature_get_cases(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
 
         prob = Problem(model=SellarMDA())
 
@@ -2026,7 +2045,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        driver = prob.driver = ScipyOptimizeDriver(tol=1e-9)
+        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
         driver.add_recorder(SqliteRecorder('cases.sql'))
 
         prob.setup()
@@ -2047,6 +2066,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
+        import numpy as np
+
+        # define Sellar MDA problem
         prob = Problem(model=SellarMDA())
 
         model = prob.model
@@ -2057,7 +2079,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         # add recorder to the driver, model and solver
         recorder = SqliteRecorder('cases.sql')
@@ -2066,14 +2088,15 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_recorder(recorder)
         model.nonlinear_solver.add_recorder(recorder)
 
+        # run the problem
         prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
         prob.cleanup()
 
+        # get the last driver case
         cr = CaseReader('cases.sql')
 
-        # get the last driver case
         driver_cases = cr.list_cases('driver')
         last_driver_case = driver_cases[-1]
 
@@ -2088,9 +2111,60 @@ class TestFeatureSqliteReader(unittest.TestCase):
                 for grandchild in cases[case][child_case]:
                     self.assertEqual(grandchild, grandchild)
 
+    def test_feature_list_sources(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
+
+        # define Sellar MDA problem
+        prob = Problem(model=SellarMDA())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        # add recorder to the driver, model and solver
+        recorder = SqliteRecorder('cases.sql')
+
+        prob.driver.add_recorder(recorder)
+        model.add_recorder(recorder)
+        model.nonlinear_solver.add_recorder(recorder)
+
+        # run the problem
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+        prob.cleanup()
+
+        # examine cases to see what was recorded
+        cr = CaseReader('cases.sql')
+
+        self.assertEqual(sorted(cr.list_sources()), ['driver', 'root', 'root.nonlinear_solver'])
+
+        driver_vars = cr.list_source_vars('driver')
+        self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
+                         ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
+
+        model_vars = cr.list_source_vars('root')
+        self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
+                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
+
+        solver_vars = cr.list_source_vars('root')
+        self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
+                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
+
     def test_feature_reading_derivatives(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        import numpy as np
 
         prob = Problem(model=SellarMDA())
 
@@ -2102,7 +2176,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        driver = prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
+        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         driver.recording_options['record_derivatives'] = True
 
         driver.add_recorder(SqliteRecorder('cases.sql'))
@@ -2114,8 +2188,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         cr = CaseReader('cases.sql')
 
-        # Get derivatives associated with the first iteration.
-        derivs = cr.get_case('rank0:SLSQP|1').jacobian
+        # Get derivatives associated with the last iteration.
+        derivs = cr.get_case(-1).jacobian
 
         # check that derivatives have been recorded.
         self.assertEqual(set(derivs.keys()), set([
@@ -2139,10 +2213,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -2217,6 +2288,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
+        import numpy as np
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -2227,14 +2300,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
-        prob.driver = ScipyOptimizeDriver()
-        driver = prob.driver
-        driver.options['optimizer'] = 'SLSQP'
-        driver.options['tol'] = 1e-9
-        driver.options['disp'] = False
+        driver = prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
-        recorder = SqliteRecorder("cases.sql")
-        driver.add_recorder(recorder)
+        driver.add_recorder(SqliteRecorder("cases.sql"))
 
         driver.recording_options['includes'] = []
         driver.recording_options['record_objectives'] = True
@@ -2268,43 +2336,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
-
-    def test_feature_list_inputs_outputs(self):
-        prob = SellarProblem()
-
-        recorder = SqliteRecorder("cases.sql")
-
-        prob.model.add_recorder(recorder)
-        prob.model.recording_options['record_residuals'] = True
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader("cases.sql")
-
-        case = cr.get_case(-1)  # last case
-
-        case.list_inputs(values=True, hierarchical=True)
-        case.list_outputs(values=True, hierarchical=True)
-
-    def test_feature_preload(self):
-        prob = SellarProblem()
-
-        prob.driver = ScipyOptimizeDriver(tol=1e-9, disp=False)
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
-
-        prob.setup()
-
-        prob['x'] = 0.
-
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = CaseReader("cases.sql", pre_load=True)
-
-        for case in cr.get_cases():
-            print(case.get_design_vars())
 
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):
@@ -2448,6 +2479,132 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             # If directory already deleted, keep going
             if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
                 raise e
+
+    def test_database_v4(self):
+        # the change between v4 and v5 was the addition of the 'source' information
+        # this tests the proper determination of the case source without that data
+        #
+        # the legacy database was created with the same setup as the above test named
+        # "test_reading_all_case_types" so this is a slimmed down version of that test
+        #
+        # NOTE: ScipyOptimizeDriver did not record its initial run under its own
+        #       recording context prior to V5, so the initial case does not reflect
+        #       the driver as the source
+
+        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
+        filename = os.path.join(filename, 'case_database_v4.sql')
+
+        cr = CaseReader(filename)
+
+        #
+        # check sources
+        #
+
+        self.assertEqual(sorted(cr.list_sources()), [
+            'driver', 'problem', 'root.mda.nonlinear_solver', 'root.nonlinear_solver', 'root.pz'
+        ])
+
+        driver_vars = cr.list_source_vars('driver')
+        self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
+                         ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
+
+        model_vars = cr.list_source_vars('root.pz')
+        self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
+                         ('inputs:', [], 'outputs:', ['z']))
+
+        solver_vars = cr.list_source_vars('root.mda.nonlinear_solver')
+        self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
+                         ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['y1', 'y2']))
+
+        #
+        # check system cases
+        #
+
+        system_cases = cr.list_cases('root.pz', recurse=False)
+        expected_cases = [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
+            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
+            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
+            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
+            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
+            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6',
+        ]
+        self.assertEqual(len(system_cases), len(expected_cases))
+        for i, coord in enumerate(system_cases):
+            self.assertEqual(coord, expected_cases[i])
+
+        #
+        # check solver cases
+        #
+
+        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
+        expected_cases = [
+            'rank0:root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:SLSQP|1|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:SLSQP|2|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:SLSQP|3|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:SLSQP|4|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:SLSQP|5|root._solve_nonlinear|6|NLRunOnce|0'
+        ]
+        self.assertEqual(len(root_solver_cases), len(expected_cases))
+        for i, coord in enumerate(root_solver_cases):
+            self.assertEqual(coord, expected_cases[i])
+
+        case = cr.get_case(root_solver_cases[-1])
+
+        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_outputs = ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']
+
+        self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
+        self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
+        self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        #
+        # check mda solver cases
+        #
+
+        # check that there are multiple iterations and mda solver is part of the coordinate
+        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver', recurse=False)
+        self.assertTrue(len(mda_solver_cases) > 1)
+        for coord in mda_solver_cases:
+            self.assertTrue('mda._solve_nonlinear' in coord)
+
+        case = cr.get_case(mda_solver_cases[-1])
+
+        expected_inputs = ['x', 'y1', 'y2', 'z']
+        expected_outputs = ['y1', 'y2']
+
+        self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
+        self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
+        self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
+        np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
+
+        # check that the recurse option returns root and mda solver cases plus child system cases
+        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
+        self.assertEqual(len(all_solver_cases),
+                         len(root_solver_cases) + len(mda_solver_cases) + len(system_cases))
+
+        #
+        # check driver cases
+        #
+
+        driver_cases = cr.list_cases('driver', recurse=False)
+        expected_cases = [
+            'rank0:SLSQP|0',
+            'rank0:SLSQP|1',
+            'rank0:SLSQP|2',
+            'rank0:SLSQP|3',
+            'rank0:SLSQP|4',
+            'rank0:SLSQP|5',
+        ]
+        # check that there are multiple iterations and they have the expected coordinates
+        self.assertTrue(len(driver_cases), len(expected_cases))
+        for i, coord in enumerate(driver_cases):
+            self.assertEqual(coord, expected_cases[i])
 
     def test_driver_v3(self):
         """

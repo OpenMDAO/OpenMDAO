@@ -132,14 +132,22 @@ class _TotalJacInfo(object):
 
         # Convert of and wrt names from promoted to absolute
         if wrt is None:
-            wrt = prom_wrt = driver_wrt
+            if driver_wrt:
+                wrt = prom_wrt = driver_wrt
+            else:
+                raise RuntimeError("Driver is not providing any design variables "
+                                   "for compute_totals.")
         else:
             prom_wrt = wrt
             if not global_names:
                 wrt = [prom2abs[name][0] for name in prom_wrt]
 
         if of is None:
-            of = prom_of = driver_of
+            if driver_of:
+                of = prom_of = driver_of
+            else:
+                raise RuntimeError("Driver is not providing any response variables "
+                                   "for compute_totals.")
         else:
             prom_of = of
             if not global_names:

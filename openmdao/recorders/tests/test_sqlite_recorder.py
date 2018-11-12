@@ -185,7 +185,7 @@ class TestSqliteRecorder(unittest.TestCase):
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
-        coordinate = [0, 'SLSQP', (3, )]
+        coordinate = [0, 'SLSQP', (4, )]
 
         expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
         expected_objectives = {"comp.f_xy": [-27.0833]}
@@ -309,7 +309,7 @@ class TestSqliteRecorder(unittest.TestCase):
         run2_t0, run2_t1 = run_driver(prob, case_prefix='Run2')
         prob.cleanup()
 
-        run1_coord = [0, 'SLSQP', (3, )]  # 1st run, 4 iterations
+        run1_coord = [0, 'SLSQP', (4, )]  # 1st run, 5 iterations
         run2_coord = [0, 'SLSQP', (0, )]  # 2nd run, 1 iteration
 
         expected_desvars = {"p1.x": [7.16706813], "p2.y": [-7.83293187]}
@@ -737,7 +737,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         coordinate = [
             0,
-            'SLSQP', (0, ),
+            'SLSQP', (1, ),
             'root._solve_nonlinear', (1, ),
             'NLRunOnce', (0, ),
             'mda._solve_nonlinear', (1, ),
@@ -761,7 +761,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # check data for 'pz'
         #
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1156,7 +1156,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Driver recording test
         #
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
             "pz.z": prob['pz.z'],
@@ -1180,7 +1180,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # System recording test
         #
-        coordinate = [0, 'SLSQP', (1, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (2, ), 'root._solve_nonlinear', (2, ), 'NLRunOnce', (0, ),
                       'pz._solve_nonlinear', (2, )]
 
         expected_inputs = None
@@ -1195,7 +1195,7 @@ class TestSqliteRecorder(unittest.TestCase):
         #
         # Solver recording test
         #
-        coordinate = [0, 'SLSQP', (5, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
+        coordinate = [0, 'SLSQP', (6, ), 'root._solve_nonlinear', (6, ), 'NLRunOnce', (0, ),
                       'mda._solve_nonlinear', (6, ), 'NonlinearBlockGS', (4, )]
 
         expected_abs_error = 0.0,
@@ -1448,7 +1448,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         # Driver recording test
-        coordinate = [0, 'SLSQP', (5, )]
+        coordinate = [0, 'SLSQP', (6, )]
 
         expected_desvars = {
             "pz.z": prob['pz.z'],
@@ -1708,7 +1708,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
         cr = CaseReader(case_recorder_filename)
-        case = cr.get_case('rank0:SLSQP|3')
+        case = cr.get_case('rank0:SLSQP|4')
 
         assert_rel_error(self, case.outputs['x'], 7.16666667, 1e-6)
         assert_rel_error(self, case.outputs['y'], -7.83333333, 1e-6)
@@ -1813,11 +1813,13 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # metadata for all the systems in the model
-        self.assertEqual(sorted(cr.system_metadata.keys()),
+        metadata = cr.system_metadata
+
+        self.assertEqual(sorted(metadata.keys()),
                          sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
         # options for system 'd1', with second option excluded
-        self.assertEqual(str(cr.system_metadata['d1']['component_options']),
+        self.assertEqual(str(metadata['d1']['component_options']),
             "================== ======= ================= ================ ======================================\n"
             "Option             Default Acceptable Values Acceptable Types Description                           \n"
             "================== ======= ================= ================ ======================================\n"
@@ -1830,7 +1832,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             "options value 1    1       N/A               N/A                                                    \n"
             "================== ======= ================= ================ ======================================")
 
-        self.assertEqual(cr.system_metadata['d1']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(metadata['d1']['component_options']['assembled_jac_type'], 'csc')
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
@@ -1862,6 +1864,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
     def test_feature_driver_options(self):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        import numpy as np
 
         prob = Problem(model=SellarDerivatives())
 
@@ -1996,6 +2000,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
+        import numpy as np
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -2107,6 +2113,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         from openmdao.api import Problem, SqliteRecorder, ScipyOptimizeDriver, CaseReader
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
+        import numpy as np
+
         prob = Problem(model=SellarDerivatives())
 
         model = prob.model
@@ -2175,6 +2183,8 @@ class TestFeatureBasicRecording(unittest.TestCase):
         from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
+        import numpy as np
+
         # create our Sellar problem
         prob = Problem(model=SellarMDA())
 
@@ -2217,7 +2227,7 @@ class TestFeatureBasicRecording(unittest.TestCase):
         # get a list of cases that were recorded by the driver
         driver_cases = cr.list_cases('driver')
 
-        self.assertEqual(len(driver_cases), 10)
+        self.assertEqual(len(driver_cases), 11)
 
         # get the first driver case and inspect the variables of interest
         case = cr.get_case(driver_cases[0])
