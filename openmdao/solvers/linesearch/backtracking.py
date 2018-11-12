@@ -193,6 +193,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
         u = system._outputs
         du = system._vectors['output']['linear']
+        self.alpha = 1.
 
         self._run_apply()
         norm0 = self._iter_get_norm()
@@ -200,6 +201,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             norm0 = 1.0
 
         u.add_scal_vec(self.alpha, du)
+        # self.alpha /= self.options['rho']
 
         if self.options['print_bound_enforce']:
             _print_violations(u, system._lower_bounds, system._upper_bounds)
@@ -263,11 +265,16 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         """
         self._analysis_error_raised = False
         system = self._system
-        u = system._outputs
-        du = system._vectors['output']['linear']
+        # u = system._outputs
+        # du = system._vectors['output']['linear']
+
+        # u.add_scal_vec(-self.alpha, du)
+        # self.alpha *= self.options['rho']
+        # u.add_scal_vec(self.alpha, du)
 
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
+        # if False:
 
             self._solver_info.append_solver()
 
@@ -295,9 +302,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             finally:
                 self._solver_info.pop()
 
-        u.add_scal_vec(-self.alpha, du)
-        self.alpha *= self.options['rho']
-        u.add_scal_vec(self.alpha, du)
+        else:
+            system._apply_nonlinear()
+
 
     def _run_iterator(self):
         """
@@ -317,26 +324,43 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         rtol = self.options['rtol']
         c = self.options['c']
 
+        system = self._system
+        u = system._outputs
+        du = system._vectors['output']['linear']
+
+
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
         self._norm0 = norm0
-        self._mpi_print(self._iter_count, norm, norm / norm0)
+        # self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        # u.add_scal_vec(self.alpha, du)
+        # self._iter_execute()
+        # self._mpi_print(self._iter_count, norm, self.alpha)
 
         # Further backtracking if needed.
         # The Armijo-Goldstein is basically a slope comparison --actual vs predicted.
         # We don't have an actual gradient, but we have the Newton vector that should
         # take us to zero, and our "runs" are the same, and we can just compare the
         # "rise".
-        while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or
-                                              self._analysis_error_raised):
+        # while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or
+        #                                       self._analysis_error_raised):
+        while self._iter_count < maxiter and ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised):
+            # print('foobar', norm, norm0)
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
-                self._iter_execute()
-                self._iter_count += 1
-                try:
 
+                u.add_scal_vec(-self.alpha, du)
+                if self._iter_count > 0:
+                    self.alpha *= self.options['rho']
+                u.add_scal_vec(self.alpha, du)
+
+
+                try:
+                    self._iter_execute()
+                    self._iter_count += 1
                     cache = self._solver_info.save_cache()
 
-                    self._run_apply()
+                    # self._run_apply()
                     norm = self._iter_get_norm()
 
                     # With solvers, we want to report the norm AFTER
@@ -357,8 +381,10 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         exc = sys.exc_info()
                         reraise(*exc)
 
-            self._mpi_print(self._iter_count, norm, norm / norm0)
-
+            # print('foo', norm , norm0, norm0 - c * self.alpha * norm0)
+            # self._mpi_print(self._iter_count, norm, norm / norm0)
+            self._mpi_print(self._iter_count, norm, self.alpha)
+            # print(3*'\n')
         fail = (np.isinf(norm) or np.isnan(norm) or
                 (norm > atol and norm / norm0 > rtol))
 
