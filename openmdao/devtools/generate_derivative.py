@@ -5,6 +5,9 @@ import os
 import traceback
 import tangent
 from tangent.utils import register_init_grad
+import textwrap
+import pprint
+
 
 from inspect import signature, getsourcelines, getsource, getmodule
 from collections import OrderedDict, defaultdict
@@ -77,144 +80,6 @@ def zero_vector(vec):
 register_init_grad(DefaultVector, zero_vector)
 
 
-def generate_gradient(comp, mode, body_src, to_replace, pnames, onames, rnames):
-    """
-    Given the string representing the source code of a python function,
-    use the tangent library to generate source code of its gradient.
-
-    Parameters
-    ----------
-    comp: Component
-        The component we're AD'ing.
-    mode : str
-        Derivative direction ('fwd' or 'rev')
-    body_src : str
-        The source code of the body of the compute/apply_nonlinear function, converted
-        into non-member form.
-
-    Returns
-    -------
-    function
-        The generated derivative function.
-    str
-        The source of the function actually being AD'd.
-    """
-    lines = ["%s = self._inputs['%s']\n" % (str2valid_python_name(n), n) for n in comp._inputs]
-    lines.extend(["%s = self._outputs['%s']\n" %
-                  (str2valid_python_name(n), n) for n in comp._outputs])
-    lines.extend(["resid__%s = self._vectors['residual']['nonlinear']['%s']\n" %
-                  (str2valid_python_name(n), n) for n in comp._vectors['residual']['nonlinear']])
-    lines.extend(["_opt__%s = self.options['%s']\n" %
-                  (str2valid_python_name(n), n) for n in comp.options])
-
-    lines.append('\nif True:\n')  # body src is indented, so put in conditional block
-
-    lines.append(body_src)
-
-    full_src = ''.join(lines)
-
-    comp_mod = sys.modules[comp.__class__.__module__]
-    namespace = comp_mod.__dict__.copy()
-    namespace['self'] = comp
-
-    # exec function body in namespace to define all of the variables
-    exec(full_src, namespace)
-
-    # to avoid having to unindent all of the body_src, just put it in an 'if True' block to keep ast happy
-    if_body_src = 'if True:\n' + body_src
-    fdviz, f_ast = dependency_analysis(if_body_src)
-
-    fmap = {}
-    modules = set()
-
-    # this allows us to substitute defined non-member functions with tangent adjoints/tangents
-    # for member functions
-    for s in fdviz.calls:
-        if s.startswith('np.') or s.startswith('numpy.') or s in __builtins__:
-            continue
-        parts = s.split('.')
-        obj = namespace[parts[0]]
-        for p in parts[1:]:
-            obj = getattr(obj, p)
-
-        if type(obj) is types.MethodType:
-            klass = obj.__self__.__class__
-            # look for AD mappings in method's module
-            mod = sys.modules[klass.__module__]
-            name = klass.__name__
-        elif type(obj) is types.FunctionType:
-            mod = sys.modules[obj.__module__]
-            name = obj.__name__
-        else:
-            mod = None
-
-        if mod is not None and hasattr(mod, '_tangent_ad_mapping'):
-            mapping = getattr(mod, '_tangent_ad_mapping', None)
-            if mapping is not None and name in mapping:
-                tan_func = mapping[name]
-                if isinstance(tan_func, dict):
-                    tan_func = tan_func[parts[-1]]
-                fmap[s] = '.'.join([tan_func.__module__, tan_func.__name__])
-                modules.add(tan_func.__module__)
-
-    funcname = 'compute_ad'
-
-    # generate string of function to be differentiated by the tangent library
-    func_source = '\n'.join([
-        "def %s(%s):" % (funcname, ', '.join(pnames)),
-        body_src,
-        "    return %s" % ', '.join(onames + rnames)
-        ])
-
-    lines = ['import %s' % modname for modname in modules]
-    lines.append(func_source)
-
-    new_src = '\n'.join(lines)
-
-    if fmap:
-        ast2 = ast.parse(new_src)
-        new_ast = transform_ast_names(ast2, fmap)
-        new_src = astunparse.unparse(new_ast)
-
-    # needs to have an associated source file for tangent's use of inspect functions to work
-
-    sys.path.append(os.getcwd())
-    temp_mod_name = '_temp_' + mode + '_' + comp.pathname.replace('.', '_')
-    temp_file_name = temp_mod_name + '.py'
-
-    with open(temp_file_name, "w") as f:
-        f.write(new_src)
-
-    invalidate_caches()  # need this to recognize dynamically created modules
-    import_module(temp_mod_name)
-    mod = sys.modules[temp_mod_name]
-    sys.path = sys.path[:-1]
-
-    # populate module with globals from component's module
-    comp_mod = sys.modules[comp.__class__.__module__]
-    new_glob = set(comp_mod.__dict__) - set(mod.__dict__)
-    for name in new_glob:
-        setattr(mod, name, getattr(comp_mod, name))
-
-    mod.self = comp
-
-    # now set other comp values in globals that we've replaced with non-member variables
-    for rhs, name in to_replace.items():
-        setattr(mod, name, eval(rhs, mod.__dict__))
-
-    func = getattr(mod, funcname)
-    sig = signature(func)
-    params = sig.parameters
-
-    print("Starting source:")
-    print(getsource(func))
-    # generate AD code for the method for all inputs
-    df = tangent.autodiff(func, wrt=tuple(range(len(params))), mode=modemap[mode],
-                          verbose=0, check_dims=False)
-
-    return df, func_source, mod
-
-
 def _get_arg_replacement_map(comp):
     """
     Return a mapping of names or subscript expressions to be replaced with simple var names.
@@ -273,8 +138,8 @@ def translate_compute_source_tangent(comp):
     """
     Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
-    Converts  def compute(self, inputs, outputs) to def kompute(self, a, b, c)
-    and translated function returns all output values as a tuple.
+    Converts  def compute(self, inputs, outputs) by adding an appropriate return line and
+    converting literal slices to slice() calls.
 
     Parameters
     ----------
@@ -285,47 +150,27 @@ def translate_compute_source_tangent(comp):
     -------
     str
         Converted source code.
-    list of str
-        Input names.
-    list of str
-        Output names.
-    list of str
-        Residual names.
-    dict
-        Translation map for self.options if revert is True, else empty dict.
     """
     if isinstance(comp, ExplicitComponent):
         compute_method = comp.compute
     else:
         compute_method = comp.apply_nonlinear
 
-    # mapping to rename variables within the compute method
-    to_replace, pnames, onames, rnames = _get_arg_replacement_map(comp)
+    params = list(signature(compute_method).parameters)
+    lines = getsourcelines(compute_method)[0]
 
-    to_revert = {"self.options['%s']" % name: '_opt__%s' % name for name in comp.options}
+    # add appropriate return line (return either outputs or residuals depending on compute_method)
+    lines.append("        return %s" % params[-1])
 
-    # get source code of original compute() method
-    # ignore blank lines, useful for detecting indentation later
-    srclines = [line for line in getsourcelines(compute_method)[0] if line.strip()]
+    src = textwrap.dedent('\n'.join(lines))
 
-    # get rid of function indent.  astunparse will automatically indent the func body to 4 spaces
-    srclines[0] = srclines[0].lstrip()
-    src = ''.join(srclines)
-    ast2 = ast.parse(src)
+    temp_mod_name = '_temp_' + comp.__class__.__name__
+    temp_file_name = temp_mod_name + '.py'
 
-    # convert any [a:b:c] to slice(a, b, c) else tangent fwd mode will barf
-    astslc = transform_ast_slices(ast2)
+    # convert any literal slices to calls to slice (else tangent fwd mode bombs)
+    src = astunparse.unparse(transform_ast_slices(ast.parse(src)))
 
-    # combine all mappings
-    mapping = to_replace.copy()
-    mapping.update(to_revert)
-    ast3 = transform_ast_names(astslc, mapping)
-    src = astunparse.unparse(ast3)
-
-    # remove the original compute() call signature
-    src = src.split(":\n", 1)[1]
-
-    return src, pnames, onames, rnames, to_revert
+    return src # , pnames, onames, rnames, to_revert
 
 
 def translate_compute_source_autograd(comp, mode):
@@ -451,75 +296,81 @@ def translate_compute_source_autograd(comp, mode):
     return src
 
 
-def revert_deriv_source(deriv_func, to_revert):
-
-    # now translate back the member vars we substituted for earlier
-    deriv_ast = ast.parse(getsource(deriv_func))
-
-    # reverse the to_revert dict
-    revert = {val: key for key, val in to_revert.items()}
-
-    deriv_ast = transform_ast_names(deriv_ast, revert)
-    deriv_src = astunparse.unparse(deriv_ast)
-    deriv_lines = deriv_src.split('\n')
-
-    # convert function signature to def _compute_derivs_ad(self, ...)
-    for i, line in enumerate(deriv_lines):
-        if line.startswith('def '):
-            deriv_lines[i] = _fix_func_def(line, '_compute_derivs_ad')
-            break
-
-    return deriv_lines
+def _get_imports(mod):
+    lines = ["from %s import *" % mod.__name__]
+    underscores = [n for n in mod.__dict__ if n.startswith('_') and not n.startswith('__')]
+    if underscores:
+        lines.append("from %s import %s" % (mod.__name__, ', '.join(underscores)))
+    lines.append('')
+    return '\n'.join(lines)
 
 
-def _get_tangent_ad_func(comp, mode):
+def _get_tangent_ad_func(comp, mode, verbose=0, check_dims=False):
 
-    src, pnames, onames, rnames, to_revert = translate_compute_source_tangent(comp)
+    # src, pnames, onames, rnames, to_revert = translate_compute_source_tangent(comp)
+    src = translate_compute_source_tangent(comp)
 
     # start construction of partial derivative functions
 
-    comp_mod = sys.modules[comp.__class__.__module__]
+    comp_mod = comp.__module__
 
-    # # gather generated gradient source code
-    # df, func_source, temp_mod = generate_gradient(comp, mode, src, to_revert,
-    #                                               pnames, onames, rnames)
+    sys.path.append(os.getcwd())
+    temp_mod_name = 'temp_' + '_'.join((comp_mod.replace('.', '_'), comp.__class__.__name__))
+    temp_file_name = temp_mod_name + '.py'
 
-    # # namespace = temp_mod.__dict__
-    # # namespace.update([(k,v) for k,v in comp_mod.__dict__.items() if not k.startswith('__')])
+    with open(temp_file_name, "w") as f:
+        f.write(_get_imports(sys.modules[comp_mod]))
+        f.write("import tangent\n")
+        f.write(src)
 
-    # deriv_src = '\n'.join(revert_deriv_source(df, to_revert))
-    # print("Deriv src:")
-    # print(deriv_src)
+    if verbose:
+        with open(temp_file_name, "r") as f:
+            print("Starting source for %s:" % comp.__class__.__name__)
+            print(f.read())
+
+    invalidate_caches()  # need this to recognize dynamically created modules
+    import_module(temp_mod_name)
+    mod = sys.modules[temp_mod_name]
 
     if isinstance(comp, ExplicitComponent):
-        func = comp.compute
+        wrt = (1,)
+        func = getattr(mod, 'compute')
     else:
-        func = comp.apply_nonlinear
+        wrt = (1,2)
+        func = getattr(mod, 'apply_nonlinear')
 
-    import textwrap
-    src = textwrap.dedent(getsource(func))
+    deriv_func = tangent.autodiff(func, wrt=wrt, mode=modemap[mode], verbose=verbose,
+                                  check_dims=check_dims)
+
+    print("DERIV MODULE:", deriv_func.__module__)
 
 
-    deriv_mod_name = temp_mod.__name__ + '_deriv'
+    del sys.modules[temp_mod_name]
+    os.remove(temp_file_name)
+
+    deriv_mod_name = temp_mod_name + '_deriv_'
+    deriv_file_name = deriv_mod_name + '.py'
 
     # write the derivative func into a module file so that tracebacks will show us the
     # correct line of source where the problem occurred, and allow us to step into the
     # function with a debugger.
-    with open(deriv_mod_name + '.py', "w") as f:
+    with open(deriv_file_name, "w") as f:
         # get all of the comp module globals
-        f.write("from %s import *\n" % comp.__class__.__module__)
+        f.write(_get_imports(sys.modules[comp_mod]))
         f.write("import tangent\n")
-        f.write(deriv_src)
+        f.write(getsource(deriv_func))
 
-    sys.path.append(os.getcwd())
+    # if verbose:
+    #     with open(deriv_file_name, "r") as f:
+    #         print("\nDeriv module source for %s:" % comp.__class__.__name__)
+    #         print(f.read(),'\n')
+
     invalidate_caches()  # need this to recognize dynamically created modules
-    mod = import_module(deriv_mod_name)
+    import_module(deriv_mod_name)
+    mod = sys.modules[deriv_mod_name]
     sys.path = sys.path[:-1]
 
-    # # create an actual function object by exec'ing the source
-    # exec(deriv_src, namespace)
-
-    return getattr(mod, '_compute_derivs_ad'), temp_mod, mod
+    return getattr(mod, deriv_func.__name__), mod
 
 
 def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
@@ -527,6 +378,8 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
     outputs = comp._outputs
     dinputs = comp._vectors['input']['linear']
     doutputs = comp._vectors['output']['linear']
+    resids = comp._vectors['residual']['nonlinear']
+    dresids = comp._vectors['residual']['linear']
 
     explicit = isinstance(comp, ExplicitComponent)
 
@@ -535,22 +388,32 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
     else:
         J = np.zeros((outputs._data.size, inputs._data.size + outputs._data.size))
 
+    to_zero = [doutputs._data, dresids._data, dinputs._data]
+
     if mode == 'fwd':
         array = dinputs._data
     else:
         array = doutputs._data
 
     for idx in range(array.size):
-        doutputs._data[:] = 0.0
-        array[:] = 0.0
+        for zvec in to_zero:
+            zvec[:] = 0.0
         array[idx] = 1.0
 
         if mode == 'fwd':
-            grad = deriv_func(comp, inputs, outputs, dinputs)
+            if explicit:
+                grad = deriv_func(comp, inputs, outputs, dinputs)
+            else:
+                grad = deriv_func(comp, inputs, outputs, resids, dinputs, doutputs)
             J[:, idx] = grad._data
-        else:
-            grad = deriv_func(comp, inputs, outputs, doutputs)
-            J[idx, :] = grad._data
+        else:  # rev
+            if explicit:
+                grad = deriv_func(comp, inputs, outputs, doutputs)
+                J[idx, :] = grad._data
+            else:
+                grad = deriv_func(comp, inputs, outputs, resids, dresids)
+                J[idx, :grad[0]._data.size] = grad[0]._data
+                J[idx, grad[0]._data.size:] = grad[1]._data
 
     colstart = colend = 0
     if explicit:
@@ -748,13 +611,204 @@ def _ad_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('file', nargs='?', help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('-m', '--method', default='autograd', action='store', dest='ad_method',
                         help='AD method (autograd, tangent).')
     parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
                         help='Specify component class(es) to run AD on.')
+
+
+def _ad_exec(options):
+    """
+    Process command line args and perform postprocessing on the specified memory dump file.
+    """
+    if options.file:
+        from openmdao.utils.om import _post_setup_exec
+        options.file = [options.file]
+        _post_setup_exec(options)
+    else:
+        _ad(None, options)
+
+
+def _get_class(classpath):
+    modpath, cname = classpath.rsplit('.', 1)
+    import_module(modpath)
+    mod = sys.modules[modpath]
+    return getattr(mod, cname)
+
+
+def _comp_iter(classes, prob):
+    """
+    """
+    if classes:
+        insts = [_get_class(cpath)() for cpath in classes]
+        for obj in insts:
+            prob.model.add_subsystem(obj.__class__.__name__.lower() + '_', obj)
+
+        prob.setup()
+        prob.run_model()
+        invec = prob.model._inputs._data
+        invec[:] = np.random.random(invec.size)
+
+        print("\nChecking partials:")
+        check_dct = prob.check_partials(out_stream=None)
+        prob.run_model()
+
+        for obj in insts:
+            print("\nClass:", obj.__class__.__name__)
+            yield obj, check_dct
+
+
+    else:  # find an instance of each Component class in the model
+        prob.run_model()
+        print("\nChecking partials:")
+        check_dct = prob.check_partials(out_stream=None)
+        prob.run_model()
+        seen = set(('IndepVarComp', 'ExecComp'))
+        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
+            cname = s.__class__.__name__
+            if cname not in seen and (cname in classes or not classes):
+                seen.add(cname)
+                print("\nClass:", cname)
+                print("Instance:", s.pathname)
+                yield s, check_dct
+
+            if classes and (len(seen) == len(classes) + 2):
+                break
+
+        not_found = classes - seen
+        if not_found:
+            raise RuntimeError("Couldn't find an instance of the following classes: %s." %
+                                not_found)
+
+
+def _ad(prob, options):
+    """
+    Compute the fwd and rev AD for the compute or apply_nonlinear method of the given class.
+    """
+    if options.outfile is None:
+        out = sys.stdout
+    else:
+        out = open(options.outfile, 'w')
+
+    classes = set(options.classes)
+
+    Problem._post_setup_func = None  # prevent infinite recursion
+
+    if prob is None:
+        prob = Problem()
+
+    summary = {}
+
+    for s, check_dct in _comp_iter(classes, prob):
+
+        summary[s.__class__.__name__] = summ = {}
+
+        rel_offset = len(s.pathname) + 1 if s.pathname else 0
+
+        type_ = 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit'
+        summ['type'] = type_
+        print("Type:", type_)
+
+        if options.ad_method == 'autograd':
+            import autograd.numpy as agnp
+            mod_wrapper.np = mod_wrapper.numpy = agnp
+
+        for mode in ('fwd', 'rev'):
+            summ[mode] = {}
+            try:
+                J = {}
+                if options.ad_method == 'autograd':
+                    func = _get_autograd_ad_func(s, mode)
+                    _get_autograd_ad_jac(s, mode, func, J)
+                elif options.ad_method == 'tangent':
+                    func, deriv_mod = _get_tangent_ad_func(s, mode, verbose=1)
+                    _get_tangent_ad_jac(s, mode, func, J)
+
+                    del sys.modules[deriv_mod.__name__]
+                    os.remove(deriv_mod.__file__)
+
+                mx_diff = 0.0
+                print("\n%s J:" % mode.upper())
+                for key in sorted(J):
+                    o, i = key
+                    rel_o = o[rel_offset:]
+                    rel_i = i[rel_offset:]
+                    if np.any(J[key]) or (rel_o, rel_i) in check_dct[s.pathname]:
+                        if (rel_o, rel_i) not in check_dct[s.pathname]:
+                            check_dct[s.pathname][rel_o, rel_i] = d = {}
+                            d['J_fwd'] = np.zeros(J[key].shape)
+                        print("(%s, %s)" % (rel_o, rel_i), end='')
+                        try:
+                            assert_almost_equal(J[key], check_dct[s.pathname][rel_o, rel_i]['J_fwd'], decimal=5)
+                        except:
+                            max_diff = np.max(np.abs(J[key] - check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
+                            if max_diff > mx_diff:
+                                mx_diff = max_diff
+                            print("  MAX DIFF:", max_diff)
+                        else:
+                            print(" ok")
+                summ[mode]['diff'] = mx_diff
+                summ[mode]['ran'] = True
+                print()
+            except:
+                traceback.print_exc(file=sys.stdout)
+                summ[mode]['ran'] = False
+                summ[mode]['diff'] = float('nan')
+                print("\n")
+            finally:
+                if options.ad_method == 'autograd':
+                    mod_wrapper.np = mod_wrapper.numpy = np
+
+    max_cname = max(len(s) for s in summary) + 2
+    max_diff = 16
+    bothgood = []
+    fwdgood = []
+    revgood = []
+    bad = []
+
+    toptemplate = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}}{rdiff:<{dwidth}}"
+    template = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}.4}{rdiff:<{dwidth}.4}"
+    print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)', rdiff='Max Diff (rev)', cwidth=max_cname, dwidth=max_diff))
+    print('--------- both derivs ok ------------')
+    for cname in sorted(summary):
+        s = summary[cname]
+        typ = s['type']
+        fwdran = s['fwd']['ran']
+        fwdmax = s['fwd']['diff']
+        revran = s['rev']['ran']
+        revmax = s['rev']['diff']
+        line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, cwidth=max_cname, dwidth=max_diff)
+        if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:
+            bothgood.append(line)
+            print(line)
+        elif fwdran and fwdmax == 0.0:
+            fwdgood.append(line)
+        elif revran and revmax == 0.0:
+            revgood.append(line)
+        else:
+            bad.append(line)
+
+    if fwdgood:
+        print('--------- fwd derivs ok ------------')
+        for b in fwdgood:
+            print(b)
+
+    if revgood:
+        print('--------- rev derivs ok ------------')
+        for b in revgood:
+            print(b)
+
+    if bad:
+        print('--------- both derivs bad ------------')
+        for b in bad:
+            print(b)
+
+    print('\nSummary:  %d both good,  %d fwd good,  %d rev good' % (len(bothgood), len(fwdgood),
+                                                                    len(revgood)))
+    exit()
 
 
 def _ad_cmd(options):
@@ -771,249 +825,5 @@ def _ad_cmd(options):
     function
         The post-setup hook function.
     """
-    if options.outfile is None:
-        out = sys.stdout
-    else:
-        out = open(options.outfile, 'w')
+    return lambda prob: _ad(prob, options)
 
-    def _ad(prob):
-        """
-        Compute the fwd and rev AD for the compute or apply_nonlinear method of the given class.
-        """
-        import pprint
-        classes = set(options.classes)
-        seen = set()
-
-        Problem._post_setup_func = None  # prevent infinite recursion
-        prob.run_model()
-        print("\nChecking partials:")
-        check_dct = prob.check_partials(out_stream=None)
-        prob.run_model()
-
-        summary = {}
-
-        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
-            cname = s.__class__.__name__
-            if cname not in seen and (cname in classes or not classes):
-                seen.add(cname)
-                if cname in ('IndepVarComp', 'ExecComp'):
-                    continue
-
-                summary[cname] = summ = {}
-
-                rel_offset = len(s.pathname) + 1 if s.pathname else 0
-
-                print("\nClass:", cname)
-                print("Instance:", s.pathname)
-                type_ = 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit'
-                summ['type'] = type_
-                print("Type:", type_)
-                if options.ad_method == 'autograd':
-                    import autograd.numpy as agnp
-                    mod_wrapper.np = mod_wrapper.numpy = agnp
-
-                for mode in ('fwd', 'rev'):
-                    summ[mode] = {}
-                    try:
-                        J = {}
-                        if options.ad_method == 'autograd':
-                            func = _get_autograd_ad_func(s, mode)
-                            _get_autograd_ad_jac(s, mode, func, J)
-                        elif options.ad_method == 'tangent':
-                            func, temp_mod, deriv_mod = _get_tangent_ad_func(s, mode)
-                            _get_tangent_ad_jac(s, mode, func, J)
-
-                            del sys.modules[temp_mod.__name__]
-                            del sys.modules[deriv_mod.__name__]
-                            os.remove(temp_mod.__file__)
-                            os.remove(deriv_mod.__file__)
-
-                        mx_diff = 0.0
-                        print("\n%s J:" % mode.upper())
-                        for key in sorted(J):
-                            o, i = key
-                            rel_o = o[rel_offset:]
-                            rel_i = i[rel_offset:]
-                            if np.any(J[key]) or (rel_o, rel_i) in check_dct[s.pathname]:
-                                if (rel_o, rel_i) not in check_dct[s.pathname]:
-                                    check_dct[s.pathname][rel_o, rel_i] = d = {}
-                                    d['J_fwd'] = np.zeros(J[key].shape)
-                                print("(%s, %s)" % (rel_o, rel_i), end='')
-                                try:
-                                    assert_almost_equal(J[key], check_dct[s.pathname][rel_o, rel_i]['J_fwd'], decimal=5)
-                                except:
-                                    max_diff = np.max(np.abs(J[key] - check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
-                                    if max_diff > mx_diff:
-                                        mx_diff = max_diff
-                                    print("  MAX DIFF:", max_diff)
-                                else:
-                                    print(" ok")
-                        summ[mode]['diff'] = mx_diff
-                        summ[mode]['ran'] = True
-                        print()
-                    except:
-                        traceback.print_exc(file=sys.stdout)
-                        summ[mode]['ran'] = False
-                        summ[mode]['diff'] = float('nan')
-                        print("\n")
-                    finally:
-                        if options.ad_method == 'autograd':
-                            mod_wrapper.np = mod_wrapper.numpy = np
-
-                if len(seen) == len(classes):
-                    break
-
-        not_found = classes - seen
-        if not_found:
-            raise RuntimeError("Couldn't find an instance of the following classes: %s." %
-                               not_found)
-
-        max_cname = max(len(s) for s in summary) + 2
-        max_diff = 16
-        fwdgood = []
-        revgood = []
-        bad = []
-
-        toptemplate = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}}{rdiff:<{dwidth}}"
-        template = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}.4}{rdiff:<{dwidth}.4}"
-        print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)', rdiff='Max Diff (rev)', cwidth=max_cname, dwidth=max_diff))
-        print('--------- both derivs ok ------------')
-        for cname in sorted(summary):
-            s = summary[cname]
-            typ = s['type']
-            fwdran = s['fwd']['ran']
-            fwdmax = s['fwd']['diff']
-            revran = s['rev']['ran']
-            revmax = s['rev']['diff']
-            line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, cwidth=max_cname, dwidth=max_diff)
-            if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:
-                print(line)
-            elif fwdran and fwdmax == 0.0:
-                fwdgood.append(line)
-            elif revran and revmax == 0.0:
-                revgood.append(line)
-            else:
-                bad.append(line)
-
-        if fwdgood:
-            print('--------- fwd derivs ok ------------')
-            for b in fwdgood:
-                print(b)
-
-        if revgood:
-            print('--------- rev derivs ok ------------')
-            for b in revgood:
-                print(b)
-
-        if bad:
-            print('--------- both derivs bad ------------')
-            for b in bad:
-                print(b)
-
-        exit()
-
-    return _ad
-
-
-def _fix_func_def(line, rename=None):
-    # line is assumed to be of the form   def foo(a, b, c)
-    # it will be converted to  def _compute_derivs_ad(self, a, b, c)
-    parts = line.split('(', 1)
-    if rename:
-        fstart = 'def %s(' % rename
-    else:
-        fstart = parts[0]
-
-    return 'def _compute_derivs_ad(' + 'self, ' + parts[1]
-
-
-def _translate_vars_from_meta(srclines):
-    pass
-    # # find any blocks that parameterize by iterating over metadata
-    # # these need to be explicitly flattened
-    # for k, line in enumerate(src):
-    #     """
-    #     For example, the lines:
-    #         for BN in self.metadata['bleed_names']:
-    #             outputs['ht_out'] += inputs[BN + ':W']
-    #     will automatically be transformed into something like
-    #         b1_W = inputs['b1:W']
-    #         b2_W = inputs['b2:W']
-    #         outputs['ht_out'] += b1_W
-    #         outputs['ht_out'] += b2_W
-    #     if the iteration is over empty metadata, the block is omitted
-    #     """
-    #     # key assumption: iteration over metadata corresponds to
-    #     # variable-length input or output
-    #     tabs0 = len(line) - len(line.lstrip())
-    #     if 'in self.metadata' in line:
-    #         # determine the iteration variable name
-    #         # e.g. 'BN' in the example above
-    #         vname = line.split().index("for")
-    #         vname = line.split()[vname + 1]
-
-    #         # allows us to break out based on indentation
-    #         block_ind = len(line) - len(line.lstrip())
-
-    #         # actually execute the block to get the metadata attribute
-    #         # this will expose how many vars are present for this instance
-    #         exc = line.replace(":", "").replace("self", "comp")
-    #         exc = ("[%s " % vname) + exc + "]"
-    #         # this would be ['b1', 'b2'], etc.
-    #         varlist = eval(exc)
-
-    #         # code lines for flattened iteration
-    #         unravelled = []
-    #         # line number of end of iteration block
-    #         stop_idx = k
-    #         # if there are no variables to iterate over, just get the end
-    #         # line number of the block to remove it
-    #         if not varlist:
-    #             for k2, future_line in enumerate(src[k+1:]):
-    #                 if len(future_line) - len(future_line.lstrip()) == block_ind:
-    #                     stop_idx = k2
-    #                     break
-    #         # otherwise, pass over the block for each variable value to
-    #         # re-write it
-    #         else:
-    #             for varname in varlist:
-    #                 # search future lines for end of block
-    #                 for k2, future_line in enumerate(src[k+1:]):
-    #                     if len(future_line) - len(future_line.lstrip()) == block_ind:
-    #                         stop_idx = k2
-    #                         break
-    #                     elif vname in future_line:
-    #                         # search and replace each instance in each line
-    #                         # e.g. find instances of things that look like
-    #                         # inputs[BN + ':W']
-    #                         # and replace with inputs['b1:W'], inputs['b2:W'], etc.
-    #                         # these will get replaced with local vars b1_W, b2_W later
-    #                         while True:
-    #                             try:
-    #                                 i = future_line.index(vname)
-    #                             except ValueError:
-    #                                 break
-    #                             left = future_line[:i][::-1].index("[")
-    #                             right = future_line[i + 1:].index("]")
-
-    #                             left = i - left
-    #                             right = i + right + 1
-
-    #                             substr = future_line[left : right]
-
-    #                             repl = substr.replace(vname, '"%s"' % varname)
-    #                             repl = '"%s"' % eval(repl)
-    #                             future_line = repl.join(future_line.split(substr))[4:]
-
-    #                             #print("!", future_line, "?")
-    #                             future_line = future_line.lstrip()
-    #                             future_line = tabs0*' ' + future_line
-
-    #                     # save edited lines
-    #                     unravelled.append(future_line)
-
-    #         # remove original iteration block
-    #         for i in range(k, k + stop_idx + 1):
-    #             src[i] = ''
-    #         # add in all unravelled iterations to source
-    #         src[k] = ''.join(unravelled)
