@@ -393,7 +393,10 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
     if mode == 'fwd':
         array = dinputs._data
     else:
-        array = doutputs._data
+        if explicit:
+            array = doutputs._data
+        else:
+            array = dresids._data
 
     for idx in range(array.size):
         for zvec in to_zero:
@@ -430,13 +433,6 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
             rowstart = rowend
 
         colstart = colend
-
-
-# def _get_tangent_ad_jac(comp, mode, df, J):
-#     if mode == 'fwd':
-#         return _get_ad_jac_fwd(comp, df, ad_method='tangent', partials=J)
-#     else:
-#         return _get_ad_jac_rev(comp, df, ad_method='tangent', partials=J)
 
 
 def _get_autograd_ad_func(comp, mode):
