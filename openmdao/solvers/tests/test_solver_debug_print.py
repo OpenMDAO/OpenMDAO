@@ -142,6 +142,7 @@ class TestNonlinearSolvers(unittest.TestCase):
     def test_solver_debug_print_feature(self):
         from openmdao.api import Problem, IndepVarComp, NewtonSolver
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.utils.general_utils import printoptions
 
         p = Problem()
         model = p.model
@@ -225,11 +226,12 @@ class TestNonlinearSolversBugFixes(unittest.TestCase):
 
         output = strout.getvalue()
         target = "'thrust_equilibrium_group.thrust_bal.thrust'"
-        self.assertTrue( target in output, msg=target + "NOT FOUND IN" + output)
+        self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
         self.assertEqual(expected_msg, str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
