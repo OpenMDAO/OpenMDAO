@@ -192,8 +192,10 @@ class BalanceComp(ImplicitComponent):
             unscaled, dimensional residuals written to via residuals[key]
         """
         for name, options in iteritems(self._state_vars):
-            lhs = inputs[options['lhs_name']]
-            rhs = inputs[options['rhs_name']]
+            lhs_opt = options['lhs_name']
+            rhs_opt = options['rhs_name']
+            lhs = inputs[lhs_opt]
+            rhs = inputs[rhs_opt]
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
