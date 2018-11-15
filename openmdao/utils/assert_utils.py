@@ -6,10 +6,43 @@ from math import isnan
 from six import raise_from
 from six.moves import zip
 
+from contextlib import contextmanager
+
+import warnings
+
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import pad_name
+from openmdao.utils.general_utils import pad_name, reset_warning_registry
+
+
+@contextmanager
+def assert_warning(category, msg):
+    """
+    Context manager asserting that a warning is issued.
+
+    Parameters
+    ----------
+    category : class
+        The class of the expected warning.
+    msg : str
+        The text of the expected warning.
+
+    Raises
+    ------
+    AssertionError
+        If the expected warning is not raised.
+    """
+    with reset_warning_registry():
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            yield
+
+    for warn in w:
+        if (issubclass(warn.category, category) and str(warn.message) == msg):
+            break
+    else:
+        raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):

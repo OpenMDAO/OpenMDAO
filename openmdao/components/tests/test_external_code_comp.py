@@ -12,7 +12,7 @@ from scipy.optimize import fsolve
 from openmdao.api import Problem, ExternalCodeComp, AnalysisError
 from openmdao.components.external_code_comp import STDOUT
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 DIRECTORY = os.path.dirname((os.path.abspath(__file__)))
 
@@ -516,7 +516,6 @@ class TestExternalCodeCompFeature(unittest.TestCase):
 # to ensure we get the warning and the correct answer.
 # self-contained, to be removed when class name goes away.
 from openmdao.api import ExternalCode
-import warnings
 
 
 class DeprecatedExternalCodeForTesting(ExternalCode):
@@ -533,13 +532,10 @@ class TestDeprecatedExternalCode(unittest.TestCase):
         shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
                     os.path.join(self.tempdir, 'extcode_example.py'))
 
-        with warnings.catch_warnings(record=True) as w:
-            self.extcode = DeprecatedExternalCodeForTesting()
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
         msg = "'ExternalCode' has been deprecated. Use 'ExternalCodeComp' instead."
-        self.assertEqual(str(w[0].message), msg)
+
+        with assert_warning(DeprecationWarning, msg):
+            self.extcode = DeprecatedExternalCodeForTesting()
 
         self.prob = Problem()
 

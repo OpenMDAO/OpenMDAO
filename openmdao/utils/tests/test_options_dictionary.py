@@ -1,6 +1,9 @@
 from openmdao.api import OptionsDictionary
+
 import unittest
-import warnings
+
+from openmdao.utils.assert_utils import assert_warning
+
 from six import PY3, assertRegex
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -121,11 +124,10 @@ class TestOptionsDict(unittest.TestCase):
 
     def test_isvalid_deprecated_type(self):
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        msg = "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             self.dict.declare('even_test', type_=int, check_valid=check_even)
-            self.assertEqual(len(w), 1)
-            self.assertEqual(str(w[-1].message), "In declaration of option 'even_test' the '_type' arg is deprecated.  Use 'types' instead.")
 
         self.dict['even_test'] = 2
         self.dict['even_test'] = 4

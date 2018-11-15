@@ -4,7 +4,6 @@ from __future__ import print_function
 import errno
 import os
 import unittest
-import warnings
 
 from shutil import rmtree
 from tempfile import mkdtemp, mkstemp
@@ -23,9 +22,8 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.general_utils import determine_adder_scaler
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler
 
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -1347,7 +1345,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "Trying to record options which cannot be pickled on system with name: subs. " \
+              "Use the 'options_excludes' recording option on system objects to avoid " \
+              "attempting to record options which cannot be pickled. Skipping recording " \
+              "options for this system."
+        with assert_warning(RuntimeWarning, msg):
             prob.run_model()
 
         prob.cleanup()
@@ -1356,10 +1358,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # no options should have been recorded for d1
         self.assertEqual(len(subs_options._dict), 0)
-
-        # make sure we got the warning we expected
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
 
     def test_pre_load(self):
         prob = SellarProblem()
