@@ -27,6 +27,7 @@ from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
     StringSubscriptVisitor, transform_ast_slices
+from openmdao.utils.general_utils import print_line_numbers
 
 
 modemap = {
@@ -90,16 +91,19 @@ def _translate_compute_source(comp):
     for i, line in enumerate(lines):
         if line.lstrip().startswith('def '):
             lines[i] = line.replace('self,', '')  # TODO: fix this to be more robust
+            break
 
     # add appropriate return line (return either outputs or residuals depending on compute_method)
-    lines.append("        return %s" % params[-1])
+    lines.append("        return %s\n" % params[-1])
 
-    src = textwrap.dedent('\n'.join(lines))
+    src = textwrap.dedent(''.join(lines))
 
     temp_mod_name = '_temp_' + comp.__class__.__name__
     temp_file_name = temp_mod_name + '.py'
 
     # convert any literal slices to calls to slice (else tangent fwd mode bombs)
+    print("SRC:")
+    print_line_numbers(src)
     src = astunparse.unparse(transform_ast_slices(ast.parse(src)))
 
     return src

@@ -6,6 +6,7 @@ import os
 import sys
 import warnings
 import unittest
+import math
 from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types, PY2
@@ -655,3 +656,18 @@ def unique_name(name, dct):
             return name
         unique = name + str(i)
     return unique
+
+
+def print_line_numbers(s):
+    """
+    Print the given string, listig line numbers on the left.
+
+    Parameters
+    ----------
+    s : str
+        The string to be printed.
+    """
+    lines = s.splitlines()
+    wid = int(math.log10(len(lines))) + 2
+    for i, l in enumerate(lines):
+        print("{0:{width}}{1}".format(i + 1, l, width=wid))
