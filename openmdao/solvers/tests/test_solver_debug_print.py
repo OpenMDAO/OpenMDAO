@@ -184,7 +184,7 @@ class TestNonlinearSolversBugFixes(unittest.TestCase):
     unrelated to the tests in that test object, and doesn't need all the setup/teardown tempfile
     creation and deletion.
     """
-    N_PROCS = 1
+    ISOLATED = True
 
     def test_debug_after_raised_error(self):
         prob = Problem()
