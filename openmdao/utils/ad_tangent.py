@@ -59,6 +59,7 @@ def zero_vector(vec):
 
 
 register_init_grad(DefaultVector, zero_vector)
+register_init_grad(str, lambda s: s)
 
 
 def _translate_compute_source(comp):
@@ -86,6 +87,10 @@ def _translate_compute_source(comp):
     params = list(signature(compute_method).parameters)
     lines = getsourcelines(compute_method)[0]
 
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith('def '):
+            lines[i] = line.replace('self,', '')  # TODO: fix this to be more robust
+
     # add appropriate return line (return either outputs or residuals depending on compute_method)
     lines.append("        return %s" % params[-1])
 
@@ -109,7 +114,7 @@ def _get_imports(mod):
     return '\n'.join(lines)
 
 
-def _get_tangent_ad_func(comp, mode, verbose=0, check_dims=False):
+def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False):
 
     src = _translate_compute_source(comp)
 
@@ -131,20 +136,27 @@ def _get_tangent_ad_func(comp, mode, verbose=0, check_dims=False):
     mod = sys.modules[temp_mod_name]
 
     if isinstance(comp, ExplicitComponent):
-        wrt = (1,)
+        wrt = (0,)
         func = getattr(mod, 'compute')
     else:
-        wrt = (1,2)
+        wrt = (0, 1)
         func = getattr(mod, 'apply_nonlinear')
 
     deriv_func = tangent.autodiff(func, wrt=wrt, mode=modemap[mode], verbose=verbose,
-                                  check_dims=check_dims)
+                                  optimized=optimize, check_dims=check_dims)
 
     del sys.modules[temp_mod_name]
     os.remove(temp_file_name)
 
     deriv_mod_name = temp_mod_name + '_deriv_'
     deriv_file_name = deriv_mod_name + '.py'
+
+    # now put 'self' back in the arg list
+    lines = getsourcelines(deriv_func)[0]
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith('def '):
+            lines[i] = line.replace('(', '(self,')
+    deriv_src = '\n'.join(lines)
 
     # write the derivative func into a module file so that tracebacks will show us the
     # correct line of source where the problem occurred, and allow us to step into the
@@ -154,7 +166,7 @@ def _get_tangent_ad_func(comp, mode, verbose=0, check_dims=False):
         # get all of the comp module globals
         f.write(_get_imports(sys.modules[comp_mod]))
         f.write("import tangent\n")
-        f.write(getsource(deriv_func))
+        f.write(deriv_src)
 
     invalidate_caches()  # need this to recognize dynamically created modules
     import_module(deriv_mod_name)

@@ -342,6 +342,8 @@ def _get_ad_jac_rev(comp, deriv_func, partials):
 
         grad = deriv_func(array)
         J[idx, :] = np.hstack(grad)  # grad has 2 parts, one for each differentiable input arg
+        J[idx, :grad[0].size] = grad[0]
+        J[idx, grad[0].size:] = grad[1]
 
     if explicit:
         itr = iteritems(inputs._views)

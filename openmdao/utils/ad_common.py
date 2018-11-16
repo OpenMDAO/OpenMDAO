@@ -25,10 +25,14 @@ def _ad_setup_parser(parser):
     parser.add_argument('file', nargs='?', help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
+    parser.add_argument('--noopt', action='store_true', dest='noopt',
+                        help="Turn off optimization.")
     parser.add_argument('-m', '--method', default='autograd', action='store', dest='ad_method',
                         help='AD method (autograd, tangent).')
     parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
                         help='Specify component class(es) to run AD on.')
+    parser.add_argument('-v', '--verbose', default=0, type=int, action='store', dest='verbose',
+                        help='Verbosity level.')
 
 
 def _ad_exec(options):
@@ -135,11 +139,16 @@ def _ad(prob, options):
                     func = _get_autograd_ad_func(s, mode)
                     _get_autograd_ad_jac(s, mode, func, J)
                 elif options.ad_method == 'tangent':
-                    func, deriv_mod = _get_tangent_ad_func(s, mode, verbose=1)
+                    func, deriv_mod = _get_tangent_ad_func(s, mode, optimize=not options.noopt,
+                                                           verbose=options.verbose)
                     _get_tangent_ad_jac(s, mode, func, J)
 
                     del sys.modules[deriv_mod.__name__]
                     os.remove(deriv_mod.__file__)
+                    try:
+                        os.remove(deriv_mod.__file__ + 'c')
+                    except:
+                        pass
 
                 mx_diff = 0.0
                 print("\n%s J:" % mode.upper())
