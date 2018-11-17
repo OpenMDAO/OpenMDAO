@@ -64,13 +64,9 @@ install:
     conda create --yes -n PY$PY python=$PY;
     source $HOME/miniconda/bin/activate PY$PY;
 
-    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+    conda install --yes numpy=$NUMPY scipy=$SCIPY coveralls cython matplotlib swig
 
     pip install --upgrade pip;
-    pip install redbaron;
-    pip install git+https://github.com/OpenMDAO/testflo.git;
-    pip install coverage;
-    pip install git+https://github.com/swryan/coveralls-python@work;
 
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
@@ -81,27 +77,21 @@ install:
       cd ../..;
     fi
 
-    python setup.py install;
+    pip install .[develop,docs];
     cd ..;
 
     pip install mpi4py;
     pip install petsc4py==$PETSc;
 
-    conda install --yes matplotlib;
-
-    pip install .[develop];
-    pip install .[docs];
     conda list;
 
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
 - cmd: conda update conda
-- cmd: conda install python=%PYTHON% numpy scipy=1.0.1 mkl==2018.0.2 nose sphinx mock pip --quiet
+- cmd: conda install python=%PYTHON% numpy scipy=1.0.1 mkl==2018.0.2 pip --quiet
 - cmd: pip install matplotlib
-- cmd: pip install testflo
 - cmd: cd C:\projects\blue*
-- cmd: pip install -e .[develop]
-- cmd: pip install -e .[docs]
+- cmd: pip install -e .[develop,docs]
 - cmd: conda list
 
 test_script:

@@ -92,13 +92,10 @@ install:
     conda create --yes -n PY$PY python=$PY;
     source $HOME/miniconda/bin/activate PY$PY;
 
-    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig nose sphinx mock;
+    conda install --yes numpy=$NUMPY scipy=$SCIPY coveralls cython matplotlib swig;
 
     pip install --upgrade pip;
-    pip install redbaron;
-    pip install git+https://github.com/OpenMDAO/testflo.git;
-    pip install coverage;
-    pip install git+https://github.com/swryan/coveralls-python@work;
+    pip install coveralls;
 
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
@@ -109,14 +106,13 @@ install:
       cd ../..;
     fi
 
-    python setup.py install;
+    # Install OpenMDAO with developer and documentation dependencies
+    pip install .[develop,docs];
     cd ..;
 
     if [ "$PETSc" ]; then
       pip install mpi4py petsc4py==$PETSc;
     fi
-
-    conda install --yes matplotlib;
   fi
 
 # install OpenMDAO (Not using -e on purpose here, to catch pkging errors)
