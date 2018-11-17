@@ -95,7 +95,6 @@ install:
     conda install --yes numpy=$NUMPY scipy=$SCIPY coveralls cython matplotlib swig;
 
     pip install --upgrade pip;
-    pip install coveralls;
 
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
@@ -106,7 +105,7 @@ install:
       cd ../..;
     fi
 
-    # Install OpenMDAO with developer and documentation dependencies
+    # Install OpenMDAO with testing and documentation dependencies
     pip install .[develop,docs];
     cd ..;
 

@@ -64,7 +64,7 @@ install:
     conda create --yes -n PY$PY python=$PY;
     source $HOME/miniconda/bin/activate PY$PY;
 
-    conda install --yes numpy=$NUMPY scipy=$SCIPY coveralls cython matplotlib swig
+    conda install --yes numpy=$NUMPY scipy=$SCIPY coveralls cython matplotlib swig;
 
     pip install --upgrade pip;
 
@@ -80,8 +80,9 @@ install:
     pip install .[develop,docs];
     cd ..;
 
-    pip install mpi4py;
-    pip install petsc4py==$PETSc;
+    if [ "$PETSc" ]; then
+      pip install mpi4py petsc4py==$PETSc;
+    fi
 
     conda list;
 
