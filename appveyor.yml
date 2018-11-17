@@ -64,9 +64,10 @@ install:
     conda create --yes -n PY$PY python=$PY;
     source $HOME/miniconda/bin/activate PY$PY;
 
-    conda install --yes numpy=$NUMPY scipy=$SCIPY coveralls cython matplotlib swig;
+    conda install --yes numpy=$NUMPY scipy=$SCIPY cython matplotlib swig;
 
     pip install --upgrade pip;
+    pip install git+https://github.com/swryan/coveralls-python@work;
 
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
@@ -84,6 +85,7 @@ install:
       pip install mpi4py petsc4py==$PETSc;
     fi
 
+    pip install .[develop,docs];
     conda list;
 
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
