@@ -5,7 +5,7 @@
 # OpenMDAO Versions
 > **PLEASE NOTE**: Until recently, this repository was named **OpenMDAO/blue**. 
 If you had cloned that repository, please update your repository name and 
-remotes to reflect these changes. You can find instructions [here][7].
+remotes to reflect these changes. You can find instructions [here][8].
 
 The **OpenMDAO 2.x.y** code has taken the name **OpenMDAO**, and is maintained 
 [here][4]. To install the latest release, run `pip install --update openmdao`.
@@ -15,8 +15,7 @@ The **OpenMDAO 1.7.4** code repository is now named **OpenMDAO1**, and has moved
 `openmdao<2` are required). 
 
 The legacy **OpenMDAO v0.x** (versions 0.13.0 and older) of the 
-**OpenMDAO-Framework** are [here][8].
-
+**OpenMDAO-Framework** are [here][6].
 
 # OpenMDAO 2
 This is an ALPHA version of **OpenMDAO 2**.
@@ -31,11 +30,9 @@ While the API is MOSTLY stable, we reserve the right to change things as needed.
 We will be making frequent updates to this code. If you’re going to try it,
 make sure you pull these updates often.
 
-
 ## Features of OpenMDAO 1.7.4 Not Yet in 2.x.y
-
-Be aware that this is an Alpha.
-Not all the features of 1.7.4 exist in 2.x.y yet.
+Be aware that this new version of **OpenMDAO** is in beta and not all the
+features of 1.7.4 are currently available.
 
 Here is a list of things that have not yet been developed in 2.x:
 
@@ -50,7 +47,7 @@ WebRecorder are currently supported)
 
 # Installation Instructions
 You have two means for installing OpenMDAO, from the Python Package Index (PyPI)
-or from a clone of the [GitHub repository](https://github.com/OpenMDAO/OpenMDAO).
+or from a clone of the [GitHub repository][4].
 ### Install from [PyPI][1]
 This is the easist way to install **OpenMDAO**.
 > `pip install openmdao`
@@ -103,19 +100,19 @@ docs.
 # Testing Instructions
 1. Install OpenMDAO and its testing dependencies:
 
-    >`pip install openmdao[develop]`
+    > `pip install openmdao[develop]`
 
 2. Run tests:
 
     > `testflo openmdao -n 1`
 
-3. If everything works correctly, you should see a message that there 
-were no failures.  If you see failures, you are encouraged to report
-it as an [issue][6].  If so, please make sure you include your system spec,
+3. If everything works correctly, you should see a message stating that there 
+were zero failures.  If you see failures, you are encouraged to report
+it as an [issue][7].  If so, please make sure you include your system spec,
 and include the error message.
 
-    > If tests fail, please include your system information, you can obtain that
-    by running the following commands in *python* and copying the results 
+    > If tests fail, please include your system information, you can obtain
+    that by running the following commands in *python* and copying the results 
     produced by the last line.
     ```python
     >>> import platform
@@ -128,18 +125,23 @@ and include the error message.
     ```python
     (('Windows', '10.0.17134'),
      ('AMD64', 'Intel64 Family 6 Model 94 Stepping 3, GenuineIntel'),
-      '3.6.6 | packaged by conda-forge | (default, Jul 26 2018, 11:48:23) [MSC v.1900 64 bit (AMD64)]')
+     '3.6.6 | packaged by conda-forge | (default, Jul 26 2018, 11:48:23) ...')
     ```
 
 
-[1]: https://pypi.org/project/openmdao/ "PyPI"
+[1]: https://pypi.org/project/openmdao/ "OpenMDAO @PyPI"
+
 [2]: http://openmdao.org/twodocs/versions/latest "Latest Docs"
-[3]: http://openmdao.org/twodocs "Archived Docts"
+[3]: http://openmdao.org/twodocs "Archived Docs"
+
 [4]: https://github.com/OpenMDAO/OpenMDAO "OpenMDAO Git Repo"
 [5]: https://github.com/OpenMDAO/OpenMDAO1 "OpenMDAO 1.x Git Repo"
-[6]: https://github.com/OpenMDAO/OpenMDAO/issues/new "Make New Issue"
-[7]: https://help.github.com/articles/changing-a-remote-s-url/ "Remote URL Update"
-[8]: https://github.com/OpenMDAO/OpenMDAO-Framework "OpenMDAO Framework Git Repo"
+[6]: https://github.com/OpenMDAO/OpenMDAO-Framework "OpenMDAO Framework Git Repo"
+
+[7]: https://github.com/OpenMDAO/OpenMDAO/issues/new "Make New OpenMDAO Issue"
+
+[8]: https://help.github.com/articles/changing-a-remote-s-url/ "Update Git Remote URL"
+
 [9]: https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master "TravisCI Badge"
 [10]: https://travis-ci.org/OpenMDAO/OpenMDAO "OpenMDAO @TravisCI"
 [11]: https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true "Build Badge"
