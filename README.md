@@ -1,13 +1,28 @@
-[![Build Status][9]][10]
-[![Build status][11]][12]
-[![Coverage Status][13]][14]
+[![TravisCI Badge][9]][10]
+[![AppVeyor Badge][11]][12]
+[![Coveralls Badge][13]][14]
 
-# OpenMDAO Versions
+# [OpenMDAO 2][0]
+*This version of **OpenMDAO** is in Development Status **[BETA](15)**.*
+
+## Documentation
+Documentation for the latest version can be found [here][2].
+
+Documentation archives for prior versions can be found [here][3].
+
+## Important Note
+While the API is MOSTLY stable, the **OpenMDAO** development team reserves the
+right to update it and other elements of the code as needed.
+
+The team will be making frequent updates to the source code, so users are
+encouraged to regularly pull for updates.
+
+### OpenMDAO Versions
 > **PLEASE NOTE**: Until recently, this repository was named **OpenMDAO/blue**. 
-If you had cloned that repository, please update your repository name and 
+If you had cloned that repository, please update your repository name and
 remotes to reflect these changes. You can find instructions [here][8].
 
-The **OpenMDAO 2.x.y** code has taken the name **OpenMDAO**, and is maintained 
+The **OpenMDAO 2.x.y** code has taken the name **OpenMDAO**, and is maintained
 [here][4]. To install the latest release, run `pip install --update openmdao`.
 
 The **OpenMDAO 1.7.4** code repository is now named **OpenMDAO1**, and has moved
@@ -17,22 +32,9 @@ The **OpenMDAO 1.7.4** code repository is now named **OpenMDAO1**, and has moved
 The legacy **OpenMDAO v0.x** (versions 0.13.0 and older) of the 
 **OpenMDAO-Framework** are [here][6].
 
-# OpenMDAO 2
-This is an ALPHA version of **OpenMDAO 2**.
-
-The latest docs can be found [here][2].
-
-Archived versions of the docs can be found [here][3].
-
-## Important Note
-While the API is MOSTLY stable, we reserve the right to change things as needed.
-
-We will be making frequent updates to this code. If you’re going to try it,
-make sure you pull these updates often.
-
-## Features of OpenMDAO 1.7.4 Not Yet in 2.x.y
-Be aware that this new version of **OpenMDAO** is in beta and not all the
-features of 1.7.4 are currently available.
+### Missing Features from OpenMDAO 1.7.4
+Be aware that this new version of **OpenMDAO** is in Development Status **BETA**
+and not all the features of 1.7.4 are currently available.
 
 Here is a list of things that have not yet been developed in 2.x:
 
@@ -45,11 +47,16 @@ Here is a list of things that have not yet been developed in 2.x:
 * CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and 
 WebRecorder are currently supported)
 
-# Installation Instructions
+## Install OpenMDAO 2
 You have two means for installing OpenMDAO, from the Python Package Index (PyPI)
 or from a clone of the [GitHub repository][4].
+
+**OpenMDAO** includes two optional set of dependencies, one for installing
+the developer tools (e.g., testing, coverage) and one for building the
+documentation.
+
 ### Install from [PyPI][1]
-This is the easist way to install **OpenMDAO**.
+This is the easiest way to install **OpenMDAO**.
 > `pip install openmdao`
 
 To install the testing dependencies, run:
@@ -66,41 +73,22 @@ This includes the packages necessary for running **OpenMDAO**'s tests.
 > `pip install OpenMDAO[develop]`
 
 If you would like to make changes to **OpenMDAO** it is recommended you
-install it in *editable* mode (i.e., development mode).
+install it in *[editable][16]* mode (i.e., development mode) so any changes you
+make to the source code will be reflected when you import **OpenMDAO** in
+*Python*.
 > `pip install -e OpenMDAO[develop]`
 
-If you are planning to change the Developer mode will allow you to make changes
-to the OpenMDAO code
+## Test OpenMDAO 2
+Users are encourage to run the unit tests to ensure **OpenMDAO** is performing
+correctly.  In order to do so, you must install the testing dependencies.
 
-#### Install the documentation making dependencies
-> `pip install OpenMDAO[docs]`
-
-# Documentation Building Instructions
-> Make sure you followed the [instructions](#install-from-a-cloned-repository)
-for installing **OpenMDAO** from a cloned repository, and the 
-[instructions](#install-the-documentation-making-dependencies) for installing 
-the documentation making dependencies
-
-> You will need **make** to build the documentation.  If you are using Windows,
-you can install [Anaconda](https://www.anaconda.com/download/) and install 
-**make** by running: `conda install make`.
-
-Change to the docs directory:
-
-> `cd OpenMDAO/openmdao/docs`
->
-> `make clean; make all`
-
-This will build the docs into `openmdao/docs/_build/html`.
-
-Then, just open  `openmdao/docs/_build/html/index.html` in a browser see the 
-docs.
-
-
-# Testing Instructions
 1. Install OpenMDAO and its testing dependencies:
 
     > `pip install openmdao[develop]`
+
+    > Alternatively, you can clone the repository, as explained
+    [here](#install-from-a-cloned-repository), and install the development
+    dependencies as described [here](#install-the-developer-dependencies).
 
 2. Run tests:
 
@@ -112,7 +100,7 @@ it as an [issue][7].  If so, please make sure you include your system spec,
 and include the error message.
 
     > If tests fail, please include your system information, you can obtain
-    that by running the following commands in *python* and copying the results 
+    that by running the following commands in *python* and copying the results
     produced by the last line.
     ```python
     >>> import platform
@@ -128,7 +116,30 @@ and include the error message.
      '3.6.6 | packaged by conda-forge | (default, Jul 26 2018, 11:48:23) ...')
     ```
 
+## Build the Documentation for OpenMDAO 2
+> You will need **make** to build the documentation.  If you are using Windows,
+you can install [Anaconda](https://www.anaconda.com/download/) and install
+**make** by running: `conda install make`.
 
+1. Make sure you have cloned the repository with the source code:
+    > Follow the [instructions](#install-from-a-cloned-repository) for
+    installing **OpenMDAO** from a cloned repository.
+
+2. Install the OpenMDAO and the documentation making dependencies:
+    > `pip install OpenMDAO[docs]`
+
+3. Change to the docs directory:
+    > `cd OpenMDAO/openmdao/docs`
+
+4. Run the command to auto-generate the documentation.
+    > `make clean; make all`
+
+This will build the docs into `openmdao/docs/_build/html`.  You can browse the
+documentation by opening `openmdao/docs/_build/html/index.html` with your web
+browser.
+
+
+[0]: http://openmdao.org/ "OpenMDAO"
 [1]: https://pypi.org/project/openmdao/ "OpenMDAO @PyPI"
 
 [2]: http://openmdao.org/twodocs/versions/latest "Latest Docs"
@@ -148,3 +159,7 @@ and include the error message.
 [12]: https://ci.appveyor.com/project/OpenMDAO/blue/branch/master "OpenMDAO @AppVeyor"
 [13]: https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master "Coverage Badge"
 [14]: https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master "OpenMDAO @Coveralls"
+
+[15]: https://en.wikipedia.org/wiki/Software_release_life_cycle#Beta "Wikipedia Beta"
+
+[16]: https://setuptools.readthedocs.io/en/latest/setuptools.html#development-mode "Pip Editable Mode"
