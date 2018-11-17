@@ -1,28 +1,36 @@
 build: off
 
-image:
-- Ubuntu
-- Visual Studio 2015
-
 environment:
-  PY:
-    - 2.7
-    - 3.6
-    - 3.7
-  NUMPY:
-    - 1.15
-  SCIPY:
-    - 1.1
-  PETSc4PY:
-    - null
-    - 3.10
   matrix:
-    exclude:
-      - image: Visual Studio 2015
-        PETSc4PY: 3.10
-      - image: Ubuntu
-        PETSc4PY: null
-    fast_finish: true
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      PYTHON: 3.7
+      NUMPY: 1.15
+      SCIPY: 1.0.1
+      PETSc: 3.9.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      PYTHON: 3.6
+      NUMPY: 1.14
+      SCIPY: 1.0.1
+      PETSc: 3.9.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      PYTHON: 2.7
+      NUMPY: 1.14
+      SCIPY: 1.0.1
+      PETSc: 3.9.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PYTHON: 2.7
+      MKL: 2018.0.2  # Math Kernel Library
+      NUMPY: 1.14
+      SCIPY: 1.0.1
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PYTHON: 3.6
+      MKL: 2018.0.2  # Math Kernel Library
+      NUMPY: 1.14
+      SCIPY: 1.0.1
 
   encrypted_74d70a284b7d_key:
     secure: 7u/kPupG0BmwqAJOLeyGMPakwj3lqukKHXsxEP4+6aX+Huu8VH2ZkDNq6GYlaw6HGJHi2JTAal9VDgOpZc9RMlweOrXJiNFWS3Iu0chy+L4=
@@ -52,52 +60,44 @@ install:
     sudo apt-get -y install openmpi-bin;
 
     echo "Building python environment...";
-    wget "https://repo.continuum.io/miniconda/Miniconda${PY:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
+    wget "https://repo.continuum.io/miniconda/Miniconda${PYTHON:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
     chmod +x miniconda.sh;
     ./miniconda.sh -b  -p $HOME/miniconda;
     export PATH=$HOME/miniconda/bin:$PATH;
 
-    conda create --yes -n PY$PY python=$PY;
-    source $HOME/miniconda/bin/activate PY$PY;
+    conda create --yes -n PY$PYTHON python=$PYTHON;
+    source $HOME/miniconda/bin/activate PY$PYTHON;
 
-    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig;
+    conda install --yes numpy=$NUMPY scipy=$SCIPY cython matplotlib swig;
 
     pip install --upgrade pip;
-
-    echo "Installing forked python packages";
     pip install git+https://github.com/swryan/coveralls-python@work;
     pip install git+https://github.com/OpenMDAO/testflo.git;
 
-    echo "Cloning pyOptSparse source code from OpenMDAO's fork"
     git clone https://github.com/OpenMDAO/pyoptsparse.git;
     cd pyoptsparse;
 
-    if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
+    if [ "$SNOPT_LOCATION" ] && [ "${PYTHON:0:1}" = "3" ]; then
       cd pyoptsparse/pySNOPT;
-      echo "Secure copying Sparse Nonlinear OPTimizer over SSH"
       scp -r "$SNOPT_LOCATION" ./source;
       cd ../..;
     fi
 
-    echo "Building pyOptSparse"
     python setup.py install;
     cd ..;
 
-    if [ "PETSc4PY" ]; then
-      echo "Installing parallel computing dependencies"
+    if [ "$PETSc" ]; then
       pip install mpi4py petsc4py==$PETSc;
     fi
 
-    echo "Installing OpenMDAO"
     pip install .[develop,docs];
     conda list;
 
-# Set conda path based on Python version
-- cmd: if %PY% GTR 3 (set CONDA="C:\\Miniconda3%PY:~2%-x64") else (set CONDA="C:\\Miniconda-x64")
+- cmd: if %PYTHON% GTR 3 (set CONDA="C:\\Miniconda3%PYTHON:~2%-x64") else (set CONDA="C:\\Miniconda-x64")
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
 - cmd: conda update conda
-- cmd: conda install python=%PY% make numpy=%NUMPY% pip scipy=%SCIPY% --quiet
+- cmd: conda install python=%PYTHON% numpy=%NUMPY% scipy=%SCIPI% mkl==%MKL% pip --quiet
 - cmd: cd C:\projects\blue*
 - cmd: pip install -e .[develop,docs]
 - cmd: conda list
