@@ -95,7 +95,6 @@ install:
     conda install --yes numpy=$NUMPY scipy=$SCIPY cython matplotlib swig;
 
     pip install --upgrade pip;
-    # Install customized packages
     pip install git+https://github.com/swryan/coveralls-python@work;
     pip install git+https://github.com/OpenMDAO/testflo.git;
 
@@ -108,7 +107,6 @@ install:
       cd ../..;
     fi
 
-    # install pyOptSparse
     python setup.py install;
     cd ..;
 
