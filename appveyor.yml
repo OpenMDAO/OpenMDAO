@@ -5,18 +5,18 @@ image:
 - Visual Studio 2015
 
 environment:
+  PY:
+    - 2.7
+    - 3.6
+    - 3.7
+  NUMPY:
+    - 1.15
+  SCIPY:
+    - 1.1
+  PETSc4PY:
+    - null
+    - 3.10
   matrix:
-    PY:
-      - 2.7
-      - 3.6
-      - 3.7
-    NUMPY:
-      - 1.15
-    SCIPY:
-      - 1.1
-    PETSc4PY:
-      - null
-      - 3.10
     exclude:
       - image: Visual Studio 2015
         PETSc4PY: 3.10
