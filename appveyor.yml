@@ -77,7 +77,7 @@ install:
       cd ../..;
     fi
 
-    pip install .[develop,docs];
+    python setup.py install;
     cd ..;
 
     if [ "$PETSc" ]; then

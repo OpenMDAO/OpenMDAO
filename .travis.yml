@@ -105,8 +105,8 @@ install:
       cd ../..;
     fi
 
-    # Install OpenMDAO with testing and documentation dependencies
-    pip install .[develop,docs];
+    # install pyOptSparse
+    python setup.py install;
     cd ..;
 
     if [ "$PETSc" ]; then
@@ -114,8 +114,9 @@ install:
     fi
   fi
 
-# install OpenMDAO (Not using -e on purpose here, to catch pkging errors)
-- pip install .;
+# install OpenMDAO and its development and documentation dependencies
+# NOTE: not using -e on purpose here, to catch packaging errors
+- pip install .[develop,docs];
 
 # display summary of installed packages and their versions
 - conda list
