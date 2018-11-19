@@ -104,6 +104,8 @@ class Problem(object):
         Object that manages all recorders added to this problem.
     _vars_to_record: dict
         Dict of lists of var names indicating what to record
+    _remote_var_set : set
+        Set of variables (absolute names) that require remote data transfer to reach all procs.
     """
 
     _post_setup_func = None
@@ -218,7 +220,7 @@ class Problem(object):
 
             # We have set and cached already
             if name in self._initial_condition_cache:
-                val = self._initial_condition_cache[name]
+                return self._initial_condition_cache[name]
 
             # Vector not setup, so we need to pull values from saved metadata request.
             else:
@@ -256,11 +258,8 @@ class Problem(object):
                     if abs_name in meta:
                         val = meta[abs_name]['value']
 
-                # else:
-                #     msg = 'Variable name "{}" not found.'
-                #     raise KeyError(msg.format(name))
-
                 if val is not _undefined:
+                    # Need to cache the "get" in case the user calls in-place numpy operations.
                     self._initial_condition_cache[name] = val
 
         elif name in self.model._outputs:
@@ -281,13 +280,6 @@ class Problem(object):
             elif self.model._discrete_inputs and name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
 
-            # else:
-            #     msg = 'Variable name "{}" not found.'
-            #     raise KeyError(msg.format(name))
-
-        # Need to cache the "get" in case the user calls in-place numpy operations.
-        #  self._initial_condition_cache[name] = val
-
         if self.model.comm.size > 1:
             # check for remote var
             if name in self.model._var_allprocs_abs2meta:
@@ -297,15 +289,11 @@ class Problem(object):
             elif name in proms['output']:
                 abs_name = proms['output'][name][0]
 
-            if abs_name is not None:
+            if abs_name in self._remote_var_set:
                 loc_val = val
-                if abs_name in self.model._var_allprocs_abs2idx:
-                    idx = self.model._var_allprocs_abs2idx[abs_name]
-                    # if any rank is missing the var, bcast it
-                    if not np.all(self.model._var_sizes['nonlinear'][:, idx]):
-                        owner = self.model._owning_rank[abs_name]
-                        if owner != self.model.comm.rank:
-                            val = None
+                owner = self.model._owning_rank[abs_name]
+                if owner != self.model.comm.rank:
+                    val = None
                 else:
                     owner = self.model._owning_rank[abs_name]
                     if val is _undefined:
@@ -847,6 +835,34 @@ class Problem(object):
 
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
                      derivatives)
+
+        # get set of all vars that we may need to bcast later
+        self._remote_var_set = remote_var_set = set()
+        if model_comm.size > 1:
+            for type_ in ('input', 'output'):
+                remote_discrete = set()
+                sizes = self.model._var_sizes['nonlinear'][type_]
+                for i, vname in enumerate(self.model._var_allprocs_abs_names[type_]):
+                    if not np.all(sizes[:, i]):
+                        remote_var_set.add(vname)
+
+                if self.model._var_allprocs_discrete[type_]:
+                    local = list(self.model._var_discrete[type_])
+                    byrank = self.comm.gather(local, root=0)
+                    if model_comm.rank == 0:
+                        full = set()
+                        for names in byrank:
+                            full.update(names)
+
+                        for names in byrank:
+                            diff = full.difference(names)
+                            remote_discrete.update(diff)
+
+                        junk = model_comm.bcast(remote_discrete, root=0)
+                    else:
+                        remote_discrete = model_comm.bcast(None, root=0)
+
+                    remote_var_set.update(remote_discrete)
 
         # Cache all args for final setup.
         self._check = check

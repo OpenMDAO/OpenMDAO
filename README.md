@@ -52,9 +52,7 @@ Not all the features of 1.7.4 exist in 2.x.y yet.
 
 Here is a list of things that have not yet been developed in 2.x:
 
-* Pass-by-object variables
 * Automatic ordering of groups/components based on data connections
-* Parallel Finite Difference
 * File variables
 * Active-set constraint calculation disabling
 * Brent Solver
