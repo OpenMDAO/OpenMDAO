@@ -104,7 +104,7 @@ install:
     fi
 
     echo ">>> Installing OpenMDAO";
-    pip install .[develop,docs];
+    pip install .[all];
     conda list;
 
 - cmd: if %PYTHON% GTR 3 (set CONDA="C:\\Miniconda3%PYTHON:~2%-x64") else (set CONDA="C:\\Miniconda-x64")
@@ -113,7 +113,7 @@ install:
 - cmd: conda update conda
 - cmd: conda install python=%PYTHON% numpy=%NUMPY% scipy=%SCIPY% pip --quiet
 - cmd: cd C:\projects\blue*
-- cmd: pip install -e .[develop,docs]
+- cmd: pip install -e .[all]
 - cmd: conda list
 
 test_script:

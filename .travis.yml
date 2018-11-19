@@ -131,7 +131,7 @@ install:
 # install OpenMDAO and its development and documentation dependencies
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
-  pip install .[develop,docs];
+  pip install .[all];
 
 # display summary of installed packages and their versions
 - conda list

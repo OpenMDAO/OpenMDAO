@@ -51,32 +51,39 @@ WebRecorder are currently supported)
 You have two options for installing **OpenMDAO**, (1) from the
 [Python Package Index (PyPI)][1], and (2) from the [GitHub repository][4].
 
-**OpenMDAO** includes two optional sets of dependencies, one for installing
-the developer tools (e.g., testing, coverage), and one for building the
-documentation.
+**OpenMDAO** includes two optional sets of dependencies, `develop` for
+installing the developer tools (e.g., testing, coverage), and `docs` for
+building the documentation.  A third option, `all` combines these two sets.
 
 ### Install from [PyPI][1]
-This is the easiest way to install **OpenMDAO**.
-> `pip install openmdao`
+This is the easiest way to install **OpenMDAO**. To install only the runtime
+dependencies:
 
-To install the testing dependencies, run:
-> `pip install openmdao[develop]`
+    pip install openmdao
+
+To install all the optional dependencies:
+
+    pip install openmdao[all]
 
 ### Install from a Cloned Repository
 This allows you to install **OpenMDAO** from a local copy of the source code.
-> `git clone http://github.com/OpenMDAO/OpenMDAO`
->
-> `pip install OpenMDAO`
+
+    git clone http://github.com/OpenMDAO/OpenMDAO
+    pip install OpenMDAO
 
 #### Install the Developer Dependencies
-This includes the packages necessary for running **OpenMDAO**'s tests.  
-> `pip install OpenMDAO[develop]`
+If you want to modify **OpenMDAO**, you may want to install the packages
+necessary for running **OpenMDAO**'s tests and documentation generator.  You
+can install them explicitly by running:
+
+    pip install OpenMDAO[all]
 
 If you would like to make changes to **OpenMDAO** it is recommended you
-install it in *[editable][16]* mode (i.e., development mode) so any changes you
-make to the source code will be reflected when you import **OpenMDAO** in
-*Python*.
-> `pip install -e OpenMDAO[develop]`
+install it in *[editable][16]* mode (i.e., development mode) by adding the `-e`
+flag when calling `pip`, this way any changes you make to the source code will
+be included when you import **OpenMDAO** in *Python*.
+
+    pip install -e OpenMDAO[test]
 
 ## Test OpenMDAO 2
 Users are encourage to run the unit tests to ensure **OpenMDAO** is performing
@@ -84,7 +91,7 @@ correctly.  In order to do so, you must install the testing dependencies.
 
 1. Install **OpenMDAO** and its testing dependencies:
 
-    > `pip install openmdao[develop]`
+    `pip install openmdao[test]`
 
     > Alternatively, you can clone the repository, as explained
     [here](#install-from-a-cloned-repository), and install the development
@@ -92,27 +99,27 @@ correctly.  In order to do so, you must install the testing dependencies.
 
 2. Run tests:
 
-    > `testflo openmdao -n 1`
+    `testflo openmdao -n 1`
 
 3. If everything works correctly, you should see a message stating that there 
-were zero failures.  If you see failures, you are encouraged to report
-it as an [issue][7].  If so, please make sure you include your system spec,
+were zero failures.  If the tests produce failures, you are encouraged to report
+them as an [issue][7].  If so, please make sure you include your system spec,
 and include the error message.
 
     > If tests fail, please include your system information, you can obtain
     that by running the following commands in *python* and copying the results
     produced by the last line.
-    ```python
-    import platform, sys
-    info = platform.uname()
-    (info.system, info.version), (info.machine, info.processor), sys.version
-    ```
+
+        import platform, sys
+
+        info = platform.uname()
+        (info.system, info.version), (info.machine, info.processor), sys.version
+
     > Which should produce a result similar to:
-    ```python
-    (('Windows', '10.0.17134'),
-     ('AMD64', 'Intel64 Family 6 Model 94 Stepping 3, GenuineIntel'),
-     '3.6.6 | packaged by conda-forge | (default, Jul 26 2018, 11:48:23) ...')
-    ```
+
+        (('Windows', '10.0.17134'),
+         ('AMD64', 'Intel64 Family 6 Model 94 Stepping 3, GenuineIntel'),
+         '3.6.6 | packaged by conda-forge | (default, Jul 26 2018, 11:48:23) ...')
 
 ## Build the Documentation for OpenMDAO 2
 > You will need **make** to build the documentation.  If you are using Windows,
@@ -123,14 +130,18 @@ you can install [Anaconda](https://www.anaconda.com/download/) and install
     > Follow the [instructions](#install-from-a-cloned-repository) for
     installing **OpenMDAO** from a cloned repository.
 
-2. Install **OpenMDAO** and the dependencies required to build the documentation :
-    > `pip install OpenMDAO[docs]`
+2. Install **OpenMDAO** and the dependencies required to build the
+   documentation:
+
+    `pip install OpenMDAO[docs]`
 
 3. Change to the docs directory:
-    > `cd OpenMDAO/openmdao/docs`
+
+    `cd OpenMDAO/openmdao/docs`
 
 4. Run the command to auto-generate the documentation.
-    > `make clean; make all`
+
+    `make clean; make all`
 
 This will build the docs into `openmdao/docs/_build/html`.  You can browse the
 documentation by opening `openmdao/docs/_build/html/index.html` with your web

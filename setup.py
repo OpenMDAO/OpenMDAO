@@ -9,6 +9,32 @@ __version__ = re.findall(
 )[0]
 
 
+optional_dependencies = {
+    'docs': [
+        'matplotlib',
+        'mock',
+        'numpydoc',
+        'redbaron',
+        'sphinx',
+        'tornado',
+    ],
+    'test': [
+        'coverage',
+        'parameterized',
+        'pycodestyle==2.3.1',
+        'pydocstyle==2.0.0',
+        'testflo',
+    ],
+}
+
+# Add an optional dependency that concatenates all others
+optional_dependencies['all'] = sorted([
+    dependency
+    for dependencies in optional_dependencies.values()
+    for dependency in dependencies
+])
+
+
 setup(
     name='openmdao',
     version=__version__,
@@ -110,21 +136,5 @@ setup(
     run_test=openmdao.devtools.run_test:run_test
     openmdao=openmdao.utils.om:openmdao_cmd
     """,
-    extras_require={
-        'develop': [
-            'coverage',
-            'parameterized',
-            'pycodestyle==2.3.1',
-            'pydocstyle==2.0.0',
-            'testflo',
-        ],
-        'docs': [
-            'matplotlib',
-            'mock',
-            'numpydoc',
-            'redbaron',
-            'sphinx',
-            'tornado',
-        ],
-    },
+    extras_require=optional_dependencies,
 )
