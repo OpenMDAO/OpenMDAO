@@ -338,14 +338,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(base_units, units))
+                msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
+                raise TypeError(msg.format(name, units))
 
             try:
                 scale, offset = get_conversion(base_units, units)
             except TypeError:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(base_units, units))
+                msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
+                raise TypeError(msg.format(name, base_units, units))
 
             val = (val + offset) * scale
 
@@ -370,13 +370,7 @@ class Problem(object):
             return meta[name]['units']
 
         proms = self.model._var_allprocs_prom2abs_list
-        if name in proms['output']:
-            return meta[proms['output'][name][0]]['units']
-
-        if name in proms['input']:
-            return meta[proms['input'][name][0]]['units']
-
-        if self._setup_status == 1:
+        if self._setup_status >= 1:
 
             if name in proms['input']:
                 # This triggers a check for unconnected non-unique inputs, and
@@ -388,8 +382,7 @@ class Problem(object):
                 abs_name = prom_name2abs_name(self.model, name, 'output')
                 return meta[abs_name]['units']
 
-        msg = 'Variable name "{}" not found.'
-        raise KeyError(msg.format(name))
+        raise KeyError('Variable name "{}" not found.'.format(name))
 
     def __setitem__(self, name, value):
         """
@@ -418,8 +411,7 @@ class Problem(object):
                 # might be a remote var.  If so, just do nothing in this proc
                 if not (name in self.model._var_allprocs_prom2abs_list or
                         name in self.model._var_allprocs_abs2meta):
-                    msg = 'Variable name "{}" not found.'
-                    raise KeyError(msg.format(name))
+                    raise KeyError('Variable name "{}" not found.'.format(name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -442,14 +434,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(units, base_units))
+                msg = "Can't set variable '{}' with units of 'None' to value with units of '{}'."
+                raise TypeError(msg.format(name, units))
 
             try:
                 scale, offset = get_conversion(units, base_units)
             except TypeError:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(units, base_units))
+                msg = "Can't set variable '{}' with units of '{}' to value with units of '{}'."
+                raise TypeError(msg.format(name, base_units, units))
 
             value = (value + offset) * scale
 

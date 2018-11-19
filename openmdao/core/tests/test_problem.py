@@ -857,19 +857,19 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "Incompatible units for conversion: 'cm' and 'degK'."
+        msg = "Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
-        msg = "Incompatible units for conversion: 'degK' and 'cm'."
+        msg = "Can't set variable 'comp.x' with units of 'cm' to value with units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
-        msg = "Incompatible units for conversion: 'None' and 'degK'."
+        msg = "Can't express variable 'no_unit.x' with units of 'None' in units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('no_unit.x', 'degK')
 
-        msg = "Incompatible units for conversion: 'degK' and 'None'."
+        msg = "Can't set variable 'no_unit.x' with units of 'None' to value with units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
