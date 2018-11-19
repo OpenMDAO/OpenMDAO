@@ -53,6 +53,7 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
+_undefined = object()
 
 
 CITATION = """@inproceedings{2014_openmdao_derivs,
@@ -210,6 +211,9 @@ class Problem(object):
         # Caching only needed if vectors aren't allocated yet.
         proms = self.model._var_allprocs_prom2abs_list
 
+        val = _undefined
+        abs_name = None
+
         if self._setup_status == 1:
 
             # We have set and cached already
@@ -229,31 +233,35 @@ class Problem(object):
 
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
-                    if isinstance(self.model, Group) and abs_name in self.model._conn_abs_in2out:
-                        src_name = self.model._conn_abs_in2out[abs_name]
-                        # So, if the inputs and outputs are promoted to the same name, then we
-                        # allow getitem, but if they aren't, then we raise an error due to non
-                        # uniqueness.
-                        if name not in proms['output']:
+                    conn = self.model._conn_abs_in2out
+                    if abs_name in meta:
+                        if isinstance(self.model, Group) and abs_name in conn:
+                            src_name = self.model._conn_abs_in2out[abs_name]
+                            # So, if the inputs and outputs are promoted to the same name, then we
+                            # allow getitem, but if they aren't, then we raise an error due to non
+                            # uniqueness.
+                            if name not in proms['output']:
+                                # This triggers a check for unconnected non-unique inputs, and
+                                # raises the same error as vector access.
+                                abs_name = prom_name2abs_name(self.model, name, 'input')
+                            val = meta[src_name]['value']
+                        else:
                             # This triggers a check for unconnected non-unique inputs, and
                             # raises the same error as vector access.
                             abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta[src_name]['value']
-                    else:
-                        # This triggers a check for unconnected non-unique inputs, and
-                        # raises the same error as vector access.
-                        abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta[abs_name]['value']
+                            val = meta[abs_name]['value']
 
                 elif name in proms['output']:
                     abs_name = prom_name2abs_name(self.model, name, 'output')
-                    val = meta[abs_name]['value']
+                    if abs_name in meta:
+                        val = meta[abs_name]['value']
 
-                else:
-                    msg = 'Variable name "{}" not found.'
-                    raise KeyError(msg.format(name))
+                # else:
+                #     msg = 'Variable name "{}" not found.'
+                #     raise KeyError(msg.format(name))
 
-                self._initial_condition_cache[name] = val
+                if val is not _undefined:
+                    self._initial_condition_cache[name] = val
 
         elif name in self.model._outputs:
             val = self.model._outputs[name]
@@ -273,12 +281,43 @@ class Problem(object):
             elif self.model._discrete_inputs and name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
 
-            else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
+            # else:
+            #     msg = 'Variable name "{}" not found.'
+            #     raise KeyError(msg.format(name))
 
         # Need to cache the "get" in case the user calls in-place numpy operations.
-        self._initial_condition_cache[name] = val
+        #  self._initial_condition_cache[name] = val
+
+        if self.model.comm.size > 1:
+            # check for remote var
+            if name in self.model._var_allprocs_abs2meta:
+                abs_name = name
+            elif name in proms['input']:
+                abs_name = proms['input'][name][0]
+            elif name in proms['output']:
+                abs_name = proms['output'][name][0]
+
+            if abs_name is not None:
+                loc_val = val
+                if abs_name in self.model._var_allprocs_abs2idx:
+                    idx = self.model._var_allprocs_abs2idx[abs_name]
+                    # if any rank is missing the var, bcast it
+                    if not np.all(self.model._var_sizes['nonlinear'][:, idx]):
+                        owner = self.model._owning_rank[abs_name]
+                        if owner != self.model.comm.rank:
+                            val = None
+                else:
+                    owner = self.model._owning_rank[abs_name]
+                    if val is _undefined:
+                        val = None
+                new_val = self.model.comm.bcast(val, root=owner)
+                if loc_val is not None and loc_val is not _undefined:
+                    val = loc_val
+                else:
+                    val = new_val
+
+        if val is _undefined:
+            raise KeyError('Variable name "{}" not found.'.format(name))
 
         return val
 
@@ -338,45 +377,31 @@ class Problem(object):
         str
             Unit string.
         """
-        if self._setup_status == 1:
-            proms = self.model._var_allprocs_prom2abs_list
-            meta = self.model._var_abs2meta
-            if name in meta:
-                units = meta[name]['units']
+        meta = self.model._var_allprocs_abs2meta
+        if name in meta:
+            return meta[name]['units']
 
-            elif name in proms['input']:
+        proms = self.model._var_allprocs_prom2abs_list
+        if name in proms['output']:
+            return meta[proms['output'][name][0]]['units']
+
+        if name in proms['input']:
+            return meta[proms['input'][name][0]]['units']
+
+        if self._setup_status == 1:
+
+            if name in proms['input']:
                 # This triggers a check for unconnected non-unique inputs, and
                 # raises the same error as vector access.
                 abs_name = prom_name2abs_name(self.model, name, 'input')
-                units = meta[abs_name]['units']
+                return meta[abs_name]['units']
 
             elif name in proms['output']:
                 abs_name = prom_name2abs_name(self.model, name, 'output')
-                units = meta[abs_name]['units']
+                return meta[abs_name]['units']
 
-            else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
-
-        elif name in self.model._outputs:
-            try:
-                units = self.model._var_abs2meta[name]['units']
-            except KeyError:
-                abs_name = self.model._var_allprocs_prom2abs_list['output'][name][0]
-                units = self.model._var_abs2meta[abs_name]['units']
-
-        elif name in self.model._inputs:
-            try:
-                units = self.model._var_abs2meta[name]['units']
-            except KeyError:
-                abs_name = self.model._var_allprocs_prom2abs_list['input'][name][0]
-                units = self.model._var_abs2meta[abs_name]['units']
-
-        else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
-
-        return units
+        msg = 'Variable name "{}" not found.'
+        raise KeyError(msg.format(name))
 
     def __setitem__(self, name, value):
         """
@@ -402,8 +427,11 @@ class Problem(object):
             elif self.model._discrete_inputs and name in self.model._discrete_inputs:
                 self.model._discrete_inputs[name] = value
             else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
+                # might be a remote var.  If so, just do nothing in this proc
+                if not (name in self.model._var_allprocs_prom2abs_list or
+                        name in self.model._var_allprocs_abs2meta):
+                    msg = 'Variable name "{}" not found.'
+                    raise KeyError(msg.format(name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
