@@ -3,14 +3,14 @@
 [![Coveralls Badge][13]][14]
 
 # [OpenMDAO 2][0]
-*This version of **OpenMDAO** is in Development Status **[BETA](15)**.*
+*This version of **OpenMDAO** is in Development Status **[BETA][15]**.*
 
 ## Documentation
 Documentation for the latest version can be found [here][2].
 
 Documentation archives for prior versions can be found [here][3].
 
-## Important Note
+## Important Notice
 While the API is MOSTLY stable, the **OpenMDAO** development team reserves the
 right to update it and other elements of the code as needed.
 
@@ -48,11 +48,11 @@ Here is a list of things that have not yet been developed in 2.x:
 WebRecorder are currently supported)
 
 ## Install OpenMDAO 2
-You have two means for installing OpenMDAO, from the Python Package Index (PyPI)
-or from a clone of the [GitHub repository][4].
+You have two options for installing **OpenMDAO**, (1) from the
+[Python Package Index (PyPI)][1], and (2) from the [GitHub repository][4].
 
-**OpenMDAO** includes two optional set of dependencies, one for installing
-the developer tools (e.g., testing, coverage) and one for building the
+**OpenMDAO** includes two optional sets of dependencies, one for installing
+the developer tools (e.g., testing, coverage), and one for building the
 documentation.
 
 ### Install from [PyPI][1]
@@ -82,7 +82,7 @@ make to the source code will be reflected when you import **OpenMDAO** in
 Users are encourage to run the unit tests to ensure **OpenMDAO** is performing
 correctly.  In order to do so, you must install the testing dependencies.
 
-1. Install OpenMDAO and its testing dependencies:
+1. Install **OpenMDAO** and its testing dependencies:
 
     > `pip install openmdao[develop]`
 
@@ -125,7 +125,7 @@ you can install [Anaconda](https://www.anaconda.com/download/) and install
     > Follow the [instructions](#install-from-a-cloned-repository) for
     installing **OpenMDAO** from a cloned repository.
 
-2. Install the OpenMDAO and the documentation making dependencies:
+2. Install **OpenMDAO** and the dependencies required to build the documentation :
     > `pip install OpenMDAO[docs]`
 
 3. Change to the docs directory:
