@@ -7,7 +7,11 @@ import re
 import sys
 import warnings
 import unittest
-from mock import Mock
+try:
+    from mock import Mock
+except ImportError:
+    class Mock(object):
+        pass
 from fnmatch import fnmatchcase
 from six import string_types, PY2
 from six.moves import range, cStringIO as StringIO

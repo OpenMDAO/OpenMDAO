@@ -9,7 +9,10 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 import scipy
 
-from parameterized import parameterized
+try:
+  from parameterized import parameterized
+except ImportError:
+  parameterized = None
 
 from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 from openmdao.components.exec_comp import _expr_dict
@@ -678,84 +681,99 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 
-    @parameterized.expand(itertools.product([
-        func_name for func_name in _expr_dict if not func_name.startswith('_')
-    ]), name_func=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args))
-    def test_exec_comp_value(self, f):
-        test_data = _ufunc_test_data[f]
 
-        prob = Problem()
-        prob.model = model = Group()
+if parameterized is None:
 
-        if len(test_data['args']) > 1:
-            ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
-            for arg_name, arg_value in iteritems(test_data['args']):
-                if arg_name == 'f':
-                    continue
-                ivc.add_output(name=arg_name, val=arg_value['value'])
-                model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
+  class TestExecCompParameterized(unittest.TestCase):
+      def test_exec_comp_value(self):
+        raise unittest.SkipTest("requires 'parameterized' (install openmdao[test] or openmdao[all])")
 
-        model.add_subsystem('comp',
-                            ExecComp(test_data['str'], **test_data['args']),
-                            promotes_outputs=['f'])
-        prob.setup()
-        prob.run_model()
+      def test_exec_comp_jac(self):
+        raise unittest.SkipTest("requires 'parameterized' (install openmdao[test] or openmdao[all])")
 
-        if 'check_func' in test_data:
+else:
+  # @unittest.skipIf(parameterized is None,
+  #                  "requires 'parameterized' (install openmdao[test] or openmdao[all])")
+  class TestExecCompParameterized(unittest.TestCase):
 
-            check_args = []
-            try:
-                check_args.append(test_data['args']['x']['value'])
-            except Exception:
-                pass
-            try:
-                check_args.append(test_data['args']['y']['value'])
-            except Exception:
-                pass
-            check_args = tuple(check_args)
+      @parameterized.expand(itertools.product([
+          func_name for func_name in _expr_dict if not func_name.startswith('_')
+      ]), name_func=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args))
+      def test_exec_comp_value(self, f):
+          test_data = _ufunc_test_data[f]
 
-            expected = test_data['check_func'](*check_args)
-        else:
-            expected = test_data['check_val']
-        np.testing.assert_almost_equal(prob['f'], expected)
+          prob = Problem()
+          prob.model = model = Group()
 
-        if 'check_val' not in test_data:
-            try:
-                prob.check_partials(compact_print=True)
-            except TypeError as e:
-                print(f, 'does not support complex-step differentiation')
+          if len(test_data['args']) > 1:
+              ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
+              for arg_name, arg_value in iteritems(test_data['args']):
+                  if arg_name == 'f':
+                      continue
+                  ivc.add_output(name=arg_name, val=arg_value['value'])
+                  model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
 
-    @parameterized.expand(itertools.product([
-        func_name for func_name in _expr_dict if not func_name.startswith('_')
-    ]), name_func=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args))
-    def test_exec_comp_jac(self, f):
+          model.add_subsystem('comp',
+                              ExecComp(test_data['str'], **test_data['args']),
+                              promotes_outputs=['f'])
+          prob.setup()
+          prob.run_model()
 
-        test_data = _ufunc_test_data[f]
+          if 'check_func' in test_data:
 
-        prob = Problem()
-        prob.model = model = Group()
+              check_args = []
+              try:
+                  check_args.append(test_data['args']['x']['value'])
+              except Exception:
+                  pass
+              try:
+                  check_args.append(test_data['args']['y']['value'])
+              except Exception:
+                  pass
+              check_args = tuple(check_args)
 
-        if len(test_data['args']) > 1:
-            ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
-            for arg_name, arg_value in iteritems(test_data['args']):
-                if arg_name == 'f':
-                    continue
-                ivc.add_output(name=arg_name, val=arg_value['value'])
-                model.connect('ivc.{0}'.format(arg_name),
-                              '{0}_comp.{1}'.format(f, arg_name))
+              expected = test_data['check_func'](*check_args)
+          else:
+              expected = test_data['check_val']
+          np.testing.assert_almost_equal(prob['f'], expected)
 
-        model.add_subsystem('{0}_comp'.format(f),
-                            ExecComp(test_data['str'], **test_data['args']),
-                            promotes_outputs=['f'])
-        prob.setup()
-        prob.run_model()
+          if 'check_val' not in test_data:
+              try:
+                  prob.check_partials(compact_print=True)
+              except TypeError as e:
+                  print(f, 'does not support complex-step differentiation')
 
-        if 'check_val' not in test_data:
-            cpd = prob.check_partials(compact_print=True)
+      @parameterized.expand(itertools.product([
+          func_name for func_name in _expr_dict if not func_name.startswith('_')
+      ]), name_func=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args))
+      def test_exec_comp_jac(self, f):
 
-            for comp in cpd:
-                for (var, wrt) in cpd[comp]:
-                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'], 0, decimal=4)
+          test_data = _ufunc_test_data[f]
+
+          prob = Problem()
+          prob.model = model = Group()
+
+          if len(test_data['args']) > 1:
+              ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
+              for arg_name, arg_value in iteritems(test_data['args']):
+                  if arg_name == 'f':
+                      continue
+                  ivc.add_output(name=arg_name, val=arg_value['value'])
+                  model.connect('ivc.{0}'.format(arg_name),
+                                '{0}_comp.{1}'.format(f, arg_name))
+
+          model.add_subsystem('{0}_comp'.format(f),
+                              ExecComp(test_data['str'], **test_data['args']),
+                              promotes_outputs=['f'])
+          prob.setup()
+          prob.run_model()
+
+          if 'check_val' not in test_data:
+              cpd = prob.check_partials(compact_print=True)
+
+              for comp in cpd:
+                  for (var, wrt) in cpd[comp]:
+                      np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'], 0, decimal=4)
 
 
 if __name__ == "__main__":
