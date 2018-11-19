@@ -103,11 +103,9 @@ and include the error message.
     that by running the following commands in *python* and copying the results
     produced by the last line.
     ```python
-    >>> import platform
-    >>> import sys
-    >>>
-    >>> info = platform.uname()
-    >>> (info.system, info.version), (info.machine, info.processor), sys.version
+    import platform, sys
+    info = platform.uname()
+    (info.system, info.version), (info.machine, info.processor), sys.version
     ```
     > Which should produce a result similar to:
     ```python
