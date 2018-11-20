@@ -212,6 +212,7 @@ class Problem(object):
         """
         # Caching only needed if vectors aren't allocated yet.
         proms = self.model._var_allprocs_prom2abs_list
+        meta = self.model._var_abs2meta
 
         val = _undefined
         abs_name = None
@@ -225,7 +226,6 @@ class Problem(object):
             # Vector not setup, so we need to pull values from saved metadata request.
             else:
                 proms = self.model._var_allprocs_prom2abs_list
-                meta = self.model._var_abs2meta
                 if name in meta:
                     if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
@@ -270,9 +270,9 @@ class Problem(object):
 
         else:
             if name in proms['input']:
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-            else:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
+                name = prom_name2abs_name(self.model, name, 'input')
+            elif name in proms['output']:
+                name = prom_name2abs_name(self.model, name, 'output')
 
             if self.model._discrete_outputs and name in self.model._discrete_outputs:
                 val = self.model._discrete_outputs[name]
