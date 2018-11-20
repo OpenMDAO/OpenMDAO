@@ -225,7 +225,6 @@ class Problem(object):
 
             # Vector not setup, so we need to pull values from saved metadata request.
             else:
-                proms = self.model._var_allprocs_prom2abs_list
                 if name in meta:
                     if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
@@ -412,8 +411,9 @@ class Problem(object):
             elif self.model._discrete_inputs and name in self.model._discrete_inputs:
                 self.model._discrete_inputs[name] = value
             else:
-                # might be a remote var.  If so, just do nothing in this proc
-                if not (name in self.model._var_allprocs_prom2abs_list or
+                proms = self.model._var_allprocs_prom2abs_list
+                # might be a remote var.  If so, just do nothing on this proc
+                if not (name in proms['input'] or name in proms['output'] or
                         name in self.model._var_allprocs_abs2meta):
                     raise KeyError('Variable name "{}" not found.'.format(name))
 
