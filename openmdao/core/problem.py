@@ -281,8 +281,9 @@ class Problem(object):
                 val = self.model._discrete_inputs[name]
 
         if self.model.comm.size > 1:
+            allprocs_meta = self.model._var_allprocs_abs2meta
             # check for remote var
-            if name in self.model._var_allprocs_abs2meta:
+            if name in allprocs_meta:
                 abs_name = name
             elif name in proms['input']:
                 abs_name = proms['input'][name][0]
@@ -290,6 +291,9 @@ class Problem(object):
                 abs_name = proms['output'][name][0]
 
             if abs_name in self._remote_var_set:
+                if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
+                    raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
+                                       "supported." % abs_name)
                 loc_val = val
                 owner = self.model._owning_rank[abs_name]
                 if owner != self.model.comm.rank:

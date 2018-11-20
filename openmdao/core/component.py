@@ -31,7 +31,7 @@ _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size'),
+    'input': ('units', 'shape', 'size', 'distributed'),
     'output': ('units', 'shape', 'size',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
 }
@@ -434,6 +434,7 @@ class Component(System):
 
         metadata['units'] = units
         metadata['desc'] = desc
+        metadata['distributed'] = self.options['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
