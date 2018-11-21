@@ -232,6 +232,11 @@ class Problem(object):
                     else:
                         val = meta[name]['value']
 
+                elif name in proms['output']:
+                    abs_name = prom_name2abs_name(self.model, name, 'output')
+                    if abs_name in meta:
+                        val = meta[abs_name]['value']
+
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
                     conn = self.model._conn_abs_in2out
@@ -252,31 +257,26 @@ class Problem(object):
                             abs_name = prom_name2abs_name(self.model, name, 'input')
                             val = meta[abs_name]['value']
 
-                elif name in proms['output']:
-                    abs_name = prom_name2abs_name(self.model, name, 'output')
-                    if abs_name in meta:
-                        val = meta[abs_name]['value']
-
                 if val is not _undefined:
                     # Need to cache the "get" in case the user calls in-place numpy operations.
                     self._initial_condition_cache[name] = val
 
-        elif name in self.model._outputs:
-            val = self.model._outputs[name]
-
-        elif name in self.model._inputs:
-            val = self.model._inputs[name]
-
         else:
-            if name in proms['input']:
+            if name in proms['output']:
+                name = proms['output'][name][0]
+            elif name in proms['input']:
                 name = prom_name2abs_name(self.model, name, 'input')
-            elif name in proms['output']:
-                name = prom_name2abs_name(self.model, name, 'output')
 
-            if self.model._discrete_outputs and name in self.model._discrete_outputs:
+            if name in meta:   # local var
+                if name in self.model._outputs._views:
+                    val = self.model._outputs[name]
+                else:
+                    val = self.model._inputs[name]
+
+            elif name in self.model._discrete_outputs:
                 val = self.model._discrete_outputs[name]
 
-            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
+            elif name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
 
         if self.model.comm.size > 1:
