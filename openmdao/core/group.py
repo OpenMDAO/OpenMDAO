@@ -1595,8 +1595,9 @@ class Group(System):
         Provide initial guess for states.
         """
         if self._has_guess:
-            for isub, sub in enumerate(self._subsystems_myproc):
+            for ind, sub in enumerate(self._subsystems_myproc):
                 if sub._has_guess:
+                    isub = self._subsystems_myproc_inds[ind]
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
 
