@@ -125,6 +125,9 @@ def _ad(prob, options):
 
         type_ = 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit'
         summ['type'] = type_
+        summ['osize'] = s._outputs._data.size
+        summ['isize'] = s._inputs._data.size
+        summ['pref'] = 'fwd' if summ['osize'] >= summ['isize'] else 'rev'
         print("Type:", type_)
 
         if options.ad_method == 'autograd':
@@ -189,9 +192,11 @@ def _ad(prob, options):
     revgood = []
     bad = []
 
-    toptemplate = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}}{rdiff:<{dwidth}}"
-    template = "{cname:<{cwidth}}{typ:<10}{fdiff:<{dwidth}.4}{rdiff:<{dwidth}.4}"
-    print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)', rdiff='Max Diff (rev)', cwidth=max_cname, dwidth=max_diff))
+    toptemplate = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}}{rdiff:<{dwid}}{iosz:<12}{pref:<14}"
+    template = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}.4}{rdiff:<{dwid}.4}{iosz:<12}{pref:<14}"
+    print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)',
+                             rdiff='Max Diff (rev)', pref='Preferred Mode',
+                             cwid=max_cname, dwid=max_diff, iosz='(I/O) Size'))
     print('--------- both derivs ok ------------')
     for cname in sorted(summary):
         s = summary[cname]
@@ -200,7 +205,9 @@ def _ad(prob, options):
         fwdmax = s['fwd']['diff']
         revran = s['rev']['ran']
         revmax = s['rev']['diff']
-        line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, cwidth=max_cname, dwidth=max_diff)
+        line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax,
+                               cwid=max_cname, dwid=max_diff,
+                               iosz='(%d/%d)' % (s['isize'], s['osize']), pref=s['pref'])
         if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:
             bothgood.append(line)
             print(line)
@@ -226,8 +233,10 @@ def _ad(prob, options):
         for b in bad:
             print(b)
 
-    print('\nSummary:  %d both good,  %d fwd good,  %d rev good' % (len(bothgood), len(fwdgood),
-                                                                    len(revgood)))
+    tot = len(bothgood) + len(fwdgood) + len(revgood) + len(bad)
+    print('\nSummary:  %d total, %d both good,  %d fwd good,  %d rev good' % (tot, len(bothgood),
+                                                                              len(fwdgood),
+                                                                              len(revgood)))
     exit()
 
 
