@@ -356,8 +356,11 @@ class ScipyOptimizeDriver(Driver):
             jac = None
 
         if opt in _hessian_optimizers:
-            from scipy.optimize import BFGS  # FIXME temporary, should be option. (P.O.)
-            hess = BFGS()
+            if 'hess' in self.opt_settings:
+                hess = self.opt_settings.pop('hess')
+            else:
+                from scipy.optimize import BFGS  # FIXME temporary, should be option. (P.O.)
+                hess = BFGS()
         else:
             hess = None
 
