@@ -463,6 +463,28 @@ class ScipyOptimizeDriver(Driver):
         return f_new
 
     def _con_val_func(self, x_new, name, dbl, idx):
+        """
+        Return the value of the constraint function requested in args.
+
+        The lower or upper bound is **not** subtracted from the value. Used for optimizers,
+        which take the bounds of the constraints (e.g. trust-constr)
+        
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+        name : string
+            Name of the constraint to be evaluated.
+        dbl : bool
+            True if double sided constraint.
+        idx : float
+            Contains index into the constraint array.
+
+        Returns
+        -------
+        float
+            Value of the constraint function.
+        """
         return self._con_cache[name][idx]
 
     def _confunc(self, x_new, name, dbl, idx):
