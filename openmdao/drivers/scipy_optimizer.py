@@ -359,7 +359,8 @@ class ScipyOptimizeDriver(Driver):
             if 'hess' in self.opt_settings:
                 hess = self.opt_settings.pop('hess')
             else:
-                from scipy.optimize import BFGS  # FIXME temporary, should be option. (P.O.)
+                # Defaults to BFGS, if not in opt_settings
+                from scipy.optimize import BFGS
                 hess = BFGS()
         else:
             hess = None
@@ -445,7 +446,7 @@ class ScipyOptimizeDriver(Driver):
                 model._solve_nonlinear()
 
             # Get the objective function evaluations
-            for name, obj in iteritems(self.get_objective_values()):
+            for obj in itervalues(self.get_objective_values()):
                 f_new = obj
                 break
 
