@@ -180,7 +180,6 @@ class ScipyOptimizeDriver(Driver):
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
-        # if (opt in _constraint_optimizers) and (opt not in _bounds_optimizers):
         if opt == 'COBYLA':
             for name, meta in iteritems(self._designvars):
                 lower = meta['lower']
@@ -195,6 +194,7 @@ class ScipyOptimizeDriver(Driver):
                     d['adder'] = None
                     d['scaler'] = None
                     d['size'] = meta['size']
+                    d['linear'] = True
                     self._cons[name] = d
 
     def run(self):
@@ -275,10 +275,6 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
-                try:
-                    print('name&meta', name, meta['linear'])
-                except KeyError:
-                    print('name&meta', name, meta)
                 if 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
