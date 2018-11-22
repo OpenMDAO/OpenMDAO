@@ -115,6 +115,8 @@ class ScipyOptimizeDriver(Driver):
         self._con_cache = None
         self._con_idx = {}
         self._obj_and_nlcons = None
+        self._dvlist = None
+        self._lincongrad_cache = None
         self.fail = False
         self.iter_count = 0
         self._exc_info = None
@@ -178,6 +180,7 @@ class ScipyOptimizeDriver(Driver):
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
+        # if (opt in _constraint_optimizers) and (opt not in _bounds_optimizers):
         if opt == 'COBYLA':
             for name, meta in iteritems(self._designvars):
                 lower = meta['lower']
@@ -272,6 +275,10 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
+                try:
+                    print('name&meta', name, meta['linear'])
+                except KeyError:
+                    print('name&meta', name, meta)
                 if 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
@@ -297,7 +304,7 @@ class ScipyOptimizeDriver(Driver):
                         ub = upper
                     # Loop over every index separately,
                     # because scipy calls each constraint by index.
-                    for j in range(0, size):
+                    for j in range(size):
                         # Double-sided constraints are accepted by the algorithm
                         args = [name, False, j]
                         # TODO linear constraint if meta['linear']
@@ -309,7 +316,7 @@ class ScipyOptimizeDriver(Driver):
                 else:  # Type of constraints is list of dict
                     # Loop over every index separately,
                     # because scipy calls each constraint by index.
-                    for j in range(0, size):
+                    for j in range(size):
                         con_dict = {}
                         if meta['equals'] is not None:
                             con_dict['type'] = 'eq'
