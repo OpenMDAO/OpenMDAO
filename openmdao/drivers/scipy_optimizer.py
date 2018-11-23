@@ -82,6 +82,10 @@ class ScipyOptimizeDriver(Driver):
     _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
+    _dvlist : list
+        Copy of _designvars.
+    _lincongrad_cache : np.ndarray
+        Pre-calculated gradients of linear constraints.
     """
 
     def __init__(self, **kwargs):
@@ -355,6 +359,7 @@ class ScipyOptimizeDriver(Driver):
         else:
             jac = None
 
+        # Hessian calculation method for optimizers, which require it
         if opt in _hessian_optimizers:
             if 'hess' in self.opt_settings:
                 hess = self.opt_settings.pop('hess')
@@ -468,7 +473,7 @@ class ScipyOptimizeDriver(Driver):
 
         The lower or upper bound is **not** subtracted from the value. Used for optimizers,
         which take the bounds of the constraints (e.g. trust-constr)
-        
+
         Parameters
         ----------
         x_new : ndarray
