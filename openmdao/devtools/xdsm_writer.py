@@ -90,6 +90,22 @@ class XDSMWriter(XDSM):
 
 
 def write_xdsm(problem, filename, include_solver=False):
+    """
+    Writes XDSM diagram of an optimization problem.
+
+    Parameters
+    ----------
+    problem : Problem
+       Problem
+    filename : str
+       Name of the output files (do not provide file extension)
+    include_solver : bool
+       Include or not the problem model's nonlinear solver in the XDSM.
+    Returns
+    -------
+       XDSM
+    """
+
     def get_cls_name(obj):
         return obj.__class__.__name__
 
@@ -137,7 +153,8 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
        Responses
     subs : tuple
        Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
-    :param kwargs:
+    kwargs : dict
+       Keyword arguments
 
     Returns
     -------
