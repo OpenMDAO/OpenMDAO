@@ -16,7 +16,7 @@ class TestXDSMViewer(unittest.TestCase):
         try:
             from pyxdsm.XDSM import XDSM
         except ImportError:
-            raise unittest.SkipTest("pyXDSM is not installed")
+            raise unittest.skipTest("pyXDSM is not installed")
 
     def test_sellar(self):
         """Makes XDSM for the Sellar problem"""
