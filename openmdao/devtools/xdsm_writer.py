@@ -124,12 +124,12 @@ def write_xdsm(problem, filename, include_solver=False):
     responses = model.get_responses()
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
-    return _write_xdsm(filename, connections=viewer_data['connections_list'],
+    return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, design_vars=design_vars,
                        responses=responses)
 
 
-def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True,
+def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None,
                 subs=(('_', '~'), (')', ' '), ('(', '_')), **kwargs):
     """
@@ -163,8 +163,22 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
        XDSM
     """
     # TODO implement residuals
+    connections = viewer_data['connections_list']
+    tree = viewer_data['tree']
 
-    comps = []
+    def get_comps(tree):
+        # Components are ordered in the tree, so they can be collected by walking through the tree.
+        components = list()
+
+        def get_children(tree_branch):
+            for ch in tree_branch['children']:
+                if ch['subsystem_type'] == 'component':
+                    components.append(ch['name'])
+                else:
+                    get_children(ch)
+
+        get_children(tree)
+        return components
 
     def residual_str(name):
         """Makes a residual symbol."""
@@ -194,9 +208,6 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
             var = name[-1]
             var = _replace_chars(var, substitutes=subs)
             new = {'comp': comp, 'var': var}
-
-            if comp not in comps:
-                comps.append(comp)
             return new
 
         if isinstance(name, list):  # If a source has multiple targets
@@ -252,6 +263,8 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
         x.connect(comp, 'opt', conn_vars)
         opt_con_vars = [opt_var_str(var) for var in conn_vars]
         x.add_output(comp, ', '.join(opt_con_vars), side='left')
+
+    comps = get_comps(tree)
 
     # Add components
     for comp in comps:
