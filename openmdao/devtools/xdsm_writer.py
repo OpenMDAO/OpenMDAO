@@ -50,7 +50,7 @@ class XDSMWriter(XDSM):
         Parameters
         ----------
         label : str
-           Label in the XDSM
+           Label in the XDSM, defaults to the name of the component.
         name : str
            Name of the component
         kwargs : dict
@@ -133,7 +133,9 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
                 design_vars=None, responses=None, residuals=None,
                 subs=(('_', '~'), (')', ' '), ('(', '_')), **kwargs):
     """
-    XDSM writer. Components are extracted from the connections.
+    XDSM writer. Components are extracted from the connections of the problem.
+
+    In the diagram the connections are marked with the source name.
 
     Parameters
     ----------
@@ -197,7 +199,7 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
                 comps.append(comp)
             return new
 
-        if isinstance(name, list):
+        if isinstance(name, list):  # If a source has multiple targets
             return [convert(n) for n in name]
         else:  # string
             return convert(name)
@@ -207,6 +209,7 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
         return conns_new
 
     def accumulate_connections(conns):
+        # Makes a dictionary with source and target components and with the connection sources
         conns_new = dict()
         for conn in conns:  # list
             src_comp = conn['src']['comp']
@@ -250,6 +253,7 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
         opt_con_vars = [opt_var_str(var) for var in conn_vars]
         x.add_output(comp, ', '.join(opt_con_vars), side='left')
 
+    # Add components
     for comp in comps:
         x.add_comp(name=comp, label=_replace_chars(comp, substitutes=subs))
 
