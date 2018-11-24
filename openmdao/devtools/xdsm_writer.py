@@ -11,7 +11,7 @@ try:
 except ImportError:
     msg = ('The pyxdsm package should be installed. You can download the package '
            'from https://github.com/mdolab/pyXDSM')
-    raise ImportError(msg)
+    raise RuntimeError(msg)
 
 from six import iteritems
 
@@ -32,10 +32,14 @@ class XDSMWriter(XDSM):
         """
         Add a solver.
 
-        param str label: Label in the XDSM
-        :param str name: Name of
-        :param dict kwargs: Keyword args
-        :return: None
+        Parameters
+        ----------
+        label : str
+           Label in the XDSM
+        name : str
+           Name of the solver
+        kwargs : dict
+           Keyword args
         """
         self.add_system(name, 'MDA', '\\text{%s}' % label, **kwargs)
 
@@ -43,10 +47,14 @@ class XDSMWriter(XDSM):
         """
         Add a component.
 
-        param str label: Label in the XDSM
-        :param str name: Name of
-        :param dict kwargs: Keyword args
-        :return: None
+        Parameters
+        ----------
+        label : str
+           Label in the XDSM
+        name : str
+           Name of the component
+        kwargs : dict
+           Keyword args
         """
         if label is None:
             label = name
@@ -56,9 +64,12 @@ class XDSMWriter(XDSM):
         """
         Add a function
 
-        :param str name: Name of
-        :param dict kwargs: Keyword args
-        :return: None
+        Parameters
+        ----------
+        name : str
+           Name of the function
+        kwargs : dict
+           Keyword args
         """
         self.add_system(name, 'Function', name, **kwargs)
 
@@ -66,10 +77,14 @@ class XDSMWriter(XDSM):
         """
         Add an optimizer.
 
-        :param str label: Label in the XDSM
-        :param str name: Name of
-        :param dict kwargs: Keyword args
-        :return: None
+        Parameters
+        ----------
+        label : str
+           Label in the XDSM
+        name : str
+           Name of the optimizer.
+        kwargs : dict
+           Keyword args
         """
         self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
 
@@ -104,22 +119,29 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
     """
     XDSM writer. Components are extracted from the connections.
 
-    .. figure:: _images/xdsm.*
-       :width: 90 %
-       :align: center
-
-       Extended Design Structure Matrix
-
-    :param str filename: Filename (absolute path without extension)
-    :param list[(str, str)] connections: Connections list
-    :param str | None optimizer: optimizer name
-    :param str | None solver: Solver name
-    :param bool cleanup: Clean-up temporary files after making the diagram
-    :param OrderedDict | None design_vars: Design variables
-    :param OrderedDict | None responses: Responses
-    :param tuple subs: Character pairs to be substituted
+    Parameters
+    ----------
+    filename : str
+       Filename (absolute path without extension)
+    connections : list[(str, str)]
+       Connections list
+    optimizer : str or None
+       Optimizer name
+    solver:  str or None
+       Solver name
+    cleanup : bool
+       Clean-up temporary files after making the diagram
+    design_vars : OrderedDict or None
+       Design variables
+    responses : OrderedDict or None
+       Responses
+    subs : tuple
+       Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
     :param kwargs:
-    :return: XDSM
+
+    Returns
+    -------
+       XDSM
     """
     # TODO implement residuals
 
@@ -137,8 +159,14 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
         """
         From an absolute path returns the variable name and its owner component in a dict.
 
-        :param str name: Connection absolute path and name
-        :return: dict(str, str)
+        Parameters
+        ----------
+        name : str
+           Connection absolute path and name
+
+        Returns
+        -------
+           dict(str, str)
         """
 
         def convert(name):
@@ -226,9 +254,16 @@ def _replace_chars(name, substitutes):
 
        Order matters, because otherwise some characters could be replaced more than once.
 
-    :param name:
-    :param dict | tuple substitutes: Character pairs with old and substitute characters
-    :return: str
+    Parameters
+    ----------
+    name : str
+       Name
+    substitutes: tuple
+       Character pairs with old and substitute characters
+
+    Returns
+    -------
+       str
     """
     for (k, v) in substitutes:
         name = name.replace(k, v)
