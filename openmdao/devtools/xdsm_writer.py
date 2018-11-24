@@ -20,6 +20,12 @@ class XDSMWriter(XDSM):
     """
     XDSM with some additional semantics.
     Creates a TeX file and TiKZ file, and converts it to PDF.
+
+    On Windows it might be necessary to add the second line in the :class:`~pyxdsm.XDSM.XDSM`::
+
+        diagram_styles_path = os.path.join(module_path, 'diagram_styles')
+        diagram_styles_path = diagram_styles_path.replace('\\', '/')  # Add this line on Windows
+
     """
 
     def add_solver(self, label, name='solver', **kwargs):
@@ -134,16 +140,22 @@ def _write_xdsm(filename, connections, optimizer=None, solver=None, cleanup=True
         :param str name: Connection absolute path and name
         :return: dict(str, str)
         """
-        name = name.split('.')
-        comp = name[-2]
-        var = name[-1]
-        var = _replace_chars(var, substitutes=subs)
-        print(var)
-        new = {'comp': comp, 'var': var}
 
-        if comp not in comps:
-            comps.append(comp)
-        return new
+        def convert(name):
+            name = name.split('.')
+            comp = name[-2]
+            var = name[-1]
+            var = _replace_chars(var, substitutes=subs)
+            new = {'comp': comp, 'var': var}
+
+            if comp not in comps:
+                comps.append(comp)
+            return new
+
+        if isinstance(name, list):
+            return [convert(n) for n in name]
+        else:  # string
+            return convert(name)
 
     def process_connections(conns):
         conns_new = [{k: convert_name(v) for k, v in iteritems(conn)} for conn in conns]
