@@ -28,7 +28,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME)
+        write_xdsm(prob, filename=FILENAME+'0')
 
     def test_sphere(self):
         """
@@ -68,14 +68,18 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME)
+        write_xdsm(prob, filename=FILENAME+'1')
 
     def tearDown(self):
         """Comment out this method, if you want to inspect the output files."""
         for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
-            filename = '.'.join([FILENAME, ext])
-            if os.path.exists(filename):
-                os.remove(filename)
+            for i in range(2):
+                filename = '.'.join([FILENAME+str(i), ext])
+                try:  # Try to clean up
+                    if os.path.exists(filename):
+                        os.remove(filename)
+                except Exception as e:
+                    pass
 
 
 if __name__ == "__main__":
