@@ -10,203 +10,251 @@ from numpy.testing import assert_almost_equal
 import scipy
 
 try:
-  from parameterized import parameterized
+    from parameterized import parameterized
 except ImportError:
-  parameterized = None
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 from openmdao.components.exec_comp import _expr_dict
 from openmdao.utils.assert_utils import assert_rel_error
 
-_ufunc_test_data = {'abs': {'str': 'f=abs(x)',
-                            'check_func': np.abs,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)}}},
-                    'acos': {'str': 'f=acos(x)',
-                             'check_func': np.arccos,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)-0.5}}},
-                    'arccos': {'str': 'f=arccos(x)',
-                               'check_func': np.arccos,
-                               'args': {'f': {'value': np.zeros(6)},
-                                        'x': {'value': np.random.random(6)-0.5}}},
-                    'arccosh': {'str': 'f=arccosh(x)',
-                                'check_func': np.arccosh,
-                                'args': {'f': {'value': np.zeros(6)},
-                                         'x': {'value': 1.1+np.random.random(6)}}},
-                    'acosh': {'str': 'f=acosh(x)',
-                              'check_func': np.arccosh,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': 1.1+np.random.random(6)}}},
-                    'arange': {'str': 'f=arange(0,10,2)',
-                               'check_val': np.arange(0, 10, 2),
-                               'args': {'f': {'value': np.zeros(5)}}},
-                    'arcsin': {'str': 'f=arcsin(x)',
-                               'check_func': np.arcsin,
-                               'args': {'f': {'value': np.zeros(6)},
-                                        'x': {'value': np.random.random(6)-.5}}},
-                    'arcsinh': {'str': 'f=arcsinh(x)',
-                                'check_func': np.arcsinh,
-                                'args': {'f': {'value': np.zeros(6)},
-                                         'x': {'value': np.random.random(6)}}},
-                    'asinh': {'str': 'f=asinh(x)',
-                              'check_func': np.arcsinh,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': np.random.random(6)}}},
-                    'asin': {'str': 'f=asin(x)',
-                             'check_func': np.arcsin,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)-.5}}},
-                    'arctan': {'str': 'f=arctan(x)',
-                               'check_func': np.arctan,
-                               'args': {'f': {'value': np.zeros(6)},
-                                        'x': {'value': np.random.random(6)}}},
-                    'atan': {'str': 'f=atan(x)',
-                             'check_func': np.arctan,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)}}},
-                    'cos': {'str': 'f=cos(x)',
-                            'check_func': np.cos,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)}}},
-                    'cosh': {'str': 'f=cosh(x)',
-                             'check_func': np.cosh,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)}}},
-                    'dot': {'str': 'f=dot(x, y)',
-                            'check_func': np.dot,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)},
-                                     'y': {'value': np.random.random(6)}}},
-                    'e': {'str': 'f=e',
-                          'check_val': np.e,
-                          'args': {'f': {'value': 0.0}}},
-                    'erf': {'str': 'f=erf(x)',
-                            'check_func': scipy.special.erf,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)}}},
-                    'erfc': {'str': 'f=erfc(x)',
-                             'check_func': scipy.special.erfc,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)}}},
-                    'exp': {'str': 'f=exp(x)',
-                            'check_func': np.exp,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)}}},
-                    'expm1': {'str': 'f=expm1(x)',
-                              'check_func': np.expm1,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': np.random.random(6)}}},
-                    'factorial': {'str': 'f=factorial(x)',
-                                  'check_func': scipy.special.factorial,
-                                  'args': {'f': {'value': np.zeros(6)},
-                                           'x': {'value': np.random.random(6)}}},
-                    'fmax': {'str': 'f=fmax(x, y)',
-                             'check_func': np.fmax,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)},
-                                      'y': {'value': np.random.random(6)}}},
-                    'fmin': {'str': 'f=fmin(x, y)',
-                             'check_func': np.fmin,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)},
-                                      'y': {'value': np.random.random(6)}}},
-                    'inner': {'str': 'f=inner(x, y)',
-                              'check_func': np.inner,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': np.random.random(6)},
-                                       'y': {'value': np.random.random(6)}}},
-                    'isinf': {'str': 'f=isinf(x)',
-                              'check_func': np.isinf,
-                              'args': {'f': {'value': np.zeros(3)},
-                                       'x': {'value': [0, np.inf, 5.0]}}},
-                    'isnan': {'str': 'f=isnan(x)',
-                              'check_func': np.isnan,
-                              'args': {'f': {'value': np.zeros(3)},
-                                       'x': {'value': [0, np.nan, np.nan]}}},
-                    'kron': {'str': 'f=kron(x, y)',
-                             'check_func': np.kron,
-                             'args': {'f': {'value': np.zeros(36)},
-                                      'x': {'value': np.random.random(6)},
-                                      'y': {'value': np.random.random(6)}}},
-                    'linspace': {'str': 'f=linspace(0,10,50)',
-                                 'check_val': np.linspace(0, 10, 50),
-                                 'args': {'f': {'value': np.zeros(50)}}},
-                    'log': {'str': 'f=log(x)',
-                            'check_func': np.log,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)+0.1}}},
-                    'log10': {'str': 'f=log10(x)',
-                              'check_func': np.log10,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': np.random.random(6)+0.1}}},
-                    'log1p': {'str': 'f=log1p(x)',
-                              'check_func': np.log1p,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': np.random.random(6)}}},
-                    'matmul': {'str': 'f=matmul(x, y)',
-                               'check_func': np.matmul,
-                               'args': {'f': {'value': np.zeros((3, 1))},
-                                        'x': {'value': np.random.random((3, 3))},
-                                        'y': {'value': np.random.random((3, 1))}}},
-                    'maximum': {'str': 'f=maximum(x, y)',
-                                'check_func': np.maximum,
-                                'args': {'f': {'value': np.zeros(6)},
-                                         'x': {'value': np.random.random(6)},
-                                         'y': {'value': np.random.random(6)}}},
-                    'minimum': {'str': 'f=minimum(x, y)',
-                                'check_func': np.minimum,
-                                'args': {'f': {'value': np.zeros(6)},
-                                         'x': {'value': np.random.random(6)},
-                                         'y': {'value': np.random.random(6)}}},
-                    'ones': {'str': 'f=ones(21)',
-                             'check_val': np.ones(21),
-                             'args': {'f': {'value': np.zeros(21)}}},
-                    'outer': {'str': 'f=outer(x, y)',
-                              'check_func': np.outer,
-                              'args': {'f': {'value': np.zeros((6, 6))},
-                                       'x': {'value': np.random.random(6)},
-                                       'y': {'value': np.random.random(6)}}},
-                    'pi': {'str': 'f=pi',
-                           'check_val': np.pi,
-                           'args': {'f': {'value': 0.0}}},
-                    'power': {'str': 'f=power(x, y)',
-                              'check_func': np.power,
-                              'args': {'f': {'value': np.zeros(6)},
-                                       'x': {'value': np.random.random(6)},
-                                       'y': {'value': np.random.random(6)+1.0}}},
-                    'prod': {'str': 'f=prod(x)',
-                             'check_func': np.prod,
-                             'args': {'f': {'value': 0.0},
-                                      'x': {'value': np.random.random(6)}}},
-                    'sin': {'str': 'f=sin(x)',
-                            'check_func': np.sin,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)}}},
-                    'sinh': {'str': 'f=sinh(x)',
-                             'check_func': np.sinh,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)}}},
-                    'sum': {'str': 'f=sum(x)',
-                            'check_func': np.sum,
-                            'args': {'f': {'value': 0.0},
-                                     'x': {'value': np.random.random(6)}}},
-                    'tan': {'str': 'f=tan(x)',
-                            'check_func': np.tan,
-                            'args': {'f': {'value': np.zeros(6)},
-                                     'x': {'value': np.random.random(6)}}},
-                    'tanh': {'str': 'f=tanh(x)',
-                             'check_func': np.tanh,
-                             'args': {'f': {'value': np.zeros(6)},
-                                      'x': {'value': np.random.random(6)}}},
-                    'tensordot': {'str': 'f=tensordot(x, y)',
-                                  'check_func': np.tensordot,
-                                  'args': {'f': {'value': 0.0},
-                                           'x': {'value': np.random.random((6, 6))},
-                                           'y': {'value': np.random.random((6, 6))}}},
-                    'zeros': {'str': 'f=zeros(21)',
-                              'check_val': np.zeros(21),
-                              'args': {'f': {'value': np.zeros(21)}}}, }
+_ufunc_test_data = {
+    'abs': {
+        'str': 'f=abs(x)',
+        'check_func': np.abs,
+        'args': { 'f': {'value': np.zeros(6)},
+                  'x': {'value': np.random.random(6)}}},
+    'acos': {
+        'str': 'f=acos(x)',
+        'check_func': np.arccos,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6) - 0.5}}},
+    'arccos': {
+        'str': 'f=arccos(x)',
+        'check_func': np.arccos,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6) - 0.5}}},
+    'arccosh': {
+        'str': 'f=arccosh(x)',
+        'check_func': np.arccosh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': 1.1 + np.random.random(6)}}},
+    'acosh': {
+        'str': 'f=acosh(x)',
+        'check_func': np.arccosh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': 1.1 + np.random.random(6)}}},
+    'arange': {
+        'str': 'f=arange(0,10,2)',
+        'check_val': np.arange(0, 10, 2),
+        'args': {'f': {'value': np.zeros(5)}}},
+    'arcsin': {
+        'str': 'f=arcsin(x)',
+        'check_func': np.arcsin,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6) - .5}}},
+    'arcsinh': {
+        'str': 'f=arcsinh(x)',
+        'check_func': np.arcsinh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'asinh': {
+        'str': 'f=asinh(x)',
+        'check_func': np.arcsinh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'asin': {
+        'str': 'f=asin(x)',
+        'check_func': np.arcsin,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6) - .5}}},
+    'arctan': {
+        'str': 'f=arctan(x)',
+        'check_func': np.arctan,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'atan': {
+        'str': 'f=atan(x)',
+        'check_func': np.arctan,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'cos': {
+        'str': 'f=cos(x)',
+        'check_func': np.cos,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'cosh': {
+        'str': 'f=cosh(x)',
+        'check_func': np.cosh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'dot': {
+        'str': 'f=dot(x, y)',
+        'check_func': np.dot,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'e': {
+        'str': 'f=e',
+        'check_val': np.e,
+        'args': {'f': {'value': 0.0}}},
+    'erf': {
+        'str': 'f=erf(x)',
+        'check_func': scipy.special.erf,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'erfc': {
+        'str': 'f=erfc(x)',
+        'check_func': scipy.special.erfc,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'exp': {
+        'str': 'f=exp(x)',
+        'check_func': np.exp,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'expm1': {
+        'str': 'f=expm1(x)',
+        'check_func': np.expm1,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'factorial': {
+        'str': 'f=factorial(x)',
+        'check_func': scipy.special.factorial,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'fmax': {
+        'str': 'f=fmax(x, y)',
+        'check_func': np.fmax,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'fmin': {
+        'str': 'f=fmin(x, y)',
+        'check_func': np.fmin,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'inner': {
+        'str': 'f=inner(x, y)',
+        'check_func': np.inner,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'isinf': {
+        'str': 'f=isinf(x)',
+        'check_func': np.isinf,
+        'args': {'f': {'value': np.zeros(3)},
+                 'x': {'value': [0, np.inf, 5.0]}}},
+    'isnan': {
+        'str': 'f=isnan(x)',
+        'check_func': np.isnan,
+        'args': {'f': {'value': np.zeros(3)},
+                 'x': {'value': [0, np.nan, np.nan]}}},
+    'kron': {
+        'str': 'f=kron(x, y)',
+        'check_func': np.kron,
+        'args': {'f': {'value': np.zeros(36)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'linspace': {
+        'str': 'f=linspace(0,10,50)',
+        'check_val': np.linspace(0, 10, 50),
+        'args': {'f': {'value': np.zeros(50)}}},
+    'log': {
+        'str': 'f=log(x)',
+        'check_func': np.log,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6) + 0.1}}},
+    'log10': {
+        'str': 'f=log10(x)',
+        'check_func': np.log10,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6) + 0.1}}},
+    'log1p': {
+        'str': 'f=log1p(x)',
+        'check_func': np.log1p,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'matmul': {
+        'str': 'f=matmul(x, y)',
+        'check_func': np.matmul,
+        'args': {'f': {'value': np.zeros((3, 1))},
+                 'x': {'value': np.random.random((3, 3))},
+                 'y': {'value': np.random.random((3, 1))}}},
+    'maximum': {
+        'str': 'f=maximum(x, y)',
+        'check_func': np.maximum,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'minimum': {
+        'str': 'f=minimum(x, y)',
+        'check_func': np.minimum,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'ones': {
+        'str': 'f=ones(21)',
+        'check_val': np.ones(21),
+         'args': {'f': {'value': np.zeros(21)}}},
+    'outer': {
+        'str': 'f=outer(x, y)',
+        'check_func': np.outer,
+        'args': {'f': {'value': np.zeros((6, 6))},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6)}}},
+    'pi': {
+        'str': 'f=pi',
+        'check_val': np.pi,
+        'args': {'f': {'value': 0.0}}},
+    'power': {
+        'str': 'f=power(x, y)',
+        'check_func': np.power,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)},
+                 'y': {'value': np.random.random(6) + 1.0}}},
+    'prod': {
+        'str': 'f=prod(x)',
+        'check_func': np.prod,
+        'args': {'f': {'value': 0.0},
+                 'x': {'value': np.random.random(6)}}},
+    'sin': {
+        'str': 'f=sin(x)',
+        'check_func': np.sin,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'sinh': {
+        'str': 'f=sinh(x)',
+        'check_func': np.sinh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'sum': {
+        'str': 'f=sum(x)',
+        'check_func': np.sum,
+        'args': {'f': {'value': 0.0},
+                 'x': {'value': np.random.random(6)}}},
+    'tan': {
+        'str': 'f=tan(x)',
+        'check_func': np.tan,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'tanh': {
+        'str': 'f=tanh(x)',
+        'check_func': np.tanh,
+        'args': {'f': {'value': np.zeros(6)},
+                 'x': {'value': np.random.random(6)}}},
+    'tensordot': {
+        'str': 'f=tensordot(x, y)',
+        'check_func': np.tensordot,
+        'args': {'f': {'value': 0.0},
+                 'x': {'value': np.random.random((6, 6))},
+                 'y': {'value': np.random.random((6, 6))}}},
+    'zeros': {
+        'str': 'f=zeros(21)',
+        'check_val': np.zeros(21),
+        'args': {'f': {'value': np.zeros(21)}}},
+}
 
 
 class TestExecComp(unittest.TestCase):
@@ -682,98 +730,83 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 
 
-if parameterized is None:
+class TestExecCompParameterized(unittest.TestCase):
 
-  class TestExecCompParameterized(unittest.TestCase):
-      def test_exec_comp_value(self):
-        raise unittest.SkipTest("requires 'parameterized' (install openmdao[test] or openmdao[all])")
+    @parameterized.expand(itertools.product([
+      func_name for func_name in _expr_dict if not func_name.startswith('_')
+    ]), name_func=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args))
+    def test_exec_comp_value(self, f):
+        test_data = _ufunc_test_data[f]
 
-      def test_exec_comp_jac(self):
-        raise unittest.SkipTest("requires 'parameterized' (install openmdao[test] or openmdao[all])")
+        prob = Problem()
+        prob.model = model = Group()
 
-else:
-  # @unittest.skipIf(parameterized is None,
-  #                  "requires 'parameterized' (install openmdao[test] or openmdao[all])")
-  class TestExecCompParameterized(unittest.TestCase):
+        if len(test_data['args']) > 1:
+            ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
+            for arg_name, arg_value in iteritems(test_data['args']):
+                if arg_name == 'f':
+                    continue
+                ivc.add_output(name=arg_name, val=arg_value['value'])
+                model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
 
-      @parameterized.expand(itertools.product([
-          func_name for func_name in _expr_dict if not func_name.startswith('_')
-      ]), name_func=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args))
-      def test_exec_comp_value(self, f):
-          test_data = _ufunc_test_data[f]
+        model.add_subsystem('comp', ExecComp(test_data['str'], **test_data['args']),
+                            promotes_outputs=['f'])
+        prob.setup()
+        prob.run_model()
 
-          prob = Problem()
-          prob.model = model = Group()
+        if 'check_func' in test_data:
+            check_args = []
+            try:
+                check_args.append(test_data['args']['x']['value'])
+            except Exception:
+                pass
+            try:
+                check_args.append(test_data['args']['y']['value'])
+            except Exception:
+                pass
+            check_args = tuple(check_args)
 
-          if len(test_data['args']) > 1:
-              ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
-              for arg_name, arg_value in iteritems(test_data['args']):
-                  if arg_name == 'f':
-                      continue
-                  ivc.add_output(name=arg_name, val=arg_value['value'])
-                  model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
+            expected = test_data['check_func'](*check_args)
+        else:
+            expected = test_data['check_val']
+        np.testing.assert_almost_equal(prob['f'], expected)
 
-          model.add_subsystem('comp',
-                              ExecComp(test_data['str'], **test_data['args']),
-                              promotes_outputs=['f'])
-          prob.setup()
-          prob.run_model()
+        if 'check_val' not in test_data:
+            try:
+                prob.check_partials(compact_print=True)
+            except TypeError as e:
+                print(f, 'does not support complex-step differentiation')
 
-          if 'check_func' in test_data:
+    @parameterized.expand(itertools.product([
+      func_name for func_name in _expr_dict if not func_name.startswith('_')
+    ]), name_func=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args))
+    def test_exec_comp_jac(self, f):
+        test_data = _ufunc_test_data[f]
 
-              check_args = []
-              try:
-                  check_args.append(test_data['args']['x']['value'])
-              except Exception:
-                  pass
-              try:
-                  check_args.append(test_data['args']['y']['value'])
-              except Exception:
-                  pass
-              check_args = tuple(check_args)
+        prob = Problem()
+        prob.model = model = Group()
 
-              expected = test_data['check_func'](*check_args)
-          else:
-              expected = test_data['check_val']
-          np.testing.assert_almost_equal(prob['f'], expected)
+        if len(test_data['args']) > 1:
+            ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
+            for arg_name, arg_value in iteritems(test_data['args']):
+                if arg_name == 'f':
+                    continue
+                ivc.add_output(name=arg_name, val=arg_value['value'])
+                model.connect('ivc.{0}'.format(arg_name),
+                              '{0}_comp.{1}'.format(f, arg_name))
 
-          if 'check_val' not in test_data:
-              try:
-                  prob.check_partials(compact_print=True)
-              except TypeError as e:
-                  print(f, 'does not support complex-step differentiation')
+        model.add_subsystem('{0}_comp'.format(f),
+                            ExecComp(test_data['str'], **test_data['args']),
+                            promotes_outputs=['f'])
+        prob.setup()
+        prob.run_model()
 
-      @parameterized.expand(itertools.product([
-          func_name for func_name in _expr_dict if not func_name.startswith('_')
-      ]), name_func=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args))
-      def test_exec_comp_jac(self, f):
+        if 'check_val' not in test_data:
+            cpd = prob.check_partials(compact_print=True)
 
-          test_data = _ufunc_test_data[f]
-
-          prob = Problem()
-          prob.model = model = Group()
-
-          if len(test_data['args']) > 1:
-              ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
-              for arg_name, arg_value in iteritems(test_data['args']):
-                  if arg_name == 'f':
-                      continue
-                  ivc.add_output(name=arg_name, val=arg_value['value'])
-                  model.connect('ivc.{0}'.format(arg_name),
-                                '{0}_comp.{1}'.format(f, arg_name))
-
-          model.add_subsystem('{0}_comp'.format(f),
-                              ExecComp(test_data['str'], **test_data['args']),
-                              promotes_outputs=['f'])
-          prob.setup()
-          prob.run_model()
-
-          if 'check_val' not in test_data:
-              cpd = prob.check_partials(compact_print=True)
-
-              for comp in cpd:
-                  for (var, wrt) in cpd[comp]:
-                      np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'], 0, decimal=4)
+            for comp in cpd:
+                for (var, wrt) in cpd[comp]:
+                    np.testing.assert_almost_equal(cpd[comp][var, wrt]['abs error'], 0, decimal=4)
 
 
 if __name__ == "__main__":

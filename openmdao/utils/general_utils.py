@@ -11,7 +11,12 @@ try:
     from mock import Mock
 except ImportError:
     class Mock(object):
+        """
+        Substitute for Mock class if not available.
+        """
+
         pass
+
 from fnmatch import fnmatchcase
 from six import string_types, PY2
 from six.moves import range, cStringIO as StringIO
