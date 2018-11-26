@@ -33,22 +33,22 @@ class AbstractXDSMWriter(object):
         self.process_arrows = []
 
     def add_solver(self, label, name='solver', **kwargs):
-        pass
+        pass  # Implement in child class
 
     def add_comp(self, name, label=None, **kwargs):
-        pass
+        pass  # Implement in child class
 
     def add_func(self, name, **kwargs):
-        pass
+        pass  # Implement in child class
 
     def add_optimizer(self, label, name='opt', **kwargs):
-        pass
+        pass  # Implement in child class
 
     def add_input(self, name, label, style='DataIO', stack=False):
-        pass
+        pass  # Implement in child class
 
     def add_output(self, name, label, style='DataIO', stack=False, side="left"):
-        pass
+        pass  # Implement in child class
 
 
 class XDSMWriter(XDSM):
@@ -133,15 +133,15 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.components = []
         self.reserved_words = '_U_',
 
-    def format_id(self, name, subs=(('_', ''),)):
+    def _format_id(self, name, subs=(('_', ''),)):
         if name not in self.reserved_words:
             return _replace_chars(name, subs)
         else:
             return name
 
     def connect(self, src, target, label, style='DataInter', stack=False, faded=False):
-        edge = {'to': self.format_id(target),
-                'from': self.format_id(src),
+        edge = {'to': self._format_id(target),
+                'from': self._format_id(src),
                 'name': label}
         self.connections.append(edge)
 
@@ -149,20 +149,20 @@ class XDSMjsWriter(AbstractXDSMWriter):
         raise NotImplementedError()
 
     def add_comp(self, name, label=None, **kwargs):
-        self.comp_names.append(self.format_id(name))
+        self.comp_names.append(self._format_id(name))
         self.add_system(name, 'analysis', label, **kwargs)
 
     def add_func(self, name, **kwargs):
         pass
 
     def add_optimizer(self, label, name='opt', **kwargs):
-        self.optimizer = self.format_id(name)
+        self.optimizer = self._format_id(name)
         self.add_system(name, 'optimization', label, **kwargs)
 
     def add_system(self, node_name, style, label=None, stack=False, faded=False):
         if label is None:
             label = node_name
-        dct = {"type": style, "id": self.format_id(node_name), "name": label}
+        dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.components.append(dct)
 
     def add_workflow(self):
@@ -183,11 +183,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.add_workflow()
         data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
 
-        print(data)
         if ext is not None:
             filename = '.'.join([filename, ext])
         with open(filename, 'w') as outfile:
             json.dump(data, outfile)
+        print('XDSM output file written to: {}'.format(filename))
 
 
 def write_xdsm(problem, filename, out_format='tex', include_solver=False, subs=_CHAR_SUBS):
