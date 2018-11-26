@@ -70,6 +70,18 @@ class TestXDSMViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         write_xdsm(prob, filename=FILENAME+'1')
 
+    def test_js(self):
+        """Makes XDSM for the Sellar problem"""
+
+        prob = Problem()
+        prob.model = SellarNoDerivatives()
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # no output checking, just make sure no exceptions raised
+        write_xdsm(prob, filename=FILENAME+'2', format='json')
+
     def tearDown(self):
         """Comment out this method, if you want to inspect the output files."""
         for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):

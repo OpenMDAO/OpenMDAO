@@ -4,6 +4,8 @@ The package is available at https://github.com/mdolab/pyXDSM.
 """
 from __future__ import print_function
 
+import json
+
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 
 try:
@@ -14,6 +16,36 @@ except ImportError:
     raise RuntimeError(msg)
 
 from six import iteritems
+
+
+class AbstractXDSMWriter(object):
+
+    def __init__(self):
+        self.comps = []
+        self.connections = []
+        self.left_outs = {}
+        self.right_outs = {}
+        self.ins = {}
+        self.processes = []
+        self.process_arrows = []
+
+    def add_solver(self, label, name='solver', **kwargs):
+        pass
+
+    def add_comp(self, name, label=None, **kwargs):
+        pass
+
+    def add_func(self, name, **kwargs):
+        pass
+
+    def add_optimizer(self, label, name='opt', **kwargs):
+        pass
+
+    def add_input(self, name, label, style='DataIO', stack=False):
+        pass
+
+    def add_output(self, name, label, style='DataIO', stack=False, side="left"):
+        pass
 
 
 class XDSMWriter(XDSM):
@@ -89,7 +121,61 @@ class XDSMWriter(XDSM):
         self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
 
 
-def write_xdsm(problem, filename, include_solver=False):
+class XDSMjsWriter(AbstractXDSMWriter):
+
+    def __init__(self):
+        super(XDSMjsWriter, self).__init__()
+        self.optimizer = 'opt'
+        self.comp_names = []
+        self.components = []
+
+    def format_id(self, name):
+        return name.replace('_', '')
+
+    def connect(self, src, target, label, style='DataInter', stack=False, faded=False):
+        dct = {'to': self.format_id(target), 'from': self.format_id(src), 'label': label}
+        self.connections.append(dct)
+
+    def add_solver(self, label, name='solver', **kwargs):
+        raise NotImplementedError()
+
+    def add_comp(self, name, label=None, **kwargs):
+        self.comp_names.append(self.format_id(name))
+        self.add_system(name, 'analysis', label, **kwargs)
+
+    def add_func(self, name, **kwargs):
+        pass
+
+    def add_optimizer(self, label, name='opt', **kwargs):
+        self.optimizer = self.format_id(name)
+        self.add_system(name, 'optimization', label, **kwargs)
+
+    def add_system(self, node_name, style, label=None, stack=False, faded=False):
+        if label is None:
+            label = node_name
+        dct = {"type": style, "id": self.format_id(node_name), "name": label}
+        self.components.append(dct)
+
+    def add_workflow(self):
+        wf = ["_U_",
+              [
+                self.optimizer, self.comp_names
+              ]
+            ]
+        self.processes = wf
+
+    def write(self, filename='xdsmjs', ext='json', *args, **kwargs):
+        self.add_workflow()
+        data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
+
+        print(data)
+        if ext is not None:
+            filename = '.'.join([filename, ext])
+        with open(filename, 'w') as outfile:
+            json.dump(data, outfile)
+
+
+def write_xdsm(problem, filename, format='tex', include_solver=False):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -126,12 +212,12 @@ def write_xdsm(problem, filename, include_solver=False):
     filename = filename.replace('\\', '/')  # Needed for LaTeX
     return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, design_vars=design_vars,
-                       responses=responses)
+                       responses=responses, format=format)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None,
-                subs=(('_', '~'), (')', ' '), ('(', '_')), **kwargs):
+                subs=(('_', '~'), (')', ' '), ('(', '_')), format='tex', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -234,7 +320,10 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     conns2 = process_connections(connections)
     conns3 = accumulate_connections(conns2)
 
-    x = XDSMWriter()
+    if format == 'tex':
+        x = XDSMWriter()
+    elif format == 'json':
+        x = XDSMjsWriter()
 
     if optimizer is not None:
         x.add_optimizer(optimizer)
