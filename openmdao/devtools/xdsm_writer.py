@@ -231,12 +231,12 @@ def write_xdsm(problem, filename, out_format='tex', include_solver=False, subs=_
     filename = filename.replace('\\', '/')  # Needed for LaTeX
     return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, design_vars=design_vars,
-                       responses=responses, format=out_format, subs=subs)
+                       responses=responses, out_format=out_format, subs=subs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None,
-                subs=_CHAR_SUBS, format='tex', **kwargs):
+                subs=_CHAR_SUBS, out_format='tex', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -339,9 +339,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     conns2 = process_connections(connections)
     conns3 = accumulate_connections(conns2)
 
-    if format == 'tex':
+    if out_format == 'tex':
         x = XDSMWriter()
-    elif format == 'json':
+    elif out_format == 'json':
         x = XDSMjsWriter()
 
     if optimizer is not None:
