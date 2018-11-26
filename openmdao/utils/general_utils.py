@@ -7,7 +7,6 @@ import re
 import sys
 import warnings
 import unittest
-from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types, PY2
 from six.moves import range, cStringIO as StringIO
@@ -320,6 +319,8 @@ def set_pyoptsparse_opt(optname, fallback=True):
 
     try:
         from pyoptsparse import OPT
+        from mock import Mock
+
         try:
             opt = OPT(optname)
             OPTIMIZER = optname
