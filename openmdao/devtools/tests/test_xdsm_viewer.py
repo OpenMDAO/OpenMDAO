@@ -71,7 +71,7 @@ class TestXDSMViewer(unittest.TestCase):
         write_xdsm(prob, filename=FILENAME+'1')
 
     def test_js(self):
-        """Makes XDSM for the Sellar problem"""
+        """Makes XDSMjs input file for the Sellar problem"""
 
         filename = 'xdsm'  # this name is needed for XDSMjs
         prob = Problem()
