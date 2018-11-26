@@ -18,6 +18,8 @@ except ImportError:
 from six import iteritems
 
 
+_CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
+
 class AbstractXDSMWriter(object):
 
     def __init__(self):
@@ -175,7 +177,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             json.dump(data, outfile)
 
 
-def write_xdsm(problem, filename, format='tex', include_solver=False):
+def write_xdsm(problem, filename, format='tex', include_solver=False, subs=_CHAR_SUBS):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -212,12 +214,12 @@ def write_xdsm(problem, filename, format='tex', include_solver=False):
     filename = filename.replace('\\', '/')  # Needed for LaTeX
     return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, design_vars=design_vars,
-                       responses=responses, format=format)
+                       responses=responses, format=format, subs=subs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None,
-                subs=(('_', '~'), (')', ' '), ('(', '_')), format='tex', **kwargs):
+                subs=_CHAR_SUBS, format='tex', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
