@@ -317,9 +317,9 @@ def set_pyoptsparse_opt(optname, fallback=True):
     if force:
         optname = force
 
+    from mock import Mock
     try:
         from pyoptsparse import OPT
-        from mock import Mock
 
         try:
             opt = OPT(optname)
