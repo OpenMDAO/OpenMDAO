@@ -198,7 +198,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
         print('XDSM output file written to: {}'.format(filename))
 
 
-def write_xdsm(problem, filename, out_format='tex', include_solver=False, subs=_CHAR_SUBS):
+def write_xdsm(problem, filename, model_path=None, recurse=True,
+               include_external_outputs=True, out_format='tex',
+               include_solver=False, subs=_CHAR_SUBS):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -224,27 +226,33 @@ def write_xdsm(problem, filename, out_format='tex', include_solver=False, subs=_
 
     viewer_data = _get_viewer_data(problem)
     driver = problem.driver
-    model = problem.model
+    if model_path is None:
+        _model = problem.model
+    else:
+        _model = problem.model._get_subsystem(model_path)
+
     if driver:
         driver_name = get_cls_name(driver)
     else:
         driver_name = None
     if include_solver:
-        solver_name = get_cls_name(model.nonlinear_solver)
+        solver_name = get_cls_name(_model.nonlinear_solver)
     else:
         solver_name = None
-    design_vars = model.get_design_vars()
-    responses = model.get_responses()
+    design_vars = _model.get_design_vars()
+    responses = _model.get_responses()
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
     return _write_xdsm(filename, viewer_data=viewer_data,
-                       optimizer=driver_name, solver=solver_name, design_vars=design_vars,
-                       responses=responses, out_format=out_format, subs=subs)
+                       optimizer=driver_name, solver=solver_name, model_path=model_path,
+                       design_vars=design_vars, responses=responses, out_format=out_format,
+                       recurse=recurse, subs=subs,
+                       include_external_outputs=include_external_outputs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
-                design_vars=None, responses=None, residuals=None,
-                subs=_CHAR_SUBS, out_format='tex', **kwargs):
+                design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
+                include_external_outputs=True, subs=_CHAR_SUBS, out_format='tex', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -253,23 +261,27 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     Parameters
     ----------
     filename : str
-       Filename (absolute path without extension)
+        Filename (absolute path without extension)
     connections : list[(str, str)]
-       Connections list
+        Connections list
     optimizer : str or None
-       Optimizer name
+        Optimizer name
     solver:  str or None
-       Solver name
+        Solver name
     cleanup : bool
-       Clean-up temporary files after making the diagram
+        Clean-up temporary files after making the diagram
     design_vars : OrderedDict or None
-       Design variables
+        Design variables
     responses : OrderedDict or None
-       Responses
+        Responses
+    model_path : str or None
+        Path to the subsystem to be transcribed to XDSM.  If None, use the model root.
+    include_external_outputs : bool
+        If True, show externally connected outputs when transcribing a subsystem.
     subs : tuple
        Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
     kwargs : dict
-       Keyword arguments
+        Keyword arguments
 
     Returns
     -------
@@ -279,18 +291,50 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
 
-    def get_comps(tree):
+    def get_comps(tree, model_path=None, recurse=True):
+        """
+        Return the components in the tree, optionally only those within the given model_path.
+
+        Parameters
+        ----------
+        tree : list(OrderedDict)
+            The model tree as returned by viewer_data.
+        model_path : str or None
+            The path of the model within the tree to be transcribed to XDSM. If None, transcribe
+            the entire tree.
+        recurse : bool
+            If True, return individual components within the model_path.  If False, treat
+            Groups as black-box components and don't show their internal components.
+
+        Returns
+        -------
+        components : list
+            A list of the components within the model_path in tree.  If recurse is False, this
+            list may contain groups.
+
+        """
         # Components are ordered in the tree, so they can be collected by walking through the tree.
         components = list()
 
-        def get_children(tree_branch):
+        def get_children(tree_branch, recurse=recurse):
             for ch in tree_branch['children']:
                 if ch['subsystem_type'] == 'component':
-                    components.append(ch['name'])
-                else:
+                    components.append(ch)
+                elif recurse:
                     get_children(ch)
+                else:
+                    components.append(ch)
 
-        get_children(tree)
+        top_level_tree = tree
+        if model_path is not None:
+            path_list = model_path.split('.')
+            while path_list:
+                next_path = path_list.pop(0)
+                children = [child for child in top_level_tree['children']]
+                top_level_tree = [c for c in children if c['name'] == next_path][0]
+
+        get_children(top_level_tree)
+
         return components
 
     def residual_str(name):
@@ -301,14 +345,16 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         """Puts an asterisk superscript on a string."""
         return '{}^*'.format(name)
 
-    def convert_name(name):
+    def convert_name(name, recurse=True):
         """
         From an absolute path returns the variable name and its owner component in a dict.
 
         Parameters
         ----------
         name : str
-           Connection absolute path and name
+            Connection absolute path and name
+        recurse : bool
+            If False, treat the top level of each name as the source/target component.
 
         Returns
         -------
@@ -316,8 +362,12 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         """
 
         def convert(name):
-            path, var = name.rsplit('.', 1)
-            comp = path.rsplit('.', 1)[-1]
+            name = name.split('.')
+            if recurse:
+                comp = name[-2]
+            else:
+                comp = name[0]
+            var = name[-1]
             var = _replace_chars(var, substitutes=subs)
             return {'comp': comp, 'var': var}
 
@@ -326,8 +376,58 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         else:  # string
             return convert(name)
 
-    def process_connections(conns):
-        conns_new = [{k: convert_name(v) for k, v in iteritems(conn)} for conn in conns]
+    def prune_connections(conns, model_path=None):
+        """
+        Remove connections that don't involve components within model.
+
+        Parameters
+        ----------
+        conns : list
+            A list of connections from viewer_data
+        model_path : str or None
+            The path in model to the system to be transcribed to XDSM.
+        recurse : bool
+            If True
+
+        Returns
+        -------
+        internal_conns : list(dict)
+            A list of the connections with sources and targets inside the given model path.
+        external_inputs : list(dict)
+            A list of the connections where the target is inside the model path but is connected
+            to an external source.
+        external_outputs : list(dict)
+            A list of the connections where the source is inside the model path but is connected
+            to an external target.
+
+        """
+        internal_conns = []
+        external_inputs = []
+        external_outputs = []
+
+        if model_path is None:
+            return conns, external_inputs, external_outputs
+
+        for conn in conns:
+            src = conn['src']
+            rel_src = src.replace(model_path + '.', '')
+            tgt = conn['tgt']
+            rel_tgt = tgt.replace(model_path + '.', '')
+
+            if src.startswith(model_path) and tgt.startswith(model_path):
+                # Internal connections
+                internal_conns.append({'src': rel_src, 'tgt': rel_tgt})
+            elif not src.startswith(model_path) and tgt.startswith(model_path):
+                # Externally connected input
+                external_inputs.append({'src': rel_src, 'tgt': rel_tgt})
+            elif src.startswith(model_path) and not tgt.startswith(model_path):
+                # Externally connected output
+                external_outputs.append({'src': rel_src, 'tgt': rel_tgt})
+
+        return internal_conns, external_inputs, external_outputs
+
+    def process_connections(conns, recurse=True):
+        conns_new = [{k: convert_name(v, recurse=recurse) for k, v in iteritems(conn)} for conn in conns]
         return conns_new
 
     def accumulate_connections(conns):
@@ -336,14 +436,31 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         for conn in conns:  # list
             src_comp = conn['src']['comp']
             tgt_comp = conn['tgt']['comp']
+            if src_comp == tgt_comp:
+                # When recurse is False, ignore connections within the same subsystem.
+                continue
             var = conn['src']['var']
             conns_new.setdefault(src_comp, {})
             conns_new[src_comp].setdefault(tgt_comp, []).append(var)
-
         return conns_new
 
-    conns2 = process_connections(connections)
+    def collect_connections(variables):
+        conv_vars = [convert_name(v) for v in variables]
+        connections = dict()
+        for conv_var in conv_vars:
+            connections.setdefault(conv_var['comp'], []).append(conv_var['var'])
+        return connections
+
+    conns1, external_inputs1, external_outputs1 = prune_connections(connections,
+                                                                   model_path=model_path)
+
+    conns2 = process_connections(conns1, recurse=recurse)
+    external_inputs2 = process_connections(external_inputs1, recurse=recurse)
+    external_outputs2 = process_connections(external_outputs1, recurse=recurse)
+
     conns3 = accumulate_connections(conns2)
+    external_inputs3 = accumulate_connections(external_inputs2)
+    external_outputs3 = accumulate_connections(external_outputs2)
 
     if out_format == 'tex':
         x = XDSMWriter()
@@ -355,13 +472,6 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     if solver is not None:
         x.add_solver(solver)
-
-    def collect_connections(variables):
-        conv_vars = [convert_name(v) for v in variables]
-        connections = dict()
-        for conv_var in conv_vars:
-            connections.setdefault(conv_var['comp'], []).append(conv_var['var'])
-        return connections
 
     design_vars2 = collect_connections(design_vars)
     responses2 = collect_connections(responses)
@@ -378,15 +488,30 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         opt_con_vars = [opt_var_str(var) for var in conn_vars]
         x.add_output(comp, ', '.join(opt_con_vars), side='left')
 
-    comps = get_comps(tree)
+    # Get the top level system to be transcripted to XDSM
+    comps = get_comps(tree, model_path=model_path, recurse=recurse)
 
     # Add components
     for comp in comps:
-        x.add_comp(name=comp, label=_replace_chars(comp, substitutes=subs))
+        x.add_comp(name=comp['name'], label=_replace_chars(comp['name'], substitutes=subs))
 
+    # Add the connections
     for src, dct in iteritems(conns3):
         for tgt, conn_vars in iteritems(dct):
             x.connect(src, tgt, ', '.join(conn_vars))
+
+    # Add the externally sourced inputs
+    for src, tgts in iteritems(external_inputs3):
+        for tgt, conn_vars in iteritems(tgts):
+            x.add_input(tgt, conn_vars)
+
+    # Add the externally connected outputs
+    if include_external_outputs:
+        for src, tgts in iteritems(external_outputs3):
+            output_vars = set()
+            for tgt, conn_vars in iteritems(tgts):
+                output_vars |= set(conn_vars)
+            x.add_output(src, list(output_vars), side='right')
 
     x.write(filename, cleanup=cleanup, **kwargs)
     return x
