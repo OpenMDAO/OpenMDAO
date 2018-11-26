@@ -22,7 +22,11 @@ _CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
 
 
 class AbstractXDSMWriter(object):
+    """
+    Abstract class to define methods for XDSM writers.
 
+    All methods should be implemented in child classes.
+    """
     def __init__(self):
         self.comps = []
         self.connections = []
@@ -125,7 +129,11 @@ class XDSMWriter(XDSM):
 
 
 class XDSMjsWriter(AbstractXDSMWriter):
+    """
+    JSON input file writer for XDSMjs.
 
+    XDSMjs is available at https://github.com/OneraHub/XDSMjs
+    """
     def __init__(self):
         super(XDSMjsWriter, self).__init__()
         self.optimizer = 'opt'

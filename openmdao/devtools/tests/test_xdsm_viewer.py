@@ -91,14 +91,20 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Comment out this method, if you want to inspect the output files."""
+
+        def clean_file(fname):
+            try:  # Try to clean up
+                if os.path.exists(fname):
+                    os.remove(fname)
+            except Exception as e:
+                pass
+
         for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
             for i in range(2):
                 filename = '.'.join([FILENAME+str(i), ext])
-                try:  # Try to clean up
-                    if os.path.exists(filename):
-                        os.remove(filename)
-                except Exception as e:
-                    pass
+                clean_file(filename)
+        
+        clean_file('xdsm.json')
 
 
 if __name__ == "__main__":
