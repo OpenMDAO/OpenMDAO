@@ -213,6 +213,22 @@ class Vector(object):
             vec._initialize_views()
         return vec
 
+    def _copy_views(self):
+        """
+        Return a lightweight object containing the views.
+         Returns
+        -------
+        <Object>
+            Object containing _name, _typ, and _views.
+        """
+        vec_cp = self.__class__(self._name, self._kind, self._system, self._root_vector,
+                                alloc_complex=self._alloc_complex, ncol=self._ncol)
+        vec_cp._system = None
+        vec_cp._typ = self._typ
+        vec_cp._name = self._name
+        vec_cp._views = deepcopy(self._views)
+        return vec_cp
+
     def keys(self):
         """
         Return variable names of variables contained in this vector (relative names).

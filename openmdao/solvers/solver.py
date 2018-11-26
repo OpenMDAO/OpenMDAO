@@ -11,8 +11,6 @@ import sys
 
 import numpy as np
 
-from copy import deepcopy
-
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
@@ -661,8 +659,8 @@ class NonlinearSolver(Solver):
             error at the first iteration.
         """
         if self.options['debug_print']:
-            self._err_cache['inputs'] = deepcopy(self._system._inputs)
-            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            self._err_cache['inputs'] = self._system._inputs._copy_views()
+            self._err_cache['outputs'] = self._system._outputs._copy_views()
 
         if self.options['maxiter'] > 0:
             self._run_apply()
