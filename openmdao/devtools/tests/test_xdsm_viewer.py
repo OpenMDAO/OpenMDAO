@@ -22,7 +22,13 @@ class TestXDSMViewer(unittest.TestCase):
         """Makes XDSM for the Sellar problem"""
 
         prob = Problem()
-        prob.model = SellarNoDerivatives()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
 
         prob.setup(check=False)
         prob.final_setup()
@@ -90,7 +96,8 @@ class TestXDSMViewer(unittest.TestCase):
         write_xdsm(prob, filename=filename, out_format='json', subs=())
 
     def tearDown(self):
-        """Comment out this method, if you want to inspect the output files."""
+        """Set "clean_up" to False, if you want to inspect the output files."""
+        clean_up = False
 
         def clean_file(fname):
             try:  # Try to clean up
@@ -99,12 +106,13 @@ class TestXDSMViewer(unittest.TestCase):
             except Exception as e:
                 pass
 
-        for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
-            for i in range(2):
-                filename = '.'.join([FILENAME+str(i), ext])
-                clean_file(filename)
-        
-        clean_file('xdsm.json')
+        if clean_up:
+            for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
+                for i in range(2):
+                    filename = '.'.join([FILENAME+str(i), ext])
+                    clean_file(filename)
+
+            clean_file('xdsm.json')
 
 
 if __name__ == "__main__":
