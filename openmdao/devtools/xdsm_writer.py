@@ -13,7 +13,7 @@ try:
 except ImportError:
     msg = ('The pyxdsm package should be installed. You can download the package '
            'from https://github.com/mdolab/pyXDSM')
-    print(msg)
+    raise ImportError(msg)
 
 from six import iteritems
 

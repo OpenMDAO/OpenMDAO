@@ -4,19 +4,19 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver
-from openmdao.devtools.xdsm_writer import write_xdsm
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
+
+try:
+    from pyxdsm.XDSM import XDSM
+    from openmdao.devtools.xdsm_writer import write_xdsm
+except ImportError:
+    XDSM = None
 
 FILENAME = 'XDSM'
 
 
+@unittest.skipUnless(XDSM, "XDSM is required.")
 class TestXDSMViewer(unittest.TestCase):
-
-    def setUp(self):
-        try:
-            from pyxdsm.XDSM import XDSM
-        except ImportError:
-            raise unittest.skipTest("pyXDSM is not installed")
 
     def test_sellar(self):
         """Makes XDSM for the Sellar problem"""
