@@ -308,12 +308,10 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         """
 
         def convert(name):
-            name = name.split('.')
-            comp = name[-2]
-            var = name[-1]
+            path, var = name.rsplit('.', 1)
+            comp = path.rsplit('.', 1)[-1]
             var = _replace_chars(var, substitutes=subs)
-            new = {'comp': comp, 'var': var}
-            return new
+            return {'comp': comp, 'var': var}
 
         if isinstance(name, list):  # If a source has multiple targets
             return [convert(n) for n in name]
