@@ -95,6 +95,20 @@ class TestXDSMViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         write_xdsm(prob, filename=filename, out_format='json', subs=())
 
+    def test_wrong_out_format(self):
+        """Incorrect output format error."""
+
+        filename = 'xdsm'  # this name is needed for XDSMjs
+        prob = Problem()
+        prob.model = SellarNoDerivatives()
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # no output checking, just make sure no exceptions raised
+        with self.assertRaises(ValueError):
+            write_xdsm(prob, filename=filename, out_format='jpg', subs=())
+
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
         clean_up = False
