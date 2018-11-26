@@ -214,9 +214,7 @@ class ParameterizedInstance(object):
 
         prob.setup(check=check, local_vector_class=vec_class)
 
-        fail, rele, abse = prob.run_model()
-        if fail:
-            raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
+        prob.run_model()
 
     def compute_totals(self, mode='fwd'):
         """
@@ -236,9 +234,7 @@ class ParameterizedInstance(object):
 
         if problem._mode != mode:
             problem.setup(check=False, mode=mode)
-            fail, rele, abse = problem.run_model()
-            if fail:
-                raise RuntimeError('Problem run failed: re %f ; ae %f' % (rele, abse))
+            problem.run_model()
 
         root = problem.model
         of = root.total_of
