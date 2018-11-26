@@ -87,7 +87,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=filename, format='json', subs=())
+        write_xdsm(prob, filename=filename, out_format='json', subs=())
 
     def tearDown(self):
         """Comment out this method, if you want to inspect the output files."""

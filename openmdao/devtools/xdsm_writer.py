@@ -131,12 +131,18 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.optimizer = 'opt'
         self.comp_names = []
         self.components = []
+        self.reserved_words = '_U_',
 
-    def format_id(self, name):
-        return name.replace('_', '')
+    def format_id(self, name, subs=(('_', ''),)):
+        if name not in self.reserved_words:
+            return _replace_chars(name, subs)
+        else:
+            return name
 
     def connect(self, src, target, label, style='DataInter', stack=False, faded=False):
-        edge = {'to': self.format_id(target), 'from': self.format_id(src), 'name': label}
+        edge = {'to': self.format_id(target),
+                'from': self.format_id(src),
+                'name': label}
         self.connections.append(edge)
 
     def add_solver(self, label, name='solver', **kwargs):
@@ -167,6 +173,12 @@ class XDSMjsWriter(AbstractXDSMWriter):
             ]
         self.processes = wf
 
+    def add_input(self, name, label=None, style='DataIO', stack=False):
+        self.connect(src='_U_', target=name, label=label)
+
+    def add_output(self, name, label=None, style='DataIO', stack=False, side="left"):
+        self.connect(src=name, target='_U_', label=label)
+
     def write(self, filename='xdsmjs', ext='json', *args, **kwargs):
         self.add_workflow()
         data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
@@ -178,7 +190,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             json.dump(data, outfile)
 
 
-def write_xdsm(problem, filename, format='tex', include_solver=False, subs=_CHAR_SUBS):
+def write_xdsm(problem, filename, out_format='tex', include_solver=False, subs=_CHAR_SUBS):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -188,8 +200,12 @@ def write_xdsm(problem, filename, format='tex', include_solver=False, subs=_CHAR
        Problem
     filename : str
        Name of the output files (do not provide file extension)
+    out_format : str
+       Output format, one of "tex" (pyXDSM) or "json" (XDSMjs)
     include_solver : bool
        Include or not the problem model's nonlinear solver in the XDSM.
+    subs : tuple(str, str)
+       Characters to be replaced
     Returns
     -------
        XDSM
@@ -215,7 +231,7 @@ def write_xdsm(problem, filename, format='tex', include_solver=False, subs=_CHAR
     filename = filename.replace('\\', '/')  # Needed for LaTeX
     return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, design_vars=design_vars,
-                       responses=responses, format=format, subs=subs)
+                       responses=responses, format=out_format, subs=subs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
@@ -384,13 +400,14 @@ def _replace_chars(name, substitutes):
     ----------
     name : str
        Name
-    substitutes: tuple
+    substitutes: tuple or None
        Character pairs with old and substitute characters
 
     Returns
     -------
        str
     """
-    for (k, v) in substitutes:
-        name = name.replace(k, v)
+    if substitutes:
+        for (k, v) in substitutes:
+            name = name.replace(k, v)
     return name
