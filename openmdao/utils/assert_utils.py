@@ -6,10 +6,14 @@ from math import isnan
 from six import raise_from
 from six.moves import zip
 
+import unittest
+
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name
+
+from functools import wraps
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
@@ -127,7 +131,6 @@ def assert_no_approx_partials(system, include_self=True, recurse=True):
     ------
     AssertionError
         If a subsystem of group is found to be using approximated partials.
-
     """
     approximated_partials = {}
     msg = 'The following components use approximated partials:\n'
@@ -159,7 +162,6 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
     ------
     AssertionError
         If a subsystem of group is found to be using approximated partials.
-
     """
     parts = ['The following groups use dictionary jacobians:\n']
     for s in system.system_iter(include_self=include_self, recurse=recurse, typ=Group):
@@ -273,3 +275,68 @@ def assert_equal_arrays(a1, a2):
     assert a1.shape == a2.shape
     for x, y in zip(a1.flat, a2.flat):
         assert x == y
+
+
+def skip_helper(msg):
+    """
+    Raise a SkipTest.
+
+    Parameters
+    ----------
+    msg : str
+        The skip messaage.
+
+    Raises
+    ------
+    SkipTest
+    """
+    raise unittest.SkipTest(msg)
+
+
+class SkipParameterized(object):
+    """
+    Replaces the parameterized class, skipping decorated test cases.
+    """
+
+    @classmethod
+    def expand(cls, input, name_func=None, doc_func=None, skip_on_empty=False, **legacy):
+        """
+        Decorate a test so that it raises a SkipTest.
+
+        Parameters
+        ----------
+        input : iterable
+            Not used (part of parameterized API).
+        name_func : function
+            Not used (part of parameterized API).
+        doc_func : function
+            Not used (part of parameterized API).
+        skip_on_empty : bool
+            Not used (part of parameterized API).
+        **legacy : dict
+            Not used (part of parameterized API).
+
+        Returns
+        -------
+        function
+            The wrapper function.
+        """
+        skip_msg = "requires 'parameterized' (install openmdao[test])"
+
+        def parameterized_expand_wrapper(f, instance=None):
+            """
+            Wrap a function so that it raises a SkipTest.
+
+            f : function
+                Function to be wrapped.
+            instance : None
+                Not used (part of parameterized API).
+
+            Returns
+            -------
+            function
+                The wrapped function.
+            """
+            return wraps(f)(lambda f: skip_helper(skip_msg))
+
+        return parameterized_expand_wrapper

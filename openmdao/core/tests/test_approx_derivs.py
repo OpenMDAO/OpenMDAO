@@ -3,7 +3,11 @@ from six.moves import range
 import unittest
 import itertools
 from six import iterkeys
-from parameterized import parameterized
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 import numpy as np
 
