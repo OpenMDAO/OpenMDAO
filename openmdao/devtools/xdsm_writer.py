@@ -20,6 +20,7 @@ from six import iteritems
 
 _CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
 
+
 class AbstractXDSMWriter(object):
 
     def __init__(self):
@@ -135,8 +136,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
         return name.replace('_', '')
 
     def connect(self, src, target, label, style='DataInter', stack=False, faded=False):
-        dct = {'to': self.format_id(target), 'from': self.format_id(src), 'label': label}
-        self.connections.append(dct)
+        edge = {'to': self.format_id(target), 'from': self.format_id(src), 'name': label}
+        self.connections.append(edge)
 
     def add_solver(self, label, name='solver', **kwargs):
         raise NotImplementedError()
