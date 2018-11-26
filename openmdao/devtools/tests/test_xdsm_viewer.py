@@ -70,16 +70,41 @@ class TestXDSMViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         write_xdsm(prob, filename=FILENAME+'1')
 
+    def test_js(self):
+        """Makes XDSMjs input file for the Sellar problem"""
+
+        filename = 'xdsm'  # this name is needed for XDSMjs
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # no output checking, just make sure no exceptions raised
+        write_xdsm(prob, filename=filename, out_format='json', subs=())
+
     def tearDown(self):
         """Comment out this method, if you want to inspect the output files."""
+
+        def clean_file(fname):
+            try:  # Try to clean up
+                if os.path.exists(fname):
+                    os.remove(fname)
+            except Exception as e:
+                pass
+
         for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
             for i in range(2):
                 filename = '.'.join([FILENAME+str(i), ext])
-                try:  # Try to clean up
-                    if os.path.exists(filename):
-                        os.remove(filename)
-                except Exception as e:
-                    pass
+                clean_file(filename)
+        
+        clean_file('xdsm.json')
 
 
 if __name__ == "__main__":

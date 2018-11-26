@@ -4,7 +4,7 @@ The package is available at https://github.com/mdolab/pyXDSM.
 """
 from __future__ import print_function
 
-from collections import OrderedDict
+import json
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 
@@ -16,6 +16,43 @@ except ImportError:
     raise RuntimeError(msg)
 
 from six import iteritems
+
+
+_CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
+
+
+class AbstractXDSMWriter(object):
+    """
+    Abstract class to define methods for XDSM writers.
+
+    All methods should be implemented in child classes.
+    """
+    def __init__(self):
+        self.comps = []
+        self.connections = []
+        self.left_outs = {}
+        self.right_outs = {}
+        self.ins = {}
+        self.processes = []
+        self.process_arrows = []
+
+    def add_solver(self, label, name='solver', **kwargs):
+        pass  # Implement in child class
+
+    def add_comp(self, name, label=None, **kwargs):
+        pass  # Implement in child class
+
+    def add_func(self, name, **kwargs):
+        pass  # Implement in child class
+
+    def add_optimizer(self, label, name='opt', **kwargs):
+        pass  # Implement in child class
+
+    def add_input(self, name, label, style='DataIO', stack=False):
+        pass  # Implement in child class
+
+    def add_output(self, name, label, style='DataIO', stack=False, side="left"):
+        pass  # Implement in child class
 
 
 class XDSMWriter(XDSM):
@@ -91,8 +128,79 @@ class XDSMWriter(XDSM):
         self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
 
 
-def write_xdsm(problem, filename, model_path=None, include_solver=False, recurse=True,
-               include_external_outputs=True):
+class XDSMjsWriter(AbstractXDSMWriter):
+    """
+    JSON input file writer for XDSMjs.
+
+    XDSMjs is available at https://github.com/OneraHub/XDSMjs
+    """
+    def __init__(self):
+        super(XDSMjsWriter, self).__init__()
+        self.optimizer = 'opt'
+        self.comp_names = []
+        self.components = []
+        self.reserved_words = '_U_',
+
+    def _format_id(self, name, subs=(('_', ''),)):
+        if name not in self.reserved_words:
+            return _replace_chars(name, subs)
+        else:
+            return name
+
+    def connect(self, src, target, label, style='DataInter', stack=False, faded=False):
+        edge = {'to': self._format_id(target),
+                'from': self._format_id(src),
+                'name': label}
+        self.connections.append(edge)
+
+    def add_solver(self, label, name='solver', **kwargs):
+        raise NotImplementedError()
+
+    def add_comp(self, name, label=None, **kwargs):
+        self.comp_names.append(self._format_id(name))
+        self.add_system(name, 'analysis', label, **kwargs)
+
+    def add_func(self, name, **kwargs):
+        pass
+
+    def add_optimizer(self, label, name='opt', **kwargs):
+        self.optimizer = self._format_id(name)
+        self.add_system(name, 'optimization', label, **kwargs)
+
+    def add_system(self, node_name, style, label=None, stack=False, faded=False):
+        if label is None:
+            label = node_name
+        dct = {"type": style, "id": self._format_id(node_name), "name": label}
+        self.components.append(dct)
+
+    def add_workflow(self):
+        wf = ["_U_",
+              [
+                self.optimizer, self.comp_names
+              ]
+            ]
+        self.processes = wf
+
+    def add_input(self, name, label=None, style='DataIO', stack=False):
+        self.connect(src='_U_', target=name, label=label)
+
+    def add_output(self, name, label=None, style='DataIO', stack=False, side="left"):
+        self.connect(src=name, target='_U_', label=label)
+
+    def write(self, filename='xdsmjs', ext='json', *args, **kwargs):
+        self.add_workflow()
+        data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
+
+        if ext is not None:
+            filename = '.'.join([filename, ext])
+        with open(filename, 'w') as outfile:
+            json.dump(data, outfile)
+        print('XDSM output file written to: {}'.format(filename))
+
+
+def write_xdsm(problem, filename, model_path=None, recurse=True,
+               include_external_outputs=True, out_format='tex',
+               include_solver=False, subs=_CHAR_SUBS):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -102,8 +210,12 @@ def write_xdsm(problem, filename, model_path=None, include_solver=False, recurse
        Problem
     filename : str
        Name of the output files (do not provide file extension)
+    out_format : str
+       Output format, one of "tex" (pyXDSM) or "json" (XDSMjs)
     include_solver : bool
        Include or not the problem model's nonlinear solver in the XDSM.
+    subs : tuple(str, str)
+       Characters to be replaced
     Returns
     -------
        XDSM
@@ -133,13 +245,14 @@ def write_xdsm(problem, filename, model_path=None, include_solver=False, recurse
     filename = filename.replace('\\', '/')  # Needed for LaTeX
     return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, model_path=model_path,
-                       design_vars=design_vars, responses=responses, recurse=recurse,
+                       design_vars=design_vars, responses=responses, out_format=out_format,
+                       recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
-                include_external_outputs=True, subs=(('_', '~'), (')', ' '), ('(', '_')), **kwargs):
+                include_external_outputs=True, subs=_CHAR_SUBS, out_format='tex', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -256,8 +369,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
                 comp = name[0]
             var = name[-1]
             var = _replace_chars(var, substitutes=subs)
-            new = {'comp': comp, 'var': var}
-            return new
+            return {'comp': comp, 'var': var}
 
         if isinstance(name, list):  # If a source has multiple targets
             return [convert(n) for n in name]
@@ -350,7 +462,10 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = accumulate_connections(external_inputs2)
     external_outputs3 = accumulate_connections(external_outputs2)
 
-    x = XDSMWriter()
+    if out_format == 'tex':
+        x = XDSMWriter()
+    elif out_format == 'json':
+        x = XDSMjsWriter()
 
     if optimizer is not None:
         x.add_optimizer(optimizer)
@@ -416,13 +531,14 @@ def _replace_chars(name, substitutes):
     ----------
     name : str
        Name
-    substitutes: tuple
+    substitutes: tuple or None
        Character pairs with old and substitute characters
 
     Returns
     -------
        str
     """
-    for (k, v) in substitutes:
-        name = name.replace(k, v)
+    if substitutes:
+        for (k, v) in substitutes:
+            name = name.replace(k, v)
     return name
