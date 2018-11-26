@@ -6,7 +6,6 @@ from fnmatch import fnmatch, filter as fnfilter
 
 try:
     import pycodestyle
-    import pydocstyle
 except ImportError:
     pycodestyle = None
 
