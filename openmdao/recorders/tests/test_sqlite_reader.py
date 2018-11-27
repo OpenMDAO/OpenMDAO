@@ -2464,6 +2464,8 @@ def _assert_model_matches_case(case, system):
 
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
+    legacy_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'legacy_sql')
+
     def setUp(self):
         self.orig_dir = os.getcwd()
         self.temp_dir = mkdtemp()
@@ -2489,8 +2491,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         #       recording context prior to V5, so the initial case does not reflect
         #       the driver as the source
 
-        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
-        filename = os.path.join(filename, 'case_database_v4.sql')
+        filename = os.path.join(self.legacy_dir, 'case_database_v4.sql')
 
         cr = CaseReader(filename)
 
@@ -2616,8 +2617,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_03.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_03.sql')
 
         cr = CaseReader(filename)
 
@@ -2669,8 +2669,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_02.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_02.sql')
 
         cr = CaseReader(filename)
 
@@ -2716,8 +2715,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_solver_v2(self):
         """ Backwards compatibility version 2. """
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_02.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_02.sql')
 
         cases = CaseReader(filename)
 
@@ -2747,8 +2745,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_system_v2(self):
         """ Backwards compatibility version 2. """
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_02.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_02.sql')
 
         cr = CaseReader(filename)
 
@@ -2791,8 +2788,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_01.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_01.sql')
 
         cr = CaseReader(filename)
 
@@ -2839,8 +2835,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_pre01.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_pre01.sql')
 
         cr = CaseReader(filename)
 

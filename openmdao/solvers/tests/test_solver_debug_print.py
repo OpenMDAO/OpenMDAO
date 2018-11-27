@@ -29,8 +29,10 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.general_utils import printoptions
 
-from parameterized import parameterized
-
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 nonlinear_solvers = [
     NonlinearBlockGS,

@@ -7,8 +7,14 @@ import webbrowser
 import threading
 import json
 from six import iteritems, itervalues
-import tornado.ioloop
-import tornado.web
+
+try:
+    import tornado
+    import tornado.ioloop
+    import tornado.web
+except ImportError:
+    tornado = None
+
 from collections import defaultdict, deque
 from itertools import groupby
 
@@ -87,84 +93,6 @@ def _stratify(call_data, sortby='time'):
 
     return depth_groups, node_list
 
-
-class _Application(tornado.web.Application):
-    def __init__(self, options):
-        self.call_data, _ = _process_profile(options.file)
-        self.depth_groups, self.node_list = _stratify(self.call_data)
-        self.options = options
-
-        # assemble our call_data nodes into a tree structure, where each
-        # entry contains that node's call data and a dict containing each
-        # child keyed by call path.
-        self.call_tree = tree = defaultdict(lambda : [None, {}])
-        for path, data in iteritems(self.call_data):
-            data['id'] = path
-            parts = path.rsplit('|', 1)
-            # add our node to our parent
-            if len(parts) > 1:
-                tree[parts[0]][1][path] = data
-            tree[path][0] = data
-
-        handlers = [
-            (r"/", _Index),
-            (r"/func/([0-9]+)", _Function),
-        ]
-
-        settings = dict(
-             template_path=os.path.join(os.path.dirname(__file__), "templates"),
-             static_path=os.path.join(os.path.dirname(__file__), "static"),
-        )
-
-        super(_Application, self).__init__(handlers, **settings)
-
-    def get_nodes(self, idx):
-        """
-        Yield all children of the given root up to a maximum number stored in options.maxcalls.
-        """
-        if idx == 0:
-            root = self.call_tree['$total']
-        else:
-            root = self.node_list[idx]
-            root = self.call_tree[root['id']]
-
-        maxcalls = self.options.maxcalls
-        stack = deque()
-        stack.appendleft(root)
-        callcount = 1
-        stop_adding = False
-        while stack:
-            parent, children = stack.pop()
-            yield parent
-            if not stop_adding:
-                callcount += len(children)
-                if callcount <= maxcalls:
-                    for child in itervalues(children):
-                        stack.appendleft(self.call_tree[child['id']])
-                else:
-                    stop_adding = True
-
-
-class _Index(tornado.web.RequestHandler):
-    def get(self):
-        """
-        Load the page template and request call data nodes starting at idx=0.
-        """
-        app = self.application
-        self.render("iprofview.html", title=app.options.title)
-
-
-class _Function(tornado.web.RequestHandler):
-    def get(self, idx):
-        """
-        Request an updated list of call data nodes, rooted at the node specified by idx.
-        """
-        app = self.application
-        dump = json.dumps(list(app.get_nodes(int(idx))))
-        self.set_header('Content-Type', 'application/json')
-        self.write(dump)
-
-
 def _iprof_setup_parser(parser):
     if not func_group:
         _setup_func_group()
@@ -189,28 +117,113 @@ def _iprof_setup_parser(parser):
                         help='Raw profile data files or a python file.')
 
 
-def _iprof_exec(options):
-    """
-    Called from a command line to instance based profile data in a web page.
-    """
-    if options.file[0].endswith('.py'):
-        if len(options.file) > 1:
-            print("iprofview can only process a single python file.", file=sys.stderr)
-            sys.exit(-1)
-        _iprof_py_file(options)
-        if MPI:
-            options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
-        else:
-            options.file = ['iprof.0']
+if tornado is None:
+    def _iprof_exec(options):
+        """
+        Called from a command line to instance based profile data in a web page.
+        """
+        raise RuntimeError("The 'iprof' function requires the 'tornado' package.  "
+                           "You can install it using 'pip install tornado'.")
 
-    if not options.noshow and (not MPI or MPI.COMM_WORLD.rank == 0):
-        app = _Application(options)
-        app.listen(options.port)
+else:
+    class _Application(tornado.web.Application):
+        def __init__(self, options):
+            self.call_data, _ = _process_profile(options.file)
+            self.depth_groups, self.node_list = _stratify(self.call_data)
+            self.options = options
 
-        print("starting server on port %d" % options.port)
+            # assemble our call_data nodes into a tree structure, where each
+            # entry contains that node's call data and a dict containing each
+            # child keyed by call path.
+            self.call_tree = tree = defaultdict(lambda : [None, {}])
+            for path, data in iteritems(self.call_data):
+                data['id'] = path
+                parts = path.rsplit('|', 1)
+                # add our node to our parent
+                if len(parts) > 1:
+                    tree[parts[0]][1][path] = data
+                tree[path][0] = data
 
-        serve_thread = _startThread(tornado.ioloop.IOLoop.current().start)
-        launch_thread = _startThread(lambda: _launch_browser(options.port))
+            handlers = [
+                (r"/", _Index),
+                (r"/func/([0-9]+)", _Function),
+            ]
 
-        while serve_thread.isAlive():
-            serve_thread.join(timeout=1)
+            settings = dict(
+                 template_path=os.path.join(os.path.dirname(__file__), "templates"),
+                 static_path=os.path.join(os.path.dirname(__file__), "static"),
+            )
+
+            super(_Application, self).__init__(handlers, **settings)
+
+        def get_nodes(self, idx):
+            """
+            Yield all children of the given root up to a maximum number stored in options.maxcalls.
+            """
+            if idx == 0:
+                root = self.call_tree['$total']
+            else:
+                root = self.node_list[idx]
+                root = self.call_tree[root['id']]
+
+            maxcalls = self.options.maxcalls
+            stack = deque()
+            stack.appendleft(root)
+            callcount = 1
+            stop_adding = False
+            while stack:
+                parent, children = stack.pop()
+                yield parent
+                if not stop_adding:
+                    callcount += len(children)
+                    if callcount <= maxcalls:
+                        for child in itervalues(children):
+                            stack.appendleft(self.call_tree[child['id']])
+                    else:
+                        stop_adding = True
+
+
+    class _Index(tornado.web.RequestHandler):
+        def get(self):
+            """
+            Load the page template and request call data nodes starting at idx=0.
+            """
+            app = self.application
+            self.render("iprofview.html", title=app.options.title)
+
+
+    class _Function(tornado.web.RequestHandler):
+        def get(self, idx):
+            """
+            Request an updated list of call data nodes, rooted at the node specified by idx.
+            """
+            app = self.application
+            dump = json.dumps(list(app.get_nodes(int(idx))))
+            self.set_header('Content-Type', 'application/json')
+            self.write(dump)
+
+    def _iprof_exec(options):
+        """
+        Called from a command line to instance based profile data in a web page.
+        """
+        if options.file[0].endswith('.py'):
+            if len(options.file) > 1:
+                print("iprofview can only process a single python file.", file=sys.stderr)
+                sys.exit(-1)
+            _iprof_py_file(options)
+            if MPI:
+                options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
+            else:
+                options.file = ['iprof.0']
+
+        if not options.noshow and (not MPI or MPI.COMM_WORLD.rank == 0):
+            app = _Application(options)
+            app.listen(options.port)
+
+            print("starting server on port %d" % options.port)
+
+            serve_thread = _startThread(tornado.ioloop.IOLoop.current().start)
+            launch_thread = _startThread(lambda: _launch_browser(options.port))
+
+            while serve_thread.isAlive():
+                serve_thread.join(timeout=1)
