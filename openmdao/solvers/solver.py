@@ -344,15 +344,6 @@ class Solver(object):
     def _run_iterator(self):
         """
         Run the iterative solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -404,8 +395,6 @@ class Solver(object):
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
                 print(prefix + ' Converged')
-
-        return fail, norm, norm / norm0
 
     def _iter_initialize(self):
         """
@@ -604,25 +593,20 @@ class NonlinearSolver(Solver):
     def solve(self):
         """
         Run the solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         raised = False
         try:
-            fail, abs_err, rel_err = self._run_iterator()
-        except Exception:
-            fail = True
+            self._run_iterator()
+
+        except AnalysisError:
             raised = True
             exc = sys.exc_info()
 
-        if fail and self.options['debug_print']:
+        except Exception:
+            raised = True
+            exc = sys.exc_info()
+
+        if raised and self.options['debug_print']:
             coord = self._recording_iter.get_formatted_iteration_coordinate()
 
             out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
@@ -644,8 +628,6 @@ class NonlinearSolver(Solver):
 
         if raised:
             reraise(*exc)
-
-        return fail, abs_err, rel_err
 
     def _iter_initialize(self):
         """
@@ -795,20 +777,11 @@ class LinearSolver(Solver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            initial error.
-        float
-            error at the first iteration.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
-        return self._run_iterator()
+        self._run_iterator()
 
     def _iter_initialize(self):
         """

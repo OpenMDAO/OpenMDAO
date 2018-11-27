@@ -491,15 +491,6 @@ class Problem(object):
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")

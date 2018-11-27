@@ -364,15 +364,6 @@ class DirectSolver(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         if len(vec_names) > 1:
             raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
@@ -413,5 +404,3 @@ class DirectSolver(LinearSolver):
             # MVP-generated jacobians are scaled.
             else:
                 x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)
-
-        return False, 0., 0.

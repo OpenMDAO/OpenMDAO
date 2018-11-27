@@ -48,15 +48,6 @@ class LinearUserDefined(LinearSolver):
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems

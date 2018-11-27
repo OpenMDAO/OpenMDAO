@@ -502,7 +502,7 @@ def pad_name(name, pad_num=10, quotes=False):
             return '{0}'.format(name)
 
 
-def run_model(prob):
+def run_model(prob, allow_exception=False):
     """
     Call `run_model` on problem and capture output.
 
@@ -510,6 +510,8 @@ def run_model(prob):
     ----------
     prob : Problem
         an instance of Problem
+    allow_exception : bool
+        Set to True to allow an exception of any kind.
 
     Returns
     -------
@@ -522,6 +524,10 @@ def run_model(prob):
     sys.stdout = strout
     try:
         prob.run_model()
+    except Exception:
+        if not allow_exception:
+            exc = sys.exc_info()
+            reraise(*exc)
     finally:
         sys.stdout = stdout
 
