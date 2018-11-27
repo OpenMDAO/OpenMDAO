@@ -6,10 +6,11 @@ from math import isnan
 from six import raise_from
 from six.moves import zip
 
-from contextlib import contextmanager
-
 import warnings
 import unittest
+
+from contextlib import contextmanager
+from functools import wraps
 
 from openmdao.core.component import Component
 from openmdao.core.group import Group
@@ -44,8 +45,6 @@ def assert_warning(category, msg):
             break
     else:
         raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
-
-from functools import wraps
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
