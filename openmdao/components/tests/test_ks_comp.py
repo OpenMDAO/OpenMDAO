@@ -10,7 +10,7 @@ from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDr
 from openmdao.components.ks_comp import KSComp
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 class TestKSFunction(unittest.TestCase):
@@ -138,7 +138,6 @@ class TestKSFunction(unittest.TestCase):
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
         from openmdao.components.ks_comp import KSComponent  # deprecated
-        import warnings
 
         prob = Problem()
         prob.model = model = Group()
@@ -146,12 +145,10 @@ class TestKSFunction(unittest.TestCase):
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2,))))
         model.add_subsystem('comp', DoubleArrayComp())
 
-        with warnings.catch_warnings(record=True) as w:
-            model.add_subsystem('ks', KSComponent(width=2))
+        msg = "'KSComponent' has been deprecated. Use 'KSComp' instead."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'KSComponent' has been deprecated. Use 'KSComp' instead.")
+        with assert_warning(DeprecationWarning, msg):
+            model.add_subsystem('ks', KSComponent(width=2))
 
         model.connect('px.x', 'comp.x1')
         model.connect('comp.y2', 'ks.g')

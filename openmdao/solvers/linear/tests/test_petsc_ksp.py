@@ -3,7 +3,6 @@
 from __future__ import division, print_function
 
 import unittest
-import warnings
 
 import numpy as np
 
@@ -20,7 +19,7 @@ except ImportError:
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -39,12 +38,10 @@ class TestPETScKrylov(unittest.TestCase):
 
         # use PetscKSP here to check for deprecation warning and verify that the deprecated
         # class still gets the right answer without duplicating this test.
-        with warnings.catch_warnings(record=True) as w:
-            group = TestImplicitGroup(lnSolverClass=PetscKSP)
+        msg = "PetscKSP is deprecated.  Use PETScKrylov instead."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "PetscKSP is deprecated.  Use PETScKrylov instead.")
+        with assert_warning(DeprecationWarning, msg):
+            group = TestImplicitGroup(lnSolverClass=PetscKSP)
 
         p = Problem(group)
         p.setup(check=False)
@@ -263,23 +260,14 @@ class TestPETScKrylov(unittest.TestCase):
         group = TestImplicitGroup(lnSolverClass=PETScKrylov)
 
         msg = "The 'preconditioner' property provides backwards compatibility " \
-            + "with OpenMDAO <= 1.x ; use 'precon' instead."
+              "with OpenMDAO <= 1.x ; use 'precon' instead."
 
-        # check deprecation on setter
-        with warnings.catch_warnings(record=True) as w:
+        # check deprecation on setter & getter
+        with assert_warning(DeprecationWarning, msg):
             precon = group.linear_solver.preconditioner = LinearBlockGS()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
-
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             pre = group.linear_solver.preconditioner
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
 
     def test_solve_on_subsystem(self):
         """solve an implicit system with KSP attached anywhere but the root"""

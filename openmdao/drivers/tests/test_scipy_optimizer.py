@@ -2,7 +2,7 @@
 
 import unittest
 import sys
-import warnings
+
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -10,7 +10,7 @@ from scipy import __version__ as scipy_version
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import run_driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -24,15 +24,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_scipyoptimizer_deprecation(self):
 
         msg = "'ScipyOptimizer' provides backwards compatibility " \
-            + "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
+              "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
 
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
-            driver = ScipyOptimizer()
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
+        with assert_warning(DeprecationWarning, msg):
+            ScipyOptimizer()
 
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.

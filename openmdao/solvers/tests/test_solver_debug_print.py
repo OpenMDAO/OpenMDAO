@@ -144,6 +144,7 @@ class TestNonlinearSolvers(unittest.TestCase):
     def test_solver_debug_print_feature(self):
         from openmdao.api import Problem, IndepVarComp, NewtonSolver
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.utils.general_utils import printoptions
 
         p = Problem()
         model = p.model
@@ -179,12 +180,27 @@ class TestNonlinearSolvers(unittest.TestCase):
             self.assertEqual(f.read(), self.expected_data)
 
 
-class TestNonlinearSolversBugFixes(unittest.TestCase):
+class TestNonlinearSolversIsolated(unittest.TestCase):
     """
-    Got some odd intermittent failures with this, so moved it to a separate test object. It is
-    unrelated to the tests in that test object, and doesn't need all the setup/teardown tempfile
-    creation and deletion.
+    This test needs to run isolated to preclude interactions in the underlying
+    `warnings` module that is used to raise the singular entry error.
     """
+    ISOLATED = True
+
+    def setUp(self):
+        # perform test in temporary directory
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_solver')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        # clean up the temporary directory
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     def test_debug_after_raised_error(self):
         prob = Problem()
         model = prob.model
@@ -227,11 +243,12 @@ class TestNonlinearSolversBugFixes(unittest.TestCase):
 
         output = strout.getvalue()
         target = "'thrust_equilibrium_group.thrust_bal.thrust'"
-        self.assertTrue( target in output, msg=target + "NOT FOUND IN" + output)
+        self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
         self.assertEqual(expected_msg, str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
