@@ -58,9 +58,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed, rel_err, abs_err = prob.run_model()
-
-        self.assertFalse(failed, "Optimization failed.")
+        prob.run_model()
 
         of = ['f_xy']
         wrt = ['x', 'y']

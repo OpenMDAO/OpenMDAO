@@ -15,7 +15,7 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, Group, BalanceComp
+from openmdao.api import Problem, IndepVarComp, ExecComp, Group, BalanceComp, AnalysisError
 
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
@@ -107,6 +107,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         nl = model.circuit.nonlinear_solver = solver()
 
         nl.options['debug_print'] = True
+        nl.options['err_on_maxiter'] = True
 
         # suppress solver output for test
         nl.options['iprint'] = model.circuit.linear_solver.options['iprint'] = -1
@@ -128,7 +129,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         with printoptions(**opts):
             # run the model and check for expected output file
-            output = run_model(p)
+            output = run_model(p, ignore_exception=True)
 
         expected_output = '\n'.join([
             self.expected_data,
@@ -142,7 +143,7 @@ class TestNonlinearSolvers(unittest.TestCase):
             self.assertEqual(f.read(), self.expected_data)
 
     def test_solver_debug_print_feature(self):
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, AnalysisError
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
         from openmdao.utils.general_utils import printoptions
 
@@ -162,6 +163,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True
+        nl.options['err_on_maxiter'] = True
 
         # set some poor initial guesses so that we don't converge
         p['circuit.n1.V'] = 10.
@@ -174,7 +176,10 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         with printoptions(**opts):
             # run the model
-            p.run_model()
+            try:
+                p.run_model()
+            except AnalysisError:
+                pass
 
         with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
             self.assertEqual(f.read(), self.expected_data)

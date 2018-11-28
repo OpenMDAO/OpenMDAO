@@ -491,15 +491,6 @@ class Problem(object):
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
@@ -517,7 +508,7 @@ class Problem(object):
 
         self.final_setup()
         self.model._clear_iprint()
-        return self.model.run_solve_nonlinear()
+        self.model.run_solve_nonlinear()
 
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -558,20 +549,11 @@ class Problem(object):
     def run_once(self):
         """
         Backward compatible call for run_model.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         warn_deprecation("The 'run_once' method provides backwards compatibility with "
                          "OpenMDAO <= 1.x ; use 'run_model' instead.")
 
-        return self.run_model()
+        self.run_model()
 
     def run(self):
         """

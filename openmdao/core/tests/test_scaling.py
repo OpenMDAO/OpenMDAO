@@ -290,10 +290,9 @@ class TestScaling(unittest.TestCase):
             prob.set_solver_print(level=0)
 
             prob.setup(check=False)
-            result = prob.run_model()
+            prob.run_model()
 
-            success = not result[0]
-            return success
+            return np.linalg.norm(prob.model._residuals._data) < 1e-5
 
         # ---------------------------
         # coeffs: r1, r2, c1, c2
