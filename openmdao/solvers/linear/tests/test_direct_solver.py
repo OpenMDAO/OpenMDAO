@@ -519,6 +519,72 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         self.assertEqual(expected_msg, str(cm.exception))
 
+    def test_raise_error_on_underdetermined(self):
+
+        class DCgenerator(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('V_bus', val=1.0)
+                self.add_input('V_out', val=1.0)
+
+                self.add_output('I_out', val=-2.0)
+                self.add_output('P_out', val=-2.0)
+
+                self.declare_partials('I_out', 'V_bus', val=1.0)
+                self.declare_partials('I_out', 'V_out', val=-1.0)
+                self.declare_partials('P_out', ['V_out', 'I_out'])
+                self.declare_partials('P_out', 'P_out', val=-1.0)
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                resids['I_out'] = inputs['V_bus'] - inputs['V_out']
+                resids['P_out'] = inputs['V_out'] * outputs['I_out'] - outputs['P_out']
+
+            def linearize(self, inputs, outputs, J):
+                J['P_out', 'V_out'] = outputs['I_out']
+                J['P_out', 'I_out'] = inputs['V_out']
+
+        class RectifierCalcs(ImplicitComponent):
+
+            def setup(self):
+                self.add_input('P_out', val=1.0)
+
+                self.add_output('P_in', val=1.0)
+                self.add_output('V_out', val=1.0)
+                self.add_output('Q_in', val=1.0)
+
+                self.declare_partials('P_in', 'P_out', val=1.0)
+                self.declare_partials('P_in', 'P_in', val=-1.0)
+                self.declare_partials('V_out', 'V_out', val=-1.0)
+                self.declare_partials('Q_in', 'P_in', val=1.0)
+                self.declare_partials('Q_in', 'Q_in', val=-1.0)
+
+            def apply_nonlinear(self, inputs, outputs, resids):
+                resids['P_in'] = inputs['P_out'] - outputs['P_in']
+                resids['V_out'] = 1.0 - outputs['V_out']
+                resids['Q_in'] = outputs['P_in'] - outputs['Q_in']
+
+        class Rectifier(Group):
+
+            def setup(self):
+                self.add_subsystem('gen', DCgenerator(), promotes=[('V_bus', 'Vm_dc'), 'P_out'])
+
+                self.add_subsystem('calcs', RectifierCalcs(), promotes=['P_out', ('V_out', 'Vm_dc')])
+
+                self.nonlinear_solver = NewtonSolver()
+                self.linear_solver = DirectSolver(assemble_jac=True)
+
+        prob = Problem(model=Rectifier())
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=2)
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        expected_msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
 
 class TestDirectSolverFeature(unittest.TestCase):
 

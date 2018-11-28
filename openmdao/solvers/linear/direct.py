@@ -90,6 +90,12 @@ def format_singular_csc_error(system, matrix):
         # There is a nan in the matrix.
         return(format_nan_error(system, dense))
     elif zero_cols.size <= zero_rows.size:
+
+        if zero_rows.size == 0:
+            # Underdetermined: duplicate columns or rows.
+            msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
+            return msg
+
         loc_txt = "row"
         loc = zero_rows[0]
     else:
