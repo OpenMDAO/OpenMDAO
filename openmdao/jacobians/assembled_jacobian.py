@@ -342,27 +342,35 @@ class AssembledJacobian(Jacobian):
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
         subjacs = system._subjacs_info
+        is_dense = isinstance(int_mtx._matrix, np.ndarray)
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
+        int_mtx._pre_update()
+        if ext_mtx is not None:
+            ext_mtx._pre_update()
+
         if self._randomize:
             for key, do_add in iters:
-                if do_add:
-                    int_mtx._update_add_submat(key, self._randomize_subjac(subjacs[key]['value']))
-                else:
-                    int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
+                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
 
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
         else:
             for key, do_add in iters:
-                if do_add:
+                if do_add and is_dense:
+                    # only do the add if matrix is dense.  If it's CSC, the summation
+                    # is automatic when we convert over from COO after assembled jac _update.
                     int_mtx._update_add_submat(key, subjacs[key]['value'])
                 else:
                     int_mtx._update_submat(key, subjacs[key]['value'])
 
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, subjacs[key]['value'])
+
+        int_mtx._post_update()
+        if ext_mtx is not None:
+            ext_mtx._post_update()
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
