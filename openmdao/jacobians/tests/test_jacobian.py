@@ -858,7 +858,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],
-                                                 [ 5.,  5.,  0., -1.]]))
+                                                 [ 5.,  10.,  0., -1.]]))
 
 if __name__ == '__main__':
     unittest.main()

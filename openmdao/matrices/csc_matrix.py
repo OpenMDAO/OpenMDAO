@@ -29,11 +29,15 @@ class CSCMatrix(COOMatrix):
             Maps output var name to row range.
         """
         data, rows, cols = self._build_sparse(num_rows, num_cols)
+        data[:] = 1.0
+        coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
+        arr = coo.toarray()
+        dup_inds = np.nonzero(arr > 1.)
 
         # get a set of indices that sorts into col major order
         srtidxs = np.lexsort((rows, cols))
 
-        data = data[srtidxs]
+        #data = data[srtidxs]
         rows = rows[srtidxs]
         cols = cols[srtidxs]
 
