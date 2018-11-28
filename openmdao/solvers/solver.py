@@ -606,10 +606,10 @@ class NonlinearSolver(Solver):
             coord = self._recording_iter.get_formatted_iteration_coordinate()
 
             out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
-            for vec_type, vec in iteritems(self._err_cache):
+            for vec_type, views in iteritems(self._err_cache):
                 out_str += '\n'
-                out_str += '# %s %ss\n' % (vec._name, vec._typ)
-                out_str += pprint.pformat(vec._views)
+                out_str += '# nonlinear %s\n' % vec_type
+                out_str += pprint.pformat(views)
                 out_str += '\n'
 
             print(out_str)

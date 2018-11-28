@@ -129,7 +129,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         with printoptions(**opts):
             # run the model and check for expected output file
-            output = run_model(p, allow_exception=True)
+            output = run_model(p, ignore_exception=True)
 
         expected_output = '\n'.join([
             self.expected_data,

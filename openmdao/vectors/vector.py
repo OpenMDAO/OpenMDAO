@@ -216,19 +216,14 @@ class Vector(object):
 
     def _copy_views(self):
         """
-        Return a lightweight copy containing just the views.
+        Return a dictionary containing just the views.
 
         Returns
         -------
-        <Vector>
-            Vector containing _name, _typ, and _views.
+        dict
+            Dictionary containing the _views.
         """
-        vec_cp = self.__class__(self._name, self._kind, self._system, self._root_vector,
-                                alloc_complex=self._alloc_complex, ncol=self._ncol)
-        vec_cp._system = None
-        vec_cp._typ = self._typ
-        vec_cp._views = deepcopy(self._views)
-        return vec_cp
+        return deepcopy(self._views)
 
     def keys(self):
         """
