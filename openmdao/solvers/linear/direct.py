@@ -404,7 +404,7 @@ class DirectSolver(LinearSolver):
             if self._assembled_jac is not None:
                 with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     if (isinstance(self._assembled_jac._int_mtx,
-                                   (COOMatrix, CSRMatrix, CSCMatrix))):
+                                   (CSCMatrix, COOMatrix, CSRMatrix))):
                         x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
                     else:
                         x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,

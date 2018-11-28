@@ -766,5 +766,99 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
 
 
+class MySparseComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('y', np.zeros(2))
+        self.add_input('x', np.zeros(2))
+        self.add_output('z', np.zeros(2))
+
+        # partials use sparse list format
+        self.declare_partials('z', 'x', rows=[0, 1], cols=[0, 1])
+        self.declare_partials('z', 'y', rows=[0, 1], cols=[1, 0])
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = np.array([3.0*inputs['x'][0]**3 + 4.0*inputs['y'][1]**2,
+                                 5.0*inputs['x'][1]**2 * inputs['y'][0]])
+
+    def compute_partials(self, inputs, partials):
+        partials['z', 'x'] = np.array([9.0*inputs['x'][0]**2, 10.0*inputs['x'][1]*inputs['y'][0]])
+        partials['z', 'y'] = np.array([8.0*inputs['y'][1], 5.0*inputs['x'][1]**2])
+
+
+class MyDenseComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('y', np.zeros(2))
+        self.add_input('x', np.zeros(2))
+        self.add_output('z', np.zeros(2))
+
+        # partials are dense
+        self.declare_partials('z', 'x')
+        self.declare_partials('z', 'y')
+
+    def compute(self, inputs, outputs):
+        outputs['z'] = np.array([3.0*inputs['x'][0]**3 + 4.0*inputs['y'][1]**2,
+                                 5.0*inputs['x'][1]**2 * inputs['y'][0]])
+
+    def compute_partials(self, inputs, partials):
+        partials['z', 'x'] = np.array([[9.0*inputs['x'][0]**2, 0.0], [0.0, 10.0*inputs['x'][1]*inputs['y'][0]]])
+        partials['z', 'y'] = np.array([[0.0, 8.0*inputs['y'][1]], [5.0*inputs['x'][1]**2, 0.0]])
+
+
+class OverlappingPartialsTestCase(unittest.TestCase):
+    def test_repeated_src_indices(self):
+        size = 2
+        p = Problem()
+        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        p.model.add_subsystem('C1', ExecComp('z=3.0*x[0]**3 + 2.0*x[1]**2', x=np.zeros(size)))
+
+        p.model.options['assembled_jac_type'] = 'dense'
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        p.model.connect('indeps.x', 'C1.x', src_indices=[1,1])
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        np.testing.assert_almost_equal(J, np.array([[13.]], dtype=float))
+
+    def test_multi_inputs_same_src_dense_comp(self):
+        p = Problem()
+        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
+
+        p.model.add_subsystem('C1', MyDenseComp())
+        p.model.options['assembled_jac_type'] = 'csc'
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        p.model.connect('indeps.x', ('C1.x', 'C1.y'))
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+                                       np.array([[-1.,  0.,  0.,  0.],
+                                                 [ 0., -1.,  0.,  0.],
+                                                 [ 9.,  8., -1.,  0.],
+                                                 [ 5.,  10.,  0., -1.]]))
+
+    def test_multi_inputs_same_src_sparse_comp(self):
+        p = Problem()
+        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
+
+        p.model.add_subsystem('C1', MySparseComp())
+        p.model.options['assembled_jac_type'] = 'csc'
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        p.model.connect('indeps.x', ('C1.x', 'C1.y'))
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+                                       np.array([[-1.,  0.,  0.,  0.],
+                                                 [ 0., -1.,  0.,  0.],
+                                                 [ 9.,  8., -1.,  0.],
+                                                 [ 5.,  5.,  0., -1.]]))
+
 if __name__ == '__main__':
     unittest.main()

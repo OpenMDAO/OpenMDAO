@@ -70,7 +70,7 @@ class COOMatrix(Matrix):
                 if src_indices is None:
                     delta = full_size
                 else:
-                    delta = shape[0] * len(src_indices)
+                    delta = shape[0] * len(np.unique(src_indices))
             elif rows is None:  # sparse matrix
                 delta = val.data.size
             else:  # list sparse format
@@ -78,13 +78,13 @@ class COOMatrix(Matrix):
 
             if loc in locations:
                 ind1, ind2, otherkey = locations[loc]
-                if not (src_indices is None and (ind2 - ind1) == delta == full_size):
-                    raise RuntimeError("Keys %s map to the same sub-jacobian of a CSC or "
-                                       "CSR partial jacobian and at least one of them is either "
-                                       "not dense or uses src_indices.  This can occur when "
-                                       "multiple inputs on the same "
-                                       "component are connected to the same output. Try using "
-                                       "a dense jacobian instead." % sorted((key, otherkey)))
+                #if not (src_indices is None and (ind2 - ind1) == delta == full_size):
+                    #raise RuntimeError("Keys %s map to the same sub-jacobian of a CSC or "
+                                       #"CSR partial jacobian and at least one of them is either "
+                                       #"not dense or uses src_indices.  This can occur when "
+                                       #"multiple inputs on the same "
+                                       #"component are connected to the same output. Try using "
+                                       #"a dense jacobian instead." % sorted((key, otherkey)))
             else:
                 ind1 = counter
                 counter += delta
@@ -174,6 +174,12 @@ class COOMatrix(Matrix):
 
         self._matrix = coo_matrix((data, (rows, cols)),
                                   shape=(num_rows, num_cols))
+
+    def _reset(self):
+        """
+        Zero out the matrix.
+        """
+        self._matrix.data[:] = 0.0
 
     def _update_submat(self, key, jac):
         """
@@ -348,10 +354,14 @@ def _get_dup_partials(rows, cols, in_ranges, out_ranges):
             cstart, cend = in_ranges[in_name]
             if cstart <= col < cend:
                 break
+        else:
+            raise RuntimeError("not found")
         for out_name in out_ranges:
             rstart, rend = out_ranges[out_name]
             if rstart <= row < rend:
                 break
+        else:
+            raise RuntimeError("not found")
         entries[(out_name, in_name)].append((row - rstart, col - cstart))
 
     return entries

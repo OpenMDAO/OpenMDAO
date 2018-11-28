@@ -281,6 +281,7 @@ class AssembledJacobian(Jacobian):
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
             seen = set()
+
             if isinstance(system, Component):
                 global_conns = _empty_dict
             else:
@@ -422,6 +423,15 @@ class AssembledJacobian(Jacobian):
 
                     d_inputs._data += ext_mtx._prod(dresids, mode, None, mask=mask)
 
+    def _reset_mats(self):
+        """
+        Zero out internal matrices if needed.
+        """
+        if self._has_overlapping_partials:
+            self._int_mtx._reset()
+            for key in self._ext_mtx:
+                self._ext_mtx[key]._reset()
+
 
 class DenseJacobian(AssembledJacobian):
     """
@@ -438,15 +448,6 @@ class DenseJacobian(AssembledJacobian):
             Parent system to this jacobian.
         """
         super(DenseJacobian, self).__init__(DenseMatrix, system=system)
-
-    def _reset_mats(self):
-        """
-        Zero out internal matrices if needed.
-        """
-        if self._has_overlapping_partials:
-            self._int_mtx._matrix[:] = 0.0
-            for key in self._ext_mtx:
-                self._ext_mtx[key]._matrix[:] = 0.0
 
 
 class COOJacobian(AssembledJacobian):

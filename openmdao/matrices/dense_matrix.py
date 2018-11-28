@@ -75,6 +75,12 @@ class DenseMatrix(Matrix):
 
                 metadata[key] = (irows, icols, list, factor)
 
+    def _reset(self):
+        """
+        Zero out the matrix.
+        """
+        self._matrix[:] = 0.0
+
     def _update_submat(self, key, jac):
         """
         Update the values of a sub-jacobian.
