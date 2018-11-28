@@ -519,7 +519,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         self.assertEqual(expected_msg, str(cm.exception))
 
-    def test_raise_error_on_underdetermined(self):
+    def test_raise_error_on_underdetermined_csc(self):
 
         class DCgenerator(ImplicitComponent):
 
