@@ -598,10 +598,6 @@ class NonlinearSolver(Solver):
         try:
             self._run_iterator()
 
-        except AnalysisError:
-            raised = True
-            exc = sys.exc_info()
-
         except Exception:
             raised = True
             exc = sys.exc_info()
