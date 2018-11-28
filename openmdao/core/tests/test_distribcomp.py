@@ -8,10 +8,7 @@ import numpy as np
 from openmdao.api import Problem, ExplicitComponent, Group, ExecComp
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
-from openmdao.utils.assert_utils import assert_rel_error
-
-import warnings
-warnings.simplefilter('always')
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -250,18 +247,12 @@ class NOMPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputComp(size))
         top.connect('C1.outvec', 'C2.invec')
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'distributed' option is set to True for Component C2, " \
+              "but there is no distributed vector implementation (MPI/PETSc) " \
+              "available. The default non-distributed vectors will be used."
+
+        with assert_warning(UserWarning, msg):
             p.setup(check=False)
-
-        expected = ("The 'distributed' option is set to True for Component C2, "
-                    "but there is no distributed vector implementation (MPI/PETSc) "
-                    "available. The default non-distributed vectors will be used.")
-
-        for warn in w:
-            if str(warn.message) == expected:
-                break
-        else:
-            self.fail("Did not see expected warning: %s" % expected)
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -490,42 +481,29 @@ class DeprecatedMPITests(unittest.TestCase):
 
         C1 = top.add_subsystem("C1", InOutArrayComp(size))
 
-        # check deprecation on setter
+        # check deprecation on setter & getter
         msg = "The 'distributed' property provides backwards compatibility " \
               "with OpenMDAO <= 2.4.0 ; use the 'distributed' option instead."
 
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             C2 = top.add_subsystem("C2", DeprecatedDistribInputComp(size))
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
-
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             C2.distributed
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
 
         # continue to make sure everything still works with the deprecation
         top.connect('C1.outvec', 'C2.invec')
 
         # Conclude setup but don't run model.
-        with warnings.catch_warnings(record=True) as w:
-            p.setup(check=False)
+        msg = "The 'distributed' option is set to True for Component C2, " \
+              "but there is no distributed vector implementation (MPI/PETSc) " \
+              "available. The default non-distributed vectors will be used."
 
         if PETScVector is None:
-            expected = ("The 'distributed' option is set to True for Component C2, "
-                        "but there is no distributed vector implementation (MPI/PETSc) "
-                        "available. The default non-distributed vectors will be used.")
-
-            for warn in w:
-                if str(warn.message) == expected:
-                    break
-            else:
-                self.fail("Did not see expected warning: %s" % expected)
+            with assert_warning(UserWarning, msg):
+                p.setup(check=False)
+        else:
+            p.setup(check=False)
 
         p.final_setup()
 

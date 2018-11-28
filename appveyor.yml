@@ -112,6 +112,7 @@ install:
 - cmd: conda config --set always_yes yes
 - cmd: conda update conda
 - cmd: conda install python=%PYTHON% numpy=%NUMPY% scipy=%SCIPY% pip --quiet
+- cmd: pip install git+https://github.com/OpenMDAO/testflo.git
 - cmd: cd C:\projects\blue*
 - cmd: pip install -e .[all]
 - cmd: conda list
