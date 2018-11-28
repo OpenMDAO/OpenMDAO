@@ -2,7 +2,6 @@
 
 import itertools
 import unittest
-from parameterized import parameterized
 
 from six import assertRaisesRegex
 from six.moves import range
@@ -18,6 +17,11 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
      SellarDis2withDerivatives
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
 class MyExplicitComp(ExplicitComponent):

@@ -10,7 +10,11 @@ import collections
 import re
 from six import PY3
 
-from numpydoc.docscrape import NumpyDocString
+try:
+    from numpydoc.docscrape import NumpyDocString
+except ImportError:
+    NumpyDocString = None
+
 
 # directories in which we do not wish to lint for docstrings/parameters.
 exclude = [
@@ -330,6 +334,7 @@ class LintTestCase(unittest.TestCase):
 
         return new_failures
 
+    @unittest.skipUnless(NumpyDocString, "requires 'NumpyDocString', install openmdao[test]")
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
         """
@@ -412,6 +417,7 @@ class LintTestCase(unittest.TestCase):
             else:
                 failures[key] = new_failures
 
+    @unittest.skipUnless(NumpyDocString, "requires 'NumpyDocString', install openmdao[test]")
     def check_function(self, dir_name, file_name, func_name, func, failures):
         """ Perform docstring checks on a function.
 

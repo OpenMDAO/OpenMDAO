@@ -9,7 +9,11 @@ import itertools
 import warnings
 
 import numpy as np
-from parameterized import parameterized
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
     NonlinearRunOnce, NonLinearRunOnce
