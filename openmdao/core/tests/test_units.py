@@ -1,13 +1,12 @@
 """ Tests the ins and outs of automatic unit conversion in OpenMDAO."""
 
 import unittest
-import warnings
 
 from six import iteritems
 
 from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DirectSolver
 from openmdao.api import ExecComp
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
@@ -294,28 +293,24 @@ class TestUnitConversion(unittest.TestCase):
     def test_add_unitless_output(self):
         prob = Problem(model=Group())
         prob.model.add_subsystem('indep', IndepVarComp('x', 0.0, units='unitless'))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+
+        msg = "Output 'x' has units='unitless' but 'unitless' has been deprecated. " \
+              "Use units=None instead.  Note that connecting a unitless variable to " \
+              "one with units is no longer an error, but will issue a warning instead."
+
+        with assert_warning(DeprecationWarning, msg):
             prob.setup(check=False)
-            self.assertEqual(str(w[-1].message),
-                             "Output 'x' has units='unitless' but 'unitless' has "
-                             "been deprecated. Use units=None "
-                             "instead.  Note that connecting a unitless variable to "
-                             "one with units is no longer an error, but will issue "
-                             "a warning instead.")
 
     def test_add_unitless_input(self):
         prob = Problem(model=Group())
         prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'unitless'}))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+
+        msg = "Input 'x' has units='unitless' but 'unitless' has been deprecated. " \
+              "Use units=None instead.  Note that connecting a unitless variable to " \
+              "one with units is no longer an error, but will issue a warning instead."
+
+        with assert_warning(DeprecationWarning, msg):
             prob.setup(check=False)
-        self.assertEqual(str(w[-1].message),
-                         "Input 'x' has units='unitless' but 'unitless' has "
-                         "been deprecated. Use units=None "
-                         "instead.  Note that connecting a unitless variable to "
-                         "one with units is no longer an error, but will issue "
-                         "a warning instead.")
 
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
@@ -326,10 +321,9 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.connect('src.x2', 'tgt.xx')
 
         msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+
+        with assert_warning(UserWarning, msg):
             prob.setup()
-        self.assertEqual(str(w[-1].message), msg)
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""

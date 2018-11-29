@@ -1571,24 +1571,13 @@ class Group(System):
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         super(Group, self)._solve_nonlinear()
 
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
-            result = self._nonlinear_solver.solve()
-
-        return result
+            self._nonlinear_solver.solve()
 
     def _guess_nonlinear(self):
         """
@@ -1671,21 +1660,10 @@ class Group(System):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
-        result = self._linear_solver.solve(vec_names, mode, rel_systems)
-
-        return result
+        self._linear_solver.solve(vec_names, mode, rel_systems)
 
     def _linearize(self, jac, sub_do_ln=True):
         """

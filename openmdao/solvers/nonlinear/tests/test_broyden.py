@@ -4,7 +4,6 @@ from __future__ import print_function
 from six import iteritems
 
 import unittest
-import warnings
 
 import numpy as np
 
@@ -14,7 +13,7 @@ from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 class VectorEquation(ImplicitComponent):
@@ -281,14 +280,11 @@ class TestBryoden(unittest.TestCase):
 
         prob.setup(check=False)
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The following states are not covered by a solver, and may have been " \
+              "omitted from the BroydenSolver 'state_vars': mixed.x3, mixed.x45"
+
+        with assert_warning(UserWarning, msg):
             prob.run_model()
-
-        self.assertEqual(len(w), 1)
-
-        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': mixed.x3, mixed.x45"
-
-        self.assertEqual(str(w[0].message), msg)
 
         # Try again with promoted names.
         prob = Problem()
@@ -306,14 +302,11 @@ class TestBryoden(unittest.TestCase):
 
         prob.setup(check=False)
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The following states are not covered by a solver, and may have been " \
+              "omitted from the BroydenSolver 'state_vars': x3, x45"
+
+        with assert_warning(UserWarning, msg):
             prob.run_model()
-
-        self.assertEqual(len(w), 1)
-
-        msg = "The following states are not covered by a solver, and may have been omitted from the BroydenSolver 'state_vars': x3, x45"
-
-        self.assertEqual(str(w[0].message), msg)
 
     def test_mixed_promoted_vars(self):
         # Testing Broyden on a 5 state case split among 3 vars.

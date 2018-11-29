@@ -4,7 +4,6 @@ from six import iteritems
 from six.moves import cStringIO
 
 import unittest
-import warnings
 
 import numpy as np
 
@@ -19,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.mpi import MPI
 
 try:
@@ -212,13 +211,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        with warnings.catch_warnings(record=True) as w:
-            data = prob.check_partials(out_stream=None)
-
         # warning about 'comp2'
-        self.assertEqual(len(w), 1)
-        expected = "No derivative data found for Component 'comp2'."
-        self.assertEqual(str(w[0].message), expected)
+        msg = "No derivative data found for Component 'comp2'."
+
+        with assert_warning(UserWarning, msg):
+            data = prob.check_partials(out_stream=None)
 
         # and no derivative data for 'comp2'
         self.assertFalse('comp2' in data)
@@ -687,16 +684,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        with warnings.catch_warnings(record=True) as w:
-            data = prob.check_partials(out_stream=None)
-
-        self.assertEqual(len(w), 1)
-
         msg = "The following components requested complex step, but force_alloc_complex " + \
               "has not been set to True, so finite difference was used: ['comp']\n" + \
               "To enable complex step, specify 'force_alloc_complex=True' when calling " + \
               "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(str(w[0].message), msg)
+
+        with assert_warning(UserWarning, msg):
+            data = prob.check_partials(out_stream=None)
 
         # Derivative still calculated, but with fd instead.
         x_error = data['comp']['f_xy', 'x']['rel error']

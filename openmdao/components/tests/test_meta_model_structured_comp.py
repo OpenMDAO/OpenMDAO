@@ -10,7 +10,8 @@ from openmdao.core.problem import Problem
 from openmdao.core.group import Group
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+
 import numpy as np
 import unittest
 
@@ -1264,15 +1265,11 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         import numpy as np
         from openmdao.api import Group, Problem, IndepVarComp
         from openmdao.components.meta_model_structured_comp import MetaModelStructured  # deprecated
-        import warnings
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'MetaModelStructured' has been deprecated. Use 'MetaModelStructuredComp' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             xor_interp = MetaModelStructured(method='slinear')
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'MetaModelStructured' has been deprecated. Use "
-                                            "'MetaModelStructuredComp' instead.")
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)

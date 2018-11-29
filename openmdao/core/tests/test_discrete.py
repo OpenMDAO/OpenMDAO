@@ -2,8 +2,8 @@
 
 import sys
 import unittest
-import warnings
 import copy
+
 from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
