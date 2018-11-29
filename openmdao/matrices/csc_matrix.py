@@ -60,4 +60,4 @@ class CSCMatrix(COOMatrix):
         Do anything that needs to be done at the end of AssembledJacobian._update.
         """
         # this will add any repeated entries together
-        self._matrix = self._matrix.tocsc()
+        self._matrix = self._coo.tocsc()
