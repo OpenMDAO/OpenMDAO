@@ -2600,19 +2600,9 @@ class System(object):
 
         This calls _solve_nonlinear, but with the model assumed to be in an unscaled state.
 
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_nonlinear()
-
-        return result
+            self._solve_nonlinear()
 
     def run_apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
@@ -2648,20 +2638,9 @@ class System(object):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_linear(vec_names, mode, ContainsAll())
-
-        return result
+            self._solve_linear(vec_names, mode, ContainsAll())
 
     def run_linearize(self, sub_do_ln=True):
         """
@@ -2690,19 +2669,9 @@ class System(object):
         """
         Compute outputs. The model is assumed to be in a scaled state.
 
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            Relative error.
-        float
-            Absolute error.
         """
         # Reconfigure if needed.
         self._check_reconf()
-
-        return False, 0., 0.
 
     def check_config(self, logger):
         """
@@ -2750,15 +2719,6 @@ class System(object):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         pass
 
