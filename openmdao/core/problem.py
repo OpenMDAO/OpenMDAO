@@ -284,10 +284,10 @@ class Problem(object):
             # check for remote var
             if name in allprocs_meta:
                 abs_name = name
-            elif name in proms['input']:
-                abs_name = proms['input'][name][0]
             elif name in proms['output']:
                 abs_name = proms['output'][name][0]
+            elif name in proms['input']:
+                abs_name = proms['input'][name][0]
 
             if abs_name in self._remote_var_set:
                 if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
@@ -375,14 +375,13 @@ class Problem(object):
         proms = self.model._var_allprocs_prom2abs_list
         if self._setup_status >= 1:
 
-            if name in proms['input']:
+            if name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                return meta[abs_name]['units']
+            elif name in proms['input']:
                 # This triggers a check for unconnected non-unique inputs, and
                 # raises the same error as vector access.
                 abs_name = prom_name2abs_name(self.model, name, 'input')
-                return meta[abs_name]['units']
-
-            elif name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
                 return meta[abs_name]['units']
 
         raise KeyError('Variable name "{}" not found.'.format(name))
