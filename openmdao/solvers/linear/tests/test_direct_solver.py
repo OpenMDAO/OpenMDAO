@@ -207,23 +207,6 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         self.assertEqual(expected_msg, str(cm.exception))
 
-    def test_raise_error_on_dup_partials(self):
-        prob = Problem()
-        model = prob.model
-
-        model.add_subsystem('des_vars', IndepVarComp('x', 1.0), promotes=['*'])
-        model.add_subsystem('dupcomp', DupPartialsComp())
-
-        model.linear_solver = DirectSolver(assemble_jac=True)
-
-        with self.assertRaises(Exception) as cm:
-            prob.setup(check=False)
-            prob.final_setup()
-
-        expected_msg = "CSC matrix data contains the following duplicate row/col entries: [(('dupcomp.x', 'dupcomp.c'), [(10, 2)])]\nThis would break internal indexing."
-
-        self.assertEqual(expected_msg, str(cm.exception))
-
     def test_raise_error_on_singular_with_densejac(self):
         prob = Problem()
         model = prob.model
