@@ -192,15 +192,6 @@ class ScipyKrylov(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
@@ -257,10 +248,6 @@ class ScipyKrylov(LinearSolver):
 
             fail |= (info != 0)
             x_vec._data[:] = x
-
-        # TODO: implement this properly
-
-        return fail, 0., 0.
 
     def _apply_precon(self, in_vec):
         """

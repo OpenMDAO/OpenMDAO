@@ -21,15 +21,6 @@ class NonlinearRunOnce(NonlinearSolver):
     def solve(self):
         """
         Run the solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         system = self._system
 
@@ -52,8 +43,6 @@ class NonlinearRunOnce(NonlinearSolver):
                     system._check_reconf_update()
             rec.abs = 0.0
             rec.rel = 0.0
-
-        return False, 0.0, 0.0
 
     def _declare_options(self):
         """

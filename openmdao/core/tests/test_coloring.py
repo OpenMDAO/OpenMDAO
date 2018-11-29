@@ -3,7 +3,6 @@ from __future__ import print_function
 import os
 import shutil
 import tempfile
-import warnings
 
 import unittest
 import numpy as np
@@ -19,12 +18,12 @@ except ImportError:
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver, ParallelGroup, Group
-from openmdao.utils.assert_utils import assert_rel_error
-
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+
 import openmdao.test_suite
 
 try:
@@ -613,11 +612,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         # check for proper handling if someone calls compute_totals on Problem with different set or different order
         # of desvars/responses than were used to define the coloring.  Behavior should be that coloring is turned off
         # and a warning is issued.
-        with warnings.catch_warnings(record=True) as w:
+        msg = "compute_totals called using a different list of design vars and/or responses than those used " \
+              "to define coloring, so coloring will be turned off.\ncoloring design vars: " \
+              "['indeps.x', 'indeps.y', 'indeps.r'], current design vars: ['indeps.x', 'indeps.y', 'indeps.r']\n" \
+              "coloring responses: ['circle.area', 'r_con.g', 'theta_con.g', 'delta_theta_con.g', 'l_conx.g'], " \
+              "current responses: ['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g']."
+
+        with assert_warning(UserWarning, msg):
             p_color.compute_totals(of=['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g'],
                                    wrt=['x', 'y', 'r'])
-        self.assertEqual(len(w), 1)
-        self.assertEqual(str(w[0].message), "compute_totals called using a different list of design vars and/or responses than those used to define coloring, so coloring will be turned off.\ncoloring design vars: ['indeps.x', 'indeps.y', 'indeps.r'], current design vars: ['indeps.x', 'indeps.y', 'indeps.r']\ncoloring responses: ['circle.area', 'r_con.g', 'theta_con.g', 'delta_theta_con.g', 'l_conx.g'], current responses: ['delta_theta_con.g', 'circle.area', 'r_con.g', 'theta_con.g', 'l_conx.g'].")
 
     def test_bad_mode(self):
         with self.assertRaises(Exception) as context:

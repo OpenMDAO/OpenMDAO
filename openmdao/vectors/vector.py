@@ -1,9 +1,10 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
 
+from six import iteritems, PY3
+from copy import deepcopy
 import os
 import numpy as np
-from six import iteritems, PY3
 
 from openmdao.utils.name_maps import name2abs_name
 
@@ -212,6 +213,17 @@ class Vector(object):
         if initialize_views:
             vec._initialize_views()
         return vec
+
+    def _copy_views(self):
+        """
+        Return a dictionary containing just the views.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the _views.
+        """
+        return deepcopy(self._views)
 
     def keys(self):
         """

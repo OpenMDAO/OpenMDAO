@@ -11,8 +11,6 @@ import sys
 
 import numpy as np
 
-from copy import deepcopy
-
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
@@ -346,15 +344,6 @@ class Solver(object):
     def _run_iterator(self):
         """
         Run the iterative solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -406,8 +395,6 @@ class Solver(object):
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
                 print(prefix + ' Converged')
-
-        return fail, norm, norm / norm0
 
     def _iter_initialize(self):
         """
@@ -606,32 +593,23 @@ class NonlinearSolver(Solver):
     def solve(self):
         """
         Run the solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         raised = False
         try:
-            fail, abs_err, rel_err = self._run_iterator()
+            self._run_iterator()
+
         except Exception:
-            fail = True
             raised = True
             exc = sys.exc_info()
 
-        if fail and self.options['debug_print']:
+        if raised and self.options['debug_print']:
             coord = self._recording_iter.get_formatted_iteration_coordinate()
 
             out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
-            for vec_type, vec in iteritems(self._err_cache):
+            for vec_type, views in iteritems(self._err_cache):
                 out_str += '\n'
-                out_str += '# %s %ss\n' % (vec._name, vec._typ)
-                out_str += pprint.pformat(vec._views)
+                out_str += '# nonlinear %s\n' % vec_type
+                out_str += pprint.pformat(views)
                 out_str += '\n'
 
             print(out_str)
@@ -647,8 +625,6 @@ class NonlinearSolver(Solver):
         if raised:
             reraise(*exc)
 
-        return fail, abs_err, rel_err
-
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.
@@ -661,8 +637,8 @@ class NonlinearSolver(Solver):
             error at the first iteration.
         """
         if self.options['debug_print']:
-            self._err_cache['inputs'] = deepcopy(self._system._inputs)
-            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            self._err_cache['inputs'] = self._system._inputs._copy_views()
+            self._err_cache['outputs'] = self._system._outputs._copy_views()
 
         if self.options['maxiter'] > 0:
             self._run_apply()
@@ -797,20 +773,11 @@ class LinearSolver(Solver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            initial error.
-        float
-            error at the first iteration.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
-        return self._run_iterator()
+        self._run_iterator()
 
     def _iter_initialize(self):
         """

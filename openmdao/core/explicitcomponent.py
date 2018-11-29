@@ -192,15 +192,6 @@ class ExplicitComponent(Component):
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         super(ExplicitComponent, self)._solve_nonlinear()
 
@@ -210,14 +201,12 @@ class ExplicitComponent(Component):
                 self._inputs.read_only = True
                 try:
                     if self._discrete_inputs or self._discrete_outputs:
-                        failed = self.compute(self._inputs, self._outputs, self._discrete_inputs,
-                                              self._discrete_outputs)
+                        self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                     self._discrete_outputs)
                     else:
-                        failed = self.compute(self._inputs, self._outputs)
+                        self.compute(self._inputs, self._outputs)
                 finally:
                     self._inputs.read_only = False
-
-        return bool(failed), 0., 0.
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -304,14 +293,6 @@ class ExplicitComponent(Component):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
 
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         for vec_name in vec_names:
             if vec_name in self._rel_vec_names:
@@ -339,8 +320,6 @@ class ExplicitComponent(Component):
 
                     # ExplicitComponent jacobian defined with -1 on diagonal.
                     d_residuals *= -1.0
-
-        return False, 0., 0.
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
@@ -389,11 +368,6 @@ class ExplicitComponent(Component):
             If not None, dict containing discrete input values.
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
-
-        Returns
-        -------
-        bool or None
-            None or False if run successfully; True if there was a failure.
         """
         pass
 
