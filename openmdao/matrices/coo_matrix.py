@@ -290,4 +290,3 @@ class COOMatrix(Matrix):
                     mask[ind1:ind2] = False
 
             return mask
-
