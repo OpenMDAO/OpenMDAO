@@ -805,7 +805,7 @@ class MyDenseComp(ExplicitComponent):
 
 
 class OverlappingPartialsTestCase(unittest.TestCase):
-    def test_repeated_src_indices(self):
+    def test_repeated_src_indices_csc(self):
         size = 2
         p = Problem()
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
@@ -821,6 +821,26 @@ class OverlappingPartialsTestCase(unittest.TestCase):
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
         np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(), 
+                                       np.array([[-1.,  0.,  0.],
+                                                 [ 0., -1.,  0.],
+                                                 [ 0., 13., -1.]]))
+
+    def test_repeated_src_indices_dense(self):
+        size = 2
+        p = Problem()
+        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
+
+        p.model.add_subsystem('C1', ExecComp('z=3.0*x[0]**3 + 2.0*x[1]**2', x=np.zeros(size)))
+
+        p.model.options['assembled_jac_type'] = 'dense'
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        p.model.connect('indeps.x', 'C1.x', src_indices=[1,1])
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
+        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix, 
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))

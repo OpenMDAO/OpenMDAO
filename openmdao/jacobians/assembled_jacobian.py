@@ -304,7 +304,7 @@ class AssembledJacobian(Jacobian):
                 _, wrtname = abs_key
                 if wrtname in output_names:
                     if abs_key in int_mtx._submats:
-                        iters.append((abs_key, False))
+                        iters.append(abs_key)
                     else:
                         # This happens when the src is an indepvarcomp that is
                         # contained in the system.
@@ -312,16 +312,16 @@ class AssembledJacobian(Jacobian):
                         if wrt in rev_conns:
                             for tgt in rev_conns[wrt]:
                                 if (of, tgt) in int_mtx._submats:
-                                    iters.append(abs_key, False)
+                                    iters.append(abs_key)
                                     break
                 else:  # wrt is an input
                     if wrtname in global_conns:
                         mapped = keymap[abs_key]
                         if mapped in seen:
-                            iters.append((abs_key, True))
+                            iters.append(abs_key)
                             self._has_overlapping_partials = True
                         else:
-                            iters.append((abs_key, False))
+                            iters.append(abs_key)
                             seen.add(mapped)
                     elif ext_mtx is not None:
                         iters_in_ext.append(abs_key)
@@ -351,19 +351,14 @@ class AssembledJacobian(Jacobian):
             ext_mtx._pre_update()
 
         if self._randomize:
-            for key, do_add in iters:
+            for key in iters:
                 int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
 
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
         else:
-            for key, do_add in iters:
-                if do_add and is_dense:
-                    # only do the add if matrix is dense.  If it's CSC, the summation
-                    # is automatic when we convert over from COO after assembled jac _update.
-                    int_mtx._update_add_submat(key, subjacs[key]['value'])
-                else:
-                    int_mtx._update_submat(key, subjacs[key]['value'])
+            for key in iters:
+                int_mtx._update_submat(key, subjacs[key]['value'])
 
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, subjacs[key]['value'])

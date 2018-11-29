@@ -23,6 +23,8 @@ class COOMatrix(Matrix):
     _mat_range_cache : dict
         Dictionary of cached CSC matrices needed for solving on a sub-range of the
         parent CSC matrix.
+    _coo : coo_matrix
+        COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
     """
 
     def __init__(self, comm):
@@ -36,6 +38,7 @@ class COOMatrix(Matrix):
         """
         super(COOMatrix, self).__init__(comm)
         self._mat_range_cache = {}
+        self._coo = None
 
     def _build_sparse(self, num_rows, num_cols):
         """
@@ -160,7 +163,7 @@ class COOMatrix(Matrix):
                 # update_submat.
                 metadata[key] = (np.argsort(idxs) + ind1, jac_type, factor)
 
-        self._matrix = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
+        self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
     def _reset(self):
         """

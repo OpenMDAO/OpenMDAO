@@ -403,8 +403,7 @@ class DirectSolver(LinearSolver):
             # AssembledJacobians are unscaled.
             if self._assembled_jac is not None:
                 with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    if (isinstance(self._assembled_jac._int_mtx,
-                                   (CSCMatrix, COOMatrix, CSRMatrix))):
+                    if (not isinstance(self._assembled_jac._int_mtx, DenseMatrix)):
                         x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
                     else:
                         x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
