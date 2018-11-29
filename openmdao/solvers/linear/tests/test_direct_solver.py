@@ -68,8 +68,8 @@ class DupPartialsComp(ExplicitComponent):
         self.add_input('c', np.zeros(19))
         self.add_output('x', np.zeros(11))
 
-        rows = [0, 1, 4, 10, 7, 9, 10]
-        cols = [0, 18, 11, 2, 5, 9, 2]
+        rows = [0,  1,  4, 10, 7, 9, 10, 4]
+        cols = [0, 18, 11,  2, 5, 9,  2, 11]
         self.declare_partials(of='x', wrt='c', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
@@ -77,6 +77,7 @@ class DupPartialsComp(ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         pass
+
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
@@ -204,6 +205,22 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_raise_error_on_dup_partials(self):
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('des_vars', IndepVarComp('x', 1.0), promotes=['*'])
+        model.add_subsystem('dupcomp', DupPartialsComp())
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup(check=False)
+
+        expected_msg = "declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
