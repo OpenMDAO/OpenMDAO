@@ -802,9 +802,9 @@ class Component(System):
                 idxset = set(zip(rows, cols))
                 if len(rows) - len(idxset) > 0:
                     dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
-                    raise RuntimeError("declare_partials has been called with rows and cols that "
-                                       "specify the following duplicate subjacobian entries: %s." %
-                                       (sorted(dups)))
+                    raise RuntimeError("%s: declare_partials has been called with rows and cols "
+                                       "that specify the following duplicate subjacobian entries: "
+                                       "%s." % (self.pathname, sorted(dups)))
 
             self._declared_partials.append((of, wrt, dependent, rows, cols, val))
 
