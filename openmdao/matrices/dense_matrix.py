@@ -37,12 +37,6 @@ class DenseMatrix(COOMatrix):
         super(DenseMatrix, self)._build(num_rows, num_cols, in_ranges, out_ranges)
         self._coo = self._matrix
 
-    def _reset(self):
-        """
-        Zero out the matrix.
-        """
-        self._matrix[:] = 0.0
-
     def _prod(self, in_vec, mode, ranges, mask=None):
         """
         Perform a matrix vector product.

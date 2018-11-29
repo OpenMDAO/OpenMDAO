@@ -165,12 +165,6 @@ class COOMatrix(Matrix):
 
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
-    def _reset(self):
-        """
-        Zero out the matrix.
-        """
-        self._matrix.data[:] = 0.0
-
     def _update_submat(self, key, jac):
         """
         Update the values of a sub-jacobian.
@@ -297,31 +291,3 @@ class COOMatrix(Matrix):
 
             return mask
 
-
-def _get_dup_partials(rows, cols, in_ranges, out_ranges):
-    counts = Counter((rows[i], cols[i]) for i in range(len(rows)))
-    dups = []
-    for entry, count in counts.most_common():
-        if count > 1:
-            dups.append(entry)
-        else:
-            break
-
-    entries = defaultdict(list)
-
-    for row, col in dups:
-        for in_name in in_ranges:
-            cstart, cend = in_ranges[in_name]
-            if cstart <= col < cend:
-                break
-        else:
-            raise RuntimeError("not found")
-        for out_name in out_ranges:
-            rstart, rend = out_ranges[out_name]
-            if rstart <= row < rend:
-                break
-        else:
-            raise RuntimeError("not found")
-        entries[(out_name, in_name)].append((row - rstart, col - cstart))
-
-    return entries

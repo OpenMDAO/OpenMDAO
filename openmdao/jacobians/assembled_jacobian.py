@@ -342,7 +342,6 @@ class AssembledJacobian(Jacobian):
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
         subjacs = system._subjacs_info
-        is_dense = isinstance(int_mtx._matrix, np.ndarray)
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
@@ -425,15 +424,6 @@ class AssembledJacobian(Jacobian):
                         self._mask_caches[d_inputs._names] = mask
 
                     d_inputs._data += ext_mtx._prod(dresids, mode, None, mask=mask)
-
-    def _reset_mats(self):
-        """
-        Zero out internal matrices if needed.
-        """
-        if self._has_overlapping_partials:
-            self._int_mtx._reset()
-            for key in self._ext_mtx:
-                self._ext_mtx[key]._reset()
 
 
 class DenseJacobian(AssembledJacobian):

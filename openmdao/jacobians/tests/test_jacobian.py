@@ -714,34 +714,6 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
                                                                    [-0.,  3.,  0.,  2.]]), .0001)
 
-    #def test_one_src_2_tgts_with_src_indices_cscjac_error(self):
-        #size = 4
-        #prob = Problem()
-        #indeps = prob.model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)))
-
-        #G1 = prob.model.add_subsystem('G1', Group())
-        #G1.add_subsystem('C1', ExecComp('z=2.0*y+3.0*x', x=np.zeros(size//2), y=np.zeros(size//2),
-                                        #z=np.zeros(size//2)))
-
-        #prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
-        #prob.model.add_objective('G1.C1.z')
-        #prob.model.add_design_var('indeps.x')
-
-        #prob.model.connect('indeps.x', 'G1.C1.x', src_indices=[0,1])
-        #prob.model.connect('indeps.x', 'G1.C1.y', src_indices=[2,3])
-
-        #prob.setup()
-
-        #with self.assertRaises(Exception) as context:
-            #prob.final_setup()
-        #self.assertEqual(str(context.exception),
-                         #"Keys [('G1.C1.z', 'G1.C1.x'), ('G1.C1.z', 'G1.C1.y')] map to the same "
-                         #"sub-jacobian of a CSC or CSR partial jacobian and at least one of them "
-                         #"is either not dense or uses src_indices.  This can occur when multiple "
-                         #"inputs on the same component are connected to the same output. Try using"
-                         #" a dense jacobian instead.")
-
     def test_one_src_2_tgts_csc_error(self):
         size = 10
         prob = Problem()
@@ -820,7 +792,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(), 
+        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))
@@ -840,7 +812,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         J = p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix, 
+        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix,
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))

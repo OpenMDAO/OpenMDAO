@@ -1706,7 +1706,6 @@ class Group(System):
         else:
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
-                jac._reset_mats()  # zero out matrices if we have any overlapping partials
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:

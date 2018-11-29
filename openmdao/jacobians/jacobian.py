@@ -238,12 +238,6 @@ class Jacobian(object):
 
         return rand(*subjac.shape) + 1.0
 
-    def _reset_mats(self):
-        """
-        Zero out internal matrices if needed.
-        """
-        pass
-
     def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
