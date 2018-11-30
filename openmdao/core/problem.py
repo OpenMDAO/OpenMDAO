@@ -207,7 +207,7 @@ class Problem(object):
 
         Returns
         -------
-        float or ndarray
+        float or ndarray or any python object
             the requested output/input variable.
         """
         # Caching only needed if vectors aren't allocated yet.
@@ -394,25 +394,33 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        value : float or ndarray or list
+        value : float or ndarray or any python object
             value to set this variable to.
         """
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
             self._initial_condition_cache[name] = value
         else:
-            if self.model._outputs and name in self.model._outputs:
-                self.model._outputs[name] = value
-            elif self.model._discrete_outputs and name in self.model._discrete_outputs:
-                self.model._discrete_outputs[name] = value
-            elif self.model._inputs and name in self.model._inputs:
-                self.model._inputs[name] = value
-            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
-                self.model._discrete_inputs[name] = value
+            all_proms = self.model._var_allprocs_prom2abs_list
+
+            if name in all_proms['output']:
+                abs_name = all_proms['output'][name][0]
+            elif name in all_proms['input']:
+                abs_name = prom_name2abs_name(self.model, name, 'input')
             else:
-                proms = self.model._var_allprocs_prom2abs_list
+                abs_name = name
+
+            if abs_name in self.model._outputs._views:
+                self.model._outputs[abs_name] = value
+            elif abs_name in self.model._inputs._views:
+                self.model._inputs[abs_name] = value
+            elif abs_name in self.model._discrete_outputs:
+                self.model._discrete_outputs[abs_name] = value
+            elif abs_name in self.model._discrete_inputs:
+                self.model._discrete_inputs[abs_name] = value
+            else:
                 # might be a remote var.  If so, just do nothing on this proc
-                if not (name in proms['input'] or name in proms['output'] or
+                if not (name in all_proms['input'] or name in all_proms['output'] or
                         name in self.model._var_allprocs_abs2meta):
                     raise KeyError('Variable name "{}" not found.'.format(name))
 
