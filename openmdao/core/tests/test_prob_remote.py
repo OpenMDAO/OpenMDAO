@@ -52,8 +52,6 @@ class ProbRemoteTestCase(unittest.TestCase):
         prob.model.add_subsystem('summ', ExecComp('z = f + g'), promotes=['f', 'g'])
         prob.model.add_subsystem('prod', ExecComp('z = f * g'), promotes=['f', 'g'])
 
-        #import wingdbstub
-
         prob.setup()
 
         # both of these values will get overwritten, but the error only happens when you
