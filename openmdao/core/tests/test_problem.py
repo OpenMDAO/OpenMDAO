@@ -2,7 +2,7 @@
 
 import sys
 import unittest
-import warnings
+
 from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
@@ -10,8 +10,8 @@ import numpy as np
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
-    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent
-from openmdao.utils.assert_utils import assert_rel_error
+    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, NonlinearRunOnce
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -157,8 +157,8 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, J[('MP2.y', 'indeps2.x')], np.eye(3)*-3., 1e-10)
         # before the bug fix, the following two derivs contained nonzero values even
         # though the variables involved were not dependent on each other.
-        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3,5)), 1e-10)
-        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5,3)), 1e-10)
+        assert_rel_error(self, J[('MP2.y', 'indeps1.x')], np.zeros((3, 5)), 1e-10)
+        assert_rel_error(self, J[('MP1.y', 'indeps2.x')], np.zeros((5, 3)), 1e-10)
 
     def test_set_2d_array(self):
         import numpy as np
@@ -294,6 +294,48 @@ class TestProblem(unittest.TestCase):
 
         assert_rel_error(self, derivs['f_xy']['x'], [[-6.0]], 1e-6)
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
+
+    def test_compute_totals_no_args_no_desvar(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_objective('calc.y')
+
+        p.setup()
+        p.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Driver is not providing any design variables for compute_totals.")
+
+    def test_compute_totals_no_args_no_response(self):
+        p = Problem()
+
+        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv.add_output('x', val=2.)
+
+        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+
+        p.model.connect('des_vars.x', 'calc.x')
+
+        p.model.add_design_var('des_vars.x')
+
+        p.setup()
+        p.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.compute_totals()
+
+        self.assertEqual(str(cm.exception),
+                         "Driver is not providing any response variables for compute_totals.")
 
     def test_compute_totals_no_args(self):
         p = Problem()
@@ -554,7 +596,6 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
 
-
         prob = Problem()
         prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
         prob.model.add_subsystem('comp', SimpleComp())
@@ -591,7 +632,6 @@ class TestProblem(unittest.TestCase):
 
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
-
 
         prob = Problem()
         prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
@@ -950,15 +990,12 @@ class TestProblem(unittest.TestCase):
 
         prob.setup(mode='fwd')
 
-        with warnings.catch_warnings(record=True) as w:
-            prob.final_setup()
+        msg = "Inefficient choice of derivative mode.  " \
+              "You chose 'fwd' for a problem with 99 design variables and 10 " \
+              "response variables (objectives and nonlinear constraints)."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
-        self.assertEqual(str(w[0].message),
-                         "Inefficient choice of derivative mode.  "
-                         "You chose 'fwd' for a problem with 99 design variables and 10 "
-                         "response variables (objectives and nonlinear constraints).")
+        with assert_warning(RuntimeWarning, msg):
+            prob.final_setup()
 
     def test_setup_bad_mode_direction_rev(self):
 
@@ -975,15 +1012,12 @@ class TestProblem(unittest.TestCase):
 
         prob.setup(mode='rev')
 
-        with warnings.catch_warnings(record=True) as w:
-            prob.final_setup()
+        msg = "Inefficient choice of derivative mode.  " \
+              "You chose 'rev' for a problem with 10 design variables and 20 " \
+              "response variables (objectives and nonlinear constraints)."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
-        self.assertEqual(str(w[0].message),
-                         "Inefficient choice of derivative mode.  "
-                         "You chose 'rev' for a problem with 10 design variables and 20 "
-                         "response variables (objectives and nonlinear constraints).")
+        with assert_warning(RuntimeWarning, msg):
+            prob.final_setup()
 
     def test_run_before_setup(self):
         # Test error message when running before setup.
@@ -1032,25 +1066,16 @@ class TestProblem(unittest.TestCase):
     def test_root_deprecated(self):
         # testing the root property
         msg = "The 'root' property provides backwards compatibility " \
-            + "with OpenMDAO <= 1.x ; use 'model' instead."
+              "with OpenMDAO <= 1.x ; use 'model' instead."
 
         prob = Problem()
 
-        # check deprecation on setter
-        with warnings.catch_warnings(record=True) as w:
+        # check deprecation on setter & getter
+        with assert_warning(DeprecationWarning, msg):
             prob.root = Group()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
-
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             prob.root
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
 
         # testing the root kwarg
         with self.assertRaises(ValueError) as cm:
@@ -1060,11 +1085,11 @@ class TestProblem(unittest.TestCase):
                          "Cannot specify both 'root' and 'model'. "
                          "'root' has been deprecated, please use 'model'.")
 
-        with warnings.catch_warnings(record=True) as w:
-            prob = Problem(root=Group())
+        msg = "The 'root' argument provides backwards " \
+              "compatibility with OpenMDAO <= 1.x ; use 'model' instead."
 
-        self.assertEqual(str(w[0].message), "The 'root' argument provides backwards "
-                         "compatibility with OpenMDAO <= 1.x ; use 'model' instead.")
+        with assert_warning(DeprecationWarning, msg):
+            prob = Problem(root=Group())
 
     def test_args(self):
         # defaults
@@ -1391,11 +1416,10 @@ class TestProblem(unittest.TestCase):
             Problem._post_setup_func = None
 
     def test_list_problem_vars(self):
-
-        prob = Problem(model=SellarDerivatives())
-        model = prob.model
+        model = SellarDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
 
+        prob = Problem(model)
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
@@ -1418,12 +1442,12 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEquals(output[1], 'Design Variables')
-        assertRegex(self, output[5], '^pz.z +\|[0-9. e+-]+\| +2')
-        self.assertEquals(output[9], 'Constraints')
-        assertRegex(self, output[14], '^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
-        self.assertEquals(output[17], 'Objectives')
-        assertRegex(self, output[21], '^obj_cmp.obj +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[1], r'Design Variables')
+        assertRegex(self, output[5], r'^pz.z +\|[0-9. e+-]+\| +2')
+        self.assertEquals(output[9], r'Constraints')
+        assertRegex(self, output[14], r'^con_cmp2.con2 +\[[0-9. e+-]+\] +1')
+        self.assertEquals(output[17], r'Objectives')
+        assertRegex(self, output[21], r'^obj_cmp.obj +\[[0-9. e+-]+\] +1')
 
         # With show_promoted_name=False
         stdout = sys.stdout
@@ -1434,9 +1458,9 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[5], '^z +\|[0-9. e+-]+\| +2')
-        assertRegex(self, output[14], '^con2 +\[[0-9. e+-]+\] +1')
-        assertRegex(self, output[21], '^obj +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[5], r'^z +\|[0-9. e+-]+\| +2')
+        assertRegex(self, output[14], r'^con2 +\[[0-9. e+-]+\] +1')
+        assertRegex(self, output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # With all the optional columns
         stdout = sys.stdout
@@ -1464,12 +1488,12 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         assertRegex(self, output[3],
-                    '^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
-                    'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
-                    'vectorize_derivs\s+cache_linear_solution')
+                    r'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
+                    r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
+                    r'vectorize_derivs\s+cache_linear_solution')
         assertRegex(self, output[5],
-                    '^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
-                    'None\s+None\s+None\s+None\s+None\s+False\s+False')
+                    r'^pz.z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
+                    r'None\s+None\s+None\s+None\s+None\s+False\s+False')
 
         # With all the optional columns and print_arrays
         stdout = sys.stdout
@@ -1496,12 +1520,12 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        assertRegex(self, output[6], '^\s+value:')
-        assertRegex(self, output[7], '^\s+\[[0-9. e+-]+\]')
-        assertRegex(self, output[9], '^\s+lower:')
-        assertRegex(self, output[10], '^\s+\[[0-9. e+-]+\]')
-        assertRegex(self, output[12], '^\s+upper:')
-        assertRegex(self, output[13], '^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[6], r'^\s+value:')
+        assertRegex(self, output[7], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[9], r'^\s+lower:')
+        assertRegex(self, output[10], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[12], r'^\s+upper:')
+        assertRegex(self, output[13], r'^\s+\[[0-9. e+-]+\]')
 
     def test_feature_list_problem_vars(self):
         import numpy as np
@@ -1538,6 +1562,33 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs',
                                           'cache_linear_solution'],
                                )
+
+class NestedProblemTestCase(unittest.TestCase):
+
+    def test_nested_prob(self):
+
+        class _ProblemSolver(NonlinearRunOnce):
+            def solve(self):
+                # create a simple subproblem and run it to test for global solver_info bug
+                p = Problem()
+                p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+                p.model.add_subsystem('comp', ExecComp('y=2*x'))
+                p.model.connect('indep.x', 'comp.x')
+                p.setup()
+                p.run_model()
+
+                return super(_ProblemSolver, self).solve()
+
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+        G = p.model.add_subsystem('G', Group())
+        G.add_subsystem('comp', ExecComp('y=2*x'))
+        G.nonlinear_solver = _ProblemSolver()
+        p.model.connect('indep.x', 'G.comp.x')
+        p.setup()
+        p.run_model()
+
+
 
 
 if __name__ == "__main__":

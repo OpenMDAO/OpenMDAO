@@ -16,7 +16,6 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.recorders.recording_iteration_stack import Recording
 
 
 def format_singular_error(err, system, mtx):
@@ -91,6 +90,12 @@ def format_singular_csc_error(system, matrix):
         # There is a nan in the matrix.
         return(format_nan_error(system, dense))
     elif zero_cols.size <= zero_rows.size:
+
+        if zero_rows.size == 0:
+            # Underdetermined: duplicate columns or rows.
+            msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
+            return msg
+
         loc_txt = "row"
         loc = zero_rows[0]
     else:
@@ -365,15 +370,6 @@ class DirectSolver(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         if len(vec_names) > 1:
             raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
@@ -382,41 +378,34 @@ class DirectSolver(LinearSolver):
 
         system = self._system
 
-        with Recording('DirectSolver', 0, self) as rec:
-            for vec_name in vec_names:
-                if vec_name not in system._rel_vec_names:
-                    continue
-                self._vec_name = vec_name
-                d_residuals = system._vectors['residual'][vec_name]
-                d_outputs = system._vectors['output'][vec_name]
+        for vec_name in vec_names:
+            if vec_name not in system._rel_vec_names:
+                continue
+            self._vec_name = vec_name
+            d_residuals = system._vectors['residual'][vec_name]
+            d_outputs = system._vectors['output'][vec_name]
 
-                # assign x and b vectors based on mode
-                if mode == 'fwd':
-                    x_vec = d_outputs
-                    b_vec = d_residuals
-                    trans_lu = 0
-                    trans_splu = 'N'
-                else:  # rev
-                    x_vec = d_residuals
-                    b_vec = d_outputs
-                    trans_lu = 1
-                    trans_splu = 'T'
+            # assign x and b vectors based on mode
+            if mode == 'fwd':
+                x_vec = d_outputs
+                b_vec = d_residuals
+                trans_lu = 0
+                trans_splu = 'N'
+            else:  # rev
+                x_vec = d_residuals
+                b_vec = d_outputs
+                trans_lu = 1
+                trans_splu = 'T'
 
-                # AssembledJacobians are unscaled.
-                if self._assembled_jac is not None:
-                    with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                        if (isinstance(self._assembled_jac._int_mtx,
-                                       (COOMatrix, CSRMatrix, CSCMatrix))):
-                            x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
-                        else:
-                            x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
-                                                                   trans=trans_lu)
+            # AssembledJacobians are unscaled.
+            if self._assembled_jac is not None:
+                with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                    if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                        x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
+                                                               trans=trans_lu)
+                    else:
+                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
 
-                # MVP-generated jacobians are scaled.
-                else:
-                    x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)
-
-                rec.abs = 0.0
-                rec.rel = 0.0
-
-        return False, 0., 0.
+            # MVP-generated jacobians are scaled.
+            else:
+                x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)

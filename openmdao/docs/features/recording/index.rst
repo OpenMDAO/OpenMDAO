@@ -8,7 +8,6 @@ Recording Data
     :maxdepth: 1
 
     saving_data.rst
-    getting_values.rst
-    getting_derivatives.rst
-    getting_metadata.rst
-    iterating_hierarchically.rst
+    iterating_over_data.rst
+    reading_data.rst
+    reading_metadata.rst

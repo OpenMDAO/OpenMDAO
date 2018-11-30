@@ -1,12 +1,9 @@
 """A module containing various configuration checks for an OpenMDAO Problem."""
 from __future__ import print_function
 
-import sys
-
 from collections import defaultdict
 from six import iteritems
 
-import networkx as nx
 import numpy as np
 
 from openmdao.core.group import Group
@@ -290,8 +287,9 @@ def _check_solvers(problem, logger):
             is_iter_ln = True
         else:
             is_iter_ln = (
-                (sys.linear_solver and ('maxiter' in sys.linear_solver.options or
-                 isinstance(sys.linear_solver, DirectSolver))) or
+                (sys.linear_solver and
+                 ('maxiter' in sys.linear_solver.options or
+                  isinstance(sys.linear_solver, DirectSolver))) or
                 (has_states and overrides_method('solve_linear', sys, ImplicitComponent))
             )
             iter_ln_depth = depth if is_iter_ln else np.inf

@@ -3,11 +3,11 @@ from __future__ import division
 
 from contextlib import contextmanager
 import os
+import re
 import sys
+import math
 import warnings
 import unittest
-import math
-from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types, PY2
 from six.moves import range, cStringIO as StringIO
@@ -59,6 +59,93 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
         warnings.warn(msg, category, stacklevel)
     finally:
         warnings.formatwarning = old_format
+
+
+class reset_warning_registry(object):
+    """
+    Context manager which archives & clears warning registry for duration of context.
+
+    From https://bugs.python.org/file40031/reset_warning_registry.py
+
+    Attributes
+    ----------
+    _pattern : regex pattern
+        Causes manager to only reset modules whose names match this pattern. defaults to ``".*"``.
+    """
+
+    #: regexp for filtering which modules are reset
+    _pattern = None
+
+    #: dict mapping module name -> old registry contents
+    _backup = None
+
+    def __init__(self, pattern=None):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        pattern : regex pattern
+            Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
+        """
+        self._pattern = re.compile(pattern or ".*")
+
+    def __enter__(self):
+        """
+        Enter the runtime context related to this object.
+
+        Returns
+        -------
+        reset_warning_registry
+            This context manager.
+
+        """
+        # archive and clear the __warningregistry__ key for all modules
+        # that match the 'reset' pattern.
+        pattern = self._pattern
+        backup = self._backup = {}
+        for name, mod in list(sys.modules.items()):
+            if pattern.match(name):
+                reg = getattr(mod, "__warningregistry__", None)
+                if reg:
+                    backup[name] = reg.copy()
+                    reg.clear()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Exit the runtime context related to this object.
+
+        Parameters
+        ----------
+        exc_type : Exception class
+            The type of the exception.
+        exc_value : Exception instance
+            The exception instance raised.
+        traceback : regex pattern
+            Traceback object.
+        """
+        # restore warning registry from backup
+        modules = sys.modules
+        backup = self._backup
+        for name, content in backup.items():
+            mod = modules.get(name)
+            if mod is None:
+                continue
+            reg = getattr(mod, "__warningregistry__", None)
+            if reg is None:
+                setattr(mod, "__warningregistry__", content)
+            else:
+                reg.clear()
+                reg.update(content)
+
+        # clear all registry entries that we didn't archive
+        pattern = self._pattern
+        for name, mod in list(modules.items()):
+            if pattern.match(name) and name not in backup:
+                reg = getattr(mod, "__warningregistry__", None)
+                if reg:
+                    reg.clear()
 
 
 def ensure_compatible(name, value, shape=None, indices=None):
@@ -205,10 +292,9 @@ def set_pyoptsparse_opt(optname, fallback=True):
     """
     For testing, sets the pyoptsparse optimizer using the given optimizer name.
 
-    This may be modified based on the value of
-    OPENMDAO_FORCE_PYOPTSPARSE_OPT. This can be used on systems that have
-    SNOPT installed to force them to use SLSQP in order to mimic our test
-    machines on travis and appveyor.
+    This may be modified based on the value of OPENMDAO_FORCE_PYOPTSPARSE_OPT.
+    This can be used on systems that have SNOPT installed to force them to use
+    SLSQP in order to mimic our test machines on travis and appveyor.
 
     Parameters
     ----------
@@ -232,7 +318,13 @@ def set_pyoptsparse_opt(optname, fallback=True):
         optname = force
 
     try:
+        from mock import Mock
+    except ImportError:
+        Mock = None
+
+    try:
         from pyoptsparse import OPT
+
         try:
             opt = OPT(optname)
             OPTIMIZER = optname
@@ -244,7 +336,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
                 except Exception:
                     pass
         else:
-            if fallback and isinstance(opt, Mock):
+            if fallback and Mock and isinstance(opt, Mock):
                 try:
                     opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
@@ -253,7 +345,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     except Exception:
         pass
 
-    if isinstance(opt, Mock):
+    if Mock and isinstance(opt, Mock):
         OPT = OPTIMIZER = None
 
     if not fallback and OPTIMIZER != optname:
@@ -415,7 +507,7 @@ def pad_name(name, pad_num=10, quotes=False):
             return '{0}'.format(name)
 
 
-def run_model(prob):
+def run_model(prob, ignore_exception=False):
     """
     Call `run_model` on problem and capture output.
 
@@ -423,6 +515,8 @@ def run_model(prob):
     ----------
     prob : Problem
         an instance of Problem
+    ignore_exception : bool
+        Set to True to ignore an exception of any kind.
 
     Returns
     -------
@@ -435,6 +529,10 @@ def run_model(prob):
     sys.stdout = strout
     try:
         prob.run_model()
+    except Exception:
+        if not ignore_exception:
+            exc = sys.exc_info()
+            reraise(*exc)
     finally:
         sys.stdout = stdout
 

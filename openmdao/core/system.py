@@ -16,8 +16,7 @@ from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, warn_deprecation, ContainsAll
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.vectors.vector import Vector, INT_DTYPE
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -148,6 +147,8 @@ class System(object):
         Nonlinear solver to be used for solve_nonlinear.
     _linear_solver : <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     _approx_schemes : OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
     _jacobian : <Jacobian>
@@ -1033,8 +1034,6 @@ class System(object):
 
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-
-        use_derivs = self._use_derivatives
 
         self._rel_vec_name_list = []
         for vec_name in self._vec_names:
@@ -2601,19 +2600,9 @@ class System(object):
 
         This calls _solve_nonlinear, but with the model assumed to be in an unscaled state.
 
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_nonlinear()
-
-        return result
+            self._solve_nonlinear()
 
     def run_apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
@@ -2649,20 +2638,9 @@ class System(object):
             list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         with self._scaled_context_all():
-            result = self._solve_linear(vec_names, mode, ContainsAll())
-
-        return result
+            self._solve_linear(vec_names, mode, ContainsAll())
 
     def run_linearize(self, sub_do_ln=True):
         """
@@ -2691,19 +2669,9 @@ class System(object):
         """
         Compute outputs. The model is assumed to be in a scaled state.
 
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            Relative error.
-        float
-            Absolute error.
         """
         # Reconfigure if needed.
         self._check_reconf()
-
-        return False, 0., 0.
 
     def check_config(self, logger):
         """
@@ -2751,15 +2719,6 @@ class System(object):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         pass
 
@@ -2804,7 +2763,7 @@ class System(object):
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance.
         recurse : boolean
             Flag indicating if the recorder should be added to all the subsystems.
@@ -2827,7 +2786,7 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = recording_iteration.stack[-1][0]
+            stack_top = self._recording_iter.stack[-1][0]
             method = stack_top.split('.')[-1]
 
             if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',

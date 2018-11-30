@@ -4,7 +4,6 @@ from six import iteritems
 from six.moves import cStringIO
 
 import unittest
-import warnings
 
 import numpy as np
 
@@ -19,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.mpi import MPI
 
 try:
@@ -212,13 +211,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        with warnings.catch_warnings(record=True) as w:
-            data = prob.check_partials(out_stream=None)
-
         # warning about 'comp2'
-        self.assertEqual(len(w), 1)
-        expected = "No derivative data found for Component 'comp2'."
-        self.assertEqual(str(w[0].message), expected)
+        msg = "No derivative data found for Component 'comp2'."
+
+        with assert_warning(UserWarning, msg):
+            data = prob.check_partials(out_stream=None)
 
         # and no derivative data for 'comp2'
         self.assertFalse('comp2' in data)
@@ -639,7 +636,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials(out_stream=None, compact_print=True)
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -687,16 +684,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        with warnings.catch_warnings(record=True) as w:
-            data = prob.check_partials(out_stream=None)
-
-        self.assertEqual(len(w), 1)
-
         msg = "The following components requested complex step, but force_alloc_complex " + \
               "has not been set to True, so finite difference was used: ['comp']\n" + \
               "To enable complex step, specify 'force_alloc_complex=True' when calling " + \
               "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(str(w[0].message), msg)
+
+        with assert_warning(UserWarning, msg):
+            data = prob.check_partials(out_stream=None)
 
         # Derivative still calculated, but with fd instead.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -721,7 +715,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials(out_stream=None, compact_print=True)
 
         x_error = data['comp']['f_xy', 'x']['rel error']
         self.assertLess(x_error.forward, 1e-5)
@@ -767,7 +761,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials(out_stream=None, compact_print=True)
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -815,7 +809,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials(out_stream=None, compact_print=True)
 
         # This will fail unless you set the check_step.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -1460,7 +1454,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        data = prob.check_partials(out_stream=None)
+        data = prob.check_partials(out_stream=None, compact_print=True)
         print(data)
 
     def test_set_step_on_comp(self):
@@ -1487,7 +1481,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.check_partials()
+        prob.check_partials(compact_print=True)
 
     def test_set_step_global(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1511,7 +1505,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(step=1e-2)
+        prob.check_partials(step=1e-2, compact_print=True)
 
     def test_set_method_on_comp(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1537,7 +1531,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        prob.check_partials()
+        prob.check_partials(compact_print=True)
 
     def test_set_method_global(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1561,33 +1555,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        prob.check_partials(method='cs')
+        prob.check_partials(method='cs', compact_print=True)
 
-    def test_set_form_on_comp(self):
-        from openmdao.api import Problem, Group, IndepVarComp
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
-        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
-        prob.model.add_subsystem('comp2', ParaboloidMatVec())
-
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
-        prob.model.connect('comp.f_xy', 'comp2.x')
-
-        prob.set_solver_print(level=0)
-
-        comp.set_check_partial_options(wrt='*', form='central')
-
-        prob.setup()
-        prob.run_model()
-
-        prob.check_partials()
 
     def test_set_form_global(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1611,33 +1581,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(form='central')
+        prob.check_partials(form='central', compact_print=True)
 
-    def test_set_step_calc_on_comp(self):
-        from openmdao.api import Problem, Group, IndepVarComp
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
-
-        prob = Problem()
-        prob.model = Group()
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
-        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
-        prob.model.add_subsystem('comp2', ParaboloidMatVec())
-
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
-        prob.model.connect('comp.f_xy', 'comp2.x')
-
-        prob.set_solver_print(level=0)
-
-        comp.set_check_partial_options(wrt='*', step_calc='rel')
-
-        prob.setup()
-        prob.run_model()
-
-        prob.check_partials()
 
     def test_set_step_calc_global(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1658,33 +1603,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        prob.check_partials(step_calc='rel')
-
-    def test_feature_compact_print_formatting(self):
-        from openmdao.api import Problem, Group, IndepVarComp
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
-
-        prob = Problem()
-        prob.model = Group()
-
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
-        comp = prob.model.add_subsystem('comp', ParaboloidTricky())
-        prob.model.add_subsystem('comp2', ParaboloidMatVec())
-
-        prob.model.connect('p1.x', 'comp.x')
-        prob.model.connect('p2.y', 'comp.y')
-        prob.model.connect('comp.f_xy', 'comp2.x')
-
-        prob.set_solver_print(level=0)
-
-        comp.set_check_partial_options(wrt='*', step_calc='rel')
-
-        prob.setup()
-        prob.run_model()
-
-        prob.check_partials(compact_print=True)
+        prob.check_partials(step_calc='rel', compact_print=True)
 
     def test_feature_check_partials_show_only_incorrect(self):
         from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent

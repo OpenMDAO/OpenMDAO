@@ -158,11 +158,11 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             comp.add_input('?', val=5.0)
 
-        msg = "'\[' is not a valid input name."
+        msg = r"'\[' is not a valid input name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_input('[', val=5.0)
 
-        msg = "'\]' is not a valid input name."
+        msg = r"'\]' is not a valid input name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_input(']', val=5.0)
 
@@ -178,11 +178,11 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output('?', val=5.0)
 
-        msg = "'\[' is not a valid output name."
+        msg = r"'\[' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output('[', val=5.0)
 
-        msg = "'\]' is not a valid output name."
+        msg = r"'\]' is not a valid output name."
         with assertRaisesRegex(self, NameError, msg):
             comp.add_output(']', val=5.0)
 

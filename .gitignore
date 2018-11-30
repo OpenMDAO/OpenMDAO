@@ -10,7 +10,9 @@ openmdao/docs/_srcdocs/usr/
 openmdao/docs/_srcdocs/dev/
 openmdao/docs/_srcdocs/packages/
 openmdao/docs/_srcdocs/index.rst
-*testflo_report.out
 openmdao/docs/tags/
 *.out
 doc_plot_*
+coloring.json
+connections.html
+rank*.dat

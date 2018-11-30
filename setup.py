@@ -1,7 +1,38 @@
+import re
+
 from setuptools import setup
 
-# exec this file to set __version__
-exec(open('openmdao/__init__.py').read())
+
+__version__ = re.findall(
+    r"""__version__ = ["']+([0-9\.]*)["']+""",
+    open('openmdao/__init__.py').read(),
+)[0]
+
+
+optional_dependencies = {
+    'docs': [
+        'matplotlib',
+        'mock',
+        'numpydoc',
+        'redbaron',
+        'sphinx',
+    ],
+    'test': [
+        'coverage',
+        'parameterized',
+        'pycodestyle==2.3.1',
+        'pydocstyle==2.0.0',
+        'testflo',
+    ],
+}
+
+# Add an optional dependency that concatenates all others
+optional_dependencies['all'] = sorted([
+    dependency
+    for dependencies in optional_dependencies.values()
+    for dependency in dependencies
+])
+
 
 setup(
     name='openmdao',
@@ -89,22 +120,12 @@ setup(
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
     install_requires=[
-        'six',
-        'numpydoc',
-        'scipy',
-        'sqlitedict',
-        'pycodestyle==2.3.1',
-        'pydocstyle==2.0.0',
-        'testflo',
-        'parameterized',
-        'pyparsing',
         'networkx>=2.0',
-        'sphinx',
-        'redbaron',
-        'mock',
-        'requests_mock',
-        'tornado',
+        'numpy',
         'pyDOE2',
+        'pyparsing',
+        'scipy',
+        'six',
         'astunparse',
     ],
     # scripts=['bin/om-pylint.sh']
@@ -114,5 +135,6 @@ setup(
     webview=openmdao.devtools.webview:webview_argv
     run_test=openmdao.devtools.run_test:run_test
     openmdao=openmdao.utils.om:openmdao_cmd
-    """
+    """,
+    extras_require=optional_dependencies,
 )

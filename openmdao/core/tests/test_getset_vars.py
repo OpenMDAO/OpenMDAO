@@ -4,7 +4,6 @@ import unittest
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestGetSetVariables(unittest.TestCase):
@@ -47,8 +46,8 @@ class TestGetSetVariables(unittest.TestCase):
         outputs['c.y'] = 5.0
         self.assertEqual(outputs['c.y'], 5.0)
 
-        # Removed part of test where we set values into the jacobian willy-nilly. You can only set
-        # declared values now.
+        # Removed part of test where we set values into the jacobian willy-nilly.
+        # You can only set declared values now.
 
     def test_with_promotion(self):
         """
@@ -105,7 +104,7 @@ class TestGetSetVariables(unittest.TestCase):
         """
         g = Group(assembled_jac_type='dense')
         g.linear_solver = DirectSolver(assemble_jac=True)
-        c = g.add_subsystem('c', ExecComp('y=2*x'))
+        g.add_subsystem('c', ExecComp('y=2*x'))
 
         p = Problem()
         model = p.model
@@ -123,7 +122,7 @@ class TestGetSetVariables(unittest.TestCase):
         p._initial_condition_cache = {}
 
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            x = p['x']
+            p['x']
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
@@ -132,7 +131,7 @@ class TestGetSetVariables(unittest.TestCase):
         p._initial_condition_cache = {}
 
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            y = p['y']
+            p['y']
 
         msg = 'Variable name "{}" not found.'
         inputs, outputs, residuals = g.get_nonlinear_vectors()
@@ -141,46 +140,46 @@ class TestGetSetVariables(unittest.TestCase):
         with assertRaisesRegex(self, KeyError, msg.format('x')):
             inputs['x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('x')):
-            x = inputs['x']
+            inputs['x']
         with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
             inputs['g.c.x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('g.c.x')):
-            gcx = inputs['g.c.x']
+            inputs['g.c.x']
 
         # outputs
         with assertRaisesRegex(self, KeyError, msg.format('y')):
             outputs['y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y')):
-            y = outputs['y']
+            outputs['y']
         with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
             outputs['g.c.y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('g.c.y')):
-            out = outputs['g.c.y']
+            outputs['g.c.y']
 
-        msg = 'Variable name pair \("{}", "{}"\) not found.'
+        msg = r'Variable name pair \("{}", "{}"\) not found.'
         jac = g.linear_solver._assembled_jac
 
         # d(output)/d(input)
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
             jac['y', 'x'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
-            dydx = jac['y', 'x']
+            jac['y', 'x']
         # allow absolute keys now
-        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-            #jac['g.c.y', 'g.c.x'] = 5.0
-        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
-            #deriv = jac['g.c.y', 'g.c.x']
+        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+        #     jac['g.c.y', 'g.c.x'] = 5.0
+        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.x')):
+        #     deriv = jac['g.c.y', 'g.c.x']
 
         # d(output)/d(output)
         with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
             jac['y', 'y'] = 5.0
         with assertRaisesRegex(self, KeyError, msg.format('y', 'y')):
-            dydy = jac['y', 'y']
+            jac['y', 'y']
         # allow absoute keys now
-        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-            #jac['g.c.y', 'g.c.y'] = 5.0
-        #with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
-            #deriv = jac['g.c.y', 'g.c.y']
+        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+        #     jac['g.c.y', 'g.c.y'] = 5.0
+        # with assertRaisesRegex(self, KeyError, msg.format('g.c.y', 'g.c.y')):
+        #     deriv = jac['g.c.y', 'g.c.y']
 
     def test_with_promotion_errors(self):
         """
@@ -208,7 +207,8 @@ class TestGetSetVariables(unittest.TestCase):
         # -------------------------------------------------------------------
 
         msg1 = 'Variable name "{}" not found.'
-        msg2 = "The promoted name x is invalid because it refers to multiple inputs: [g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
+        msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
+               "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
@@ -231,7 +231,7 @@ class TestGetSetVariables(unittest.TestCase):
         with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y')):
             self.assertEqual(outputs['g.c2.y'], 5.0)
 
-        msg1 = 'Variable name pair \("{}", "{}"\) not found.'
+        msg1 = r'Variable name pair \("{}", "{}"\) not found.'
 
         jac = g.linear_solver._assembled_jac
 
@@ -245,17 +245,16 @@ class TestGetSetVariables(unittest.TestCase):
         self.assertEqual(str(context.exception), msg2)
 
         # absolute keys now allowed
-        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-            #jac['g.c2.y', 'g.c2.x'] = 5.0
-        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
-            #deriv = jac['g.c2.y', 'g.c2.x']
+        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+        #     jac['g.c2.y', 'g.c2.x'] = 5.0
+        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.x')):
+        #     deriv = jac['g.c2.y', 'g.c2.x']
 
         # d(outputs)/d(outputs)
-        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-            #jac['g.c2.y', 'g.c2.y'] = 5.0
-        #with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
-            #deriv = jac['g.c2.y', 'g.c2.y']
-
+        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+        #     jac['g.c2.y', 'g.c2.y'] = 5.0
+        # with assertRaisesRegex(self, KeyError, msg1.format('g.c2.y', 'g.c2.y')):
+        #     deriv = jac['g.c2.y', 'g.c2.y']
 
     def test_nested_promotion_errors(self):
         """
@@ -279,10 +278,11 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: [g.c2.x, g.c3.x] that are not connected to an output variable."
+        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: " \
+               "[g.c2.x, g.c3.x] that are not connected to an output variable."
 
         # inputs (g.x is not connected)
-        #with assertRaisesRegex(self, RuntimeError, msg1.format('g.x')):
+        # with assertRaisesRegex(self, RuntimeError, msg1.format('g.x')):
         with self.assertRaises(Exception) as context:
             p['g.x'] = 5.0
             p.final_setup()
@@ -310,7 +310,8 @@ class TestGetSetVariables(unittest.TestCase):
             self.assertEqual(p['g.x'], 5.0)
         self.assertEqual(str(context.exception), msg1)
 
-        msg2 = "The promoted name x is invalid because it refers to multiple inputs: [g.c2.x, g.c3.x] that are not connected to an output variable."
+        msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
+               "[g.c2.x, g.c3.x] that are not connected to an output variable."
 
         jac = g.linear_solver._assembled_jac
         # d(outputs)/d(inputs)
@@ -344,7 +345,8 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: [g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
+        msg1 = "The promoted name g.x is invalid because it refers to multiple inputs: " \
+               "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
         # From here, 'g.x' has a valid source.
         model.connect('x', 'g.x')

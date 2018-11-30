@@ -1,12 +1,10 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
-import os
 import json
 from collections import OrderedDict
 import pprint
 import sys
-import warnings
 
 from six import iteritems, itervalues, string_types
 
@@ -18,7 +16,6 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 
@@ -125,8 +122,6 @@ class Driver(object):
         # Case recording options
         self.recording_options = OptionsDictionary()
 
-        self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record Driver metadata')
         self.recording_options.declare('record_model_metadata', types=bool, default=True,
                                        desc='Record metadata for all Systems in the model')
         self.recording_options.declare('record_desvars', types=bool, default=True,
@@ -149,9 +144,6 @@ class Driver(object):
                                             'level')
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the driver level')
-        self.recording_options.declare('record_n2_data', types=bool, default=True,
-                                       desc='Set to True to record metadata required for '
-                                       'N^2 viewing')
 
         # What the driver supports.
         self.supports = OptionsDictionary()
@@ -165,8 +157,6 @@ class Driver(object):
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
-        # TODO, support these in OpenMDAO
-        self.supports.declare('integer_design_vars', types=bool, default=False)
 
         self.iter_count = 0
         self._model_viewer_data = None
@@ -188,7 +178,7 @@ class Driver(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -236,8 +226,8 @@ class Driver(object):
             Pointer to the containing problem.
         """
         self._problem = problem
+        self._recording_iter = problem._recording_iter
         model = problem.model
-        mode = problem._mode
 
         self._total_jac = None
 
@@ -390,12 +380,6 @@ class Driver(object):
         }
 
         self._rec_mgr.startup(self)
-        if self.recording_options['record_metadata']:
-            if self.recording_options['record_n2_data']:
-                if self._rec_mgr._recorders:
-                    from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-                    self._model_viewer_data = _get_viewer_data(problem)
-            self._rec_mgr.record_metadata(self)
 
         # Also record the system metadata to the recorders attached to this Driver
         if self.recording_options['record_model_metadata']:
@@ -689,11 +673,11 @@ class Driver(object):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            failure_flag, _, _ = self._problem.model._solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self):
+            self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
-        return failure_flag
+        return False
 
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """
@@ -732,7 +716,7 @@ class Driver(object):
             print(len(header) * '-' + '\n')
 
         if problem.model._owns_approx_jac:
-            recording_iteration.stack.append(('_compute_totals_approx', 0))
+            self._recording_iter.stack.append(('_compute_totals_approx', 0))
 
             try:
                 if total_jac is None:
@@ -743,7 +727,7 @@ class Driver(object):
                 else:
                     totals = total_jac.compute_totals_approx()
             finally:
-                recording_iteration.stack.pop()
+                self._recording_iter.stack.pop()
 
         else:
             if total_jac is None:
@@ -754,12 +738,12 @@ class Driver(object):
             if not total_jac.has_lin_cons:
                 self._total_jac = total_jac
 
-            recording_iteration.stack.append(('_compute_totals', 0))
+            self._recording_iter.stack.append(('_compute_totals', 0))
 
             try:
                 totals = total_jac.compute_totals()
             finally:
-                recording_iteration.stack.pop()
+                self._recording_iter.stack.pop()
 
         if self._rec_mgr._recorders and self.recording_options['record_derivatives']:
             metadata = create_local_meta(self._get_name())
@@ -1029,7 +1013,7 @@ class Driver(object):
 
         if not MPI or MPI.COMM_WORLD.rank == 0:
             header = 'Driver debug print for iter coord: {}'.format(
-                recording_iteration.get_formatted_iteration_coordinate())
+                self._recording_iter.get_formatted_iteration_coordinate())
             print(header)
             print(len(header) * '-')
 

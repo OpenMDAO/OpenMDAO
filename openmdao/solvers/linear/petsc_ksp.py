@@ -11,7 +11,6 @@ except ImportError:
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.recorders.recording_iteration_stack import Recording
 
 KSP_TYPES = [
     "richardson",
@@ -150,12 +149,9 @@ class Monitor(object):
         norm : float
             the norm.
         """
-        with Recording('PETScKrylov', self._solver._iter_count, self._solver) as rec:
-            if counter == 0 and norm != 0.0:
-                self._norm0 = norm
-            self._norm = norm
-            rec.abs = self._norm
-            rec.rel = self._norm / self._norm0
+        if counter == 0 and norm != 0.0:
+            self._norm0 = norm
+        self._norm = norm
 
         self._solver._mpi_print(counter, norm, norm / self._norm0)
         self._solver._iter_count += 1
@@ -336,15 +332,6 @@ class PETScKrylov(LinearSolver):
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
@@ -391,8 +378,6 @@ class PETScKrylov(LinearSolver):
             x_vec._data[:] = sol_array
 
             sol_petsc_vec = rhs_petsc_vec = None
-
-        return False, 0., 0.
 
     def apply(self, mat, in_vec, result):
         """

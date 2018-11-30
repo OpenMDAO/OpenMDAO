@@ -4,13 +4,13 @@ from __future__ import print_function
 import time
 import numpy as np
 import unittest
-import warnings
 TestCase = unittest.TestCase
+
 from six import iterkeys
 
 from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, ExplicitComponent, ExecComp, DirectSolver
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.test_suite.components.matmultcomp import MatMultComp
 
@@ -466,22 +466,16 @@ class ParFDWarningsTestCase(unittest.TestCase):
         self.mat = np.random.random(5 * size).reshape((5, size)) - 0.5
 
     def test_total_no_mpi(self):
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+
+        with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=True)
 
-        self.assertEqual(len(w), 1)
-        self.assertEqual(str(w[0].message),
-                         "'': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
-
     def test_partial_no_mpi(self):
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'comp': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+
+        with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
-
-        self.assertEqual(len(w), 1)
-        self.assertEqual(str(w[0].message),
-                         "'comp': MPI is not active but num_par_fd = 3. No parallel finite difference will be performed.")
-
-
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

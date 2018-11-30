@@ -18,7 +18,6 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 
 if MPI:
@@ -680,7 +679,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         from openmdao.api import Problem
         from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
-        recording_iteration.stack = []
         size = 4
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
@@ -697,8 +695,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         assert_rel_error(self, J['ParallelGroup1.Con1.y']['Indep1.x'][0], np.ones(size)*2., 1e-6)
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
-
-        recording_iteration.stack = []
 
         # now run in rev mode and compare times for deriv calculation
         p = Problem(model=PartialDependGroup())

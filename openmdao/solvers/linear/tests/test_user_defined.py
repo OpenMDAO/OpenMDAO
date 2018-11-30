@@ -17,6 +17,7 @@ try:
 except ImportError:
     PETScVector = None
 
+
 class DistribStateImplicit(ImplicitComponent):
 
     def setup(self):
@@ -108,19 +109,12 @@ class DistribStateImplicit(ImplicitComponent):
             unscaled, dimensional quantities read via d_residuals[key]
         mode : str
             either 'fwd' or 'rev'
-
-        Returns
-        -------
-        None or bool or (bool, float, float)
-            The bool is the failure flag; and the two floats are absolute and relative error.
         """
         # Note: we are just preconditioning with Identity as a proof of concept.
         if mode == 'fwd':
             d_outputs.set_vec(d_residuals)
         elif mode == 'rev':
             d_residuals.set_vec(d_outputs)
-
-        return False, 0., 0.
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -150,7 +144,6 @@ class TestUserDefinedSolver(unittest.TestCase):
         def custom_method(d_outputs, d_residuals, mode):
             if d_outputs['out_var'][0] != -12.0:
                 raise ValueError('This value should be unscaled.')
-            return False, 0, 0
 
 
         class ScaledComp(ImplicitComponent):
@@ -288,19 +281,12 @@ class TestUserDefinedSolver(unittest.TestCase):
                     unscaled, dimensional quantities read via d_residuals[key]
                 mode : str
                     either 'fwd' or 'rev'
-
-                Returns
-                -------
-                None or bool or (bool, float, float)
-                    The bool is the failure flag; and the two floats are absolute and relative error.
                 """
                 # Note: we are just preconditioning with Identity as a proof of concept.
                 if mode == 'fwd':
                     d_outputs.set_vec(d_residuals)
                 elif mode == 'rev':
                     d_residuals.set_vec(d_outputs)
-
-                return False, 0., 0.
 
         prob = Problem()
 

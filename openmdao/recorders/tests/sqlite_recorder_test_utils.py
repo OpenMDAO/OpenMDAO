@@ -322,7 +322,7 @@ def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
         test.assertEqual(format_version_actual, format_version_expected)
 
 
-def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
+def assertViewerDataRecorded(test, expected):
 
     with database_cursor(test.filename) as db_cur:
         db_cur.execute("SELECT format_version FROM metadata")
@@ -332,15 +332,11 @@ def assertDriverMetadataRecorded(test, expected, expect_none_viewer_data=False):
         db_cur.execute("SELECT model_viewer_data FROM driver_metadata")
         row = db_cur.fetchone()
 
-        if expected is None and not expect_none_viewer_data:
+        if expected is None:
             test.assertIsNone(row)
             return
 
         model_viewer_data = json.loads(row[0])
-
-        if expect_none_viewer_data:
-            test.assertIsNone(model_viewer_data)
-            return
 
         test.assertTrue(isinstance(model_viewer_data, dict))
 

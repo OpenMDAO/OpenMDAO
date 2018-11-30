@@ -14,8 +14,8 @@ except ImportError:
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.record_util import is_valid_sqlite3_db
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 
 
@@ -87,16 +87,21 @@ def _get_viewer_data(data_source):
     """
     if isinstance(data_source, Problem):
         root_group = data_source.model
+        if not isinstance(root_group, Group):
+            simple_warning("The model is not a Group, viewer data is unavailable.")
+            return {}
+
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
             root_group = data_source
         else:
             # this function only makes sense when it is at the root
             return {}
-    elif is_valid_sqlite3_db(data_source):
+
+    elif isinstance(data_source, str):
+        check_valid_sqlite3_db(data_source)
         import sqlite3
-        con = sqlite3.connect(data_source,
-                              detect_types=sqlite3.PARSE_DECLTYPES)
+        con = sqlite3.connect(data_source, detect_types=sqlite3.PARSE_DECLTYPES)
         cur = con.cursor()
         cur.execute("SELECT format_version FROM metadata")
         row = cur.fetchone()
@@ -116,8 +121,9 @@ def _get_viewer_data(data_source):
                 if PY3:
                     import pickle
                     return pickle.loads(model_text[0])
+
     else:
-        raise TypeError('get_model_viewer_data only accepts Problems, Groups or filenames')
+        raise TypeError('_get_viewer_data only accepts Problems, Groups or filenames')
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref

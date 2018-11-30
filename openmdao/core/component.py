@@ -2,11 +2,9 @@
 
 from __future__ import division
 
-import warnings
-
-from collections import OrderedDict, Iterable
+from collections import OrderedDict, Iterable, Counter
 from itertools import product
-from six import string_types, iteritems, itervalues
+from six import string_types, iteritems
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -803,6 +801,15 @@ class Component(System):
             # If only one of rows/cols is specified
             if (rows is None) ^ (cols is None):
                 raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+            if rows is not None:
+                # check for repeated rows/cols indices
+                idxset = set(zip(rows, cols))
+                if len(rows) - len(idxset) > 0:
+                    dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
+                    raise RuntimeError("%s: declare_partials has been called with rows and cols "
+                                       "that specify the following duplicate subjacobian entries: "
+                                       "%s." % (self.pathname, sorted(dups)))
 
             self._declared_partials.append((of, wrt, dependent, rows, cols, val))
 

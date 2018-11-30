@@ -144,7 +144,7 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -310,11 +310,6 @@ class ExperimentalDriver(object):
         }
 
         self._rec_mgr.startup(self)
-        if self._rec_mgr._recorders:
-            from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-            self._model_viewer_data = _get_viewer_data(problem)
-        if self.recording_options['record_metadata']:
-            self._rec_mgr.record_metadata(self)
 
         # set up simultaneous deriv coloring
         if self._simul_coloring_info and self.supports['simultaneous_derivatives']:
@@ -536,10 +531,10 @@ class ExperimentalDriver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with Recording(self._get_name(), self.iter_count, self) as rec:
-            failure_flag = self._problem.model._solve_nonlinear()
+            self._problem.model._solve_nonlinear()
 
         self.iter_count += 1
-        return failure_flag
+        return False
 
     def _dict2array_jac(self, derivs):
         osize = 0

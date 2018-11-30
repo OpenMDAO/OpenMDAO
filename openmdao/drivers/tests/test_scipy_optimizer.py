@@ -2,13 +2,15 @@
 
 import unittest
 import sys
-import warnings
+
+from distutils.version import LooseVersion
 
 import numpy as np
+from scipy import __version__ as scipy_version
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
     ScipyOptimizer, ExplicitComponent, DirectSolver, NonlinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import run_driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -22,15 +24,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_scipyoptimizer_deprecation(self):
 
         msg = "'ScipyOptimizer' provides backwards compatibility " \
-            + "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
+              "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead."
 
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
-            driver = ScipyOptimizer()
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
+        with assert_warning(DeprecationWarning, msg):
+            ScipyOptimizer()
 
     def test_compute_totals_basic_return_array(self):
         # Make sure 'array' return_format works.
@@ -61,9 +58,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
 
-        failed, rel_err, abs_err = prob.run_model()
-
-        self.assertFalse(failed, "Optimization failed.")
+        prob.run_model()
 
         of = ['f_xy']
         wrt = ['x', 'y']
@@ -873,6 +868,188 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
         assert_rel_error(self, prob['x'], 0.0, 1e-3)
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
+                         "scipy >= 1.1 is required.")
+    def test_trust_constr(self):
+
+        def rosenbrock(x):
+            x_0 = x[:-1]
+            x_1 = x[1:]
+            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
+
+        class Rosenbrock(ExplicitComponent):
+
+            def __init__(self, problem):
+                super(Rosenbrock, self).__init__()
+                self.problem = problem
+                self.counter = 0
+
+            def setup(self):
+                self.add_input('x', np.array([1.5, 1.5, 1.5]))
+                self.add_output('f', 0.0)
+                self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = rosenbrock(x)
+
+        x0 = np.array([0.5, 0.8, 1.4])
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps.add_output('x', list(x0))
+
+        prob.model.add_subsystem('rosen', Rosenbrock(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(3)), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'trust-constr'
+        prob.driver.options['tol'] = 1e-5
+        prob.driver.options['maxiter'] = 2000
+        prob.driver.options['disp'] = False
+
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f', scaler=rosenbrock(x0))
+        prob.model.add_constraint('c', lower=0, upper=10)  # Double sided
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_rel_error(self, prob['x'][0], 1., 2e-2)
+        assert_rel_error(self, prob['f'], 0., 1e-2)
+        self.assertTrue(prob['c'] < 10)
+        self.assertTrue(prob['c'] > 0)
+
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
+                         "scipy >= 1.1 is required.")
+    def test_trust_constr_equality_con(self):
+
+        def rosenbrock(x):
+            x_0 = x[:-1]
+            x_1 = x[1:]
+            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
+
+        class Rosenbrock(ExplicitComponent):
+
+            def __init__(self, problem):
+                super(Rosenbrock, self).__init__()
+                self.problem = problem
+                self.counter = 0
+
+            def setup(self):
+                self.add_input('x', np.array([1.5, 1.5, 1.5]))
+                self.add_output('f', 0.0)
+                self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = rosenbrock(x)
+
+        x0 = np.array([0.5, 0.8, 1.4])
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps.add_output('x', list(x0))
+
+        prob.model.add_subsystem('rosen', Rosenbrock(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(3)), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'trust-constr'
+        prob.driver.options['tol'] = 1e-5
+        prob.driver.options['maxiter'] = 2000
+        prob.driver.options['disp'] = False
+
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f', scaler=rosenbrock(x0))
+        prob.model.add_constraint('c', equals=1.)
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_rel_error(self, prob['c'], 1., 1e-3)
+
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
+                         "scipy >= 1.1 is required.")
+    def test_trust_constr_inequality_con(self):
+
+        class Rosenbrock(ExplicitComponent):
+
+            def __init__(self, problem):
+                super(Rosenbrock, self).__init__()
+                self.problem = problem
+                self.counter = 0
+
+            def setup(self):
+                self.add_input('x', np.array([1.5, 1.5]))
+                self.add_output('f', 0.0)
+                self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = sum(x**2)
+
+        x0 = np.array([1.2, 1.5])
+
+        prob = Problem()
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps.add_output('x', list(x0))
+
+        prob.model.add_subsystem('sphere', Rosenbrock(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(2)), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'trust-constr'
+        prob.driver.options['tol'] = 1e-5
+        prob.driver.options['maxiter'] = 2000
+        prob.driver.options['disp'] = False
+
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f')
+        prob.model.add_constraint('c', lower=1.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        assert_rel_error(self, prob['c'], 1.0, 1e-2)
+
+    # TODO, add bounds test, when SciPy issue #9043 is resolved
+    # def test_trust_constr_bounds(self):
+    #     class Rosenbrock(ExplicitComponent):
+    #
+    #         def __init__(self, problem):
+    #             super(Rosenbrock, self).__init__()
+    #             self.problem = problem
+    #             self.counter = 0
+    #
+    #         def setup(self):
+    #             self.add_input('x', np.array([1.5, 1.5]))
+    #             self.add_output('f', 0.0)
+    #             self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+    #
+    #         def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+    #             x = inputs['x']
+    #             outputs['f'] = sum(x ** 2)
+    #
+    #     x0 = np.array([-3., -3.])
+    #
+    #     prob = Problem()
+    #     indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+    #     indeps.add_output('x', list(x0))
+    #
+    #     prob.model.add_subsystem('sphere', Rosenbrock(problem=prob), promotes=['*'])
+    #     prob.driver = ScipyOptimizeDriver()
+    #     prob.driver.options['optimizer'] = 'trust-constr'
+    #     prob.driver.options['tol'] = 1e-5
+    #     prob.driver.options['maxiter'] = 2000
+    #     prob.driver.options['disp'] = False
+    #
+    #     prob.model.add_design_var('x', lower=np.array([-4., -4.]), upper=np.array([-1, -1.5]))
+    #     prob.model.add_objective('f')
+    #
+    #     prob.setup()
+    #     prob.run_driver()
+    #
+    #     assert_rel_error(self, prob['x'][0], -1, 1e-2)
+    #     assert_rel_error(self, prob['x'][1], -1.5, 1e-2)
+
     def test_simple_paraboloid_lower_linear(self):
 
         prob = Problem()
@@ -1251,6 +1428,41 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.setup(check=False)
 
         prob.run_driver()
+
+    def test_multiple_objectives_error(self):
+
+        from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver, ExecComp
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        self.assertFalse(prob.driver.supports['multiple_objectives'])
+        prob.driver.options['debug_print'] = ['nl_cons', 'objs']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_objective('c')  # Second objective
+        prob.setup(check=False)
+
+        with self.assertRaises(RuntimeError):
+            prob.run_model()
+
+        with self.assertRaises(RuntimeError):
+            prob.run_driver()
 
 
 if __name__ == "__main__":

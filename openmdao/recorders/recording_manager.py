@@ -15,7 +15,7 @@ class RecordingManager(object):
 
     Attributes
     ----------
-    _recorders : list of BaseRecorder
+    _recorders : list of CaseRecorder
         All of the recorders attached to the current object.
     rank : int
         Rank of the iteration coordinate.
@@ -46,7 +46,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
             a recorder from _recorders
         """
         return self._recorders[index]
@@ -57,7 +57,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        iter : BaseRecorder
+        iter : CaseRecorder
             a recorder from _recorders.
         """
         return iter(self._recorders)
@@ -68,7 +68,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            Recorder instance to be added to the manager.
         """
         self._recorders.append(recorder)
@@ -187,3 +187,37 @@ class RecordingManager(object):
             True if RecordingManager is managing at least one recorder
         """
         return True if self._recorders else False
+
+
+def record_viewer_data(problem):
+    """
+    Record model viewer data for all recorders that have that option enabled.
+
+    We don't want to collect the viewer data if it's not needed though,
+    so first we'll find all recorders that need the data (if any) and
+    then record it for those recorders.
+
+    Parameters
+    ----------
+    problem : Problem
+        The problem for which model viewer data is to be recorded.
+    """
+    # assemble list of all objects that may have recorders
+    systems = [system for system in problem.model.system_iter(include_self=True, recurse=True)]
+    nl_solv = [system._nonlinear_solver for system in systems if system._nonlinear_solver]
+    ls_solv = [nl.linesearch for nl in nl_solv if hasattr(nl, 'linesearch') and nl.linesearch]
+    rec_obj = [problem, problem.driver] + systems + nl_solv + ls_solv
+
+    # get all recorders that need to record the viewer data
+    recorders = set()
+    for obj in rec_obj:
+        for recorder in obj._rec_mgr._recorders:
+            if recorder._record_viewer_data:
+                recorders.add(recorder)
+
+    # if any recorders were found, get the viewer data and record it
+    if recorders:
+        from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+        viewer_data = _get_viewer_data(problem)
+        for recorder in recorders:
+            recorder.record_viewer_data(viewer_data)

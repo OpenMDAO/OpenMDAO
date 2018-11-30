@@ -1518,6 +1518,10 @@ function PtN2Diagram(parentDiv, modelData) {
             var newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
             parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
         }
+        for (var i = 2000; i <= 4000; i += 1000) {
+            var newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
+            parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
+        }
         ClearArrowsAndConnects();
         HEIGHT_PX = height;
         LEVEL_OF_DETAIL_THRESHOLD = HEIGHT_PX / 3;
@@ -1580,6 +1584,12 @@ function PtN2Diagram(parentDiv, modelData) {
 
         for (var i = 600; i <= 1000; i += 50) {
             var f = function (idx) {
+                return function () { VerticalResize(idx); };
+            }(i);
+            div.querySelector("#idVerticalResize" + i + "px").onclick = f;
+        }
+        for (var i = 2000; i <= 4000; i += 1000) {
+            var f = function(idx) {
                 return function () { VerticalResize(idx); };
             }(i);
             div.querySelector("#idVerticalResize" + i + "px").onclick = f;

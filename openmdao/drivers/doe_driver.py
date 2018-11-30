@@ -191,8 +191,8 @@ class DOEDriver(Driver):
 
         with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
-                failure_flag, _, _ = self._problem.model._solve_nonlinear()
-                metadata['success'] = not failure_flag
+                self._problem.model._solve_nonlinear()
+                metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:
                 metadata['success'] = 0
@@ -236,7 +236,7 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         # keep track of recorders so we can flag them as parallel

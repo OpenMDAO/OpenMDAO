@@ -4,7 +4,6 @@ Define the BroydenSolver class.
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
 from __future__ import print_function
-from copy import deepcopy
 import warnings
 from six.moves import range
 
@@ -283,8 +282,8 @@ class BroydenSolver(NonlinearSolver):
         """
         system = self._system
         if self.options['debug_print']:
-            self._err_cache['inputs'] = deepcopy(self._system._inputs)
-            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            self._err_cache['inputs'] = self._system._inputs._copy_views()
+            self._err_cache['outputs'] = self._system._outputs._copy_views()
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:
@@ -572,7 +571,7 @@ class BroydenSolver(NonlinearSolver):
         do_sub_ln = ln_solver._linearize_children()
         my_asm_jac = ln_solver._assembled_jac
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac:
+        if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
         self._linearize()
 
@@ -621,7 +620,7 @@ class BroydenSolver(NonlinearSolver):
         do_sub_ln = ln_solver._linearize_children()
         my_asm_jac = ln_solver._assembled_jac
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-        if my_asm_jac is not None and ln_solver._assembled_jac is not my_asm_jac:
+        if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
 
         inv_jac = self.linear_solver._inverse()

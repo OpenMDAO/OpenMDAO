@@ -11,16 +11,12 @@ import sys
 
 import numpy as np
 
-from copy import deepcopy
-
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.jacobians.assembled_jacobian import AssembledJacobian, DenseJacobian, CSCJacobian
-from openmdao.recorders.recording_iteration_stack import Recording, recording_iteration
+from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.recorders.recording_iteration_stack import recording_iteration
 
 _emptyset = set()
 
@@ -141,11 +137,12 @@ class Solver(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
+    _solver_info : SolverInfo
+        A stack-like object shared by all Solvers in the model.
     """
 
     # Object to store some formatting for iprint that is shared across all solvers.
     SOLVER = 'base_solver'
-    _solver_info = SolverInfo()
 
     def __init__(self, **kwargs):
         """
@@ -161,6 +158,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
+        self._solver_info = None
 
         # Solver options
         self.options = OptionsDictionary()
@@ -221,11 +219,11 @@ class Solver(object):
 
     def add_recorder(self, recorder):
         """
-        Add a recorder to the driver's RecordingManager.
+        Add a recorder to the solver's RecordingManager.
 
         Parameters
         ----------
-        recorder : <BaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance to be added to RecManager.
         """
         if MPI:
@@ -254,6 +252,8 @@ class Solver(object):
         """
         self._system = system
         self._depth = depth
+        self._solver_info = system._solver_info
+        self._recording_iter = system._recording_iter
 
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
@@ -344,15 +344,6 @@ class Solver(object):
     def _run_iterator(self):
         """
         Run the iterative solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -404,8 +395,6 @@ class Solver(object):
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
                 print(prefix + ' Converged')
-
-        return fail, norm, norm / norm0
 
     def _iter_initialize(self):
         """
@@ -604,32 +593,23 @@ class NonlinearSolver(Solver):
     def solve(self):
         """
         Run the solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         raised = False
         try:
-            fail, abs_err, rel_err = self._run_iterator()
+            self._run_iterator()
+
         except Exception:
-            fail = True
             raised = True
             exc = sys.exc_info()
 
-        if fail and self.options['debug_print']:
-            coord = recording_iteration.get_formatted_iteration_coordinate()
+        if raised and self.options['debug_print']:
+            coord = self._recording_iter.get_formatted_iteration_coordinate()
 
             out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
-            for vec_type, vec in iteritems(self._err_cache):
+            for vec_type, views in iteritems(self._err_cache):
                 out_str += '\n'
-                out_str += '# %s %ss\n' % (vec._name, vec._typ)
-                out_str += pprint.pformat(vec._views)
+                out_str += '# nonlinear %s\n' % vec_type
+                out_str += pprint.pformat(views)
                 out_str += '\n'
 
             print(out_str)
@@ -645,8 +625,6 @@ class NonlinearSolver(Solver):
         if raised:
             reraise(*exc)
 
-        return fail, abs_err, rel_err
-
     def _iter_initialize(self):
         """
         Perform any necessary pre-processing operations.
@@ -659,8 +637,8 @@ class NonlinearSolver(Solver):
             error at the first iteration.
         """
         if self.options['debug_print']:
-            self._err_cache['inputs'] = deepcopy(self._system._inputs)
-            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            self._err_cache['inputs'] = self._system._inputs._copy_views()
+            self._err_cache['outputs'] = self._system._outputs._copy_views()
 
         if self.options['maxiter'] > 0:
             self._run_apply()
@@ -674,11 +652,11 @@ class NonlinearSolver(Solver):
         """
         Run the apply_nonlinear method on the system.
         """
-        recording_iteration.stack.append(('_run_apply', 0))
+        self._recording_iter.stack.append(('_run_apply', 0))
         try:
             self._system._apply_nonlinear()
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
     def _iter_get_norm(self):
         """
@@ -735,6 +713,17 @@ class LinearSolver(Solver):
         if self.options['assemble_jac']:
             yield self
 
+    def add_recorder(self, recorder):
+        """
+        Add a recorder to the solver's RecordingManager.
+
+        Parameters
+        ----------
+        recorder : <CaseRecorder>
+           A recorder instance to be added to RecManager.
+        """
+        raise RuntimeError('Recording is not supported on Linear Solvers.')
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -784,20 +773,11 @@ class LinearSolver(Solver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            initial error.
-        float
-            error at the first iteration.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
-        return self._run_iterator()
+        self._run_iterator()
 
     def _iter_initialize(self):
         """
@@ -832,7 +812,7 @@ class LinearSolver(Solver):
         """
         Run the apply_linear method on the system.
         """
-        recording_iteration.stack.append(('_run_apply', 0))
+        self._recording_iter.stack.append(('_run_apply', 0))
 
         system = self._system
         scope_out, scope_in = system._get_scope()
@@ -841,7 +821,7 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
-            recording_iteration.stack.pop()
+            self._recording_iter.stack.pop()
 
     def _iter_get_norm(self):
         """

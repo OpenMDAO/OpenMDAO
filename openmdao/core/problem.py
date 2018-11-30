@@ -7,7 +7,6 @@ import sys
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
-import warnings
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import range, cStringIO
@@ -19,14 +18,15 @@ from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
+from openmdao.solvers.solver import SolverInfo
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.group import System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
-from openmdao.recorders.recording_iteration_stack import recording_iteration
-from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.recorders.recording_iteration_stack import _RecIteration
+from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
@@ -161,8 +161,6 @@ class Problem(object):
 
         self._mode = None  # mode is assigned in setup()
 
-        recording_iteration.stack = []
-
         self._initial_condition_cache = {}
 
         # Status of the setup of _model.
@@ -181,8 +179,6 @@ class Problem(object):
         # Case recording options
         self.recording_options = OptionsDictionary()
 
-        self.recording_options.declare('record_metadata', types=bool, default=True,
-                                       desc='Record metadata')
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'problem level')
@@ -495,15 +491,6 @@ class Problem(object):
 
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         if self._mode is None:
             raise RuntimeError("The `setup` method must be called before `run_model`.")
@@ -511,9 +498,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError("The 'case_prefix' argument should be a string.")
-            recording_iteration.prefix = case_prefix
+            self._recording_iter.prefix = case_prefix
         else:
-            recording_iteration.prefix = None
+            self._recording_iter.prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -521,7 +508,7 @@ class Problem(object):
 
         self.final_setup()
         self.model._clear_iprint()
-        return self.model.run_solve_nonlinear()
+        self.model.run_solve_nonlinear()
 
     def run_driver(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -546,9 +533,9 @@ class Problem(object):
         if case_prefix:
             if not isinstance(case_prefix, str):
                 raise TypeError("The 'case_prefix' argument should be a string.")
-            recording_iteration.prefix = case_prefix
+            self._recording_iter.prefix = case_prefix
         else:
-            recording_iteration.prefix = None
+            self._recording_iter.prefix = None
 
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
@@ -562,20 +549,11 @@ class Problem(object):
     def run_once(self):
         """
         Backward compatible call for run_model.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         warn_deprecation("The 'run_once' method provides backwards compatibility with "
                          "OpenMDAO <= 1.x ; use 'run_model' instead.")
 
-        return self.run_model()
+        self.run_model()
 
     def run(self):
         """
@@ -663,8 +641,8 @@ class Problem(object):
         }
 
         self._rec_mgr.startup(self)
-        if self.recording_options['record_metadata']:
-            self._rec_mgr.record_metadata(self)
+
+        record_viewer_data(self)
 
     def add_recorder(self, recorder):
         """
@@ -672,7 +650,7 @@ class Problem(object):
 
         Parameters
         ----------
-        recorder : BaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -681,6 +659,10 @@ class Problem(object):
         """
         Clean up resources prior to exit.
         """
+        # shut down all recorders
+        self._rec_mgr.shutdown()
+
+        # clean up driver and model resources
         self.driver.cleanup()
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
@@ -809,6 +791,11 @@ class Problem(object):
             raise ValueError(msg)
 
         self._mode = self._orig_mode = mode
+
+        # this will be shared by all Solvers in the model
+        model._solver_info = SolverInfo()
+        self._recording_iter = _RecIteration()
+        model._recording_iter = self._recording_iter
 
         model_comm = self.driver._setup_comm(comm)
 

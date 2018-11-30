@@ -203,6 +203,13 @@ class SimpleGADriver(Driver):
         model = self._problem.model
         ga = self._ga
 
+        ga.elite = self.options['elitism']
+        pop_size = self.options['pop_size']
+        max_gen = self.options['max_gen']
+        user_bits = self.options['bits']
+        Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
+        Pc = self.options['Pc']
+
         # Size design variables.
         desvars = self._designvars
         count = 0
@@ -213,7 +220,10 @@ class SimpleGADriver(Driver):
 
         lower_bound = np.empty((count, ))
         upper_bound = np.empty((count, ))
+        outer_bound = np.full((count, ), np.inf)
+        bits = np.empty((count, ), dtype=np.int)
         x0 = np.empty(count)
+
         desvar_vals = self.get_design_var_values()
 
         # Figure out bounds vectors and initial design vars
@@ -223,23 +233,31 @@ class SimpleGADriver(Driver):
             upper_bound[i:j] = meta['upper']
             x0[i:j] = desvar_vals[name]
 
-        ga.elite = self.options['elitism']
-        pop_size = self.options['pop_size']
-        max_gen = self.options['max_gen']
-        user_bits = self.options['bits']
-        Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
-        Pc = self.options['Pc']
-
         # Bits of resolution
-        bits = np.ceil(np.log2(upper_bound - lower_bound + 1)).astype(int)
-        prom2abs = model._var_allprocs_prom2abs_list['output']
+        abs2prom = model._var_abs2prom['output']
 
-        for name, val in iteritems(user_bits):
-            try:
-                i, j = self._desvar_idx[name]
-            except KeyError:
-                abs_name = prom2abs[name][0]
-                i, j = self._desvar_idx[abs_name]
+        for name, meta in iteritems(desvars):
+            i, j = self._desvar_idx[name]
+            prom_name = abs2prom[name]
+
+            if name in user_bits:
+                val = user_bits[name]
+
+            elif prom_name in user_bits:
+                val = user_bits[prom_name]
+
+            else:
+                # If the user does not declare a bits for this variable, we assume they want it to
+                # be encoded as an integer. Encoding requires a power of 2 in the range, so we need
+                # to pad additional values above the upper range, and adjust accordingly. Design
+                # points with values above the upper bound will be discarded by the GA.
+                log_range = np.log2(upper_bound[i:j] - lower_bound[i:j] + 1)
+                if log_range % 2 > 0:
+                    val = np.ceil(log_range)
+                    outer_bound[i:j] = upper_bound[i:j]
+                    upper_bound[i:j] = 2**np.ceil(log_range) - 1 + lower_bound[i:j]
+                else:
+                    val = log_range
 
             bits[i:j] = val
 
@@ -247,7 +265,7 @@ class SimpleGADriver(Driver):
         if pop_size == 0:
             pop_size = 4 * np.sum(bits)
 
-        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound,
+        desvar_new, obj, nfit = ga.execute_ga(x0, lower_bound, upper_bound, outer_bound,
                                               bits, pop_size, max_gen,
                                               self._randomstate, Pm, Pc)
 
@@ -471,7 +489,7 @@ class GeneticAlgorithm(object):
         self.elite = True
         self.model_mpi = model_mpi
 
-    def execute_ga(self, x0, vlb, vub, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
+    def execute_ga(self, x0, vlb, vub, vob, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
         """
         Perform the genetic algorithm.
 
@@ -482,7 +500,10 @@ class GeneticAlgorithm(object):
         vlb : ndarray
             Lower bounds array.
         vub : ndarray
-            Upper bounds array.
+            Upper bounds array. This includes over-allocation so that every point falls on an
+            integer value.
+        vob : ndarray
+            Outer bounds array. This is purely for bounds check.
         bits : ndarray
             Number of bits to encode the design space for each element of the design vector.
         pop_size : int
@@ -538,7 +559,15 @@ class GeneticAlgorithm(object):
                 # and use it on all.
                 x_pop = comm.bcast(x_pop, root=0)
 
-                cases = [((item, ii), None) for ii, item in enumerate(x_pop)]
+                cases = [((item, ii), None) for ii, item in enumerate(x_pop)
+                         if np.all(item - vob <= 0)]
+
+                # Pad the cases with some dummy cases to make the cases divisible amongst the procs.
+                # TODO: Add a load balancing option to this driver.
+                extra = len(cases) % comm.size
+                if extra > 0:
+                    for j in range(comm.size - extra):
+                        cases.append(cases[-1])
 
                 results = concurrent_eval(self.objfun, cases, comm, allgather=True,
                                           model_mpi=self.model_mpi)
@@ -562,7 +591,12 @@ class GeneticAlgorithm(object):
                 # Serial
                 for ii in range(self.npop):
                     x = x_pop[ii]
-                    fitness[ii], success, _ = self.objfun(x, 0)
+
+                    if np.any(x - vob > 0):
+                        # Exceeded bounds for integer variables that are over-allocated.
+                        success = False
+                    else:
+                        fitness[ii], success, _ = self.objfun(x, 0)
 
                     if success:
                         nfit += 1

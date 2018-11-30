@@ -2,12 +2,13 @@
 
 from __future__ import division, print_function
 
+from distutils.version import LooseVersion
 import numpy as np
+import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.recorders.recording_iteration_stack import Recording
 
 _SOLVER_TYPES = {
     # 'bicg': bicg,
@@ -170,12 +171,11 @@ class ScipyKrylov(LinearSolver):
             the current residual vector.
         """
         norm = np.linalg.norm(res)
-        with Recording('ScipyKrylov', self._iter_count, self):
-            if self._iter_count == 0:
-                if norm != 0.0:
-                    self._norm0 = norm
-                else:
-                    self._norm0 = 1.0
+        if self._iter_count == 0:
+            if norm != 0.0:
+                self._norm0 = norm
+            else:
+                self._norm0 = 1.0
 
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
@@ -192,15 +192,6 @@ class ScipyKrylov(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
@@ -242,9 +233,14 @@ class ScipyKrylov(LinearSolver):
 
             self._iter_count = 0
             if solver is gmres:
-                x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                 callback=self._monitor)
+                if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
+                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                                     x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                     callback=self._monitor)
+                else:
+                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                                     x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                     callback=self._monitor)
             else:
                 x, info = solver(linop, b_vec._data.copy(), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
@@ -252,10 +248,6 @@ class ScipyKrylov(LinearSolver):
 
             fail |= (info != 0)
             x_vec._data[:] = x
-
-        # TODO: implement this properly
-
-        return fail, 0., 0.
 
     def _apply_precon(self, in_vec):
         """

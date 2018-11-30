@@ -69,31 +69,34 @@ def format_iteration_coordinate(coord, prefix=None):
     return ':'.join([prefix, separator.join(iteration_coordinate)])
 
 
-def is_valid_sqlite3_db(filename):
+def check_valid_sqlite3_db(filename):
     """
-    Return true if the given filename contains a valid SQLite3 database file.
+    Raise an IOError if the given filename does not reference a valid SQLite3 database file.
 
     Parameters
     ----------
     filename : str
         The path to the file to be tested
 
-    Returns
-    -------
-    bool :
-        True if the filename specifies a valid SQlite3 database.
-
+    Raises
+    ------
+    IOError
+        If the given filename does not reference a valid SQLite3 database file.
     """
+    # check that the file exists
     if not os.path.isfile(filename):
-        return False
-    if os.path.getsize(filename) < 100:
-        # SQLite database file header is 100 bytes
-        return False
+        raise IOError('File does not exist({0})'.format(filename))
 
+    # check that the file is large enough (SQLite database file header is 100 bytes)
+    if os.path.getsize(filename) < 100:
+        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
+
+    # check that the first 100 bytes actually contains a valid SQLite database header
     with open(filename, 'rb') as fd:
         header = fd.read(100)
 
-    return header[:16] == b'SQLite format 3\x00'
+    if header[:16] != b'SQLite format 3\x00':
+        raise IOError('File does not contain a valid sqlite database ({0})'.format(filename))
 
 
 def check_path(path, includes, excludes, include_all_path=False):
@@ -156,12 +159,12 @@ def json_to_np_array(vals, abs2meta):
         return None
 
     for var in json_vals:
-        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta)
+        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta[var]['shape'])
 
     return values_to_array(json_vals)
 
 
-def convert_to_np_array(val, varname, abs2meta):
+def convert_to_np_array(val, varname, shape):
     """
     Convert list to numpy array.
 
@@ -171,8 +174,8 @@ def convert_to_np_array(val, varname, abs2meta):
         the list to be converted to an np.array
     varname : str
         name of variable to be converted
-    abs2meta : dict
-        Dictionary mapping absolute variable names to variable metadata.
+    shape : tuple
+        the shape of the resulting np.array
 
     Returns
     -------
@@ -181,9 +184,9 @@ def convert_to_np_array(val, varname, abs2meta):
     """
     if isinstance(val, list):
         array = np.array(val)
-        shape = abs2meta[varname]['shape']
         array = np.resize(array, shape)
         return array
+
     return val
 
 
