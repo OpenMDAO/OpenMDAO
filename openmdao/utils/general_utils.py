@@ -712,7 +712,7 @@ def json_loads_byteified(json_str):
 
 
 _badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
-_transtab = "".maketrans(_badtab, '_'*len(_badtab))
+_transtab = "".maketrans(_badtab, '_' * len(_badtab))
 
 
 def str2valid_python_name(s):

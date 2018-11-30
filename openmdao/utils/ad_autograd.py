@@ -1,3 +1,6 @@
+"""
+Automatic differentiation functions using the autograd package.
+"""
 
 import sys
 from inspect import signature, getsourcelines, getsource, getmodule
@@ -24,14 +27,17 @@ from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis
 import autograd.numpy as agnp
 from autograd import make_jvp, make_vjp, jacobian
 from autograd.differential_operators import make_jvp_reversemode
-from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, DictVSpace, container_take
+from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, \
+    DictVSpace, container_take
 
-class VectorBox(DictBox):
+
+class _VectorBox(DictBox):
     def get_slice(self, slc): return container_take(self._value._data, slc)
 
-VectorBox.register(Vector)
-VectorBox.register(DefaultVector)
-VectorBox.register(PETScVector)
+
+_VectorBox.register(Vector)
+_VectorBox.register(DefaultVector)
+_VectorBox.register(PETScVector)
 
 
 def _get_arg_replacement_map(comp):
@@ -187,7 +193,8 @@ def translate_compute_source_autograd(comp, mode):
     if mode == 'fwd':
         if explicit:
             # sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, params[0])
-            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, params[0], params[1])
+            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__,
+                                                      params[0], params[1])
         else:
             sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, params[0], params[1])
         retstr = "    return tuple(%s.values())" % params[output_id]
@@ -196,16 +203,12 @@ def translate_compute_source_autograd(comp, mode):
             sigstr = "def %s_trans(self, %s):" % (compute_method.__name__, vecnames[0])
             retstr = "    return np.hstack([%s])" % ', '.join(["%s.flatten()" % n for n in onames])
         else:
-            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__, vecnames[0], vecnames[1])
+            sigstr = "def %s_trans(self, %s, %s):" % (compute_method.__name__,
+                                                      vecnames[0], vecnames[1])
             retstr = "    return np.hstack([%s])" % ', '.join(["%s.flatten()" % n for n in rnames])
 
     # generate string of function to be differentiated
-    src = '\n'.join([
-        sigstr,
-        '\n'.join(pre_lines),
-        src,
-        retstr
-        ])
+    src = '\n'.join([sigstr, '\n'.join(pre_lines), src, retstr])
 
     print(src)
     return src
@@ -221,7 +224,7 @@ def _get_autograd_ad_func(comp, mode):
         argnum = 1
     else:
         compute_method = comp.apply_nonlinear
-        argnum = (1,2)
+        argnum = (1, 2)
 
     funcname = compute_method.__name__ + '_trans'
 
@@ -253,7 +256,8 @@ def _get_autograd_ad_func(comp, mode):
         if isinstance(comp, ExplicitComponent):
             return make_jvp(func, argnum)(comp, comp._inputs, outs)
         else:
-            resids = {n[offset:]: v for n, v in iteritems(comp._vectors['residual']['linear']._views)}
+            resids = {n[offset:]: v for n, v in
+                      iteritems(comp._vectors['residual']['linear']._views)}
             return make_jvp(func, argnum)(comp, comp._inputs, outs, resids)
     else:
         if isinstance(comp, ExplicitComponent):

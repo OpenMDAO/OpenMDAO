@@ -75,7 +75,6 @@ def _comp_iter(classes, prob):
             print("\nClass:", obj.__class__.__name__)
             yield obj, check_dct
 
-
     else:  # find an instance of each Component class in the model
         prob.run_model()
         print("\nChecking partials:")
@@ -150,7 +149,7 @@ def _ad(prob, options):
                     os.remove(deriv_mod.__file__)
                     try:
                         os.remove(deriv_mod.__file__ + 'c')
-                    except:
+                    except FileNotFoundError:
                         pass
 
                 mx_diff = 0.0
@@ -165,9 +164,12 @@ def _ad(prob, options):
                             d['J_fwd'] = np.zeros(J[key].shape)
                         print("(%s, %s)" % (rel_o, rel_i), end='')
                         try:
-                            assert_almost_equal(J[key], check_dct[s.pathname][rel_o, rel_i]['J_fwd'], decimal=5)
-                        except:
-                            max_diff = np.max(np.abs(J[key] - check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
+                            assert_almost_equal(J[key],
+                                                check_dct[s.pathname][rel_o, rel_i]['J_fwd'],
+                                                decimal=5)
+                        except Exception:
+                            max_diff = np.max(np.abs(J[key] -
+                                                     check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
                             if max_diff > mx_diff:
                                 mx_diff = max_diff
                             print("  MAX DIFF:", max_diff)
@@ -176,7 +178,7 @@ def _ad(prob, options):
                 summ[mode]['diff'] = mx_diff
                 summ[mode]['ran'] = True
                 print()
-            except:
+            except Exception:
                 traceback.print_exc(file=sys.stdout)
                 summ[mode]['ran'] = False
                 summ[mode]['diff'] = float('nan')
@@ -255,4 +257,3 @@ def _ad_cmd(options):
         The post-setup hook function.
     """
     return lambda prob: _ad(prob, options)
-

@@ -1,3 +1,7 @@
+"""
+Automatic differentiation functions using the google's tangent package.
+"""
+
 from collections import Iterable
 
 import sys
@@ -36,7 +40,7 @@ modemap = {
 }
 
 
-class Vec(object):
+class _Vec(object):
     def __init__(self, v):
         self._data = np.zeros_like(v._data)
         self._views = {}
@@ -55,11 +59,11 @@ class Vec(object):
         self._views[name][:] = val
 
 
-def zero_vector(vec):
-    return Vec(vec)
+def _zero_vector(vec):
+    return _Vec(vec)
 
 
-register_init_grad(DefaultVector, zero_vector)
+register_init_grad(DefaultVector, _zero_vector)
 register_init_grad(str, lambda s: s)
 
 
@@ -240,4 +244,3 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
             rowstart = rowend
 
         colstart = colend
-
