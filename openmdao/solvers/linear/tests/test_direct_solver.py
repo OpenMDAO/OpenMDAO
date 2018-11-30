@@ -68,8 +68,8 @@ class DupPartialsComp(ExplicitComponent):
         self.add_input('c', np.zeros(19))
         self.add_output('x', np.zeros(11))
 
-        rows = [0, 1, 4, 10, 7, 9, 10]
-        cols = [0, 18, 11, 2, 5, 9, 2]
+        rows = [0,  1,  4, 10, 7, 9, 10, 4]
+        cols = [0, 18, 11,  2, 5, 9,  2, 11]
         self.declare_partials(of='x', wrt='c', rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
@@ -77,6 +77,7 @@ class DupPartialsComp(ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
         pass
+
 
 class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
@@ -218,9 +219,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup(check=False)
-            prob.final_setup()
 
-        expected_msg = "CSC matrix data contains the following duplicate row/col entries: [(('dupcomp.x', 'dupcomp.c'), [(10, 2)])]\nThis would break internal indexing."
+        expected_msg = "dupcomp: declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
