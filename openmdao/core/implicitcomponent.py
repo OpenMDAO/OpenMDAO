@@ -252,9 +252,6 @@ class ImplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._assembled_jac is not None:
-            self._assembled_jac._reset_mats()
-
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.

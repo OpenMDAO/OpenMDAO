@@ -400,12 +400,11 @@ class DirectSolver(LinearSolver):
             # AssembledJacobians are unscaled.
             if self._assembled_jac is not None:
                 with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    if (isinstance(self._assembled_jac._int_mtx,
-                                   (COOMatrix, CSRMatrix, CSCMatrix))):
-                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
-                    else:
+                    if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
                         x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
                                                                trans=trans_lu)
+                    else:
+                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
 
             # MVP-generated jacobians are scaled.
             else:
