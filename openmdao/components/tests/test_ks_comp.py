@@ -62,6 +62,51 @@ class TestKSFunction(unittest.TestCase):
         for (of, wrt) in partials['ks']:
             assert_rel_error(self, partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
 
+    def test_partials_no_compute(self):
+        prob = Problem()
+
+        model = prob.model
+        comp = model.add_subsystem('ks', KSComp(width=2), promotes=['*'])
+
+        prob.setup(check=False)
+
+        inputs = {
+            'g': prob['g']
+        }
+
+        outputs = {
+            'KS': prob['KS']
+        }
+
+        partials = {}
+
+        # initial compute
+        prob.run_model()
+
+        # verify that compute_partials doesn't rely on info from compute
+
+        print('----------------------')
+        print('inputs:', inputs)
+        print('outputs:', outputs)
+        print('----------------------')
+        print('compute:')
+        comp.compute(inputs, outputs)
+        print('inputs:', inputs)
+        print('outputs:', outputs)
+        comp.compute_partials(inputs, partials)
+        print('partials:', partials)
+
+        print('----------------------')
+        print('inputs:', inputs)
+        print('outputs:', outputs)
+        print('----------------------')
+        comp.compute_partials({'g': np.array([[1., 2.]])}, partials)
+        print('partials:', partials)
+        # print('compute:')
+        # comp.compute(inputs, outputs)
+        print('inputs:', inputs)
+        print('outputs:', outputs)
+
     def test_beam_stress(self):
         E = 1.
         L = 1.
@@ -251,6 +296,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['ks.KS'][0], -12.0)
+
 
 if __name__ == "__main__":
     unittest.main()

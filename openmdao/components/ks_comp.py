@@ -184,7 +184,12 @@ class KSComp(ExplicitComponent):
         if opt['lower_flag']:
             con_val = -con_val
 
+        # print('vec_size:', opt['vec_size'])
+        # print('con_val:', con_val)
+
         for j in range(opt['vec_size']):
+            # print(j, ':',)
+            # print(con_val[j, :])
             outputs['KS'][j, :] = KSfunction.compute(con_val[j, :], opt['rho'])
 
     def compute_partials(self, inputs, partials):
@@ -215,6 +220,13 @@ class KSComp(ExplicitComponent):
             derivs = -derivs
 
         partials['KS', 'g'] = derivs.flatten()
+
+        # from pprint import pprint
+        # print("inputs['g']:")
+        # pprint(inputs['g'])
+        # print()
+        # print("partials['KS', 'g']:")
+        # pprint(partials['KS', 'g'])
 
 
 class KSComponent(KSComp):
