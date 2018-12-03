@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, Group, ExecComp
+from openmdao.api import Problem, ExplicitComponent, Group, ExecComp, ParallelGroup
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
@@ -512,6 +512,52 @@ class DeprecatedMPITests(unittest.TestCase):
         p.run_model()
 
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
+
+
+@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI, "MPI is required.")
+class ProbRemoteTests(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_prob_getitem_err(self):
+        size = 3
+
+        p = Problem(model=Group())
+        top = p.model
+        par = top.add_subsystem('par', ParallelGroup())
+        C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(size))
+        C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(size))
+        p.setup(check=False)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        if C1 in p.model.par._subsystems_myproc:
+            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
+
+        if C2 in p.model.par._subsystems_myproc:
+            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
+
+        p.run_model()
+
+        # test that getitem from Problem on a distrib var raises an exception
+        with self.assertRaises(Exception) as context:
+            ans = p['par.C2.invec']
+        self.assertEqual(str(context.exception),
+                         "Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
+        with self.assertRaises(Exception) as context:
+            ans = p['par.C2.outvec']
+        self.assertEqual(str(context.exception),
+                         "Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
+        with self.assertRaises(Exception) as context:
+            ans = p['par.C1.invec']
+        self.assertEqual(str(context.exception),
+                         "Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
+        with self.assertRaises(Exception) as context:
+            ans = p['par.C1.outvec']
+        self.assertEqual(str(context.exception),
+                         "Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

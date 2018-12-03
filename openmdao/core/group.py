@@ -638,7 +638,7 @@ class Group(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = None
+            self._discrete_inputs = self._discrete_outputs = ()
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -1584,8 +1584,9 @@ class Group(System):
         Provide initial guess for states.
         """
         if self._has_guess:
-            for isub, sub in enumerate(self._subsystems_myproc):
+            for ind, sub in enumerate(self._subsystems_myproc):
                 if sub._has_guess:
+                    isub = self._subsystems_myproc_inds[ind]
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
 
