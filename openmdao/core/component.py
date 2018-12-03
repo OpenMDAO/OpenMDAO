@@ -31,7 +31,7 @@ _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size'),
+    'input': ('units', 'shape', 'size', 'distributed'),
     'output': ('units', 'shape', 'size',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
 }
@@ -276,7 +276,7 @@ class Component(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = None
+            self._discrete_inputs = self._discrete_outputs = ()
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -434,6 +434,7 @@ class Component(System):
 
         metadata['units'] = units
         metadata['desc'] = desc
+        metadata['distributed'] = self.options['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -684,7 +685,6 @@ class Component(System):
             'desc': desc
         }
 
-        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
         else:

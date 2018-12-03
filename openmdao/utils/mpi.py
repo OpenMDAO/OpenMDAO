@@ -165,6 +165,38 @@ def multi_proc_fail_check(comm):
                                     % (i, f))
 
 
+@contextmanager
+def multi_proc_exception_check(comm):
+    """
+    Raise an exception on all procs if it is raised on one.
+
+    Wrap this around code that you want to globally fail if it fails
+    on any MPI process in comm.  If not running under MPI, don't
+    handle any exceptions.
+
+    Parameters
+    ----------
+    comm : MPI communicator or None
+        Communicator from the ParallelGroup that owns the calling solver.
+    """
+    if MPI is None:
+        yield
+    else:
+        try:
+            yield
+        except Exception:
+            msg = traceback.format_exc()
+        else:
+            msg = ''
+
+        fails = comm.allgather(msg)
+
+        for i, f in enumerate(fails):
+            if f:
+                raise RuntimeError("Exception raised in rank %d: traceback follows\n%s"
+                                   % (i, f))
+
+
 if MPI:
     def mpirun_tests():
         """
