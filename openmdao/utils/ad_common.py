@@ -2,6 +2,7 @@
 import sys
 import os
 import traceback
+import importlib
 
 import numpy as np
 
@@ -27,7 +28,7 @@ def _ad_setup_parser(parser):
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('--noopt', action='store_true', dest='noopt',
                         help="Turn off optimization.")
-    parser.add_argument('-m', '--method', default='autograd', action='store', dest='ad_method',
+    parser.add_argument('-m', '--method', default='tangent', action='store', dest='ad_method',
                         help='AD method (autograd, tangent).')
     parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
                         help='Specify component class(es) to run AD on.')
@@ -49,7 +50,7 @@ def _ad_exec(options):
 
 def _get_class(classpath):
     modpath, cname = classpath.rsplit('.', 1)
-    import_module(modpath)
+    importlib.import_module(modpath)
     mod = sys.modules[modpath]
     return getattr(mod, cname)
 

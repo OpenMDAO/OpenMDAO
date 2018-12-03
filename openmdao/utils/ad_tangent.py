@@ -11,6 +11,7 @@ import tangent
 from tangent.utils import register_init_grad
 import textwrap
 import pprint
+from numbers import Number
 
 
 from inspect import signature, getsourcelines, getsource, getmodule
@@ -32,6 +33,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
     StringSubscriptVisitor, transform_ast_slices
 from openmdao.utils.general_utils import print_line_numbers
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 modemap = {
@@ -63,11 +65,35 @@ def _zero_vector(vec):
     return _Vec(vec)
 
 
+class _Opt(object):
+    def __init__(self, opt):
+        self._dct = {}
+        for key in opt:
+            val = opt[key]
+            if isinstance(val, Number):
+                self._dct[key] = type(val)(0)
+            elif isinstance(val, np.ndarray):
+                self._dct[key] = np.zeros_like(val)
+            else:  # punt
+                self._dct[key] = val
+
+    def __getitem__(self, name):
+        return self._dct[name]
+
+    def __setitem__(self, name, val):
+        self._dct[name] = val
+
+
+def _zero_opt(opt):
+    return _Opt(opt)
+
+
 register_init_grad(DefaultVector, _zero_vector)
+register_init_grad(OptionsDictionary, _zero_opt)
 register_init_grad(str, lambda s: s)
 
 
-def _translate_compute_source(comp):
+def _translate_compute_source(comp, verbose=0):
     """
     Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
@@ -78,6 +104,8 @@ def _translate_compute_source(comp):
     ----------
     comp : Component
         The component being AD'd.
+    verbose : bool
+        Verbosity flag.
 
     Returns
     -------
@@ -106,8 +134,9 @@ def _translate_compute_source(comp):
     temp_file_name = temp_mod_name + '.py'
 
     # convert any literal slices to calls to slice (else tangent fwd mode bombs)
-    print("SRC:")
-    print_line_numbers(src)
+    if verbose == 1:
+        print("SRC:")
+        print_line_numbers(src)
     src = astunparse.unparse(transform_ast_slices(ast.parse(src)))
 
     return src
@@ -124,7 +153,7 @@ def _get_imports(mod):
 
 def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False):
 
-    src = _translate_compute_source(comp)
+    src = _translate_compute_source(comp, verbose=verbose)
 
     # start construction of partial derivative functions
 
