@@ -359,8 +359,7 @@ class Solver(object):
 
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        while self._iter_count < maxiter and \
-                norm > atol and norm / norm0 > rtol:
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._iter_execute()
                 self._iter_count += 1
@@ -376,12 +375,9 @@ class Solver(object):
                 norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        fail = (np.isinf(norm) or np.isnan(norm) or
-                (norm > atol and norm / norm0 > rtol))
-
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
-            if fail:
+            if np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol):
                 if iprint > -1:
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
                     print(prefix + msg)
@@ -409,26 +405,9 @@ class Solver(object):
         """
         pass
 
-    def _iter_execute(self):
-        """
-        Perform the operations in the iteration loop.
-        """
-        pass
-
     def _run_apply(self):
         """
         Run the appropriate apply method on the system.
-        """
-        pass
-
-    def _iter_get_norm(self):
-        """
-        Return the norm of the residual.
-
-        Returns
-        -------
-        float
-            norm.
         """
         pass
 
@@ -476,17 +455,13 @@ class Solver(object):
 
         # Get the data
         data = {}
-        # if self.options['record_abs_error'] or self.options['record_rel_error']:
-        #     norm = self._iter_get_norm()
 
         if self.recording_options['record_abs_error']:
-            # data['abs'] = norm
             data['abs'] = kwargs.get('abs')
         else:
             data['abs'] = None
 
         if self.recording_options['record_rel_error']:
-            # data['rel'] = norm / self._norm0
             data['rel'] = kwargs.get('rel')
         else:
             data['rel'] = None
@@ -582,32 +557,29 @@ class NonlinearSolver(Solver):
         raised = False
         try:
             self._run_iterator()
-
         except Exception:
-            raised = True
             exc = sys.exc_info()
 
-        if raised and self.options['debug_print']:
-            coord = self._recording_iter.get_formatted_iteration_coordinate()
+            if self.options['debug_print']:
+                coord = self._recording_iter.get_formatted_iteration_coordinate()
 
-            out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
-            for vec_type, views in iteritems(self._err_cache):
-                out_str += '\n'
-                out_str += '# nonlinear %s\n' % vec_type
-                out_str += pprint.pformat(views)
-                out_str += '\n'
+                out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+                for vec_type, views in iteritems(self._err_cache):
+                    out_str += '\n'
+                    out_str += '# nonlinear %s\n' % vec_type
+                    out_str += pprint.pformat(views)
+                    out_str += '\n'
 
-            print(out_str)
+                print(out_str)
 
-            filename = coord.replace('._solve_nonlinear', '')
-            filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
-            with open(filename, 'w') as f:
-                f.write(out_str)
-                print("Inputs and outputs at start of iteration have been "
-                      "saved to '%s'." % filename)
-                sys.stdout.flush()
+                filename = coord.replace('._solve_nonlinear', '')
+                filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
+                with open(filename, 'w') as f:
+                    f.write(out_str)
+                    print("Inputs and outputs at start of iteration have been "
+                          "saved to '%s'." % filename)
+                    sys.stdout.flush()
 
-        if raised:
             reraise(*exc)
 
     def _iter_initialize(self):
@@ -747,39 +719,7 @@ class LinearSolver(Solver):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        self._vec_names = vec_names
-        self._rel_systems = rel_systems
-        self._mode = mode
-        self._run_iterator()
-
-    def _iter_initialize(self):
-        """
-        Perform any necessary pre-processing operations.
-
-        Returns
-        -------
-        float
-            initial error.
-        float
-            error at the first iteration.
-        """
-        system = self._system
-
-        if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']
-        else:  # rev
-            b_vecs = system._vectors['output']
-
-        for vec_name in self._vec_names:
-            self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
-
-        if self.options['maxiter'] > 1:
-            self._run_apply()
-            norm = self._iter_get_norm()
-        else:
-            norm = 1.0
-        norm0 = norm if norm != 0.0 else 1.0
-        return norm0, norm
+        raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
 
     def _run_apply(self):
         """
@@ -833,6 +773,34 @@ class BlockLinearSolver(LinearSolver):
             for vec_name in system._lin_rel_vec_name_list:
                 self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
 
+    def _update_rhs_vecs(self):
+        for vec_name in self._vec_names:
+            if vec_name in self._system._rel_vec_names:
+                if self._mode == 'fwd':
+                    self._rhs_vecs[vec_name][:] = self._system._vectors['residual'][vec_name]._data
+                else:
+                    self._rhs_vecs[vec_name][:] = self._system._vectors['output'][vec_name]._data
+
+    def _iter_initialize(self):
+        """
+        Perform any necessary pre-processing operations.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        self._update_rhs_vecs()
+        if self.options['maxiter'] > 1:
+            self._run_apply()
+            norm = self._iter_get_norm()
+        else:
+            norm = 1.0
+        norm0 = norm if norm != 0.0 else 1.0
+        return norm0, norm
+
     def _iter_get_norm(self):
         """
         Return the norm of the residual.
@@ -856,3 +824,21 @@ class BlockLinearSolver(LinearSolver):
                 norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5
+
+    def solve(self, vec_names, mode, rel_systems=None):
+        """
+        Run the solver.
+
+        Parameters
+        ----------
+        vec_names : [str, ...]
+            list of names of the right-hand-side vectors.
+        mode : str
+            'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
+        """
+        self._vec_names = vec_names
+        self._rel_systems = rel_systems
+        self._mode = mode
+        self._run_iterator()

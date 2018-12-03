@@ -28,17 +28,8 @@ class LinearRunOnce(LinearBlockGS):
         self._vec_names = vec_names
         self._mode = mode
         self._rel_systems = rel_systems
-        system = self._system
 
-        # Pre-processing
-        if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']
-        else:  # rev
-            b_vecs = system._vectors['output']
-
-        for vec_name in self._vec_names:
-            if vec_name in system._rel_vec_names:
-                self._rhs_vecs[vec_name][:] = b_vecs[vec_name]._data
+        self._update_rhs_vecs()
 
         # Single iteration of GS
         self._iter_execute()
