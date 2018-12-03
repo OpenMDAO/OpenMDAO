@@ -449,21 +449,6 @@ class Solver(object):
         """
         return True
 
-    def solve(self):
-        """
-        Run the solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
-        """
-        pass
-
     def __str__(self):
         """
         Return a string representation of the solver.
@@ -745,18 +730,6 @@ class LinearSolver(Solver):
             depth of the current system (already incremented).
         """
         super(LinearSolver, self)._setup_solvers(system, depth)
-
-        if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']
-        else:  # rev
-            b_vecs = system._vectors['output']
-
-        self._rhs_vecs = {}
-
-        if system._use_derivatives:
-            for vec_name in system._lin_rel_vec_name_list:
-                self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
-
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
                                "jacobians." % (self.SOLVER, system.pathname))
@@ -823,6 +796,43 @@ class LinearSolver(Solver):
         finally:
             self._recording_iter.stack.pop()
 
+
+class BlockLinearSolver(LinearSolver):
+    """
+    A base class for LinearBlockGS and LinearBlockJac.
+    """
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(BlockLinearSolver, self)._declare_options()
+        self.supports['assembled_jac'] = False
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(BlockLinearSolver, self)._setup_solvers(system, depth)
+
+        if self._mode == 'fwd':
+            b_vecs = system._vectors['residual']
+        else:  # rev
+            b_vecs = system._vectors['output']
+
+        self._rhs_vecs = {}
+
+        if system._use_derivatives:
+            for vec_name in system._lin_rel_vec_name_list:
+                self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
+
     def _iter_get_norm(self):
         """
         Return the norm of the residual.
@@ -846,16 +856,3 @@ class LinearSolver(Solver):
                 norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5
-
-
-class BlockLinearSolver(LinearSolver):
-    """
-    A base class for LinearBlockGS and LinearBlockJac.
-    """
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        super(BlockLinearSolver, self)._declare_options()
-        self.supports['assembled_jac'] = False
