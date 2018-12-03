@@ -16,7 +16,6 @@ optional_dependencies = {
         'numpydoc',
         'redbaron',
         'sphinx',
-        'tornado',
     ],
     'test': [
         'coverage',

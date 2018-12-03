@@ -281,6 +281,7 @@ class AssembledJacobian(Jacobian):
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
             seen = set()
+
             if isinstance(system, Component):
                 global_conns = _empty_dict
             else:
@@ -303,7 +304,7 @@ class AssembledJacobian(Jacobian):
                 _, wrtname = abs_key
                 if wrtname in output_names:
                     if abs_key in int_mtx._submats:
-                        iters.append((abs_key, False))
+                        iters.append(abs_key)
                     else:
                         # This happens when the src is an indepvarcomp that is
                         # contained in the system.
@@ -311,16 +312,16 @@ class AssembledJacobian(Jacobian):
                         if wrt in rev_conns:
                             for tgt in rev_conns[wrt]:
                                 if (of, tgt) in int_mtx._submats:
-                                    iters.append(abs_key, False)
+                                    iters.append(abs_key)
                                     break
                 else:  # wrt is an input
                     if wrtname in global_conns:
                         mapped = keymap[abs_key]
                         if mapped in seen:
-                            iters.append((abs_key, True))
+                            iters.append(abs_key)
                             self._has_overlapping_partials = True
                         else:
-                            iters.append((abs_key, False))
+                            iters.append(abs_key)
                             seen.add(mapped)
                     elif ext_mtx is not None:
                         iters_in_ext.append(abs_key)
@@ -344,24 +345,26 @@ class AssembledJacobian(Jacobian):
 
         iters, iters_in_ext = self._get_subjac_iters(system)
 
+        int_mtx._pre_update()
+        if ext_mtx is not None:
+            ext_mtx._pre_update()
+
         if self._randomize:
-            for key, do_add in iters:
-                if do_add:
-                    int_mtx._update_add_submat(key, self._randomize_subjac(subjacs[key]['value']))
-                else:
-                    int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
+            for key in iters:
+                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
 
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
         else:
-            for key, do_add in iters:
-                if do_add:
-                    int_mtx._update_add_submat(key, subjacs[key]['value'])
-                else:
-                    int_mtx._update_submat(key, subjacs[key]['value'])
+            for key in iters:
+                int_mtx._update_submat(key, subjacs[key]['value'])
 
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, subjacs[key]['value'])
+
+        int_mtx._post_update()
+        if ext_mtx is not None:
+            ext_mtx._post_update()
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -438,15 +441,6 @@ class DenseJacobian(AssembledJacobian):
             Parent system to this jacobian.
         """
         super(DenseJacobian, self).__init__(DenseMatrix, system=system)
-
-    def _reset_mats(self):
-        """
-        Zero out internal matrices if needed.
-        """
-        if self._has_overlapping_partials:
-            self._int_mtx._matrix[:] = 0.0
-            for key in self._ext_mtx:
-                self._ext_mtx[key]._matrix[:] = 0.0
 
 
 class COOJacobian(AssembledJacobian):
