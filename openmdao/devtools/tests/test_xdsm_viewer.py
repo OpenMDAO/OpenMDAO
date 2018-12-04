@@ -18,7 +18,7 @@ FILENAME = 'XDSM'
 @unittest.skipUnless(XDSM, "XDSM is required.")
 class TestXDSMViewer(unittest.TestCase):
 
-    def test_sellar(self):
+    def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
 
         prob = Problem()
@@ -36,7 +36,25 @@ class TestXDSMViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         write_xdsm(prob, filename=FILENAME+'0', show_browser=False)
 
-    def test_sphere(self):
+    def test_pyxdsm_sellar_no_recurse(self):
+        """Makes XDSM for the Sellar problem, with no recursion."""
+
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # no output checking, just make sure no exceptions raised
+        write_xdsm(prob, filename=FILENAME+'1', show_browser=False, recurse=False)
+
+    def test_pyxdsm_sphere(self):
         """
         Makes an XDSM of the Sphere test case. It also adds a design variable, constraint and
         objective.
@@ -74,9 +92,9 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME+'1', show_browser=False)
+        write_xdsm(prob, filename=FILENAME+'2', show_browser=False)
 
-    def test_js(self):
+    def test_xdsmjs(self):
         """Makes XDSMjs input file for the Sellar problem"""
 
         filename = 'xdsm'  # this name is needed for XDSMjs
@@ -111,7 +129,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = True
+        clean_up = False
 
         def clean_file(fname):
             try:  # Try to clean up
@@ -121,8 +139,9 @@ class TestXDSMViewer(unittest.TestCase):
                 pass
 
         if clean_up:
+            nr_pyxdsm_tests = 3
             for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
-                for i in range(2):
+                for i in range(nr_pyxdsm_tests):
                     filename = '.'.join([FILENAME+str(i), ext])
                     clean_file(filename)
 

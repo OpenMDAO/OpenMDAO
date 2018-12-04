@@ -25,6 +25,10 @@ from six import iteritems
 # Character substitutions in labels
 _CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
 
+# Constant file names in XDSMjs
+_XDSMJS_DATA = 'xdsm.json'
+_XDSMJS_FILENAME = 'xdsm.html'
+
 
 class AbstractXDSMWriter(object):
     """
@@ -221,12 +225,14 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         If False, treat the top level of each name as the source/target component.
     include_external_outputs : bool
         If True, show externally connected outputs when transcribing a subsystem.
-    out_format : str
+        Defaults to True.
+    out_format : str, optional
         Output format, one of "tex" (pyXDSM) or "json" (XDSMjs)
+        Defaults to "tex".
     include_solver : bool
         Include or not the problem model's nonlinear solver in the XDSM.
-    subs : tuple(str, str)
-        Characters to be replaced
+    subs : tuple(str, str), optional
+        Characters to be replaced.
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
@@ -244,14 +250,10 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     else:
         _model = problem.model._get_subsystem(model_path)
 
-    if driver:
-        driver_name = _get_cls_name(driver)
-    else:
-        driver_name = None
-    if include_solver:
-        solver_name = _get_cls_name(_model.nonlinear_solver)
-    else:
-        solver_name = None
+    # Name is None if the driver is not specified
+    driver_name = _get_cls_name(driver) if driver else None
+    solver_name = _get_cls_name(_model.nonlinear_solver) if include_solver else None
+
     design_vars = _model.get_design_vars()
     responses = _model.get_responses()
 
@@ -296,6 +298,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         If False, treat the top level of each name as the source/target component.
     include_external_outputs : bool, optional
         If True, show externally connected outputs when transcribing a subsystem.
+        Defaults to True.
     subs : tuple, optional
        Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
     show_browser : bool, optional
@@ -323,12 +326,12 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    if out_format == 'tex':
+    if out_format == 'tex':  # pyXDSM
         x = XDSMWriter()
-    elif out_format == 'json':
+    elif out_format == 'json':  # XDSMjs
         x = XDSMjsWriter()
         xdsmjs_path = kwargs.pop('xdsmjs_path', None)
-    else:
+    else:  # invalid option
         msg = 'The "out_format" should be "tex" or "json", instead it is "{}"'
         raise ValueError(msg.format(out_format))
 
@@ -393,8 +396,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
             # These are constant filenames in XDSMjs.
             # For each new diagram 'xdsm.json' has to be overwritten.
             if xdsmjs_path is not None:
-                xdsmjs_data = 'xdsm.json'
-                xdsmjs_filename = 'xdsm.html'
+                xdsmjs_data = _XDSMJS_DATA
+                xdsmjs_filename = _XDSMJS_FILENAME
                 ext = 'json'
                 source = '.'.join([filename, ext])
                 destination = os.path.join(xdsmjs_path, xdsmjs_data)
