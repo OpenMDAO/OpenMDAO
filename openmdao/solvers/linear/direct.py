@@ -90,6 +90,12 @@ def format_singular_csc_error(system, matrix):
         # There is a nan in the matrix.
         return(format_nan_error(system, dense))
     elif zero_cols.size <= zero_rows.size:
+
+        if zero_rows.size == 0:
+            # Underdetermined: duplicate columns or rows.
+            msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
+            return msg
+
         loc_txt = "row"
         loc = zero_rows[0]
     else:
@@ -364,15 +370,6 @@ class DirectSolver(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         if len(vec_names) > 1:
             raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
@@ -403,15 +400,12 @@ class DirectSolver(LinearSolver):
             # AssembledJacobians are unscaled.
             if self._assembled_jac is not None:
                 with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    if (isinstance(self._assembled_jac._int_mtx,
-                                   (COOMatrix, CSRMatrix, CSCMatrix))):
-                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
-                    else:
+                    if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
                         x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
                                                                trans=trans_lu)
+                    else:
+                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
 
             # MVP-generated jacobians are scaled.
             else:
                 x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)
-
-        return False, 0., 0.

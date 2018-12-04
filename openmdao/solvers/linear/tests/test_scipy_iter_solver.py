@@ -4,12 +4,10 @@ from __future__ import division, print_function
 
 from six import iteritems
 import unittest
-import warnings
 
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -18,6 +16,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDe
 from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 # use this to fake out the TestImplicitGroup so it'll use the solver we want.
@@ -45,12 +44,10 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
         # use ScipyIterativeSolver here to check for deprecation warning and verify that the deprecated
         # class still gets the right answer without duplicating this test.
-        with warnings.catch_warnings(record=True) as w:
-            group = TestImplicitGroup(lnSolverClass=lambda : ScipyIterativeSolver(solver=self.linear_solver_name))
+        msg = "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "ScipyIterativeSolver is deprecated.  Use ScipyKrylov instead.")
+        with assert_warning(DeprecationWarning, msg):
+            group = TestImplicitGroup(lnSolverClass=lambda : ScipyIterativeSolver(solver=self.linear_solver_name))
 
         p = Problem(group)
         p.setup(check=False)
@@ -151,21 +148,12 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         msg = "The 'preconditioner' property provides backwards compatibility " \
             + "with OpenMDAO <= 1.x ; use 'precon' instead."
 
-        # check deprecation on setter
-        with warnings.catch_warnings(record=True) as w:
+        # check deprecation on setter & getter
+        with assert_warning(DeprecationWarning, msg):
             group.linear_solver.preconditioner = LinearBlockGS()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
-
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             group.linear_solver.preconditioner
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
 
     def test_linear_solution_cache(self):
         # Test derivatives across a converged Sellar model. When caching

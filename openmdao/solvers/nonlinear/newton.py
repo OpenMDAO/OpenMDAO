@@ -2,8 +2,6 @@
 
 from __future__ import print_function
 
-from copy import deepcopy
-
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
@@ -186,8 +184,8 @@ class NewtonSolver(NonlinearSolver):
             error at the first iteration.
         """
         if self.options['debug_print']:
-            self._err_cache['inputs'] = deepcopy(self._system._inputs)
-            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            self._err_cache['inputs'] = self._system._inputs._copy_views()
+            self._err_cache['outputs'] = self._system._outputs._copy_views()
 
         system = self._system
 

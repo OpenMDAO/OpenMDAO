@@ -638,7 +638,7 @@ class Group(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = None
+            self._discrete_inputs = self._discrete_outputs = ()
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -1571,32 +1571,22 @@ class Group(System):
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         super(Group, self)._solve_nonlinear()
 
         name = self.pathname if self.pathname else 'root'
 
         with Recording(name + '._solve_nonlinear', self.iter_count, self):
-            result = self._nonlinear_solver.solve()
-
-        return result
+            self._nonlinear_solver.solve()
 
     def _guess_nonlinear(self):
         """
         Provide initial guess for states.
         """
         if self._has_guess:
-            for isub, sub in enumerate(self._subsystems_myproc):
+            for ind, sub in enumerate(self._subsystems_myproc):
                 if sub._has_guess:
+                    isub = self._subsystems_myproc_inds[ind]
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
 
@@ -1670,21 +1660,10 @@ class Group(System):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            relative error.
-        float
-            absolute error.
         """
         vec_names = [v for v in vec_names if v in self._rel_vec_names]
 
-        result = self._linear_solver.solve(vec_names, mode, rel_systems)
-
-        return result
+        self._linear_solver.solve(vec_names, mode, rel_systems)
 
     def _linearize(self, jac, sub_do_ln=True):
         """
@@ -1706,7 +1685,6 @@ class Group(System):
         else:
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
-                jac._reset_mats()  # zero out matrices if we have any overlapping partials
 
             # Only linearize subsystems if we aren't approximating the derivs at this level.
             for subsys in self._subsystems_myproc:

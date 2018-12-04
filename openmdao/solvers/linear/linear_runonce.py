@@ -24,13 +24,6 @@ class LinearRunOnce(LinearBlockGS):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        float
-            Initial error.
-        float
-            Error at the first iteration.
         """
         self._vec_names = vec_names
         self._mode = mode
@@ -49,8 +42,6 @@ class LinearRunOnce(LinearBlockGS):
 
         # Single iteration of GS
         self._iter_execute()
-
-        return False, 0.0, 0.0
 
     def _declare_options(self):
         """

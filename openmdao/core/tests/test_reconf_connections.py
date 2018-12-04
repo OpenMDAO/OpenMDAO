@@ -227,8 +227,7 @@ class TestReconfConnections(unittest.TestCase):
         self.assertEqual(len(p['c3.y']), 1)
 
         # Run the model again, which will trigger reconfiguration; counter = 2, size of y = 2
-        fail, _, _ = p.run_model()
-        self.assertFalse(fail)
+        p.run_model()
         self.assertEqual(len(p['c3.y']), 2)
         self.assertEqual(len(p['c2.y']), 2)
 

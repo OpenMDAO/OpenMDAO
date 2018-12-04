@@ -115,6 +115,18 @@ class Matrix(object):
         """
         pass
 
+    def _pre_update(self):
+        """
+        Do anything that needs to be done at the beginning of AssembledJacobian._update.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Do anything that needs to be done at the end of AssembledJacobian._update.
+        """
+        pass
+
 
 def _compute_index_map(jrows, jcols, irow, icol, src_indices):
     """

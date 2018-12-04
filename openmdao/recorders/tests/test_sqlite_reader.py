@@ -4,7 +4,6 @@ from __future__ import print_function
 import errno
 import os
 import unittest
-import warnings
 
 from shutil import rmtree
 from tempfile import mkdtemp, mkstemp
@@ -23,9 +22,8 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.general_utils import determine_adder_scaler
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler
 
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -1347,7 +1345,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "Trying to record options which cannot be pickled on system with name: subs. " \
+              "Use the 'options_excludes' recording option on system objects to avoid " \
+              "attempting to record options which cannot be pickled. Skipping recording " \
+              "options for this system."
+        with assert_warning(RuntimeWarning, msg):
             prob.run_model()
 
         prob.cleanup()
@@ -1356,10 +1358,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # no options should have been recorded for d1
         self.assertEqual(len(subs_options._dict), 0)
-
-        # make sure we got the warning we expected
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
 
     def test_pre_load(self):
         prob = SellarProblem()
@@ -2466,6 +2464,8 @@ def _assert_model_matches_case(case, system):
 
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
+    legacy_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'legacy_sql')
+
     def setUp(self):
         self.orig_dir = os.getcwd()
         self.temp_dir = mkdtemp()
@@ -2491,8 +2491,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         #       recording context prior to V5, so the initial case does not reflect
         #       the driver as the source
 
-        filename = os.path.join(os.path.dirname(__file__), 'legacy_sql')
-        filename = os.path.join(filename, 'case_database_v4.sql')
+        filename = os.path.join(self.legacy_dir, 'case_database_v4.sql')
 
         cr = CaseReader(filename)
 
@@ -2618,8 +2617,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_03.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_03.sql')
 
         cr = CaseReader(filename)
 
@@ -2671,8 +2669,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_02.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_02.sql')
 
         cr = CaseReader(filename)
 
@@ -2718,8 +2715,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_solver_v2(self):
         """ Backwards compatibility version 2. """
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_02.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_02.sql')
 
         cases = CaseReader(filename)
 
@@ -2749,8 +2745,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_system_v2(self):
         """ Backwards compatibility version 2. """
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_solver_system_02.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_solver_system_02.sql')
 
         cr = CaseReader(filename)
 
@@ -2793,8 +2788,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_01.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_01.sql')
 
         cr = CaseReader(filename)
 
@@ -2841,8 +2835,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        filename = os.path.join(os.path.dirname(__file__),
-                                'legacy_sql', 'case_driver_pre01.sql')
+        filename = os.path.join(self.legacy_dir, 'case_driver_pre01.sql')
 
         cr = CaseReader(filename)
 

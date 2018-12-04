@@ -3,7 +3,7 @@ import unittest
 
 from openmdao.api import Group, Problem, MultiFiMetaModelUnStructuredComp, MultiFiSurrogateModel, \
      MultiFiCoKrigingSurrogate
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 class MockSurrogate(MultiFiSurrogateModel):
@@ -351,15 +351,11 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
         from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured  # deprecated
-        import warnings
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'MultiFiMetaModelUnStructured' has been deprecated. Use 'MultiFiMetaModelUnStructuredComp' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm = MultiFiMetaModelUnStructured(nfi=3)
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'MultiFiMetaModelUnStructured' has been deprecated. Use "
-                                            "'MultiFiMetaModelUnStructuredComp' instead.")
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
@@ -380,15 +376,11 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
         from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModel  # deprecated
-        import warnings
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'MultiFiMetaModel' component has been deprecated. Use 'MultiFiMetaModelUnStructuredComp' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm = MultiFiMetaModel(nfi=3)
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'MultiFiMetaModel' component has been deprecated. Use "
-                                            "'MultiFiMetaModelUnStructuredComp' instead.")
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)

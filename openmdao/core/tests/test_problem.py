@@ -2,7 +2,7 @@
 
 import sys
 import unittest
-import warnings
+
 from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
@@ -11,7 +11,7 @@ from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, NonlinearRunOnce
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -857,19 +857,19 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "Incompatible units for conversion: 'cm' and 'degK'."
+        msg = "Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
-        msg = "Incompatible units for conversion: 'degK' and 'cm'."
+        msg = "Can't set variable 'comp.x' with units of 'cm' to value with units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
-        msg = "Incompatible units for conversion: 'None' and 'degK'."
+        msg = "Can't express variable 'no_unit.x' with units of 'None' in units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('no_unit.x', 'degK')
 
-        msg = "Incompatible units for conversion: 'degK' and 'None'."
+        msg = "Can't set variable 'no_unit.x' with units of 'None' to value with units of 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
@@ -990,15 +990,12 @@ class TestProblem(unittest.TestCase):
 
         prob.setup(mode='fwd')
 
-        with warnings.catch_warnings(record=True) as w:
-            prob.final_setup()
+        msg = "Inefficient choice of derivative mode.  " \
+              "You chose 'fwd' for a problem with 99 design variables and 10 " \
+              "response variables (objectives and nonlinear constraints)."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
-        self.assertEqual(str(w[0].message),
-                         "Inefficient choice of derivative mode.  "
-                         "You chose 'fwd' for a problem with 99 design variables and 10 "
-                         "response variables (objectives and nonlinear constraints).")
+        with assert_warning(RuntimeWarning, msg):
+            prob.final_setup()
 
     def test_setup_bad_mode_direction_rev(self):
 
@@ -1015,15 +1012,12 @@ class TestProblem(unittest.TestCase):
 
         prob.setup(mode='rev')
 
-        with warnings.catch_warnings(record=True) as w:
-            prob.final_setup()
+        msg = "Inefficient choice of derivative mode.  " \
+              "You chose 'rev' for a problem with 10 design variables and 20 " \
+              "response variables (objectives and nonlinear constraints)."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
-        self.assertEqual(str(w[0].message),
-                         "Inefficient choice of derivative mode.  "
-                         "You chose 'rev' for a problem with 10 design variables and 20 "
-                         "response variables (objectives and nonlinear constraints).")
+        with assert_warning(RuntimeWarning, msg):
+            prob.final_setup()
 
     def test_run_before_setup(self):
         # Test error message when running before setup.
@@ -1072,25 +1066,16 @@ class TestProblem(unittest.TestCase):
     def test_root_deprecated(self):
         # testing the root property
         msg = "The 'root' property provides backwards compatibility " \
-            + "with OpenMDAO <= 1.x ; use 'model' instead."
+              "with OpenMDAO <= 1.x ; use 'model' instead."
 
         prob = Problem()
 
-        # check deprecation on setter
-        with warnings.catch_warnings(record=True) as w:
+        # check deprecation on setter & getter
+        with assert_warning(DeprecationWarning, msg):
             prob.root = Group()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
-
-        # check deprecation on getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             prob.root
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), msg)
 
         # testing the root kwarg
         with self.assertRaises(ValueError) as cm:
@@ -1100,11 +1085,11 @@ class TestProblem(unittest.TestCase):
                          "Cannot specify both 'root' and 'model'. "
                          "'root' has been deprecated, please use 'model'.")
 
-        with warnings.catch_warnings(record=True) as w:
-            prob = Problem(root=Group())
+        msg = "The 'root' argument provides backwards " \
+              "compatibility with OpenMDAO <= 1.x ; use 'model' instead."
 
-        self.assertEqual(str(w[0].message), "The 'root' argument provides backwards "
-                         "compatibility with OpenMDAO <= 1.x ; use 'model' instead.")
+        with assert_warning(DeprecationWarning, msg):
+            prob = Problem(root=Group())
 
     def test_args(self):
         # defaults

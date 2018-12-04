@@ -4,13 +4,11 @@ Unit tests for the unstructured metamodel component.
 from math import sin
 import numpy as np
 import unittest
-import warnings
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel, NearestNeighbor
 
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import reset_warning_registry
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 
 class MetaModelTestCase(unittest.TestCase):
@@ -746,15 +744,11 @@ class MetaModelTestCase(unittest.TestCase):
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
         from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured  # deprecated
-        import warnings
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'MetaModelUnStructured' has been deprecated. Use 'MetaModelUnStructuredComp' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm = MetaModelUnStructured()
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'MetaModelUnStructured' has been deprecated. Use "
-                                            "'MetaModelUnStructuredComp' instead.")
 
         mm.add_input('x1', 0.)
         mm.add_input('x2', 0.)
@@ -762,14 +756,12 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y1', 0.)
         mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'default_surrogate' attribute provides backwards compatibility " \
+              "with earlier version of OpenMDAO; use options['default_surrogate'] " \
+              "instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm.default_surrogate = ResponseSurface()
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
 
         # add metamodel to a problem
         prob = Problem(model=Group())
@@ -784,16 +776,14 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
 
         # populate training data
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'metadata' attribute provides backwards compatibility " \
+              "with earlier version of OpenMDAO; use 'options' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
             mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
             mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
             mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
-        self.assertEqual(len(w), 4)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'metadata' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use 'options' instead.")
 
         # run problem for provided data point and check prediction
         prob['mm.x1'] = 2.0
@@ -815,14 +805,12 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
 
         # change default surrogate, re-setup and check that metamodel re-trains
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
+              "earlier version of OpenMDAO; use options['default_surrogate'] instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm.default_surrogate = FloatKrigingSurrogate()
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
+
         prob.setup(check=False)
 
         surrogate = mm._metadata('y1').get('surrogate')
@@ -841,15 +829,11 @@ class MetaModelTestCase(unittest.TestCase):
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
         from openmdao.components.meta_model_unstructured_comp import MetaModel  # deprecated
-        import warnings
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "'MetaModel' has been deprecated. Use 'MetaModelUnStructuredComp' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm = MetaModel()
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message), "'MetaModel' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
 
         mm.add_input('x1', 0.)
         mm.add_input('x2', 0.)
@@ -857,14 +841,11 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y1', 0.)
         mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
 
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
+              "earlier version of OpenMDAO; use options['default_surrogate'] instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm.default_surrogate = ResponseSurface()
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
 
         # add metamodel to a problem
         prob = Problem(model=Group())
@@ -879,16 +860,14 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
 
         # populate training data
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'metadata' attribute provides backwards compatibility " \
+              "with earlier version of OpenMDAO; use 'options' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm.metadata['train:x1'] = [1.0, 2.0, 3.0]
             mm.metadata['train:x2'] = [1.0, 3.0, 4.0]
             mm.metadata['train:y1'] = [3.0, 2.0, 1.0]
             mm.metadata['train:y2'] = [1.0, 4.0, 7.0]
-        self.assertEqual(len(w), 4)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'metadata' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use 'options' instead.")
 
         # run problem for provided data point and check prediction
         prob['mm.x1'] = 2.0
@@ -910,14 +889,12 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
 
         # change default surrogate, re-setup and check that metamodel re-trains
-        with warnings.catch_warnings(record=True) as w:
+        msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
+              "earlier version of OpenMDAO; use options['default_surrogate'] instead."
+
+        with assert_warning(DeprecationWarning, msg):
             mm.default_surrogate = FloatKrigingSurrogate()
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
+
         prob.setup(check=False)
 
         surrogate = mm._metadata('y1').get('surrogate')
@@ -1005,16 +982,16 @@ class MetaModelTestCase(unittest.TestCase):
 
         # Test with user not explicitly setting fd
         trig = Trig()
-        with warnings.catch_warnings(record=True) as w:
-            with reset_warning_registry():
-                prob = no_surrogate_test_setup(trig)
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
-        expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
-        "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
-        "using default finite difference options because they were not explicitly declared.\n" \
-        "The derivatives computed using the defaults are:\n" \
-        "    trig.sin_x, trig.x\n"
-        self.assertEqual(expected_msg, str(w[0].message))
+
+        msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
+              "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
+              "using default finite difference options because they were not explicitly declared.\n" \
+              "The derivatives computed using the defaults are:\n" \
+              "    trig.sin_x, trig.x\n"
+
+        with assert_warning(RuntimeWarning, msg):
+            prob = no_surrogate_test_setup(trig)
+
         J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
         deriv_using_fd = J[('trig.sin_x', 'indep.x')]
         assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
@@ -1076,15 +1053,15 @@ class MetaModelTestCase(unittest.TestCase):
         prob['indep.x1'] = 5.0
         prob['indep.x2'] = 5.0
         trig.train = False
-        with warnings.catch_warnings(record=True) as w:
+
+        msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
+              "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
+              "using default finite difference options because they were not explicitly declared.\n" \
+              "The derivatives computed using the defaults are:\n" \
+              "    trig.sin_x, trig.x2\n"
+
+        with assert_warning(RuntimeWarning, msg):
             prob.run_model()
-        self.assertTrue(issubclass(w[0].category, RuntimeWarning))
-        expected_msg = "Because the MetaModelUnStructuredComp 'trig' uses a surrogate which does not define a linearize method,\n" \
-        "OpenMDAO will use finite differences to compute derivatives. Some of the derivatives will be computed\n" \
-        "using default finite difference options because they were not explicitly declared.\n" \
-        "The derivatives computed using the defaults are:\n" \
-        "    trig.sin_x, trig.x2\n"
-        self.assertEqual(expected_msg, str(w[0].message))
 
         self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['method'])
         self.assertEqual('backward', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['form'])
