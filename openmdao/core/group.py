@@ -410,12 +410,20 @@ class Group(System):
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
 
-    def _check_reconf_update(self):
+    def _check_reconf_update(self, subsys=None):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+
+        Parameters
+        ----------
+        subsys : System or None
+            If not None, check only if the given subsystem has reconfigured.
         """
-        # See if any local subsystem has reconfigured
-        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+        if subsys is None:
+            # See if any local subsystem has reconfigured
+            reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+        else:
+            reconf = subsys._reconfigured
 
         # See if any subsystem on this or any other processor has configured
         if self.comm.size > 1:

@@ -40,7 +40,7 @@ class NonlinearRunOnce(NonlinearSolver):
                 for isub, subsys in enumerate(system._subsystems_myproc):
                     system._transfer('nonlinear', 'fwd', isub)
                     subsys._solve_nonlinear()
-                    system._check_reconf_update()
+                    system._check_reconf_update(subsys)
             rec.abs = 0.0
             rec.rel = 0.0
 

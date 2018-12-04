@@ -86,7 +86,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if use_aitken:
 
-            outputs = self._system._outputs
+            outputs = system._outputs
             aitken_min_factor = self.options['aitken_min_factor']
             aitken_max_factor = self.options['aitken_max_factor']
 
@@ -107,7 +107,7 @@ class NonlinearBlockGS(NonlinearSolver):
         for isub, subsys in enumerate(system._subsystems_myproc):
             system._transfer('nonlinear', 'fwd', isub)
             subsys._solve_nonlinear()
-            system._check_reconf_update()
+            system._check_reconf_update(subsys)
 
         self._solver_info.pop()
 

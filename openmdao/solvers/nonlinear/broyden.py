@@ -319,7 +319,7 @@ class BroydenSolver(NonlinearSolver):
             for isub, subsys in enumerate(system._subsystems_myproc):
                 system._transfer('nonlinear', 'fwd', isub)
                 subsys._solve_nonlinear()
-                system._check_reconf_update()
+                system._check_reconf_update(subsys)
 
             self._solver_info.pop()
 
