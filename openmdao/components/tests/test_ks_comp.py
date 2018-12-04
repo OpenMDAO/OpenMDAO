@@ -10,7 +10,7 @@ from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDr
 from openmdao.components.ks_comp import KSComp
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
 
 
 class TestKSFunction(unittest.TestCase):
@@ -66,46 +66,29 @@ class TestKSFunction(unittest.TestCase):
         prob = Problem()
 
         model = prob.model
-        comp = model.add_subsystem('ks', KSComp(width=2), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+
+        ks_comp = model.add_subsystem('ks', KSComp(width=2))
+
+        model.connect('px.x', 'ks.g')
 
         prob.setup(check=False)
+        prob.run_driver()
 
-        inputs = {
-            'g': prob['g']
-        }
-
-        outputs = {
-            'KS': prob['KS']
-        }
-
+        # compute partials with the current model inputs
+        inputs = { 'g': prob['ks.g'] }
         partials = {}
 
-        # initial compute
-        prob.run_model()
+        ks_comp.compute_partials(inputs, partials)
+        assert_rel_error(self, partials[('KS', 'g')], np.array([1., 0.]), 1e-6)
 
-        # verify that compute_partials doesn't rely on info from compute
+        # swap inputs and call compute partials again, without calling compute
+        inputs['g'][0][0] = 4
+        inputs['g'][0][1] = 5
 
-        print('----------------------')
-        print('inputs:', inputs)
-        print('outputs:', outputs)
-        print('----------------------')
-        print('compute:')
-        comp.compute(inputs, outputs)
-        print('inputs:', inputs)
-        print('outputs:', outputs)
-        comp.compute_partials(inputs, partials)
-        print('partials:', partials)
-
-        print('----------------------')
-        print('inputs:', inputs)
-        print('outputs:', outputs)
-        print('----------------------')
-        comp.compute_partials({'g': np.array([[1., 2.]])}, partials)
-        print('partials:', partials)
-        # print('compute:')
-        # comp.compute(inputs, outputs)
-        print('inputs:', inputs)
-        print('outputs:', outputs)
+        ks_comp.compute_partials(inputs, partials)
+        assert_rel_error(self, partials[('KS', 'g')], np.array([0., 1.]), 1e-6)
 
     def test_beam_stress(self):
         E = 1.
