@@ -76,11 +76,11 @@ class XDSMWriter(XDSM):
         Parameters
         ----------
         label : str
-           Label in the XDSM
+            Label in the XDSM
         name : str
-           Name of the solver
+            Name of the solver
         kwargs : dict
-           Keyword args
+            Keyword args
         """
         self.add_system(name, 'MDA', '\\text{%s}' % label, **kwargs)
 
@@ -91,11 +91,11 @@ class XDSMWriter(XDSM):
         Parameters
         ----------
         label : str
-           Label in the XDSM, defaults to the name of the component.
+            Label in the XDSM, defaults to the name of the component.
         name : str
-           Name of the component
+            Name of the component
         kwargs : dict
-           Keyword args
+            Keyword args
         """
         if label is None:
             label = name
@@ -108,9 +108,9 @@ class XDSMWriter(XDSM):
         Parameters
         ----------
         name : str
-           Name of the function
+            Name of the function
         kwargs : dict
-           Keyword args
+            Keyword args
         """
         self.add_system(name, 'Function', name, **kwargs)
 
@@ -121,11 +121,11 @@ class XDSMWriter(XDSM):
         Parameters
         ----------
         label : str
-           Label in the XDSM
+            Label in the XDSM
         name : str
-           Name of the optimizer.
+            Name of the optimizer.
         kwargs : dict
-           Keyword args
+            Keyword args
         """
         self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
 
@@ -209,15 +209,21 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     Parameters
     ----------
     problem : Problem
-       Problem
+        Problem
     filename : str
-       Name of the output files (do not provide file extension)
+        Name of the output files (do not provide file extension)
+    model_path : str or None
+        Path to the subsystem to be transcribed to XDSM.  If None, use the model root.
+    recurse : bool
+        If False, treat the top level of each name as the source/target component.
+    include_external_outputs : bool
+        If True, show externally connected outputs when transcribing a subsystem.
     out_format : str
-       Output format, one of "tex" (pyXDSM) or "json" (XDSMjs)
+        Output format, one of "tex" (pyXDSM) or "json" (XDSMjs)
     include_solver : bool
-       Include or not the problem model's nonlinear solver in the XDSM.
+        Include or not the problem model's nonlinear solver in the XDSM.
     subs : tuple(str, str)
-       Characters to be replaced
+        Characters to be replaced
     Returns
     -------
        XDSM
@@ -275,6 +281,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         Responses
     model_path : str or None
         Path to the subsystem to be transcribed to XDSM.  If None, use the model root.
+    recurse : bool
+        If False, treat the top level of each name as the source/target component.
     include_external_outputs : bool
         If True, show externally connected outputs when transcribing a subsystem.
     subs : tuple
@@ -284,7 +292,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     Returns
     -------
-       XDSM
+        XDSM
     """
     # TODO implement residuals
     connections = viewer_data['connections_list']
@@ -412,11 +420,11 @@ def _convert_name(name, recurse=True, subs=None):
     recurse : bool
         If False, treat the top level of each name as the source/target component.
     subs: tuple or None
-       Character pairs with old and substitute characters
+        Character pairs with old and substitute characters
 
     Returns
     -------
-       dict(str, str)
+        dict(str, str)
     """
 
     def convert(name):
