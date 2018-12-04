@@ -7,6 +7,7 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 from __future__ import print_function
 
 import json
+import os
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
@@ -204,7 +205,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
-               include_solver=False, subs=_CHAR_SUBS):
+               include_solver=False, subs=_CHAR_SUBS, show_browser=True, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -226,6 +227,11 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         Include or not the problem model's nonlinear solver in the XDSM.
     subs : tuple(str, str)
         Characters to be replaced
+    show_browser : bool, optional
+        If True, pop up a browser to view the generated html file.
+        Defaults to True.
+    kwargs : dict
+        Keyword arguments
     Returns
     -------
        XDSM
@@ -254,13 +260,14 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                        optimizer=driver_name, solver=solver_name, model_path=model_path,
                        design_vars=design_vars, responses=responses, out_format=out_format,
                        recurse=recurse, subs=subs,
-                       include_external_outputs=include_external_outputs)
+                       include_external_outputs=include_external_outputs, show_browser=show_browser,
+                       **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, out_format='tex',
-                show_browser=True, **kwargs):
+                show_browser=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -272,24 +279,28 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         Filename (absolute path without extension)
     connections : list[(str, str)]
         Connections list
-    optimizer : str or None
+    optimizer : str or None, optional
         Optimizer name
-    solver:  str or None
+    solver:  str or None, optional
         Solver name
-    cleanup : bool
-        Clean-up temporary files after making the diagram
+    cleanup : bool, optional
+        Clean-up temporary files after making the diagram.
+        Defaults to True.
     design_vars : OrderedDict or None
         Design variables
-    responses : OrderedDict or None
+    responses : OrderedDict or None, , optional
         Responses
-    model_path : str or None
+    model_path : str or None, optional
         Path to the subsystem to be transcribed to XDSM.  If None, use the model root.
-    recurse : bool
+    recurse : bool, optional
         If False, treat the top level of each name as the source/target component.
-    include_external_outputs : bool
+    include_external_outputs : bool, optional
         If True, show externally connected outputs when transcribing a subsystem.
-    subs : tuple
+    subs : tuple, optional
        Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
+    show_browser : bool, optional
+        If True, pop up a browser to view the generated html file.
+        Defaults to False.
     kwargs : dict
         Keyword arguments
 
@@ -316,6 +327,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         x = XDSMWriter()
     elif out_format == 'json':
         x = XDSMjsWriter()
+        xdsmjs_path = kwargs.pop('xdsmjs_path', None)
     else:
         msg = 'The "out_format" should be "tex" or "json", instead it is "{}"'
         raise ValueError(msg.format(out_format))
@@ -369,15 +381,37 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     x.write(filename, cleanup=cleanup, **kwargs)
 
     if show_browser:
-        if out_format == 'tex':
+        # path will be specified based on the "out_format", if all required inputs where
+        # provided for showing the results.
+        path = None
+        if out_format == 'tex':  # pyXDSM
             ext = 'pdf'
-        elif out_format == 'json':
-            ext = 'html'
+            path = '.'.join([filename, ext])
+        elif out_format == 'json':  # XDSMjs
+            from shutil import copyfile
+
+            # These are constant filenames in XDSMjs.
+            # For each new diagram 'xdsm.json' has to be overwritten.
+            if xdsmjs_path is not None:
+                xdsmjs_data = 'xdsm.json'
+                xdsmjs_filename = 'xdsm.html'
+                ext = 'json'
+                source = '.'.join([filename, ext])
+                destination = os.path.join(xdsmjs_path, xdsmjs_data)
+                path = os.path.join(xdsmjs_path, xdsmjs_filename)
+
+                # JSON file is copied to the XDSMjs folder with the fixed name 'xdsm.json'
+                copyfile(source, destination)
+            else:
+                msg = ('To show the XDSM diagram in the browser the "xdsmjs_path" '
+                       'is a required keyword argument.')
+                print(msg)
         else:
             err_msg = '"{}" is an invalid output format.'
             raise ValueError(err_msg.format(out_format))
-        path = '.'.join([filename, ext])
-        webview(path)
+        if path:  #
+            print('Opening {} in browser'.format(path))
+            webview(path)
 
     return x
 

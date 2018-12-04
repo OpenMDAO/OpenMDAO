@@ -34,7 +34,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME+'0')
+        write_xdsm(prob, filename=FILENAME+'0', show_browser=False)
 
     def test_sphere(self):
         """
@@ -74,7 +74,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME+'1')
+        write_xdsm(prob, filename=FILENAME+'1', show_browser=False)
 
     def test_js(self):
         """Makes XDSMjs input file for the Sellar problem"""
@@ -93,7 +93,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=filename, out_format='json', subs=())
+        write_xdsm(prob, filename=filename, out_format='json', subs=(), show_browser=False)
 
     def test_wrong_out_format(self):
         """Incorrect output format error."""
@@ -107,7 +107,7 @@ class TestXDSMViewer(unittest.TestCase):
 
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
-            write_xdsm(prob, filename=filename, out_format='jpg', subs=())
+            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=False)
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
