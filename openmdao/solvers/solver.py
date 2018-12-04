@@ -554,7 +554,6 @@ class NonlinearSolver(Solver):
         """
         Run the solver.
         """
-        raised = False
         try:
             self._run_iterator()
         except Exception:
@@ -761,25 +760,23 @@ class BlockLinearSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super(BlockLinearSolver, self)._setup_solvers(system, depth)
-
-        if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']
-        else:  # rev
-            b_vecs = system._vectors['output']
-
-        self._rhs_vecs = {}
-
         if system._use_derivatives:
-            for vec_name in system._lin_rel_vec_name_list:
-                self._rhs_vecs[vec_name] = b_vecs[vec_name]._data.copy()
+            self._create_rhs_vecs()
+
+    def _create_rhs_vecs(self):
+        self._rhs_vecs = rhs = {}
+        for vec_name in self._system._lin_rel_vec_name_list:
+            if self._mode == 'fwd':
+                rhs[vec_name] = self._system._vectors['residual'][vec_name]._data.copy()
+            else:
+                rhs[vec_name] = self._system._vectors['output'][vec_name]._data.copy()
 
     def _update_rhs_vecs(self):
-        for vec_name in self._vec_names:
-            if vec_name in self._system._rel_vec_names:
-                if self._mode == 'fwd':
-                    self._rhs_vecs[vec_name][:] = self._system._vectors['residual'][vec_name]._data
-                else:
-                    self._rhs_vecs[vec_name][:] = self._system._vectors['output'][vec_name]._data
+        for vec_name in self._system._lin_rel_vec_name_list:
+            if self._mode == 'fwd':
+                self._rhs_vecs[vec_name][:] = self._system._vectors['residual'][vec_name]._data
+            else:
+                self._rhs_vecs[vec_name][:] = self._system._vectors['output'][vec_name]._data
 
     def _iter_initialize(self):
         """
@@ -818,10 +815,9 @@ class BlockLinearSolver(LinearSolver):
             b_vecs = system._vectors['output']
 
         norm = 0
-        for vec_name in self._vec_names:
-            if vec_name in system._rel_vec_names:
-                b_vecs[vec_name]._data -= self._rhs_vecs[vec_name]
-                norm += b_vecs[vec_name].get_norm()**2
+        for vec_name in system._lin_rel_vec_name_list:
+            b_vecs[vec_name]._data -= self._rhs_vecs[vec_name]
+            norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5
 
