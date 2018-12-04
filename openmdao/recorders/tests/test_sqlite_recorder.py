@@ -478,8 +478,9 @@ class TestSqliteRecorder(unittest.TestCase):
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
-            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # second check to see if not recorded recursively, when option set to False
         prob = Problem(model=SellarDerivatives())
@@ -513,8 +514,9 @@ class TestSqliteRecorder(unittest.TestCase):
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
-            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         prob = Problem(model=SellarDerivatives())
         prob.setup()
@@ -1820,19 +1822,16 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # options for system 'd1', with second option excluded
         self.assertEqual(str(metadata['d1']['component_options']),
-            "================== ======= ================= ================ ======================================\n"
-            "Option             Default Acceptable Values Acceptable Types Description                           \n"
-            "================== ======= ================= ================ ======================================\n"
-            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi\n"
-            "                                                              ng an assembled jacobian, will use thi\n"
-            "                                                              s type.\n"
-            "distributed        False   N/A               N/A              True if the component has variables th\n"
-            "                                                              at are distributed across multiple pro\n"
-            "                                                              cesses.\n"
-            "options value 1    1       N/A               N/A                                                    \n"
-            "================== ======= ================= ================ ======================================")
+            "=============== ======= ================= ================ =========================================\n"
+            "Option          Default Acceptable Values Acceptable Types Description                              \n"
+            "=============== ======= ================= ================ =========================================\n"
+            "distributed     False   N/A               N/A              True if the component has variables that \n"
+            "                                                           are distributed across multiple processes\n"
+            "                                                           .\n"
+            "options value 1 1       N/A               N/A                                                       \n"
+            "=============== ======= ================= ================ =========================================")
 
-        self.assertEqual(metadata['d1']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(metadata['d1']['component_options']['distributed'], False)
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader
