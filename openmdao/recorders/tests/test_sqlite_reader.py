@@ -235,6 +235,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.setup()
 
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
+
         model.d1.add_recorder(self.recorder)  # SellarDis1withDerivatives (an ExplicitComp)
         model.obj_cmp.add_recorder(self.recorder)  # an ExecComp
 

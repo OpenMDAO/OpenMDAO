@@ -66,6 +66,9 @@ class NonlinearBlockGS(NonlinearSolver):
         self.options.declare('cs_reconverge', default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
+        self.options.declare('use_apply_nonlinear', False,
+                             desc="Set to True to always call apply_linear on the solver's system "
+                             "after solve_nonlinear has been called.")
 
     def _iter_initialize(self):
         """
@@ -96,11 +99,11 @@ class NonlinearBlockGS(NonlinearSolver):
         Perform the operations in the iteration loop.
         """
         system = self._system
+        outputs = system._outputs
         use_aitken = self.options['use_aitken']
 
         if use_aitken:
 
-            outputs = self._system._outputs
             aitken_min_factor = self.options['aitken_min_factor']
             aitken_max_factor = self.options['aitken_max_factor']
 
@@ -111,6 +114,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # store a copy of the outputs, used to compute the change in outputs later
             delta_outputs_n = outputs._data.copy()
 
+        if use_aitken or not self.options['use_apply_nonlinear']:
             # store a copy of the outputs
             outputs_n = outputs._data.copy()
 
@@ -154,6 +158,46 @@ class NonlinearBlockGS(NonlinearSolver):
 
             # save update to use in next iteration
             delta_outputs_n_1[:] = delta_outputs_n
+
+        if not self.options['use_apply_nonlinear']:
+            # Residual is the change in the outputs vector.
+            system._residuals._data[:] = outputs._data - outputs_n
+
+    def _run_apply(self):
+        """
+        Run the apply_nonlinear method on the system.
+        """
+        system = self._system
+        maxiter = self.options['maxiter']
+        itercount = self._iter_count
+
+        if self.options['use_apply_nonlinear'] or (itercount < 1 and maxiter < 2):
+
+            # This option runs apply_linear to calculate the residuals, and thus ends up executing
+            # ExplicitComponents twice per iteration.
+
+            self._recording_iter.stack.append(('_run_apply', 0))
+            try:
+                system._apply_nonlinear()
+            finally:
+                self._recording_iter.stack.pop()
+
+        elif itercount < 1:
+            # Run instead of calling apply, so that we don't "waste" the extra run. This also
+            # further increments the iteration counter.
+            itercount += 1
+            outputs = system._outputs
+
+            outputs_n = outputs._data.copy()
+
+            self._solver_info.append_subsolver()
+            for isub, subsys in enumerate(system._subsystems_myproc):
+                system._transfer('nonlinear', 'fwd', isub)
+                subsys._solve_nonlinear()
+                system._check_reconf_update()
+
+            self._solver_info.pop()
+            system._residuals._data[:] = outputs._data - outputs_n
 
     def _mpi_print_header(self):
         """
