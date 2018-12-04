@@ -9,6 +9,7 @@ from __future__ import print_function
 import json
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from openmdao.devtools.webview import webview
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -20,6 +21,7 @@ except ImportError:
 from six import iteritems
 
 
+# Character substitutions in labels
 _CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
 
 
@@ -257,7 +259,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
-                include_external_outputs=True, subs=_CHAR_SUBS, out_format='tex', **kwargs):
+                include_external_outputs=True, subs=_CHAR_SUBS, out_format='tex',
+                show_browser=True, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -364,6 +367,18 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
             x.add_output(src, list(output_vars), side='right')
 
     x.write(filename, cleanup=cleanup, **kwargs)
+
+    if show_browser:
+        if out_format == 'tex':
+            ext = 'pdf'
+        elif out_format == 'json':
+            ext = 'html'
+        else:
+            err_msg = '"{}" is an invalid output format.'
+            raise ValueError(err_msg.format(out_format))
+        path = '.'.join([filename, ext])
+        webview(path)
+
     return x
 
 
