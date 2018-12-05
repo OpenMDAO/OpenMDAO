@@ -558,27 +558,8 @@ class NonlinearSolver(Solver):
             self._run_iterator()
         except Exception:
             exc = sys.exc_info()
-
             if self.options['debug_print']:
-                coord = self._recording_iter.get_formatted_iteration_coordinate()
-
-                out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
-                for vec_type, views in iteritems(self._err_cache):
-                    out_str += '\n'
-                    out_str += '# nonlinear %s\n' % vec_type
-                    out_str += pprint.pformat(views)
-                    out_str += '\n'
-
-                print(out_str)
-
-                filename = coord.replace('._solve_nonlinear', '')
-                filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
-                with open(filename, 'w') as f:
-                    f.write(out_str)
-                    print("Inputs and outputs at start of iteration have been "
-                          "saved to '%s'." % filename)
-                    sys.stdout.flush()
-
+                self._print_exc_debug_info()
             reraise(*exc)
 
     def _iter_initialize(self):
@@ -629,12 +610,30 @@ class NonlinearSolver(Solver):
         """
         Raise an exception if any discrete outputs exist in our System.
         """
-        system = self._system
-
-        if system._var_allprocs_discrete['output']:
+        if self._system._var_allprocs_discrete['output']:
             raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
-                               (system.pathname, type(self).__name__,
-                                sorted(system._var_allprocs_discrete['output'])))
+                               (self._system.pathname, type(self).__name__,
+                                sorted(self._system._var_allprocs_discrete['output'])))
+
+    def _print_exc_debug_info(self):
+        coord = self._recording_iter.get_formatted_iteration_coordinate()
+
+        out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+        for vec_type, views in iteritems(self._err_cache):
+            out_str += '\n'
+            out_str += '# nonlinear %s\n' % vec_type
+            out_str += pprint.pformat(views)
+            out_str += '\n'
+
+        print(out_str)
+
+        filename = coord.replace('._solve_nonlinear', '')
+        filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
+        with open(filename, 'w') as f:
+            f.write(out_str)
+            print("Inputs and outputs at start of iteration have been "
+                    "saved to '%s'." % filename)
+            sys.stdout.flush()
 
 
 class LinearSolver(Solver):
@@ -801,6 +800,9 @@ class BlockLinearSolver(LinearSolver):
     def _iter_get_norm(self):
         """
         Return the norm of the residual.
+
+        Note: This the side effect of modifying the residual vector in fwd mode
+        and the output vector in rev mode.
 
         Returns
         -------
