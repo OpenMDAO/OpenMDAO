@@ -1003,70 +1003,70 @@ def _get_mat(rows, cols):
         return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
 
 
-#@unittest.skipUnless(PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
-#class MatMultMultipointTestCase(unittest.TestCase):
-    #N_PROCS = 4
+@unittest.skipUnless(PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
+class MatMultMultipointTestCase(unittest.TestCase):
+    N_PROCS = 4
 
-    #def test_multipoint_with_coloring(self):
-        #size = 10
-        #num_pts = self.N_PROCS
+    def test_multipoint_with_coloring(self):
+        size = 10
+        num_pts = self.N_PROCS
 
-        #np.random.seed(11)
+        np.random.seed(11)
 
-        #p = Problem()
-        #p.driver = pyOptSparseDriver()
-        #p.driver.options['optimizer'] = OPTIMIZER
-        #p.driver.options['dynamic_simul_derivs'] = True
-        #if OPTIMIZER == 'SNOPT':
-            #p.driver.opt_settings['Major iterations limit'] = 100
-            #p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-            #p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            #p.driver.opt_settings['iSumm'] = 6
+        p = Problem()
+        p.driver = pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.options['dynamic_simul_derivs'] = True
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+            p.driver.opt_settings['iSumm'] = 6
 
-        #model = p.model
-        #for i in range(num_pts):
-            #model.add_subsystem('indep%d' % i, IndepVarComp('x', val=np.ones(size)))
-            #model.add_design_var('indep%d.x' % i)
+        model = p.model
+        for i in range(num_pts):
+            model.add_subsystem('indep%d' % i, IndepVarComp('x', val=np.ones(size)))
+            model.add_design_var('indep%d.x' % i)
 
-        #par1 = model.add_subsystem('par1', ParallelGroup())
-        #for i in range(num_pts):
-            #mat = _get_mat(5, size)
-            #par1.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
-            #model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
+        par1 = model.add_subsystem('par1', ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_mat(5, size)
+            par1.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
+            model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
-        #par2 = model.add_subsystem('par2', ParallelGroup())
-        #for i in range(num_pts):
-            #mat = _get_mat(size, 5)
-            #par2.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
-            #model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
-            #par2.add_constraint('comp%d.y' % i, lower=-1.)
+        par2 = model.add_subsystem('par2', ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_mat(size, 5)
+            par2.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
+            model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
+            par2.add_constraint('comp%d.y' % i, lower=-1.)
 
-            #model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.ones(size)))
-            #model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
+            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.ones(size)))
+            model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
 
-        #model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
+        model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
 
-        #for i in range(num_pts):
-            #model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
+        for i in range(num_pts):
+            model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
 
-        #model.add_objective('obj.y')
+        model.add_objective('obj.y')
 
-        #p.setup()
+        p.setup()
 
-        #p.run_driver()
+        p.run_driver()
 
-        #J = p.compute_totals()
+        J = p.compute_totals()
 
-        #for i in range(num_pts):
-            #vname = 'par2.comp%d.A' % i
-            #if vname in model._var_abs_names['input']:
-                #norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
-                                      #getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
-                #self.assertLess(norm, 1.e-7)
-            #elif vname not in model._var_allprocs_abs_names['input']:
-                #self.fail("Can't find variable par2.comp%d.A" % i)
+        for i in range(num_pts):
+            vname = 'par2.comp%d.A' % i
+            if vname in model._var_abs_names['input']:
+                norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
+                                      getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
+                self.assertLess(norm, 1.e-7)
+            elif vname not in model._var_allprocs_abs_names['input']:
+                self.fail("Can't find variable par2.comp%d.A" % i)
 
-        ## print("final obj:", p['obj.y'])
+        # print("final obj:", p['obj.y'])
 
 
 if __name__ == '__main__':
