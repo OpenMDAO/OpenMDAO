@@ -46,8 +46,8 @@ The relaxation is turned off by default, but it may help convergence for more ti
 
 .. _optimization: http://mdolab.engin.umich.edu/content/scalable-parallel-approach-aeroelastic-analysis-and-derivative
 
-Norm Calculation
------------------
+Residual Calculation
+--------------------
 The `Unified Derivatives Equations` are formulated so that explicit equations (via `ExplicitComponent`) are also expressed
 as implicit relationships, and their residual is also calculated in "apply_linear", which runs the component a second time and
 saves the difference in the output vector as the residual. However, this would require an extra call to `execute`, which is
