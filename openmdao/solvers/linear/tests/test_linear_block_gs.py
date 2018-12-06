@@ -106,9 +106,9 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.nonlinear_solver.options['maxiter'] = 5
         model.linear_solver = ScipyKrylov()
         model.linear_solver.precon = self.linear_solver_class()
+        model.linear_solver.precon.options['maxiter'] = 100
 
         prob.setup(check=False)
-        prob.set_solver_print(level=0)
 
         prob.run_model()
         res = model._residuals.get_norm()
