@@ -110,6 +110,8 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         prob.setup(check=False)
 
+        prob['d1.y1'] = 4.0
+        prob.set_solver_print()
         prob.run_model()
         res = model._residuals.get_norm()
 

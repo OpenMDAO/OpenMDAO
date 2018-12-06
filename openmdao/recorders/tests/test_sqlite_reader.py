@@ -377,7 +377,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr._output2meta['x']['lower'], -1000.)
         self.assertEqual(cr._output2meta['x']['upper'], 1000.)
         self.assertEqual(cr._output2meta['y2']['upper'], 1000.)
-        self.assertEqual(cr._output2meta['y2']['lower'], -1000.)
+        self.assertEqual(cr._output2meta['y2']['lower'], 0.1)
 
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=LinearBlockGS())
@@ -954,7 +954,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         expected_outputs = {
             'd1.y1': {
-                'lower': -1000.,
+                'lower': 0.1,
                 'upper': 1000.,
                 'ref': 1.0,
                 'resids': [1.318e-10],
