@@ -10,7 +10,7 @@ from openmdao.api import Problem, IndepVarComp, Group, ExecComp, ScipyOptimizeDr
 from openmdao.components.ks_comp import KSComp
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 class TestKSFunction(unittest.TestCase):
