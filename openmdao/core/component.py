@@ -885,6 +885,11 @@ class Component(System):
                   "of '{}' was provided."
             raise ValueError(msg.format(type(wrt).__name__))
 
+        if not isinstance(directional, bool):
+            msg = "The value of 'directional' must be True or False, but a type " \
+                  "of '{}' was provided."
+            raise ValueError(msg.format(type(directional).__name__))
+
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
                                               directional))
