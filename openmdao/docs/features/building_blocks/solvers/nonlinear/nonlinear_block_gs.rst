@@ -50,7 +50,7 @@ Residual Calculation
 --------------------
 The `Unified Derivatives Equations` are formulated so that explicit equations (via `ExplicitComponent`) are also expressed
 as implicit relationships, and their residual is also calculated in "apply_linear", which runs the component a second time and
-saves the difference in the output vector as the residual. However, this would require an extra call to `execute`, which is
+saves the difference in the output vector as the residual. However, this would require an extra call to `compute`, which is
 inefficient for slower components. To elimimate the inefficiency of running the model twice every iteration the NonlinearBlockGS
 driver saves a copy of the output vector and uses that to calculate the residual without rerunning the model. This does require
 a little more memory, so if you are solving a model where memory is more of a concern than execution time, you can set the
