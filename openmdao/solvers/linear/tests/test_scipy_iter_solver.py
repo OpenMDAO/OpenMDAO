@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS
+from openmdao.api import Group, IndepVarComp, Problem, ExecComp, NonlinearBlockGS, BoundsEnforceLS
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov, ScipyIterativeSolver
 from openmdao.solvers.nonlinear.newton import NewtonSolver
@@ -379,10 +379,11 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.linesearch = BoundsEnforceLS()
         model.linear_solver = ScipyKrylov()
 
         model.linear_solver.precon = LinearBlockGS()
-        model.linear_solver.precon.options['maxiter'] = 10
+        model.linear_solver.precon.options['maxiter'] = 2
 
         prob.setup()
         prob.run_model()
