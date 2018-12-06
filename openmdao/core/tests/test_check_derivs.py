@@ -18,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
 try:
@@ -1362,6 +1362,69 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertTrue('c1c.d1' in data)
         self.assertTrue('abc1cab' in data)
+
+    def test_directional_derivative_option(self):
+
+        class ArrayComp(ExplicitComponent):
+
+            def setup(self):
+
+                J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                                [6.0, 2.5, 2.0, 4.0],
+                                [-1.0, 0.0, 8.0, 1.0],
+                                [1.0, 4.0, -5.0, 6.0]])
+
+                self.J1 = J1
+                self.J2 = J1 * 3.3
+                self.Jb = J1.T
+
+                # Inputs
+                self.add_input('x1', np.zeros([4]))
+                self.add_input('x2', np.zeros([4]))
+                self.add_input('bb', np.zeros([4]))
+
+                # Outputs
+                self.add_output('y1', np.zeros([4]))
+
+                self.declare_partials(of='*', wrt='*')
+                self.set_check_partial_options('x*', directional=True)
+
+                self.exec_count = 0
+
+            def compute(self, inputs, outputs):
+                """
+                Execution.
+                """
+                outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+                self.exec_count += 1
+
+            def compute_partials(self, inputs, partials):
+                """
+                Analytical derivatives.
+                """
+                partials[('y1', 'x1')] = self.J1
+                partials[('y1', 'x2')] = self.J2
+                partials[('y1', 'bb')] = self.Jb
+
+        prob = Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials()
+
+        # Note on why we run 10 times:
+        # 1    - Initial execution
+        # 2~3  - Called apply_nonlinear at the start of fwd and rev analytic deriv calculations
+        # 4    - Called apply_nonlinear to clean up before starting FD
+        # 5~8  - FD wrt bb, non-directional
+        # 9    - FD wrt x1, directional
+        # 10   - FD wrt x2, directional
+        self.assertEqual(mycomp.exec_count, 10)
+
+        assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
 
 class TestCheckPartialsFeature(unittest.TestCase):

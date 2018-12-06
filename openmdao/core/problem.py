@@ -1250,7 +1250,7 @@ class Problem(object):
 
                 # Precedence: component options > global options > defaults
                 if local_wrt in local_opts:
-                    for name in ['form', 'step', 'step_calc']:
+                    for name in ['form', 'step', 'step_calc', 'directional']:
                         value = local_opts[local_wrt][name]
                         if value is not None:
                             fd_options[name] = value
@@ -1267,6 +1267,13 @@ class Problem(object):
             for abs_key, partial in iteritems(approx_jac):
                 rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
+
+                # If this is a directional derivative, conver the analytic to a directional one.
+                wrt = rel_key[1]
+                if wrt in local_opts and local_opts[wrt]['directional']:
+                    deriv = partials_data[c_name][rel_key]
+                    for key in ['J_fwd', 'J_rev']:
+                        deriv[key] = np.atleast_2d(np.sum(deriv[key], axis=1)).T
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
@@ -1797,6 +1804,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         for of, wrt in sorted_keys:
 
+            if totals:
+                fd_opts = global_options['']
+            else:
+                fd_opts = global_options[sys_name][wrt]
+
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
             if not totals:
@@ -1915,13 +1927,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 worst_subjac_line = deriv_info_line
                 else:  # not compact print
 
-                    if totals:
-                        fd_desc = "{}:{}".format(global_options['']['method'],
-                                                 global_options['']['form'])
-
-                    else:
-                        fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
-                                                 global_options[sys_name][wrt]['form'])
+                    fd_desc = "{}:{}".format(fd_opts['method'], fd_opts['form'])
+                    directional = fd_opts.get('directional')
 
                     # Magnitudes
                     if out_stream:
@@ -1964,18 +1971,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     # Raw Derivatives
                     if out_stream:
-                        out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                        if directional:
+                            out_buffer.write('    Directional Forward Derivative (Jfor)\n')
+                        else:
+                            out_buffer.write('    Raw Forward Derivative (Jfor)\n')
                         out_buffer.write(str(forward) + '\n')
                         out_buffer.write('\n')
 
                     if not totals and system.matrix_free:
                         if out_stream:
-                            out_buffer.write('    Raw Reverse Derivative (Jfor)\n')
+                            if directional:
+                                out_buffer.write('    Directional Reverse Derivative (Jrev)\n')
+                            else:
+                                out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                             out_buffer.write(str(reverse) + '\n')
                             out_buffer.write('\n')
 
                     if out_stream:
-                        out_buffer.write('    Raw FD Derivative (Jfd)\n')
+                        if directional:
+                            out_buffer.write('    Directional FD Derivative (Jfd)\n')
+                        else:
+                            out_buffer.write('    Raw FD Derivative (Jfd)\n')
                         out_buffer.write(str(fd) + '\n')
                         out_buffer.write('\n')
 

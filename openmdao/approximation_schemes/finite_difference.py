@@ -19,6 +19,7 @@ DEFAULT_FD_OPTIONS = {
     'form': 'forward',
     'order': None,
     'step_calc': 'abs',
+    'directional': False,
 }
 
 DEFAULT_ORDER = {
@@ -132,12 +133,12 @@ class FiniteDifference(ApproximationScheme):
         Returns
         -------
         tuple(str, str, float, int, str)
-            Sorting key (wrt, form, step_size, order, step_calc)
+            Sorting key (wrt, form, step_size, order, step_calc, directional)
 
         """
         fd_options = approx_tuple[2]
         return (approx_tuple[1], fd_options['form'], fd_options['order'],
-                fd_options['step'], fd_options['step_calc'])
+                fd_options['step'], fd_options['step_calc'], fd_options['directional'])
 
     def _init_approximations(self, system):
         """
@@ -163,7 +164,7 @@ class FiniteDifference(ApproximationScheme):
 
         self._approx_groups = [None] * len(approx_groups)
         for i, (key, approximations) in enumerate(approx_groups):
-            wrt, form, order, step, step_calc = key
+            wrt, form, order, step, step_calc, directional = key
 
             # FD forms are written as a collection of changes to inputs (deltas) and the associated
             # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
@@ -190,9 +191,15 @@ class FiniteDifference(ApproximationScheme):
                 in_size = len(in_idx)
             else:
                 in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = range(in_size)
+                in_idx = np.arange(in_size)
 
             outputs = []
+
+            # Directional derivatives for quick partial checking.
+            # We place the indices in a list so that they are all stepped at the same time.
+            if directional:
+                in_idx = [in_idx]
+                in_size = 1
 
             for approx_tuple in approximations:
                 of = approx_tuple[0]
