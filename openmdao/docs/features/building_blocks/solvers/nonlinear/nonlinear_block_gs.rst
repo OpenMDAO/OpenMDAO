@@ -54,7 +54,7 @@ saves the difference in the output vector as the residual. However, this would r
 inefficient for slower components. To elimimate the inefficiency of running the model twice every iteration the NonlinearBlockGS
 driver saves a copy of the output vector and uses that to calculate the residual without rerunning the model. This does require
 a little more memory, so if you are solving a model where memory is more of a concern than execution time, you can set the
-"use_apply_nonlinear" option to True to use thhe original formulation that calls "apply_linear" on the subsystem.
+"use_apply_nonlinear" option to True to use the original formulation that calls "apply_linear" on the subsystem.
 
 
 NonlinearBlockGS Option Examples
