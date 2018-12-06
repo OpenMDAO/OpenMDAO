@@ -182,6 +182,8 @@ class SellarDis2withDerivatives(SellarDis2):
         y1 = inputs['y1']
         if y1.real < 0.0:
             y1 *= -1
+        if y1.real < 1e-8:
+            y1 = 1e-8
 
         J['y2', 'y1'] = .5*y1**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
@@ -606,6 +608,8 @@ class SellarImplicitDis2(ImplicitComponent):
         y1 = inputs['y1']
         if y1.real < 0.0:
             y1 *= -1
+        if y1.real < 1e-8:
+            y1 = 1e-8
 
         J['y2', 'y1'] = -.5*y1**-.5
         J['y2', 'z'] = -np.array([[1.0, 1.0]])
