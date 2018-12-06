@@ -205,10 +205,7 @@ class NewtonSolver(NonlinearSolver):
                 self._solver_info.append_solver()
 
                 # should call the subsystems solve before computing the first residual
-                for isub, subsys in enumerate(system._subsystems_myproc):
-                    system._transfer('nonlinear', 'fwd', isub)
-                    subsys._solve_nonlinear()
-                    system._check_reconf_update(subsys)
+                self._gs_iter()
 
                 self._solver_info.pop()
 
@@ -255,13 +252,7 @@ class NewtonSolver(NonlinearSolver):
         if do_subsolve:
             with Recording('Newton_subsolve', 0, self):
                 self._solver_info.append_solver()
-
-                for isub, subsys in enumerate(system._subsystems_allprocs):
-                    system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
+                self._gs_iter()
                 self._solver_info.pop()
 
         # Enable local fd

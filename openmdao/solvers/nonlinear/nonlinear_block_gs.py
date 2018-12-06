@@ -104,11 +104,7 @@ class NonlinearBlockGS(NonlinearSolver):
             outputs_n.set_vec(outputs)
 
         self._solver_info.append_subsolver()
-        for isub, subsys in enumerate(system._subsystems_myproc):
-            system._transfer('nonlinear', 'fwd', isub)
-            subsys._solve_nonlinear()
-            system._check_reconf_update(subsys)
-
+        self._gs_iter()
         self._solver_info.pop()
 
         if use_aitken:

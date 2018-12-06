@@ -635,6 +635,22 @@ class NonlinearSolver(Solver):
                   "saved to '%s'." % filename)
             sys.stdout.flush()
 
+    def _gs_iter(self):
+        """
+        Perform a Gauss-Seidel iteration over this Solver's subsystems.
+        """
+        system = self._system
+        if system._subsystems_allprocs:
+            loc = system._loc_subsys_map
+
+        for isub, subsys in enumerate(system._subsystems_allprocs):
+            system._transfer('nonlinear', 'fwd', isub)
+
+            if subsys.name in loc:
+                subsys._solve_nonlinear()
+
+            system._check_reconf_update(subsys)
+
 
 class LinearSolver(Solver):
     """

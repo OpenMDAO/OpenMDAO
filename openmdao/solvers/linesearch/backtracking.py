@@ -261,13 +261,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
             try:
                 cache = self._solver_info.save_cache()
-
-                for isub, subsys in enumerate(system._subsystems_allprocs):
-                    system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
+                self._gs_iter()
                 system._apply_nonlinear()
 
             except AnalysisError as err:

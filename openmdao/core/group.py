@@ -421,9 +421,14 @@ class Group(System):
         """
         if subsys is None:
             # See if any local subsystem has reconfigured
-            reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+            for subsys in self._subgroups_myproc:
+                if subsys._reconfigured:
+                    reconf = 1
+                    break
+            else:
+                reconf = 0
         else:
-            reconf = subsys._reconfigured
+            reconf = int(subsys._reconfigured) if subsys.name in self._loc_subsys_map else 0
 
         # See if any subsystem on this or any other processor has configured
         if self.comm.size > 1:
