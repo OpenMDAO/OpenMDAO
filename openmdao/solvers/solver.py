@@ -341,7 +341,7 @@ class Solver(object):
         """
         pass
 
-    def _run_iterator(self):
+    def _solve(self):
         """
         Run the iterative solver.
         """
@@ -555,7 +555,7 @@ class NonlinearSolver(Solver):
         Run the solver.
         """
         try:
-            self._run_iterator()
+            self._solve()
         except Exception:
             exc = sys.exc_info()
             if self.options['debug_print']:
@@ -855,4 +855,4 @@ class BlockLinearSolver(LinearSolver):
         self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
-        self._run_iterator()
+        self._solve()

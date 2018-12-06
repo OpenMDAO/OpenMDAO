@@ -93,7 +93,7 @@ class BoundsEnforceLS(NonlinearSolver):
         opt.undeclare("maxiter")
         opt.undeclare("err_on_maxiter")
 
-    def _run_iterator(self):
+    def _solve(self):
         """
         Run the iterative solver.
         """
@@ -281,7 +281,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         self.alpha *= self.options['rho']
         u.add_scal_vec(self.alpha, du)
 
-    def _run_iterator(self):
+    def _solve(self):
         """
         Run the iterative solver.
         """
