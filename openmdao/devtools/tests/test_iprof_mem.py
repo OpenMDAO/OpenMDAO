@@ -40,7 +40,7 @@ class TestProfileMemory(unittest.TestCase):
         # 0.34  (45 calls)  ExecComp.compute
         # 0.39  (8 calls)  NonlinearSolver._run_apply:(NonlinearBlockGS)
         # 0.39  (8 calls)  Group._apply_nonlinear:(SellarNoDerivatives)
-        # 0.57  (7 calls)  NonlinearBlockGS._iter_execute
+        # 0.57  (7 calls)  NonlinearBlockGS._single_iteration
         # 0.59  (1 calls)  System._final_setup:(SellarNoDerivatives)
         # 0.75  (1 calls)  Problem.final_setup
         # 1.07  (1 calls)  NonlinearSolver.solve:(NonlinearBlockGS)

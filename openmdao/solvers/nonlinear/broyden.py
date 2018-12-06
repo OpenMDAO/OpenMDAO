@@ -349,7 +349,7 @@ class BroydenSolver(NonlinearSolver):
         else:
             return np.sum(fxm**2) ** 0.5
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """

@@ -218,7 +218,7 @@ class NewtonSolver(NonlinearSolver):
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """

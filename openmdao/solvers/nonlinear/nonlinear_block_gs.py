@@ -77,7 +77,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """

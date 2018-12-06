@@ -361,7 +361,7 @@ class Solver(object):
 
         while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._iter_execute()
+                self._single_iteration()
                 self._iter_count += 1
                 self._run_apply()
                 norm = self._iter_get_norm()
@@ -632,7 +632,7 @@ class NonlinearSolver(Solver):
         with open(filename, 'w') as f:
             f.write(out_str)
             print("Inputs and outputs at start of iteration have been "
-                    "saved to '%s'." % filename)
+                  "saved to '%s'." % filename)
             sys.stdout.flush()
 
 

@@ -32,7 +32,7 @@ class LinearRunOnce(LinearBlockGS):
         self._update_rhs_vecs()
 
         # Single iteration of GS
-        self._iter_execute()
+        self._single_iteration()
 
     def _declare_options(self):
         """

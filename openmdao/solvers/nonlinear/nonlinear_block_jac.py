@@ -11,7 +11,7 @@ class NonlinearBlockJac(NonlinearSolver):
 
     SOLVER = 'NL: NLBJ'
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """

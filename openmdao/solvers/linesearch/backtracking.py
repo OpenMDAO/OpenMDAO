@@ -245,7 +245,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         opt.declare('retry_on_analysis_error', default=True,
                     desc="Backtrack and retry if an AnalysisError is raised.")
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """
@@ -309,7 +309,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or
                                               self._analysis_error_raised):
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
-                self._iter_execute()
+                self._single_iteration()
                 self._iter_count += 1
                 try:
 
