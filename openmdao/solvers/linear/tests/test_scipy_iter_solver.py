@@ -357,39 +357,33 @@ class TestScipyKrylovFeature(unittest.TestCase):
     def test_specify_precon(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, NewtonSolver, \
-             LinearBlockGS, ExecComp
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
+        from openmdao.api import Problem, ScipyKrylov, NewtonSolver, LinearBlockGS, \
+             DirectSolver
 
-        prob = Problem()
+        from openmdao.test_suite.components.double_sellar import DoubleSellar
+
+        prob = Problem(model=DoubleSellar())
         model = prob.model
-
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.linesearch = BoundsEnforceLS()
         model.linear_solver = ScipyKrylov()
+        model.g1.linear_solver = DirectSolver()
+        model.g2.linear_solver = DirectSolver()
 
         model.linear_solver.precon = LinearBlockGS()
-        model.linear_solver.precon.options['maxiter'] = 2
+        # TODO: This should work with 1 iteration.
+        #model.linear_solver.precon.options['maxiter'] = 1
 
         prob.setup()
+        prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
+        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+
 
 if __name__ == "__main__":
     unittest.main()
