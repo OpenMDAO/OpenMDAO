@@ -191,7 +191,7 @@ class FiniteDifference(ApproximationScheme):
                 in_size = len(in_idx)
             else:
                 in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = np.arange(in_size)
+                in_idx = range(in_size)
 
             outputs = []
 

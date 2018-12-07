@@ -1268,7 +1268,7 @@ class Problem(object):
                 rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
 
-                # If this is a directional derivative, conver the analytic to a directional one.
+                # If this is a directional derivative, convert the analytic to a directional one.
                 wrt = rel_key[1]
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
