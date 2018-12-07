@@ -46,6 +46,17 @@ The relaxation is turned off by default, but it may help convergence for more ti
 
 .. _optimization: http://mdolab.engin.umich.edu/content/scalable-parallel-approach-aeroelastic-analysis-and-derivative
 
+Residual Calculation
+--------------------
+The `Unified Derivatives Equations` are formulated so that explicit equations (via `ExplicitComponent`) are also expressed
+as implicit relationships, and their residual is also calculated in "apply_linear", which runs the component a second time and
+saves the difference in the output vector as the residual. However, this would require an extra call to `compute`, which is
+inefficient for slower components. To elimimate the inefficiency of running the model twice every iteration the NonlinearBlockGS
+driver saves a copy of the output vector and uses that to calculate the residual without rerunning the model. This does require
+a little more memory, so if you are solving a model where memory is more of a concern than execution time, you can set the
+"use_apply_nonlinear" option to True to use the original formulation that calls "apply_linear" on the subsystem.
+
+
 NonlinearBlockGS Option Examples
 --------------------------------
 
@@ -62,9 +73,11 @@ NonlinearBlockGS Option Examples
 **atol**
 
   Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
-  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
-  components and `evaluate` on explicit components. If this norm value is lower than the absolute
-  tolerance `atol`, the iteration will terminate.
+  each iteration, the norm of the residuals is calculated one of two ways. If the "use_apply_linear" option
+  is set to False (its default), then the norm is calculated by subtracting a cached previous value of the
+  outputs from the current value.  If "use_apply_linear" is True, then the norm is calculated by calling
+  apply_linear on all of the subsystems. In this case, `ExplicitComponents` are executed a second time.
+  If this norm value is lower than the absolute tolerance `atol`, the iteration will terminate.
 
   .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_atol
@@ -73,9 +86,12 @@ NonlinearBlockGS Option Examples
 **rtol**
 
   Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
-  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
-  components and `evaluate` on explicit components. If the ratio of the currently calculated norm to the
-  initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
+  each iteration, the norm of the residuals is calculated one of two ways. If the "use_apply_linear" option
+  is set to False (its default), then the norm is calculated by subtracting a cached previous value of the
+  outputs from the current value.  If "use_apply_linear" is True, then the norm is calculated by calling
+  apply_linear on all of the subsystems. In this case, `ExplicitComponents` are executed a second time.
+  If the ratio of the currently calculated norm to the initial residual norm is lower than the relative tolerance
+  `rtol`, the iteration will terminate.
 
   .. embed-code::
       openmdao.solvers.nonlinear.tests.test_nonlinear_block_gs.TestNLBGaussSeidel.test_feature_rtol
