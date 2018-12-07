@@ -1852,6 +1852,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     continue
 
             if not suppress_output:
+                directional = fd_opts.get('directional')
+
                 if compact_print:
                     if totals:
                         if out_stream:
@@ -1890,11 +1892,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             num_bad_jacs += 1
 
                         if out_stream:
+                            if directional:
+                                wrt = "(d)'%s'" % wrt
+                                wrt_padded = pad_name(wrt, max_width_wrt, quotes=False)
+                            else:
+                                wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                             if not all_comps_provide_jacs:
                                 deriv_info_line = \
                                     deriv_line.format(
                                         pad_name(of, max_width_of, quotes=True),
-                                        pad_name(wrt, max_width_wrt, quotes=True),
+                                        wrt_padded,
                                         magnitude.forward,
                                         _format_if_not_matrix_free(
                                             system.matrix_free, magnitude.reverse),
@@ -1914,7 +1921,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 deriv_info_line = \
                                     deriv_line.format(
                                         pad_name(of, max_width_of, quotes=True),
-                                        pad_name(wrt, max_width_wrt, quotes=True),
+                                        wrt_padded,
                                         magnitude.forward,
                                         magnitude.fd,
                                         abs_err.forward,
@@ -1928,11 +1935,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 else:  # not compact print
 
                     fd_desc = "{}:{}".format(fd_opts['method'], fd_opts['form'])
-                    directional = fd_opts.get('directional')
 
                     # Magnitudes
                     if out_stream:
-                        out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                        if directional:
+                            out_buffer.write("  {}: '{}' wrt (d)'{}'\n".format(sys_name, of, wrt))
+                        else:
+                            out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
                         out_buffer.write('    Forward Magnitude : {:.6e}\n'.format(
                             magnitude.forward))
                     if not totals and system.matrix_free:
