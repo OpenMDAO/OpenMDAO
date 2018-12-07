@@ -7,7 +7,6 @@ import re
 import sys
 import warnings
 import unittest
-from mock import Mock
 from fnmatch import fnmatchcase
 from six import string_types, PY2
 from six.moves import range, cStringIO as StringIO
@@ -292,10 +291,9 @@ def set_pyoptsparse_opt(optname, fallback=True):
     """
     For testing, sets the pyoptsparse optimizer using the given optimizer name.
 
-    This may be modified based on the value of
-    OPENMDAO_FORCE_PYOPTSPARSE_OPT. This can be used on systems that have
-    SNOPT installed to force them to use SLSQP in order to mimic our test
-    machines on travis and appveyor.
+    This may be modified based on the value of OPENMDAO_FORCE_PYOPTSPARSE_OPT.
+    This can be used on systems that have SNOPT installed to force them to use
+    SLSQP in order to mimic our test machines on travis and appveyor.
 
     Parameters
     ----------
@@ -319,7 +317,13 @@ def set_pyoptsparse_opt(optname, fallback=True):
         optname = force
 
     try:
+        from mock import Mock
+    except ImportError:
+        Mock = None
+
+    try:
         from pyoptsparse import OPT
+
         try:
             opt = OPT(optname)
             OPTIMIZER = optname
@@ -331,7 +335,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
                 except Exception:
                     pass
         else:
-            if fallback and isinstance(opt, Mock):
+            if fallback and Mock and isinstance(opt, Mock):
                 try:
                     opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
@@ -340,7 +344,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     except Exception:
         pass
 
-    if isinstance(opt, Mock):
+    if Mock and isinstance(opt, Mock):
         OPT = OPTIMIZER = None
 
     if not fallback and OPTIMIZER != optname:
@@ -502,7 +506,7 @@ def pad_name(name, pad_num=10, quotes=False):
             return '{0}'.format(name)
 
 
-def run_model(prob):
+def run_model(prob, ignore_exception=False):
     """
     Call `run_model` on problem and capture output.
 
@@ -510,6 +514,8 @@ def run_model(prob):
     ----------
     prob : Problem
         an instance of Problem
+    ignore_exception : bool
+        Set to True to ignore an exception of any kind.
 
     Returns
     -------
@@ -522,6 +528,10 @@ def run_model(prob):
     sys.stdout = strout
     try:
         prob.run_model()
+    except Exception:
+        if not ignore_exception:
+            exc = sys.exc_info()
+            reraise(*exc)
     finally:
         sys.stdout = stdout
 

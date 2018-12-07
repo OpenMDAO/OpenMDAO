@@ -15,7 +15,7 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, Group, BalanceComp
+from openmdao.api import Problem, IndepVarComp, ExecComp, Group, BalanceComp, AnalysisError
 
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
@@ -29,8 +29,10 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.general_utils import printoptions
 
-from parameterized import parameterized
-
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 nonlinear_solvers = [
     NonlinearBlockGS,
@@ -101,10 +103,13 @@ class TestNonlinearSolvers(unittest.TestCase):
         model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
-
         nl = model.circuit.nonlinear_solver = solver()
 
         nl.options['debug_print'] = True
+        nl.options['err_on_maxiter'] = True
+
+        if name == 'NonlinearBlockGS':
+            nl.options['use_apply_nonlinear'] = True
 
         # suppress solver output for test
         nl.options['iprint'] = model.circuit.linear_solver.options['iprint'] = -1
@@ -126,7 +131,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         with printoptions(**opts):
             # run the model and check for expected output file
-            output = run_model(p)
+            output = run_model(p, ignore_exception=True)
 
         expected_output = '\n'.join([
             self.expected_data,
@@ -140,8 +145,9 @@ class TestNonlinearSolvers(unittest.TestCase):
             self.assertEqual(f.read(), self.expected_data)
 
     def test_solver_debug_print_feature(self):
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, AnalysisError
         from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.utils.general_utils import printoptions
 
         p = Problem()
         model = p.model
@@ -159,6 +165,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True
+        nl.options['err_on_maxiter'] = True
 
         # set some poor initial guesses so that we don't converge
         p['circuit.n1.V'] = 10.
@@ -171,18 +178,36 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         with printoptions(**opts):
             # run the model
-            p.run_model()
+            try:
+                p.run_model()
+            except AnalysisError:
+                pass
 
         with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
 
-class TestNonlinearSolversBugFixes(unittest.TestCase):
+class TestNonlinearSolversIsolated(unittest.TestCase):
     """
-    Got some odd intermittent failures with this, so moved it to a separate test object. It is
-    unrelated to the tests in that test object, and doesn't need all the setup/teardown tempfile
-    creation and deletion.
+    This test needs to run isolated to preclude interactions in the underlying
+    `warnings` module that is used to raise the singular entry error.
     """
+    ISOLATED = True
+
+    def setUp(self):
+        # perform test in temporary directory
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='test_solver')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        # clean up the temporary directory
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     def test_debug_after_raised_error(self):
         prob = Problem()
         model = prob.model
@@ -225,11 +250,12 @@ class TestNonlinearSolversBugFixes(unittest.TestCase):
 
         output = strout.getvalue()
         target = "'thrust_equilibrium_group.thrust_bal.thrust'"
-        self.assertTrue( target in output, msg=target + "NOT FOUND IN" + output)
+        self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
         expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
         self.assertEqual(expected_msg, str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

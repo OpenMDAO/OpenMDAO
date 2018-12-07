@@ -4,10 +4,17 @@ import numpy as np
 from numpy import ndarray
 from six import iteritems
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map
+from scipy.sparse import coo_matrix
+
+from openmdao.matrices.coo_matrix import COOMatrix
+
+# NOTE: DenseMatrix is inherited from COOMatrix so that we can easily handle use cases
+#       where partials overlap the same matrix entries, as in the case of repeated
+#       src_indices entries.  This does require additional memory above storing just
+#       the dense matrix, but it's worth it because the code is simpler and more robust.
 
 
-class DenseMatrix(Matrix):
+class DenseMatrix(COOMatrix):
     """
     Dense global matrix.
     """
@@ -27,106 +34,8 @@ class DenseMatrix(Matrix):
         out_ranges : dict
             Maps output var name to row range.
         """
-        self._matrix = np.zeros((num_rows, num_cols))
-        submats = self._submats
-        metadata = self._metadata
-
-        for key in submats:
-            info, loc, src_indices, shape, factor = submats[key]
-            irow, icol = loc
-            rows = info['rows']
-
-            if rows is None:
-                val = info['value']
-                if val is None or isinstance(val, np.ndarray):
-                    nrows, ncols = shape
-                    irow2 = irow + nrows
-                    if src_indices is None:
-                        icol2 = icol + ncols
-                        metadata[key] = (slice(irow, irow2),
-                                         slice(icol, icol2), np.ndarray, factor)
-                    else:
-                        metadata[key] = (slice(irow, irow2),
-                                         src_indices + icol, np.ndarray, factor)
-                else:  # sparse
-                    jac = val.tocoo()
-                    if src_indices is None:
-                        irows = irow + jac.row
-                        icols = icol + jac.col
-                    else:
-                        irows, icols, idxs = _compute_index_map(jac.row,
-                                                                jac.col,
-                                                                irow, icol,
-                                                                src_indices)
-                        revidxs = np.argsort(idxs)
-                        irows, icols = irows[revidxs], icols[revidxs]
-
-                    metadata[key] = (irows, icols, type(val), factor)
-            else:  # list format [data, rows, cols]
-                if src_indices is None:
-                    irows = rows + irow
-                    icols = info['cols'] + icol
-                else:
-                    irows, icols, idxs = _compute_index_map(rows, info['cols'],
-                                                            irow, icol,
-                                                            src_indices)
-                    revidxs = np.argsort(idxs)
-                    irows, icols = irows[revidxs], icols[revidxs]
-
-                metadata[key] = (irows, icols, list, factor)
-
-    def _update_submat(self, key, jac):
-        """
-        Update the values of a sub-jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            the global output and input variable names.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        irows, icols, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
-            raise TypeError("Jacobian entry for %s is of different type (%s) than "
-                            "the type (%s) used at init time." % (key,
-                                                                  type(jac).__name__,
-                                                                  jac_type.__name__))
-        if isinstance(jac, np.ndarray):
-            self._matrix[irows, icols] = jac
-        else:  # sparse
-            self._matrix[irows, icols] = jac.data
-
-        if factor is not None:
-            self._matrix[irows, icols] *= factor
-
-    def _update_add_submat(self, key, jac):
-        """
-        Add the subjac values to an existing  sub-jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            the global output and input variable names.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        irows, icols, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
-            raise TypeError("Jacobian entry for %s is of different type (%s) than "
-                            "the type (%s) used at init time." % (key,
-                                                                  type(jac).__name__,
-                                                                  jac_type.__name__))
-
-        if isinstance(jac, np.ndarray):
-            val = jac
-        else:  # sparse
-            val = jac.data
-
-        if factor is not None:
-            self._matrix[irows, icols] += val * factor
-        else:
-            self._matrix[irows, icols] += val
+        super(DenseMatrix, self)._build(num_rows, num_cols, in_ranges, out_ranges)
+        self._coo = self._matrix
 
     def _prod(self, in_vec, mode, ranges, mask=None):
         """
@@ -206,3 +115,16 @@ class DenseMatrix(Matrix):
                     mask[val[1]] = False
 
             return mask
+
+    def _pre_update(self):
+        """
+        Do anything that needs to be done at the end of AssembledJacobian._update.
+        """
+        self._matrix = self._coo
+
+    def _post_update(self):
+        """
+        Do anything that needs to be done at the end of AssembledJacobian._update.
+        """
+        # this will add any repeated entries together
+        self._matrix = self._coo.toarray()

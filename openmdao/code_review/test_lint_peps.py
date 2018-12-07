@@ -3,8 +3,17 @@ from __future__ import print_function
 import unittest
 import os
 from fnmatch import fnmatch, filter as fnfilter
-import pycodestyle
-import pydocstyle
+
+try:
+    import pycodestyle
+except ImportError:
+    pycodestyle = None
+
+try:
+    import pydocstyle
+except ImportError:
+    pydocstyle = None
+
 import re
 
 # fill in patterns to exclude directories here
@@ -53,37 +62,38 @@ def _get_files():
         for name in fnfilter(fnames, '*.py'):
             yield os.path.join(dirpath, name)
 
+if pycodestyle:
+    class StringReport(pycodestyle.StandardReport):
 
-class StringReport(pycodestyle.StandardReport):
+        def get_failures(self):
+            """
+            Returns the list of failures, including source lines, as a formatted
+            strings ready to be printed.
+            """
+            err_strings = []
+            if self.total_errors > 0:
+                self._deferred_print.sort()
+                for line_number, offset, code, text, doc in self._deferred_print:
+                    err_strings.append(self._fmt % {
+                        'path': self.filename,
+                        'row': self.line_offset + line_number, 'col': offset + 1,
+                        'code': code, 'text': text,
+                    })
+                    if line_number > len(self.lines):
+                        line = ''
+                    else:
+                        line = self.lines[line_number - 1]
+                    err_strings.append(line.rstrip())
+                    err_strings.append(re.sub(r'\S', ' ', line[:offset]) + '^')
+            return err_strings
 
-    def get_failures(self):
-        """
-        Returns the list of failures, including source lines, as a formatted
-        strings ready to be printed.
-        """
-        err_strings = []
-        if self.total_errors > 0:
-            self._deferred_print.sort()
-            for line_number, offset, code, text, doc in self._deferred_print:
-                err_strings.append(self._fmt % {
-                    'path': self.filename,
-                    'row': self.line_offset + line_number, 'col': offset + 1,
-                    'code': code, 'text': text,
-                })
-                if line_number > len(self.lines):
-                    line = ''
-                else:
-                    line = self.lines[line_number - 1]
-                err_strings.append(line.rstrip())
-                err_strings.append(re.sub(r'\S', ' ', line[:offset]) + '^')
-        return err_strings
-
-    def get_file_results(self):
-        return self.file_errors
+        def get_file_results(self):
+            return self.file_errors
 
 
 class LintTestCase(unittest.TestCase):
 
+    @unittest.skipUnless(pycodestyle, "requires 'pycodestyle', install openmdao[test]")
     def test_pep8(self):
         pep8opts = pycodestyle.StyleGuide(
             ignore=ignores['pep8'],
@@ -104,6 +114,7 @@ class LintTestCase(unittest.TestCase):
         if failures:
             self.fail('{} PEP 8 Failure(s):\n'.format(report.total_errors) + '\n'.join(failures))
 
+    @unittest.skipUnless(pydocstyle, "requires 'pydocstyle', install openmdao[test]")
     def test_pep257(self):
         failures = [str(fail) for fail in pydocstyle.check(_get_files(),
                                                       ignore=ignores['pep257'])]

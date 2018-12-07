@@ -45,8 +45,8 @@ NewtonSolver Option Examples
 **atol**
 
   Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
-  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
-  components and `evaluate` on explicit components. If this norm value is lower than the absolute
+  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on all of the components.
+  If this norm value is lower than the absolute
   tolerance `atol`, the iteration will terminate.
 
   .. embed-code::
@@ -56,8 +56,8 @@ NewtonSolver Option Examples
 **rtol**
 
   Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
-  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on implicit
-  components and `evaluate` on explicit components. If the ratio of the currently calculated norm to the
+  each iteration, the norm of the residuals is calculated by calling `apply_nonlinear` on all of the components.
+  If the ratio of the currently calculated norm to the
   initial residual norm is lower than the relative tolerance `rtol`, the iteration will terminate.
 
   .. embed-code::

@@ -1,13 +1,13 @@
 """Test the Newton nonlinear solver. """
 
 import unittest
-import warnings
+
 import numpy as np
 
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
     DirectSolver, AnalysisError
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -91,16 +91,14 @@ class TestNewton(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = ScipyKrylov()
 
-        msg = "The 'line_search' attribute provides backwards compatibility with OpenMDAO 1.x ; use 'linesearch' instead."
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            top.model.nonlinear_solver.line_search = ArmijoGoldsteinLS(bound_enforcement='vector')
-            self.assertEqual(str(w[-1].message), msg)
+        msg = "The 'line_search' attribute provides backwards compatibility with OpenMDAO 1.x ; " \
+              "use 'linesearch' instead."
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with assert_warning(DeprecationWarning, msg):
+            top.model.nonlinear_solver.line_search = ArmijoGoldsteinLS(bound_enforcement='vector')
+
+        with assert_warning(DeprecationWarning, msg):
             ls = top.model.nonlinear_solver.line_search
-            self.assertEqual(str(w[-1].message), msg)
 
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 1.0

@@ -84,15 +84,6 @@ class ImplicitComponent(Component):
     def _solve_nonlinear(self):
         """
         Compute outputs. The model is assumed to be in a scaled state.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         # Reconfigure if needed.
         super(ImplicitComponent, self)._solve_nonlinear()
@@ -102,25 +93,17 @@ class ImplicitComponent(Component):
         try:
             if self._nonlinear_solver is not None:
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-                    result = self._nonlinear_solver.solve()
+                    self._nonlinear_solver.solve()
             else:
                 with self._unscaled_context(outputs=[self._outputs]):
                     with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                         if self._discrete_inputs or self._discrete_outputs:
-                            result = self.solve_nonlinear(self._inputs, self._outputs,
-                                                          self._discrete_inputs,
-                                                          self._discrete_outputs)
+                            self.solve_nonlinear(self._inputs, self._outputs,
+                                                 self._discrete_inputs, self._discrete_outputs)
                         else:
-                            result = self.solve_nonlinear(self._inputs, self._outputs)
+                            self.solve_nonlinear(self._inputs, self._outputs)
         finally:
             self._inputs.read_only = False
-
-        if result is None:
-            return False, 0., 0.
-        elif type(result) is bool:
-            return result, 0., 0.
-        else:
-            return result
 
     def _guess_nonlinear(self):
         """
@@ -220,24 +203,12 @@ class ImplicitComponent(Component):
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         if self._linear_solver is not None:
-            result = self._linear_solver.solve(vec_names, mode, rel_systems)
-            return result
+            self._linear_solver.solve(vec_names, mode, rel_systems)
 
         else:
             failed = False
-            abs_errors = [0.0]
-            rel_errors = [0.0]
             for vec_name in vec_names:
                 if vec_name not in self._rel_vec_names:
                     continue
@@ -254,36 +225,21 @@ class ImplicitComponent(Component):
                     try:
                         if d_outputs._ncol > 1:
                             if self.has_solve_multi_linear:
-                                result = self.solve_multi_linear(d_outputs, d_residuals, mode)
+                                self.solve_multi_linear(d_outputs, d_residuals, mode)
                             else:
                                 for i in range(d_outputs._ncol):
                                     # need to make the multivecs look like regular single vecs
                                     # since the component doesn't know about multivecs.
                                     d_outputs._icol = i
                                     d_residuals._icol = i
-                                    result = self.solve_linear(d_outputs, d_residuals, mode)
-                                    if isinstance(result, bool):
-                                        failed |= result
-                                    elif result is not None:
-                                        failed = failed or result[0]
-                                        abs_errors.append(result[1])
-                                        rel_errors.append(result[2])
+                                    self.solve_linear(d_outputs, d_residuals, mode)
 
                                 d_outputs._icol = None
                                 d_residuals._icol = None
                         else:
-                            result = self.solve_linear(d_outputs, d_residuals, mode)
+                            self.solve_linear(d_outputs, d_residuals, mode)
                     finally:
                         d_outputs.read_only = d_residuals.read_only = False
-
-                if isinstance(result, bool):
-                    failed |= result
-                elif result is not None:
-                    failed = failed or result[0]
-                    abs_errors.append(result[1])
-                    rel_errors.append(result[2])
-
-            return failed, np.linalg.norm(abs_errors), np.linalg.norm(rel_errors)
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """
@@ -296,9 +252,6 @@ class ImplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._assembled_jac is not None:
-            self._assembled_jac._reset_mats()
-
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
@@ -342,11 +295,6 @@ class ImplicitComponent(Component):
             unscaled, dimensional input variables read via inputs[key]
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-
-        Returns
-        -------
-        None or bool or (bool, float, float)
-            The bool is the failure flag; and the two floats are absolute and relative error.
         """
         pass
 
@@ -416,18 +364,11 @@ class ImplicitComponent(Component):
             unscaled, dimensional quantities read via d_residuals[key]
         mode : str
             either 'fwd' or 'rev'
-
-        Returns
-        -------
-        None or bool or (bool, float, float)
-            The bool is the failure flag; and the two floats are absolute and relative error.
         """
         if mode == 'fwd':
             d_outputs.set_vec(d_residuals)
         else:  # rev
             d_residuals.set_vec(d_outputs)
-
-        return False, 0., 0.
 
     def linearize(self, inputs, outputs, jacobian):
         """
