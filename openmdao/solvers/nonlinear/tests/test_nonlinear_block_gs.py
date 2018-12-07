@@ -106,11 +106,11 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlgbs.options['maxiter'] = 2
 
         prob.setup()
-
+        prob.set_solver_print()
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5454858939, .00001)
-        assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
+        assert_rel_error(self, prob['y1'], 25.58914915, .00001)
+        assert_rel_error(self, prob['y2'], 12.05857185, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -141,7 +141,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5891491526, .00001)
+        assert_rel_error(self, prob['y1'], 25.5883027, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
     def test_feature_atol(self):
@@ -205,15 +205,44 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(model.nonlinear_solver._iter_count, 8)
+        self.assertEqual(model.nonlinear_solver._iter_count, 7)
 
-        # Make sure we only call apply_linear on 'heads'
-        #nd1 = model.cycle.d1.execution_count
-        #nd2 = model.cycle.d2.execution_count
-        #if model.cycle.d1._run_apply == True:
-            #self.assertEqual(nd1, 2*nd2)
-        #else:
-            #self.assertEqual(2*nd1, nd2)
+        # Only one extra execution
+        self.assertEqual(model.d1.execution_count, 8)
+
+        # With run_apply_linear, we execute the components more times.
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                    z=np.array([0.0, 0.0]), x=0.0),
+                                promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        nlgbs = model.nonlinear_solver = NonlinearBlockGS()
+        nlgbs.options['use_apply_nonlinear'] = True
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        # Make sure we aren't iterating like crazy
+        self.assertEqual(model.nonlinear_solver._iter_count, 7)
+
+        # Nearly double the executions.
+        self.assertEqual(model.d1.execution_count, 15)
 
     def test_sellar_analysis_error(self):
         # Tests Sellar behavior when AnalysisError is raised.
