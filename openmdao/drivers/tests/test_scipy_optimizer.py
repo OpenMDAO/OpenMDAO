@@ -879,11 +879,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         class Rosenbrock(ExplicitComponent):
 
-            def __init__(self, problem):
-                super(Rosenbrock, self).__init__()
-                self.problem = problem
-                self.counter = 0
-
             def setup(self):
                 self.add_input('x', np.array([1.5, 1.5, 1.5]))
                 self.add_output('f', 0.0)
@@ -897,10 +892,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob = Problem()
         model = prob.model
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x', list(x0))
 
-        prob.model.add_subsystem('rosen', Rosenbrock(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
         prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(3)), promotes=['*'])
         prob.driver = driver = ScipyOptimizeDriver()
         driver.options['optimizer'] = 'trust-constr'
@@ -931,11 +926,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         class Rosenbrock(ExplicitComponent):
 
-            def __init__(self, problem):
-                super(Rosenbrock, self).__init__()
-                self.problem = problem
-                self.counter = 0
-
             def setup(self):
                 self.add_input('x', np.array([1.5, 1.5, 1.5]))
                 self.add_output('f', 0.0)
@@ -949,10 +939,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob = Problem()
         model = prob.model
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x', list(x0))
 
-        prob.model.add_subsystem('rosen', Rosenbrock(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
         prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(3)), promotes=['*'])
         prob.driver = driver = ScipyOptimizeDriver()
         driver.options['optimizer'] = 'trust-constr'
@@ -984,11 +974,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         class Rosenbrock(ExplicitComponent):
 
-            def __init__(self, problem):
-                super(Rosenbrock, self).__init__()
-                self.problem = problem
-                self.counter = 0
-
             def setup(self):
                 self.add_input('x', np.array([1.5, 1.5, 1.5]))
                 self.add_output('f', 0.0)
@@ -1002,10 +987,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob = Problem()
         model = prob.model
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob))
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
         indeps.add_output('x', list(x0))
 
-        model.add_subsystem('rosen', Rosenbrock(problem=prob))
+        model.add_subsystem('rosen', Rosenbrock())
         model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(3)))
         model.connect('indeps.x', 'rosen.x')
         model.connect('indeps.x', 'con.x')
@@ -1030,11 +1015,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         class Sphere(ExplicitComponent):
 
-            def __init__(self, problem):
-                super(Sphere, self).__init__()
-                self.problem = problem
-                self.counter = 0
-
             def setup(self):
                 self.add_input('x', np.array([1.5, 1.5]))
                 self.add_output('f', 0.0)
@@ -1047,10 +1027,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         x0 = np.array([1.2, 1.5])
 
         prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x', list(x0))
 
-        prob.model.add_subsystem('sphere', Sphere(problem=prob), promotes=['*'])
+        prob.model.add_subsystem('sphere', Sphere(), promotes=['*'])
         prob.model.add_subsystem('con', ExecComp('c=sum(x)', x=np.ones(2)), promotes=['*'])
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'trust-constr'
@@ -1071,11 +1051,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     # def test_trust_constr_bounds(self):
     #     class Rosenbrock(ExplicitComponent):
     #
-    #         def __init__(self, problem):
-    #             super(Rosenbrock, self).__init__()
-    #             self.problem = problem
-    #             self.counter = 0
-    #
     #         def setup(self):
     #             self.add_input('x', np.array([1.5, 1.5]))
     #             self.add_output('f', 0.0)
@@ -1088,10 +1063,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     #     x0 = np.array([-3., -3.])
     #
     #     prob = Problem()
-    #     indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
+    #     indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
     #     indeps.add_output('x', list(x0))
     #
-    #     prob.model.add_subsystem('sphere', Rosenbrock(problem=prob), promotes=['*'])
+    #     prob.model.add_subsystem('sphere', Rosenbrock(), promotes=['*'])
     #     prob.driver = ScipyOptimizeDriver()
     #     prob.driver.options['optimizer'] = 'trust-constr'
     #     prob.driver.options['tol'] = 1e-5
