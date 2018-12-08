@@ -285,7 +285,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         else:
             self._run_apply()
 
-
     def _run_iterator(self):
         """
         Run the iterative solver.
@@ -303,8 +302,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         norm0, norm = self._iter_initialize()
         self._norm0 = norm0
 
-        # Further backtracking if needed.                                 self._analysis_error_raised):
-        while self._iter_count < maxiter and ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised):
+        # Further backtracking if needed.
+        while self._iter_count < maxiter and
+              ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised):
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
 
                 u.add_scal_vec(-self.alpha, du)
@@ -340,5 +340,3 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
             # self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, norm, self.alpha)
-
-
