@@ -303,8 +303,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         self._norm0 = norm0
 
         # Further backtracking if needed.
-        while self._iter_count < maxiter and
-              ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised):
+        while (self._iter_count < maxiter and
+               ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised)):
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
 
                 u.add_scal_vec(-self.alpha, du)
