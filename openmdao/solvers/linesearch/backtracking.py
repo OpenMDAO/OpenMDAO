@@ -96,15 +96,6 @@ class BoundsEnforceLS(NonlinearSolver):
     def _run_iterator(self):
         """
         Run the iterative solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._iter_count = 0
         system = self._system
@@ -141,9 +132,6 @@ class BoundsEnforceLS(NonlinearSolver):
             rec.rel = norm / norm0
 
         self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        fail = (np.isinf(norm) or np.isnan(norm))
-        return fail, norm, norm / norm0
 
 
 class ArmijoGoldsteinLS(NonlinearSolver):
@@ -309,15 +297,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
     def _run_iterator(self):
         """
         Run the iterative solver.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
@@ -381,11 +360,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         exc = sys.exc_info()
                         reraise(*exc)
 
-            # print('foo', norm , norm0, norm0 - c * self.alpha * norm0)
-            # self._mpi_print(self._iter_count, norm, norm / norm0)
+            self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, norm, self.alpha)
-            # print(3*'\n')
-        fail = (np.isinf(norm) or np.isnan(norm) or
-                (norm > atol and norm / norm0 > rtol))
 
-        return fail, norm, norm / norm0

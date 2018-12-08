@@ -6,14 +6,17 @@ from six import assertRaisesRegex
 from six.moves import range
 
 import itertools
-import warnings
 
 import numpy as np
-from parameterized import parameterized
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
     NonlinearRunOnce, NonLinearRunOnce
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.sellar import SellarDis2
 
 
@@ -96,13 +99,11 @@ class TestGroup(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', 5.0))
         p.model.add_subsystem('comp', ExecComp('b=2*a'))
-        with warnings.catch_warnings(record=True) as w:
-            p.model.nonlinear_solver = NonLinearRunOnce()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead.")
+        msg = "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead."
+
+        with assert_warning(DeprecationWarning, msg):
+            p.model.nonlinear_solver = NonLinearRunOnce()
 
     def test_group_simple(self):
         from openmdao.api import ExecComp, Problem
@@ -119,14 +120,11 @@ class TestGroup(unittest.TestCase):
         model = Group()
         ecomp = ExecComp('b=2.0*a', a=3.0, b=6.0)
 
-        with warnings.catch_warnings(record=True) as w:
-            comp1 = model.add('comp1', ecomp)
+        msg = "The 'add' method provides backwards compatibility with OpenMDAO <= 1.x ; " \
+              "use 'add_subsystem' instead."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'add' method provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'add_subsystem' instead.")
+        with assert_warning(DeprecationWarning, msg):
+            comp1 = model.add('comp1', ecomp)
 
         self.assertTrue(ecomp is comp1)
 
@@ -1046,10 +1044,9 @@ class TestConnect(unittest.TestCase):
 
         msg = "Output 'src.x2' with units of 'degC' is connected " \
               "to input 'tgt.x' which has no units."
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+
+        with assert_warning(UserWarning, msg):
             prob.setup(check=False)
-            self.assertEqual(str(w[-1].message), msg)
 
     def test_connect_incompatible_units(self):
         msg = "Output units of 'degC' for 'src.x2' are incompatible " \
@@ -1074,15 +1071,14 @@ class TestConnect(unittest.TestCase):
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
+
         prob.set_solver_print(level=0)
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            prob.setup(check=False)
+        msg = "Input 'tgt.x' with units of 'degC' is " \
+              "connected to output 'src.x2' which has no units."
 
-            self.assertEqual(str(w[-1].message),
-                             "Input 'tgt.x' with units of 'degC' is "
-                             "connected to output 'src.x2' which has no units.")
+        with assert_warning(UserWarning, msg):
+            prob.setup(check=False)
 
         prob.run_model()
 
@@ -1096,13 +1092,11 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            prob.setup(check=False)
+        msg = "Input 'tgt.y' with units of 'degC' is " \
+              "connected to output 'src.y' which has no units."
 
-            self.assertEqual(str(w[-1].message),
-                             "Input 'tgt.y' with units of 'degC' is "
-                             "connected to output 'src.y' which has no units.")
+        with assert_warning(UserWarning, msg):
+            prob.setup(check=False)
 
         prob.run_model()
 

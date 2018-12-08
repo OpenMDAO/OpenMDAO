@@ -4,7 +4,6 @@ Define the BroydenSolver class.
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
 from __future__ import print_function
-from copy import deepcopy
 import warnings
 from six.moves import range
 
@@ -283,8 +282,8 @@ class BroydenSolver(NonlinearSolver):
         """
         system = self._system
         if self.options['debug_print']:
-            self._err_cache['inputs'] = deepcopy(self._system._inputs)
-            self._err_cache['outputs'] = deepcopy(self._system._outputs)
+            self._err_cache['inputs'] = self._system._inputs._copy_views()
+            self._err_cache['outputs'] = self._system._outputs._copy_views()
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:

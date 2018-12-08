@@ -332,15 +332,6 @@ class PETScKrylov(LinearSolver):
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
@@ -387,8 +378,6 @@ class PETScKrylov(LinearSolver):
             x_vec._data[:] = sol_array
 
             sol_petsc_vec = rhs_petsc_vec = None
-
-        return False, 0., 0.
 
     def apply(self, mat, in_vec, result):
         """
