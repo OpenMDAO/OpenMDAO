@@ -310,6 +310,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # self._mpi_print(self._iter_count, norm, norm / norm0)
 
         # Further backtracking if needed.
+        cache = self._solver_info.save_cache()
 
         while (self._iter_count < maxiter and
                ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised)):
@@ -320,9 +321,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     self.alpha *= self.options['rho']
                 u.add_scal_vec(self.alpha, du)
 
-                cache = self._solver_info.save_cache()
                 try:
                     self._iter_execute()
+                    cache = self._solver_info.save_cache()
                     self._iter_count += 1
 
                     # self._run_apply()
