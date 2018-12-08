@@ -262,8 +262,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
-        # if False:
-
             self._solver_info.append_solver()
 
             try:
@@ -293,7 +291,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         else:
             system._apply_nonlinear()
 
-
     def _run_iterator(self):
         """
         Run the iterative solver.
@@ -307,32 +304,21 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         u = system._outputs
         du = system._vectors['output']['linear']
 
-
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
         self._norm0 = norm0
         # self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        # u.add_scal_vec(self.alpha, du)
-        # self._iter_execute()
-        # self._mpi_print(self._iter_count, norm, self.alpha)
-
         # Further backtracking if needed.
-        # The Armijo-Goldstein is basically a slope comparison --actual vs predicted.
-        # We don't have an actual gradient, but we have the Newton vector that should
-        # take us to zero, and our "runs" are the same, and we can just compare the
-        # "rise".
-        # while self._iter_count < maxiter and (((norm0 - norm) < c * self.alpha * norm0) or
-        #                                       self._analysis_error_raised):
-        while self._iter_count < maxiter and ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised):
-            # print('foobar', norm, norm0)
+
+        while (self._iter_count < maxiter and
+               ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised)):
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
 
                 u.add_scal_vec(-self.alpha, du)
                 if self._iter_count > 0:
                     self.alpha *= self.options['rho']
                 u.add_scal_vec(self.alpha, du)
-
 
                 try:
                     self._iter_execute()
@@ -362,4 +348,3 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
             self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, norm, self.alpha)
-
