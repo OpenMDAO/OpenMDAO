@@ -253,19 +253,13 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         """
         self._analysis_error_raised = False
         system = self._system
-        # u = system._outputs
-        # du = system._vectors['output']['linear']
-
-        # u.add_scal_vec(-self.alpha, du)
-        # self.alpha *= self.options['rho']
-        # u.add_scal_vec(self.alpha, du)
 
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
             self._solver_info.append_solver()
-            cache = self._solver_info.save_cache()
 
             try:
+                cache = self._solver_info.save_cache()
 
                 for isub, subsys in enumerate(system._subsystems_allprocs):
                     system._transfer('nonlinear', 'fwd', isub)
@@ -273,7 +267,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     if subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                system._apply_nonlinear()
+                self._run_apply()
 
             except AnalysisError as err:
                 self._solver_info.restore_cache(cache)
@@ -289,7 +283,8 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 self._solver_info.pop()
 
         else:
-            system._apply_nonlinear()
+            self._run_apply()
+
 
     def _run_iterator(self):
         """
@@ -307,13 +302,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         self._iter_count = 0
         norm0, norm = self._iter_initialize()
         self._norm0 = norm0
-        # self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        # Further backtracking if needed.
-        cache = self._solver_info.save_cache()
-
-        while (self._iter_count < maxiter and
-               ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised)):
+        # Further backtracking if needed.                                 self._analysis_error_raised):
+        while self._iter_count < maxiter and ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised):
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
 
                 u.add_scal_vec(-self.alpha, du)
@@ -321,12 +312,12 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     self.alpha *= self.options['rho']
                 u.add_scal_vec(self.alpha, du)
 
+                cache = self._solver_info.save_cache()
+
                 try:
                     self._iter_execute()
-                    cache = self._solver_info.save_cache()
                     self._iter_count += 1
 
-                    # self._run_apply()
                     norm = self._iter_get_norm()
 
                     # With solvers, we want to report the norm AFTER
@@ -347,5 +338,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         exc = sys.exc_info()
                         reraise(*exc)
 
-            self._mpi_print(self._iter_count, norm, norm / norm0)
+            # self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, norm, self.alpha)
+
+

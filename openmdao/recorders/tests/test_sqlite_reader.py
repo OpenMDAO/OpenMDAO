@@ -1926,6 +1926,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.options['maxiter'] = 3
+        # model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['iprint'] = 2
         model.linear_solver = ScipyKrylov()
 
         ls = model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
@@ -1964,6 +1966,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, c in enumerate(cr.list_cases()):
             case = cr.get_case(c)
+
 
             coord = case.iteration_coordinate
             self.assertEqual(coord, expected[i])
