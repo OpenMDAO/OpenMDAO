@@ -29,6 +29,7 @@ class TestSellarFeature(unittest.TestCase):
         prob.model = SellarMDALinearSolver()
 
         prob.setup(check=False)
+        prob.model.cycle.nonlinear_solver.options['use_apply_nonlinear'] = True
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)

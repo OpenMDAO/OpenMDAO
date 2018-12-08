@@ -103,7 +103,6 @@ install:
 
     echo " >> Installing forked python packages";
     pip install git+https://github.com/swryan/coveralls-python@work;
-    pip install git+https://github.com/OpenMDAO/testflo.git;
 
     echo " >> Installing pyOptSparse";
     echo "  > Cloning pyOptSparse from OpenMDAO's fork";

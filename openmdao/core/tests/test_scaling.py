@@ -372,6 +372,7 @@ class TestScaling(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
         prob.set_solver_print(level=0)
 
@@ -410,6 +411,7 @@ class TestScaling(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
         prob.set_solver_print(level=0)
 
@@ -444,6 +446,7 @@ class TestScaling(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
         prob.set_solver_print(level=0)
 
@@ -480,6 +483,7 @@ class TestScaling(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
         prob.set_solver_print(level=0)
 
