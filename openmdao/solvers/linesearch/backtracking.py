@@ -263,9 +263,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
             self._solver_info.append_solver()
+            cache = self._solver_info.save_cache()
 
             try:
-                cache = self._solver_info.save_cache()
 
                 for isub, subsys in enumerate(system._subsystems_allprocs):
                     system._transfer('nonlinear', 'fwd', isub)
@@ -320,10 +320,10 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                     self.alpha *= self.options['rho']
                 u.add_scal_vec(self.alpha, du)
 
+                cache = self._solver_info.save_cache()
                 try:
                     self._iter_execute()
                     self._iter_count += 1
-                    cache = self._solver_info.save_cache()
 
                     # self._run_apply()
                     norm = self._iter_get_norm()
