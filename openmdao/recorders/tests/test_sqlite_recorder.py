@@ -867,12 +867,12 @@ class TestSqliteRecorder(unittest.TestCase):
             0,
             'Driver', (0,),
             'root._solve_nonlinear', (0,),
-            'NewtonSolver', (3,),
+            'NewtonSolver', (2,),
             'ArmijoGoldsteinLS', (2,)
         ]
 
-        expected_abs_error = 5.46371836663e-11
-        expected_rel_error = 0.120259301544
+        expected_abs_error = 5.6736837450444e-12
+        expected_rel_error = 0.0047475363051265665
 
         expected_solver_output = {
             "con_cmp1.con1": [-22.42830237],
