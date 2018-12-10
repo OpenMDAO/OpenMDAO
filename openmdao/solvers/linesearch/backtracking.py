@@ -287,7 +287,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         else:
             self._run_apply()
 
-
     def _run_iterator(self):
         """
         Run the iterative solver.
