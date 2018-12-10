@@ -312,7 +312,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
             if line.startswith('|  LS: AG 3'):
                 correct = True
                 break
-        self.assertTrue(correct)
+        self.assertTrue(correct, msg='Expected line search output not found in stdout')
 
     def test_read_only_bug(self):
         # this tests for a bug in which guess_nonlinear failed due to the output
@@ -354,13 +354,15 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         finally:
             sys.stdout = stdout
 
+        output = strout.getvalue().split('\n')
+
         correct = False
         for line in output:
             # make sure a line starting with this string is present in stdout
             if line.startswith('|  LS: AG 3'):
                 correct = True
                 break
-        self.assertTrue(correct)
+        self.assertTrue(correct, msg='Expected line search output not found in stdout')
 
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
