@@ -8,7 +8,7 @@ from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 try:
     from pyxdsm.XDSM import XDSM
-    from openmdao.devtools.xdsm_writer import write_xdsm
+    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
 except ImportError:
     XDSM = None
 
@@ -129,7 +129,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = False
+        clean_up = True
 
         def clean_file(fname):
             try:  # Try to clean up
