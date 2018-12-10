@@ -7,17 +7,16 @@ import numpy as np
 from openmdao.api import Group, Problem, IndepVarComp, LinearBlockGS, \
     NewtonSolver, ExecComp, ScipyKrylov, ImplicitComponent, \
     DirectSolver, AnalysisError
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.core.tests.test_discrete import InternalDiscreteGroup
+from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
 from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
      SubSellar
+from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
-from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
-from openmdao.test_suite.components.implicit_newton_linesearch \
-    import ImplCompTwoStates, ImplCompTwoStatesArrays
-from openmdao.core.tests.test_discrete import InternalDiscreteGroup
 
 class TestNewton(unittest.TestCase):
 
