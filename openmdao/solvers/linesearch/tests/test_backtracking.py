@@ -186,6 +186,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         # Test the behavior with the switch turned on.
         top = self.top
         top.setup(check=False)
+        self.ls.options['retry_on_analysis_error'] = True
 
         # Test lower bound: should go as far as it can without going past 1.75 and triggering an
         # AnalysisError. It doesn't do a great job, so ends up at 1.8 instead of 1.75
@@ -304,7 +305,14 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
-        self.assertTrue(output[26].startswith('|  LS: AG 3'))
+
+        correct = False
+        for line in output:
+            # make sure a line starting with this string is present in stdout
+            if line.startswith('|  LS: AG 3'):
+                correct = True
+                break
+        self.assertTrue(correct, msg='Expected line search output not found in stdout')
 
     def test_read_only_bug(self):
         # this tests for a bug in which guess_nonlinear failed due to the output
@@ -347,7 +355,14 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
-        self.assertTrue(output[26].startswith('|  LS: AG 3'))
+
+        correct = False
+        for line in output:
+            # make sure a line starting with this string is present in stdout
+            if line.startswith('|  LS: AG 3'):
+                correct = True
+                break
+        self.assertTrue(correct, msg='Expected line search output not found in stdout')
 
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
