@@ -186,6 +186,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         # Test the behavior with the switch turned on.
         top = self.top
         top.setup(check=False)
+        self.ls.options['retry_on_analysis_error'] = True
 
         # Test lower bound: should go as far as it can without going past 1.75 and triggering an
         # AnalysisError. It doesn't do a great job, so ends up at 1.8 instead of 1.75
