@@ -556,6 +556,8 @@ class TestSqliteRecorder(unittest.TestCase):
         model.recording_options['record_metadata'] = True
         model.add_recorder(self.recorder)
 
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
+
         d1 = model.d1  # SellarDis1withDerivatives, an ExplicitComp
         d1.recording_options['record_inputs'] = True
         d1.recording_options['record_outputs'] = True
@@ -715,6 +717,8 @@ class TestSqliteRecorder(unittest.TestCase):
         model.recording_options['record_metadata'] = True
         model.add_recorder(self.recorder)
 
+        model.mda.nonlinear_solver.options['use_apply_nonlinear'] = True
+
         pz = model.pz  # IndepVarComp which is an ExplicitComponent
         pz.recording_options['record_inputs'] = True
         pz.recording_options['record_outputs'] = True
@@ -780,6 +784,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.setup()
 
         nl = prob.model.nonlinear_solver
+        nl.options['use_apply_nonlinear'] = True
         nl.recording_options['record_abs_error'] = True
         nl.recording_options['record_rel_error'] = True
         nl.recording_options['record_solver_residuals'] = True
@@ -864,12 +869,12 @@ class TestSqliteRecorder(unittest.TestCase):
             0,
             'Driver', (0,),
             'root._solve_nonlinear', (0,),
-            'NewtonSolver', (3,),
+            'NewtonSolver', (2,),
             'ArmijoGoldsteinLS', (2,)
         ]
 
-        expected_abs_error = 5.46371836663e-11
-        expected_rel_error = 0.120259301544
+        expected_abs_error = 5.6736837450444e-12
+        expected_rel_error = 0.0047475363051265665
 
         expected_solver_output = {
             "con_cmp1.con1": [-22.42830237],
@@ -963,6 +968,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.model.nonlinear_solver.add_recorder(self.recorder)
         prob.model.nonlinear_solver.recording_options['record_solver_residuals'] = True
+        prob.model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
@@ -1356,6 +1362,8 @@ class TestSqliteRecorder(unittest.TestCase):
         # Need to do recursive adding of recorders AFTER setup
         prob.model.add_recorder(self.recorder, recurse=True)
 
+        prob.model.mda.nonlinear_solver.options['use_apply_nonlinear'] = True
+
         prob.run_model()
         prob.cleanup()
 
@@ -1388,6 +1396,8 @@ class TestSqliteRecorder(unittest.TestCase):
     def test_record_system_with_prefix(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=NonlinearRunOnce)
         prob.setup(mode='rev')
+
+        prob.model.mda.nonlinear_solver.options['use_apply_nonlinear'] = True
 
         prob.model.add_recorder(self.recorder, recurse=True)
 
@@ -1847,6 +1857,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         obj_cmp.recording_options['includes'] = ['*']
         obj_cmp.recording_options['excludes'] = ['obj_cmp.x']
 
+        prob.model.nonlinear_solver.options['use_apply_nonlinear'] = True
+
         prob.run_model()
         prob.cleanup()
 
@@ -1917,6 +1929,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         solver = prob.model.nonlinear_solver
         solver.add_recorder(recorder)
         solver.recording_options['record_abs_error'] = True
+        solver.options['use_apply_nonlinear'] = True
 
         prob.run_model()
         prob.cleanup()

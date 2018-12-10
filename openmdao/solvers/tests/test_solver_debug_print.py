@@ -103,11 +103,13 @@ class TestNonlinearSolvers(unittest.TestCase):
         model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
-
         nl = model.circuit.nonlinear_solver = solver()
 
         nl.options['debug_print'] = True
         nl.options['err_on_maxiter'] = True
+
+        if name == 'NonlinearBlockGS':
+            nl.options['use_apply_nonlinear'] = True
 
         # suppress solver output for test
         nl.options['iprint'] = model.circuit.linear_solver.options['iprint'] = -1

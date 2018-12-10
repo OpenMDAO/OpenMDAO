@@ -56,7 +56,7 @@ class SellarDis1(ExplicitComponent):
         self.add_input('y2', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y1', val=1.0, units=units, ref=ref)
+        self.add_output('y1', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
         self._do_declares()
 
@@ -137,7 +137,7 @@ class SellarDis2(ExplicitComponent):
         self.add_input('y1', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y2', val=1.0, units=units, ref=ref)
+        self.add_output('y2', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
         self._do_declares()
 
@@ -182,6 +182,8 @@ class SellarDis2withDerivatives(SellarDis2):
         y1 = inputs['y1']
         if y1.real < 0.0:
             y1 *= -1
+        if y1.real < 1e-8:
+            y1 = 1e-8
 
         J['y2', 'y1'] = .5*y1**-.5
         J['y2', 'z'] = np.array([[1.0, 1.0]])
@@ -515,7 +517,7 @@ class SellarImplicitDis1(ImplicitComponent):
         self.add_input('y2', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y1', val=1.0, units=units, ref=ref)
+        self.add_output('y1', val=1.0, lower=-0.1, upper=1000, units=units, ref=ref)
 
         # Derivatives
         self.declare_partials('*', '*')
@@ -574,7 +576,7 @@ class SellarImplicitDis2(ImplicitComponent):
         self.add_input('y1', val=1.0, units=units)
 
         # Coupling output
-        self.add_output('y2', val=1.0, units=units, ref=ref)
+        self.add_output('y2', val=1.0, lower=0.1, upper=1000., units=units, ref=ref)
 
         # Derivatives
         self.declare_partials('*', '*')
@@ -606,6 +608,8 @@ class SellarImplicitDis2(ImplicitComponent):
         y1 = inputs['y1']
         if y1.real < 0.0:
             y1 *= -1
+        if y1.real < 1e-8:
+            y1 = 1e-8
 
         J['y2', 'y1'] = -.5*y1**-.5
         J['y2', 'z'] = -np.array([[1.0, 1.0]])
