@@ -305,7 +305,14 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue().split('\n')
-        self.assertTrue(output[28].startswith('|  LS: AG 3'))
+
+        correct = False
+        for line in output:
+            # make sure a line starting with this string is present in stdout
+            if line.startswith('|  LS: AG 3'):
+                correct = True
+                break
+        self.assertTrue(correct)
 
     def test_read_only_bug(self):
         # this tests for a bug in which guess_nonlinear failed due to the output
@@ -347,8 +354,13 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         finally:
             sys.stdout = stdout
 
-        output = strout.getvalue().split('\n')
-        self.assertTrue(output[28].startswith('|  LS: AG 3'))
+        correct = False
+        for line in output:
+            # make sure a line starting with this string is present in stdout
+            if line.startswith('|  LS: AG 3'):
+                correct = True
+                break
+        self.assertTrue(correct)
 
 
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
