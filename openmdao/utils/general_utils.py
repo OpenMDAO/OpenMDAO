@@ -708,3 +708,29 @@ def json_loads_byteified(json_str):
         return _byteify(json.loads(json_str, object_hook=_byteify), ignore_dicts=True)
     else:
         return json.loads(json_str)
+
+
+class FunctionFinder(ast.NodeVisitor):
+    """
+    This class locates all of the functions and methods in a file and associates any
+    method with its corresponding class.
+    """
+    def __init__(self, fname, cache):
+        ast.NodeVisitor.__init__(self)
+        self.fname = fname
+        self.cache = cache
+        self.class_stack = []
+        self.func_stack = []
+
+    def visit_ClassDef(self, node):
+        self.class_stack.append(node.name)
+        for bnode in node.body:
+            self.visit(bnode)
+        self.class_stack.pop()
+
+    def visit_FunctionDef(self, node):
+        self.func_stack.append(node.name)
+        for bnode in node.body:
+            self.visit(bnode)
+        self.func_stack.pop()
+
