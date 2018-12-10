@@ -2903,6 +2903,9 @@ class System(object):
                 if sub._owns_approx_jac:
                     sub._jacobian.set_complex_step_mode(active)
 
+                if sub._assembled_jac:
+                    sub._assembled_jac.set_complex_step_mode(active)
+
     def cleanup(self):
         """
         Clean up resources prior to exit.

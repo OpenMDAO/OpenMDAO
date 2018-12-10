@@ -370,7 +370,7 @@ class TestBryoden(unittest.TestCase):
         prob.setup(check=False)
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
-        model.nonlinear_solver.linear_solver = DirectSolver()
+        model.nonlinear_solver.linear_solver = DirectSolver(assemble_jac=False)
 
         prob.run_model()
 
@@ -587,6 +587,48 @@ class TestBryoden(unittest.TestCase):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_around_broyden_compute_jac(self):
+        # Basic sellar test.
+
+        prob = Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = BroydenSolver()
+        sub.linear_solver = DirectSolver(assemble_jac=False)
+        model.linear_solver = DirectSolver(assemble_jac=False)
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+
+        prob.run_model()
+
+        sub.nonlinear_solver.options['compute_jacobian'] = True
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+
+    def test_cs_around_broyden_compute_jac_dense(self):
         # Basic sellar test.
 
         prob = Problem()

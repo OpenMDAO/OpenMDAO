@@ -2252,7 +2252,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = DirectSolver()
+        sub.linear_solver = DirectSolver(assemble_jac=False)
 
         # Need this.
         model.linear_solver = LinearBlockGS()

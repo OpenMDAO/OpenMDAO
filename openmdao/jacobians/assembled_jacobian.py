@@ -366,6 +366,9 @@ class AssembledJacobian(Jacobian):
         if ext_mtx is not None:
             ext_mtx._post_update()
 
+        if self._under_complex_step:
+            self._int_mtx._matrix = int_mtx._matrix.astype(np.complex)
+
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
