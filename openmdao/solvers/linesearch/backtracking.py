@@ -189,7 +189,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             norm0 = 1.0
 
         u.add_scal_vec(self.alpha, du)
-        # self.alpha /= self.options['rho']
 
         if self.options['print_bound_enforce']:
             _print_violations(u, system._lower_bounds, system._upper_bounds)
@@ -253,8 +252,6 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         """
         self._analysis_error_raised = False
         system = self._system
-
-        print('foo', self._iter_count)
 
         # Hybrid newton support.
         if self._do_subsolve and self._iter_count > 0:
