@@ -41,6 +41,19 @@ less accurate.
     :layout: interleave
 
 
+Directional Derivatives
+-----------------------
+
+You can also specify that an input or set of inputs be checked using a directional derivative. For vector inputs, this means
+that, instead of calculating the derivative with respect to each element of the array, we calculate the derivative with respect to a linear
+combination of all array indices. For finite difference and complex step, the step value is applied simultaneously to all elements of
+the vector.  This is a much quicker check because it only requires a single execution of the component for the variable rather than one
+for each element of the array.
+
+.. embed-code::
+    openmdao.core.tests.test_check_derivs.TestCheckPartialsFeature.test_directional
+    :layout: interleave
+
 ----------------------------------------
 Changing Global Settings For Whole Model
 ----------------------------------------
