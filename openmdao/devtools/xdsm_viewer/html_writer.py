@@ -1,3 +1,7 @@
+"""
+HTML file writing to create (semi)standalone XDSMjs output file.
+"""
+
 import json
 import os
 
@@ -20,13 +24,15 @@ def write_html(outfile, source_data):
     source_data : str or dict
         Output HTML file
     """
+    script_tag = '<script type="text/javascript">\n{}\n</script>\n'
+
     # directories
     main_dir = os.path.dirname(os.path.abspath(__file__))
     code_dir = os.path.join(main_dir, 'XDSMjs')
     src_dir = os.path.join(code_dir, "src")
     build_dir = os.path.join(code_dir, "build")
     vis_dir = os.path.join(main_dir, "visualization")
-    style_dir = code_dir
+    style_dir = code_dir  # CSS
 
     # grab the libraries
     scripts = ''
@@ -35,27 +41,28 @@ def write_html(outfile, source_data):
     with open(os.path.join(build_dir, "xdsm.bundle.js"), "r") as f:
         xdsm_bundle = f.read()
 
+    # grab the scripts
     for name in script_names:
         with open(os.path.join(src_dir, "{}.js".format(name)), "r") as f:
             code = f.read()
-            script = '<script type="text/javascript">\n{}\n</script>\n'.format(code)
+            script = script_tag.format(code)
             scripts += script
 
     with open(os.path.join(code_dir, "xdsm-main.js"), "r") as f:
         code = f.read()
-        script = '<script type="text/javascript">\n{}\n</script>\n'.format(code)
+        script = script_tag.format(code)
         scripts += script
 
+    # grab the data
     if isinstance(source_data, str):
         data_name = source_data
         # replace file name
         xdsm_bundle = xdsm_bundle.replace(_DEFAULT_JSON_FILE, data_name)
     elif isinstance(source_data, dict):
-        data_name = 'xdsm_data'
-        tag = '<script id="{}" type="text/javascript">\nvar modelData = {}\n</script>\n'
+        tag = script_tag.format('var modelData = {}')
 
         json_data = json.dumps(source_data)  # JSON formatted string
-        script = tag.format(data_name, json_data)
+        script = tag.format(json_data)
         scripts += script
         # replace file name
         # FIXME this is wrong syntax now
@@ -83,6 +90,7 @@ def write_html(outfile, source_data):
     index = index.replace('{{xdsm_bundle}}', xdsm_bundle)
     index = index.replace('{{scripts}}', scripts)
 
+    # Embed style, scripts and data to HTML
     with open(outfile, 'w') as f:
         f.write(index)
 
