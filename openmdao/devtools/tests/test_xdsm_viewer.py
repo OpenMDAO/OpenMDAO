@@ -129,7 +129,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = False
+        clean_up = True
 
         def clean_file(fname):
             try:  # Try to clean up
@@ -145,7 +145,9 @@ class TestXDSMViewer(unittest.TestCase):
                     filename = '.'.join([FILENAME+str(i), ext])
                     clean_file(filename)
 
-            clean_file('xdsm.json')
+            for ext in ('json', 'html'):
+                filename = '.'.join(['xdsm', ext])
+                clean_file(filename)
 
 
 if __name__ == "__main__":
