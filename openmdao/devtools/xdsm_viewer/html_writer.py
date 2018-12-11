@@ -13,6 +13,8 @@ def write_html(outfile, source_data):
     If a JSON file name is provided, the file will be referenced in the HTML.
     If the input is a dictionary, it will be embedded.
 
+    Parameters
+    ----------
     outfile : str
         Output HTML file
     source_data : str or dict

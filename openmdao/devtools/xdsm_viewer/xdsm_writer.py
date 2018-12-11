@@ -11,6 +11,7 @@ import os
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
+from openmdao.devtools.xdsm_viewer.html_writer import write_html
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -200,15 +201,38 @@ class XDSMjsWriter(AbstractXDSMWriter):
         data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
         return data
 
-    def write(self, filename='xdsmjs', ext='json', *args, **kwargs):
+    def write(self, filename='xdsmjs', embed_data=False, *args, **kwargs):
+        """
+        Writes HTML output file, and depending on the value of "embed_data" a JSON file with the
+        data.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Output file name (without extension).
+            Defaults to "xdsmjs".
+        embed_data : bool, optional
+            Embed XDSM data into the HTML file.
+            If False, a JSON file will be also written.
+            Defaults to False.
+        """
         self.add_workflow()
         data = self.collect_data()
 
-        if ext is not None:
-            filename = '.'.join([filename, ext])
-        with open(filename, 'w') as outfile:
-            json.dump(data, outfile)
-        print('XDSM output file written to: {}'.format(filename))
+        html_filename = '.'.join([filename, 'html'])
+
+        if embed_data:
+            source_data = data
+            write_html(outfile=html_filename, source_data=data)
+        else:
+            json_filename = '.'.join([filename, 'json'])
+            with open(json_filename, 'w') as f:
+                json.dump(data, f)
+            source_data = json_filename
+
+        # Write HTML file
+        write_html(outfile=html_filename, source_data=source_data)
+        print('XDSM output file written to: {}'.format(html_filename))
 
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
