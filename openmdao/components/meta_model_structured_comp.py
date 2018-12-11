@@ -10,7 +10,10 @@ from scipy import __version__ as scipy_version
 try:
     from scipy.interpolate._bsplines import make_interp_spline
 except ImportError:
-    make_interp_spline = False
+    def make_interp_spline(*args, **kwargs):
+        msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
+              " installed version is %s." % scipy_version
+        raise RuntimeError(msg)
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
@@ -186,11 +189,6 @@ class _RegularGridInterp(object):
             order will be reduced as needed on a per-dimension basis. Default
             is True (raise an exception).
         """
-        if not make_interp_spline:
-            msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
-                  " installed version is %s." % scipy_version
-            simple_warning(msg)
-
         configs = _RegularGridInterp._interp_methods()
         self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
@@ -626,11 +624,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         Initialize the component.
         """
-        if not make_interp_spline:
-            msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
-                  " installed version is %s." % scipy_version
-            simple_warning(msg)
-
         self.options.declare('extrapolate', types=bool, default=False,
                              desc='Sets whether extrapolation should be performed '
                                   'when an input is out of bounds.')

@@ -8,11 +8,13 @@ import sys
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2
+from six import string_types, PY2, itervalues
 from six.moves import range, cStringIO as StringIO
-from collections import Iterable
+from collections import Iterable, defaultdict
 import numbers
 import json
+import inspect
+import ast
 
 import numpy as np
 import openmdao
@@ -710,27 +712,79 @@ def json_loads_byteified(json_str):
         return json.loads(json_str)
 
 
-class FunctionFinder(ast.NodeVisitor):
-    """
-    This class locates all of the functions and methods in a file and associates any
-    method with its corresponding class.
-    """
-    def __init__(self, fname, cache):
-        ast.NodeVisitor.__init__(self)
-        self.fname = fname
-        self.cache = cache
-        self.class_stack = []
-        self.func_stack = []
+def get_class_calls(class_, func_name=None):
+    funcs = defaultdict(set)
+    allfuncs = []
+    defined = set()
+    for cls in inspect.getmro(class_):
+        for f in itervalues(cls.__dict__):
+            if inspect.isfunction(f) and f.__name__ not in defined:
+                allfuncs.append((f.__name__, cls.__name__ + '.' + f.__name__))
+                defined.add(f.__name__)
 
-    def visit_ClassDef(self, node):
-        self.class_stack.append(node.name)
-        for bnode in node.body:
-            self.visit(bnode)
-        self.class_stack.pop()
+    if func_name is None:
+        return [f for _, f in sorted(allfuncs, key=lambda x: x[0])]
 
-    def visit_FunctionDef(self, node):
-        self.func_stack.append(node.name)
-        for bnode in node.body:
-            self.visit(bnode)
-        self.func_stack.pop()
 
+def _get_nested_calls(class_, func_name):
+    func = getattr(class_, func_name)
+    src = inspect.getsource(func)
+    self_calls = _get_self_calls(class_, src)
+
+
+def _get_long_name(node):
+    # If the node is an Attribute or Name node that is composed
+    # only of other Attribute or Name nodes, then return the full
+    # dotted name for this node. Otherwise, i.e., if this node
+    # contains Subscripts or Calls, return None.
+    if isinstance(node, ast.Name):
+        return node.id
+    elif not isinstance(node, ast.Attribute):
+        return None
+    val = node.value
+    parts = [node.attr]
+    while True:
+        if isinstance(val, ast.Attribute):
+            parts.append(val.attr)
+            val = val.value
+        elif isinstance(val, ast.Name):
+            parts.append(val.id)
+            break
+        else:  # it's more than just a simple dotted name
+            return None
+    return '.'.join(parts[::-1])
+
+
+class CallVisitor(ast.NodeVisitor):
+    def __init__(self, class_):
+        super(CallVisitor, self).__init__()
+        self.calls = defaultdict(list)
+        self.class_ = class_
+
+    def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
+        fncname = _get_long_name(node.func)
+        class_ = self.class_
+        if fncname is not None and fncname.startswith('self.') and len(fncname.split('.') == 2):
+            self.calls[class_].append(fncname.split('.')[1])
+            for arg in node.args:
+                self.visit(arg)
+        elif isinstance(node.func, ast.Attribute) and isinstance(node.func.attr, ast.Call):
+            callnode = node.func.attr
+            n = _get_long_name(callnode.func)
+            if n == 'super':
+                sup_1 = _get_long_name(callnode.args[1])
+                sup_0 = _get_long_name(callnode.args[0])
+                if sup_1 == 'self' and sup_0 is not None:
+                    for c in inspect.getmro(self.class_):
+                        if sup_0 == c.__name__:
+                            self.calls[c].append()
+                            break
+                    else:
+                        self.generic_visit(node)
+            else:
+                self.generic_visit(node)
+        else:
+            self.generic_visit(node)
+
+
+# def _get_self_calls(class_, src):
