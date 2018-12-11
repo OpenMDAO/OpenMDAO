@@ -1,3 +1,4 @@
+import json
 import os
 
 _DEFAULT_JSON_FILE = "xdsm.json"
@@ -68,7 +69,6 @@ def write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.jso
 
 if __name__ == '__main__':
     write_html()  # with string JSON name
-    # import json
     # with open("XDSMjs/examples/idf.json") as f:
     #     data = json.load(f)
     # write_html(source_data=data)
