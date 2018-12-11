@@ -2,6 +2,7 @@ import json
 import os
 
 _DEFAULT_JSON_FILE = "xdsm.json"
+_HTML_TEMPLATE = "index.html"
 
 
 def write_html(outfile, source_data):
@@ -71,7 +72,7 @@ def write_html(outfile, source_data):
         xdsm_style = f.read()
 
     # grab the index.html
-    with open(os.path.join(vis_dir, "index.html"), "r") as f:
+    with open(os.path.join(vis_dir, _HTML_TEMPLATE), "r") as f:
         index = f.read()
 
     # put all style and JS into index
