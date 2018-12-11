@@ -262,7 +262,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         If True, show externally connected outputs when transcribing a subsystem.
         Defaults to True.
     out_format : str, optional
-        Output format, one of "tex" (pyXDSM) or "json" (XDSMjs)
+        Output format, one of "tex" (pyXDSM) or "json"/"html" (XDSMjs)
         Defaults to "tex".
     include_solver : bool
         Include or not the problem model's nonlinear solver in the XDSM.
@@ -361,9 +361,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    if out_format == 'tex':  # pyXDSM
+    if out_format in ('tex', 'pdf'):  # pyXDSM
         x = XDSMWriter()
-    elif out_format == 'json':  # XDSMjs
+    elif out_format in ('json', 'html'):  # XDSMjs
         x = XDSMjsWriter()
         xdsmjs_path = kwargs.pop('xdsmjs_path', None)
     else:  # invalid option

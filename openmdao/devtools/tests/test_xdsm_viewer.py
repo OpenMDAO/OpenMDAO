@@ -110,8 +110,10 @@ class TestXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=filename, out_format='json', subs=(), show_browser=False)
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
     def test_wrong_out_format(self):
         """Incorrect output format error."""
@@ -139,12 +141,15 @@ class TestXDSMViewer(unittest.TestCase):
                 pass
 
         if clean_up:
-            nr_pyxdsm_tests = 3
+
+            # clean-up of pyXDSM files
+            nr_pyxdsm_tests = 3  # number of tests with pyXDSM
             for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
                 for i in range(nr_pyxdsm_tests):
                     filename = '.'.join([FILENAME+str(i), ext])
                     clean_file(filename)
 
+            # clean-up of XDSMjs files
             for ext in ('json', 'html'):
                 filename = '.'.join(['xdsm', ext])
                 clean_file(filename)
