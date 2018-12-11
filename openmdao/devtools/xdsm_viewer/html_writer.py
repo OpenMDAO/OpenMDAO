@@ -31,16 +31,20 @@ def write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.jso
         script = '<script type="text/javascript">\n{}\n</script>\n'.format(code)
         scripts += script
 
-    # with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
-    #     d3 = f.read()
-    # with open(os.path.join(libs_dir, "vkBeautify.js"), "r") as f:
-    #     vk_beautify = f.read()
-    #
-    # # grab the src
-    # with open(os.path.join(src_dir, "constants.js"), "r") as f:
-    #     constants = f.read()
-    # with open(os.path.join(src_dir, "draw.js"), "r") as f:
-    #     draw = f.read()
+    if isinstance(source_data, str):
+        data_name = source_data
+        # replace file name
+        xdsm_bundle = xdsm_bundle.replace(_DEFAULT_JSON_FILE, data_name)
+    else:
+        data_name = 'xdsm_data'
+        tag = '<script id="{}" type="text/javascript">\nvar modelData = {}\n</script>\n'
+
+        json_data = json.dumps(source_data)  # JSON formatted string
+        script = tag.format(data_name, json_data)
+        scripts += script
+        # replace file name
+        xdsm_bundle = xdsm_bundle.replace('fetch("{}",void 0)'.format(_DEFAULT_JSON_FILE),
+                                          "modelData")  # FIXME incorrect syntax
 
     # grab the style
     with open(os.path.join(style_dir, "fontello.css"), "r") as f:
@@ -51,9 +55,6 @@ def write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.jso
     # grab the index.html
     with open(os.path.join(vis_dir, "index.html"), "r") as f:
         index = f.read()
-
-    # replace file name
-    xdsm_bundle = xdsm_bundle.replace(_DEFAULT_JSON_FILE, source_data)
 
     # put all style and JS into index
     index = index.replace('{{fontello_style}}', fontello_style)
@@ -66,4 +67,8 @@ def write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.jso
 
 
 if __name__ == '__main__':
-    write_html()
+    write_html()  # with string JSON name
+    # import json
+    # with open("XDSMjs/examples/idf.json") as f:
+    #     data = json.load(f)
+    # write_html(source_data=data)
