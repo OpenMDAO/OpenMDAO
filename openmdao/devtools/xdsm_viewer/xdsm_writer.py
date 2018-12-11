@@ -147,9 +147,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
     def __init__(self):
         super(XDSMjsWriter, self).__init__()
         self.optimizer = 'opt'
-        self.comp_names = []
+        self.comp_names = []  # Component names
         self.components = []
-        self.reserved_words = '_U_',
+        self.reserved_words = '_U_',  # Ignored at text formatting
 
     def _format_id(self, name, subs=(('_', ''),)):
         if name not in self.reserved_words:
@@ -157,7 +157,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         else:
             return name
 
-    def connect(self, src, target, label, style='DataInter', stack=False, faded=False):
+    def connect(self, src, target, label, **kwargs):
         edge = {'to': self._format_id(target),
                 'from': self._format_id(src),
                 'name': label}
@@ -177,7 +177,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.optimizer = self._format_id(name)
         self.add_system(name, 'optimization', label, **kwargs)
 
-    def add_system(self, node_name, style, label=None, stack=False, faded=False):
+    def add_system(self, node_name, style, label=None, **kwargs):
         if label is None:
             label = node_name
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
@@ -198,10 +198,17 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.connect(src=name, target='_U_', label=label)
 
     def collect_data(self):
+        """
+        Makes a dictionary with the structure of an XDSMjs JSON file.
+
+        Returns
+        -------
+            dict
+        """
         data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
         return data
 
-    def write(self, filename='xdsmjs', embed_data=False, *args, **kwargs):
+    def write(self, filename='xdsmjs', embed_data=False, **kwargs):
         """
         Writes HTML output file, and depending on the value of "embed_data" a JSON file with the
         data.
