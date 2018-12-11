@@ -196,9 +196,13 @@ class XDSMjsWriter(AbstractXDSMWriter):
     def add_output(self, name, label=None, style='DataIO', stack=False, side="left"):
         self.connect(src=name, target='_U_', label=label)
 
+    def collect_data(self):
+        data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
+        return data
+
     def write(self, filename='xdsmjs', ext='json', *args, **kwargs):
         self.add_workflow()
-        data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
+        data = self.collect_data()
 
         if ext is not None:
             filename = '.'.join([filename, ext])
