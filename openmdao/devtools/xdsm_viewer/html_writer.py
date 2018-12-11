@@ -44,8 +44,7 @@ def write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.jso
         script = tag.format(data_name, json_data)
         scripts += script
         # replace file name
-        xdsm_bundle = xdsm_bundle.replace('fetch("{}",void 0)'.format(_DEFAULT_JSON_FILE),
-                                          "modelData")  # FIXME incorrect syntax
+        raise NotImplementedError('For now a JSON file name should be provided instead of the data')
 
     # grab the style
     with open(os.path.join(style_dir, "fontello.css"), "r") as f:
@@ -69,6 +68,7 @@ def write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.jso
 
 if __name__ == '__main__':
     write_html()  # with string JSON name
+    # import json
     # with open("XDSMjs/examples/idf.json") as f:
     #     data = json.load(f)
     # write_html(source_data=data)
