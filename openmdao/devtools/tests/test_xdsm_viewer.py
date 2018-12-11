@@ -20,7 +20,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
-
+        filename = FILENAME+'0'
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -33,12 +33,15 @@ class TestXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME+'0', show_browser=False)
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
     def test_pyxdsm_sellar_no_recurse(self):
         """Makes XDSM for the Sellar problem, with no recursion."""
 
+        filename = FILENAME+'1'
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -51,8 +54,10 @@ class TestXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME+'1', show_browser=False, recurse=False)
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False, recurse=False)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
     def test_pyxdsm_sphere(self):
         """
@@ -76,6 +81,7 @@ class TestXDSMViewer(unittest.TestCase):
                 outputs['f'] = sum(x**2)
 
         x0 = np.array([1.2, 1.5])
+        filename = FILENAME+'2'
 
         prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(problem=prob), promotes=['*'])
@@ -91,8 +97,10 @@ class TestXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        # no output checking, just make sure no exceptions raised
-        write_xdsm(prob, filename=FILENAME+'2', show_browser=False)
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
     def test_xdsmjs(self):
         """Makes XDSMjs input file for the Sellar problem"""
