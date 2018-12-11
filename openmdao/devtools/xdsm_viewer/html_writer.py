@@ -59,16 +59,19 @@ def write_html(outfile, source_data):
         # replace file name
         xdsm_bundle = xdsm_bundle.replace(_DEFAULT_JSON_FILE, data_name)
     elif isinstance(source_data, dict):
-        tag = script_tag.format('var modelData = {}')
-
-        json_data = json.dumps(source_data)  # JSON formatted string
-        script = tag.format(json_data)
-        scripts += script
-        # replace file name
-        # FIXME this is wrong syntax now
-        # TODO loading the JSON file should be replaced to use the modelData var or
-        #  alternatively embed JSON script.
-        xdsm_bundle = xdsm_bundle.replace('"xdsm.json",fetch("xdsm.json",void 0)', "modelData")
+        msg = ('The option to embed the data is not implemented yet. '
+               'Use a JSON file name as input instead.')
+        raise NotImplementedError(msg)
+        # tag = script_tag.format('var modelData = {}')
+        #
+        # json_data = json.dumps(source_data)  # JSON formatted string
+        # script = tag.format(json_data)
+        # scripts += script
+        # # replace file name
+        # # FIXME this is wrong syntax now
+        # # TODO loading the JSON file should be replaced to use the modelData var or
+        # #  alternatively embed JSON script.
+        # xdsm_bundle = xdsm_bundle.replace('"xdsm.json",fetch("xdsm.json",void 0)', "modelData")
     else:
         msg = ('Invalid data type for source data: {} \n'
                'The source data should be a JSON file name or a dictionary.')
@@ -99,7 +102,7 @@ if __name__ == '__main__':
     # with JSON file name as input
     write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.json")
 
-    # with JSON data as input
-    with open("XDSMjs/examples/idf.json") as f:
-        data = json.load(f)
-    write_html(outfile='xdsm_diagram_data_embedded.html', source_data=data)
+    # # with JSON data as input
+    # with open("XDSMjs/examples/idf.json") as f:
+    #     data = json.load(f)
+    # write_html(outfile='xdsm_diagram_data_embedded.html', source_data=data)
