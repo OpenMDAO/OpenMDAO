@@ -8,13 +8,14 @@ import sys
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2, itervalues
+from six import string_types, PY2, itervalues, iteritems, next
 from six.moves import range, cStringIO as StringIO
 from collections import Iterable, defaultdict
 import numbers
 import json
 import inspect
 import ast
+import textwrap
 
 import networkx as nx
 import numpy as np
@@ -749,33 +750,34 @@ def _get_long_name(node):
             return None
     return '.'.join(parts[::-1])
 
+import astunparse
 
-class CallVisitor(ast.NodeVisitor):
+class _CallVisitor(ast.NodeVisitor):
     def __init__(self, class_):
-        super(CallVisitor, self).__init__()
+        super(_CallVisitor, self).__init__()
         self.calls = defaultdict(set)
         self.class_ = class_
 
     def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
         fncname = _get_long_name(node.func)
         class_ = self.class_
-        if fncname is not None and fncname.startswith('self.') and len(fncname.split('.') == 2):
+        if fncname is not None and fncname.startswith('self.') and len(fncname.split('.')) == 2:
             self.calls[class_].add(fncname.split('.')[1])
             for arg in node.args:
                 self.visit(arg)
-        elif isinstance(node.func, ast.Attribute) and isinstance(node.func.attr, ast.Call):
-            callnode = node.func.attr
+        elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
+            callnode = node.func.value
             n = _get_long_name(callnode.func)
-            if n == 'super':  # this only works for a sigle level
+            if n == 'super':  # this only works for a single call level
                 sup_1 = _get_long_name(callnode.args[1])
                 sup_0 = _get_long_name(callnode.args[0])
-                if sup_1 == 'self' and sup_0 is not None and len(sup_0.split('.') == 1):
+                if sup_1 == 'self' and sup_0 is not None and len(sup_0.split('.')) == 1:
                     mro = inspect.getmro(self.class_)
                     for i, c in enumerate(mro[:-1]):
                         if sup_0 == c.__name__:
                             # we need super of the current class
                             c = mro[i + 1]
-                            fn = _get_long_name(node.func.value)
+                            fn = node.func.attr
                             if fn is not None and len(fn.split('.')) == 1:
                                 self.calls[c].add(fn)
                             else:
@@ -789,32 +791,71 @@ class CallVisitor(ast.NodeVisitor):
             self.generic_visit(node)
 
 
-def _get_nested_calls(class_, func_name, parent=None, seen=None):
+def _find_owning_class(mro, func_name):
+    # TODO: this won't work for classes with __slots__
+
+    for c in mro:
+        if func_name in c.__dict__:
+            return '.'.join((c.__name__, func_name)), c
+
+    return None, None
+
+
+def _get_nested_calls(class_, func_name, parent, seen):
+
+    owners = []
 
     func = getattr(class_, func_name)
     src = inspect.getsource(func)
-    node = ast.parse(src, mode='exec')
-    visitor = CallVisitor(class_)
+    dedented_src = textwrap.dedent(src)
+
+    node = ast.parse(dedented_src, mode='exec')
+    visitor = _CallVisitor(class_)
     visitor.visit(node)
-
-    # TODO: this won't work for classes with __slots__
-
-    if seen is None:
-        seen = set()
-
-    owners = []
 
     # now find the actual owning class for each call
     for class_, funcset in iteritems(visitor.calls):
         mro = inspect.getmro(class_)
         for f in funcset:
-            for c in mro:
-                if f in c.__dict__:
-                    full = '.'.join((c.__name__, f))
-                    if full not in seen:
-                        owners.append((parent, full))
-                        seen.add(full)
-                        owners.extend(_get_nested_calls(c, f, full, seen))
+            full, c = _find_owning_class(mro, f)
+            if full is not None:
+                owners.append((parent, full))
+                if full not in seen:
+                    owners.extend(_get_nested_calls(class_, f, full, seen))
+                    seen.add(full)
 
     return owners
 
+
+def get_nested_calls(class_, func_name):
+    owners = []
+    seen = set()
+
+    full, klass = _find_owning_class(inspect.getmro(class_), func_name)
+    if full is not None:
+        owners.append((None, full))
+        seen.add(full)
+        parent = full
+
+        owners.extend(_get_nested_calls(class_, func_name, parent, seen))
+
+    if owners:
+        graph = nx.DiGraph()
+        for p, f in owners:
+            graph.add_edge(p, f)
+
+        seen = set([None])
+        stack = [(0, iter(graph[None]))]
+        while stack:
+            depth, children = stack[-1]
+            try:
+                n = next(children)
+                if n not in seen:
+                    print('  ' * depth, n)
+                    stack.append((depth + 1, iter(graph[n])))
+                    seen.add(n)
+                    continue
+            except StopIteration:
+                stack.pop()
+
+    return owners
