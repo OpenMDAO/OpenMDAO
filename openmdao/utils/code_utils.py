@@ -189,7 +189,7 @@ def _calltree_setup_parser(parser):
 
 def _calltree_exec(options):
     """
-    Process command line args and perform tracing on a specified python file.
+    Process command line args and call get_nested_calls on the specified class method.
     """
     parts = options.method_path[0].split('.')
     if len(parts) < 3:
