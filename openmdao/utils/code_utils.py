@@ -64,6 +64,7 @@ class _SelfCallCollector(ast.NodeVisitor):
         elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
             callnode = node.func.value
             n = _get_long_name(callnode.func)
+            # if this is a 'super' call, get the base of the specified class
             if n == 'super':  # this only works for a single call level
                 sup_1 = _get_long_name(callnode.args[1])
                 sup_0 = _get_long_name(callnode.args[0])
@@ -91,8 +92,7 @@ class _SelfCallCollector(ast.NodeVisitor):
 
 def _find_owning_class(mro, func_name):
     """
-    Given a func name and a method resolution order, return the full funcname and class
-    where the function is first found.
+    Return the full funcname and class where the function is first found in the class MRO.
     """
     # TODO: this won't work for classes with __slots__
 
@@ -104,7 +104,9 @@ def _find_owning_class(mro, func_name):
 
 
 def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
-
+    """
+    Parse the AST of the given method and all 'self' methods it calls and record owning classes.
+    """
     func = getattr(class_, func_name)
     src = inspect.getsource(func)
     dedented_src = textwrap.dedent(src)
@@ -128,7 +130,7 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
 
 def get_nested_calls(class_, method_name, stream=sys.stdout):
     """
-    Display the call tree for the specified class method and all class methods it calls.
+    Display the call tree for the specified class method and all 'self' class methods it calls.
 
     Parameters
     ----------
