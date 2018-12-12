@@ -23,7 +23,7 @@ from openmdao.error_checking.check_config import _check_config_cmd, _check_confi
 from openmdao.devtools.iprof_utils import _Options
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
-from openmdao.utils.general_utils import _calltree_setup_parser, _calltree_exec
+from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 
 
 def _view_model_setup_parser(parser):
