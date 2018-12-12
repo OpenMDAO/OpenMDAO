@@ -742,7 +742,6 @@ def _get_long_name(node):
             return None
     return '.'.join(parts[::-1])
 
-import astunparse
 
 class _SelfCallCollector(ast.NodeVisitor):
     def __init__(self, class_):
@@ -816,7 +815,7 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
                     _get_nested_calls(starting_class, klass, f, full, graph, seen)
 
 
-def get_nested_calls(class_, func_name):
+def get_nested_calls(class_, func_name, stream=sys.stdout):
     graph = OrderedDiGraph()
     seen = set()
 
@@ -835,7 +834,7 @@ def get_nested_calls(class_, func_name):
             depth, children = stack[-1]
             try:
                 n = next(children)
-                print("%s%s" % ('  ' * depth, n))
+                print("%s%s" % ('  ' * depth, n), file=stream)
                 if n not in seen:
                     stack.append((depth + 1, iter(graph[n])))
                     seen.add(n)
@@ -870,4 +869,9 @@ def _calltree_exec(options):
     mod = importlib.import_module(modpath)
     klass = getattr(mod, class_name)
 
-    get_nested_calls(klass, func_name)
+    stream_map = { 'stdout': sys.stdout, 'stderr': sys.stderr}
+    stream = stream_map.get(options.outfile)
+    if stream is None:
+        stream = open(options.outfile, 'w')
+
+    get_nested_calls(klass, func_name, stream)
