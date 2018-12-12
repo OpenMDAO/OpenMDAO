@@ -50,7 +50,7 @@ The following is a list of available OpenMDAO solvers separated by type:
 
 
 Below is a figure depicting how a model containing both recursive and monolithic solvers
-would function.  The numbered circles represent the order of calls to sub-solvers in the model.
+would function.  The numbered circles represent the order of calls to subsystems in the model.
 
 .. figure:: solver_call_diag.svg
    :align: center
