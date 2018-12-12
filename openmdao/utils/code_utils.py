@@ -161,14 +161,14 @@ def get_nested_calls(class_, method_name, stream=sys.stdout):
         parent = full
         _get_nested_calls(class_, klass, method_name, parent, graph, seen)
 
-    if graph:
+    if graph and stream is not None:
         seen = set([None])
         stack = [(0, iter(graph[None]))]
         while stack:
             depth, children = stack[-1]
             try:
                 n = next(children)
-                print("%s%s" % ('  ' * depth, n), file=stream)
+                stream.write("%s%s\n" % ('  ' * depth, n))
                 if n not in seen:
                     stack.append((depth + 1, iter(graph[n])))
                     seen.add(n)
