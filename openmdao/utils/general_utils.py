@@ -744,9 +744,9 @@ def _get_long_name(node):
 
 import astunparse
 
-class _CallVisitor(ast.NodeVisitor):
+class _SelfCallCollector(ast.NodeVisitor):
     def __init__(self, class_):
-        super(_CallVisitor, self).__init__()
+        super(_SelfCallCollector, self).__init__()
         self.self_calls = defaultdict(list)
         self.class_ = class_
 
@@ -800,9 +800,9 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
     dedented_src = textwrap.dedent(src)
 
     node = ast.parse(dedented_src, mode='exec')
-    visitor = _CallVisitor(starting_class)
+    visitor = _SelfCallCollector(starting_class)
     visitor.visit(node)
-    
+
     seen.add('.'.join((class_.__name__, func_name)))
 
     # now find the actual owning class for each call
