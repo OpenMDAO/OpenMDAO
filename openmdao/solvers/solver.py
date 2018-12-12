@@ -817,7 +817,7 @@ class BlockLinearSolver(LinearSolver):
         """
         Return the norm of the residual.
 
-        Note: This the side effect of modifying the residual vector in fwd mode
+        Note: This has the side effect of modifying the residual vector in fwd mode
         and the output vector in rev mode.
 
         Returns
