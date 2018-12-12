@@ -47,6 +47,10 @@ def _get_long_name(node):
 
 
 class _SelfCallCollector(ast.NodeVisitor):
+    """
+    An ast.NodeVisitor that records calls to self.* methods.
+    """
+
     def __init__(self, class_):
         super(_SelfCallCollector, self).__init__()
         self.self_calls = defaultdict(list)
