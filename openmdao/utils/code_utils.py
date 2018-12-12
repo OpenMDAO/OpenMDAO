@@ -55,16 +55,40 @@ class _SelfCallCollector(ast.NodeVisitor):
         super(_SelfCallCollector, self).__init__()
         self.self_calls = defaultdict(list)
         self.class_ = class_
+        self.mro = inspect.getmro(class_)
+        self.mro_names = set([c.__name__ for c in self.mro])
 
     def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
         fncname = _get_long_name(node.func)
         class_ = self.class_
-        if fncname is not None and fncname.startswith('self.') and len(fncname.split('.')) == 2:
-            shortfnc = fncname.split('.')[1]
-            if shortfnc not in self.self_calls[class_]:
-                self.self_calls[class_].append(shortfnc)
-            for arg in node.args:
-                self.visit(arg)
+        if fncname is not None:
+            if fncname.startswith('self.') and len(fncname.split('.')) == 2:
+                shortfnc = fncname.split('.')[1]
+                if shortfnc not in self.self_calls[class_]:
+                    self.self_calls[class_].append(shortfnc)
+                for arg in node.args:
+                    self.visit(arg)
+            # check for Class.func(inst) form for base class method call
+            elif (len(fncname.split('.')) == 2 and fncname.split('.')[0] in self.mro_names and
+                  node.args and isinstance(node.args[0], ast.Name) and node.args[0].id == 'self'):
+                cname, func = fncname.split('.')
+                for c in self.mro:
+                    if c.__name__ == cname:
+                        sub_mro = inspect.getmro(c)
+                        for sub_c in sub_mro:
+                            if func in sub_c.__dict__:
+                                c = sub_c
+                                break
+                        if func not in self.self_calls[c]:
+                            self.self_calls[c].append(func)
+                        for arg in node.args:
+                            self.visit(arg)
+                        break
+                else:
+                    self.generic_visit(node)
+            else:
+                self.generic_visit(node)
+        # check for super(Class, self) call
         elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
             callnode = node.func.value
             n = _get_long_name(callnode.func)
@@ -73,8 +97,7 @@ class _SelfCallCollector(ast.NodeVisitor):
                 sup_1 = _get_long_name(callnode.args[1])
                 sup_0 = _get_long_name(callnode.args[0])
                 if sup_1 == 'self' and sup_0 is not None and len(sup_0.split('.')) == 1:
-                    mro = inspect.getmro(self.class_)
-                    for i, c in enumerate(mro[:-1]):
+                    for i, c in enumerate(self.mro[:-1]):
                         if sup_0 == c.__name__:
                             # we need super of the specified class
                             sub_mro = inspect.getmro(c)
@@ -85,6 +108,8 @@ class _SelfCallCollector(ast.NodeVisitor):
                             fn = node.func.attr
                             if fn not in self.self_calls[c]:
                                 self.self_calls[c].append(fn)
+                            for arg in node.args:
+                                self.visit(arg)
                             break
                     else:
                         self.generic_visit(node)
