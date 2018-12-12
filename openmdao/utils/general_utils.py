@@ -848,7 +848,7 @@ def _calltree_setup_parser(parser):
     """
     Set up the command line options for the 'openmdao call_tree' command line tool.
     """
-    parser.add_argument('classpath', nargs=1, help='Full module path to desired class.')
+    parser.add_argument('method_path', nargs=1, help='Full module path to desired class method.')
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         default='stdout', help='Output file.  Defaults to stdout.')
 
@@ -857,7 +857,7 @@ def _calltree_exec(options):
     """
     Process command line args and perform tracing on a specified python file.
     """
-    parts = options.classpath[0].split('.')
+    parts = options.method_path[0].split('.')
     if len(parts) < 3:
         raise RuntimeError("You must supply the full module path to the function, "
                            "for example:  openmdao.api.Group._setup.")
