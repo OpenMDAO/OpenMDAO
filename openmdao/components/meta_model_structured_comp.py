@@ -8,9 +8,9 @@ from six.moves import range, zip
 
 from scipy import __version__ as scipy_version
 try:
-    from scipy.interpolate._bsplines import make_interp_spline
+    from scipy.interpolate._bsplines import make_interp_spline as _make_interp_spline
 except ImportError:
-    def make_interp_spline(*args, **kwargs):
+    def _make_interp_spline(*args, **kwargs):
         msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
               " installed version is %s." % scipy_version
         raise RuntimeError(msg)
@@ -325,7 +325,7 @@ class _RegularGridInterp(object):
                 if n_p <= k:
                     ki[-1] = n_p - 1
 
-        interpolator = make_interp_spline
+        interpolator = _make_interp_spline
         result = self._evaluate_splines(self.values[:].T,
                                         xi,
                                         indices,
@@ -783,7 +783,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             for j in range(self.options['vec_size']):
                 for i, axis in enumerate(self.params):
                     e_i = np.eye(axis.size)
-                    interp = make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
+                    interp = _make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
                     if i == 0:
                         val = interp(pt[j, i])
                     else:

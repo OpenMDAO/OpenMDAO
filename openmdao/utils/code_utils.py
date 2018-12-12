@@ -14,6 +14,10 @@ import networkx as nx
 
 
 class OrderedDiGraph(nx.DiGraph):
+    """
+    A DiGraph using OrderedDicts for internal storage.
+    """
+
     node_dict_factory = OrderedDict
     adjlist_dict_factory = OrderedDict
     edge_attr_dict_factory = OrderedDict
@@ -67,8 +71,12 @@ class _SelfCallCollector(ast.NodeVisitor):
                     mro = inspect.getmro(self.class_)
                     for i, c in enumerate(mro[:-1]):
                         if sup_0 == c.__name__:
-                            # we need super of the current class
-                            c = mro[i + 1]
+                            # we need super of the specified class
+                            sub_mro = inspect.getmro(c)
+                            for sub_c in sub_mro:
+                                if sub_c is not c:
+                                    c = sub_c
+                                    break
                             fn = node.func.attr
                             if fn not in self.self_calls[c]:
                                 self.self_calls[c].append(fn)
@@ -82,6 +90,10 @@ class _SelfCallCollector(ast.NodeVisitor):
 
 
 def _find_owning_class(mro, func_name):
+    """
+    Given a func name and a method resolution order, return the full funcname and class
+    where the function is first found.
+    """
     # TODO: this won't work for classes with __slots__
 
     for c in mro:
@@ -114,17 +126,34 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
                     _get_nested_calls(starting_class, klass, f, full, graph, seen)
 
 
-def get_nested_calls(class_, func_name, stream=sys.stdout):
+def get_nested_calls(class_, method_name, stream=sys.stdout):
+    """
+    Display the call tree for the specified class method and all class methods it calls.
+
+    Parameters
+    ----------
+    class_ : class
+        The starting class.
+    method_name : str
+        The name of the class method.
+    stream : file-like
+        The output stream where output will be displayed.
+
+    Returns
+    -------
+    networkx.DiGraph
+        A graph containing edges from methods to their sub-methods.
+    """
     graph = OrderedDiGraph()
     seen = set()
 
-    full, klass = _find_owning_class(inspect.getmro(class_), func_name)
+    full, klass = _find_owning_class(inspect.getmro(class_), method_name)
     if full is None:
-        print("Can't find function '%s' in class '%s'." % (func_name, class_.__name__))
+        print("Can't find function '%s' in class '%s'." % (method_name, class_.__name__))
     else:
         graph.add_edge(None, full)
         parent = full
-        _get_nested_calls(class_, klass, func_name, parent, graph, seen)
+        _get_nested_calls(class_, klass, method_name, parent, graph, seen)
 
     if graph:
         seen = set([None])
@@ -168,9 +197,14 @@ def _calltree_exec(options):
     mod = importlib.import_module(modpath)
     klass = getattr(mod, class_name)
 
-    stream_map = { 'stdout': sys.stdout, 'stderr': sys.stderr}
+    stream_map = {'stdout': sys.stdout, 'stderr': sys.stderr}
     stream = stream_map.get(options.outfile)
     if stream is None:
         stream = open(options.outfile, 'w')
 
     get_nested_calls(klass, func_name, stream)
+
+
+if __name__ == '__main__':
+    from openmdao.api import LinearBlockGS
+    get_nested_calls(LinearBlockGS, 'solve')
