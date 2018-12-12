@@ -23,6 +23,7 @@ from openmdao.error_checking.check_config import _check_config_cmd, _check_confi
 from openmdao.devtools.iprof_utils import _Options
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
+from openmdao.utils.general_utils import _calltree_setup_parser, _calltree_exec
 
 
 def _view_model_setup_parser(parser):
@@ -371,6 +372,7 @@ _post_setup_map = {
 # Other non-post-setup functions go here
 _non_post_setup_map = {
     'trace': (_itrace_setup_parser, _itrace_exec),
+    'call_tree': (_calltree_setup_parser, _calltree_exec),
     'iprof': (_iprof_setup_parser, _iprof_exec),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec),

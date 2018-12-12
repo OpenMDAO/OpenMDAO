@@ -10,16 +10,22 @@ import unittest
 from fnmatch import fnmatchcase
 from six import string_types, PY2, itervalues, iteritems, next
 from six.moves import range, cStringIO as StringIO
-from collections import Iterable, defaultdict
+from collections import Iterable, defaultdict, OrderedDict
 import numbers
 import json
 import inspect
 import ast
 import textwrap
+import importlib
 
 import networkx as nx
 import numpy as np
 import openmdao
+
+class OrderedDiGraph(nx.DiGraph):
+    node_dict_factory = OrderedDict
+    adjlist_dict_factory = OrderedDict
+    edge_attr_dict_factory = OrderedDict
 
 
 def warn_deprecation(msg):
@@ -714,20 +720,6 @@ def json_loads_byteified(json_str):
         return json.loads(json_str)
 
 
-def get_class_calls(class_, func_name=None):
-    funcs = defaultdict(set)
-    allfuncs = []
-    defined = set()
-    for cls in inspect.getmro(class_):
-        for f in itervalues(cls.__dict__):
-            if inspect.isfunction(f) and f.__name__ not in defined:
-                allfuncs.append((f.__name__, cls.__name__ + '.' + f.__name__))
-                defined.add(f.__name__)
-
-    if func_name is None:
-        return [f for _, f in sorted(allfuncs, key=lambda x: x[0])]
-
-
 def _get_long_name(node):
     # If the node is an Attribute or Name node that is composed
     # only of other Attribute or Name nodes, then return the full
@@ -755,14 +747,16 @@ import astunparse
 class _CallVisitor(ast.NodeVisitor):
     def __init__(self, class_):
         super(_CallVisitor, self).__init__()
-        self.calls = defaultdict(set)
+        self.self_calls = defaultdict(list)
         self.class_ = class_
 
     def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
         fncname = _get_long_name(node.func)
         class_ = self.class_
         if fncname is not None and fncname.startswith('self.') and len(fncname.split('.')) == 2:
-            self.calls[class_].add(fncname.split('.')[1])
+            shortfnc = fncname.split('.')[1]
+            if shortfnc not in self.self_calls[class_]:
+                self.self_calls[class_].append(shortfnc)
             for arg in node.args:
                 self.visit(arg)
         elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
@@ -778,10 +772,8 @@ class _CallVisitor(ast.NodeVisitor):
                             # we need super of the current class
                             c = mro[i + 1]
                             fn = node.func.attr
-                            if fn is not None and len(fn.split('.')) == 1:
-                                self.calls[c].add(fn)
-                            else:
-                                self.generic_visit(node)
+                            if fn not in self.self_calls[c]:
+                                self.self_calls[c].append(fn)
                             break
                     else:
                         self.generic_visit(node)
@@ -801,61 +793,81 @@ def _find_owning_class(mro, func_name):
     return None, None
 
 
-def _get_nested_calls(class_, func_name, parent, seen):
-
-    owners = []
+def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
 
     func = getattr(class_, func_name)
     src = inspect.getsource(func)
     dedented_src = textwrap.dedent(src)
 
     node = ast.parse(dedented_src, mode='exec')
-    visitor = _CallVisitor(class_)
+    visitor = _CallVisitor(starting_class)
     visitor.visit(node)
+    
+    seen.add('.'.join((class_.__name__, func_name)))
 
     # now find the actual owning class for each call
-    for class_, funcset in iteritems(visitor.calls):
-        mro = inspect.getmro(class_)
+    for klass, funcset in iteritems(visitor.self_calls):
+        mro = inspect.getmro(klass)
         for f in funcset:
             full, c = _find_owning_class(mro, f)
             if full is not None:
-                owners.append((parent, full))
+                graph.add_edge(parent, full)
                 if full not in seen:
-                    owners.extend(_get_nested_calls(class_, f, full, seen))
-                    seen.add(full)
-
-    return owners
+                    _get_nested_calls(starting_class, klass, f, full, graph, seen)
 
 
 def get_nested_calls(class_, func_name):
-    owners = []
+    graph = OrderedDiGraph()
     seen = set()
 
     full, klass = _find_owning_class(inspect.getmro(class_), func_name)
-    if full is not None:
-        owners.append((None, full))
-        seen.add(full)
+    if full is None:
+        print("Can't find function '%s' in class '%s'." % (func_name, class_.__name__))
+    else:
+        graph.add_edge(None, full)
         parent = full
+        _get_nested_calls(class_, klass, func_name, parent, graph, seen)
 
-        owners.extend(_get_nested_calls(class_, func_name, parent, seen))
-
-    if owners:
-        graph = nx.DiGraph()
-        for p, f in owners:
-            graph.add_edge(p, f)
-
+    if graph:
         seen = set([None])
         stack = [(0, iter(graph[None]))]
         while stack:
             depth, children = stack[-1]
             try:
                 n = next(children)
+                print("%s%s" % ('  ' * depth, n))
                 if n not in seen:
-                    print('  ' * depth, n)
                     stack.append((depth + 1, iter(graph[n])))
                     seen.add(n)
-                    continue
             except StopIteration:
                 stack.pop()
 
-    return owners
+    return graph
+
+
+def _calltree_setup_parser(parser):
+    """
+    Set up the command line options for the 'openmdao call_tree' command line tool.
+    """
+    parser.add_argument('classpath', nargs=1, help='Full module path to desired class.')
+    parser.add_argument('-o', '--outfile', action='store', dest='outfile',
+                        default='stdout', help='Output file.  Defaults to stdout.')
+
+
+def _calltree_exec(options):
+    """
+    Process command line args and perform tracing on a specified python file.
+    """
+    parts = options.classpath[0].split('.')
+    if len(parts) < 3:
+        raise RuntimeError("You must supply the full module path to the function, "
+                           "for example:  openmdao.api.Group._setup.")
+
+    class_name = parts[-2]
+    func_name = parts[-1]
+    modpath = '.'.join(parts[:-2])
+
+    mod = importlib.import_module(modpath)
+    klass = getattr(mod, class_name)
+
+    get_nested_calls(klass, func_name)
