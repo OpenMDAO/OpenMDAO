@@ -8,9 +8,9 @@ import sys
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2, itervalues, iteritems, next
+from six import string_types, PY2
 from six.moves import range, cStringIO as StringIO
-from collections import Iterable, defaultdict, OrderedDict
+from collections import Iterable
 import numbers
 import json
 
