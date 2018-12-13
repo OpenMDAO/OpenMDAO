@@ -72,7 +72,10 @@ motivation for using a preconditioner is the observation that iterative methods 
 properties if the linear system has a smaller condition number, so the goal of the preconditioner is to
 improve the condition number in part or all of the Jacobian.
 
-Here, we add a Gauss-Seidel preconditioner to the simple Sellar solution with Newton. Note that the number of
+Here, we add a Gauss-Seidel preconditioner to the double Sellar problem's top Newton solver.  This preconditioner
+will call the DirectSolver to solve the "g1" and "g2" subgroups.
+
+Note that the number of
 GMRES iterations is lower when using the preconditioner.
 
 .. embed-code::

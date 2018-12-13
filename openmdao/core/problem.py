@@ -53,6 +53,7 @@ ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
 MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
+_undefined = object()
 
 
 CITATION = """@inproceedings{2014_openmdao_derivs,
@@ -103,6 +104,8 @@ class Problem(object):
         Object that manages all recorders added to this problem.
     _vars_to_record: dict
         Dict of lists of var names indicating what to record
+    _remote_var_set : set
+        Set of variables (absolute names) that require remote data transfer to reach all procs.
     """
 
     _post_setup_func = None
@@ -204,22 +207,24 @@ class Problem(object):
 
         Returns
         -------
-        float or ndarray
+        float or ndarray or any python object
             the requested output/input variable.
         """
         # Caching only needed if vectors aren't allocated yet.
         proms = self.model._var_allprocs_prom2abs_list
+        meta = self.model._var_abs2meta
+
+        val = _undefined
+        abs_name = None
 
         if self._setup_status == 1:
 
             # We have set and cached already
             if name in self._initial_condition_cache:
-                val = self._initial_condition_cache[name]
+                return self._initial_condition_cache[name]
 
             # Vector not setup, so we need to pull values from saved metadata request.
             else:
-                proms = self.model._var_allprocs_prom2abs_list
-                meta = self.model._var_abs2meta
                 if name in meta:
                     if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                         src_name = self.model._conn_abs_in2out[name]
@@ -227,58 +232,83 @@ class Problem(object):
                     else:
                         val = meta[name]['value']
 
+                elif name in proms['output']:
+                    abs_name = prom_name2abs_name(self.model, name, 'output')
+                    if abs_name in meta:
+                        val = meta[abs_name]['value']
+
                 elif name in proms['input']:
                     abs_name = proms['input'][name][0]
-                    if isinstance(self.model, Group) and abs_name in self.model._conn_abs_in2out:
-                        src_name = self.model._conn_abs_in2out[abs_name]
-                        # So, if the inputs and outputs are promoted to the same name, then we
-                        # allow getitem, but if they aren't, then we raise an error due to non
-                        # uniqueness.
-                        if name not in proms['output']:
+                    conn = self.model._conn_abs_in2out
+                    if abs_name in meta:
+                        if isinstance(self.model, Group) and abs_name in conn:
+                            src_name = self.model._conn_abs_in2out[abs_name]
+                            # So, if the inputs and outputs are promoted to the same name, then we
+                            # allow getitem, but if they aren't, then we raise an error due to non
+                            # uniqueness.
+                            if name not in proms['output']:
+                                # This triggers a check for unconnected non-unique inputs, and
+                                # raises the same error as vector access.
+                                abs_name = prom_name2abs_name(self.model, name, 'input')
+                            val = meta[src_name]['value']
+                        else:
                             # This triggers a check for unconnected non-unique inputs, and
                             # raises the same error as vector access.
                             abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta[src_name]['value']
-                    else:
-                        # This triggers a check for unconnected non-unique inputs, and
-                        # raises the same error as vector access.
-                        abs_name = prom_name2abs_name(self.model, name, 'input')
-                        val = meta[abs_name]['value']
+                            val = meta[abs_name]['value']
 
-                elif name in proms['output']:
-                    abs_name = prom_name2abs_name(self.model, name, 'output')
-                    val = meta[abs_name]['value']
-
-                else:
-                    msg = 'Variable name "{}" not found.'
-                    raise KeyError(msg.format(name))
-
-                self._initial_condition_cache[name] = val
-
-        elif name in self.model._outputs:
-            val = self.model._outputs[name]
-
-        elif name in self.model._inputs:
-            val = self.model._inputs[name]
+                if val is not _undefined:
+                    # Need to cache the "get" in case the user calls in-place numpy operations.
+                    self._initial_condition_cache[name] = val
 
         else:
-            if name in proms['input']:
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-            else:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
+            if name in proms['output']:
+                name = proms['output'][name][0]
+            elif name in proms['input']:
+                name = prom_name2abs_name(self.model, name, 'input')
 
-            if self.model._discrete_outputs and name in self.model._discrete_outputs:
+            if name in meta:   # local var
+                if name in self.model._outputs._views:
+                    val = self.model._outputs[name]
+                else:
+                    val = self.model._inputs[name]
+
+            elif name in self.model._discrete_outputs:
                 val = self.model._discrete_outputs[name]
 
-            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
+            elif name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
 
-            else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
+        if self.model.comm.size > 1:
+            allprocs_meta = self.model._var_allprocs_abs2meta
+            # check for remote var
+            if name in allprocs_meta:
+                abs_name = name
+            elif name in proms['output']:
+                abs_name = proms['output'][name][0]
+            elif name in proms['input']:
+                abs_name = proms['input'][name][0]
 
-        # Need to cache the "get" in case the user calls in-place numpy operations.
-        self._initial_condition_cache[name] = val
+            if abs_name in self._remote_var_set:
+                if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
+                    raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
+                                       "supported." % abs_name)
+                loc_val = val
+                owner = self.model._owning_rank[abs_name]
+                if owner != self.model.comm.rank:
+                    val = None
+                else:
+                    owner = self.model._owning_rank[abs_name]
+                    if val is _undefined:
+                        val = None
+                new_val = self.model.comm.bcast(val, root=owner)
+                if loc_val is not None and loc_val is not _undefined:
+                    val = loc_val
+                else:
+                    val = new_val
+
+        if val is _undefined:
+            raise KeyError('Variable name "{}" not found.'.format(name))
 
         return val
 
@@ -311,14 +341,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(base_units, units))
+                msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
+                raise TypeError(msg.format(name, units))
 
             try:
                 scale, offset = get_conversion(base_units, units)
             except TypeError:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(base_units, units))
+                msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
+                raise TypeError(msg.format(name, base_units, units))
 
             val = (val + offset) * scale
 
@@ -338,45 +368,23 @@ class Problem(object):
         str
             Unit string.
         """
-        if self._setup_status == 1:
-            proms = self.model._var_allprocs_prom2abs_list
-            meta = self.model._var_abs2meta
-            if name in meta:
-                units = meta[name]['units']
+        meta = self.model._var_allprocs_abs2meta
+        if name in meta:
+            return meta[name]['units']
 
+        proms = self.model._var_allprocs_prom2abs_list
+        if self._setup_status >= 1:
+
+            if name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                return meta[abs_name]['units']
             elif name in proms['input']:
                 # This triggers a check for unconnected non-unique inputs, and
                 # raises the same error as vector access.
                 abs_name = prom_name2abs_name(self.model, name, 'input')
-                units = meta[abs_name]['units']
+                return meta[abs_name]['units']
 
-            elif name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
-                units = meta[abs_name]['units']
-
-            else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
-
-        elif name in self.model._outputs:
-            try:
-                units = self.model._var_abs2meta[name]['units']
-            except KeyError:
-                abs_name = self.model._var_allprocs_prom2abs_list['output'][name][0]
-                units = self.model._var_abs2meta[abs_name]['units']
-
-        elif name in self.model._inputs:
-            try:
-                units = self.model._var_abs2meta[name]['units']
-            except KeyError:
-                abs_name = self.model._var_allprocs_prom2abs_list['input'][name][0]
-                units = self.model._var_abs2meta[abs_name]['units']
-
-        else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
-
-        return units
+        raise KeyError('Variable name "{}" not found.'.format(name))
 
     def __setitem__(self, name, value):
         """
@@ -386,24 +394,35 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        value : float or ndarray or list
+        value : float or ndarray or any python object
             value to set this variable to.
         """
         # Caching only needed if vectors aren't allocated yet.
         if self._setup_status == 1:
             self._initial_condition_cache[name] = value
         else:
-            if self.model._outputs and name in self.model._outputs:
-                self.model._outputs[name] = value
-            elif self.model._discrete_outputs and name in self.model._discrete_outputs:
-                self.model._discrete_outputs[name] = value
-            elif self.model._inputs and name in self.model._inputs:
-                self.model._inputs[name] = value
-            elif self.model._discrete_inputs and name in self.model._discrete_inputs:
-                self.model._discrete_inputs[name] = value
+            all_proms = self.model._var_allprocs_prom2abs_list
+
+            if name in all_proms['output']:
+                abs_name = all_proms['output'][name][0]
+            elif name in all_proms['input']:
+                abs_name = prom_name2abs_name(self.model, name, 'input')
             else:
-                msg = 'Variable name "{}" not found.'
-                raise KeyError(msg.format(name))
+                abs_name = name
+
+            if abs_name in self.model._outputs._views:
+                self.model._outputs[abs_name] = value
+            elif abs_name in self.model._inputs._views:
+                self.model._inputs[abs_name] = value
+            elif abs_name in self.model._discrete_outputs:
+                self.model._discrete_outputs[abs_name] = value
+            elif abs_name in self.model._discrete_inputs:
+                self.model._discrete_inputs[abs_name] = value
+            else:
+                # might be a remote var.  If so, just do nothing on this proc
+                if not (name in all_proms['input'] or name in all_proms['output'] or
+                        name in self.model._var_allprocs_abs2meta):
+                    raise KeyError('Variable name "{}" not found.'.format(name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -426,14 +445,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(units, base_units))
+                msg = "Can't set variable '{}' with units of 'None' to value with units of '{}'."
+                raise TypeError(msg.format(name, units))
 
             try:
                 scale, offset = get_conversion(units, base_units)
             except TypeError:
-                msg = "Incompatible units for conversion: '{}' and '{}'."
-                raise TypeError(msg.format(units, base_units))
+                msg = "Can't set variable '{}' with units of '{}' to value with units of '{}'."
+                raise TypeError(msg.format(name, base_units, units))
 
             value = (value + offset) * scale
 
@@ -801,6 +820,34 @@ class Problem(object):
 
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
                      derivatives)
+
+        # get set of all vars that we may need to bcast later
+        self._remote_var_set = remote_var_set = set()
+        if model_comm.size > 1:
+            for type_ in ('input', 'output'):
+                remote_discrete = set()
+                sizes = self.model._var_sizes['nonlinear'][type_]
+                for i, vname in enumerate(self.model._var_allprocs_abs_names[type_]):
+                    if not np.all(sizes[:, i]):
+                        remote_var_set.add(vname)
+
+                if self.model._var_allprocs_discrete[type_]:
+                    local = list(self.model._var_discrete[type_])
+                    byrank = self.comm.gather(local, root=0)
+                    if model_comm.rank == 0:
+                        full = set()
+                        for names in byrank:
+                            full.update(names)
+
+                        for names in byrank:
+                            diff = full.difference(names)
+                            remote_discrete.update(diff)
+
+                        junk = model_comm.bcast(remote_discrete, root=0)
+                    else:
+                        remote_discrete = model_comm.bcast(None, root=0)
+
+                    remote_var_set.update(remote_discrete)
 
         # Cache all args for final setup.
         self._check = check
@@ -1203,7 +1250,7 @@ class Problem(object):
 
                 # Precedence: component options > global options > defaults
                 if local_wrt in local_opts:
-                    for name in ['form', 'step', 'step_calc']:
+                    for name in ['form', 'step', 'step_calc', 'directional']:
                         value = local_opts[local_wrt][name]
                         if value is not None:
                             fd_options[name] = value
@@ -1220,6 +1267,13 @@ class Problem(object):
             for abs_key, partial in iteritems(approx_jac):
                 rel_key = abs_key2rel_key(comp, abs_key)
                 partials_data[c_name][rel_key][jac_key] = partial
+
+                # If this is a directional derivative, convert the analytic to a directional one.
+                wrt = rel_key[1]
+                if wrt in local_opts and local_opts[wrt]['directional']:
+                    deriv = partials_data[c_name][rel_key]
+                    for key in ['J_fwd', 'J_rev']:
+                        deriv[key] = np.atleast_2d(np.sum(deriv[key], axis=1)).T
 
         # Conversion of defaultdict to dicts
         partials_data = {comp_name: dict(outer) for comp_name, outer in iteritems(partials_data)}
@@ -1750,6 +1804,11 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         for of, wrt in sorted_keys:
 
+            if totals:
+                fd_opts = global_options['']
+            else:
+                fd_opts = global_options[sys_name][wrt]
+
             derivative_info = derivatives[of, wrt]
             forward = derivative_info['J_fwd']
             if not totals:
@@ -1793,6 +1852,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     continue
 
             if not suppress_output:
+                directional = fd_opts.get('directional')
+
                 if compact_print:
                     if totals:
                         if out_stream:
@@ -1831,11 +1892,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             num_bad_jacs += 1
 
                         if out_stream:
+                            if directional:
+                                wrt = "(d)'%s'" % wrt
+                                wrt_padded = pad_name(wrt, max_width_wrt, quotes=False)
+                            else:
+                                wrt_padded = pad_name(wrt, max_width_wrt, quotes=True)
                             if not all_comps_provide_jacs:
                                 deriv_info_line = \
                                     deriv_line.format(
                                         pad_name(of, max_width_of, quotes=True),
-                                        pad_name(wrt, max_width_wrt, quotes=True),
+                                        wrt_padded,
                                         magnitude.forward,
                                         _format_if_not_matrix_free(
                                             system.matrix_free, magnitude.reverse),
@@ -1855,7 +1921,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 deriv_info_line = \
                                     deriv_line.format(
                                         pad_name(of, max_width_of, quotes=True),
-                                        pad_name(wrt, max_width_wrt, quotes=True),
+                                        wrt_padded,
                                         magnitude.forward,
                                         magnitude.fd,
                                         abs_err.forward,
@@ -1868,17 +1934,14 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 worst_subjac_line = deriv_info_line
                 else:  # not compact print
 
-                    if totals:
-                        fd_desc = "{}:{}".format(global_options['']['method'],
-                                                 global_options['']['form'])
-
-                    else:
-                        fd_desc = "{}:{}".format(global_options[sys_name][wrt]['method'],
-                                                 global_options[sys_name][wrt]['form'])
+                    fd_desc = "{}:{}".format(fd_opts['method'], fd_opts['form'])
 
                     # Magnitudes
                     if out_stream:
-                        out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
+                        if directional:
+                            out_buffer.write("  {}: '{}' wrt (d)'{}'\n".format(sys_name, of, wrt))
+                        else:
+                            out_buffer.write("  {}: '{}' wrt '{}'\n".format(sys_name, of, wrt))
                         out_buffer.write('    Forward Magnitude : {:.6e}\n'.format(
                             magnitude.forward))
                     if not totals and system.matrix_free:
@@ -1917,18 +1980,27 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
                     # Raw Derivatives
                     if out_stream:
-                        out_buffer.write('    Raw Forward Derivative (Jfor)\n')
+                        if directional:
+                            out_buffer.write('    Directional Forward Derivative (Jfor)\n')
+                        else:
+                            out_buffer.write('    Raw Forward Derivative (Jfor)\n')
                         out_buffer.write(str(forward) + '\n')
                         out_buffer.write('\n')
 
                     if not totals and system.matrix_free:
                         if out_stream:
-                            out_buffer.write('    Raw Reverse Derivative (Jfor)\n')
+                            if directional:
+                                out_buffer.write('    Directional Reverse Derivative (Jrev)\n')
+                            else:
+                                out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                             out_buffer.write(str(reverse) + '\n')
                             out_buffer.write('\n')
 
                     if out_stream:
-                        out_buffer.write('    Raw FD Derivative (Jfd)\n')
+                        if directional:
+                            out_buffer.write('    Directional FD Derivative (Jfd)\n')
+                        else:
+                            out_buffer.write('    Raw FD Derivative (Jfd)\n')
                         out_buffer.write(str(fd) + '\n')
                         out_buffer.write('\n')
 

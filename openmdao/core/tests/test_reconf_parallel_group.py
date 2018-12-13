@@ -53,12 +53,8 @@ class Test(unittest.TestCase):
         prob['x0'] = 6.
         prob['x1'] = 4.
         prob.run_model()
-        if prob.comm.rank == 0:
-            assert_rel_error(self, prob['C1.z'], 8.0)
-            print(prob['C1.z'])
-        elif prob.comm.rank == 1:
-            assert_rel_error(self, prob['C2.z'], 6.0)
-            print(prob['C2.z'])
+        assert_rel_error(self, prob['C1.z'], 8.0)
+        assert_rel_error(self, prob['C2.z'], 6.0)
 
         # Now, reconfigure so ReconfGroup is not parallel, and x0, x1 should be preserved
         prob.model.g.resetup('reconf')

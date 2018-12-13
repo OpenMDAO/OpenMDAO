@@ -235,6 +235,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.setup()
 
+        model.nonlinear_solver.options['use_apply_nonlinear'] = True
+
         model.d1.add_recorder(self.recorder)  # SellarDis1withDerivatives (an ExplicitComp)
         model.obj_cmp.add_recorder(self.recorder)  # an ExecComp
 
@@ -372,10 +374,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(cr._input2meta['obj_cmp.y1']['explicit'], True)
         self.assertEqual(cr._input2meta['obj_cmp.y2']['explicit'], True)
 
-        self.assertEqual(cr._output2meta['x']['lower'], -1000)
-        self.assertEqual(cr._output2meta['x']['upper'], 1000)
-        self.assertEqual(cr._output2meta['y2']['upper'], None)
-        self.assertEqual(cr._output2meta['y2']['lower'], None)
+        self.assertEqual(cr._output2meta['x']['lower'], -1000.)
+        self.assertEqual(cr._output2meta['x']['upper'], 1000.)
+        self.assertEqual(cr._output2meta['y2']['upper'], 1000.)
+        self.assertEqual(cr._output2meta['y2']['lower'], 0.1)
 
     def test_reading_solver_metadata(self):
         prob = SellarProblem(linear_solver=LinearBlockGS())
@@ -952,7 +954,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         expected_outputs = {
             'd1.y1': {
-                'lower': None,
+                'lower': 0.1,
+                'upper': 1000.,
                 'ref': 1.0,
                 'resids': [1.318e-10],
                 'shape': (1,),
@@ -1923,6 +1926,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model.nonlinear_solver = NewtonSolver()
         model.nonlinear_solver.options['maxiter'] = 3
+        # model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['iprint'] = 2
         model.linear_solver = ScipyKrylov()
 
         ls = model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
@@ -1961,6 +1966,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, c in enumerate(cr.list_cases()):
             case = cr.get_case(c)
+
 
             coord = case.iteration_coordinate
             self.assertEqual(coord, expected[i])
