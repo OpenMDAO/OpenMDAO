@@ -3,6 +3,7 @@ Tools for working with code.
 """
 
 import sys
+import os
 import inspect
 import ast
 import textwrap
@@ -154,7 +155,7 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
             if full is not None:
                 graph.add_edge(parent, full)
                 if full not in seen:
-                    _get_nested_calls(starting_class, klass, f, full, graph, seen)
+                    _get_nested_calls(starting_class, c, f, full, graph, seen)
 
 
 def get_nested_calls(class_, method_name, stream=sys.stdout):
@@ -224,6 +225,8 @@ def _calltree_exec(options):
     class_name = parts[-2]
     func_name = parts[-1]
     modpath = '.'.join(parts[:-2])
+
+    sys.path.append(os.getcwd())
 
     mod = importlib.import_module(modpath)
     klass = getattr(mod, class_name)
