@@ -1,6 +1,6 @@
 """Define the CSCmatrix class."""
 
-from scipy.sparse import coo_matrix
+from scipy.sparse import csc_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix
 
@@ -38,5 +38,9 @@ class CSCMatrix(COOMatrix):
         """
         Do anything that needs to be done at the end of AssembledJacobian._update.
         """
+        coo = self._coo
         # this will add any repeated entries together
-        self._matrix = self._coo.tocsc()
+        # NOTE: this form of the ctor was used instead of self._coo.tocsc() because
+        # on older versions of scipy the row/col arrays are reused and the result is
+        # that self._coo.row and self._coo.col get scrambled after csc conversion.
+        self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)

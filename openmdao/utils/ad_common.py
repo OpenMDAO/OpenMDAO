@@ -1,3 +1,7 @@
+"""
+Routines common to both autograd and tangent.
+"""
+
 from __future__ import print_function, division
 
 import sys
@@ -9,6 +13,7 @@ import numpy as np
 
 from openmdao.utils.ad_autograd import _get_autograd_ad_func, _get_autograd_ad_jac
 from openmdao.utils.ad_tangent import _get_tangent_ad_func, _get_tangent_ad_jac
+from openmdao.utils.general_utils import get_module_attr
 from numpy.testing import assert_almost_equal
 from openmdao.core.problem import Problem
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
@@ -28,7 +33,7 @@ def _ad_setup_parser(parser):
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Output file name. By default, output goes to stdout.')
     parser.add_argument('--noopt', action='store_true', dest='noopt',
-                        help="Turn off optimization.")
+                        help="Turn off optimization. (tangent only)")
     parser.add_argument('-m', '--method', default='tangent', action='store', dest='ad_method',
                         help='AD method (autograd, tangent).')
     parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
@@ -39,7 +44,7 @@ def _ad_setup_parser(parser):
 
 def _ad_exec(options):
     """
-    Process command line args and perform postprocessing on the specified memory dump file.
+    Process command line args and perform AD.
     """
     if options.file:
         from openmdao.utils.om import _post_setup_exec
@@ -49,55 +54,80 @@ def _ad_exec(options):
         _ad(None, options)
 
 
-def _get_class(classpath):
-    modpath, cname = classpath.rsplit('.', 1)
-    importlib.import_module(modpath)
-    mod = sys.modules[modpath]
-    return getattr(mod, cname)
-
-
-def _comp_iter(classes, prob):
+def _create_and_check_partials(prob, classes):
     """
+    Creates instances of the given classes and checks their partials.
+
+    Parameters
+    ----------
+    prob : Problem
+        The problem object.
+    classes : list of str
+        List of class names (full module path).
+
+    Yields
+    ------
+    object
+        Instance of specified class.
+    dict
+        Dictionary returned from check_partials.
     """
-    if all(['.' in cpath for cpath in classes]) and classes:
-        insts = [_get_class(cpath)() for cpath in classes]
-        for obj in insts:
-            prob.model.add_subsystem(obj.__class__.__name__.lower() + '_', obj)
+    insts = [get_module_attr(cpath)() for cpath in classes]
+    for obj in insts:
+        prob.model.add_subsystem(obj.__class__.__name__.lower() + '_', obj)
 
-        prob.setup()
-        prob.run_model()
-        invec = prob.model._inputs._data
-        invec[:] = np.random.random(invec.size)
+    prob.setup()
+    prob.run_model()
+    invec = prob.model._inputs._data
+    invec[:] = np.random.random(invec.size)
 
-        print("\nChecking partials:")
-        check_dct = prob.check_partials(out_stream=None)
-        prob.run_model()
+    print("\nChecking partials:")
+    check_dct = prob.check_partials(out_stream=None)
+    prob.run_model()
 
-        for obj in insts:
-            print("\nClass:", obj.__class__.__name__)
-            yield obj, check_dct
+    for obj in insts:
+        print("\nClass:", obj.__class__.__name__)
+        yield obj, check_dct
 
-    else:  # find an instance of each Component class in the model
-        prob.run_model()
-        print("\nChecking partials:")
-        check_dct = prob.check_partials(out_stream=None)
-        prob.run_model()
-        seen = set(('IndepVarComp', 'ExecComp'))
-        for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
-            cname = s.__class__.__name__
-            if cname not in seen and (cname in classes or not classes):
-                seen.add(cname)
-                print("\nClass:", cname)
-                print("Instance:", s.pathname)
-                yield s, check_dct
+def _find_and_check_partials(prob, classes):
+    """
+    Finds instances of the given classes in the problem and checks their partials.
 
-            if classes and (len(seen) == len(classes) + 2):
-                break
+    Parameters
+    ----------
+    prob : Problem
+        The problem object.
+    classes : list of str
+        List of class names.
 
-        not_found = classes - seen
-        if not_found:
-            raise RuntimeError("Couldn't find an instance of the following classes: %s." %
-                                not_found)
+    Yields
+    ------
+    object
+        Instance of specified class.
+    dict
+        Dictionary returned from check_partials.
+    """
+    prob.run_model()
+    print("\nChecking partials:")
+    check_dct = prob.check_partials(out_stream=None)
+    prob.run_model()
+    seen = set(('IndepVarComp', 'ExecComp'))
+    for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
+        cname = s.__class__.__name__
+        if cname not in seen and (cname in classes or not classes):
+            seen.add(cname)
+            print("\nClass:", cname)
+            print("Instance:", s.pathname)
+            yield s, check_dct
+
+        # if we've found an instance of each class we're looking for, we're done.
+        if classes and (len(seen) == len(classes) + 2):
+            break
+
+    not_found = classes - seen
+    if not_found:
+        raise RuntimeError("Couldn't find an instance of the following classes: %s." %
+                            not_found)
 
 
 def _ad(prob, options):
@@ -116,9 +146,14 @@ def _ad(prob, options):
     if prob is None:
         prob = Problem()
 
+    if classes and all(['.' in cpath for cpath in classes]):
+        it = _create_and_check_partials
+    else:
+        it = _find_and_check_partials
+
     summary = {}
 
-    for s, check_dct in _comp_iter(classes, prob):
+    for s, check_dct in it(prob, classes):
 
         summary[s.__class__.__name__] = summ = {}
 

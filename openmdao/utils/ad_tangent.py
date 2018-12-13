@@ -18,13 +18,13 @@ from inspect import signature, getsourcelines, getsource, getmodule
 from collections import OrderedDict, defaultdict
 import inspect
 from os import remove
-from importlib import import_module, invalidate_caches
+import importlib
 import types
 import time
 import numpy as np
 import ast
 import astunparse
-from six import itervalues, iteritems
+from six import itervalues, iteritems, PY3
 from itertools import chain
 
 from openmdao.vectors.default_vector import Vector, DefaultVector
@@ -168,8 +168,9 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
         f.write("import tangent\n")
         f.write(src)
 
-    invalidate_caches()  # need this to recognize dynamically created modules
-    import_module(temp_mod_name)
+    if PY3:
+        importlib.invalidate_caches()  # need this to recognize dynamically created modules
+    importlib.import_module(temp_mod_name)
     mod = sys.modules[temp_mod_name]
 
     if isinstance(comp, ExplicitComponent):
@@ -205,8 +206,9 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
         f.write("import tangent\n")
         f.write(deriv_src)
 
-    invalidate_caches()  # need this to recognize dynamically created modules
-    import_module(deriv_mod_name)
+    if PY3:
+        importlib.invalidate_caches()  # need this to recognize dynamically created modules
+    importlib.import_module(deriv_mod_name)
     mod = sys.modules[deriv_mod_name]
     sys.path = sys.path[:-1]
 

@@ -3,17 +3,17 @@ Automatic differentiation functions using the autograd package.
 """
 
 import sys
-from inspect import signature, getsourcelines, getsource, getmodule
-from collections import OrderedDict, defaultdict
+from six import itervalues, iteritems, PY2
 import inspect
+from inspect import getsourcelines, getsource, getmodule
+from collections import OrderedDict, defaultdict
 from os import remove
-from importlib import import_module, invalidate_caches
+from importlib import import_module
 import types
 import time
 import numpy as np
 import ast
 import astunparse
-from six import itervalues, iteritems
 from itertools import chain
 
 from openmdao.utils.general_utils import str2valid_python_name, unique_name
@@ -24,20 +24,23 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
     StringSubscriptVisitor, transform_ast_slices
 
-import autograd.numpy as agnp
-from autograd import make_jvp, make_vjp, jacobian
-from autograd.differential_operators import make_jvp_reversemode
-from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, \
-    DictVSpace, container_take
+try:
+    import autograd.numpy as agnp
+    from autograd import make_jvp, make_vjp, jacobian
+    from autograd.differential_operators import make_jvp_reversemode
+    from autograd.builtins import tuple as agtuple, list as aglist, dict as agdict, DictBox, \
+        DictVSpace, container_take
+except ImportError:
+    agnp = make_jvp = make_vjp = jacobian = make_jvp_reversemode = agtuple = aglist = agdict = None
+    DictBox = DictVSpace = container_take = None
+else:
+    class _VectorBox(DictBox):
+        def get_slice(self, slc): return container_take(self._value._data, slc)
 
 
-class _VectorBox(DictBox):
-    def get_slice(self, slc): return container_take(self._value._data, slc)
-
-
-_VectorBox.register(Vector)
-_VectorBox.register(DefaultVector)
-_VectorBox.register(PETScVector)
+    _VectorBox.register(Vector)
+    _VectorBox.register(DefaultVector)
+    _VectorBox.register(PETScVector)
 
 
 def _get_arg_replacement_map(comp):
@@ -61,7 +64,10 @@ def _get_arg_replacement_map(comp):
     else:
         compute_method = comp.apply_nonlinear
 
-    params = list(signature(compute_method).parameters)
+    if PY2:
+        params = list(inspect.getargspec(compute_method).args)
+    else:
+        params = list(inspect.signature(compute_method).parameters)
 
     # lists of local names of inputs and outputs (and maybe resids) to code generate
     pnames = []
@@ -180,7 +186,7 @@ def translate_compute_source_autograd(comp, mode):
                 end += val.size
                 if isinstance(val, np.ndarray) and len(val.shape) > 1:
                     pre_lines.append('    %s = %s[%d:%d].reshape(%s)' %
-                                    (mapping["%s['%s']" % (pname, n)], vecname, start, end,
+                                     (mapping["%s['%s']" % (pname, n)], vecname, start, end,
                                      val.shape))
                 else:
                     pre_lines.append('    %s = %s[%d:%d]' % (mapping["%s['%s']" % (pname, n)],
