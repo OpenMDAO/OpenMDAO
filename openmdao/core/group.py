@@ -759,8 +759,6 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        super(Group, self)._setup_global_connections()
-
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
