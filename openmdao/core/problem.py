@@ -661,8 +661,6 @@ class Problem(object):
 
         self._rec_mgr.startup(self)
 
-        record_viewer_data(self)
-
     def add_recorder(self, recorder):
         """
         Add a recorder to the problem.
@@ -868,7 +866,9 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        response_size, desvar_size = self.driver._update_voi_meta(self.model)
+        driver = self.driver
+
+        response_size, desvar_size = driver._update_voi_meta(self.model)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
@@ -881,9 +881,9 @@ class Problem(object):
             self.model._final_setup(self.comm, 'full',
                                     force_alloc_complex=self._force_alloc_complex)
 
-        self.driver._setup_driver(self)
+        driver._setup_driver(self)
 
-        coloring_info = self.driver._simul_coloring_info
+        coloring_info = driver._simul_coloring_info
         if coloring_info and coloring._use_sparsity:
             # if we're using simultaneous derivatives then our effective size is less
             # than the full size
@@ -906,7 +906,11 @@ class Problem(object):
                            "(objectives and nonlinear constraints)." %
                            (mode, desvar_size, response_size), RuntimeWarning)
 
-        self._setup_recording()
+        # we only want to set up recording once
+        if self._setup_status == 1:
+            driver._setup_recording()
+            self._setup_recording()
+            record_viewer_data(self)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
