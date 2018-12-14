@@ -130,7 +130,7 @@ class Case(object):
                 inputs = json_to_np_array(data['inputs'], abs2meta)
             elif data_format in (1, 2):
                 inputs = blob_to_array(data['inputs'])
-                if str(inputs) == 'None':
+                if not inputs:
                     inputs = None
             else:
                 inputs = data['inputs']
@@ -142,7 +142,7 @@ class Case(object):
                 outputs = json_to_np_array(data['outputs'], abs2meta)
             elif self._format_version in (1, 2):
                 outputs = blob_to_array(data['outputs'])
-                if str(outputs) == 'None':
+                if not outputs:
                     outputs = None
             else:
                 outputs = data['outputs']
@@ -154,7 +154,7 @@ class Case(object):
                 residuals = json_to_np_array(data['residuals'], abs2meta)
             elif data_format in (1, 2):
                 residuals = blob_to_array(data['residuals'])
-                if str(residuals) == 'None':
+                if not residuals:
                     residuals = None
             else:
                 residuals = data['residuals']
@@ -164,7 +164,7 @@ class Case(object):
         if 'jacobian' in data.keys():
             if data_format >= 2:
                 jacobian = blob_to_array(data['jacobian'])
-                if str(jacobian) == 'None':
+                if not jacobian:
                     jacobian = None
             else:
                 jacobian = data['jacobian']

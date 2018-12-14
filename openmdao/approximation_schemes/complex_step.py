@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import simple_warning
 DEFAULT_CS_OPTIONS = {
     'step': 1e-40,
     'form': 'forward',
+    'directional': False,
 }
 
 _full_slice = slice(None)
@@ -81,11 +82,11 @@ class ComplexStep(ApproximationScheme):
         Returns
         -------
         tuple(str, str, float)
-            Sorting key (wrt, form, step_size)
+            Sorting key (wrt, form, step_size, directional)
 
         """
         options = approx_tuple[2]
-        return (approx_tuple[1], options['form'], options['step'])
+        return (approx_tuple[1], options['form'], options['step'], options['directional'])
 
     def _init_approximations(self, system):
         """
@@ -111,7 +112,7 @@ class ComplexStep(ApproximationScheme):
 
         self._approx_groups = [None] * len(approx_groups)
         for i, (key, approx) in enumerate(approx_groups):
-            wrt, form, delta = key
+            wrt, form, delta, directional = key
             if form == 'reverse':
                 delta *= -1.0
             fact = 1.0 / delta
@@ -125,6 +126,12 @@ class ComplexStep(ApproximationScheme):
                 in_idx = range(in_size)
 
             outputs = []
+
+            # Directional derivatives for quick partial checking.
+            # We place the indices in a list so that they are all stepped at the same time.
+            if directional:
+                in_idx = [in_idx]
+                in_size = 1
 
             for approx_tuple in approx:
                 of = approx_tuple[0]
@@ -153,6 +160,9 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
+        if len(self._exec_list) == 0:
+            return
+
         if system.under_complex_step:
 
             # If we are nested under another complex step, then warn and swap to FD.
@@ -167,9 +177,6 @@ class ComplexStep(ApproximationScheme):
                     fd.add_approximation(item[0:2], {})
 
             self._fd.compute_approximations(system, jac, total=total)
-            return
-
-        if len(self._exec_list) == 0:
             return
 
         if total:
