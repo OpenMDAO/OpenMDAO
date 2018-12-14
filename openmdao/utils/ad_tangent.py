@@ -97,7 +97,7 @@ def _translate_compute_source(comp, verbose=0):
     """
     Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
-    Converts  def compute(self, inputs, outputs) by adding an appropriate return line and
+    Converts def compute(self, inputs, outputs) by adding an appropriate return line and
     converting literal slices to slice() calls.
 
     Parameters
@@ -189,12 +189,31 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
     deriv_mod_name = temp_mod_name + '_deriv_'
     deriv_file_name = deriv_mod_name + '.py'
 
+    # actual tangent generated deriv file (might contain more than one function)
+    lines = open(deriv_func.__code__.co_filename, 'r').readlines()
+
     # now put 'self' back in the arg list
-    lines = getsourcelines(deriv_func)[0]
+    # lines = getsourcelines(deriv_func)[0]
+    # funcs = set()
+    nreplaced = 0
     for i, line in enumerate(lines):
-        if line.lstrip().startswith('def '):
-            lines[i] = line.replace('(', '(self,')
-    deriv_src = '\n'.join(lines)
+        lstrip = line.lstrip()
+        if lstrip.startswith('def '):
+            if nreplaced == 0:  # top level function. we'll replace other funcs (and calls to them) later
+                lines[i] = line.replace('(', '(self, ')
+                nreplaced += 1
+            # else:
+                # funcs.add(lstrip.split('(', 1)[0].rsplit()[-1])
+
+    deriv_src = ''.join(lines)
+
+    #if funcs:
+        ## we need to add a self arg whenever a deriv function (other than the first one)
+        ## is called.
+        #funcs = set([' %s(' % f for f in funcs])  # modify funcnames for easier replace
+        ## should always be a space before funcname because it's in ANF
+        #for f in funcs:
+            #deriv_src = deriv_src.replace(f, ' %sself, ' % f)
 
     # write the derivative func into a module file so that tracebacks will show us the
     # correct line of source where the problem occurred, and allow us to step into the
