@@ -318,19 +318,19 @@ class Driver(object):
             if MPI:
                 mydesvars = [n for n in all_desvars if rrank == rowned[n]]
             else:
-                mydesvars = all_desvars
+                mydesvars = list(all_desvars)
 
         if recording_options['record_objectives']:
             if MPI:
                 myobjectives = [n for n in all_objectives if rrank == rowned[n]]
             else:
-                myobjectives = all_objectives
+                myobjectives = list(all_objectives)
 
         if recording_options['record_constraints']:
             if MPI:
                 myconstraints = [n for n in all_constraints if rrank == rowned[n]]
             else:
-                myconstraints = all_constraints
+                myconstraints = list(all_constraints)
 
         filtered_vars_to_record = {
             'des': mydesvars,
@@ -348,7 +348,7 @@ class Driver(object):
                 if MPI:
                     myresponses = [n for n in myresponses if rrank == rowned[n]]
 
-            filtered_vars_to_record['res'] = myresponses
+            filtered_vars_to_record['res'] = list(myresponses)
 
         # inputs (if in options)
         if 'record_inputs' in recording_options:
@@ -365,9 +365,9 @@ class Driver(object):
                         for d in all_vars[:-1]:
                             myinputs.update(d)
 
-                    myinputs = set([n for n in myinputs if rrank == rowned[n]])
+                    myinputs = [n for n in myinputs if rrank == rowned[n]]
 
-            filtered_vars_to_record['in'] = myinputs
+            filtered_vars_to_record['in'] = list(myinputs)
 
         # system outputs (if the options being processed are for the driver itself)
         if recording_options is self.recording_options:
@@ -390,7 +390,7 @@ class Driver(object):
                 if MPI:
                     myoutputs = [n for n in myoutputs if rrank == rowned[n]]
 
-            filtered_vars_to_record['sys'] = myoutputs
+            filtered_vars_to_record['sys'] = list(myoutputs)
 
         return filtered_vars_to_record
 
@@ -401,8 +401,6 @@ class Driver(object):
         self._filtered_vars_to_record = self._get_vars_to_record(self.recording_options)
 
         self._rec_mgr.startup(self)
-
-        print(self.__class__.__name__, 'recorders:', self._rec_mgr._recorders)
 
         # record the system metadata to the recorders attached to this Driver
         if self.recording_options['record_model_metadata']:

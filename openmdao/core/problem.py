@@ -841,7 +841,7 @@ class Problem(object):
                            "(objectives and nonlinear constraints)." %
                            (mode, desvar_size, response_size), RuntimeWarning)
 
-        # we only want to set up recording once
+        # we only want to set up recording once, after problem setup
         if self._setup_status == 1:
             driver._setup_recording()
             self._setup_recording()
