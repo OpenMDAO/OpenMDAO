@@ -305,7 +305,6 @@ class Driver(object):
         mydesvars = myobjectives = myconstraints = set()
 
         if recording_options['record_desvars']:
-            print('recording desvars', recording_options['record_desvars'])
             if MPI:
                 mydesvars = [n for n in all_desvars if rrank == rowned[n]]
             else:
@@ -328,10 +327,6 @@ class Driver(object):
             'obj': myobjectives,
             'con': myconstraints
         }
-
-        if recording_options is self.recording_options:
-            from pprint import pprint
-            pprint(filtered_vars_to_record)
 
         # responses (if in options)
         if 'record_responses' in recording_options:
@@ -379,15 +374,13 @@ class Driver(object):
                         for d in all_vars[:-1]:
                             myoutputs.update(d)
 
-                    # de-duplicate
-                    myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
+                # de-duplicate
+                myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
 
+                if MPI:
                     myoutputs = [n for n in myoutputs if rrank == rowned[n]]
 
             filtered_vars_to_record['sys'] = myoutputs
-
-        if recording_options is self.recording_options:
-            pprint(filtered_vars_to_record)
 
         return filtered_vars_to_record
 
