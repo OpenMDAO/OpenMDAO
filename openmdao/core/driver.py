@@ -278,109 +278,132 @@ class Driver(object):
                 self.supports['simultaneous_derivatives']):
             self._setup_simul_coloring()
 
-    def _setup_recording(self):
+    def _get_vars_to_record(self, recording_options):
         """
-        Set up case recording.
+        Get variables to record based on recording options.
         """
         problem = self._problem
         model = problem.model
 
-        mydesvars = myobjectives = myconstraints = myresponses = set()
-        myinputs = set()
-        mysystem_outputs = set()
-
-        incl = self.recording_options['includes']
-        excl = self.recording_options['excludes']
-
-        rec_desvars = self.recording_options['record_desvars']
-        rec_objectives = self.recording_options['record_objectives']
-        rec_constraints = self.recording_options['record_constraints']
-        rec_responses = self.recording_options['record_responses']
-        rec_inputs = self.recording_options['record_inputs']
-
-        all_desvars = {n for n in self._designvars
-                       if check_path(n, incl, excl, True)}
-        all_objectives = {n for n in self._objs
-                          if check_path(n, incl, excl, True)}
-        all_constraints = {n for n in self._cons
-                           if check_path(n, incl, excl, True)}
-        if rec_desvars:
-            mydesvars = all_desvars
-
-        if rec_objectives:
-            myobjectives = all_objectives
-
-        if rec_constraints:
-            myconstraints = all_constraints
-
-        if rec_responses:
-            myresponses = {n for n in self._responses
-                           if check_path(n, incl, excl, True)}
-
-        # get the includes that were requested for this Driver recording
-        if incl:
-            # The my* variables are sets
-
-            # First gather all of the desired outputs
-            # The following might only be the local vars if MPI
-            mysystem_outputs = {n for n in model._outputs
-                                if check_path(n, incl, excl)}
-
-            # If MPI, and on rank 0, need to gather up all the variables
-            #    even those not local to rank 0
-            if MPI:
-                all_vars = model.comm.gather(mysystem_outputs, root=0)
-                if MPI.COMM_WORLD.rank == 0:
-                    mysystem_outputs = all_vars[-1]
-                    for d in all_vars[:-1]:
-                        mysystem_outputs.update(d)
-
-            # de-duplicate mysystem_outputs
-            mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
-                                                           all_constraints)
-
-        if rec_inputs:
-            prob = self._problem
-            root = prob.model
-            myinputs = {n for n in root._inputs
-                        if check_path(n, incl, excl)}
-
-            if MPI:
-                all_vars = root.comm.gather(myinputs, root=0)
-                if MPI.COMM_WORLD.rank == 0:
-                    myinputs = all_vars[-1]
-                    for d in all_vars[:-1]:
-                        myinputs.update(d)
-
-        if MPI:  # filter based on who owns the variables
-            # TODO Eventually, we think we can get rid of this next check. But to be safe,
-            #       we are leaving it in there.
+        if MPI:
+            # TODO: Eventually, we think we can get rid of this next check.
+            #       But to be safe, we are leaving it in there.
             if not model.is_active():
                 raise RuntimeError("RecordingManager.startup should never be called when "
                                    "running in parallel on an inactive System")
             rrank = problem.comm.rank
             rowned = model._owning_rank
-            mydesvars = [n for n in mydesvars if rrank == rowned[n]]
-            myresponses = [n for n in myresponses if rrank == rowned[n]]
-            myobjectives = [n for n in myobjectives if rrank == rowned[n]]
-            myconstraints = [n for n in myconstraints if rrank == rowned[n]]
-            mysystem_outputs = [n for n in mysystem_outputs if rrank == rowned[n]]
-            myinputs = [n for n in myinputs if rrank == rowned[n]]
 
-        self._filtered_vars_to_record = {
+        incl = recording_options['includes']
+        excl = recording_options['excludes']
+
+        all_desvars = {n for n in self._designvars if check_path(n, incl, excl, True)}
+        all_objectives = {n for n in self._objs if check_path(n, incl, excl, True)}
+        all_constraints = {n for n in self._cons if check_path(n, incl, excl, True)}
+
+        # design variables, objectives and constraints are always in the options
+        mydesvars = myobjectives = myconstraints = set()
+
+        if recording_options['record_desvars']:
+            print('recording desvars', recording_options['record_desvars'])
+            if MPI:
+                mydesvars = [n for n in all_desvars if rrank == rowned[n]]
+            else:
+                mydesvars = all_desvars
+
+        if recording_options['record_objectives']:
+            if MPI:
+                myobjectives = [n for n in all_objectives if rrank == rowned[n]]
+            else:
+                myobjectives = all_objectives
+
+        if recording_options['record_constraints']:
+            if MPI:
+                myconstraints = [n for n in all_constraints if rrank == rowned[n]]
+            else:
+                myconstraints = all_constraints
+
+        filtered_vars_to_record = {
             'des': mydesvars,
             'obj': myobjectives,
-            'con': myconstraints,
-            'res': myresponses,
-            'sys': mysystem_outputs,
-            'in': myinputs
+            'con': myconstraints
         }
+
+        if recording_options is self.recording_options:
+            from pprint import pprint
+            pprint(filtered_vars_to_record)
+
+        # responses (if in options)
+        if 'record_responses' in recording_options:
+            myresponses = set()
+
+            if recording_options['record_responses']:
+                myresponses = {n for n in self._responses if check_path(n, incl, excl, True)}
+
+                if MPI:
+                    myresponses = [n for n in myresponses if rrank == rowned[n]]
+
+            filtered_vars_to_record['res'] = myresponses
+
+        # inputs (if in options)
+        if 'record_inputs' in recording_options:
+            myinputs = set()
+
+            if recording_options['record_inputs']:
+                myinputs = {n for n in model._inputs if check_path(n, incl, excl)}
+
+                if MPI:
+                    # gather the variables from all ranks to rank 0
+                    all_vars = model.comm.gather(myinputs, root=0)
+                    if MPI.COMM_WORLD.rank == 0:
+                        myinputs = all_vars[-1]
+                        for d in all_vars[:-1]:
+                            myinputs.update(d)
+
+                    myinputs = set([n for n in myinputs if rrank == rowned[n]])
+
+            filtered_vars_to_record['in'] = myinputs
+
+        # system outputs (if the options being processed are for the driver itself)
+        if recording_options is self.recording_options:
+            myoutputs = set()
+
+            if incl:
+                myoutputs = {n for n in model._outputs if check_path(n, incl, excl)}
+
+                if MPI:
+                    # gather the variables from all ranks to rank 0
+                    all_vars = model.comm.gather(myoutputs, root=0)
+                    if MPI.COMM_WORLD.rank == 0:
+                        myoutputs = all_vars[-1]
+                        for d in all_vars[:-1]:
+                            myoutputs.update(d)
+
+                    # de-duplicate
+                    myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
+
+                    myoutputs = [n for n in myoutputs if rrank == rowned[n]]
+
+            filtered_vars_to_record['sys'] = myoutputs
+
+        if recording_options is self.recording_options:
+            pprint(filtered_vars_to_record)
+
+        return filtered_vars_to_record
+
+    def _setup_recording(self):
+        """
+        Set up case recording.
+        """
+        self._filtered_vars_to_record = self._get_vars_to_record(self.recording_options)
 
         self._rec_mgr.startup(self)
 
-        # Also record the system metadata to the recorders attached to this Driver
+        print(self.__class__.__name__, 'recorders:', self._rec_mgr._recorders)
+
+        # record the system metadata to the recorders attached to this Driver
         if self.recording_options['record_model_metadata']:
-            for sub in model.system_iter(recurse=True, include_self=True):
+            for sub in self._problem.model.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
 
     def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
