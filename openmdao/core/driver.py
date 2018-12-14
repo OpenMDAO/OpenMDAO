@@ -281,6 +281,16 @@ class Driver(object):
     def _get_vars_to_record(self, recording_options):
         """
         Get variables to record based on recording options.
+
+        Parameters
+        ----------
+        recording_options : <OptionsDictionary>
+            Dictionary with recording options.
+
+        Returns
+        -------
+        dict
+           Dictionary containing lists of variables to record.
         """
         problem = self._problem
         model = problem.model
