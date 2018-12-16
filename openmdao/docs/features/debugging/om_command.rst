@@ -26,6 +26,10 @@ for example, for :code:`tree`, follow the command with a *-h*.  For example:
 .. embed-shell-cmd::
     :cmd: openmdao tree -h
 
+.. note::
+    Several of the example commands below make use of a file :code:`circuit.py`. This file is located in the
+    openmdao/test_suite/scripts directory.
+
 
 Post-setup Commands
 -------------------
@@ -71,7 +75,7 @@ viewable in a browser, for example:
 
 .. code-block:: none
 
-    openmdao view_model circuit_example.py
+    openmdao view_model circuit.py
 
 
 will generate an :math:`N^2` diagram like the one below.
