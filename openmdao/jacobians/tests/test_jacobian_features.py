@@ -6,7 +6,11 @@ import scipy as sp
 import itertools
 
 from six import iteritems
-from parameterized import parameterized
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 from openmdao.api import IndepVarComp, Group, Problem, ExplicitComponent, \
                          ScipyKrylov, DirectSolver

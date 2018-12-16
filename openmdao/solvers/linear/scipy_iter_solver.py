@@ -2,7 +2,9 @@
 
 from __future__ import division, print_function
 
+from distutils.version import LooseVersion
 import numpy as np
+import scipy
 from scipy.sparse.linalg import LinearOperator, gmres
 
 from openmdao.solvers.solver import LinearSolver
@@ -190,15 +192,6 @@ class ScipyKrylov(LinearSolver):
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
-
-        Returns
-        -------
-        boolean
-            Failure flag; True if failed to converge, False is successful.
-        float
-            absolute error.
-        float
-            relative error.
         """
         self._vec_names = vec_names
         self._rel_systems = rel_systems
@@ -240,9 +233,14 @@ class ScipyKrylov(LinearSolver):
 
             self._iter_count = 0
             if solver is gmres:
-                x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                 callback=self._monitor)
+                if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
+                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                                     x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                     callback=self._monitor)
+                else:
+                    x, info = solver(linop, b_vec._data.copy(), M=M, restart=restart,
+                                     x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                     callback=self._monitor)
             else:
                 x, info = solver(linop, b_vec._data.copy(), M=M,
                                  x0=x_vec_combined, maxiter=maxiter, tol=atol,
@@ -250,10 +248,6 @@ class ScipyKrylov(LinearSolver):
 
             fail |= (info != 0)
             x_vec._data[:] = x
-
-        # TODO: implement this properly
-
-        return fail, 0., 0.
 
     def _apply_precon(self, in_vec):
         """

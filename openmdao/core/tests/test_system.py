@@ -3,12 +3,10 @@
 import unittest
 from six import assertRaisesRegex
 
-import warnings
-
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 class TestSystem(unittest.TestCase):
@@ -213,47 +211,27 @@ class TestSystem(unittest.TestCase):
 
         model = Group()
 
-        # check nl_solver setter
-        with warnings.catch_warnings(record=True) as w:
+        # check nl_solver setter & getter
+        msg = "The 'nl_solver' attribute provides backwards compatibility " \
+              "with OpenMDAO 1.x ; use 'nonlinear_solver' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             model.nl_solver = DummySolver()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'nl_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
-
-        # check nl_solver getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             solver = model.nl_solver
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'nl_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'nonlinear_solver' instead.")
 
         self.assertTrue(isinstance(solver, DummySolver))
 
-        # check ln_solver setter
-        with warnings.catch_warnings(record=True) as w:
+        # check ln_solver setter & getter
+        msg = "The 'ln_solver' attribute provides backwards compatibility " \
+              "with OpenMDAO 1.x ; use 'linear_solver' instead."
+
+        with assert_warning(DeprecationWarning, msg):
             model.ln_solver = DummySolver()
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'ln_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
-
-        # check ln_solver getter
-        with warnings.catch_warnings(record=True) as w:
+        with assert_warning(DeprecationWarning, msg):
             solver = model.ln_solver
-
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'ln_solver' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linear_solver' instead.")
 
         self.assertTrue(isinstance(solver, DummySolver))
 
@@ -265,14 +243,11 @@ class TestSystem(unittest.TestCase):
         prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
         prob.model.add_subsystem('double', VectorDoublingComp())
 
-        with warnings.catch_warnings(record=True) as w:
-            prob.model.double.metadata['size'] = 3
+        msg = "The 'metadata' attribute provides backwards compatibility " \
+              "with earlier version of OpenMDAO; use 'options' instead."
 
-        self.assertEqual(len(w), 1)
-        self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-        self.assertEqual(str(w[0].message),
-                         "The 'metadata' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use 'options' instead.")
+        with assert_warning(DeprecationWarning, msg):
+            prob.model.double.metadata['size'] = 3
 
         prob.model.connect('inputs.x', 'double.x')
         prob.setup()

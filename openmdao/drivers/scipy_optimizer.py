@@ -30,7 +30,7 @@ _hessian_optimizers = ['trust-constr', 'trust-ncg']
 # TODO, add 'trust-constr' to bounds optimizers, when SciPy issue #9043 is resolved
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
 _constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
-_constraint_grad_optimizers = ['SLSQP']
+_constraint_grad_optimizers = ['SLSQP', 'trust-constr']
 _eq_constraint_optimizers = ['SLSQP', 'trust-constr']
 
 # These require Hessian or Hessian-vector product, so they are not supported
@@ -82,6 +82,10 @@ class ScipyOptimizeDriver(Driver):
     _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
+    _dvlist : list
+        Copy of _designvars.
+    _lincongrad_cache : np.ndarray
+        Pre-calculated gradients of linear constraints.
     """
 
     def __init__(self, **kwargs):
@@ -115,6 +119,8 @@ class ScipyOptimizeDriver(Driver):
         self._con_cache = None
         self._con_idx = {}
         self._obj_and_nlcons = None
+        self._dvlist = None
+        self._lincongrad_cache = None
         self.fail = False
         self.iter_count = 0
         self._exc_info = None
@@ -192,6 +198,7 @@ class ScipyOptimizeDriver(Driver):
                     d['adder'] = None
                     d['scaler'] = None
                     d['size'] = meta['size']
+                    d['linear'] = True
                     self._cons[name] = d
 
     def run(self):
@@ -297,7 +304,7 @@ class ScipyOptimizeDriver(Driver):
                         ub = upper
                     # Loop over every index separately,
                     # because scipy calls each constraint by index.
-                    for j in range(0, size):
+                    for j in range(size):
                         # Double-sided constraints are accepted by the algorithm
                         args = [name, False, j]
                         # TODO linear constraint if meta['linear']
@@ -309,7 +316,7 @@ class ScipyOptimizeDriver(Driver):
                 else:  # Type of constraints is list of dict
                     # Loop over every index separately,
                     # because scipy calls each constraint by index.
-                    for j in range(0, size):
+                    for j in range(size):
                         con_dict = {}
                         if meta['equals'] is not None:
                             con_dict['type'] = 'eq'
@@ -352,9 +359,14 @@ class ScipyOptimizeDriver(Driver):
         else:
             jac = None
 
+        # Hessian calculation method for optimizers, which require it
         if opt in _hessian_optimizers:
-            from scipy.optimize import BFGS  # FIXME temporary, should be option. (P.O.)
-            hess = BFGS()
+            if 'hess' in self.opt_settings:
+                hess = self.opt_settings.pop('hess')
+            else:
+                # Defaults to BFGS, if not in opt_settings
+                from scipy.optimize import BFGS
+                hess = BFGS()
         else:
             hess = None
 
@@ -439,7 +451,7 @@ class ScipyOptimizeDriver(Driver):
                 model._solve_nonlinear()
 
             # Get the objective function evaluations
-            for name, obj in iteritems(self.get_objective_values()):
+            for obj in itervalues(self.get_objective_values()):
                 f_new = obj
                 break
 
@@ -456,6 +468,28 @@ class ScipyOptimizeDriver(Driver):
         return f_new
 
     def _con_val_func(self, x_new, name, dbl, idx):
+        """
+        Return the value of the constraint function requested in args.
+
+        The lower or upper bound is **not** subtracted from the value. Used for optimizers,
+        which take the bounds of the constraints (e.g. trust-constr)
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing parameter values at new design point.
+        name : string
+            Name of the constraint to be evaluated.
+        dbl : bool
+            True if double sided constraint.
+        idx : float
+            Contains index into the constraint array.
+
+        Returns
+        -------
+        float
+            Value of the constraint function.
+        """
         return self._con_cache[name][idx]
 
     def _confunc(self, x_new, name, dbl, idx):

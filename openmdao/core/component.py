@@ -2,7 +2,7 @@
 
 from __future__ import division
 
-from collections import OrderedDict, Iterable
+from collections import OrderedDict, Iterable, Counter
 from itertools import product
 from six import string_types, iteritems
 
@@ -31,7 +31,7 @@ _supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size'),
+    'input': ('units', 'shape', 'size', 'distributed'),
     'output': ('units', 'shape', 'size',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
 }
@@ -276,7 +276,7 @@ class Component(System):
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
         else:
-            self._discrete_inputs = self._discrete_outputs = None
+            self._discrete_inputs = self._discrete_outputs = ()
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -434,6 +434,7 @@ class Component(System):
 
         metadata['units'] = units
         metadata['desc'] = desc
+        metadata['distributed'] = self.options['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -684,7 +685,6 @@ class Component(System):
             'desc': desc
         }
 
-        # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
         else:
@@ -797,6 +797,15 @@ class Component(System):
             if (rows is None) ^ (cols is None):
                 raise ValueError('If one of rows/cols is specified, then both must be specified')
 
+            if rows is not None:
+                # check for repeated rows/cols indices
+                idxset = set(zip(rows, cols))
+                if len(rows) - len(idxset) > 0:
+                    dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
+                    raise RuntimeError("%s: declare_partials has been called with rows and cols "
+                                       "that specify the following duplicate subjacobian entries: "
+                                       "%s." % (self.pathname, sorted(dups)))
+
             self._declared_partials.append((of, wrt, dependent, rows, cols, val))
 
         # Approximation of the derivative, former API call approx_partials.
@@ -831,7 +840,8 @@ class Component(System):
 
             self._approximated_partials.append((of, wrt, method, kwargs))
 
-    def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None):
+    def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
+                                  directional=False):
         """
         Set options that will be used for checking partial derivatives.
 
@@ -852,6 +862,9 @@ class Component(System):
         step_calc : str
             Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
             relative.  Leave undeclared to keep unchanged from previous or default value.
+        directional : bool
+            Set to True to perform a single directional derivative for each vector variable in the
+            pattern named in wrt.
         """
         supported_methods = ('fd', 'cs')
         if method not in supported_methods:
@@ -872,8 +885,14 @@ class Component(System):
                   "of '{}' was provided."
             raise ValueError(msg.format(type(wrt).__name__))
 
+        if not isinstance(directional, bool):
+            msg = "The value of 'directional' must be True or False, but a type " \
+                  "of '{}' was provided."
+            raise ValueError(msg.format(type(directional).__name__))
+
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        self._declared_partial_checks.append((wrt_list, method, form, step, step_calc))
+        self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
+                                              directional))
 
     def _get_check_partial_options(self):
         """
@@ -892,7 +911,7 @@ class Component(System):
 
         invalid_wrt = []
 
-        for wrt_list, method, form, step, step_calc in self._declared_partial_checks:
+        for wrt_list, method, form, step, step_calc, directional in self._declared_partial_checks:
             for pattern in wrt_list:
                 matches = find_matches(pattern, outs + ins)
 
@@ -905,8 +924,9 @@ class Component(System):
                         opt = opts[match]
 
                         # New assignments take precedence
-                        for name, value in zip(['method', 'form', 'step', 'step_calc'],
-                                               [method, form, step, step_calc]):
+                        keynames = ['method', 'form', 'step', 'step_calc', 'directional']
+                        for name, value in zip(keynames,
+                                               [method, form, step, step_calc, directional]):
                             if value is not None:
                                 opt[name] = value
 
@@ -914,7 +934,8 @@ class Component(System):
                         opts[match] = {'method': method,
                                        'form': form,
                                        'step': step,
-                                       'step_calc': step_calc}
+                                       'step_calc': step_calc,
+                                       'directional': directional}
 
         if invalid_wrt:
             if len(invalid_wrt) == 1:

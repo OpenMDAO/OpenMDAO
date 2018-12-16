@@ -2,8 +2,8 @@
 
 import sys
 import unittest
-import warnings
 import copy
+
 from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
@@ -150,6 +150,19 @@ class DiscreteTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], 2)
+
+    def test_simple_run_once_promoted(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        indep.add_discrete_output('x', 11)
+        model.add_subsystem('comp', ModCompEx(3), promotes=['*'])
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['y'], 2)
 
     def test_simple_run_once_implicit(self):
         prob = Problem()

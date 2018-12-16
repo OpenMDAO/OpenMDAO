@@ -4,7 +4,6 @@ from six import iteritems
 from six.moves import cStringIO
 
 import unittest
-import warnings
 
 import numpy as np
 
@@ -19,7 +18,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
 try:
@@ -120,6 +119,48 @@ class MyComp(ExplicitComponent):
         J['y', 'x2'] = np.array([40])
 
 
+class ArrayComp(ExplicitComponent):
+
+    def setup(self):
+
+        J1 = np.array([[1.0, 3.0, -2.0, 7.0],
+                        [6.0, 2.5, 2.0, 4.0],
+                        [-1.0, 0.0, 8.0, 1.0],
+                        [1.0, 4.0, -5.0, 6.0]])
+
+        self.J1 = J1
+        self.J2 = J1 * 3.3
+        self.Jb = J1.T
+
+        # Inputs
+        self.add_input('x1', np.zeros([4]))
+        self.add_input('x2', np.zeros([4]))
+        self.add_input('bb', np.zeros([4]))
+
+        # Outputs
+        self.add_output('y1', np.zeros([4]))
+
+        self.declare_partials(of='*', wrt='*')
+        self.set_check_partial_options('x*', directional=True)
+
+        self.exec_count = 0
+
+    def compute(self, inputs, outputs):
+        """
+        Execution.
+        """
+        outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
+        self.exec_count += 1
+
+    def compute_partials(self, inputs, partials):
+        """
+        Analytical derivatives.
+        """
+        partials[('y1', 'x1')] = self.J1
+        partials[('y1', 'x2')] = self.J2
+        partials[('y1', 'bb')] = self.Jb
+
+
 class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
@@ -212,13 +253,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        with warnings.catch_warnings(record=True) as w:
-            data = prob.check_partials(out_stream=None)
-
         # warning about 'comp2'
-        self.assertEqual(len(w), 1)
-        expected = "No derivative data found for Component 'comp2'."
-        self.assertEqual(str(w[0].message), expected)
+        msg = "No derivative data found for Component 'comp2'."
+
+        with assert_warning(UserWarning, msg):
+            data = prob.check_partials(out_stream=None)
 
         # and no derivative data for 'comp2'
         self.assertFalse('comp2' in data)
@@ -687,16 +726,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
-        with warnings.catch_warnings(record=True) as w:
-            data = prob.check_partials(out_stream=None)
-
-        self.assertEqual(len(w), 1)
-
         msg = "The following components requested complex step, but force_alloc_complex " + \
               "has not been set to True, so finite difference was used: ['comp']\n" + \
               "To enable complex step, specify 'force_alloc_complex=True' when calling " + \
               "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-        self.assertEqual(str(w[0].message), msg)
+
+        with assert_warning(UserWarning, msg):
+            data = prob.check_partials(out_stream=None)
 
         # Derivative still calculated, but with fd instead.
         x_error = data['comp']['f_xy', 'x']['rel error']
@@ -1153,7 +1189,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 4)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 4)
-        self.assertEqual(stream.getvalue().count('Jrev'), 16)
+        self.assertEqual(stream.getvalue().count('Jrev'), 20)
 
         # 2: Explicit comp, all comps define Jacobians for compact and non-compact display
         class MyComp(ExplicitComponent):
@@ -1211,7 +1247,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Reverse'), 4)
-        self.assertEqual(stream.getvalue().count('Jrev'), 8)
+        self.assertEqual(stream.getvalue().count('Jrev'), 10)
 
         # 4: Mixed comps. Some with jacobians. Some not
         prob = Problem()
@@ -1368,6 +1404,61 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertTrue('c1c.d1' in data)
         self.assertTrue('abc1cab' in data)
+
+    def test_directional_derivative_option(self):
+
+        prob = Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None)
+
+        # Note on why we run 10 times:
+        # 1    - Initial execution
+        # 2~3  - Called apply_nonlinear at the start of fwd and rev analytic deriv calculations
+        # 4    - Called apply_nonlinear to clean up before starting FD
+        # 5~8  - FD wrt bb, non-directional
+        # 9    - FD wrt x1, directional
+        # 10   - FD wrt x2, directional
+        self.assertEqual(mycomp.exec_count, 10)
+
+        assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
+
+        stream = cStringIO()
+        J = prob.check_partials(out_stream=stream, compact_print=True)
+        output = stream.getvalue()
+        self.assertTrue("(d)'x1'" in output)
+        self.assertTrue("(d)'x2'" in output)
+
+    def test_directional_derivative_option_complex_step(self):
+
+        class ArrayCompCS(ArrayComp):
+            def setup(self):
+                super(ArrayCompCS, self).setup()
+                self.set_check_partial_options('x*', directional=True, method='cs')
+
+        prob = Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayCompCS(), promotes=['*'])
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.run_model()
+
+        data = prob.check_partials(method='cs', out_stream=None)
+
+        # Note on why we run 10 times:
+        # 1    - Initial execution
+        # 2~3  - Called apply_nonlinear at the start of fwd and rev analytic deriv calculations
+        # 4    - Called apply_nonlinear to clean up before starting FD
+        # 5~8  - FD wrt bb, non-directional
+        # 9    - FD wrt x1, directional
+        # 10   - FD wrt x2, directional
+        self.assertEqual(mycomp.exec_count, 10)
+
+        assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
 
 class TestCheckPartialsFeature(unittest.TestCase):
@@ -1563,8 +1654,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.check_partials(method='cs', compact_print=True)
 
-
-
     def test_set_form_global(self):
         from openmdao.api import Problem, Group, IndepVarComp
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
@@ -1588,7 +1677,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.run_model()
 
         prob.check_partials(form='central', compact_print=True)
-
 
     def test_set_step_calc_global(self):
         from openmdao.api import Problem, Group, IndepVarComp
@@ -1691,6 +1779,17 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True, includes=['abc1cab'])
 
         prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
+
+    def test_directional(self):
+
+        prob = Problem()
+        model = prob.model
+        mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        data = prob.check_partials()
 
 
 class TestProblemCheckTotals(unittest.TestCase):
