@@ -76,7 +76,7 @@ function setD3ContentDiv() {
 }
 
 function setN2Group() {
-    n2Group = svg.append("g");
+    n2Group = svg.append("g").attr('id', 'N2'); // id given just so it is easier to see in Chrome dev tools when debugging
 }
 
 function setN2ElementsGroup() {
