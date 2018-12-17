@@ -131,13 +131,27 @@ def transform_ast_slices(node):
 
 
 class DependencyVisitor(ast.NodeVisitor):
+    """
+    Perform dependency analysis on a function definition.
+    """
     def __init__(self):
         super(DependencyVisitor, self).__init__()
         self.graph = nx.DiGraph()
         self.rhs_set = set()
         self.lhs_set = set()
         self.vset = None
+        self.params = None
         self.calls = set()
+
+    def visit_FunctionDef(self, node):
+        self.params = set([n.arg for n in node.args.args])
+        if node.args.vararg is not None:
+            self.params.add(node.args.vararg.arg)
+        if node.args.kwarg is not None:
+            self.params.add(node.args.kwarg.arg)
+
+        for bnode in node.body:
+            self.visit(bnode)
 
     def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
         long_name = _get_long_name(node.func)
@@ -203,9 +217,34 @@ class DependencyVisitor(ast.NodeVisitor):
         else:
             self.generic_visit(node)
 
-    def get_constants(self):
+    def get_external(self):
+        """
+        Return a list of var names of vars not passed in or modified/created in the function.
+        """
         g = self.graph
-        return [node for node in g if node not in self.lhs_set and node not in g.successors(node)]
+        return [node for node in g if node not in self.params and g.degree(node) == 1]
+
+
+def dependency_analysis(src):
+    f_ast = ast.parse(src, mode='exec')
+    fdvis = DependencyVisitor()
+    fdvis.visit(f_ast)
+
+    # from openmdao.utils.graph_utils import all_connected_nodes
+    # for node in fdvis.graph:
+    #     print(node, list(set(list(all_connected_nodes(fdvis.graph, node))[1:])))
+
+    return fdvis, f_ast
+
+
+def get_external_vars(func_src):
+    """
+    Return names of variables not passed into or created/modified within the given function source.
+    """
+    f_ast = ast.parse(func_src, mode='exec')
+    fdvis = DependencyVisitor()
+    fdvis.visit(f_ast)
+    return fdvis.get_external()
 
 
 class NameTransformer(ast.NodeTransformer):
@@ -267,18 +306,6 @@ def transform_ast_names(node, mapping):
     ast.fix_missing_locations(new_ast)
 
     return new_ast
-
-
-def dependency_analysis(src):
-    f_ast = ast.parse(src, mode='exec')
-    fdvis = DependencyVisitor()
-    fdvis.visit(f_ast)
-
-    # from openmdao.utils.graph_utils import all_connected_nodes
-    # for node in fdvis.graph:
-    #     print(node, list(set(list(all_connected_nodes(fdvis.graph, node))[1:])))
-
-    return fdvis, f_ast
 
 
 if __name__ == '__main__':

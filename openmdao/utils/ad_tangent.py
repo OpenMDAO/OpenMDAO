@@ -31,7 +31,7 @@ from openmdao.vectors.default_vector import Vector, DefaultVector
 from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
-    StringSubscriptVisitor, transform_ast_slices
+    StringSubscriptVisitor, transform_ast_slices, get_external_vars
 from openmdao.utils.general_utils import print_line_numbers
 from openmdao.utils.options_dictionary import OptionsDictionary
 
@@ -97,7 +97,7 @@ def _translate_compute_source(comp, verbose=0):
     """
     Convert a compute or apply_nonlinear method into a function with individual args for each var.
 
-    Converts def compute(self, inputs, outputs) by adding an appropriate return line and
+    Converts compute or apply_nonlinear by adding an appropriate return line and
     converting literal slices to slice() calls.
 
     Parameters
@@ -189,7 +189,7 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
     deriv_mod_name = temp_mod_name + '_deriv_'
     deriv_file_name = deriv_mod_name + '.py'
 
-    # actual tangent generated deriv file (might contain more than one function)
+    # actual tangent-generated deriv file (might contain more than one function)
     lines = open(deriv_func.__code__.co_filename, 'r').readlines()
 
     # now put 'self' back in the arg list
@@ -199,34 +199,25 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
     for i, line in enumerate(lines):
         lstrip = line.lstrip()
         if lstrip.startswith('def '):
-            if nreplaced == 0:  # top level function. we'll replace other funcs (and calls to them) later
+            if nreplaced == 0:  # add self for top level function only
                 lines[i] = line.replace('(', '(self, ')
                 nreplaced += 1
-            # else:
-                # funcs.add(lstrip.split('(', 1)[0].rsplit()[-1])
 
     deriv_src = ''.join(lines)
-
-    #if funcs:
-        ## we need to add a self arg whenever a deriv function (other than the first one)
-        ## is called.
-        #funcs = set([' %s(' % f for f in funcs])  # modify funcnames for easier replace
-        ## should always be a space before funcname because it's in ANF
-        #for f in funcs:
-            #deriv_src = deriv_src.replace(f, ' %sself, ' % f)
 
     # write the derivative func into a module file so that tracebacks will show us the
     # correct line of source where the problem occurred, and allow us to step into the
     # function with a debugger.
     with open(deriv_file_name, "w") as f:
         f.write("import numpy\n")  # tangent templates use 'numpy' so make sure it's here
-        # get all of the comp module globals
+        # get all of the comp module imports
         f.write(_get_imports(sys.modules[comp_mod]))
         f.write("import tangent\n")
         f.write(deriv_src)
 
     if PY3:
         importlib.invalidate_caches()  # need this to recognize dynamically created modules
+
     importlib.import_module(deriv_mod_name)
     mod = sys.modules[deriv_mod_name]
     sys.path = sys.path[:-1]
@@ -252,32 +243,39 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
     to_zero = [doutputs._data, dresids._data, dinputs._data]
 
     if mode == 'fwd':
-        array = dinputs._data
+        if explicit:
+            arrays = [dinputs._data]
+        else:
+            arrays = [dinputs._data, doutputs._data]
     else:
         if explicit:
-            array = doutputs._data
+            arrays = [doutputs._data]
         else:
-            array = dresids._data
+            arrays = [dresids._data]
 
-    for idx in range(array.size):
-        for zvec in to_zero:
-            zvec[:] = 0.0
-        array[idx] = 1.0
+    col_offset = 0
+    for array in arrays:
+        for idx in range(array.size):
+            for zvec in to_zero:
+                zvec[:] = 0.0
+            array[idx] = 1.0
+    
+            if mode == 'fwd':
+                if explicit:
+                    grad = deriv_func(comp, inputs, outputs, dinputs)
+                else:
+                    grad = deriv_func(comp, inputs, outputs, resids, dinputs, doutputs)
+                J[:, idx + col_offset] = grad._data
+            else:  # rev
+                if explicit:
+                    grad = deriv_func(comp, inputs, outputs, doutputs)
+                    J[idx, :] = grad._data
+                else:
+                    grad = deriv_func(comp, inputs, outputs, resids, dresids)
+                    J[idx, :grad[0]._data.size] = grad[0]._data
+                    J[idx, grad[0]._data.size:] = grad[1]._data
 
-        if mode == 'fwd':
-            if explicit:
-                grad = deriv_func(comp, inputs, outputs, dinputs)
-            else:
-                grad = deriv_func(comp, inputs, outputs, resids, dinputs, doutputs)
-            J[:, idx] = grad._data
-        else:  # rev
-            if explicit:
-                grad = deriv_func(comp, inputs, outputs, doutputs)
-                J[idx, :] = grad._data
-            else:
-                grad = deriv_func(comp, inputs, outputs, resids, dresids)
-                J[idx, :grad[0]._data.size] = grad[0]._data
-                J[idx, grad[0]._data.size:] = grad[1]._data
+        col_offset += array.size
 
     colstart = colend = 0
     if explicit:
