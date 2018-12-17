@@ -95,7 +95,7 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         recurse : bool
-            If True, setup jacobians in all descendants.
+            If True, setup jacobians in all descendants. (ignored)
         """
         if self._use_derivatives:
             self._set_partials_meta()

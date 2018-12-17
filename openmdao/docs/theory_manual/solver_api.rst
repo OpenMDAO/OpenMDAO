@@ -6,9 +6,9 @@ OpenMDAO Solvers
 
 Every OpenMDAO solver is either a linear solver, inheriting from the :code:`LinearSolver` class, or
 a nonlinear solver, inheriting from the :code:`NonlinearSolver` class. A solver can be either monolithic
-or recursive in behavior.  Monolithic solvers typically construct some sort of linearization of
-their enclosing Group and use that to converge to a solution, while recursive solvers perform
-subsolves on their enclosing Group's children while iterating to convergence.
+or recursive in behavior.  Monolithic solvers treat the associated system as a single block. Recursive
+solvers, as the name suggests, recurse down through their system hierarchy asking each sub-system to
+operate on itself.
 
 
 The following is a list of available OpenMDAO solvers separated by type:
