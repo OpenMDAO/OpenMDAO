@@ -241,7 +241,7 @@ class DirectSolver(LinearSolver):
             ranges = self._assembled_jac._view_ranges[system.pathname]
             matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
 
-            # Perform dense or sparse lu factorization
+            # Perform dense or sparse lu factorization.
             if isinstance(mtx, DenseMatrix):
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
