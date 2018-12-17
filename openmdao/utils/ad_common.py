@@ -12,7 +12,7 @@ import importlib
 import numpy as np
 
 from openmdao.utils.ad_autograd import _get_autograd_ad_func, _get_autograd_ad_jac
-from openmdao.utils.ad_tangent import _get_tangent_ad_func, _get_tangent_ad_jac
+from openmdao.utils.ad_tangent import _get_tangent_ad_func, _get_tangent_ad_jac, _dot_prod_test
 from openmdao.utils.general_utils import get_module_attr
 from numpy.testing import assert_almost_equal
 from openmdao.core.problem import Problem
@@ -188,6 +188,7 @@ def _ad(prob, options):
                         os.remove(deriv_mod.__file__ + 'c')
                     except FileNotFoundError:
                         pass
+                summ[mode]['func'] = func
 
                 mx_diff = 0.0
                 print("\n%s J:" % mode.upper())
@@ -220,9 +221,15 @@ def _ad(prob, options):
                 summ[mode]['ran'] = False
                 summ[mode]['diff'] = float('nan')
                 print("\n")
-            finally:
-                if options.ad_method == 'autograd':
-                    mod_wrapper.np = mod_wrapper.numpy = np
+
+        if options.ad_method == 'autograd':
+            mod_wrapper.np = mod_wrapper.numpy = np
+
+        if summ['fwd']['ran'] and summ['rev']['ran']:
+            summ['dotprod'] = _dot_prod_test(s, summ['fwd']['func'], summ['rev']['func'])
+        else:
+            summ['dotprod'] = float('nan')
+
 
     max_cname = max(len(s) for s in summary) + 2
     max_diff = 16
@@ -231,10 +238,10 @@ def _ad(prob, options):
     revgood = []
     bad = []
 
-    toptemplate = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}}{rdiff:<{dwid}}{iosz:<12}{pref:<14}"
-    template = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}.4}{rdiff:<{dwid}.4}{iosz:<12}{pref:<14}"
+    toptemplate = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}}{rdiff:<{dwid}}{dot:<{dwid}}{iosz:<12}{pref:<14}"
+    template = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}.4}{rdiff:<{dwid}.4}{dot:<{dwid}.4}{iosz:<12}{pref:<14}"
     print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)',
-                             rdiff='Max Diff (rev)', pref='Preferred Mode',
+                             rdiff='Max Diff (rev)', dot='Dotprod Test', pref='Preferred Mode',
                              cwid=max_cname, dwid=max_diff, iosz='(I/O) Size'))
     print('--------- both derivs ok ------------')
     for cname in sorted(summary):
@@ -244,7 +251,8 @@ def _ad(prob, options):
         fwdmax = s['fwd']['diff']
         revran = s['rev']['ran']
         revmax = s['rev']['diff']
-        line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax,
+        dptest = s['dotprod']
+        line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, dot=dptest,
                                cwid=max_cname, dwid=max_diff,
                                iosz='(%d/%d)' % (s['isize'], s['osize']), pref=s['pref'])
         if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:

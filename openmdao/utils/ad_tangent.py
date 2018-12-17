@@ -225,6 +225,48 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
     return getattr(mod, deriv_func.__name__), mod
 
 
+def _dot_prod_test(comp, fwd_func, rev_func):
+    inputs = comp._inputs
+    outputs = comp._outputs
+    dinputs = comp._vectors['input']['linear']
+    doutputs = comp._vectors['output']['linear']
+    resids = comp._vectors['residual']['nonlinear']
+    dresids = comp._vectors['residual']['linear']
+    explicit = isinstance(comp, ExplicitComponent)
+
+    in_save = dinputs._data.copy()
+    out_save = doutputs._data.copy()
+    resid_save = dresids._data.copy()
+
+    rand_inputs = np.random.random(in_save.size) + 1.0
+    rand_outputs = np.random.random(out_save.size) + 1.0
+
+    try:
+        dinputs._data[:] = rand_inputs
+        if explicit:
+            fwd_grad = fwd_func(comp, inputs, outputs, dinputs)
+            doutputs._data[:] = rand_outputs
+            rev_grad = rev_func(comp, inputs, outputs, doutputs)
+            dpy = rand_outputs.dot(fwd_grad._data)
+            dpx = rev_grad._data.dot(rand_inputs)
+        else:
+            doutputs._data[:] = rand_outputs
+            fwd_grad = fwd_func(comp, inputs, outputs, resids, dinputs, doutputs)
+            dresids._data[:] = rand_outputs
+            rev_grad = rev_func(comp, inputs, outputs, resids, dresids)
+            dpy = rand_outputs.dot(fwd_grad._data)
+            dpx = rev_grad[0]._data.dot(rand_inputs) + rev_grad[1]._data.dot(rand_outputs)
+    finally:
+        # restore old vector values
+        dinputs._data[:] = in_save
+        doutputs._data[:] = out_save
+        dresids._data[:] = resid_save
+
+    print("y.dot(dy)", dpy)
+    print("dx.dot(x)", dpx)
+    return abs(dpy - dpx)
+
+
 def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
     inputs = comp._inputs
     outputs = comp._outputs
@@ -259,7 +301,7 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
             for zvec in to_zero:
                 zvec[:] = 0.0
             array[idx] = 1.0
-    
+
             if mode == 'fwd':
                 if explicit:
                     grad = deriv_func(comp, inputs, outputs, dinputs)
