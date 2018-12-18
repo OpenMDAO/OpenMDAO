@@ -95,9 +95,8 @@ class RecordingManager(object):
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.
             if not model.is_active():
-                raise RuntimeError(
-                    "RecordingManager.startup should never be called when "
-                    "running in parallel on an inactive System")
+                raise RuntimeError("RecordingManager.startup should never be called when "
+                                   "running in parallel on an inactive System")
 
         for recorder in self._recorders:
             # Each of the recorders determines its self._filtered_* list of vars
