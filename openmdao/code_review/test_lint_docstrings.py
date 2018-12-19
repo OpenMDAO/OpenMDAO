@@ -551,9 +551,10 @@ class LintTestCase(unittest.TestCase):
                         funcs = []
 
                     for func_name in funcs:
-                        func = getattr(mod, func_name)
-                        self.check_function(dir_name, file_name, func_name,
-                                            func, failures)
+                        if not func_name.startswith('_'):
+                            func = getattr(mod, func_name)
+                            self.check_function(dir_name, file_name, func_name,
+                                                func, failures)
 
         if failures:
             msg = '\n'

@@ -425,9 +425,14 @@ class System(object):
 
             self._reconfigured = True
 
-    def _check_reconf_update(self):
+    def _check_reconf_update(self, subsys=None):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+
+        Parameters
+        ----------
+        subsys : System or None
+            ignored
         """
         self._reconfigured = False
 

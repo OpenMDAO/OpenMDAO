@@ -578,8 +578,8 @@ class TestNewton(unittest.TestCase):
                 super(CountNewton, self).__init__(**kwargs)
                 self.total_count = 0
 
-            def _iter_execute(self):
-                super(CountNewton, self)._iter_execute()
+            def _single_iteration(self):
+                super(CountNewton, self)._single_iteration()
                 self.total_count += 1
 
         class CountDS(DirectSolver):
