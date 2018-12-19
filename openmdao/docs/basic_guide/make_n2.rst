@@ -38,3 +38,5 @@ The lack of cycles in the model is made visually evident by the lack of any conn
 Collapse groups down by right-clicking on them, and zoom in and out of different parts of the hierarchy by left-clicking.
 These controls help show that the :math:`N^2` diagram is a powerful tool for letting you inspect and understand large, complex models.
 
+The right side of the diagram shows the solver hierarchy. Initially, it shows the linear solvers but by clicking on
+the `Toggle Solver Names` button in the toolbar, the names of the nonlinear solvers can be displayed.

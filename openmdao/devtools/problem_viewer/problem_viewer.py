@@ -14,6 +14,7 @@ except ImportError:
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
@@ -62,11 +63,34 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             for children_list in children_lists:
                 children.extend(children_list)
 
+    if isinstance(system, ImplicitComponent):
+        if overrides_method('solve_linear', system, ImplicitComponent):
+            tree_dict['linear_solver'] = "solve_linear"
+        else:
+            tree_dict['linear_solver'] = ""
+    else:
+        if system.linear_solver:
+            tree_dict['linear_solver'] = system.linear_solver.SOLVER
+        else:
+            tree_dict['linear_solver'] = ""
+
+    if isinstance(system, ImplicitComponent):
+        if overrides_method('solve_nonlinear', system, ImplicitComponent):
+            tree_dict['nonlinear_solver'] = "solve_nonlinear"
+        else:
+            tree_dict['nonlinear_solver'] = ""
+    else:
+        if system.nonlinear_solver:
+            tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+        else:
+            tree_dict['nonlinear_solver'] = ""
+
     tree_dict['children'] = children
 
     if not tree_dict['name']:
         tree_dict['name'] = 'root'
         tree_dict['type'] = 'root'
+
 
     return tree_dict
 
