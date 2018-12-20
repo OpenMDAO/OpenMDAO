@@ -8,7 +8,9 @@ import sys
 import os
 import traceback
 import tangent
+from tangent.transformers import TreeTransformer
 from tangent.utils import register_init_grad
+from tangent import naming
 import textwrap
 import pprint
 from numbers import Number
@@ -24,16 +26,19 @@ import time
 import numpy as np
 import ast
 import astunparse
+import gast
 from six import itervalues, iteritems, PY3
 from itertools import chain
 
-from openmdao.vectors.default_vector import Vector, DefaultVector
+from openmdao.vectors.vector import Vector, set_vec
+from openmdao.vectors.default_vector import DefaultVector
 from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
-    StringSubscriptVisitor, transform_ast_slices, get_external_vars
+    StringSubscriptVisitor, get_external_vars  #, transform_ast_slices
 from openmdao.utils.general_utils import print_line_numbers
 from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.devtools.debug import compute_approx_jac, compare_jacs
 
 
 modemap = {
@@ -42,6 +47,7 @@ modemap = {
 }
 
 
+# Use this within AD function in place of Vector
 class _Vec(object):
     def __init__(self, v):
         self._data = np.zeros_like(v._data)
@@ -61,10 +67,7 @@ class _Vec(object):
         self._views[name][:] = val
 
 
-def _zero_vector(vec):
-    return _Vec(vec)
-
-
+# use this in AD function in place of OptionsDictionary
 class _Opt(object):
     def __init__(self, opt):
         self._dct = {}
@@ -84,13 +87,19 @@ class _Opt(object):
         self._dct[name] = val
 
 
-def _zero_opt(opt):
-    return _Opt(opt)
-
-
-register_init_grad(DefaultVector, _zero_vector)
-register_init_grad(OptionsDictionary, _zero_opt)
+register_init_grad(DefaultVector, lambda vec: _Vec(vec))
+register_init_grad(OptionsDictionary, lambda opt: _Opt(opt))
 register_init_grad(str, lambda s: s)
+
+
+@tangent.tangent_(set_vec)
+def tset_vec(z, x, y):
+    d[z] = d[x]
+
+@tangent.grads.adjoint(set_vec)
+def svec(z, x, y):
+    d[x] = d[z]
+    d[y] = d[z]
 
 
 def _translate_compute_source(comp, verbose=0):
@@ -134,10 +143,11 @@ def _translate_compute_source(comp, verbose=0):
     temp_file_name = temp_mod_name + '.py'
 
     # convert any literal slices to calls to slice (else tangent fwd mode bombs)
+    #src = astunparse.unparse(transform_ast_slices(ast.parse(src)))
+
     if verbose == 1:
         print("SRC:")
         print_line_numbers(src)
-    src = astunparse.unparse(transform_ast_slices(ast.parse(src)))
 
     return src
 
@@ -190,7 +200,8 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
     deriv_file_name = deriv_mod_name + '.py'
 
     # actual tangent-generated deriv file (might contain more than one function)
-    lines = open(deriv_func.__code__.co_filename, 'r').readlines()
+    with open(deriv_func.__code__.co_filename, 'r') as f:
+        lines = f.readlines()
 
     # now put 'self' back in the arg list
     # lines = getsourcelines(deriv_func)[0]
@@ -334,3 +345,62 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
             rowstart = rowend
 
         colstart = colend
+
+
+def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, check_dims=False, **kwargs):
+    """
+    Compare AD jac for the given component with its appoximate jac (either fd or cs).
+
+    Parameters
+    ----------
+    comp : Component
+        The component to be checked.
+    failtol : float (1.e-6)
+        Maximum difference allowed between subjacs before failure.
+    mode : str or None
+        AD mode used, 'fwd' or 'rev'.  Both are checked if None.
+    verbose : int (0)
+        If 1 the source code of the generated functions will be
+        output to stdout at various stages of the process for debugging
+        purposes. If > 1, all intermediate code generation steps will print.
+    optimize : bool (True)
+        If True, allow tangent to perform optimizations on the generated code.
+    check_dims : bool (True)
+        If True, indicates whether to check
+        that the result of the original function `func` is a scalar, raising
+        an error if it is not.
+        Gradients are only valid for scalar-valued outputs, so tangent checks
+        this by defualt.
+    **kwargs : dict
+        Other named args passed to compute_approx_jac.
+    """
+    save_inputs = comp._inputs._data.copy()
+    Japprox, no_cs = compute_approx_jac(comp, **kwargs)
+
+    if mode is None:
+        modes = ['fwd', 'rev']
+    else:
+        modes = [mode]
+
+    for mode in modes:
+        comp._inputs._data[:] = save_inputs
+        deriv_func, dmod = _get_tangent_ad_func(comp, mode, verbose=verbose, optimize=optimize,
+                                                check_dims=check_dims)
+        Jad = {}
+        _get_tangent_ad_jac(comp, mode, deriv_func, Jad)
+
+        del sys.modules[dmod.__name__]
+        os.remove(dmod.__file__)
+        try:
+            os.remove(dmod.__file__ + 'c')
+        except FileNotFoundError:
+            pass
+
+        rel_offset = len(comp.pathname) + 1 if comp.pathname else 0
+
+        for key, diff, diff_type in compare_jacs(Japprox, Jad):
+            o, i = key
+            relkey = (o[rel_offset:], i[rel_offset:])
+
+            if diff > failtol:
+                raise RuntimeError("Max diff for subjac %s is %g (%s)" % (relkey, diff, diff_type))

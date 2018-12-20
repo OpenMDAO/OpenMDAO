@@ -598,3 +598,27 @@ class Vector(object):
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
         self._under_complex_step = active
+
+
+# stuff for AD
+def set_vec(vsource, vtarget):
+    """
+    Fill the data of the target Vector with data from the source Vector.
+
+    Use this in place of the Vector method set_vec if you intend to compute
+    your component's derivatives using the tangent AD system.
+
+    Parameters
+    ----------
+    vsource : Vector
+        The source Vector.
+    vtarget : Vector
+        The target Vector.
+
+    Returns
+    -------
+    Vector
+        The target Vector.
+    """
+    vtarget._data[:] = vsource._data
+    return vtarget

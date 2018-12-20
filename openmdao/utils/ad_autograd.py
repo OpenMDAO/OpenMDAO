@@ -22,7 +22,7 @@ from openmdao.vectors.default_vector import Vector, DefaultVector
 from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
-    StringSubscriptVisitor, transform_ast_slices
+    StringSubscriptVisitor #, transform_ast_slices
 
 try:
     import autograd.numpy as agnp

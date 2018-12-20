@@ -18,6 +18,7 @@ from numpy.testing import assert_almost_equal
 from openmdao.core.problem import Problem
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 import openmdao.utils.mod_wrapper as mod_wrapper
+from openmdao.devtools.debug import compute_approx_jac, compare_jacs
 
 
 def _ad_setup_parser(parser):
@@ -40,6 +41,12 @@ def _ad_setup_parser(parser):
                         help='Specify component class(es) to run AD on.')
     parser.add_argument('-v', '--verbose', default=0, type=int, action='store', dest='verbose',
                         help='Verbosity level.')
+    parser.add_argument('--fwd', action='store_true', dest='fwd',
+                        help="Show forward mode results.")
+    parser.add_argument('--rev', action='store_true', dest='rev',
+                        help="Show reverse mode results.")
+    parser.add_argument('-t', '--tol', default=1.e-6, type=float, action='store', dest='tol',
+                        help='Maximum difference in derivatives allowed.')
 
 
 def _ad_exec(options):
@@ -57,6 +64,8 @@ def _ad_exec(options):
 def _create_and_check_partials(prob, classes):
     """
     Creates instances of the given classes and checks their partials.
+
+    Note: this only works for classes that can be instantiated with no args.
 
     Parameters
     ----------
@@ -77,21 +86,20 @@ def _create_and_check_partials(prob, classes):
         prob.model.add_subsystem(obj.__class__.__name__.lower() + '_', obj)
 
     prob.setup()
-    prob.run_model()
+    prob.final_setup()
     invec = prob.model._inputs._data
-    invec[:] = np.random.random(invec.size)
-
-    print("\nChecking partials:")
-    check_dct = prob.check_partials(out_stream=None)
-    prob.run_model()
+    invec[:] = np.random.random(invec.size) + 1.0
 
     for obj in insts:
         print("\nClass:", obj.__class__.__name__)
-        yield obj, check_dct
+        yield obj
 
-def _find_and_check_partials(prob, classes):
+
+def _find_instances(prob, classes, exclude=()):
     """
-    Finds instances of the given classes in the problem and checks their partials.
+    Finds instances of the given classes in the problem.
+
+    Yields only one instance of each class.
 
     Parameters
     ----------
@@ -99,29 +107,26 @@ def _find_and_check_partials(prob, classes):
         The problem object.
     classes : list of str
         List of class names.
+    exclude : set of str or None
+        Set of class names to exclude.
 
     Yields
     ------
     object
         Instance of specified class.
-    dict
-        Dictionary returned from check_partials.
+
     """
-    prob.run_model()
-    print("\nChecking partials:")
-    check_dct = prob.check_partials(out_stream=None)
-    prob.run_model()
-    seen = set(('IndepVarComp', 'ExecComp'))
+    seen = set(exclude)
     for s in prob.model.system_iter(recurse=True, include_self=True, typ=Component):
         cname = s.__class__.__name__
         if cname not in seen and (cname in classes or not classes):
             seen.add(cname)
             print("\nClass:", cname)
             print("Instance:", s.pathname)
-            yield s, check_dct
+            yield s
 
         # if we've found an instance of each class we're looking for, we're done.
-        if classes and (len(seen) == len(classes) + 2):
+        if classes and (len(seen) == len(classes) + len(exclude)):
             break
 
     not_found = classes - seen
@@ -147,75 +152,86 @@ def _ad(prob, options):
         prob = Problem()
 
     if classes and all(['.' in cpath for cpath in classes]):
-        it = _create_and_check_partials
+        it = _create_instances(prob, classes)
     else:
-        it = _find_and_check_partials
+        prob.run_model()
+        it = _find_instances(prob, classes, exclude=set(['IndepVarComp', 'ExecComp']))
 
+    modes = []
+    if options.fwd:
+        modes.append('fwd')
+    if options.rev:
+        modes.append('rev')
+    if not modes:
+        modes = ['fwd', 'rev']
+
+    tol = options.tol
     summary = {}
 
-    for s, check_dct in it(prob, classes):
-
-        summary[s.__class__.__name__] = summ = {}
-
-        rel_offset = len(s.pathname) + 1 if s.pathname else 0
-
-        type_ = 'Explicit' if isinstance(s, ExplicitComponent) else 'Implicit'
-        summ['type'] = type_
-        summ['osize'] = s._outputs._data.size
-        summ['isize'] = s._inputs._data.size
-        summ['pref'] = 'fwd' if summ['osize'] >= summ['isize'] else 'rev'
-        print("Type:", type_)
+    for comp in it:
 
         if options.ad_method == 'autograd':
             import autograd.numpy as agnp
             mod_wrapper.np = mod_wrapper.numpy = agnp
 
-        for mode in ('fwd', 'rev'):
+        summary[comp.__class__.__name__] = summ = {}
+
+        rel_offset = len(comp.pathname) + 1 if comp.pathname else 0
+
+        type_ = 'Explicit' if isinstance(comp, ExplicitComponent) else 'Implicit'
+        summ['type'] = type_
+        summ['osize'] = comp._outputs._data.size
+        summ['isize'] = comp._inputs._data.size
+        summ['pref'] = 'fwd' if summ['osize'] >= summ['isize'] else 'rev'
+        print("Type:", type_)
+
+        save_inputs = comp._inputs._data.copy()
+        Japprox, no_cs = compute_approx_jac(comp, method='cs')
+
+        for mode in modes:
             summ[mode] = {}
             try:
-                J = {}
-                if options.ad_method == 'autograd':
-                    func = _get_autograd_ad_func(s, mode)
-                    _get_autograd_ad_jac(s, mode, func, J)
-                elif options.ad_method == 'tangent':
-                    func, deriv_mod = _get_tangent_ad_func(s, mode, optimize=not options.noopt,
-                                                           verbose=options.verbose)
-                    _get_tangent_ad_jac(s, mode, func, J)
+                comp._inputs._data[:] = save_inputs
+                deriv_func, dmod = _get_tangent_ad_func(comp, mode, verbose=options.verbose,
+                                                        optimize=not options.noopt)
+                summ[mode]['func'] = deriv_func
+                Jad = {}
+                _get_tangent_ad_jac(comp, mode, deriv_func, Jad)
 
-                    del sys.modules[deriv_mod.__name__]
-                    os.remove(deriv_mod.__file__)
-                    try:
-                        os.remove(deriv_mod.__file__ + 'c')
-                    except FileNotFoundError:
-                        pass
-                summ[mode]['func'] = func
+                del sys.modules[dmod.__name__]
+                os.remove(dmod.__file__)
+                try:
+                    os.remove(dmod.__file__ + 'c')
+                except FileNotFoundError:
+                    pass
 
-                mx_diff = 0.0
-                print("\n%s J:" % mode.upper())
-                for key in sorted(J):
-                    o, i = key
-                    rel_o = o[rel_offset:]
-                    rel_i = i[rel_offset:]
-                    if np.any(J[key]) or (rel_o, rel_i) in check_dct[s.pathname]:
-                        if (rel_o, rel_i) not in check_dct[s.pathname]:
-                            check_dct[s.pathname][rel_o, rel_i] = d = {}
-                            d['J_fwd'] = np.zeros(J[key].shape)
-                        print("(%s, %s)" % (rel_o, rel_i), end='')
-                        try:
-                            assert_almost_equal(J[key],
-                                                check_dct[s.pathname][rel_o, rel_i]['J_fwd'],
-                                                decimal=5)
-                        except Exception:
-                            max_diff = np.max(np.abs(J[key] -
-                                                     check_dct[s.pathname][rel_o, rel_i]['J_fwd']))
-                            if max_diff > mx_diff:
-                                mx_diff = max_diff
-                            print("  MAX DIFF:", max_diff)
-                        else:
-                            print(" ok")
-                summ[mode]['diff'] = mx_diff
+                results = list(compare_jacs(Japprox, Jad))
+                maxmax = 0.
+                max_keywid = 0
+                for key, mxdiff, typ in results:
+                    relkey = str((key[0][rel_offset:], key[1][rel_offset:]))
+                    keywid = len(relkey)
+                    if keywid > max_keywid:
+                        max_keywid = keywid
+                    if mxdiff > maxmax:
+                        maxmax = mxdiff
+                summ[mode]['diff'] = maxmax
                 summ[mode]['ran'] = True
+
+                print("\n%s J:" % mode.upper())
+                print("{key:<{max_keywid}} {mxdiff:<12} ErrTyp {ref:<8}".format(
+                    key='(of, wrt)', mxdiff='diff', ref='norm(Jref)', max_keywid=max_keywid))
+
+                for key, mxdiff, typ in sorted(results, key=lambda x: x[1]):
+                    if mxdiff < 1.e-12 and not np.any(Japprox[key]):
+                        continue
+                    relkey = str((key[0][rel_offset:], key[1][rel_offset:]))
+                    print("{key:<{max_keywid}} {mxdiff:<12.7} ({typ})  {ref:<12.7}".format(
+                        key=relkey, max_keywid=max_keywid, mxdiff=mxdiff, typ=typ,
+                        ref=np.linalg.norm(Japprox[key])))
+
                 print()
+
             except Exception:
                 traceback.print_exc(file=sys.stdout)
                 summ[mode]['ran'] = False
@@ -225,8 +241,8 @@ def _ad(prob, options):
         if options.ad_method == 'autograd':
             mod_wrapper.np = mod_wrapper.numpy = np
 
-        if summ['fwd']['ran'] and summ['rev']['ran']:
-            summ['dotprod'] = _dot_prod_test(s, summ['fwd']['func'], summ['rev']['func'])
+        if options.ad_method == 'tangent' and summ['fwd']['ran'] and summ['rev']['ran']:
+            summ['dotprod'] = _dot_prod_test(comp, summ['fwd']['func'], summ['rev']['func'])
         else:
             summ['dotprod'] = float('nan')
 
@@ -238,29 +254,31 @@ def _ad(prob, options):
     revgood = []
     bad = []
 
-    toptemplate = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}}{rdiff:<{dwid}}{dot:<{dwid}}{iosz:<12}{pref:<14}"
-    template = "{cname:<{cwid}}{typ:<10}{fdiff:<{dwid}.4}{rdiff:<{dwid}.4}{dot:<{dwid}.4}{iosz:<12}{pref:<14}"
-    print(toptemplate.format(cname='Class', typ='Type', fdiff='Max Diff (fwd)',
+    toptemplate = \
+        "{n:<{cwid}}{typ:<10}{fdiff:<{dwid}}{rdiff:<{dwid}}{dot:<{dwid}}{iosz:<12}{pref:<14}"
+    template = \
+        "{n:<{cwid}}{typ:<10}{fdiff:<{dwid}.4}{rdiff:<{dwid}.4}{dot:<{dwid}.4}{iosz:<12}{pref:<14}"
+    print(toptemplate.format(n='Class', typ='Type', fdiff='Max Diff (fwd)',
                              rdiff='Max Diff (rev)', dot='Dotprod Test', pref='Preferred Mode',
                              cwid=max_cname, dwid=max_diff, iosz='(I/O) Size'))
     print('--------- both derivs ok ------------')
-    for cname in sorted(summary):
-        s = summary[cname]
+    for cname, s in sorted(summary.items(),
+                           key=lambda x: max(x[1]['fwd']['diff'], x[1]['rev']['diff'])):
         typ = s['type']
         fwdran = s['fwd']['ran']
         fwdmax = s['fwd']['diff']
         revran = s['rev']['ran']
         revmax = s['rev']['diff']
         dptest = s['dotprod']
-        line = template.format(cname=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, dot=dptest,
+        line = template.format(n=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, dot=dptest,
                                cwid=max_cname, dwid=max_diff,
                                iosz='(%d/%d)' % (s['isize'], s['osize']), pref=s['pref'])
-        if fwdran and revran and fwdmax == 0.0 and revmax == 0.0:
+        if fwdran and revran and fwdmax <= tol and revmax <= tol:
             bothgood.append(line)
             print(line)
-        elif fwdran and fwdmax == 0.0:
+        elif fwdran and fwdmax <= tol:
             fwdgood.append(line)
-        elif revran and revmax == 0.0:
+        elif revran and revmax <= tol:
             revgood.append(line)
         else:
             bad.append(line)
@@ -302,3 +320,5 @@ def _ad_cmd(options):
         The post-setup hook function.
     """
     return lambda prob: _ad(prob, options)
+
+

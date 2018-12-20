@@ -4,15 +4,21 @@ from __future__ import print_function
 
 import sys
 import os
+from itertools import product
 
 import numpy as np
 import cProfile
 from contextlib import contextmanager
+from six import iteritems, iterkeys, itervalues
 
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.mpi import MPI
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -342,3 +348,112 @@ def profiling(outname='prof.out'):
 
     prof.disable()
     prof.dump_stats(outname)
+
+
+def compute_approx_jac(comp, method='fd', step=None, form='forward', step_calc='abs'):
+    # Finite Difference to calculate Jacobian
+    alloc_complex = comp._outputs._alloc_complex
+    all_fd_options = {}
+    could_not_cs = False
+
+    c_name = comp.pathname
+    all_fd_options[c_name] = {}
+    implicit = isinstance(comp, ImplicitComponent)
+
+    approximations = {'fd': FiniteDifference(), 'cs': ComplexStep()}
+
+    of = list(comp._var_allprocs_prom2abs_list['output'])
+    wrt = list(comp._var_allprocs_prom2abs_list['input'])
+
+    # The only outputs in wrt should be implicit states.
+    if implicit:
+        wrt.extend(of)
+
+    # Load up approximation objects with the requested settings.
+    local_opts = comp._get_check_partial_options()
+    for rel_key in product(of, wrt):
+        abs_key = rel_key2abs_key(comp, rel_key)
+        local_wrt = rel_key[1]
+
+        # Determine if fd or cs.
+        if local_wrt in local_opts:
+            local_method = local_opts[local_wrt]['method']
+            if local_method:
+                method = local_method
+
+        # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
+        if method == 'cs' and not alloc_complex:
+            could_not_cs = True
+            method = 'fd'
+
+        fd_options = {'order': None, 'method': method}
+
+        if method == 'cs':
+            defaults = DEFAULT_CS_OPTIONS
+
+            fd_options['form'] = None
+            fd_options['step_calc'] = None
+
+        elif method == 'fd':
+            defaults = DEFAULT_FD_OPTIONS
+
+            fd_options['form'] = form
+            fd_options['step_calc'] = step_calc
+
+        if step:
+            fd_options['step'] = step
+        else:
+            fd_options['step'] = defaults['step']
+
+        # Precedence: component options > global options > defaults
+        if local_wrt in local_opts:
+            for name in ['form', 'step', 'step_calc', 'directional']:
+                value = local_opts[local_wrt][name]
+                if value is not None:
+                    fd_options[name] = value
+
+        all_fd_options[c_name][local_wrt] = fd_options
+
+        approximations[fd_options['method']].add_approximation(abs_key, fd_options)
+
+    approx_jac = {}
+    for approximation in itervalues(approximations):
+        # Perform the FD here.
+        approximation.compute_approximations(comp, jac=approx_jac)
+
+    return approx_jac, could_not_cs
+
+
+def compare_jacs(Jref, J, rel_trigger=1.0):
+    results = []
+
+    for key in set(J).union(Jref):
+        if key in J:
+            subJ = J[key]
+        else:
+            subJ = np.zeros(Jref[key].shape)
+
+        if key in Jref:
+            subJref = Jref[key]
+        else:
+            subJref = np.zeros(J[key].shape)
+
+        diff = np.abs(subJ - subJref)
+        absref = np.abs(subJref)
+        rel_idxs = np.nonzero(absref > rel_trigger)
+        diff[rel_idxs] /= absref[rel_idxs]
+
+        max_diff_idx = np.argmax(diff)
+        max_diff = diff.flatten()[max_diff_idx]
+
+        # now determine if max diff is abs or rel
+        diff[:] = 0.0
+        diff[rel_idxs] = 1.0
+        if diff.flatten()[max_diff_idx] > 0.0:
+            results.append((key, max_diff, 'rel'))
+        else:
+            results.append((key, max_diff, 'abs'))
+
+    return results
+
+
