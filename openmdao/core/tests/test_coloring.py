@@ -17,7 +17,8 @@ except ImportError:
     load_npz = None
 
 from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
-    ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver, ParallelGroup, Group
+    ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver, ParallelGroup, Group, \
+    SqliteRecorder, CaseReader
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import get_simul_meta, _solves_info
@@ -52,7 +53,7 @@ class CounterGroup(Group):
 SIZE = 10
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, derivs=True,
-           **options):
+            recorder=None, **options):
 
     p = Problem(model=CounterGroup())
 
@@ -125,6 +126,9 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
         p.driver.set_simul_deriv_color(color_info)
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
+
+    if recorder:
+        p.driver.add_recorder(recorder)
 
     p.setup(mode=mode, derivatives=derivs)
     p.run_driver()
@@ -351,6 +355,37 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
+
+
+@unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+class SimulColoringRecordingTestCase(unittest.TestCase):
+
+    def setUp(self):
+        from tempfile import mkdtemp
+        self.dir = mkdtemp()
+        self.original_path = os.getcwd()
+        os.chdir(self.dir)
+
+    def tearDown(self):
+        os.chdir(self.original_path)
+        try:
+            shutil.rmtree(self.dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
+
+    def test_recording(self):
+        # coloring involves an underlying call to run_model (and final_setup),
+        # this verifies that it is handled properly by the recording setup logic
+        recorder = SqliteRecorder('cases.sql')
+
+        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT',
+                    dynamic_simul_derivs=True, print_results=False, recorder=recorder)
+
+        cr = CaseReader('cases.sql')
+
+        self.assertEqual(cr.list_cases(), ['rank0:SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
 
 class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):

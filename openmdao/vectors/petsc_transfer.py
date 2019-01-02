@@ -82,7 +82,7 @@ class PETScTransfer(DefaultTransfer):
             offsets_in = offsets[vec_name]['input']
             offsets_out = offsets[vec_name]['output']
 
-            # Loop through all explicit / implicit connections owned by this system
+            # Loop through all connections owned by this system
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
                 if abs_out not in relvars['output']:
                     continue

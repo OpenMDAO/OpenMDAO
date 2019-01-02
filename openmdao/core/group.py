@@ -410,12 +410,25 @@ class Group(System):
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
 
-    def _check_reconf_update(self):
+    def _check_reconf_update(self, subsys=None):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
+
+        Parameters
+        ----------
+        subsys : System or None
+            If not None, check only if the given subsystem has reconfigured.
         """
-        # See if any local subsystem has reconfigured
-        reconf = np.any([subsys._reconfigured for subsys in self._subsystems_myproc])
+        if subsys is None:
+            # See if any local subsystem has reconfigured
+            for subsys in self._subgroups_myproc:
+                if subsys._reconfigured:
+                    reconf = 1
+                    break
+            else:
+                reconf = 0
+        else:
+            reconf = int(subsys._reconfigured) if subsys.name in self._loc_subsys_map else 0
 
         # See if any subsystem on this or any other processor has configured
         if self.comm.size > 1:
@@ -746,8 +759,6 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        super(Group, self)._setup_global_connections()
-
         global_abs_in2out = self._conn_global_abs_in2out
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']

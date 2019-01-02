@@ -227,6 +227,7 @@ class COOMatrix(Matrix):
                 else:
                     rstart, rend, cstart, cend = ranges
                     rmat = mat.tocoo()
+
                     # find all row and col indices that are within the desired range
                     ridxs = np.nonzero(np.logical_and(rmat.row >= rstart, rmat.row < rend))[0]
                     cidxs = np.nonzero(np.logical_and(rmat.col >= cstart, rmat.col < cend))[0]

@@ -38,6 +38,7 @@ class ExplicitComponent(Component):
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
+        self.options.undeclare('assembled_jac_type')
 
     def _configure(self):
         """
@@ -86,6 +87,18 @@ class ExplicitComponent(Component):
             # ExplicitComponent jacobians have -1 on the diagonal.
             self._declare_partials(out_name, out_name, rows=arange, cols=arange,
                                    val=np.full(meta['size'], -1.))
+
+    def _setup_jacobians(self, recurse=True):
+        """
+        Set and populate jacobian.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, setup jacobians in all descendants. (ignored)
+        """
+        if self._use_derivatives:
+            self._set_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):
