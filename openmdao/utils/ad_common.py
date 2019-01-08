@@ -61,7 +61,7 @@ def _ad_exec(options):
         _ad(None, options)
 
 
-def _create_and_check_partials(prob, classes):
+def _create_instances(prob, classes):
     """
     Creates instances of the given classes and checks their partials.
 
@@ -153,6 +153,7 @@ def _ad(prob, options):
 
     if classes and all(['.' in cpath for cpath in classes]):
         it = _create_instances(prob, classes)
+        prob.run_model()
     else:
         prob.run_model()
         it = _find_instances(prob, classes, exclude=set(['IndepVarComp', 'ExecComp']))
@@ -270,16 +271,20 @@ def _ad(prob, options):
         revran = s['rev']['ran']
         revmax = s['rev']['diff']
         dptest = s['dotprod']
+
         line = template.format(n=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, dot=dptest,
                                cwid=max_cname, dwid=max_diff,
                                iosz='(%d/%d)' % (s['isize'], s['osize']), pref=s['pref'])
+
+        add = "  different: %s %s" % (fwdmax, revmax) if fwdmax != revmax else ''
+
         if fwdran and revran and fwdmax <= tol and revmax <= tol:
             bothgood.append(line)
-            print(line)
+            print(line + add)
         elif fwdran and fwdmax <= tol:
-            fwdgood.append(line)
+            fwdgood.append(line + add)
         elif revran and revmax <= tol:
-            revgood.append(line)
+            revgood.append(line + add)
         else:
             bad.append(line)
 

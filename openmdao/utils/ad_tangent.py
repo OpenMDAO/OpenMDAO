@@ -347,9 +347,11 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
         colstart = colend
 
 
-def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, check_dims=False, **kwargs):
+def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, raise_exc=True, **kwargs):
     """
     Compare AD jac for the given component with its appoximate jac (either fd or cs).
+
+    The model must be in a valid state before running this, else the FD will give bad results.
 
     Parameters
     ----------
@@ -365,27 +367,28 @@ def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, check_dim
         purposes. If > 1, all intermediate code generation steps will print.
     optimize : bool (True)
         If True, allow tangent to perform optimizations on the generated code.
-    check_dims : bool (True)
-        If True, indicates whether to check
-        that the result of the original function `func` is a scalar, raising
-        an error if it is not.
-        Gradients are only valid for scalar-valued outputs, so tangent checks
-        this by defualt.
+    raise_exc : bool (True)
+        If True, raise an exception if difference in derivs is > failtol.
     **kwargs : dict
         Other named args passed to compute_approx_jac.
+
+    Returns
+    -------
+    float
+        Max difference found between AD and FD (or CS) derivatives.
     """
     save_inputs = comp._inputs._data.copy()
-    Japprox, no_cs = compute_approx_jac(comp, **kwargs)
+    Japprox, no_cs = compute_approx_jac(comp, method='cs', **kwargs)
 
     if mode is None:
         modes = ['fwd', 'rev']
     else:
         modes = [mode]
 
+    max_diff = 0.0
     for mode in modes:
         comp._inputs._data[:] = save_inputs
-        deriv_func, dmod = _get_tangent_ad_func(comp, mode, verbose=verbose, optimize=optimize,
-                                                check_dims=check_dims)
+        deriv_func, dmod = _get_tangent_ad_func(comp, mode, verbose=verbose, optimize=optimize)
         Jad = {}
         _get_tangent_ad_jac(comp, mode, deriv_func, Jad)
 
@@ -402,5 +405,10 @@ def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, check_dim
             o, i = key
             relkey = (o[rel_offset:], i[rel_offset:])
 
-            if diff > failtol:
+            if raise_exc and diff > failtol:
                 raise RuntimeError("Max diff for subjac %s is %g (%s)" % (relkey, diff, diff_type))
+
+            if diff > max_diff:
+                max_diff = diff
+
+    return max_diff

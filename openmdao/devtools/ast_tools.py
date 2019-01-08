@@ -1,5 +1,11 @@
+from __future__ import print_function
+
+import sys
 import ast
+from ast import Assign, AugAssign, Name, Call, Store, Load, Str, Expr, Module
 import astunparse
+import inspect
+import textwrap
 import networkx as nx
 from collections import defaultdict
 
@@ -78,6 +84,138 @@ def _get_long_name(node):
             return None
     return '.'.join(parts[::-1])
 
+
+class DebugTransformer(ast.NodeTransformer):
+    """
+    Rewrite code to print the result of each Assign or AugAssign.
+    """
+    def __init__(self):
+        super(DebugTransformer, self).__init__()
+        self._stack = []
+        self._funcs = []
+
+    def _create_prints(self, targets):
+        args = []
+        indent = '   ' * len(self._stack)
+        for t in targets:
+            tstr = astunparse.unparse(t)[:-1]  # last char is '\n' so remove it
+            n = ast.parse(tstr, mode='eval')
+            args.extend((Str(indent + tstr + ' ='), n.body))
+
+        return Expr(value=Call(func=Name(id='print', ctx=Load()), args=args, keywords=[]))
+
+    def _visit_statements(self, statements):
+        newstatements = []
+        self._stack.append(newstatements)
+
+        for s in statements:
+            bn = self.visit(s)
+            if bn is not None:
+                newstatements.append(bn)
+
+        return self._stack.pop()
+
+    def visit_Assign(self, node):  # targets, value
+        # don't need to visit the RHS
+
+        self._stack[-1].append(node)  # add original assign
+        self._stack[-1].append(self._create_prints(node.targets))  # add print statement
+
+        return None  # return None so enclosing loop won't re-add this node to its list
+
+    def visit_AugAssign(self, node):  # expr target, operator op, expr value
+        # don't need to visit the RHS
+
+        self._stack[-1].append(node)  # add original assign
+        self._stack[-1].append(self._create_prints([node.target]))  # add print statement
+
+        return None  # return None so enclosing loop won't re-add this node to its list
+
+    def visit_FunctionDef(self, node):
+        self._funcs.append(node)
+        args = [Str('%s(' % node.name)]
+        args.extend([Name(id=a.arg, ctx=Load()) for a in node.args.args if a.arg != 'self'])
+        args.append(Str(')'))
+        pnode = Expr(value=Call(func=Name(id='print', ctx=Load()), args=args, keywords=[]))
+        node.body = [pnode] + self._visit_statements(node.body)
+        return node
+
+    def visit_For(self, node):  # expr target, expr iter, stmt* body, stmt* orelse
+        node.body = [self._create_prints([node.target])] + self._visit_statements(node.body)
+        if node.orelse:
+            node.orelse = self._visit_statements(node.orelse)
+        return node
+
+    def visit_While(self, node):  # expr test, stmt* body, stmt* orelse
+        node.body = self._visit_statements(node.body)
+        if node.orelse:
+            node.orelse = self._visit_statements(node.orelse)
+        return node
+
+    def visit_If(self, node):  # expr test, stmt* body, stmt* orelse
+        node.body = self._visit_statements(node.body)
+        if node.orelse:
+            node.orelse = self._visit_statements(node.orelse)
+        return node
+
+    def visit_With(self, node):  # expr context_expr, expr? optional_vars, stmt* body
+        node.body = self._visit_statements(node.body)
+        return node
+
+    def visit_Return(self, node):  #expr? value
+        if node.value:
+            indent = '   ' * len(self._stack)
+            tstr = astunparse.unparse(node.value)[:-1]
+            args = [Str(indent + 'return')]
+            args.append(ast.parse(tstr, mode='eval').body)
+            pnode = Expr(value=Call(func=Name(id='print', ctx=Load()), args=args, keywords=[]))
+
+            self._stack[-1].append(pnode)  # add print
+            self._stack[-1].append(node)  # add original return
+            return None
+        else:
+            return node
+
+
+def add_prints(stream=sys.stdout, verbose=0):
+    """
+    A decorator that dumps the result of each assignment in the wrapped function to stdout.
+    """
+    def pwrap(func):
+        func_src = inspect.getsource(func)
+        src = textwrap.dedent(func_src)
+
+        # filter out this decorator from the source
+        src = '\n'.join([l for l in src.splitlines() if not l.startswith('@add_prints')])
+        if verbose > 1:
+            print('SRC', file=stream)
+            print(src, file=stream)
+
+        f_ast = ast.parse(src, mode='exec')
+        trans = DebugTransformer()
+        trans.visit(f_ast)
+        node = Module(body=[trans._funcs[0]])
+        ast.fix_missing_locations(node)
+
+        if verbose > 0:
+            print('\nMODIFIED SRC', end='', file=stream)
+            print(astunparse.unparse(node), file=stream)
+
+        dec_code = compile(node, func.__code__.co_filename, mode='exec')
+        exec(dec_code, func.__globals__)
+        newfunc = func.__globals__[func.__name__]
+        params = list(inspect.getargspec(func).args)
+
+        def wrap(*args, **kwargs):
+            save = sys.stdout
+            sys.stdout = stream
+            try:
+                return newfunc(*args, **kwargs)
+            finally:
+                sys.stdout = save
+
+        return wrap
+    return pwrap
 
 class StringSubscriptVisitor(ast.NodeVisitor):
     """

@@ -6,9 +6,8 @@ import numpy as np
 
 import tangent
 
-from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, \
-    ExecComp, Group, ImplicitComponent, ExplicitComponent,ParallelGroup, BroydenSolver
+    ExecComp, Group, ImplicitComponent, ExplicitComponent
 from openmdao.vectors.vector import set_vec
 from openmdao.devtools.debug import compute_approx_jac
 from openmdao.utils.ad_tangent import _get_tangent_ad_func, _get_tangent_ad_jac, check_ad
@@ -46,6 +45,45 @@ class Passthrough(ExplicitComponent):
         outputs = set_vec(inputs, outputs)
 
 
+class Looper(ExplicitComponent):
+
+    def __init__(self, *args, **kwargs):
+        super(Looper, self).__init__(*args, **kwargs)
+        self.names = ['a', 'b']
+
+    def setup(self):
+
+        # primary inputs and outputs
+        for n in self.names:
+            self.add_input(n + '_in', val=1.0)
+            self.add_output(n + '_out', val=0.0)
+
+    def compute(self, inputs, outputs):
+
+        insum = 0.0
+        names = self.names
+        for n in names:
+            insum = insum + inputs[n + '_in']
+
+        for n in names:
+            outputs[n + '_out'] = insum + 3.0 * inputs[n + '_in']
+
+
+class ForCond(ExplicitComponent):
+    def setup(self):
+        self.n = 5
+        self.add_input('x', np.ones(self.n))
+        self.add_output('y', np.zeros(self.n))
+
+    def compute(self, inputs, outputs):
+        for i in range(self.n):
+            if i == 0:
+                outputs['y'][i] = sin(inputs['x'][i])
+            else:
+                outputs['y'][i] = inputs['x'][i]
+
+
+
 def get_harness(comp, name='comp', top=False):
     if top:
         p = Problem(comp)
@@ -54,6 +92,7 @@ def get_harness(comp, name='comp', top=False):
         p.model.add_subsystem(name, comp)
 
     p.setup()
+    p.final_setup()
     return p, comp
 
 
@@ -67,7 +106,8 @@ class TangentTestCase(unittest.TestCase):
         p.run_model()
         check_ad(comp)
 
-    def test_optimize(self):
+    def test_optimize_req_key(self):
+        # make sure tangent doesn't optimize away variables needed as keys in __getitem__ calls
         self.fail("not tested")
 
     def test_aug_assign(self):
@@ -88,7 +128,10 @@ class TangentTestCase(unittest.TestCase):
         self.fail("not tested")
 
     def test_dynamic_loop(self):
-        self.fail("not tested")
+        p, comp = get_harness(Looper())
+        comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
+        p.run_model()
+        check_ad(comp)
 
     def test_subfunction(self):
         self.fail("not tested")
