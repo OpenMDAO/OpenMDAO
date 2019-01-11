@@ -12,7 +12,7 @@ except ImportError:
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DirectSolver
+    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DirectSolver, LinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
@@ -1270,6 +1270,62 @@ class TestGroupComplexStep(unittest.TestCase):
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
+    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+                          name_func=lambda f, n, p:
+                          'test_subbed_csc_external_mtx_'+'_'.join(title(a) for a in p.args))
+    def test_subbed_csc_external_mtx(self, vec_class):
+
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
+
+        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
+        class SellarDerivatives(Group):
+
+            def setup(self):
+                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+                self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+                self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+                sub = self.add_subsystem('sub', Group(), promotes=['*'])
+
+                sub.linear_solver = DirectSolver()
+                sub.options['assembled_jac_type'] = 'csc'
+
+                sub.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                                       x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
+                                  promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+                sub.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                                  promotes=['con1', 'y1'])
+                sub.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                                  promotes=['con2', 'y2'])
+
+                self.nonlinear_solver = NewtonSolver()
+                self.linear_solver = LinearBlockGS(assemble_jac=False)
+                self.linear_solver.options['maxiter'] = 25
+
+        prob = Problem()
+        prob.model = SellarDerivatives()
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=2)
+
+        prob.model.approx_totals(method='cs')
+
+        prob.run_model()
 
         wrt = ['z', 'x']
         of = ['obj', 'con1', 'con2']

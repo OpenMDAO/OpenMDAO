@@ -1,5 +1,6 @@
 """Define the CSCmatrix class."""
 
+import numpy as np
 from scipy.sparse import csc_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix
@@ -30,7 +31,7 @@ class CSCMatrix(COOMatrix):
 
     def _pre_update(self):
         """
-        Do anything that needs to be done at the end of AssembledJacobian._update.
+        Do anything that needs to be done at the start of AssembledJacobian._update.
         """
         self._matrix = self._coo
 
@@ -40,7 +41,27 @@ class CSCMatrix(COOMatrix):
         """
         coo = self._coo
         # this will add any repeated entries together
-        # NOTE: this form of the ctor was used instead of self._coo.tocsc() because
+        # NOTE: this form of the vector was used instead of self._coo.tocsc() because
         # on older versions of scipy the row/col arrays are reused and the result is
         # that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
+        #print('post', coo.data, self._matrix)
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if active:
+            self._coo.data = self._coo.data.astype(np.complex)
+            self._coo.dtype = np.complex
+        else:
+            self._coo.data = self._coo.data.astype(np.float)
+            self._coo.dtype = np.float

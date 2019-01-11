@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import sys
 from collections import defaultdict
 
-from six import iteritems
+from six import iteritems, itervalues
 
 import numpy as np
 
@@ -356,6 +356,7 @@ class AssembledJacobian(Jacobian):
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
         else:
+
             for key in iters:
                 int_mtx._update_submat(key, subjacs[key]['value'])
 
@@ -365,9 +366,6 @@ class AssembledJacobian(Jacobian):
         int_mtx._post_update()
         if ext_mtx is not None:
             ext_mtx._post_update()
-
-        if self._under_complex_step:
-            self._int_mtx._matrix = int_mtx._matrix.astype(np.complex)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -399,6 +397,10 @@ class AssembledJacobian(Jacobian):
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 if d_outputs._names and d_residuals._names:
+                    if self._under_complex_step:
+                        print('--- res', d_outputs._data)
+                        print('--- mat', int_mtx._matrix.toarray())
+                        print('--- int', int_mtx._prod(d_outputs._data, mode, int_ranges))
                     d_residuals._data += int_mtx._prod(d_outputs._data, mode, int_ranges)
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
@@ -410,6 +412,8 @@ class AssembledJacobian(Jacobian):
                         mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
+                    if self._under_complex_step:
+                        print('--- ext', ext_mtx._prod(d_inputs._data, mode, None, mask=mask))
                     d_residuals._data += ext_mtx._prod(d_inputs._data, mode, None, mask=mask)
 
             else:  # rev
@@ -427,6 +431,25 @@ class AssembledJacobian(Jacobian):
                         self._mask_caches[d_inputs._names] = mask
 
                     d_inputs._data += ext_mtx._prod(dresids, mode, None, mask=mask)
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        super(AssembledJacobian, self).set_complex_step_mode(active)
+
+        self._int_mtx.set_complex_step_mode(active)
+        for mtx in itervalues(self._ext_mtx):
+            if mtx:
+                mtx.set_complex_step_mode(active)
 
 
 class DenseJacobian(AssembledJacobian):

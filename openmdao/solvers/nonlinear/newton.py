@@ -239,6 +239,8 @@ class NewtonSolver(NonlinearSolver):
         self._linearize()
 
         self.linear_solver.solve(['linear'], 'fwd')
+        print('sol', system._vectors['output']['linear']._data)
+        print(80*'*')
 
         if self.linesearch:
             self.linesearch._do_subsolve = do_subsolve
