@@ -397,10 +397,6 @@ class AssembledJacobian(Jacobian):
                 outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 if d_outputs._names and d_residuals._names:
-                    if self._under_complex_step:
-                        print('--- res', d_outputs._data)
-                        print('--- mat', int_mtx._matrix.toarray())
-                        print('--- int', int_mtx._prod(d_outputs._data, mode, int_ranges))
                     d_residuals._data += int_mtx._prod(d_outputs._data, mode, int_ranges)
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
@@ -412,8 +408,6 @@ class AssembledJacobian(Jacobian):
                         mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
-                    if self._under_complex_step:
-                        print('--- ext', ext_mtx._prod(d_inputs._data, mode, None, mask=mask))
                     d_residuals._data += ext_mtx._prod(d_inputs._data, mode, None, mask=mask)
 
             else:  # rev

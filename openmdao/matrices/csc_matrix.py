@@ -45,23 +45,3 @@ class CSCMatrix(COOMatrix):
         # on older versions of scipy the row/col arrays are reused and the result is
         # that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
-        #print('post', coo.data, self._matrix)
-
-    def set_complex_step_mode(self, active):
-        """
-        Turn on or off complex stepping mode.
-
-        When turned on, the value in each subjac is cast as complex, and when turned
-        off, they are returned to real values.
-
-        Parameters
-        ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
-        """
-        if active:
-            self._coo.data = self._coo.data.astype(np.complex)
-            self._coo.dtype = np.complex
-        else:
-            self._coo.data = self._coo.data.astype(np.float)
-            self._coo.dtype = np.float

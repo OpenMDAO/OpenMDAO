@@ -304,4 +304,9 @@ class COOMatrix(Matrix):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        super(COOMatrix, self).set_complex_step_mode(active)
+        if active:
+            self._coo.data = self._coo.data.astype(np.complex)
+            self._coo.dtype = np.complex
+        else:
+            self._coo.data = self._coo.data.real
+            self._coo.dtype = np.float

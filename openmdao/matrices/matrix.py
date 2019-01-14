@@ -115,7 +115,7 @@ class Matrix(object):
         """
         pass
 
-    def _pre_update(self, complex_data=False):
+    def _pre_update(self):
         """
         Do anything that needs to be done at the beginning of AssembledJacobian._update.
         """

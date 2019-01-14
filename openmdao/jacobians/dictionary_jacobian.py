@@ -106,11 +106,7 @@ class DictionaryJacobian(Jacobian):
                     subjac = self._randomize_subjac(subjac_info['value'])
                 else:
                     subjac = subjac_info['value']
-                #print('subjac', abs_key, subjac)
                 res_name, other_name = abs_key
-                #print('oflat', oflat)
-                #print('iflat', iflat)
-                #print('rflat before', rflat)
                 if res_name in d_res_names:
                     rows = subjac_info['rows']
                     if rows is not None:  # sparse list format
@@ -166,5 +162,3 @@ class DictionaryJacobian(Jacobian):
                                 rflat[res_name] += subjac.dot(iflat[other_name])
                             else:  # rev
                                 iflat[other_name] += subjac.T.dot(rflat[res_name])
-
-                #print('rflat after', rflat)
