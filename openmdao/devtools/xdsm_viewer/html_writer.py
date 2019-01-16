@@ -19,6 +19,8 @@ def write_html(outfile, source_data=None, data_file=None):
     If a JSON file name is provided, the file will be referenced in the HTML.
     If the input is a dictionary, it will be embedded.
 
+    If both data file and source data are given, data file is
+
     Parameters
     ----------
     outfile : str
@@ -79,7 +81,7 @@ def write_html(outfile, source_data=None, data_file=None):
     with open(os.path.join(style_dir, "xdsm.css"), "r") as f:
         xdsm_style = f.read()
 
-    # grab the index.html
+    # grab the index.html template
     with open(os.path.join(vis_dir, _HTML_TEMPLATE), "r") as f:
         index = f.read()
 

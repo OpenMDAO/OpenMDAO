@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver
+from openmdao.devtools.xdsm_viewer.html_writer import write_html
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 try:
@@ -155,6 +156,66 @@ class TestXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
+    def test_html_writer_dct(self):
+        """
+        Makes XDSMjs input file.
+
+        Data is in a dictionary
+        """
+
+        filename = 'xdsm3'  # this name is needed for XDSMjs
+
+        data = {
+            "nodes": [{"id": "Opt", "name": "Optimization", "type": "optimization"},
+                      {"id": "MDA", "name": "MDA", "type": "mda"},
+                      {"id": "DA1", "name": "Analysis 1"},
+                      {"id": "DA2", "name": "Analysis 2"},
+                      {"id": "DA3", "name": "Analysis 3"},
+                      {"id": "Func", "name": "Functions"}
+                      ],
+            "edges": [{"from": "Opt", "to": "DA1", "name": "x_0,x_1"},
+                      {"from": "DA1", "to": "DA3", "name": "x_share"},
+                      {"from": "DA3", "to": "DA1", "name": "y_1^2"},
+                      {"from": "MDA", "to": "DA1", "name": "x_2"},
+                      {"from": "Func", "to": "Opt", "name": "f,c"},
+                      {"from": "_U_", "to": "DA1", "name": "x_0"},
+                      {"from": "DA3", "to": "_U_", "name": "y_0"}
+                      ],
+            "workflow": ["Opt", ["MDA", "DA1", "DA2", "DA3"], "Func"]
+        }
+
+        outfile = '.'.join([filename, 'html'])
+        write_html(outfile=outfile, source_data=data)
+
+        self.assertTrue(os.path.isfile(outfile))
+
+    def test_html_writer_str(self):
+        """
+        Makes XDSMjs input file.
+
+        Data is a string.
+        """
+
+        filename = 'xdsm4'  # this name is needed for XDSMjs
+
+        data = ("{'nodes': [{'type': 'optimization', 'id': 'Opt', 'name': 'Optimization'}, "
+                "{'type': 'mda', 'id': 'MDA', 'name': 'MDA'}, {'id': 'DA1', 'name': 'Analysis 1'}, "
+                "{'id': 'DA2', 'name': 'Analysis 2'}, {'id': 'DA3', 'name': 'Analysis 3'}, "
+                "{'id': 'Func', 'name': 'Functions'}], "
+                "'edges': [{'to': 'DA1', 'from': 'Opt', 'name': 'x_0,x_1'}, "
+                "{'to': 'DA3', 'from': 'DA1', 'name': 'x_share'}, "
+                "{'to': 'DA1', 'from': 'DA3', 'name': 'y_1^2'}, "
+                "{'to': 'DA1', 'from': 'MDA', 'name': 'x_2'}, "
+                "{'to': 'Opt', 'from': 'Func', 'name': 'f,c'}, "
+                "{'to': 'DA1', 'from': '_U_', 'name': 'x_0'}, "
+                "{'to': '_U_', 'from': 'DA3', 'name': 'y_0'}], "
+                "'workflow': ['Opt', ['MDA', 'DA1', 'DA2', 'DA3'], 'Func']}")
+
+        outfile = '.'.join([filename, 'html'])
+        write_html(outfile=outfile, source_data=data)
+
+        self.assertTrue(os.path.isfile(outfile))
+
     def test_wrong_out_format(self):
         """Incorrect output format error."""
 
@@ -171,7 +232,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = True
+        clean_up = False
 
         def clean_file(fname):
             try:  # Try to clean up
@@ -191,7 +252,7 @@ class TestXDSMViewer(unittest.TestCase):
 
             # clean-up of XDSMjs files
             for ext in ('json', 'html'):
-                for name in ['xdsm', 'xdsm_embedded']:
+                for name in ['xdsm', 'xdsm3', 'xdsm4', 'xdsm_embedded']:
                     filename = '.'.join([name, ext])
                     clean_file(filename)
 
