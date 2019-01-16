@@ -208,7 +208,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
         return data
 
-    def write(self, filename='xdsmjs', embed_data=False, **kwargs):
+    def write(self, filename='xdsmjs', embed_data=True, **kwargs):
         """
         Writes HTML output file, and depending on the value of "embed_data" a JSON file with the
         data.
@@ -221,7 +221,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         embed_data : bool, optional
             Embed XDSM data into the HTML file.
             If False, a JSON file will be also written.
-            Defaults to False.
+            Defaults to True.
         """
         self.add_workflow()
         data = self.collect_data()
@@ -229,16 +229,15 @@ class XDSMjsWriter(AbstractXDSMWriter):
         html_filename = '.'.join([filename, 'html'])
 
         if embed_data:
-            source_data = data
+            # Write HTML file
             write_html(outfile=html_filename, source_data=data)
         else:
             json_filename = '.'.join([filename, 'json'])
             with open(json_filename, 'w') as f:
                 json.dump(data, f)
-            source_data = json_filename
 
-        # Write HTML file
-        write_html(outfile=html_filename, source_data=source_data)
+            # Write HTML file
+            write_html(outfile=html_filename, data_file=json_filename)
         print('XDSM output file written to: {}'.format(html_filename))
 
 

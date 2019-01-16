@@ -103,7 +103,11 @@ class TestXDSMViewer(unittest.TestCase):
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
     def test_xdsmjs(self):
-        """Makes XDSMjs input file for the Sellar problem"""
+        """
+        Makes XDSMjs input file for the Sellar problem.
+
+        Data is in a separate JSON file.
+        """
 
         filename = 'xdsm'  # this name is needed for XDSMjs
         prob = Problem()
@@ -119,7 +123,34 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+                   embed_data=False)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
+
+    def test_xdsmjs_embed_data(self):
+        """
+        Makes XDSMjs input file for the Sellar problem.
+
+        Data is embedded into the HTML file.
+        """
+
+        filename = 'xdsm_embedded_data'  # this name is needed for XDSMjs
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+                   embed_data=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 

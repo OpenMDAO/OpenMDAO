@@ -11,7 +11,7 @@ _DEFAULT_JSON_FILE = "xdsm.json"
 _HTML_TEMPLATE = "index.html"
 
 
-def write_html(outfile, source_data):
+def write_html(outfile, source_data=None, data_file=None):
     """
     Writes XDSMjs HTML output file, with style and script files embedded.
 
@@ -23,7 +23,9 @@ def write_html(outfile, source_data):
     ----------
     outfile : str
         Output HTML file
-    source_data : str or dict
+    source_data : str or dict or None
+        XDSM data in a dictionary or string
+    data_file : str or None
         Output HTML file
     """
 
@@ -52,26 +54,23 @@ def write_html(outfile, source_data):
 
     xdsm_attrs = {'class': 'xdsm'}
     # grab the data
-    if isinstance(source_data, str):
+    if data_file is not None:
         # Add name of the data file
-        xdsm_attrs['data-mdo-file'] = source_data
-    elif isinstance(source_data, dict):
-        msg = ('The option to embed the data is not implemented yet. '
-               'Use a JSON file name as input instead.')
-        raise NotImplementedError(msg)
-        # tag = script_tag.format('var modelData = {}')
-        #
-        # json_data = json.dumps(source_data)  # JSON formatted string
-        # script = tag.format(json_data)
-        # scripts += script
-        # # replace file name
-        # # FIXME this is wrong syntax now
-        # # TODO loading the JSON file should be replaced to use the modelData var or
-        # #  alternatively embed JSON script.
-        # xdsm_bundle = xdsm_bundle.replace('"xdsm.json",fetch("xdsm.json",void 0)', "modelData")
-    else:
-        msg = ('Invalid data type for source data: {} \n'
-               'The source data should be a JSON file name or a dictionary.')
+        xdsm_attrs['data-mdo-file'] = data_file
+    elif source_data is not None:
+        if isinstance(source_data, (dict, str)):
+            data_str = str(source_data)  # dictionary converted to string
+        else:
+            msg = ('Invalid data type for source data: {} \n'
+                   'The source data should be a JSON file name or a dictionary.')
+            raise ValueError(msg.format(type(source_data)))
+
+        # Replace quote marks for the HTML syntax
+        for i in ('u"', "u'", '"', "'"):  # quote marks and unicode prefixes
+            data_str = data_str.replace(i, r'&quot;')
+        xdsm_attrs['data-mdo'] = data_str
+    else:  # both source data and data file name are None
+        msg = 'Specify either "source_data" or "data_file".'
         raise ValueError(msg.format(type(source_data)))
 
     # grab the style
@@ -99,6 +98,7 @@ def write_html(outfile, source_data):
 
 
 def _write_tags(tag, content, attrs, new_lines=False):
+    # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
     template = '<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
     if attrs is None:
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     # with JSON file name as input
     write_html(outfile='xdsmjs/xdsm_diagram.html', source_data="examples/idf.json")
 
-    # # with JSON data as input
-    # with open("XDSMjs/examples/idf.json") as f:
-    #     data = json.load(f)
-    # write_html(outfile='xdsm_diagram_data_embedded.html', source_data=data)
+    # with JSON data as input
+    with open("XDSMjs/examples/idf.json") as f:
+        data = json.load(f)
+    write_html(outfile='xdsm_diagram_data_embedded.html', source_data=data)
