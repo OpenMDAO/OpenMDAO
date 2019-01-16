@@ -48,7 +48,7 @@ def write_html(outfile, source_data):
             script = script_tag.format(code)
             scripts += script
 
-    with open(os.path.join(code_dir, "xdsm-main.js"), "r") as f:
+    with open(os.path.join(src_dir, "xdsm-factory.js"), "r") as f:
         code = f.read()
         script = script_tag.format(code)
         scripts += script
