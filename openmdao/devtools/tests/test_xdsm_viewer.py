@@ -4,12 +4,11 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver
-from openmdao.devtools.xdsm_viewer.html_writer import write_html
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 try:
     from pyxdsm.XDSM import XDSM
-    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
+    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm, write_html
 except ImportError:
     XDSM = None
 
