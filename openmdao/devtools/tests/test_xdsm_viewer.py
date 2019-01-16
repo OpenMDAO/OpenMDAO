@@ -126,6 +126,7 @@ class TestXDSMViewer(unittest.TestCase):
         write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
                    embed_data=False)
         # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'json'])))
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
     def test_xdsmjs_embed_data(self):
@@ -135,7 +136,7 @@ class TestXDSMViewer(unittest.TestCase):
         Data is embedded into the HTML file.
         """
 
-        filename = 'xdsm_embedded_data'  # this name is needed for XDSMjs
+        filename = 'xdsm_embedded'  # this name is needed for XDSMjs
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -170,7 +171,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = False
+        clean_up = True
 
         def clean_file(fname):
             try:  # Try to clean up
@@ -190,8 +191,9 @@ class TestXDSMViewer(unittest.TestCase):
 
             # clean-up of XDSMjs files
             for ext in ('json', 'html'):
-                filename = '.'.join(['xdsm', ext])
-                clean_file(filename)
+                for name in ['xdsm', 'xdsm_embedded']:
+                    filename = '.'.join([name, ext])
+                    clean_file(filename)
 
 
 if __name__ == "__main__":

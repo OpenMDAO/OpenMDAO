@@ -1,6 +1,15 @@
 """
 XDSM writer using the pyXDSM package or XDSMjs.
 
+The XDSM (eXtended Design Structure Matrix) is a tool used to visualize MDO processes.
+It is an extension of the classical Design Structure Matrix commonly used in systems engineering to
+describe the interfaces among components of a complex system.
+
+Theoretical background:
+Lambe, AB and Martins, JRRA (2012): Extensions to the Design Structure Matrix for the Description of
+Multidisciplinary Design, Analysis, and Optimization Processes.
+In: Structural and Multidisciplinary Optimization.
+
 The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
@@ -140,9 +149,10 @@ class XDSMWriter(XDSM):
 
 class XDSMjsWriter(AbstractXDSMWriter):
     """
-    JSON input file writer for XDSMjs.
+    Creates an interactive diagram with XDSMjs, which can be opened with a web browser.
 
-    XDSMjs is available at https://github.com/OneraHub/XDSMjs
+    XDSMjs was created by Remi Lafage. The code and documentation is available at
+    https://github.com/OneraHub/XDSMjs
     """
     def __init__(self):
         super(XDSMjsWriter, self).__init__()
@@ -212,6 +222,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
         """
         Writes HTML output file, and depending on the value of "embed_data" a JSON file with the
         data.
+
+        If "embed_data" is true, a single standalone HTML file will be generated, which includes
+        the data of the XDSM diagram.
 
         Parameters
         ----------
