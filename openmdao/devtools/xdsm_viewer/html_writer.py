@@ -34,25 +34,13 @@ def write_html(outfile, source_data=None, data_file=None):
     # directories
     main_dir = os.path.dirname(os.path.abspath(__file__))
     code_dir = os.path.join(main_dir, 'XDSMjs')
-    src_dir = os.path.join(code_dir, "src")
     build_dir = os.path.join(code_dir, "build")
     vis_dir = os.path.join(main_dir, "visualization")
     style_dir = code_dir  # CSS
 
-    # grab the libraries
-    scripts = ''
-    script_names = {'animation', 'controls', 'graph', 'labelizer', 'selectable', 'xdsm',
-                    'xdsm-factory'}
-
     with open(os.path.join(build_dir, "xdsm.bundle.js"), "r") as f:
         code = f.read()
         xdsm_bundle = _write_script(code, {'type': 'text/javascript'})
-    # grab the scripts
-    for name in script_names:
-        with open(os.path.join(src_dir, "{}.js".format(name)), "r") as f:
-            code = f.read()
-            script = _write_script(code, {'type': 'text/javascript'})
-            scripts += script
 
     xdsm_attrs = {'class': 'xdsm'}
     # grab the data
@@ -92,7 +80,6 @@ def write_html(outfile, source_data=None, data_file=None):
     index = index.replace('{{fontello_style}}', fontello_style)
     index = index.replace('{{xdsm_style}}', xdsm_style)
     index = index.replace('{{xdsm_bundle}}', xdsm_bundle)
-    index = index.replace('{{scripts}}', scripts)
 
     # Embed style, scripts and data to HTML
     with open(outfile, 'w') as f:
