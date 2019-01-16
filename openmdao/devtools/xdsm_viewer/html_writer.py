@@ -5,6 +5,8 @@ HTML file writing to create (semi)standalone XDSMjs output file.
 import json
 import os
 
+from six import iteritems
+
 _DEFAULT_JSON_FILE = "xdsm.json"
 _HTML_TEMPLATE = "index.html"
 
@@ -24,7 +26,6 @@ def write_html(outfile, source_data):
     source_data : str or dict
         Output HTML file
     """
-    script_tag = '<script type="text/javascript">\n{}\n</script>\n'
 
     # directories
     main_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,28 +37,24 @@ def write_html(outfile, source_data):
 
     # grab the libraries
     scripts = ''
-    script_names = {'animation', 'controls', 'graph', 'labelizer', 'selectable', 'xdsm'}
+    script_names = {'animation', 'controls', 'graph', 'labelizer', 'selectable', 'xdsm',
+                    'xdsm-factory'}
 
     with open(os.path.join(build_dir, "xdsm.bundle.js"), "r") as f:
-        xdsm_bundle = f.read()
-
+        code = f.read()
+        xdsm_bundle = _write_script(code, {'type': 'text/javascript'})
     # grab the scripts
     for name in script_names:
         with open(os.path.join(src_dir, "{}.js".format(name)), "r") as f:
             code = f.read()
-            script = script_tag.format(code)
+            script = _write_script(code, {'type': 'text/javascript'})
             scripts += script
 
-    with open(os.path.join(src_dir, "xdsm-factory.js"), "r") as f:
-        code = f.read()
-        script = script_tag.format(code)
-        scripts += script
-
+    xdsm_attrs = {'class': 'xdsm'}
     # grab the data
     if isinstance(source_data, str):
-        data_name = source_data
-        # replace file name
-        xdsm_bundle = xdsm_bundle.replace(_DEFAULT_JSON_FILE, data_name)
+        # Add name of the data file
+        xdsm_attrs['data-mdo-file'] = source_data
     elif isinstance(source_data, dict):
         msg = ('The option to embed the data is not implemented yet. '
                'Use a JSON file name as input instead.')
@@ -88,6 +85,9 @@ def write_html(outfile, source_data):
         index = f.read()
 
     # put all style and JS into index
+    toolbar_div = _write_div(attrs={'class': 'xdsm-toolbar'})
+    xdsm_div = _write_div(attrs=xdsm_attrs)
+    index = index.replace('{{body}}', toolbar_div + '\n' + xdsm_div)
     index = index.replace('{{fontello_style}}', fontello_style)
     index = index.replace('{{xdsm_style}}', xdsm_style)
     index = index.replace('{{xdsm_bundle}}', xdsm_bundle)
@@ -96,6 +96,23 @@ def write_html(outfile, source_data):
     # Embed style, scripts and data to HTML
     with open(outfile, 'w') as f:
         f.write(index)
+
+
+def _write_tags(tag, content, attrs, new_lines=False):
+    line_sep = '\n' if new_lines else ''
+    template = '<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
+    if attrs is None:
+        attrs = {}
+    attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
+    return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep)
+
+
+def _write_div(content='', attrs=None):
+    return _write_tags('div', content, attrs, new_lines=False)
+
+
+def _write_script(content='', attrs=None):
+    return _write_tags('script', content, attrs, new_lines=True)
 
 
 if __name__ == '__main__':
