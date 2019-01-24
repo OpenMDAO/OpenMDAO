@@ -9,7 +9,7 @@ import os
 import traceback
 import tangent
 from tangent.transformers import TreeTransformer
-from tangent.utils import register_init_grad
+from tangent.utils import register_init_grad, register_add_grad
 from tangent import naming
 import textwrap
 import pprint
@@ -35,10 +35,11 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
-    StringSubscriptVisitor, get_external_vars  #, transform_ast_slices
+    StringSubscriptVisitor
 from openmdao.utils.general_utils import print_line_numbers
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.devtools.debug import compute_approx_jac, compare_jacs
+from openmdao.devtools.ast_tools import add_prints
 
 
 modemap = {
@@ -66,9 +67,12 @@ class _Vec(object):
     def __setitem__(self, name, val):
         self._views[name][:] = val
 
+    def __str__(self):
+        return str(self._data)
+
 
 # use this in AD function in place of OptionsDictionary
-class _Opt(object):
+class _OptionsAD(object):
     def __init__(self, opt):
         self._dct = {}
         for key in opt:
@@ -88,8 +92,13 @@ class _Opt(object):
 
 
 register_init_grad(DefaultVector, lambda vec: _Vec(vec))
-register_init_grad(OptionsDictionary, lambda opt: _Opt(opt))
-register_init_grad(str, lambda s: s)
+register_init_grad(OptionsDictionary, lambda opt: _OptionsAD(opt))
+register_init_grad(_OptionsAD, lambda opt: opt)
+register_init_grad(str, lambda s: 0.0)
+register_add_grad(float, _OptionsAD, lambda l, r: l)
+register_add_grad(_OptionsAD, float, lambda l, r: r)
+register_add_grad(np.ndarray, _OptionsAD, lambda l, r: l.copy())
+register_add_grad(_OptionsAD, np.ndarray, lambda l, r: r.copy())
 
 
 @tangent.tangent_(set_vec)
@@ -134,10 +143,10 @@ def _translate_compute_source(comp, verbose=0):
             lines[i] = line.replace('self,', '')  # TODO: fix this to be more robust
             break
 
-    # add appropriate return line (return either outputs or residuals depending on compute_method)
-    lines.append("        return %s\n" % params[-1])
-
     src = textwrap.dedent(''.join(lines))
+
+    # add appropriate return line (return either outputs or residuals depending on compute_method)
+    src += "    return %s\n" % params[-1]
 
     temp_mod_name = '_temp_' + comp.__class__.__name__
     temp_file_name = temp_mod_name + '.py'
@@ -204,8 +213,6 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
         lines = f.readlines()
 
     # now put 'self' back in the arg list
-    # lines = getsourcelines(deriv_func)[0]
-    # funcs = set()
     nreplaced = 0
     for i, line in enumerate(lines):
         lstrip = line.lstrip()
@@ -233,7 +240,11 @@ def _get_tangent_ad_func(comp, mode, verbose=0, optimize=True, check_dims=False)
     mod = sys.modules[deriv_mod_name]
     sys.path = sys.path[:-1]
 
-    return getattr(mod, deriv_func.__name__), mod
+    dfunc = getattr(mod, deriv_func.__name__)
+    if verbose > 2:
+        dfunc = add_prints()(dfunc)
+
+    return dfunc, mod
 
 
 def _dot_prod_test(comp, fwd_func, rev_func):
@@ -347,11 +358,13 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
         colstart = colend
 
 
-def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, raise_exc=True, **kwargs):
+def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, raise_exc=True,
+                     **kwargs):
     """
     Compare AD jac for the given component with its appoximate jac (either fd or cs).
 
-    The model must be in a valid state before running this, else the FD will give bad results.
+    The model must be in a valid state before running this, else the FD will give bad
+    results.
 
     Parameters
     ----------
@@ -388,7 +401,8 @@ def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, raise_exc
     max_diff = 0.0
     for mode in modes:
         comp._inputs._data[:] = save_inputs
-        deriv_func, dmod = _get_tangent_ad_func(comp, mode, verbose=verbose, optimize=optimize)
+        deriv_func, dmod = _get_tangent_ad_func(comp, mode, verbose=verbose,
+                                                optimize=optimize)
         Jad = {}
         _get_tangent_ad_jac(comp, mode, deriv_func, Jad)
 
@@ -406,7 +420,8 @@ def check_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, raise_exc
             relkey = (o[rel_offset:], i[rel_offset:])
 
             if raise_exc and diff > failtol:
-                raise RuntimeError("Max diff for subjac %s is %g (%s)" % (relkey, diff, diff_type))
+                raise RuntimeError("Max diff for subjac %s is %g (%s)" % (relkey, diff,
+                                                                          diff_type))
 
             if diff > max_diff:
                 max_diff = diff

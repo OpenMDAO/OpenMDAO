@@ -9,6 +9,9 @@ import textwrap
 import networkx as nx
 from collections import defaultdict
 
+import gast
+SINGLE_VAR = (gast.Name, gast.Attribute, gast.Subscript)
+
 class ImportScanner(ast.NodeVisitor):
     """
     This node visitor collects all import information from a file.
@@ -62,27 +65,37 @@ def _get_attr_node(names, ctx):
     return node
 
 
-def _get_long_name(node):
-    # If the node is an Attribute or Name node that is composed
-    # only of other Attribute or Name nodes, then return the full
-    # dotted name for this node. Otherwise, i.e., if this node
-    # contains Subscripts or Calls, return None.
-    if isinstance(node, ast.Name):
+def _get_full_name(node):
+    """
+    Return full dotted name for Attribute or Name nodes.
+
+    If Attribute contains nodes other than Attribute or Name, return None.
+    """
+    if isinstance(node, gast.Name):
         return node.id
-    elif not isinstance(node, ast.Attribute):
-        return None
-    val = node.value
-    parts = [node.attr]
-    while True:
-        if isinstance(val, ast.Attribute):
-            parts.append(val.attr)
-            val = val.value
-        elif isinstance(val, ast.Name):
-            parts.append(val.id)
-            break
-        else:  # it's more than just a simple dotted name
-            return None
-    return '.'.join(parts[::-1])
+    elif isinstance(node, gast.Attribute):
+        vn = _get_full_name(node.value)
+        if vn is not None:
+            return '.'.join((vn, node.attr))
+
+
+def get_name(node):
+    """Get the name of a variable.
+
+    Args:
+      node: A `Name`, `Subscript` or `Attribute` node.
+
+    Returns:
+      The name of the variable e.g. `'x'` for `x`, `x.i` and `x[i]`.
+    """
+    if isinstance(node, gast.Name):
+        return node.id
+    elif isinstance(node, gast.Subscript):
+        return get_name(node.value)
+    elif isinstance(node, gast.Attribute):
+        return '.'.join((get_name(node.value), node.attr))
+    else:
+        raise TypeError
 
 
 class DebugTransformer(ast.NodeTransformer):
@@ -204,7 +217,6 @@ def add_prints(stream=sys.stdout, verbose=0):
         dec_code = compile(node, func.__code__.co_filename, mode='exec')
         exec(dec_code, func.__globals__)
         newfunc = func.__globals__[func.__name__]
-        params = list(inspect.getargspec(func).args)
 
         def wrap(*args, **kwargs):
             save = sys.stdout
@@ -227,7 +239,7 @@ class StringSubscriptVisitor(ast.NodeVisitor):
         self.subscripts = defaultdict(list)
 
     def visit_Subscript(self, node):  # (value, slice, ctx)
-        long_name = _get_long_name(node.value)
+        long_name = _get_full_name(node.value)
         if long_name is not None:
             if isinstance(node.slice, ast.Index) and isinstance(node.slice.value, ast.Str):
                 self.subscripts[long_name].append(astunparse.unparse(node.slice).strip())
@@ -243,115 +255,134 @@ class DependencyVisitor(ast.NodeVisitor):
     """
     def __init__(self):
         super(DependencyVisitor, self).__init__()
+        self.targets = None
+        self.store = False
         self.graph = nx.DiGraph()
-        self.rhs_set = set()
-        self.lhs_set = set()
-        self.vset = None
-        self.params = None
-        self.calls = set()
+        self.returns = []
+        self.equivs = defaultdict(list)
 
     def visit_FunctionDef(self, node):
-        self.params = set([n.arg for n in node.args.args])
-        if node.args.vararg is not None:
-            self.params.add(node.args.vararg.arg)
-        if node.args.kwarg is not None:
-            self.params.add(node.args.kwarg.arg)
-
+        self.graph = nx.DiGraph()
+        self.returns = []
+        self.equivs = defaultdict(list)
         for bnode in node.body:
             self.visit(bnode)
 
-    def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
-        long_name = _get_long_name(node.func)
-        if long_name is not None:
-            self.calls.add(long_name)
-            for arg in node.args:
-                self.visit(arg)
-        else:
-            self.generic_visit(node)
+        used = set()
+        for ret in self.returns:
+            used.update(x[1] for x in nx.dfs_edges(self.graph, ret))
+        for u in sorted(used):
+            print(u)
+
+    def visit_Return(self, node):
+        save = self.targets
+        self.targets = set()
+        self.store = True
+        self.visit(node.value)
+        self.returns = self.targets
+        self.targets = save
+        self.store = False
+
+    def visit_For(self, node):
+        self.targets = set()  # ('target', 'iter', 'body', 'orelse')
+        self.store = True
+        self.visit(node.target)
+        self.store = False
+        self.visit(node.iter)
+        self.targets = None
+
+        for n in node.body:
+            self.visit(n)
+
+        if node.orelse is not None:
+            for n in node.orelse:
+                self.visit(n)
 
     def visit_Assign(self, node):  # (targets, value)
-        self.rhs_set = set()
-        self.lhs_set = set()
-        self.vset = self.rhs_set
+        self.targets = set()
+        self.store = True
+        etargs = []
+        for t in node.targets:
+            self.visit(t)
+            if isinstance(t, SINGLE_VAR):
+                etargs.append(get_name(t))
+        self.store = False
         self.visit(node.value)
-
-        self.vset = self.lhs_set
-        for target in node.targets:
-            self.visit(target)
-
-        self.vset = None
-
-        for rhs in self.rhs_set:
-            for lhs in self.lhs_set:
-                self.graph.add_edge(lhs, rhs)
+        self.targets = None
+        # for a simple assignment, e.g., x = y, if later, x[?] = z, then
+        # y should also be dependent on z
+        if etargs and isinstance(node.value, SINGLE_VAR):
+            n = get_name(node.value)
+            if n is not None:
+                for t in etargs:
+                    self.equivs[t].append(n)
 
     def visit_AugAssign(self, node): # (target, op, value)
-        self.rhs_set = set()
-        self.lhs_set = set()
-        self.vset = self.rhs_set
-        self.visit(node.value)
-        self.vset = self.lhs_set
+        self.targets = set()
+        self.store = True
         self.visit(node.target)
-        self.vset = None
-
-        for rhs in self.rhs_set:
-            for lhs in self.lhs_set:
-                self.graph.add_edge(lhs, rhs)
+        self.store = False
+        self.visit(node.value)
+        self.targets = None
 
     def visit_Name(self, node):  # (id)
-        if self.vset is not None:
-            self.vset.add(node.id)
+        if self.targets is not None:
+            if self.store:
+                self.targets.add(node.id)
+                self.graph.add_node(node.id)
+            else:
+                for t in self.targets:
+                    self.graph.add_edge(t, node.id)
+
+    def visit_Call(self, node):
+        # don't visit the func name, just the args
+        for arg in node.args:
+            self.visit(arg)
 
     def visit_Attribute(self, node):  # (value, attr)
-        long_name = _get_long_name(node)
-        if long_name is None:
-            return self.generic_visit(node)
-        if self.vset is not None:
-            self.vset.add(long_name)
+        if self.targets is not None:
+            long_name = get_name(node)
+            if long_name is None:
+                return
+
+            if self.store:
+                self.targets.append(long_name)
+                self.graph.add_node(long_name)
+            else:
+                for t in self.targets:
+                    self.graph.add_edge(t, long_name)
 
     def visit_Subscript(self, node):  # (value, slice, ctx)
-        if self.vset is not None:
-            long_name = _get_long_name(node.value)
+        if self.targets is not None:
+            long_name = get_name(node.value)
             if long_name is not None:
-                if isinstance(node.slice, ast.Index):
-                    long_name = astunparse.unparse(node).strip()
-                    self.vset.add(long_name)
+                if self.store:
+                    self.targets.add(long_name)
+                    self.graph.add_node(long_name)
+                    if long_name in self.equivs:
+                        self.targets.update(self.equivs[long_name])
                 else:
-                    self.vset.add(long_name)
-                    self.visit(node.slice)
+                    for t in self.targets:
+                        self.graph.add_edge(t, long_name)
             else:
-                self.generic_visit(node)
-        else:
-            self.generic_visit(node)
+                self.generic_visit(node.value)
 
-    def get_external(self):
-        """
-        Return a list of var names of vars not passed in or modified/created in the function.
-        """
+            if self.store:
+                self.store = False
+                self.visit(node.slice)
+                self.store = True
+            else:
+                self.visit(node.slice)
+
+    def use_count(self):
         g = self.graph
-        return [node for node in g if node not in self.params and g.degree(node) == 1]
+        return [(n, g.in_degree(n)) for n in g]
 
 
-def dependency_analysis(src):
-    f_ast = ast.parse(src, mode='exec')
+def dependency_analysis(node):
     fdvis = DependencyVisitor()
-    fdvis.visit(f_ast)
-
-    # from openmdao.utils.graph_utils import all_connected_nodes
-    # for node in fdvis.graph:
-    #     print(node, list(set(list(all_connected_nodes(fdvis.graph, node))[1:])))
-
-    return fdvis, f_ast
-
-
-def get_external_vars(func_src):
-    """
-    Return names of variables not passed into or created/modified within the given function source.
-    """
-    f_ast = ast.parse(func_src, mode='exec')
-    fdvis = DependencyVisitor()
-    fdvis.visit(f_ast)
-    return fdvis.get_external()
+    fdvis.visit(node)
+    return fdvis
 
 
 class NameTransformer(ast.NodeTransformer):
@@ -364,13 +395,13 @@ class NameTransformer(ast.NodeTransformer):
                         ctx=node.ctx.__class__())
 
     def visit_Attribute(self, node):
-        long_name = _get_long_name(node)
+        long_name = _get_full_name(node)
         if long_name is None or long_name not in self.mapping:
             return self.generic_visit(node)
         return _get_attr_node(self.mapping[long_name].split('.'), node.ctx)
 
     def visit_Subscript(self, node):
-        long_name = _get_long_name(node.value)
+        long_name = _get_full_name(node.value)
         xform = self.mapping.get(long_name)
         if xform is None:
             full_replace = True

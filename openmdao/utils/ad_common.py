@@ -137,7 +137,7 @@ def _find_instances(prob, classes, exclude=()):
 
 def _ad(prob, options):
     """
-    Compute the fwd and rev AD for the compute or apply_nonlinear method of the given class.
+    Fwd and/or rev AD for the compute or apply_nonlinear method of the given class.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -246,7 +246,6 @@ def _ad(prob, options):
             summ['dotprod'] = _dot_prod_test(comp, summ['fwd']['func'], summ['rev']['func'])
         else:
             summ['dotprod'] = float('nan')
-
 
     max_cname = max(len(s) for s in summary) + 2
     max_diff = 16

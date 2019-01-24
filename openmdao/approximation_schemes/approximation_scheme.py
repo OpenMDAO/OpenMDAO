@@ -90,12 +90,11 @@ class ApproximationScheme(object):
 
 
 def _gather_jac_results(comm, results):
-    myproc = comm.rank
     new_results = defaultdict(list)
 
     # create full results list
     all_results = comm.allgather(results)
-    for rank, proc_results in enumerate(all_results):
+    for proc_results in all_results:
         for key in proc_results:
             new_results[key].extend(proc_results[key])
 

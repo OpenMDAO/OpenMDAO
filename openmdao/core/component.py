@@ -1168,43 +1168,6 @@ class Component(System):
         """
         pass
 
-    def _compute_ad_partials(self, inputs, partials, ad_method):
-        """
-        Compute our partials using automatic differentiation (AD).
-
-        Parameters
-        ----------
-        inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
-        ad_method : str
-            Method used to comput automatic derivatives ('autograd', 'tangent').
-        """
-        # TODO: coloring
-        try:
-            if ad_method == 'autograd':
-                import autograd.numpy as agnp
-                mod_wrapper.np = mod_wrapper.numpy = agnp
-
-            if self._ad_partials_func is None:
-                from openmdao.devtools.generate_derivative import _get_tangent_ad_func, \
-                    _get_ad_jac_fwd, _get_ad_jac_rev, _get_autograd_ad_func
-
-                ad_mode = 'reverse' if inputs._data.size > self._outputs._data.size else 'forward'
-
-                if ad_method == 'tangent':
-                    self._ad_partials_func = _get_tangent_ad_func(self, ad_mode)
-                elif ad_method == 'autograd':
-                    self._ad_partials_func = _get_autograd_ad_func(self, ad_mode)
-
-            if ad_mode == 'forward':
-                _get_ad_jac_fwd(self, self._ad_partials_func, ad_method, partials)
-            else:
-                _get_ad_jac_rev(self, self._ad_partials_func, ad_method, partials)
-        finally:
-            mod_wrapper.np = mod_wrapper.numpy = np
-
 
 class _DictValues(object):
     """
