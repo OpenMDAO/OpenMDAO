@@ -41,7 +41,7 @@ class CSCMatrix(COOMatrix):
         """
         coo = self._coo
         # this will add any repeated entries together
-        # NOTE: this form of the vector was used instead of self._coo.tocsc() because
-        # on older versions of scipy the row/col arrays are reused and the result is
-        # that self._coo.row and self._coo.col get scrambled after csc conversion.
+        # NOTE: The CSC matrix was created in the following way instead of using self._coo.tocsc()
+        # because on older versions of scipy, self._coo.tocsc() reuses the row/col arrays and the
+        # result is that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
