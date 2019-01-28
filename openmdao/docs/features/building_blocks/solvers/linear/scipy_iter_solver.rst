@@ -72,11 +72,12 @@ motivation for using a preconditioner is the observation that iterative methods 
 properties if the linear system has a smaller condition number, so the goal of the preconditioner is to
 improve the condition number in part or all of the Jacobian.
 
-Here, we add a Gauss-Seidel preconditioner to the double Sellar problem's top Newton solver.  This preconditioner
-will call the DirectSolver to solve the "g1" and "g2" subgroups.
+Here, we add a Gauss-Seidel preconditioner to a problem that contains two subgroups, each with an implicit component that implements a quadratic
+equation. These are solved together by a Newton solver at the top.  The goal of the preconditioner here is to solve the smaller linear systems
+for the quadratic components independently, and use that solution to precondition the full system solution. This is accomplished by setting up
+the linear solver hierarchy so that the preconditioner is `LinearBlockGS` and the subsytems `sub1` and `sub2` contain a `DirectSolver`.
 
-Note that the number of
-GMRES iterations is lower when using the preconditioner.
+Note that the number of GMRES iterations is lower when using the preconditioner.
 
 .. embed-code::
     openmdao.solvers.linear.tests.test_scipy_iter_solver.TestScipyKrylovFeature.test_specify_precon

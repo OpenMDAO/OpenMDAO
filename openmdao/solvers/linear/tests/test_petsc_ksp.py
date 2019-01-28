@@ -164,7 +164,7 @@ class TestPETScKrylov(unittest.TestCase):
         self.assertTrue(precon._iter_count > 0)
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
-        precon = group.linear_solver.precon = DirectSolver()
+        precon = group.linear_solver.precon = DirectSolver(assemble_jac=False)
         p.setup(check=False)
 
         # Conclude setup but don't run model.
@@ -194,7 +194,7 @@ class TestPETScKrylov(unittest.TestCase):
         """Solve implicit system with PETScKrylov using a preconditioner."""
 
         group = TestImplicitGroup(lnSolverClass=PETScKrylov)
-        precon = group.linear_solver.precon = DirectSolver()
+        precon = group.linear_solver.precon = DirectSolver(assemble_jac=False)
         group.linear_solver.options['precon_side'] = 'left'
         group.linear_solver.options['ksp_type'] = 'richardson'
 
@@ -226,7 +226,7 @@ class TestPETScKrylov(unittest.TestCase):
         assert_rel_error(self, output, group.expected_solution, 3e-15)
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
-        precon = group.linear_solver.precon = DirectSolver()
+        precon = group.linear_solver.precon = DirectSolver(assemble_jac=False)
         group.linear_solver.options['precon_side'] = 'left'
         group.linear_solver.options['ksp_type'] = 'richardson'
 

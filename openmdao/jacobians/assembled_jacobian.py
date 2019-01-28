@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import sys
 from collections import defaultdict
 
-from six import iteritems
+from six import iteritems, itervalues
 
 import numpy as np
 
@@ -356,6 +356,7 @@ class AssembledJacobian(Jacobian):
             for key in iters_in_ext:
                 ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
         else:
+
             for key in iters:
                 int_mtx._update_submat(key, subjacs[key]['value'])
 
@@ -424,6 +425,25 @@ class AssembledJacobian(Jacobian):
                         self._mask_caches[d_inputs._names] = mask
 
                     d_inputs._data += ext_mtx._prod(dresids, mode, None, mask=mask)
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        super(AssembledJacobian, self).set_complex_step_mode(active)
+
+        self._int_mtx.set_complex_step_mode(active)
+        for mtx in itervalues(self._ext_mtx):
+            if mtx:
+                mtx.set_complex_step_mode(active)
 
 
 class DenseJacobian(AssembledJacobian):

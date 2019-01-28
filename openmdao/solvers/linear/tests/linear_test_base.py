@@ -8,6 +8,7 @@ import unittest
 import numpy as np
 
 from openmdao.api import Group, IndepVarComp, Problem
+from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -55,6 +56,7 @@ class LinearSolverTests(object):
 
         def test_simple_matvec(self):
             # Tests derivatives on a simple comp that defines compute_jacvec.
+            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
             prob = Problem()
             model = prob.model = Group()
             model.add_subsystem('x_param', IndepVarComp('length', 3.0),
@@ -66,6 +68,11 @@ class LinearSolverTests(object):
             prob.set_solver_print(level=0)
 
             prob.setup(check=False, mode='fwd')
+
+            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
+            if isinstance(model.linear_solver, DirectSolver):
+                model.linear_solver.options['assemble_jac'] = False
+
             prob['width'] = 2.0
             prob.run_model()
 
@@ -99,6 +106,11 @@ class LinearSolverTests(object):
 
             prob.setup(check=False, mode='fwd')
             prob['width'] = 2.0
+
+            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
+            if isinstance(model.linear_solver, DirectSolver):
+                model.linear_solver.options['assemble_jac'] = False
+
             prob.run_model()
 
             of = ['area']
@@ -132,6 +144,11 @@ class LinearSolverTests(object):
 
             prob.setup(check=False, mode='fwd')
             prob['width'] = 2.0
+
+            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
+            if isinstance(model.linear_solver, DirectSolver):
+                model.linear_solver.options['assemble_jac'] = False
+
             prob.run_model()
 
             of = ['area']
