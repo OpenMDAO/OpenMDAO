@@ -358,31 +358,41 @@ class TestScipyKrylovFeature(unittest.TestCase):
         import numpy as np
 
         from openmdao.api import Problem, ScipyKrylov, NewtonSolver, LinearBlockGS, \
-             DirectSolver
+             DirectSolver, ExecComp, PETScKrylov
 
-        from openmdao.test_suite.components.double_sellar import DoubleSellar
+        from openmdao.test_suite.components.quad_implicit import QuadraticComp
 
-        prob = Problem(model=DoubleSellar())
+        prob = Problem()
         model = prob.model
 
-        model.nonlinear_solver = NewtonSolver()
-        model.nonlinear_solver.linesearch = BoundsEnforceLS()
-        model.linear_solver = ScipyKrylov()
-        model.g1.linear_solver = DirectSolver()
-        model.g2.linear_solver = DirectSolver()
+        sub1 = model.add_subsystem('sub1', Group())
+        sub1.add_subsystem('q1', QuadraticComp())
+        sub1.add_subsystem('z1', ExecComp('y = -6.0 + .01 * x'))
+        sub2 = model.add_subsystem('sub2', Group())
+        sub2.add_subsystem('q2', QuadraticComp())
+        sub2.add_subsystem('z2', ExecComp('y = -6.0 + .01 * x'))
 
-        model.linear_solver.precon = LinearBlockGS()
-        # TODO: This should work with 1 iteration.
-        #model.linear_solver.precon.options['maxiter'] = 1
+        model.connect('sub1.q1.x', 'sub1.z1.x')
+        model.connect('sub1.z1.y', 'sub2.q2.c')
+        model.connect('sub2.q2.x', 'sub2.z2.x')
+        model.connect('sub2.z2.y', 'sub1.q1.c')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = ScipyKrylov()
 
         prob.setup()
+
+        model.sub1.linear_solver = DirectSolver()
+        model.sub2.linear_solver = DirectSolver()
+
+        model.linear_solver.precon = LinearBlockGS()
+        model.linear_solver.precon.options['maxiter'] = 1
+
         prob.set_solver_print(level=2)
         prob.run_model()
 
-        assert_rel_error(self, prob['g1.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g1.y2'], 0.80, .00001)
-        assert_rel_error(self, prob['g2.y1'], 0.64, .00001)
-        assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
+        assert_rel_error(self, prob['sub1.q1.x'], 1.996, .0001)
+        assert_rel_error(self, prob['sub2.q2.x'], 1.996, .0001)
 
 
 if __name__ == "__main__":
