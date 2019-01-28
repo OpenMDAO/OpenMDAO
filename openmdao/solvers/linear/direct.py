@@ -174,7 +174,7 @@ class DirectSolver(LinearSolver):
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
 
-        # Always use an assembled jacobian.
+        # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
     def _linearize_children(self):
