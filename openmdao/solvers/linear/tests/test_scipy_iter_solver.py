@@ -386,7 +386,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         model.sub2.linear_solver = DirectSolver()
 
         model.linear_solver.precon = LinearBlockGS()
-        model.linear_solver.precon.options['maxiter'] = 1
 
         prob.set_solver_print(level=2)
         prob.run_model()
