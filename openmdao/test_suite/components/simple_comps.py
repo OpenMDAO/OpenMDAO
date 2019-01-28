@@ -37,9 +37,9 @@ class DoubleArrayComp(ExplicitComponent):
         Execution.
         """
         outputs['y1'] = self.JJ[0:2, 0:2].dot(inputs['x1']) + \
-                         self.JJ[0:2, 2:4].dot(inputs['x2'])
+                        self.JJ[0:2, 2:4].dot(inputs['x2'])
         outputs['y2'] = self.JJ[2:4, 0:2].dot(inputs['x1']) + \
-                         self.JJ[2:4, 2:4].dot(inputs['x2'])
+                        self.JJ[2:4, 2:4].dot(inputs['x2'])
 
     def compute_partials(self, inputs, partials):
         """
