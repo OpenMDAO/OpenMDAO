@@ -198,10 +198,7 @@ class KSComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         opt = self.options
-        vec_size = opt['vec_size']
         width = opt['width']
-
-        derivs = np.empty((vec_size, width))
 
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
