@@ -33,7 +33,11 @@ from six import iteritems
 
 
 # Character substitutions in labels
-_CHAR_SUBS = (('_', '~'), (')', ' '), ('(', '_'))
+# Underscore is replaced with a skipped underscore
+# Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
+# Underscore is converted first to a temporary character, so the underscore in subscripts won't be
+# replaced
+_CHAR_SUBS = ('_', '*'), ('(', '_{'), (')', '}'), ('*', '\_')
 
 # Constant file names in XDSMjs
 _XDSMJS_DATA = 'xdsm.json'
