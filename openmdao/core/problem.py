@@ -1784,7 +1784,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                         fwd_rev_error / fd_norm)
 
             # Skip printing the dependent keys if the derivatives are fine.
-            if indep_key is not None:
+            if not compact_print and indep_key is not None:
                 rel_key = (of, wrt)
                 if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
                     del derivative_data[sys_name][rel_key]
