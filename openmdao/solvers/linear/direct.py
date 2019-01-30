@@ -174,6 +174,9 @@ class DirectSolver(LinearSolver):
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
 
+        # Use an assembled jacobian by default.
+        self.options['assemble_jac'] = True
+
     def _linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
@@ -238,7 +241,7 @@ class DirectSolver(LinearSolver):
             ranges = self._assembled_jac._view_ranges[system.pathname]
             matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
 
-            # Perform dense or sparse lu factorization
+            # Perform dense or sparse lu factorization.
             if isinstance(mtx, DenseMatrix):
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():

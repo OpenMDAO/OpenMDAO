@@ -3,16 +3,17 @@
 from __future__ import division, print_function
 
 import unittest
-from six import iteritems
+from six import assertRaisesRegex, iteritems
 
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, NewtonSolver, ExecComp, \
      NewtonSolver, BalanceComp, ExplicitComponent, ImplicitComponent
-from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class NanComp(ExplicitComponent):
@@ -109,6 +110,8 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         p.setup(check=False)
 
+        g1.linear_solver.options['assemble_jac'] = False
+
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -191,7 +194,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver()
+        teg.linear_solver = DirectSolver(assemble_jac=False)
 
         teg.nonlinear_solver = NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True
@@ -319,7 +322,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver()
+        teg.linear_solver = DirectSolver(assemble_jac=False)
 
         teg.nonlinear_solver = NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True
@@ -353,7 +356,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c4.y', 'c5.x')
         model.connect('c4.y2', 'c6.x')
 
-        model.linear_solver = DirectSolver()
+        model.linear_solver = DirectSolver(assemble_jac=False)
 
         prob.setup()
         prob.run_model()
@@ -571,7 +574,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                 self.add_subsystem('calcs', RectifierCalcs(), promotes=['P_out', ('V_out', 'Vm_dc')])
 
                 self.nonlinear_solver = NewtonSolver()
-                self.linear_solver = DirectSolver(assemble_jac=True)
+                self.linear_solver = DirectSolver()
 
         prob = Problem(model=Rectifier())
 
@@ -584,6 +587,25 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         expected_msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
 
         self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_matvec_error_raised(self):
+        prob = Problem()
+        model = prob.model = Group()
+        model.add_subsystem('x_param', IndepVarComp('length', 3.0),
+                            promotes=['length'])
+        model.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
+                            promotes=['length', 'width', 'area'])
+
+        model.linear_solver = self.linear_solver_class()
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='fwd')
+
+        prob['width'] = 2.0
+
+        msg = "AssembledJacobian not supported for matrix-free subcomponent."
+        with assertRaisesRegex(self, Exception, msg):
+            prob.run_model()
 
 
 class TestDirectSolverFeature(unittest.TestCase):

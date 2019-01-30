@@ -419,7 +419,7 @@ class _TotalJacInfo(object):
         has_par_deriv_color = False
         abs2meta = model._var_allprocs_abs2meta
         var_sizes = model._var_sizes
-        var_offsets = model._var_offsets
+        var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
         idx_iter_dict = OrderedDict()  # a dict of index iterators
 

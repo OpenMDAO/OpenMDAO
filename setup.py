@@ -22,7 +22,7 @@ optional_dependencies = {
         'parameterized',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.3',
+        'testflo>=1.3.4',
     ],
 }
 
