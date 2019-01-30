@@ -20,7 +20,7 @@ class _BasicBlock(object):
     def __init__(self, id):
         self.id = id
         self.statements = []
-        self.out = {}
+        self.out = frozenset()
 
     def add_statement(self, statement, smap, subs=None):
         self.statements.append(statement)
@@ -37,24 +37,23 @@ class _BasicBlock(object):
 
 
 def setup_reaching_def(block, smap, graph):
-    inputs = set()
+    inputs = []
     for p in graph.predecessors(block.id):
-        inputs.update(graph.nodes[p]['block'].out)
+        inputs.extend(graph.nodes[p]['block'].out)
 
     before = hash(block.out)
 
-    out = set()
     if block.statements:
         for i, s in enumerate(block.statements):
             defs = smap[s][0]
             if i > 0:
                 inputs = out
-            kill = set(def_ for def_ in inputs if def_[0] in defs)
-            gen = set((d, s) for d in defs)
-            out = gen | (inputs - kill)
+            out = [(d, s) for d in defs]
+            out.extend(def_ for def_ in inputs if def_[0] not in defs)
     else:
-        out = inputs.copy()
+        out = inputs
 
+    out = frozenset(out)
     changed = hash(out) != before
 
     block.out = out
@@ -277,6 +276,6 @@ if __name__ == '__main__':
                                 # print(n, '???')
                     # else:
                     #     print(n, 'None')
-                    # print("OUT:", [n for n, _ in block.out])
+                    print("OUT:", [n for n, _ in block.out])
 
                 print("edges:", list(vis.graph.edges()))
