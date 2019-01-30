@@ -95,7 +95,7 @@ def get_name(node):
     elif isinstance(node, gast.Attribute):
         return '.'.join((get_name(node.value), node.attr))
     else:
-        raise TypeError
+        raise TypeError("Can't get name of a %s node" % type(node).__name__)
 
 
 class DebugTransformer(ast.NodeTransformer):
