@@ -31,6 +31,9 @@ except ImportError:
 
 from six import iteritems
 
+_DIR = os.path.dirname(os.path.abspath(__file__))
+_XDSMJS_PATH = os.path.join(_DIR, 'XDSMjs')
+
 _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xdsmjs'}
 
 # Character substitutions in labels
@@ -454,35 +457,15 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     if show_browser:
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
-        path = None
         if writer_name == 'pyxdsm':  # pyXDSM
             ext = 'pdf'
-            path = '.'.join([filename, ext])
         elif writer_name == 'xdsmjs':  # XDSMjs
-            from shutil import copyfile
-
-            # These are constant filenames in XDSMjs.
-            # For each new diagram 'xdsm.json' has to be overwritten.
-            if xdsmjs_path is not None:
-                xdsmjs_data = _XDSMJS_DATA
-                xdsmjs_filename = _XDSMJS_FILENAME
-                ext = 'json'
-                source = '.'.join([filename, ext])
-                destination = os.path.join(xdsmjs_path, xdsmjs_data)
-                path = os.path.join(xdsmjs_path, xdsmjs_filename)
-
-                # JSON file is copied to the XDSMjs folder with the fixed name 'xdsm.json'
-                copyfile(source, destination)
-            else:
-                msg = ('To show the XDSM diagram in the browser the "xdsmjs_path" '
-                       'is a required keyword argument.')
-                print(msg)
+            ext = 'html'
         else:
             err_msg = '"{}" is an invalid writer name.'
             raise ValueError(err_msg.format(writer))
-        if path:  #
-            print('Opening {} in browser'.format(path))
-            webview(path)
+        path = '.'.join([filename, ext])
+        webview(path)  # Can open also PDFs
 
     return x
 
