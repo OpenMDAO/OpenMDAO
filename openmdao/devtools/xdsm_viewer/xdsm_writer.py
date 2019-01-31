@@ -13,6 +13,9 @@ In: Structural and Multidisciplinary Optimization.
 The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
+
+# TODO implement "stack" boxes for parallel components
+
 from __future__ import print_function
 
 import json
@@ -34,6 +37,7 @@ from six import iteritems
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _XDSMJS_PATH = os.path.join(_DIR, 'XDSMjs')
 
+# Writer is chosen based on the output format
 _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xdsmjs'}
 
 # Character substitutions in labels
@@ -46,9 +50,24 @@ _CHAR_SUBS = {
     'xdsmjs': (),
 }
 
-# Constant file names in XDSMjs
-_XDSMJS_DATA = 'xdsm.json'
-_XDSMJS_FILENAME = 'xdsm.html'
+# Default file names in XDSMjs
+
+_XDSMJS_DATA = 'xdsm.json'  # data file, used only if data is not embedded
+_XDSMJS_FILENAME = 'xdsm.html'  # output file
+
+
+# Settings for pyXDSM
+
+# The box width can be set by the user:
+# _DEFAULT_BOX_WIDTH or _DEFAULT_BOX_CHAR_LIMIT can be overwritten with keyword argument "box_width"
+_DEFAULT_BOX_WIDTH = 3.  # Width of boxes [cm]. Depends on other settings, weather it is used or not
+# Maximum characters for line breaking.
+# The line can be longer, if a variable name is longer.
+_DEFAULT_BOX_CHAR_LIMIT = 25
+# Controls the appearance of boxes
+# Can be set with keyword argument "box_stacking"
+# Options: horizontal, vertical, max_chars
+_DEFAULT_BOX_STACKING = 'max_chars'
 
 
 class AbstractXDSMWriter(object):
@@ -267,6 +286,39 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     """
     Writes XDSM diagram of an optimization problem.
 
+    With the 'tex' or 'pdf' output format it uses the pyXDSM package, with 'json' or 'HTML'
+    output format it uses XDSMjs.
+
+    If a component (or group) name is not unique in the diagram, the systems absolute path is
+    used as a label. If the component (or group) name is unique, the relative name of the
+    system is the label.
+
+    In the diagram the connections are marked with the source name.
+
+    Writer specific settings and default:
+
+    pyXDSM
+    ~~~~~~
+
+    * The appearance of the boxes can be controlled with "box_stacking" and "box_width" arguments.
+      The box stacking can be "horizontal", "vertical", "cut_chars" or "max_chars".
+      With "cut_chars" the text in the box will be one line with the maximum number of characters
+      limited by "box_width". In the latter case the "box_width" argument is used to determine
+      the maximum allowed width of boxes (in characters).
+      A default value is taken, if not specified.
+    * By default the part of variable names following underscores (_)
+      are not converted to subscripts.
+      To write in subscripts wrap that part of the name into a round bracket.
+      Example: To write :math:`x_12` the variable name should be "x(12)"
+
+    XDSMjs
+    ~~~~~~
+
+    * If "embed_data" is true, a single standalone HTML file will be generated, which includes
+      the data of the XDSM diagram.
+    * variable names with exactly one underscore have a subscript.
+      Example: "x_12" will be :math:`x_12`
+
     Parameters
     ----------
     problem : Problem
@@ -319,7 +371,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         writer = out_formats[out_format]
     except KeyError:
         msg = 'Invalid output format "{}", choose from: {}'
-        raise KeyError(msg.format(out_format, out_formats.keys()))
+        raise ValueError(msg.format(out_format, out_formats.keys()))
     writer_name = writer.lower()  # making it case insensitive
     if isinstance(subs, dict):
         subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
@@ -337,8 +389,6 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
                 show_browser=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
-
-    In the diagram the connections are marked with the source name.
 
     Parameters
     ----------
@@ -380,6 +430,18 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         XDSM
     """
     # TODO implement residuals
+
+    # Box appearance
+    box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
+    box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
+
+    def format_block(names, **kwargs):
+        if writer == 'pyxdsm':
+            return _format_block_string(var_names=names, stacking=box_stacking,
+                                        box_width=box_width, **kwargs)
+        else:
+            return names
+
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
 
@@ -400,7 +462,6 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         x = XDSMWriter()
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
-        xdsmjs_path = kwargs.pop('xdsmjs_path', None)
 
     if optimizer is not None:
         x.add_optimizer(optimizer)
@@ -416,26 +477,26 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
         opt_con_vars = [_opt_var_str(var) for var in conn_vars]   # Optimal var names
         x.connect('opt', comp, conn_vars)  # Connection from optimizer
-        x.add_output(comp, ', '.join(opt_con_vars), side='left')  # Optimal output
+        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
     # Responses
     for comp, conn_vars in iteritems(responses2):
         conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
         opt_con_vars = [_opt_var_str(var) for var in conn_vars]
         x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
-        x.add_output(comp, ', '.join(opt_con_vars), side='left')  # Optimal output
+        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse)
 
     # Add components
     for comp in comps:
-        x.add_comp(name=comp['name'], label=_replace_chars(comp['name'], substitutes=subs))
+        x.add_comp(name=comp['abs_name'], label=_replace_chars(comp['name'], substitutes=subs))
 
     # Add the connections
     for src, dct in iteritems(conns3):
         for tgt, conn_vars in iteritems(dct):
-            x.connect(src, tgt, ', '.join(conn_vars))
+            x.connect(src, tgt, format_block(conn_vars))
 
     # Add the externally sourced inputs
     for src, tgts in iteritems(external_inputs3):
@@ -485,22 +546,28 @@ def _opt_var_str(name):
 
 
 def _process_connections(conns, recurse=True, subs=None):
-    conns_new = [{k: _convert_name(v, recurse=recurse, subs=subs) for k, v in iteritems(conn)} for conn in conns]
+
+    def convert(x):
+        return _convert_name(x, recurse=recurse, subs=subs)
+
+    conns_new = [{k: convert(v) for k, v in iteritems(conn)} for conn in conns]
     return conns_new
 
 
 def _accumulate_connections(conns):
     # Makes a dictionary with source and target components and with the connection sources
+    name_type = 'path'
     conns_new = dict()
     for conn in conns:  # list
-        src_comp = conn['src']['comp']
-        tgt_comp = conn['tgt']['comp']
+        src_comp = conn['src'][name_type]
+        tgt_comp = conn['tgt'][name_type]
         if src_comp == tgt_comp:
             # When recurse is False, ignore connections within the same subsystem.
             continue
         var = conn['src']['var']
         conns_new.setdefault(src_comp, {})
         conns_new[src_comp].setdefault(tgt_comp, []).append(var)
+    print('new conns: ', conns_new)
     return conns_new
 
 
@@ -508,7 +575,7 @@ def _collect_connections(variables):
     conv_vars = [_convert_name(v) for v in variables]
     connections = dict()
     for conv_var in conv_vars:
-        connections.setdefault(conv_var['comp'], []).append(conv_var['var'])
+        connections.setdefault(conv_var['path'], []).append(conv_var['var'])
     return connections
 
 
@@ -532,19 +599,27 @@ def _convert_name(name, recurse=True, subs=None):
     """
 
     def convert(name):
-        name = name.split('.')
+        name_items = name.split('.')
         if recurse:
-            comp = name[-2]
+            comp = name_items[-2]  # -1 is variable name, before that -2 is the component name
+            path = name.rsplit('.', 1)[0]
         else:
-            comp = name[0]
-        var = name[-1]
+            comp = name_items[0]
+            path = comp
+        var = name_items[-1]
         var = _replace_chars(var, substitutes=subs)
-        return {'comp': comp, 'var': var}
+        return {'comp': comp, 'var': var,
+                'abs_name': _format_name(name), 'path': _format_name(path)}
 
     if isinstance(name, list):  # If a source has multiple targets
         return [convert(n) for n in name]
     else:  # string
         return convert(name)
+
+
+def _format_name(x):
+    # Character to replace dot (.) in names for pyXDSM component and connection names
+    return x.replace('.', '@')
 
 
 def _prune_connections(conns, model_path=None):
@@ -576,24 +651,26 @@ def _prune_connections(conns, model_path=None):
 
     if model_path is None:
         return conns, external_inputs, external_outputs
+    else:
+        for conn in conns:
+            src = conn['src']
+            rel_src = src.replace(model_path + '.', '')
+            src_path = _format_name(src.rsplit('.', 1)[0])
+            tgt = conn['tgt']
+            rel_tgt = tgt.replace(model_path + '.', '')
+            tgt_path = _format_name(tgt.rsplit('.', 1)[0])
 
-    for conn in conns:
-        src = conn['src']
-        rel_src = src.replace(model_path + '.', '')
-        tgt = conn['tgt']
-        rel_tgt = tgt.replace(model_path + '.', '')
+            if src.startswith(model_path) and tgt.startswith(model_path):
+                # Internal connections
+                internal_conns.append({'src': src_path, 'tgt': tgt_path})
+            elif not src.startswith(model_path) and tgt.startswith(model_path):
+                # Externally connected input
+                external_inputs.append({'src': src_path, 'tgt': tgt_path})
+            elif src.startswith(model_path) and not tgt.startswith(model_path):
+                # Externally connected output
+                external_outputs.append({'src': src_path, 'tgt': tgt_path})
 
-        if src.startswith(model_path) and tgt.startswith(model_path):
-            # Internal connections
-            internal_conns.append({'src': rel_src, 'tgt': rel_tgt})
-        elif not src.startswith(model_path) and tgt.startswith(model_path):
-            # Externally connected input
-            external_inputs.append({'src': rel_src, 'tgt': rel_tgt})
-        elif src.startswith(model_path) and not tgt.startswith(model_path):
-            # Externally connected output
-            external_outputs.append({'src': rel_src, 'tgt': rel_tgt})
-
-    return internal_conns, external_inputs, external_outputs
+        return internal_conns, external_inputs, external_outputs
 
 
 def _get_comps(tree, model_path=None, recurse=True):
@@ -620,15 +697,34 @@ def _get_comps(tree, model_path=None, recurse=True):
     """
     # Components are ordered in the tree, so they can be collected by walking through the tree.
     components = list()
+    comp_names = set()
 
-    def get_children(tree_branch):
+    def get_children(tree_branch, path=''):
         for ch in tree_branch['children']:
+            ch['path'] = path
+            name = ch['name']
+            if path:
+                ch['abs_name'] = _format_name('.'.join([path, name]))
+            else:
+                ch['abs_name'] = _format_name(name)
+            ch['rel_name'] = name
             if ch['subsystem_type'] == 'component':
+                if name in comp_names:  # There is already a component with the same name
+                    ch['name'] = '.'.join([path, name])  # Replace with absolute name
+                    for comp in components:
+                        if comp['name'] == name:  # replace in the other component to abs. name
+                            comp['name'] = '.'.join([comp['path'], name])
                 components.append(ch)
+                comp_names.add(ch['rel_name'])
             elif recurse:
-                get_children(ch)
+                if path:
+                    new_path = '.'.join([path, ch['name']])
+                else:
+                    new_path = ch['name']
+                get_children(ch, new_path)
             else:
                 components.append(ch)
+                comp_names.add(ch['rel_name'])
 
     top_level_tree = tree
     if model_path is not None:
@@ -639,8 +735,48 @@ def _get_comps(tree, model_path=None, recurse=True):
             top_level_tree = [c for c in children if c['name'] == next_path][0]
 
     get_children(top_level_tree)
-
+    print('components: ', components)
     return components
+
+
+def _format_block_string(var_names, stacking='vertical', **kwargs):
+    if stacking == 'vertical':
+        return var_names
+    elif stacking == 'horizontal':
+        return ', '.join(var_names)
+    elif stacking in ('max_chars', 'cut_chars'):
+        max_chars = kwargs.pop('box_width', _DEFAULT_BOX_CHAR_LIMIT)
+        if len(var_names) < 2:
+            return var_names
+        else:
+            lengths = 0
+            lines = list()
+            line = ''
+            for name in var_names:
+                lengths += len(name)
+                if lengths <= max_chars:
+                    if line:  # there are already var names on the line
+                        line += ', ' + name
+                    else:  # it will be the first var name on the line
+                        line = name
+                else:  # make new line
+                    if stacking == 'max_chars':
+                        lines.append(line)
+                        line = name
+                        lengths = len(name)
+                    else:  # 'cut_chars'
+                        lines.append(line + ', ...')
+                        line = ''  # No new line
+                        break
+            if line:  # it will be the last line, if var_names was not empty
+                lines.append(line)
+            if len(lines) > 1:
+                return lines
+            else:
+                return lines[0]  # return the string instead of a list
+    else:
+        msg = 'Invalid block stacking option "{}".'
+        raise ValueError(msg.format(stacking))
 
 
 def _replace_chars(name, substitutes):

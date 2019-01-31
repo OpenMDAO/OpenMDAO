@@ -3,7 +3,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver
+from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
+    Group
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 try:
@@ -102,6 +103,76 @@ class TestXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
+    def test_pyxdsm_identical_relative_names(self):
+        class TimeComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('t_initial', val=0.)
+                self.add_input('t_duration', val=1.)
+                self.add_output('time', shape=(2,))
+
+            def compute(self, inputs, outputs):
+                t_initial = inputs['t_initial']
+                t_duration = inputs['t_duration']
+
+                outputs['time'][0] = t_initial
+                outputs['time'][1] = t_initial + t_duration
+
+        class Phase(Group):
+
+            def setup(self):
+                super(Phase, self).setup()
+
+                indep = IndepVarComp()
+                for var in ['t_initial', 't_duration']:
+                    indep.add_output(var, val=1.0)
+
+                self.add_subsystem('time_extents', indep, promotes_outputs=['*'])
+
+                time_comp = TimeComp()
+                self.add_subsystem('time', time_comp)
+
+                self.connect('t_initial', 'time.t_initial')
+                self.connect('t_duration', 'time.t_duration')
+
+                self.set_order(['time_extents', 'time'])
+
+        p = Problem()
+        p.driver = ScipyOptimizeDriver()
+        orbit_phase = Phase()
+        p.model.add_subsystem('orbit_phase', orbit_phase)
+
+        systems_phase = Phase()
+        p.model.add_subsystem('systems_phase', systems_phase)
+
+        systems_phase = Phase()
+        p.model.add_subsystem('extra_phase', systems_phase)
+        p.model.add_design_var('orbit_phase.t_initial')
+        p.model.add_design_var('orbit_phase.t_duration')
+        p.setup(check=True)
+
+        p.run_model()
+        # Test non unique local names
+        write_xdsm(p, 'xdsm3', out_format='tex', show_browser=False)
+        self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'pdf'])))
+
+        # Check formatting
+
+        # Max character box formatting
+        write_xdsm(p, 'xdsm4', out_format='tex', show_browser=False,
+                   box_stacking='cut_chars', box_width=15)
+        self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'pdf'])))
+        # Cut characters box formatting
+        write_xdsm(p, 'xdsm5', out_format='tex', show_browser=False,
+                   box_stacking='max_chars', box_width=15)
+        self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'pdf'])))
+        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
+
+        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
+
     def test_xdsmjs(self):
         """
         Makes XDSMjs input file for the Sellar problem.
@@ -109,7 +180,7 @@ class TestXDSMViewer(unittest.TestCase):
         Data is in a separate JSON file.
         """
 
-        filename = 'xdsm'  # this name is needed for XDSMjs
+        filename = 'xdsmjs'  # this name is needed for XDSMjs
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -136,7 +207,7 @@ class TestXDSMViewer(unittest.TestCase):
         Data is embedded into the HTML file.
         """
 
-        filename = 'xdsm_embedded'  # this name is needed for XDSMjs
+        filename = 'xdsmjs_embedded'  # this name is needed for XDSMjs
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -162,7 +233,7 @@ class TestXDSMViewer(unittest.TestCase):
         Data is in a dictionary
         """
 
-        filename = 'xdsm3'  # this name is needed for XDSMjs
+        filename = 'xdsmjs2'  # this name is needed for XDSMjs
 
         data = {
             "nodes": [{"id": "Opt", "name": "Optimization", "type": "optimization"},
@@ -195,7 +266,7 @@ class TestXDSMViewer(unittest.TestCase):
         Data is a string.
         """
 
-        filename = 'xdsm4'  # this name is needed for XDSMjs
+        filename = 'xdsmjs4'  # this name is needed for XDSMjs
 
         data = ("{'nodes': [{'type': 'optimization', 'id': 'Opt', 'name': 'Optimization'}, "
                 "{'type': 'mda', 'id': 'MDA', 'name': 'MDA'}, {'id': 'DA1', 'name': 'Analysis 1'}, "
@@ -243,7 +314,7 @@ class TestXDSMViewer(unittest.TestCase):
         if clean_up:
 
             # clean-up of pyXDSM files
-            nr_pyxdsm_tests = 3  # number of tests with pyXDSM
+            nr_pyxdsm_tests = 4  # number of tests with pyXDSM
             for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
                 for i in range(nr_pyxdsm_tests):
                     filename = '.'.join([FILENAME+str(i), ext])
@@ -251,7 +322,7 @@ class TestXDSMViewer(unittest.TestCase):
 
             # clean-up of XDSMjs files
             for ext in ('json', 'html'):
-                for name in ['xdsm', 'xdsm3', 'xdsm4', 'xdsm_embedded']:
+                for name in ['xdsmjs', 'xdsmjs2', 'xdsmjs3', 'xdsmjs_embedded', 'xdsmjs_orbit']:
                     filename = '.'.join([name, ext])
                     clean_file(filename)
 
