@@ -271,10 +271,15 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                         declared_partials.add(abs_key)
             non_declared_partials = []
             for of, n_of in self._surrogate_output_names:
-                for wrt, n_wrt in self._surrogate_input_names:
-                    abs_key = rel_key2abs_key(self, (of, wrt))
-                    if abs_key not in declared_partials:
-                        non_declared_partials.append(abs_key)
+                has_derivs = False
+                surrogate = self._metadata(of).get('surrogate')
+                if surrogate:
+                    has_derivs = overrides_method('linearize', surrogate, SurrogateModel)
+                if True or not has_derivs:
+                    for wrt, n_wrt in self._surrogate_input_names:
+                        abs_key = rel_key2abs_key(self, (of, wrt))
+                        if abs_key not in declared_partials:
+                            non_declared_partials.append(abs_key)
             if non_declared_partials:
                 msg = "Because the MetaModelUnStructuredComp '{}' uses a surrogate " \
                       "which does not define a linearize method,\nOpenMDAO will use " \
