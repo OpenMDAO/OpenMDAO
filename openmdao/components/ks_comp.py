@@ -47,10 +47,10 @@ class KSfunction(object):
         tuple
             g_max, g_diff, exponents and summation as needed by compute and derivates functions.
         """
-        g_max = np.max(g)
+        g_max = np.max(np.atleast_2d(g), axis=-1)[:, np.newaxis]
         g_diff = g - g_max
         exponents = np.exp(rho * g_diff)
-        summation = np.sum(exponents)
+        summation = np.sum(exponents, axis=-1)[:, np.newaxis]
         return g_max, g_diff, exponents, summation
 
     @staticmethod
@@ -99,7 +99,7 @@ class KSfunction(object):
         dKS_dsum = 1.0 / (rho * summation)
         dKS_dg = dKS_dsum * dsum_dg
 
-        dsum_drho = np.sum(g_diff * exponents)
+        dsum_drho = np.sum(g_diff * exponents, axis=-1)[:, np.newaxis]
         dKS_drho = dKS_dsum * dsum_drho
 
         return dKS_dg, dKS_drho
@@ -184,8 +184,7 @@ class KSComp(ExplicitComponent):
         if opt['lower_flag']:
             con_val = -con_val
 
-        for j in range(opt['vec_size']):
-            outputs['KS'][j, :] = KSfunction.compute(con_val[j, :], opt['rho'])
+        outputs['KS'] = KSfunction.compute(con_val, opt['rho'])
 
     def compute_partials(self, inputs, partials):
         """
@@ -199,17 +198,13 @@ class KSComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         opt = self.options
-        vec_size = opt['vec_size']
         width = opt['width']
-
-        derivs = np.empty((vec_size, width))
 
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
             con_val = -con_val
 
-        for j in range(vec_size):
-            derivs[j, :] = KSfunction.derivatives(con_val[j, :], opt['rho'])[0]
+        derivs = KSfunction.derivatives(con_val, opt['rho'])[0]
 
         if self.options['lower_flag']:
             derivs = -derivs

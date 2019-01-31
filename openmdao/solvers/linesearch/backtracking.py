@@ -78,7 +78,7 @@ class BoundsEnforceLS(NonlinearSolver):
         super(BoundsEnforceLS, self)._declare_options()
         opt = self.options
         opt.declare(
-            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
+            'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', then the output vector is backtracked to the "
             "first point where violation occured. If it is set to 'scalar' or 'wall', then only "
             "the violated variables are backtracked to their point of violation.")
