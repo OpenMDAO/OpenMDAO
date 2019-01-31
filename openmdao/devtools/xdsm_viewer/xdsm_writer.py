@@ -408,17 +408,19 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     design_vars2 = _collect_connections(design_vars)
     responses2 = _collect_connections(responses)
 
-    # Feed forward
+    # Design variables
     for comp, conn_vars in iteritems(design_vars2):
-        x.connect('opt', comp, conn_vars)
-        opt_con_vars = [_opt_var_str(var) for var in conn_vars]
-        x.add_output(comp, ', '.join(opt_con_vars), side='left')
+        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
+        opt_con_vars = [_opt_var_str(var) for var in conn_vars]   # Optimal var names
+        x.connect('opt', comp, conn_vars)  # Connection from optimizer
+        x.add_output(comp, ', '.join(opt_con_vars), side='left')  # Optimal output
 
-    # Feedback
+    # Responses
     for comp, conn_vars in iteritems(responses2):
-        x.connect(comp, 'opt', conn_vars)
+        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
         opt_con_vars = [_opt_var_str(var) for var in conn_vars]
-        x.add_output(comp, ', '.join(opt_con_vars), side='left')
+        x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
+        x.add_output(comp, ', '.join(opt_con_vars), side='left')  # Optimal output
 
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse)
@@ -435,7 +437,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     # Add the externally sourced inputs
     for src, tgts in iteritems(external_inputs3):
         for tgt, conn_vars in iteritems(tgts):
-            x.add_input(tgt, conn_vars)
+            formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
+            x.add_input(tgt, formatted_conn_vars)
 
     # Add the externally connected outputs
     if include_external_outputs:
@@ -443,7 +446,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
             output_vars = set()
             for tgt, conn_vars in iteritems(tgts):
                 output_vars |= set(conn_vars)
-            x.add_output(src, list(output_vars), side='right')
+                formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
+            x.add_output(src, formatted_outputs, side='right')
 
     x.write(filename, cleanup=cleanup, **kwargs)
 
@@ -474,8 +478,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
                        'is a required keyword argument.')
                 print(msg)
         else:
-            err_msg = '"{}" is an invalid output format.'
-            raise ValueError(err_msg.format(out_format))
+            err_msg = '"{}" is an invalid writer name.'
+            raise ValueError(err_msg.format(writer))
         if path:  #
             print('Opening {} in browser'.format(path))
             webview(path)
@@ -528,6 +532,7 @@ def _collect_connections(variables):
 def _convert_name(name, recurse=True, subs=None):
     """
     From an absolute path returns the variable name and its owner component in a dict.
+    Names are also formatted.
 
     Parameters
     ----------
@@ -633,7 +638,7 @@ def _get_comps(tree, model_path=None, recurse=True):
     # Components are ordered in the tree, so they can be collected by walking through the tree.
     components = list()
 
-    def get_children(tree_branch, recurse=recurse):
+    def get_children(tree_branch):
         for ch in tree_branch['children']:
             if ch['subsystem_type'] == 'component':
                 components.append(ch)
