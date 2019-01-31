@@ -94,6 +94,12 @@ class IndepVarComp(ExplicitComponent):
         for (name, val, kwargs) in self._indep_external_discrete:
             super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
 
+        if len(self._indep) + len(self._indep_external) + len(self._indep_external_discrete) == 0:
+            raise RuntimeError("No outputs (independent variables) have been declared for "
+                               "component '{}'. They must either be declared during "
+                               "instantiation or by calling add_output or add_discrete_output "
+                               "afterwards.".format(self.pathname))
+
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
         """
