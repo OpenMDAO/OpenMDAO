@@ -2355,7 +2355,9 @@ class System(object):
 
     def list_inputs(self,
                     values=True,
+                    prom_name=False,
                     units=False,
+                    shape=False,
                     hierarchical=True,
                     print_arrays=False,
                     out_stream=_DEFAULT_OUT_STREAM):
@@ -2370,8 +2372,13 @@ class System(object):
         ----------
         values : bool, optional
             When True, display/return input values. Default is True.
+        prom_name : bool, optional
+            When True, display/return the promoted name of the variable.
+            Default is False.
         units : bool, optional
             When True, display/return units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -2399,8 +2406,12 @@ class System(object):
             outs = {}
             if values:
                 outs['value'] = val
+            if prom_name:
+                outs['prom_name'] = self._var_abs2prom['input'][name]
             if units:
                 outs['units'] = meta[name]['units']
+            if shape:
+                outs['shape'] = val.shape
             inputs.append((name, outs))
 
         if out_stream is _DEFAULT_OUT_STREAM:
