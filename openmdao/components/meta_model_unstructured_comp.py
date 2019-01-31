@@ -275,7 +275,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 surrogate = self._metadata(of).get('surrogate')
                 if surrogate:
                     has_derivs = overrides_method('linearize', surrogate, SurrogateModel)
-                if True or not has_derivs:
+                if not has_derivs:
                     for wrt, n_wrt in self._surrogate_input_names:
                         abs_key = rel_key2abs_key(self, (of, wrt))
                         if abs_key not in declared_partials:
