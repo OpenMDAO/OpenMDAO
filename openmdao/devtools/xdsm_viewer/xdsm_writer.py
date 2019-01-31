@@ -103,6 +103,9 @@ class AbstractXDSMWriter(object):
     def add_output(self, name, label, style='DataIO', stack=False, side="left"):
         pass  # Implement in child class
 
+    def add_process(self, systems, arrow=True):
+        pass  # Implement in child class
+
 
 class XDSMWriter(XDSM):
     """
@@ -476,8 +479,11 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     for comp, conn_vars in iteritems(design_vars2):
         conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
         opt_con_vars = [_opt_var_str(var) for var in conn_vars]   # Optimal var names
+        init_con_vars = [_init_var_str(var) for var in conn_vars]   # Optimal var names
         x.connect('opt', comp, conn_vars)  # Connection from optimizer
-        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
+        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
+        x.add_output('opt', format_block(opt_con_vars), side='left')  # Optimal design variables
+        x.add_input('opt', format_block(init_con_vars))  # Initial design variables
 
     # Responses
     for comp, conn_vars in iteritems(responses2):
@@ -502,7 +508,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     for src, tgts in iteritems(external_inputs3):
         for tgt, conn_vars in iteritems(tgts):
             formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
-            x.add_input(tgt, formatted_conn_vars)
+            x.add_input(tgt, format_block(formatted_conn_vars))
 
     # Add the externally connected outputs
     if include_external_outputs:
@@ -543,6 +549,11 @@ def _residual_str(name):
 def _opt_var_str(name):
     """Puts an asterisk superscript on a string."""
     return '{}^*'.format(name)
+
+
+def _init_var_str(name):
+    """Puts a 0 superscript on a string."""
+    return '{}^{{(0)}}'.format(name)
 
 
 def _process_connections(conns, recurse=True, subs=None):
