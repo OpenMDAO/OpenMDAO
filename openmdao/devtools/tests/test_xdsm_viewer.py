@@ -302,7 +302,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = False
+        clean_up = True
 
         def clean_file(fname):
             try:  # Try to clean up
