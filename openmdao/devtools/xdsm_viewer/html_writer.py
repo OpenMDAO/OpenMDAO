@@ -7,8 +7,8 @@ import os
 
 from six import iteritems
 
-_DEFAULT_JSON_FILE = "xdsm.json"
-_HTML_TEMPLATE = "index.html"
+_DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
+_HTML_TEMPLATE = "index.html"  # Template for the output file
 
 
 def write_html(outfile, source_data=None, data_file=None):

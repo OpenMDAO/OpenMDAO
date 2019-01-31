@@ -31,13 +31,17 @@ except ImportError:
 
 from six import iteritems
 
+_OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xdsmjs'}
 
 # Character substitutions in labels
+# pyXDSM:
+# Interpreted as TeX syntax
 # Underscore is replaced with a skipped underscore
 # Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
-# Underscore is converted first to a temporary character, so the underscore in subscripts won't be
-# replaced
-_CHAR_SUBS = ('_', '*'), ('(', '_{'), (')', '}'), ('*', '\_')
+_CHAR_SUBS = {
+    'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
+    'xdsmjs': (),
+}
 
 # Constant file names in XDSMjs
 _XDSMJS_DATA = 'xdsm.json'
@@ -198,11 +202,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.components.append(dct)
 
     def add_workflow(self):
-        wf = ["_U_",
-              [
-                self.optimizer, self.comp_names
-              ]
-            ]
+        wf = ["_U_", [self.optimizer, self.comp_names]]
         self.processes = wf
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
@@ -282,8 +282,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         Defaults to "tex".
     include_solver : bool
         Include or not the problem model's nonlinear solver in the XDSM.
-    subs : tuple(str, str), optional
-        Characters to be replaced.
+    subs : dict(str, tuple), tuple(str, str), optional
+        Characters to be replaced. Dictionary with writer names and character pairs or just the
+        character pairs.
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
@@ -309,9 +310,19 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     responses = _model.get_responses()
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
+
+    try:
+        out_formats = _OUT_FORMATS
+        writer = out_formats[out_format]
+    except KeyError:
+        msg = 'Invalid output format "{}", choose from: {}'
+        raise KeyError(msg.format(out_format, out_formats.keys()))
+    writer_name = writer.lower()  # making it case insensitive
+    if isinstance(subs, dict):
+        subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
     return _write_xdsm(filename, viewer_data=viewer_data,
                        optimizer=driver_name, solver=solver_name, model_path=model_path,
-                       design_vars=design_vars, responses=responses, out_format=out_format,
+                       design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        **kwargs)
@@ -319,7 +330,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
-                include_external_outputs=True, subs=_CHAR_SUBS, out_format='tex',
+                include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
                 show_browser=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
@@ -352,6 +363,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         Defaults to True.
     subs : tuple, optional
        Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
+    writer: str, optional
+        Writer is pyXDSM or XDSMjs.
+        Defaults to pyXDSM.
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to False.
@@ -377,14 +391,13 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    if out_format in ('tex', 'pdf'):  # pyXDSM
+    writer_name = writer.lower()  # making it case insensitive
+
+    if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
-    elif out_format in ('json', 'html'):  # XDSMjs
+    elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
         xdsmjs_path = kwargs.pop('xdsmjs_path', None)
-    else:  # invalid option
-        msg = 'The "out_format" should be "tex" or "json", instead it is "{}"'
-        raise ValueError(msg.format(out_format))
 
     if optimizer is not None:
         x.add_optimizer(optimizer)
@@ -438,10 +451,10 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
         path = None
-        if out_format == 'tex':  # pyXDSM
+        if writer_name == 'pyxdsm':  # pyXDSM
             ext = 'pdf'
             path = '.'.join([filename, ext])
-        elif out_format == 'json':  # XDSMjs
+        elif writer_name == 'xdsmjs':  # XDSMjs
             from shutil import copyfile
 
             # These are constant filenames in XDSMjs.
