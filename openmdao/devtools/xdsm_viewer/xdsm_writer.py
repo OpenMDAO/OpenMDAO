@@ -70,6 +70,7 @@ _DEFAULT_BOX_CHAR_LIMIT = 25
 _DEFAULT_BOX_STACKING = 'max_chars'
 # Show arrowheads in processes
 _PROCESS_ARROWS = False
+_MAX_BOX_LINES = None
 
 
 class AbstractXDSMWriter(object):
@@ -183,6 +184,7 @@ class XDSMWriter(XDSM):
 
     def add_workflow(self):
         comp_names = [c[0] for c in self.comps]
+        comp_names.append(comp_names[0])  # close the loop
         self.add_process(comp_names, arrow=_PROCESS_ARROWS)
 
 
@@ -290,7 +292,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
-               include_solver=False, subs=_CHAR_SUBS, show_browser=True, **kwargs):
+               include_solver=False, subs=_CHAR_SUBS, show_browser=True,
+               add_process_conns=True, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -318,6 +321,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       are not converted to subscripts.
       To write in subscripts wrap that part of the name into a round bracket.
       Example: To write :math:`x_12` the variable name should be "x(12)"
+    * "box_lines" can be used to limit the number of lines, if the box stacking is vertical
 
     XDSMjs
     ~~~~~~
@@ -351,6 +355,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
+    add_process_conns: bool
+        Add process connections (thin black lines)
+        Defaults to True
     kwargs : dict
         Keyword arguments
     Returns
@@ -388,13 +395,13 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
-                       **kwargs)
+                       add_process_conns=add_process_conns, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
-                show_browser=False, **kwargs):
+                show_browser=False, add_process_conns=True, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -430,6 +437,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to False.
+    add_process_conns: bool
+        Add process connections (thin black lines)
+        Defaults to True
     kwargs : dict
         Keyword arguments
 
@@ -442,11 +452,12 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
+    box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
 
     def format_block(names, **kwargs):
         if writer == 'pyxdsm':
             return _format_block_string(var_names=names, stacking=box_stacking,
-                                        box_width=box_width, **kwargs)
+                                        box_width=box_width, box_lines=box_lines, **kwargs)
         else:
             return names
 
@@ -484,8 +495,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     for comp, conn_vars in iteritems(design_vars2):
         conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
         opt_con_vars = [_opt_var_str(var) for var in conn_vars]   # Optimal var names
-        init_con_vars = [_init_var_str(var) for var in conn_vars]   # Optimal var names
-        x.connect('opt', comp, conn_vars)  # Connection from optimizer
+        init_con_vars = [_init_var_str(var, writer_name) for var in conn_vars]   # Optimal var names
+        x.connect('opt', comp, format_block(conn_vars))  # Connection from optimizer
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
         x.add_output('opt', format_block(opt_con_vars), side='left')  # Optimal design variables
         x.add_input('opt', format_block(init_con_vars))  # Initial design variables
@@ -524,7 +535,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
                 formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
             x.add_output(src, formatted_outputs, side='right')
 
-    x.add_workflow()
+    if add_process_conns:
+        x.add_workflow()
     x.write(filename, cleanup=cleanup, **kwargs)
 
     if show_browser:
@@ -557,9 +569,12 @@ def _opt_var_str(name):
     return '{}^*'.format(name)
 
 
-def _init_var_str(name):
+def _init_var_str(name, writer):
     """Puts a 0 superscript on a string."""
-    return '{}^{{(0)}}'.format(name)
+    if writer == 'pyxdsm':
+        return '{}^{{(0)}}'.format(name)
+    elif writer == 'xdsmjs':
+        return '{}^(0)'.format(name)
 
 
 def _process_connections(conns, recurse=True, subs=None):
@@ -755,8 +770,15 @@ def _get_comps(tree, model_path=None, recurse=True):
 
 
 def _format_block_string(var_names, stacking='vertical', **kwargs):
+    max_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
     if stacking == 'vertical':
-        return var_names
+        if (max_lines is None) or (max_lines >= len(var_names)):
+            return var_names
+        else:
+            names = var_names[0:max_lines]
+            names[-1] = names[-1] + ', ...'
+            return names
+
     elif stacking == 'horizontal':
         return ', '.join(var_names)
     elif stacking in ('max_chars', 'cut_chars'):
