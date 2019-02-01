@@ -7,13 +7,23 @@ from six import iteritems
 
 import gast
 from gast import NodeVisitor, FunctionDef, For, If, While, Try, Break, Continue, Assign, \
-                 AugAssign, Name, Load, Store
+                 AugAssign, Name, Call, Attribute, Load, Store, NodeTransformer, Pass, walk
+arguments = gast.gast.arguments
 ast_ = gast
 import networkx as nx
 
 from openmdao.devtools.ast_tools import get_name
 
 CONTROL_FLOW = (If, For, While, Break, Continue, Try)
+
+
+class StatementInfo(object):
+    __slots__ = ['defs', 'used', 'ins', 'outs']
+    def __init__(self, defs, used):
+        self.defs = defs
+        self.used = used
+        self.ins = None
+        self.outs = None
 
 
 class _BasicBlock(object):
@@ -31,8 +41,7 @@ class _BasicBlock(object):
         else:
             vis.visit(statement)
 
-        #                 [defs, used, remove_count, global_index]
-        smap[statement] = [vis.defs, vis.used, 0, len(smap)]
+        smap[statement] = StatementInfo(vis.defs, vis.used)
 
 
 
@@ -45,11 +54,14 @@ def setup_reaching_def(block, smap, graph):
 
     if block.statements:
         for i, s in enumerate(block.statements):
-            defs = smap[s][0]
+            sinfo = smap[s]
+            defs = sinfo.defs
             if i > 0:
                 inputs = out
             out = [(d, s) for d in defs]
             out.extend(def_ for def_ in inputs if def_[0] not in defs)
+            sinfo.ins = inputs
+            sinfo.outs = out
     else:
         out = inputs
 
@@ -74,6 +86,188 @@ def reaching_definitions(cfg):
                     changed_set.remove(block)
                 # print(block.id, [n for n, s in block.out])
         # print("CHANGED:", changed_set)
+
+
+SKIP_REMOVE = (For, arguments)
+
+def unused(cfg):
+    graph = cfg.graph
+    smap = cfg.smap
+    used = []
+    defs = set()
+
+    for s, sinfo in iteritems(smap):
+        defs.update((d, s) for d in sinfo.defs)
+        used.extend(def_ for def_ in sinfo.ins if def_[0] in sinfo.used)
+
+    # need a check against used_nodes for cases where an Assign has multiple
+    # targets and at least one of them is used.
+    used_nodes = set(d[1] for d in used)
+
+    diff = defs.difference(used)
+    diff = [def_ for def_ in diff if
+            not isinstance(def_[1], SKIP_REMOVE) and
+            def_[1] not in used_nodes]
+
+    return diff
+
+
+def remove_unused(topnode, check_stacks=True):
+    for node in walk(topnode):
+        if isinstance(node, FunctionDef):
+            changed = True
+            while changed:
+                vis = ControlFlowGraphVisitor(node)
+                #for n, data in vis.graph.nodes(data=True):
+                    #block = data['block']
+                    #statements = block.statements
+                    #if statements:
+                        #for s in statements:
+                            #try:
+                                #print(n, astunparse.unparse(s).strip())
+                                ## if vis.smap[s].used: print('   USED:', vis.smap[s].used)
+                                ## if vis.smap[s].defs: print('   DEFS:', vis.smap[s].defs)
+                            #except:
+                                #traceback.print_exc()
+                                ## print(n, '???')
+                    ## else:
+                    ##     print(n, 'None')
+                    #print("OUT:", [n for n, _ in block.out])
+
+                #print("edges:", list(vis.graph.edges()))
+                ppmap = get_matching_push_map(node) if check_stacks else {}
+
+                un = unused(vis)
+                changed = bool(un)
+                import astunparse
+                to_remove = set()
+                #print("\nunused:")
+                for n, s in un:
+                    #print(n, astunparse.unparse(s))
+                    to_remove.add(s)
+                    if check_stacks and s in ppmap:
+                        push = ppmap[s]
+                        if push is None:
+                            raise RuntimeError("No matching push for '%s'" %
+                                               astunparse.unparse(s).strip())
+                        else:
+                            #print("matching push:", astunparse.unparse(ppmap[s]))
+                            to_remove.add(ppmap[s])
+                rem = Remover(to_remove)
+                rem.visit(node)
+                print("\n\nremoved:")
+                # print(astunparse.unparse(node))
+
+    return topnode
+
+_pushpop = (
+    'push',
+    'push_stack',
+    'pop',
+    'pop_stack'
+)
+
+
+class StackFixer(NodeVisitor):
+    def __init__(self):
+        self.pushpop_map = defaultdict(lambda: [None, None])
+        self.assign = None
+        self.push = None
+        self.pop = None
+
+    def visit_Assign(self, node):
+        self.assign = node
+        if isinstance(node.value, Call):
+            self.visit(node.value)
+        self.assign = None
+
+    def visit_Call(self, node):
+        if (isinstance(node.func, Attribute) and node.func.attr in _pushpop and
+                isinstance(node.func.value, Name) and node.func.value.id == 'tangent'):
+            stack_id = node.args[-1].s
+            if self.assign is not None:  # this is a pop
+                self.pushpop_map[stack_id][1] = self.assign
+            else:  # a push
+                self.pushpop_map[stack_id][0] = node
+
+
+def get_matching_push_map(node):
+    matches = {}
+    fixer = StackFixer()
+    fixer.visit(node)
+    for stack_id, lst in iteritems(fixer.pushpop_map):
+        push, pop = lst
+
+        matches[pop] = push
+        # not sure if we need the following for anything
+        # matches[push] = pop
+
+    return matches
+
+class Remover(NodeTransformer):
+    def __init__(self, to_remove):
+        self.to_remove = to_remove
+
+    def _visit_statements(self, nodes):
+        lst = []
+        if nodes:
+            for s in nodes:
+                n = self.visit(s)
+                if n:
+                    lst.append(n)
+        return lst
+
+    def visit_Assign(self, node):  # targets, value
+        if node in self.to_remove:
+            return None
+        return node
+
+    def visit_AugAssign(self, node):  # target, value
+        if node in self.to_remove:
+            return None
+        return node
+
+    # def visit_Call(self, node):
+    #     if node in self.to_remove:
+    #         return None
+    #     return node
+
+    def visit_Expr(self, node):
+        if node.value in self.to_remove:
+            return None
+        return node
+
+    def visit_If(self, node):  # expr test, stmt* body, stmt* orelse
+        node.body = self._visit_statements(node.body)
+        if node.orelse:
+            node.orelse = self._visit_statements(node.orelse)
+        if not node.body and not node.orelse:
+            return None
+        return node
+
+    def visit_For(self, node):  # expr target, expr iter, stmt* body, stmt* orelse
+        node.body = self._visit_statements(node.body)
+        if node.orelse:
+            node.orelse = self._visit_statements(node.orelse)
+
+        if node in self.to_remove and not node.body and not node.orelse:
+            return None
+
+        if not node.body:
+            node.body = [Pass()]
+
+        i = node.iter
+
+        return node
+
+    def visit_While(self, node):  # expr test, stmt* body, stmt* orelse
+        node.body = self._visit_statements(node.body)
+        if node.orelse:
+            node.orelse = self._visit_statements(node.orelse)
+
+        if not node.body and not node.orelse:
+            return None
+        return node
 
 
 class ControlFlowGraphVisitor(NodeVisitor):
@@ -235,22 +429,34 @@ class UseDefVisitor(gast.NodeVisitor):
         super(UseDefVisitor, self).__init__()
         self.defs = set()
         self.used = set()
+        self.aug = False
 
     def visit_Name(self, node):
         if node.ctx.__class__ is Load:
             self.used.add(node.id)
         else:
             self.defs.add(node.id)
+            if self.aug:
+                self.used.add(node.id)  # for AugAssign, target is defined AND used.
 
     def visit_Attribute(self, node):
         try:
             name = get_name(node)
         except TypeError:
             pass
-        if node.ctx.__class__ is Load:
-            self.used.add(name)
         else:
-            self.defs.add(name)
+            if node.ctx.__class__ is Load:
+                self.used.add(name)
+            else:
+                self.defs.add(name)
+                if self.aug:
+                    self.used.add(name)  # for AugAssign, target is defined AND used.
+
+    def visit_AugAssign(self, node):
+        self.aug = True
+        self.visit(node.target)
+        self.aug = False
+        self.visit(node.value)
 
 
 if __name__ == '__main__':
@@ -261,21 +467,9 @@ if __name__ == '__main__':
         for node in ast_.walk(ast_.parse(f.read(), 'exec')):
             if isinstance(node, FunctionDef):
                 print("\n\nFunction:", node.name)
-                vis = ControlFlowGraphVisitor(node)
-                for n, data in vis.graph.nodes(data=True):
-                    block = data['block']
-                    statements = block.statements
-                    if statements:
-                        for s in statements:
-                            try:
-                                print(n, astunparse.unparse(s).strip())
-                                # if vis.smap[s][1]: print('   USED:', vis.smap[s][1])
-                                # if vis.smap[s][0]: print('   DEFS:', vis.smap[s][0])
-                            except:
-                                traceback.print_exc()
-                                # print(n, '???')
-                    # else:
-                    #     print(n, 'None')
-                    print("OUT:", [n for n, _ in block.out])
+                print("BEFORE:")
+                print(astunparse.unparse(node))
+                node = remove_unused(node, check_stacks=True)
+                print("AFTER:")
+                print(astunparse.unparse(node))
 
-                print("edges:", list(vis.graph.edges()))

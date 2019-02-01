@@ -145,14 +145,14 @@ class TangentTestCase(unittest.TestCase):
         p, comp = get_harness(PassThroughOptBug())
         p['comp.x'] = np.random.random(comp.size)
         p.run_model()
-        check_tangent_ad(comp, mode='fwd', verbose=0)
+        check_tangent_ad(comp, mode='fwd')
 
     def test_optimize_req_key_rev(self):
         # make sure tangent doesn't optimize away variables needed as keys in __getitem__ calls
         p, comp = get_harness(PassThroughOptBug())
         p['comp.x'] = np.random.random(comp.size)
         p.run_model()
-        check_tangent_ad(comp, mode='rev', verbose=0)
+        check_tangent_ad(comp, mode='rev')
 
     def test_aug_assign(self):
         self.fail("not tested")
@@ -187,13 +187,13 @@ class TangentTestCase(unittest.TestCase):
         p, comp = get_harness(ForCond())
         comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
         p.run_model()
-        check_tangent_ad(comp, verbose=2, mode='fwd')
+        check_tangent_ad(comp, mode='fwd')
 
     def test_loop_with_cond_rev(self):
         p, comp = get_harness(ForCond())
         comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
         p.run_model()
-        check_tangent_ad(comp, verbose=2, mode='rev')
+        check_tangent_ad(comp, verbose=2, optimize=False, mode='rev')
 
     def test_subfunction(self):
         self.fail("not tested")
