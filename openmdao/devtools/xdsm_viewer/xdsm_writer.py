@@ -68,6 +68,8 @@ _DEFAULT_BOX_CHAR_LIMIT = 25
 # Can be set with keyword argument "box_stacking"
 # Options: horizontal, vertical, max_chars
 _DEFAULT_BOX_STACKING = 'max_chars'
+# Show arrowheads in processes
+_PROCESS_ARROWS = False
 
 
 class AbstractXDSMWriter(object):
@@ -179,6 +181,10 @@ class XDSMWriter(XDSM):
         """
         self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
 
+    def add_workflow(self):
+        comp_names = [c[0] for c in self.comps]
+        self.add_process(comp_names, arrow=_PROCESS_ARROWS)
+
 
 class XDSMjsWriter(AbstractXDSMWriter):
     """
@@ -265,7 +271,6 @@ class XDSMjsWriter(AbstractXDSMWriter):
             If False, a JSON file will be also written.
             Defaults to True.
         """
-        self.add_workflow()
         data = self.collect_data()
 
         html_filename = '.'.join([filename, 'html'])
@@ -519,6 +524,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
                 formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
             x.add_output(src, formatted_outputs, side='right')
 
+    x.add_workflow()
     x.write(filename, cleanup=cleanup, **kwargs)
 
     if show_browser:
@@ -578,7 +584,6 @@ def _accumulate_connections(conns):
         var = conn['src']['var']
         conns_new.setdefault(src_comp, {})
         conns_new[src_comp].setdefault(tgt_comp, []).append(var)
-    print('new conns: ', conns_new)
     return conns_new
 
 
@@ -746,7 +751,6 @@ def _get_comps(tree, model_path=None, recurse=True):
             top_level_tree = [c for c in children if c['name'] == next_path][0]
 
     get_children(top_level_tree)
-    print('components: ', components)
     return components
 
 
