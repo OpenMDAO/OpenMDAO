@@ -28,7 +28,7 @@ _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
                         'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
 _hessian_optimizers = ['trust-constr', 'trust-ncg']
 # TODO, add 'trust-constr' to bounds optimizers, when SciPy issue #9043 is resolved
-_bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP']
+_bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr']
 _constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
 _constraint_grad_optimizers = ['SLSQP', 'trust-constr']
 _eq_constraint_optimizers = ['SLSQP', 'trust-constr']
@@ -37,6 +37,11 @@ _eq_constraint_optimizers = ['SLSQP', 'trust-constr']
 # right now.
 _unsupported_optimizers = ['dogleg', 'trust-ncg']
 
+# With "old-style" a constraint is a dictionary, with "new-style" an object
+# In principle now everything can work with "old-style"
+# These settings have no effect to the optimizers implemented before SciPy 1.1
+_supports_new_style = ['trust-constr']
+_use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
 @phdthesis{hwang_thesis_2015,
@@ -266,6 +271,15 @@ class ScipyOptimizeDriver(Driver):
 
                     bounds.append((p_low, p_high))
 
+        if use_bounds and (opt in _supports_new_style) and _use_new_style:
+            # For 'trust-constr' it is better to use the new type bounds, because it seems to work
+            # better (for the current examples in the tests) with the "keep_feasible" option
+            from scipy.optimize import Bounds
+            from scipy.optimize._constraints import old_bound_to_new
+            lower, upper = old_bound_to_new(bounds)
+            keep_feasible = self.opt_settings.get('keep_feasible_bounds', True)
+            bounds = Bounds(lb=lower, ub=upper, keep_feasible=keep_feasible)
+
         # Constraints
         constraints = []
         i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
@@ -289,7 +303,9 @@ class ScipyOptimizeDriver(Driver):
                     i += size
 
                 # In scipy constraint optimizers take constraints in two separate formats
-                if opt in ['trust-constr']:  # Type of constraints is list of NonlinearConstraint
+
+                # Type of constraints is list of NonlinearConstraint
+                if opt in _supports_new_style and _use_new_style:
                     try:
                         from scipy.optimize import NonlinearConstraint
                     except ImportError:
