@@ -274,8 +274,14 @@ class ScipyOptimizeDriver(Driver):
         if use_bounds and (opt in _supports_new_style) and _use_new_style:
             # For 'trust-constr' it is better to use the new type bounds, because it seems to work
             # better (for the current examples in the tests) with the "keep_feasible" option
-            from scipy.optimize import Bounds
-            from scipy.optimize._constraints import old_bound_to_new
+            try:
+                from scipy.optimize import Bounds
+                from scipy.optimize._constraints import old_bound_to_new
+            except ImportError:
+                msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and above. '
+                       'The installed version is {}')
+                raise ImportError(msg.format(scipy_version))
+
             lower, upper = old_bound_to_new(bounds)
             keep_feasible = self.opt_settings.get('keep_feasible_bounds', True)
             bounds = Bounds(lb=lower, ub=upper, keep_feasible=keep_feasible)

@@ -1047,7 +1047,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_rel_error(self, prob['c'], 1.0, 1e-2)
 
-    # TODO, add bounds test, when SciPy issue #9043 is resolved
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
     def test_trust_constr_bounds(self):
         class Rosenbrock(ExplicitComponent):
 
