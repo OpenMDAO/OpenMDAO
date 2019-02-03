@@ -3,31 +3,30 @@ OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
 from __future__ import print_function
-from collections import OrderedDict
-import sys
 
+import sys
+from collections import OrderedDict
+from distutils.version import LooseVersion
+
+import numpy as np
+from scipy import __version__ as scipy_version
+from scipy.optimize import minimize
 from six import itervalues, iteritems, reraise
 from six.moves import range
 
-import numpy as np
-from scipy.optimize import minimize
-from scipy import __version__ as scipy_version
-
 import openmdao
+import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
-import openmdao.utils.coloring as coloring_mod
-
 
 _optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP', 'trust-constr']
-if scipy_version == '1.1.0':
+               'TNC', 'COBYLA', 'SLSQP']
+if LooseVersion(scipy_version) >= LooseVersion("1.1"):
     _optimizers.append('trust-constr')
 
 _gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
                         'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
 _hessian_optimizers = ['trust-constr', 'trust-ncg']
-# TODO, add 'trust-constr' to bounds optimizers, when SciPy issue #9043 is resolved
 _bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr']
 _constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
 _constraint_grad_optimizers = ['SLSQP', 'trust-constr']
@@ -38,6 +37,7 @@ _eq_constraint_optimizers = ['SLSQP', 'trust-constr']
 _unsupported_optimizers = ['dogleg', 'trust-ncg']
 
 # With "old-style" a constraint is a dictionary, with "new-style" an object
+# With "old-style" a bound is a tuple, with "new-style" a Bounds instance
 # In principle now everything can work with "old-style"
 # These settings have no effect to the optimizers implemented before SciPy 1.1
 _supports_new_style = ['trust-constr']
@@ -282,7 +282,8 @@ class ScipyOptimizeDriver(Driver):
                        'The installed version is {}')
                 raise ImportError(msg.format(scipy_version))
 
-            lower, upper = old_bound_to_new(bounds)
+            # Convert "old-style" bounds to "new_style" bounds
+            lower, upper = old_bound_to_new(bounds)  # tuple, tuple
             keep_feasible = self.opt_settings.get('keep_feasible_bounds', True)
             bounds = Bounds(lb=lower, ub=upper, keep_feasible=keep_feasible)
 
