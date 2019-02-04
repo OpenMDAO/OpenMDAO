@@ -19,28 +19,28 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
 
-_optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP']
+_optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
+               'TNC', 'COBYLA', 'SLSQP'}
 if LooseVersion(scipy_version) >= LooseVersion("1.1"):
-    _optimizers.append('trust-constr')
+    _optimizers.add('trust-constr')
 
-_gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
-                        'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
-_hessian_optimizers = ['trust-constr', 'trust-ncg']
-_bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr']
-_constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
-_constraint_grad_optimizers = ['SLSQP', 'trust-constr']
-_eq_constraint_optimizers = ['SLSQP', 'trust-constr']
+_gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
+                        'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr'}
+_hessian_optimizers = {'trust-constr', 'trust-ncg'}
+_bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr'}
+_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr'}
+_constraint_grad_optimizers = {'SLSQP', 'trust-constr'}
+_eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
-_unsupported_optimizers = ['dogleg', 'trust-ncg']
+_unsupported_optimizers = {'dogleg', 'trust-ncg'}
 
 # With "old-style" a constraint is a dictionary, with "new-style" an object
 # With "old-style" a bound is a tuple, with "new-style" a Bounds instance
 # In principle now everything can work with "old-style"
 # These settings have no effect to the optimizers implemented before SciPy 1.1
-_supports_new_style = ['trust-constr']
+_supports_new_style = {'trust-constr'}
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
