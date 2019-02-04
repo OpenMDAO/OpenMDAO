@@ -1,6 +1,7 @@
 """
 Class definition for SurrogateModel, the base class for all surrogate models.
 """
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class SurrogateModel(object):
@@ -18,6 +19,9 @@ class SurrogateModel(object):
         Initialize all attributes.
         """
         self.trained = False
+
+        self.options = OptionsDictionary()
+        self._declare_options()
 
     def train(self, x, y):
         """
@@ -65,6 +69,12 @@ class SurrogateModel(object):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
+        """
+        pass
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
         """
         pass
 

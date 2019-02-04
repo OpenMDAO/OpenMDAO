@@ -1,15 +1,17 @@
 """
 Unit tests for the unstructured metamodel component.
 """
-from math import sin
-import numpy as np
 import unittest
+from math import sin
+
+import numpy as np
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel, NearestNeighbor
 
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.logger_utils import TestLogger
+
 
 class MetaModelTestCase(unittest.TestCase):
 
@@ -1191,6 +1193,129 @@ class MetaModelTestCase(unittest.TestCase):
         deriv_second_time = J[('trig.sin_x', 'indep.x')]
 
         assert_rel_error(self, deriv_first_time, deriv_second_time, 1e-4)
+
+
+class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
+
+    def test_kriging(self):
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
+        from openmdao.api import KrigingSurrogate
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=KrigingSurrogate())
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
+
+    def test_float_kriging(self):
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
+        from openmdao.api import FloatKrigingSurrogate
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=FloatKrigingSurrogate())
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
+
+    def test_nearest_neighbor(self):
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
+        from openmdao.api import NearestNeighbor
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=NearestNeighbor(interpolant_type='linear'))
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 2e-3)
+
+    def test_response_surface(self):
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
+        from openmdao.api import ResponseSurface
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=ResponseSurface())
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0, 3.14, 20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 2e-3)
 
 
 if __name__ == "__main__":

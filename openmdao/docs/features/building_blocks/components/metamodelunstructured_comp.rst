@@ -52,6 +52,46 @@ values. This training step only occurs on the first run.
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature
     :layout: code, output
 
+Available Surrogates
+--------------------
+
+The following surrogates are available to use with `MetaModelUnStructuredComp`.
+
+:ref:`KrigingSurrogate <kriging>`
+  **Derivatives**: Yes
+
+  **Description**: Based on Kriging interpolation; prediction returns mean predicted value, optionally returns RMSE.
+
+
+:ref:`FloatKrigingSurrogate <kriging>`
+  **Derivatives**: Yes
+
+  **Description**: Same as KrigingSurrogate, but only returns mean on prediction.
+
+
+:ref:`MultiFiCoKrigingSurrogate <feature_building_components>`
+  **Derivatives**: No
+
+  **Description**: Integrates the Multi-Fidelity Co-Kriging method.
+
+
+:ref:`FloatMultiFiCoKrigingSurrogate <feature_building_components>`
+  **Derivatives**: No
+
+  **Description**: Same as MultiFiCoKrigingSurrogate, but only returns mean on prediction.
+
+
+:ref:`NearestNeighbor <nearest_neighbor>`
+  **Derivatives**: Yes
+
+  **Description**: Based on the N-Dimensional Interpolation library by Stephen Marone.
+
+
+:ref:`ResponseSurface <response_surface>`
+  **Derivatives**: Yes
+
+  **Description**: Based on second order response surface equations.
+
 
 Advanced usage
 --------------
