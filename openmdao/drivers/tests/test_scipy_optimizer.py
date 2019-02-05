@@ -1624,6 +1624,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         assert_rel_error(self, prob['x'], np.ones(size), 1e-2)
         assert_rel_error(self, prob['f'], 0.0, 1e-2)
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
         from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
         # Example from the Scipy documentation
