@@ -19,21 +19,26 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
 
+# Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
                'TNC', 'COBYLA', 'SLSQP'}
-if LooseVersion(scipy_version) >= LooseVersion("1.1"):
+if LooseVersion(scipy_version) >= LooseVersion("1.1"):  # Only available in newer versions
     _optimizers.add('trust-constr')
 
 _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
                         'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
-_bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr'}
+_bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
+                      'differential_evolution'}
 _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr'}
-_constraint_grad_optimizers = {'SLSQP', 'trust-constr'}
+_constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'basinhopping', 'brute', 'differential_evolution'}
-if LooseVersion(scipy_version) >= LooseVersion("1.2"):
+if LooseVersion(scipy_version) >= LooseVersion("1.2"):  # Only available in newer versions
     _global_optimizers |= {'shgo', 'dual_annealing'}
+
+# Global optimizers and optimizers in minimize
+_all_optimizers = _optimizers | _global_optimizers
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
@@ -139,7 +144,7 @@ class ScipyOptimizeDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
+        self.options.declare('optimizer', 'SLSQP', values=_all_optimizers,
                              desc='Name of optimizer to use')
         self.options.declare('tol', 1.0e-6, lower=0.0,
                              desc='Tolerance for termination. For detailed '
@@ -402,17 +407,42 @@ class ScipyOptimizeDriver(Driver):
 
         # optimize
         try:
-            result = minimize(self._objfunc, x_init,
-                              # args=(),
-                              method=opt,
-                              jac=jac,
-                              hess=hess,
-                              # hessp=None,
+            if opt in _optimizers:
+                result = minimize(self._objfunc, x_init,
+                                  # args=(),
+                                  method=opt,
+                                  jac=jac,
+                                  hess=hess,
+                                  # hessp=None,
+                                  bounds=bounds,
+                                  constraints=constraints,
+                                  tol=self.options['tol'],
+                                  # callback=None,
+                                  options=self.opt_settings)
+            elif opt == 'dual_annealing':
+                from scipy.optimize import dual_annealing
+                self.opt_settings.pop('disp')  # It does not have this argument
+                # Thtre is no "options" param, so "opt_settings" can be used to set the (many)
+                # keyword arguments
+                result = dual_annealing(self._objfunc,
+                                        bounds=bounds,
+                                        **self.opt_settings)
+            elif opt == 'shgo':
+                from scipy.optimize import shgo
+                params = 'minimizer_kwargs', 'sampling_method ', 'n', 'iters',
+                kwargs = dict()
+                for param in params:
+                    if param in self.opt_settings:
+                        kwargs[param] = self.opt_settings[param]
+                self.opt_settings['f_tol'] = self.options['tol']
+                # TODO pass Jacobi to options['jac']
+                result = shgo(self._objfunc,
                               bounds=bounds,
                               constraints=constraints,
-                              tol=self.options['tol'],
-                              # callback=None,
-                              options=self.opt_settings)
+                              options=self.opt_settings,
+                              **kwargs)
+            else:
+                raise NotImplementedError()
 
         # If an exception was swallowed in one of our callbacks, we want to raise it
         # rather than the cryptic message from scipy.

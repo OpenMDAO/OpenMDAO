@@ -1497,6 +1497,95 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             prob.run_driver()
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
+    def test_dual_annealing(self):
+        # Source of example:
+        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
+
+        from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
+
+        size = 7  # size of the design variable
+
+        def rastrigin(x):
+            a = 10  # constant
+            return np.sum(np.square(x) - a*np.cos(2*np.pi*x)) + a*np.size(x)
+
+        class Rastrigin(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', np.ones(size))
+                self.add_output('f', 0.0)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = rastrigin(x)
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+
+        prob.driver = driver = ScipyOptimizeDriver()
+        driver.options['optimizer'] = 'dual_annealing'
+        driver.options['disp'] = False
+        driver.options['tol'] = 1e-9
+        driver.options['maxiter'] = 1000  # default for this algorithm
+        driver.opt_settings['seed'] = 1234
+        driver.opt_settings['initial_temp'] = 10000
+
+        model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
+        model.add_objective('f')
+        prob.setup()
+        prob.run_driver()
+        assert_rel_error(self, prob['x'], np.zeros(size), 1e-6)
+        assert_rel_error(self, prob['f'], 0.0, 1e-6)
+
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
+    def test_shgo(self):
+        # Source of example:
+        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
+
+        from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
+
+        size = 3  # size of the design variable
+
+        def rastrigin(x):
+            a = 10  # constant
+            return np.sum(np.square(x) - a*np.cos(2*np.pi*x)) + a*np.size(x)
+
+        class Rastrigin(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', np.ones(size))
+                self.add_output('f', 0.0)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = rastrigin(x)
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+
+        prob.driver = driver = ScipyOptimizeDriver()
+        driver.options['optimizer'] = 'shgo'
+        driver.options['disp'] = False
+        driver.options['maxiter'] = 100
+        driver.opt_settings['maxtime'] = 10  # seconds
+        driver.opt_settings['iters'] = 3
+
+        model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
+        model.add_objective('f')
+        prob.setup()
+        prob.run_driver()
+        assert_rel_error(self, prob['x'], np.zeros(size), 1e-6)
+        assert_rel_error(self, prob['f'], 0.0, 1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()
