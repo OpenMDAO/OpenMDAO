@@ -33,7 +33,7 @@ _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealin
 _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
-_global_optimizers = {'basinhopping', 'brute', 'differential_evolution'}
+_global_optimizers = {'differential_evolution'}
 if LooseVersion(scipy_version) >= LooseVersion("1.2"):  # Only available in newer versions
     _global_optimizers |= {'shgo', 'dual_annealing'}
 
@@ -422,11 +422,18 @@ class ScipyOptimizeDriver(Driver):
             elif opt == 'dual_annealing':
                 from scipy.optimize import dual_annealing
                 self.opt_settings.pop('disp')  # It does not have this argument
-                # Thtre is no "options" param, so "opt_settings" can be used to set the (many)
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
                 result = dual_annealing(self._objfunc,
                                         bounds=bounds,
                                         **self.opt_settings)
+            elif opt == 'differential_evolution':
+                from scipy.optimize import differential_evolution
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
+                # keyword arguments
+                result = differential_evolution(self._objfunc,
+                                                bounds=bounds,
+                                                **self.opt_settings)
             elif opt == 'shgo':
                 from scipy.optimize import shgo
                 params = 'minimizer_kwargs', 'sampling_method ', 'n', 'iters',
@@ -442,7 +449,8 @@ class ScipyOptimizeDriver(Driver):
                               options=self.opt_settings,
                               **kwargs)
             else:
-                raise NotImplementedError()
+                msg = 'Optimizer "{}" is not implemented yet. Choose from: {}'
+                raise NotImplementedError(msg.format(opt, _all_optimizers))
 
         # If an exception was swallowed in one of our callbacks, we want to raise it
         # rather than the cryptic message from scipy.
