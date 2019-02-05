@@ -286,18 +286,16 @@ class FloatKrigingSurrogate(KrigingSurrogate):
     Deprecated.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         """
         Capture Initialize to throw warning.
 
         Parameters
         ----------
-        *args : list
-            Deprecated arguments.
         **kwargs : dict
             Deprecated arguments.
         """
         warn_deprecation("'FloatKrigingSurrogate' has been deprecated. Use "
                          "'KrigingSurrogate' instead.")
-        super(FloatKrigingSurrogate, self).__init__(*args, **kwargs)
+        super(FloatKrigingSurrogate, self).__init__(**kwargs)
 
