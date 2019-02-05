@@ -25,8 +25,9 @@ _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
 if LooseVersion(scipy_version) >= LooseVersion("1.1"):  # Only available in newer versions
     _optimizers.add('trust-constr')
 
+# For 'basinhopping' and 'shgo' gradients are used only in the local minimization
 _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', 'dogleg',
-                        'trust-ncg', 'trust-constr', 'basinhopping'}
+                        'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
                       'differential_evolution', 'basinhopping'}
@@ -42,6 +43,7 @@ _all_optimizers = _optimizers | _global_optimizers
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
+# dual-annealing and basinhopping not supported yet
 _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 
 # With "old-style" a constraint is a dictionary, with "new-style" an object
@@ -455,6 +457,7 @@ class ScipyOptimizeDriver(Driver):
                 self.opt_settings.pop('disp')  # It does not have this argument
                 # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
+                # Note, that
                 result = dual_annealing(self._objfunc,
                                         bounds=bounds,
                                         **self.opt_settings)
@@ -467,13 +470,17 @@ class ScipyOptimizeDriver(Driver):
                                                 **self.opt_settings)
             elif opt == 'shgo':
                 from scipy.optimize import shgo
-                params = 'minimizer_kwargs', 'sampling_method ', 'n', 'iters',
                 kwargs = dict()
-                for param in params:
+                for param in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
                     if param in self.opt_settings:
                         kwargs[param] = self.opt_settings[param]
+                # Set the Jacobian and the Hessian to the value calculated in OpenMDAO
+                if 'minimizer_kwargs' not in kwargs or kwargs['minimizer_kwargs'] is None:
+                    kwargs['minimizer_kwargs'] = {}
+                kwargs['minimizer_kwargs'].setdefault('jac', jac)
+                kwargs['minimizer_kwargs'].setdefault('hess', hess)
+                # Objective function tolerance
                 self.opt_settings['f_tol'] = self.options['tol']
-                # TODO pass Jacobi to options['jac']
                 result = shgo(self._objfunc,
                               bounds=bounds,
                               constraints=constraints,
