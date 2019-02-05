@@ -29,7 +29,7 @@ _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', '
                         'trust-ncg', 'trust-constr', 'basinhopping'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
-                      'differential_evolution'}
+                      'differential_evolution', 'basinhopping'}
 _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
@@ -428,7 +428,27 @@ class ScipyOptimizeDriver(Driver):
                 if 'minimizer_kwargs' not in self.opt_settings:
                     self.opt_settings['minimizer_kwargs'] = {"method": "L-BFGS-B", "jac": True}
                 self.opt_settings.pop('maxiter')  # It does not have this argument
+
+                def accept_test(f_new, x_new, f_old, x_old):
+                    # Used to implement bounds besides the original functionality
+                    if bounds is not None:
+                        bound_check = all([b[0] <= xi <= b[1] for xi, b in zip(x_new, bounds)])
+                        user_test = self.opt_settings.pop('accept_test', None)  # callable
+                        # has to satisfy both the bounds and the acceptance test defined by the
+                        # user
+                        if user_test is not None:
+                            test_res = user_test(f_new, x_new, f_old, x_old)
+                            if test_res == 'force accept':
+                                return test_res
+                            else:  # result is boolean
+                                return bound_check and test_res
+                        else:  # no user acceptance test, check only the bounds
+                            return bound_check
+                    else:
+                        return True
+
                 result = basinhopping(fun, x_init,
+                                      accept_test=accept_test,
                                       **self.opt_settings)
             elif opt == 'dual_annealing':
                 from scipy.optimize import dual_annealing

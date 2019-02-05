@@ -1498,28 +1498,14 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
             prob.run_driver()
 
     def test_basinhopping(self):
-        # Source of example:
-        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
 
         from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
-
-        size = 2  # size of the design variable
-
-        class MyTakeStep(object):
-            def __init__(self, stepsize=0.5):
-                self.stepsize = stepsize
-
-            def __call__(self, x):
-                s = self.stepsize
-                x[0] += np.random.uniform(-2. * s, 2. * s)
-                x[1:] += np.random.uniform(-s, s, x[1:].shape)
-                return x
 
         class Func2d(ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', np.ones(size))
-                self.add_output('f', 0.5)
+                self.add_input('x', np.ones(2))
+                self.add_output('f', 0.0)
                 self.declare_partials('f', 'x')
 
             def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
@@ -1536,15 +1522,13 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob = Problem()
         model = prob.model
 
-        model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)), promotes=['*'])
         model.add_subsystem('func2d', Func2d(), promotes=['*'])
 
         prob.driver = driver = ScipyOptimizeDriver()
         driver.options['optimizer'] = 'basinhopping'
         driver.options['disp'] = False
-        driver.options['tol'] = 1e-9
         driver.opt_settings['niter'] = 200
-        driver.opt_settings['take_step'] = MyTakeStep()
 
         model.add_design_var('x')
         model.add_objective('f')
@@ -1594,8 +1578,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.ones(size), 1e-6)
-        assert_rel_error(self, prob['f'], 0.0, 1e-6)
+        assert_rel_error(self, prob['x'], np.ones(size), 1e-2)
+        assert_rel_error(self, prob['f'], 0.0, 1e-2)
 
     def test_differential_evolution(self):
         # Source of example:
