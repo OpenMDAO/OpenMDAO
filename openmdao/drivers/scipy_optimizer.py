@@ -30,7 +30,7 @@ _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', '
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
                       'differential_evolution', 'basinhopping'}
-_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr'}
+_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
