@@ -1506,7 +1506,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
 
-        size = 10  # size of the design variable
+        size = 3  # size of the design variable
 
         def rastrigin(x):
             a = 10  # constant
@@ -1534,7 +1534,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['maxiter'] = 1000  # default for this algorithm
         driver.opt_settings['seed'] = 1234
-        # driver.opt_settings['initial_temp'] = 20000
+        driver.opt_settings['initial_temp'] = 40000
 
         model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
         model.add_objective('f')
