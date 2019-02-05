@@ -1497,52 +1497,105 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             prob.run_driver()
 
-    @unittest.expectedFailure
-    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
-                         "scipy >= 1.2 is required.")
-    def test_dual_annealing(self):
+    def test_basinhopping(self):
         # Source of example:
         # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
 
         from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
 
-        size = 3  # size of the design variable
+        size = 2  # size of the design variable
 
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a*np.cos(2*np.pi*x)) + a*np.size(x)
+        class MyTakeStep(object):
+            def __init__(self, stepsize=0.5):
+                self.stepsize = stepsize
 
-        class Rastrigin(ExplicitComponent):
+            def __call__(self, x):
+                s = self.stepsize
+                x[0] += np.random.uniform(-2. * s, 2. * s)
+                x[1:] += np.random.uniform(-s, s, x[1:].shape)
+                return x
+
+        class Func2d(ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', 0.5 * np.ones(size))
+                self.add_input('x', np.ones(size))
                 self.add_output('f', 0.5)
+                self.declare_partials('f', 'x')
 
             def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
                 x = inputs['x']
-                outputs['f'] = rastrigin(x)
+                outputs['f'] = np.cos(14.5 * x[0] - 0.3) + (x[1] + 0.2) * x[1] + (x[0] + 0.2) * x[0]
+
+            def compute_partials(self, inputs, partials):
+                x = inputs['x']
+                df = np.zeros(2)
+                df[0] = -14.5 * np.sin(14.5 * x[0] - 0.3) + 2. * x[0] + 0.2
+                df[1] = 2. * x[1] + 0.2
+                partials['f', 'x'] = df
 
         prob = Problem()
         model = prob.model
 
         model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)), promotes=['*'])
-        model.add_subsystem('rastrigin', Rastrigin(), promotes=['*'])
+        model.add_subsystem('func2d', Func2d(), promotes=['*'])
+
+        prob.driver = driver = ScipyOptimizeDriver()
+        driver.options['optimizer'] = 'basinhopping'
+        driver.options['disp'] = False
+        driver.options['tol'] = 1e-9
+        driver.opt_settings['niter'] = 200
+        driver.opt_settings['take_step'] = MyTakeStep()
+
+        model.add_design_var('x')
+        model.add_objective('f')
+        prob.setup()
+        prob.run_driver()
+        assert_rel_error(self, prob['x'], np.array([-0.1951, -0.1000]), 1e-3)
+        assert_rel_error(self, prob['f'], -1.0109, 1e-3)
+
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
+    def test_dual_annealing(self):
+
+        from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver
+
+        size = 6  # size of the design variable
+
+        def rosenbrock(x):
+            x_0 = x[:-1]
+            x_1 = x[1:]
+            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
+
+        class Rosenbrock(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.5*np.ones(size))
+                self.add_output('f', 0.0)
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                x = inputs['x']
+                outputs['f'] = rosenbrock(x)
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
 
         prob.driver = driver = ScipyOptimizeDriver()
         driver.options['optimizer'] = 'dual_annealing'
         driver.options['disp'] = False
         driver.options['tol'] = 1e-9
-        driver.options['maxiter'] = 1000  # default for this algorithm
+        driver.options['maxiter'] = 2000
         driver.opt_settings['seed'] = 1234
-        driver.opt_settings['initial_temp'] = 40000
+        driver.opt_settings['initial_temp'] = 5230
 
-        model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
+        model.add_design_var('x', lower=-2*np.ones(size), upper=2*np.ones(size))
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'][:-2], np.zeros(size-1), 1e-6)
+        assert_rel_error(self, prob['x'], np.ones(size), 1e-6)
         assert_rel_error(self, prob['f'], 0.0, 1e-6)
-        assert_rel_error(self, prob['x'][-1], 0.0, 1e-6)  # FIXME always the last element fails
 
     def test_differential_evolution(self):
         # Source of example:

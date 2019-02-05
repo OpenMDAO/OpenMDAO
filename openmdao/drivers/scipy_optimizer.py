@@ -25,15 +25,15 @@ _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
 if LooseVersion(scipy_version) >= LooseVersion("1.1"):  # Only available in newer versions
     _optimizers.add('trust-constr')
 
-_gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
-                        'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr'}
+_gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', 'dogleg',
+                        'trust-ncg', 'trust-constr', 'basinhopping'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
                       'differential_evolution'}
 _constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr'}
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
-_global_optimizers = {'differential_evolution'}
+_global_optimizers = {'differential_evolution', 'basinhopping'}
 if LooseVersion(scipy_version) >= LooseVersion("1.2"):  # Only available in newer versions
     _global_optimizers |= {'shgo', 'dual_annealing'}
 
@@ -419,6 +419,17 @@ class ScipyOptimizeDriver(Driver):
                                   tol=self.options['tol'],
                                   # callback=None,
                                   options=self.opt_settings)
+            elif opt == 'basinhopping':
+                from scipy.optimize import basinhopping
+
+                def fun(x):
+                    return self._objfunc(x), jac(x)
+
+                if 'minimizer_kwargs' not in self.opt_settings:
+                    self.opt_settings['minimizer_kwargs'] = {"method": "L-BFGS-B", "jac": True}
+                self.opt_settings.pop('maxiter')  # It does not have this argument
+                result = basinhopping(fun, x_init,
+                                      **self.opt_settings)
             elif opt == 'dual_annealing':
                 from scipy.optimize import dual_annealing
                 self.opt_settings.pop('disp')  # It does not have this argument
