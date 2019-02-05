@@ -36,7 +36,7 @@ The following example demonstrates a simple `Problem` in which a
 In this example, the `MetaModelUnStructuredComp` ``trig`` has a single input,
 ``x``, and two outputs, ``sin_x`` and ``cos_x``.
 
-`FloatKrigingSurrogate` is given as the surrogate for the ``sin_x`` output.
+`KrigingSurrogate` is given as the surrogate for the ``sin_x`` output.
 Although no surrogate has been given for the ``cos_x`` output, a
 ``default_surrogate`` is specified for the component. Any output which has
 not had a surrogate assigned will use one of the default type.
@@ -63,22 +63,10 @@ The following surrogates are available to use with `MetaModelUnStructuredComp`.
   **Description**: Based on Kriging interpolation; prediction returns mean predicted value, optionally returns RMSE.
 
 
-:ref:`FloatKrigingSurrogate <kriging>`
-  **Derivatives**: Yes
-
-  **Description**: Same as KrigingSurrogate, but only returns mean on prediction.
-
-
 :ref:`MultiFiCoKrigingSurrogate <feature_building_components>`
   **Derivatives**: No
 
   **Description**: Integrates the Multi-Fidelity Co-Kriging method.
-
-
-:ref:`FloatMultiFiCoKrigingSurrogate <feature_building_components>`
-  **Derivatives**: No
-
-  **Description**: Same as MultiFiCoKrigingSurrogate, but only returns mean on prediction.
 
 
 :ref:`NearestNeighbor <nearest_neighbor>`

@@ -1,14 +1,22 @@
 .. _kriging:
 
-***************************************
-KrigingSurrogate, FloatKrigingSurrogate
-***************************************
+****************
+KrigingSurrogate
+****************
 
 
 
-The `FloatKriginSurrogate` implements the same surrogate model as `KrigingSurrogate`, but it only predicts the mean of the approximated output. Note
-that the `KrigingSurrogate` can also be executed in this mode by setting the `eval_rmse` option to False, which is the default.
+Note: the `FloatKriginSurrogate` implements the same surrogate model as `KrigingSurrogate` with `eval_rmse` set to False,
+so that it only predicts the mean of the approximated output. This is deprecated and provided for backwards compatibility.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_float_kriging
+    openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_kriging
     :layout: code, output
+
+KrigingSurrogate Options
+------------------------
+
+.. embed-options::
+    openmdao.surrogate_models.kriging
+    KrigingSurrogate
+    options

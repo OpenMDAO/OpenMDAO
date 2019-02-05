@@ -1021,30 +1021,6 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         return (X, Y)
 
 
-class FloatMultiFiCoKrigingSurrogate(MultiFiCoKrigingSurrogate):
-    """
-    Predictions are returned as the mean of the NormalDistribution predicted by base class model.
-    """
-
-    def predict(self, new_x):
-        """
-        Calculate a predicted value of the response based on the current trained model.
-
-        Parameters
-        ----------
-        new_x : array_like
-            An array with shape (n_eval, n_features) giving the point(s) at
-            which the prediction(s) should be made.
-
-        Returns
-        -------
-        float
-            New predicted value.
-        """
-        dist = super(FloatMultiFiCoKrigingSurrogate, self).predict(new_x)
-        return dist.mu
-
-
 if __name__ == "__main__":
     import doctest
     doctest.testmod()

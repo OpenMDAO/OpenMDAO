@@ -40,10 +40,10 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(msg in testlogger.get('error')[0])
 
         # check that output with no specified surrogate gets the default
-        sin_mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        sin_mm.options['default_surrogate'] = KrigingSurrogate()
         prob.setup(check=False)
         surrogate = sin_mm._metadata('f_x').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate),
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate),
                         'sin_mm.f_x should get the default surrogate')
 
         # check error message when no training data is provided
@@ -114,11 +114,11 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(msg in testlogger.get('error')[0])
 
         # check that output with no specified surrogate gets the default
-        sin_mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        sin_mm.options['default_surrogate'] = KrigingSurrogate()
         prob.setup(check=False)
 
         surrogate = sin_mm._metadata('f_x').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate),
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate),
                         'sin_mm.f_x should get the default surrogate')
 
         prob['sin_mm.x'] = 2.22
@@ -159,7 +159,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('x2', 0.)
 
         mm.add_output('y1', 0.)
-        mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
+        mm.add_output('y2', 0., surrogate=KrigingSurrogate())
 
         mm.options['default_surrogate'] = ResponseSurface()
 
@@ -173,7 +173,7 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, ResponseSurface))
 
         surrogate = mm._metadata('y2').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate))
 
         # populate training data
         mm.options['train:x1'] = [1.0, 2.0, 3.0]
@@ -201,11 +201,11 @@ class MetaModelTestCase(unittest.TestCase):
         assert_rel_error(self, prob['mm.y1'], 1.5934, .001)
 
         # change default surrogate, re-setup and check that metamodel re-trains
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
         prob.setup(check=False)
 
         surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate))
 
         self.assertTrue(mm.train)  # training will occur after re-setup
 
@@ -215,7 +215,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y1', 0.)
         mm.add_output('y2', 0.)
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -243,7 +243,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_output('y1', 0.)
         mm.add_output('y2', 0.)
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -270,7 +270,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('x', np.zeros((2, 2)))
         mm.add_output('y', np.zeros(2,))
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -302,7 +302,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('x', np.zeros((2, 2)))
         mm.add_output('y', np.zeros((2, 2)))
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -335,7 +335,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('y', 0.)
         mm.add_output('f', 0.)
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -363,7 +363,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('y', 0.)
         mm.add_output('f', 0.)
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -389,7 +389,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('x', 0.)
         mm.add_output('f', 0.)
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('p', IndepVarComp('x', 0.),
@@ -433,7 +433,7 @@ class MetaModelTestCase(unittest.TestCase):
         # create a MetaModelUnStructuredComp, specifying surrogates for the outputs
         import numpy as np
 
-        from openmdao.api import Problem, MetaModelUnStructuredComp, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructuredComp, KrigingSurrogate
 
         trig = MetaModelUnStructuredComp()
 
@@ -443,11 +443,11 @@ class MetaModelTestCase(unittest.TestCase):
 
         trig.add_output('sin_x', 0.,
                         training_data=.5*np.sin(x_train),
-                        surrogate=FloatKrigingSurrogate())
+                        surrogate=KrigingSurrogate())
         trig.add_output('cos_x', 0.,
                         training_data=.5*np.cos(x_train))
 
-        trig.options['default_surrogate'] = FloatKrigingSurrogate()
+        trig.options['default_surrogate'] = KrigingSurrogate()
 
         # add it to a Problem, run and check the predicted values
         prob = Problem()
@@ -464,10 +464,10 @@ class MetaModelTestCase(unittest.TestCase):
         # similar to previous example, but output is 2d
         import numpy as np
 
-        from openmdao.api import Problem, MetaModelUnStructuredComp, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructuredComp, KrigingSurrogate
 
         # create a MetaModelUnStructuredComp that predicts sine and cosine as an array
-        trig = MetaModelUnStructuredComp(default_surrogate=FloatKrigingSurrogate())
+        trig = MetaModelUnStructuredComp(default_surrogate=KrigingSurrogate())
         trig.add_input('x', 0)
         trig.add_output('y', np.zeros(2))
 
@@ -497,7 +497,7 @@ class MetaModelTestCase(unittest.TestCase):
         size = 3
 
         # create a vectorized MetaModelUnStructuredComp for sine
-        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=FloatKrigingSurrogate())
+        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=KrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros(size))
 
@@ -560,7 +560,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('xx', np.zeros((vec_size, 1)))
         mm.add_output('y', np.zeros((vec_size, 4, 2)))
 
-        mm.options['default_surrogate'] = FloatKrigingSurrogate()
+        mm.options['default_surrogate'] = KrigingSurrogate()
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
@@ -635,12 +635,12 @@ class MetaModelTestCase(unittest.TestCase):
         # array but you skip all the n-copies thing and do it all as an array
         import numpy as np
 
-        from openmdao.api import Problem, MetaModelUnStructuredComp, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructuredComp, KrigingSurrogate
 
         size = 3
 
         # create a vectorized MetaModelUnStructuredComp for sine
-        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=FloatKrigingSurrogate())
+        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=KrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros(size))
 
@@ -664,12 +664,12 @@ class MetaModelTestCase(unittest.TestCase):
         # similar to previous example, but processes 3 inputs/outputs at a time
         import numpy as np
 
-        from openmdao.api import Problem, MetaModelUnStructuredComp, FloatKrigingSurrogate
+        from openmdao.api import Problem, MetaModelUnStructuredComp, KrigingSurrogate
 
         size = 3
 
         # create a vectorized MetaModelUnStructuredComp for sine and cosine
-        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=FloatKrigingSurrogate())
+        trig = MetaModelUnStructuredComp(vec_size=size, default_surrogate=KrigingSurrogate())
         trig.add_input('x', np.zeros(size))
         trig.add_output('y', np.zeros((size, 2)))
 
@@ -715,7 +715,7 @@ class MetaModelTestCase(unittest.TestCase):
                 self.add_input('x', 0.,
                                training_data=np.linspace(0,10,20))
                 self.add_output('sin_x', 0.,
-                                surrogate=FloatKrigingSurrogate(),
+                                surrogate=KrigingSurrogate(),
                                 training_data=.5*np.sin(np.linspace(0,10,20)))
 
                 self.declare_partials(of='sin_x', wrt='x', method='fd')
@@ -756,7 +756,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('x2', 0.)
 
         mm.add_output('y1', 0.)
-        mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
+        mm.add_output('y2', 0., surrogate=KrigingSurrogate())
 
         msg = "The 'default_surrogate' attribute provides backwards compatibility " \
               "with earlier version of OpenMDAO; use options['default_surrogate'] " \
@@ -775,7 +775,7 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, ResponseSurface))
 
         surrogate = mm._metadata('y2').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate))
 
         # populate training data
         msg = "The 'metadata' attribute provides backwards compatibility " \
@@ -811,12 +811,12 @@ class MetaModelTestCase(unittest.TestCase):
               "earlier version of OpenMDAO; use options['default_surrogate'] instead."
 
         with assert_warning(DeprecationWarning, msg):
-            mm.default_surrogate = FloatKrigingSurrogate()
+            mm.default_surrogate = KrigingSurrogate()
 
         prob.setup(check=False)
 
         surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate))
 
         self.assertTrue(mm.train)  # training will occur after re-setup
 
@@ -841,7 +841,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.add_input('x2', 0.)
 
         mm.add_output('y1', 0.)
-        mm.add_output('y2', 0., surrogate=FloatKrigingSurrogate())
+        mm.add_output('y2', 0., surrogate=KrigingSurrogate())
 
         msg = "The 'default_surrogate' attribute provides backwards compatibility with " \
               "earlier version of OpenMDAO; use options['default_surrogate'] instead."
@@ -859,7 +859,7 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue(isinstance(surrogate, ResponseSurface))
 
         surrogate = mm._metadata('y2').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate))
 
         # populate training data
         msg = "The 'metadata' attribute provides backwards compatibility " \
@@ -895,12 +895,12 @@ class MetaModelTestCase(unittest.TestCase):
               "earlier version of OpenMDAO; use options['default_surrogate'] instead."
 
         with assert_warning(DeprecationWarning, msg):
-            mm.default_surrogate = FloatKrigingSurrogate()
+            mm.default_surrogate = KrigingSurrogate()
 
         prob.setup(check=False)
 
         surrogate = mm._metadata('y1').get('surrogate')
-        self.assertTrue(isinstance(surrogate, FloatKrigingSurrogate))
+        self.assertTrue(isinstance(surrogate, KrigingSurrogate))
 
         self.assertTrue(mm.train)  # training will occur after re-setup
 
@@ -1227,36 +1227,6 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
 
-    def test_float_kriging(self):
-        import numpy as np
-
-        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
-        from openmdao.api import FloatKrigingSurrogate
-
-        prob = Problem()
-
-        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
-
-        sin_mm = MetaModelUnStructuredComp()
-        sin_mm.add_input('x', 0.)
-        sin_mm.add_output('f_x', 0., surrogate=FloatKrigingSurrogate())
-
-        prob.model.add_subsystem('sin_mm', sin_mm)
-
-        prob.model.connect('p.x', 'sin_mm.x')
-
-        prob.setup(check=True)
-
-        # train the surrogate and check predicted value
-        sin_mm.options['train:x'] = np.linspace(0,10,20)
-        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
-
-        prob['sin_mm.x'] = 2.1
-
-        prob.run_model()
-
-        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
-
     def test_nearest_neighbor(self):
         import numpy as np
 
@@ -1316,6 +1286,23 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 2e-3)
+
+
+class MetaModelUnstructuredFloatKrigingDeprecation(unittest.TestCase):
+
+    def test_deprecated(self):
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+
+        msg = "'FloatKrigingSurrogate' has been deprecated. Use 'KrigingSurrogate' instead."
+
+        #with assert_warning(DeprecationWarning, msg):
+        sin_mm.add_output('f_x', 0., surrogate=FloatKrigingSurrogate())
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 """Surrogate model based on Kriging."""
+from six.moves import zip, range
 
 import numpy as np
 import scipy.linalg as linalg
 from scipy.optimize import minimize
-from six.moves import zip, range
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
+from openmdao.utils.general_utils import warn_deprecation
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 
@@ -21,18 +22,12 @@ class KrigingSurrogate(SurrogateModel):
     ----------
     alpha : ndarray
         Reduced likelihood parameter: alpha
-    eval_rmse : bool
-        When true, calculate the root mean square prediction error.
     L : ndarray
         Reduced likelihood parameter: L
     n_dims : int
         Number of independents in the surrogate
     n_samples : int
         Number of training points.
-    nugget : double or ndarray, optional
-        Nugget smoothing parameter for smoothing noisy data. Represents the variance
-        of the input values. If nugget is an ndarray, it must be of the same length
-        as the number of training points. Default: 10. * Machine Epsilon
     sigma2 : ndarray
         Reduced likelihood parameter: sigma squared
     thetas : ndarray
@@ -51,29 +46,20 @@ class KrigingSurrogate(SurrogateModel):
         Standard deviation of training model response values, normalized.
     """
 
-    def __init__(self, nugget=10. * MACHINE_EPSILON, eval_rmse=False):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        nugget : double or ndarray, optional
-            Nugget smoothing parameter for smoothing noisy data. Represents the variance
-            of the input values. If nugget is an ndarray, it must be of the same length
-            as the number of training points. Default: 10. * Machine Epsilon
-
-        eval_rmse : bool
-            Flag indicating whether the Root Mean Squared Error (RMSE) should be computed.
-            Set to False by default.
+        **kwargs : dict
+            options dictionary.
         """
-        super(KrigingSurrogate, self).__init__()
+        super(KrigingSurrogate, self).__init__(**kwargs)
 
         self.n_dims = 0                 # number of independent
         self.n_samples = 0              # number of training points
         self.thetas = np.zeros(0)
-
-        # nugget smoothing parameter from [Sasena, 2002]
-        self.nugget = nugget
 
         self.alpha = np.zeros(0)
         self.L = np.zeros(0)
@@ -87,7 +73,20 @@ class KrigingSurrogate(SurrogateModel):
         self.Y_mean = np.zeros(0)
         self.Y_std = np.zeros(0)
 
-        self.eval_rmse = eval_rmse
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('eval_rmse', default=False,
+                             desc="Flag indicating whether the Root Mean Squared Error (RMSE) "
+                                  "should be computed. Set to False by default.")
+
+        # nugget smoothing parameter from [Sasena, 2002]
+        self.options.declare('nugget', default=10. * MACHINE_EPSILON,
+                             desc="Nugget smoothing parameter for smoothing noisy data. Represents "
+                                  "the variance of the input values. If nugget is an ndarray, it "
+                                  "must be of the same length as the number of training points. "
+                                  "Default: 10. * Machine Epsilon")
 
     def train(self, x, y):
         """
@@ -179,7 +178,7 @@ class KrigingSurrogate(SurrogateModel):
             distances[i + 1:, :, i] = distances[i, :, i + 1:].T
 
         R = np.exp(-thetas.dot(np.square(distances)))
-        R[np.diag_indices_from(R)] = 1. + self.nugget
+        R[np.diag_indices_from(R)] = 1. + self.options['nugget']
 
         [U, S, Vh] = linalg.svd(R)
 
@@ -242,7 +241,7 @@ class KrigingSurrogate(SurrogateModel):
         # Predictor
         y = self.Y_mean + self.Y_std * y_t
 
-        if self.eval_rmse:
+        if self.options['eval_rmse']:
             mse = (1. - np.dot(np.dot(r, self.Vh.T),
                                np.einsum('j,kj,lk->jl', self.S_inv, self.U, r))) * self.sigma2
 
@@ -284,24 +283,21 @@ class KrigingSurrogate(SurrogateModel):
 
 class FloatKrigingSurrogate(KrigingSurrogate):
     """
-    Surrogate model based on the simple Kriging interpolation.
-
-    Predictions are returned as floats, which are the mean of the model's prediction.
+    Deprecated.
     """
 
-    def predict(self, x):
+    def __init__(self, *args, **kwargs):
         """
-        Calculate predicted value of response based on the current trained model.
+        Capture Initialize to throw warning.
 
         Parameters
         ----------
-        x : array-like
-            Point at which the surrogate is evaluated.
-
-        Returns
-        -------
-        float
-            Mean value of kriging prediction.
+        *args : list
+            Deprecated arguments.
+        **kwargs : dict
+            Deprecated arguments.
         """
-        dist = super(FloatKrigingSurrogate, self).predict(x)
-        return dist[0]  # mean value
+        warn_deprecation("'FloatKrigingSurrogate' has been deprecated. Use "
+                         "'KrigingSurrogate' instead.")
+        super(FloatKrigingSurrogate, self).__init__(*args, **kwargs)
+
