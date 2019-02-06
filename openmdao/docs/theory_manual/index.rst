@@ -13,6 +13,7 @@ mathematical manner to help users gain a deeper understanding of how the framewo
 .. toctree::
    :maxdepth: 1
 
+   class_structure.rst
    implicit_transformation_of_vars.rst
    setup_stack.rst
    solver_api.rst
