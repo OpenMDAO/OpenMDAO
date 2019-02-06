@@ -99,6 +99,19 @@ class ForCond(ExplicitComponent):
                 y[i] = x[i] * 3.
 
 
+class DoubleSubscript(ExplicitComponent):
+    def setup(self):
+        self.n = 5
+        self.add_input('x', np.ones(self.n))
+        self.add_output('y', np.zeros(self.n))
+
+        self.declare_partials(of='*', wrt='*')
+
+    def compute(self, inputs, outputs):
+        #outputs['y'] = inputs['x'] * 3.0
+        outputs['y'][0] = inputs['x'][0] * 4.0
+
+
 class PassThroughOptBug(ExplicitComponent):
     def setup(self):
         self.size = size = 3
@@ -181,7 +194,7 @@ class TangentTestCase(unittest.TestCase):
         p, comp = get_harness(Looper())
         comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
         p.run_model()
-        check_tangent_ad(comp, mode='rev')
+        check_tangent_ad(comp, mode='rev', verbose=2, optimize=False)
 
     def test_loop_with_cond_fwd(self):
         p, comp = get_harness(ForCond())
@@ -194,6 +207,18 @@ class TangentTestCase(unittest.TestCase):
         comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
         p.run_model()
         check_tangent_ad(comp, verbose=2, optimize=False, mode='rev')
+
+    def test_double_subscript_fwd(self):
+        p, comp = get_harness(DoubleSubscript())
+        comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
+        p.run_model()
+        check_tangent_ad(comp, verbose=2, optimize=False, mode='fwd')
+
+    def test_double_subscript_rev(self):
+        p, comp = get_harness(DoubleSubscript())
+        comp._inputs._data[:] = np.random.random(comp._inputs._data.size)
+        p.run_model()
+        check_tangent_ad(comp, verbose=0, optimize=False, mode='rev')
 
     def test_subfunction(self):
         self.fail("not tested")

@@ -406,6 +406,8 @@ def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, r
         Jad = {}
         _get_tangent_ad_jac(comp, mode, deriv_func, Jad)
 
+        print("FINAL:")
+        print(inspect.getsource(deriv_func))
         del sys.modules[dmod.__name__]
         os.remove(dmod.__file__)
         try:
