@@ -48,7 +48,7 @@ The hierarchy of groups and components collectively form the model.
 
 Solver
 ------
-Every system may contain two solvers: a :code:`NonlinearSolver` and a :code:`LinearSolver`, which share
+Every system may contain two solvers, a :code:`NonlinearSolver` and a :code:`LinearSolver`, which share
 a common :code:`Solver` base class. Nonlinear solvers are used to converge implicit components or groups
 with cycles and linear solvers are used when computing derivatives across the model (see :ref:`Setting
 Nonlinear and Linear Solvers <set-solvers>`). Additional details about the different kinds of solvers 
