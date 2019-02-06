@@ -1287,6 +1287,69 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
         assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 2e-3)
 
+    def test_kriging_options_eval_rmse(self):
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
+        from openmdao.api import KrigingSurrogate
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=KrigingSurrogate(eval_rmse=True))
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        prob.run_model()
+
+        print("mean")
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 1e-4)
+        print("std")
+        assert_rel_error(self, sin_mm._metadata('f_x')['rmse'][0, 0], 0.0, 1e-4)
+
+    def test_nearest_neighbor_rbf_options(self):
+        import numpy as np
+
+        from openmdao.api import Problem, MetaModelUnStructuredComp, IndepVarComp
+        from openmdao.api import NearestNeighbor
+
+        prob = Problem()
+
+        prob.model.add_subsystem('p', IndepVarComp('x', 2.1))
+
+        sin_mm = MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=NearestNeighbor(interpolant_type='rbf', num_neighbors=3))
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0,10,20)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['sin_mm.f_x'], .5*np.sin(prob['sin_mm.x']), 5e-3)
+
 
 class MetaModelUnstructuredFloatKrigingDeprecation(unittest.TestCase):
 

@@ -63,12 +63,6 @@ The following surrogates are available to use with `MetaModelUnStructuredComp`.
   **Description**: Based on Kriging interpolation; prediction returns mean predicted value, optionally returns RMSE.
 
 
-:ref:`MultiFiCoKrigingSurrogate <feature_building_components>`
-  **Derivatives**: No
-
-  **Description**: Integrates the Multi-Fidelity Co-Kriging method.
-
-
 :ref:`NearestNeighbor <nearest_neighbor>`
   **Derivatives**: Yes
 
