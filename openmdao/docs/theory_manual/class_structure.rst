@@ -29,7 +29,7 @@ A :code:`System` can be a :code:`Group` or a :code:`Component`.
 
 A :code:`Group` contains components, other groups, or a mix of both. The containment relationships 
 between groups and components form a hierarchy tree, where a top-level group contains other groups, 
-which  contain other groups, and so on, until we reach the bottom of the tree, which is composed 
+which contain other groups, and so on, until we reach the bottom of the tree, which is composed
 only of components. In addition to managing the data dependencies between its subsystems, groups 
 serve three purposes: 
 
