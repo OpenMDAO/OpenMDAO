@@ -69,6 +69,10 @@ def write_html(outfile, source_data=None, data_file=None, embeddable=False):
 
     # grab the style
     styles = _read_files(('fontello', 'xdsm'), style_dir, 'css')
+    styles_elem = _write_tags(tag='style',
+                              content='\n\n'.join(itervalues(styles)),
+                              attrs={'type': "text/css"},
+                              new_lines=True)
 
     # put all style and JS into index
     toolbar_div = _write_div(attrs={'class': 'xdsm-toolbar'})
@@ -76,29 +80,27 @@ def write_html(outfile, source_data=None, data_file=None, embeddable=False):
     body = '\n\n'.join([toolbar_div, xdsm_div])
 
     if embeddable:
-        index = '\n\n'.join([styles, xdsm_bundle, body])
+        index = '\n\n'.join([styles_elem, xdsm_bundle, body])
     else:
-        doc_type = '<!doctype html>'
         meta = '<meta charset="{}">'.format(_CHAR_SET)
-        styles_elem = _write_tags(tag='style',
-                                  content='\n\n'.join(itervalues(styles)),
-                                  attrs={'type': "text/css"},
-                                  new_lines=True)
-        head_elem =  _write_tags(tag='head',
-                                 content='\n\n'.join([meta, styles_elem, xdsm_bundle]),
-                                 new_lines=True)
-        body_elem = _write_tags(tag='body',
-                                content=body,
-                                new_lines=True)
 
-        index = _write_tags(tag='html',
-                            content='\n\n'.join([doc_type, head_elem, body_elem]),
-                            attrs={'class': "js", 'lang': ""},
-                            new_lines=True)
+        head = '\n\n'.join([meta, styles_elem, xdsm_bundle])
+
+        index = _head_and_body(head, body, attrs={'class': "js", 'lang': ""})
 
     # Embed style, scripts and data to HTML
     with open(outfile, 'w') as f:
         f.write(index)
+
+
+def _head_and_body(head, body, attrs):
+    # Wraps the head and body in tags
+    doc_type = '<!doctype html>'
+    head_elem = _write_tags(tag='head', content=head, new_lines=True)
+    body_elem = _write_tags(tag='body', content=body, new_lines=True)
+    content = '\n\n'.join([head_elem, body_elem])
+    index = _write_tags(tag='html', content=content, attrs=attrs, new_lines=True)
+    return doc_type + '\n' + index
 
 
 def _write_tags(tag, content, attrs=None, new_lines=False):

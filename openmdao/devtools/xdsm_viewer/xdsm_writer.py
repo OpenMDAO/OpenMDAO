@@ -277,16 +277,17 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
         html_filename = '.'.join([filename, 'html'])
 
+        embeddable = kwargs.pop('embeddable', False)
         if embed_data:
             # Write HTML file
-            write_html(outfile=html_filename, source_data=data)
+            write_html(outfile=html_filename, source_data=data, embeddable=embeddable)
         else:
             json_filename = '.'.join([filename, 'json'])
             with open(json_filename, 'w') as f:
                 json.dump(data, f)
 
             # Write HTML file
-            write_html(outfile=html_filename, data_file=json_filename)
+            write_html(outfile=html_filename, data_file=json_filename, embeddable=embeddable)
         print('XDSM output file written to: {}'.format(html_filename))
 
 
@@ -330,6 +331,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       the data of the XDSM diagram.
     * variable names with exactly one underscore have a subscript.
       Example: "x_12" will be :math:`x_12`
+    * If "embeddable" is True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>,
+      <body> and <head> tags. If False, gives a single, standalone HTML file for viewing.
 
     Parameters
     ----------
