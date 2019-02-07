@@ -177,6 +177,9 @@ def _ad(prob, options):
 
         summary[comp.__class__.__name__] = summ = {}
 
+        summ['fwd'] = {'ran': False, 'diff': float('nan')}
+        summ['rev'] = {'ran': False, 'diff': float('nan')}
+
         rel_offset = len(comp.pathname) + 1 if comp.pathname else 0
 
         type_ = 'Explicit' if isinstance(comp, ExplicitComponent) else 'Implicit'
@@ -242,7 +245,7 @@ def _ad(prob, options):
         if options.ad_method == 'autograd':
             mod_wrapper.np = mod_wrapper.numpy = np
 
-        if options.ad_method == 'tangent' and summ['fwd']['ran'] and summ['rev']['ran']:
+        if (options.ad_method == 'tangent' and summ['fwd']['ran'] and summ['rev']['ran']):
             summ['dotprod'] = _dot_prod_test(comp, summ['fwd']['func'], summ['rev']['func'])
         else:
             summ['dotprod'] = float('nan')
@@ -267,8 +270,10 @@ def _ad(prob, options):
         typ = s['type']
         fwdran = s['fwd']['ran']
         fwdmax = s['fwd']['diff']
+
         revran = s['rev']['ran']
         revmax = s['rev']['diff']
+
         dptest = s['dotprod']
 
         line = template.format(n=cname, typ=typ, fdiff=fwdmax, rdiff=revmax, dot=dptest,
