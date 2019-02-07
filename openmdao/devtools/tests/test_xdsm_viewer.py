@@ -226,6 +226,32 @@ class TestXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
+    def test_xdsmjs_embeddable(self):
+        """
+        Makes XDSMjs input file for the Sellar problem.
+
+        HTML file is embeddable (no head and body tags)
+        """
+
+        filename = 'xdsmjs_embeddable'  # this name is needed for XDSMjs
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+                   embed_data=True, embeddable=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
+
     def test_html_writer_dct(self):
         """
         Makes XDSMjs input file.
@@ -303,6 +329,8 @@ class TestXDSMViewer(unittest.TestCase):
     def tearDown(self):
         """Set "clean_up" to False, if you want to inspect the output files."""
         clean_up = True
+        xdsmjs_names = ('xdsmjs', 'xdsmjs2', 'xdsmjs3', 'xdsmjs_embedded', 'xdsmjs_orbit',
+                        'xdsmjs_embeddable')
 
         def clean_file(fname):
             try:  # Try to clean up
@@ -322,7 +350,7 @@ class TestXDSMViewer(unittest.TestCase):
 
             # clean-up of XDSMjs files
             for ext in ('json', 'html'):
-                for name in ['xdsmjs', 'xdsmjs2', 'xdsmjs3', 'xdsmjs_embedded', 'xdsmjs_orbit']:
+                for name in xdsmjs_names:
                     filename = '.'.join([name, ext])
                     clean_file(filename)
 
