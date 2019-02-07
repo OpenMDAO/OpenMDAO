@@ -323,6 +323,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       To write in subscripts wrap that part of the name into a round bracket.
       Example: To write :math:`x_12` the variable name should be "x(12)"
     * "box_lines" can be used to limit the number of lines, if the box stacking is vertical
+    * "numbered_comps": bool, If True, components are numbered. Defaults to True.
+    * "index_separator": str, characters (for example a space or new line) to separate component
+      numbers from component names. Only used, "numbered_comps" is True.
 
     XDSMjs
     ~~~~~~
@@ -452,10 +455,15 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     """
     # TODO implement residuals
 
+    writer_name = writer.lower()  # making it case insensitive
+
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
     box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
+    # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
+    add_component_indices = kwargs.pop('numbered_comps', True) and writer_name == 'pyxdsm'
+    index_separator = kwargs.pop('index_separator', '')  # nothing, space or new line
 
     def format_block(names, **kwargs):
         if writer == 'pyxdsm':
@@ -466,6 +474,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
+
+    # Get the top level system to be transcripted to XDSM
+    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
                                                                      model_path=model_path)
@@ -478,15 +489,17 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    writer_name = writer.lower()  # making it case insensitive
-
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
 
     if optimizer is not None:
-        x.add_optimizer(optimizer)
+        opt_label = optimizer
+        if add_component_indices:
+            opt_index = len(comps)+2  # index of last component + 1
+            opt_label = '1, {}-2:{}{}'.format(opt_index, index_separator, optimizer)
+        x.add_optimizer(label=opt_label)
 
     if solver is not None:
         x.add_solver(solver)
@@ -511,12 +524,12 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
-    # Get the top level system to be transcripted to XDSM
-    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
-
     # Add components
-    for comp in comps:
-        x.add_comp(name=comp['abs_name'], label=_replace_chars(comp['name'], substitutes=subs))
+    for i, comp in enumerate(comps, 2):  # Driver is 1, so starting from 2
+        label = _replace_chars(comp['name'], substitutes=subs)
+        if add_component_indices:
+            label = '{}:{}{}'.format(i, index_separator, label)
+        x.add_comp(name=comp['abs_name'], label=label)
 
     # Add the connections
     for src, dct in iteritems(conns3):
