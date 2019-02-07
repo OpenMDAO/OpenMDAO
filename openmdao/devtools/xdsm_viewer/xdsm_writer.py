@@ -313,10 +313,16 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     ~~~~~~
 
     * The appearance of the boxes can be controlled with "box_stacking" and "box_width" arguments.
-      The box stacking can be "horizontal", "vertical", "cut_chars" or "max_chars".
-      With "cut_chars" the text in the box will be one line with the maximum number of characters
-      limited by "box_width". In the latter case the "box_width" argument is used to determine
-      the maximum allowed width of boxes (in characters).
+      The box stacking can be:
+
+      * "horizontal" - All variables in one line
+      * "vertical" - All variables in one column
+      * "cut_chars" - The text in the box will be one line with the maximum number of characters
+        limited by "box_width".
+      * "max_chars" - The "box_width" argument is used to determine
+        the maximum allowed width of boxes (in characters).
+      * "empty" - There are no variable names in the data block. Good for large diagrams.
+
       A default value is taken, if not specified.
     * By default the part of variable names following underscores (_)
       are not converted to subscripts.
@@ -501,7 +507,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         opt_label = optimizer
         if add_component_indices:
             opt_index = len(comps)+2  # index of last component + 1
-            opt_label = '1, {}-2:{}{}'.format(opt_index, index_separator, optimizer)
+            opt_label = '1, {}$\\rightarrow$ 2:{}{}'.format(opt_index, index_separator, optimizer)
         x.add_optimizer(label=opt_label)
 
     if solver is not None:
@@ -828,6 +834,8 @@ def _format_block_string(var_names, stacking='vertical', **kwargs):
                 return lines
             else:
                 return lines[0]  # return the string instead of a list
+    elif stacking == 'empty':  # No variable names in the data block, good for big diagrams
+        return ''
     else:
         msg = 'Invalid block stacking option "{}".'
         raise ValueError(msg.format(stacking))
