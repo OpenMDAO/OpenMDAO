@@ -10,7 +10,7 @@ for Machine Learning (GPML) by Rasmussen and Williams. In the default configurat
 computes the mean of the predicted value. KrigingSurrogate also has an option "eval_rmse", which can
 be set to True to also compute the RMSE (root mean squared error).
 
-Here is a simple example where a Kriging model is used to approximate the output a sinusoidal component.
+Here is a simple example where a Kriging model is used to approximate the output of a sinusoidal component.
 
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_kriging

@@ -8,6 +8,8 @@ Surrogate model based on the N-Dimensional Interpolation library_ by Stephen Mar
 
 .. _library: https://github.com/SMarone/NDInterp
 
+Here is a simple example where the `NearestNeighbor` surrogate is used to approximate the output of a sinusoidal component.
+
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_nearest_neighbor
     :layout: code, output
