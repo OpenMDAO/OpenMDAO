@@ -4,8 +4,6 @@ import sys
 import tempfile
 import unittest
 
-from six import StringIO
-
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
@@ -342,34 +340,6 @@ class TestXDSMViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
             write_xdsm(prob, filename=filename, out_format='jpg', subs=(), quiet=True, show_browser=False)
-
-    def tearDown(self):
-        """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = True
-        xdsmjs_names = ('xdsmjs', 'xdsmjs2', 'xdsmjs3', 'xdsmjs_embedded', 'xdsmjs_orbit',
-                        'xdsmjs_embeddable')
-
-        def clean_file(fname):
-            try:  # Try to clean up
-                if os.path.exists(fname):
-                    os.remove(fname)
-            except Exception as e:
-                pass
-
-        if clean_up:
-
-            # clean-up of pyXDSM files
-            nr_pyxdsm_tests = 4  # number of tests with pyXDSM
-            for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
-                for i in range(nr_pyxdsm_tests):
-                    filename = '.'.join([FILENAME+str(i), ext])
-                    clean_file(filename)
-
-            # clean-up of XDSMjs files
-            for ext in ('json', 'html'):
-                for name in xdsmjs_names:
-                    filename = '.'.join([name, ext])
-                    clean_file(filename)
 
 
 if __name__ == "__main__":
