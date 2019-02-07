@@ -1,3 +1,4 @@
 [submodule "openmdao/devtools/xdsm_viewer/XDSMjs"]
 	path = openmdao/devtools/xdsm_viewer/XDSMjs
 	url = https://github.com/OneraHub/XDSMjs.git
+    branch = master
