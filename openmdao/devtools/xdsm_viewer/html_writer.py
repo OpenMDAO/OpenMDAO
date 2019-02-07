@@ -8,22 +8,12 @@ import os
 from six import iteritems, itervalues
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
-_HTML_TEMPLATE = (
-    '<!doctype html>'
-    '<html class="js" lang="">'
-    '<head>'
-    '<meta charset="utf-8">'
-    '{{styles}}'
-    '{{xdsm_bundle}}'
-    '</head>'
-    '<body>'
-    '{{body}}'
-    '</body>'
-    '</html>'
-)  # Template for the output file
+
+# HTML character set
+_CHAR_SET = "utf-8"
 
 
-def write_html(outfile, source_data=None, data_file=None):
+def write_html(outfile, source_data=None, data_file=None, embeddable=False):
     """
     Writes XDSMjs HTML output file, with style and script files embedded.
 
@@ -41,6 +31,9 @@ def write_html(outfile, source_data=None, data_file=None):
         XDSM data in a dictionary or string
     data_file : str or None
         Output HTML file
+    embeddable : bool, optional
+        If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
+        and <head> tags. If False, gives a single, standalone HTML file for viewing.
     """
 
     # directories
@@ -77,28 +70,38 @@ def write_html(outfile, source_data=None, data_file=None):
     # grab the style
     styles = _read_files(('fontello', 'xdsm'), style_dir, 'css')
 
-    # grab the index.html template
-    index = _HTML_TEMPLATE
-
     # put all style and JS into index
     toolbar_div = _write_div(attrs={'class': 'xdsm-toolbar'})
     xdsm_div = _write_div(attrs=xdsm_attrs)
-    index = index.replace('{{body}}', toolbar_div + '\n' + xdsm_div)
-    index = index.replace('{{fontello_style}}', styles['fontello'])
-    index = index.replace('{{xdsm_style}}', styles['xdsm'])
-    styles_elem = _write_tags(tag='style',
-                              content='\n\n'.join(itervalues(styles)),
-                              attrs={'type': "text/css"},
-                              new_lines=True)
-    index = index.replace('{{styles}}', styles_elem)
-    index = index.replace('{{xdsm_bundle}}', xdsm_bundle)
+    body = '\n\n'.join([toolbar_div, xdsm_div])
+
+    if embeddable:
+        index = '\n\n'.join([styles, xdsm_bundle, body])
+    else:
+        doc_type = '<!doctype html>'
+        meta = '<meta charset="{}">'.format(_CHAR_SET)
+        styles_elem = _write_tags(tag='style',
+                                  content='\n\n'.join(itervalues(styles)),
+                                  attrs={'type': "text/css"},
+                                  new_lines=True)
+        head_elem =  _write_tags(tag='head',
+                                 content='\n\n'.join([meta, styles_elem, xdsm_bundle]),
+                                 new_lines=True)
+        body_elem = _write_tags(tag='body',
+                                content=body,
+                                new_lines=True)
+
+        index = _write_tags(tag='html',
+                            content='\n\n'.join([doc_type, head_elem, body_elem]),
+                            attrs={'class': "js", 'lang': ""},
+                            new_lines=True)
 
     # Embed style, scripts and data to HTML
     with open(outfile, 'w') as f:
         f.write(index)
 
 
-def _write_tags(tag, content, attrs, new_lines=False):
+def _write_tags(tag, content, attrs=None, new_lines=False):
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
     template = '<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
