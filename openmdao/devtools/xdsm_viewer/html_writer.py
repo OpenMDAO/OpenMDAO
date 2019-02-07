@@ -9,8 +9,7 @@ from six import iteritems, itervalues
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
 
-# HTML character set
-_CHAR_SET = "utf-8"
+_CHAR_SET = "utf-8"  # HTML character set
 
 
 def write_html(outfile, source_data=None, data_file=None, embeddable=False):
