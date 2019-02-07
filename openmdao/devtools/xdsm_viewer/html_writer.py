@@ -1,5 +1,5 @@
 """
-HTML file writing to create (semi)standalone XDSMjs output file.
+HTML file writing to create standalone XDSMjs output file.
 """
 
 import json
@@ -7,8 +7,8 @@ import os
 
 from six import itervalues
 
-from openmdao.devtools.html_utils import read_files, write_tags, write_div, head_and_body, \
-    write_script, write_style
+from openmdao.devtools.html_utils import read_files, write_div, head_and_body, write_script, \
+    write_style
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
 _CHAR_SET = "utf-8"  # HTML character set

@@ -5,7 +5,7 @@ import networkx as nx
 from collections import OrderedDict
 import base64
 
-from openmdao.devtools.html_utils import head_and_body, write_style
+from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script
 
 try:
     import h5py
@@ -253,10 +253,11 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     style_dir = os.path.join(vis_dir, "style")
 
     # grab the libraries, src and style
-    libs = _read_files(('awesomplete', 'd3.v4.min', 'vkBeautify'), libs_dir, 'js')
+    lib_dct = {'d3': 'd3.v4.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}
+    libs = read_files(itervalues(lib_dct), libs_dir, 'js')
     src_names = 'constants', 'draw', 'legend', 'modal', 'ptN2', 'search', 'svg'
-    srcs = _read_files(src_names, src_dir, 'js')
-    styles = _read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+    srcs = read_files(src_names, src_dir, 'js')
+    styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
     style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
 
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
@@ -271,18 +272,22 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         index = '\n\n'.join([style_elems, index])
     else:
         meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
-        head = '\n\n'.join([meta, style_elems])
-        index = head_and_body(head, index)
+        head = '\n\n'.join([meta, style_elems])  # Write styles to head
+        index = head_and_body(head=head, body=index)
 
     # put all style and JS into index
     index = index.replace('{{fontello}}', encoded_font)
 
-    for k, v in iteritems({'d3': 'd3.v4.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}):
-        index = index.replace('{{{}_lib}}'.format(k), libs[v])
+    for k, v in iteritems(lib_dct):
+        script = write_script(libs[v], attrs={'type': 'text/javascript'}, indent=4)
+        index = index.replace('{{{}_lib}}'.format(k), script)
 
     for name, code in iteritems(srcs):
-        index = index.replace('{{{}_lib}}'.format(name.lower()), code)
-    index = index.replace('{{model_data}}', model_viewer_data)
+        script = write_script(code, attrs={'type': 'text/javascript'}, indent=4)
+        index = index.replace('{{{}_lib}}'.format(name.lower()), script)
+
+    script = write_script(model_viewer_data, attrs={'type': 'text/javascript'}, indent=4)
+    index = index.replace('{{model_data}}', script)
     index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
     with open(outfile, 'w') as f:  # write output file
@@ -292,12 +297,3 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     if show_browser:
         from openmdao.devtools.webview import webview
         webview(outfile)
-
-
-def _read_files(filenames, directory, extension):
-    # Reads files (based on filenames) from a directory with a given extension.
-    libs = dict()
-    for name in filenames:
-        with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
-            libs[name] = f.read()
-    return libs

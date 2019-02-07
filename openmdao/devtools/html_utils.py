@@ -17,26 +17,27 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content, attrs=None, new_lines=False):
+def write_tags(tag, content, attrs=None, new_lines=False, indent=0):
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
-    template = '<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
+    spaces = ' ' * indent
+    template = '{spaces}<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
     if attrs is None:
         attrs = {}
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
-    return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep)
+    return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
-def write_div(content='', attrs=None):
-    return write_tags('div', content, attrs, new_lines=False)
+def write_div(content='', attrs=None, indent=0):
+    return write_tags('div', content, attrs, new_lines=False, indent=indent)
 
 
-def write_style(content=''):
-    return write_tags('style', content, attrs={'type': "text/css"}, new_lines=True)
+def write_style(content='', indent=0):
+    return write_tags('style', content, attrs={'type': "text/css"}, new_lines=True, indent=indent)
 
 
-def write_script(content='', attrs=None):
-    return write_tags('script', content, attrs, new_lines=True)
+def write_script(content='', attrs=None, indent=0):
+    return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent)
 
 
 def read_files(filenames, directory, extension):
