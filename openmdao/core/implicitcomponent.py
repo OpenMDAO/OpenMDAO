@@ -408,3 +408,19 @@ class ImplicitComponent(Component):
             List of all states.
         """
         return self._list_states()
+
+    def _get_partials_varlists(self):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of, wrt = super(ImplicitComponent, self)._get_partials_varlists()
+
+        # The only outputs in wrt should be implicit states.
+        wrt.extend(of)
+
+        return of, wrt

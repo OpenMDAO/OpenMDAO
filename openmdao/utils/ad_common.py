@@ -18,7 +18,7 @@ from numpy.testing import assert_almost_equal
 from openmdao.core.problem import Problem
 from openmdao.core.explicitcomponent import Component, ExplicitComponent
 import openmdao.utils.mod_wrapper as mod_wrapper
-from openmdao.devtools.debug import compute_approx_jac, compare_jacs
+from openmdao.devtools.debug import compare_jacs
 
 
 def _ad_setup_parser(parser):
@@ -185,7 +185,7 @@ def _ad(prob, options):
         print("Type:", type_)
 
         save_inputs = comp._inputs._data.copy()
-        Japprox, no_cs = compute_approx_jac(comp, method='cs')
+        Japprox = comp.compute_approx_partials(method='cs')
 
         for mode in modes:
             summ[mode] = {}

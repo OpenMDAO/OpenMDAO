@@ -11,7 +11,6 @@ import tangent
 from openmdao.api import Problem, IndepVarComp, \
     ExecComp, Group, ImplicitComponent, ExplicitComponent
 from openmdao.vectors.vector import set_vec
-from openmdao.devtools.debug import compute_approx_jac
 from openmdao.utils.ad_tangent import _get_tangent_ad_func, _get_tangent_ad_jac, check_tangent_ad
 
 from openmdao.utils.assert_utils import assert_rel_error
@@ -162,7 +161,7 @@ class TangentTestCase(unittest.TestCase):
             shutil.rmtree(self.tempdir)
         except OSError:
             pass
-        
+
     def test_set_vec(self):
         p, comp = get_harness(PassThrough(size=5))
         p['comp.a'] = np.random.random(comp.size) + 1.0

@@ -4,7 +4,7 @@ from __future__ import division
 
 from collections import OrderedDict, Iterable, Counter
 from itertools import product
-from six import string_types, iteritems
+from six import string_types, iteritems, itervalues
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -1167,6 +1167,98 @@ class Component(System):
         Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass
+
+    def _get_partials_varlists(self):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of = list(self._var_allprocs_prom2abs_list['output'])
+        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        return of, wrt
+
+    def compute_approx_partials(self, method='fd', step=None, form='forward', step_calc='abs'):
+        """
+        Compute partial derivatives for this Component using finite FD or CS.
+
+        Parameters
+        ----------
+        method : str
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
+        step : float
+            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
+            'cs'.
+        form : string
+            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
+            'forward'.
+        step_calc : string
+            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
+            Default is 'abs'.
+
+        Returns
+        -------
+        dict, dict, bool
+            Approx. partial jacobian, component FD options, could_not_cs
+        """
+        alloc_complex = self._outputs._alloc_complex
+        approximations = {'fd': FiniteDifference(), 'cs': ComplexStep()}
+
+        of, wrt = self._get_partials_varlists()
+
+        # Load up approximation objects with the requested settings.
+        local_opts = self._get_check_partial_options()
+        for rel_key in product(of, wrt):
+            abs_key = rel_key2abs_key(self, rel_key)
+            local_wrt = rel_key[1]
+
+            # Determine if fd or cs.
+            if local_wrt in local_opts:
+                local_method = local_opts[local_wrt]['method']
+                if local_method:
+                    method = local_method
+
+            # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
+            if method == 'cs' and not alloc_complex:
+                method = 'fd'
+
+            fd_options = {'order': None, 'method': method}
+
+            if method == 'cs':
+                defaults = DEFAULT_CS_OPTIONS
+
+                fd_options['form'] = None
+                fd_options['step_calc'] = None
+
+            elif method == 'fd':
+                defaults = DEFAULT_FD_OPTIONS
+
+                fd_options['form'] = form
+                fd_options['step_calc'] = step_calc
+
+            if step:
+                fd_options['step'] = step
+            else:
+                fd_options['step'] = defaults['step']
+
+            # Precedence: component options > global options > defaults
+            if local_wrt in local_opts:
+                for name in ['form', 'step', 'step_calc', 'directional']:
+                    value = local_opts[local_wrt][name]
+                    if value is not None:
+                        fd_options[name] = value
+
+            approximations[fd_options['method']].add_approximation(abs_key, fd_options)
+
+        approx_jac = {}
+        for approximation in itervalues(approximations):
+            # Perform the FD here.
+            approximation.compute_approximations(self, jac=approx_jac)
+
+        return approx_jac
 
 
 class _DictValues(object):

@@ -38,7 +38,7 @@ from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis
     StringSubscriptVisitor
 from openmdao.utils.general_utils import print_line_numbers
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.devtools.debug import compute_approx_jac, compare_jacs
+from openmdao.devtools.debug import compare_jacs
 from openmdao.devtools.ast_tools import add_prints
 
 
@@ -356,8 +356,8 @@ def _get_tangent_ad_jac(comp, mode, deriv_func, partials):
         colstart = colend
 
 
-def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, raise_exc=True,
-                     **kwargs):
+def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, method='cs',
+                     raise_exc=True, **kwargs):
     """
     Compare AD jac for the given component with its appoximate jac (either fd or cs).
 
@@ -378,10 +378,12 @@ def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, r
         purposes. If > 1, all intermediate code generation steps will print.
     optimize : bool (True)
         If True, allow tangent to perform optimizations on the generated code.
+    method : str
+        Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
     raise_exc : bool (True)
         If True, raise an exception if difference in derivs is > failtol.
     **kwargs : dict
-        Other named args passed to compute_approx_jac.
+        Other named args passed to compute_approx_partials.
 
     Returns
     -------
@@ -389,7 +391,7 @@ def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, r
         Max difference found between AD and FD (or CS) derivatives.
     """
     save_inputs = comp._inputs._data.copy()
-    Japprox, no_cs = compute_approx_jac(comp, method='cs', **kwargs)
+    Japprox = comp.compute_approx_partials(method=method, **kwargs)
 
     if mode is None:
         modes = ['fwd', 'rev']
