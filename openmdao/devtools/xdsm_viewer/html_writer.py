@@ -8,7 +8,6 @@ import os
 from six import iteritems, itervalues
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
-
 _CHAR_SET = "utf-8"  # HTML character set
 
 
