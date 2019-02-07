@@ -410,7 +410,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
-        driver.recording_options['includes'] = ['mda.d2.y2']
+        driver.recording_options['includes'] = ['y2']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -2230,7 +2230,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.driver.add_recorder(recorder)
         prob.driver.recording_options['record_desvars'] = True
         prob.driver.recording_options['includes'] = []
-        prob.driver.recording_options['excludes'] = ['p2.y']
+        prob.driver.recording_options['excludes'] = ['y']
 
         prob.set_solver_print(0)
         prob.setup()

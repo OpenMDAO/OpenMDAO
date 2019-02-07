@@ -243,12 +243,15 @@ class ExperimentalDriver(object):
         rec_constraints = self.recording_options['record_constraints']
         rec_responses = self.recording_options['record_responses']
 
+        # includes and excludes for outputs are specified using promoted names
+        abs2prom = model._var_abs2prom['output']
+
         all_desvars = {n for n in self._designvars
-                       if check_path(n, incl, excl, True)}
+                       if check_path(abs2prom[n], incl, excl, True)}
         all_objectives = {n for n in self._objs
-                          if check_path(n, incl, excl, True)}
+                          if check_path(abs2prom[n], incl, excl, True)}
         all_constraints = {n for n in self._cons
-                           if check_path(n, incl, excl, True)}
+                           if check_path(abs2prom[n], incl, excl, True)}
         if rec_desvars:
             mydesvars = all_desvars
 
@@ -260,7 +263,7 @@ class ExperimentalDriver(object):
 
         if rec_responses:
             myresponses = {n for n in self._responses
-                           if check_path(n, incl, excl, True)}
+                           if check_path(abs2prom[n], incl, excl, True)}
 
         # get the includes that were requested for this Driver recording
         if incl:
@@ -271,7 +274,7 @@ class ExperimentalDriver(object):
             # First gather all of the desired outputs
             # The following might only be the local vars if MPI
             mysystem_outputs = {n for n in root._outputs
-                                if check_path(n, incl, excl)}
+                                if check_path(abs2prom[n], incl, excl)}
 
             # If MPI, and on rank 0, need to gather up all the variables
             #    even those not local to rank 0

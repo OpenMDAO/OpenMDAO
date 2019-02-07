@@ -307,9 +307,15 @@ class Driver(object):
         incl = recording_options['includes']
         excl = recording_options['excludes']
 
-        all_desvars = {n for n in self._designvars if check_path(n, incl, excl, True)}
-        all_objectives = {n for n in self._objs if check_path(n, incl, excl, True)}
-        all_constraints = {n for n in self._cons if check_path(n, incl, excl, True)}
+        # includes and excludes for outputs are specified using promoted names
+        abs2prom = model._var_abs2prom['output']
+
+        all_desvars = {n for n in self._designvars
+                       if check_path(abs2prom[n], incl, excl, True)}
+        all_objectives = {n for n in self._objs
+                          if check_path(abs2prom[n], incl, excl, True)}
+        all_constraints = {n for n in self._cons
+                           if check_path(abs2prom[n], incl, excl, True)}
 
         # design variables, objectives and constraints are always in the options
         mydesvars = myobjectives = myconstraints = set()
@@ -343,7 +349,8 @@ class Driver(object):
             myresponses = set()
 
             if recording_options['record_responses']:
-                myresponses = {n for n in self._responses if check_path(n, incl, excl, True)}
+                myresponses = {n for n in self._responses
+                               if check_path(abs2prom[n], incl, excl, True)}
 
                 if MPI:
                     myresponses = [n for n in myresponses if rrank == rowned[n]]
@@ -374,7 +381,7 @@ class Driver(object):
             myoutputs = set()
 
             if incl:
-                myoutputs = {n for n in model._outputs if check_path(n, incl, excl)}
+                myoutputs = {n for n in model._outputs if check_path(abs2prom[n], incl, excl)}
 
                 if MPI:
                     # gather the variables from all ranks to rank 0
