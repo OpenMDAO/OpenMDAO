@@ -592,76 +592,9 @@ class Problem(object):
         """
         Set up case recording.
         """
-        model = self.model
-        driver = self.driver
-
-        mydesvars = myobjectives = myconstraints = set()
-
-        incl = self.recording_options['includes']
-        excl = self.recording_options['excludes']
-
-        rec_desvars = self.recording_options['record_desvars']
-        rec_objectives = self.recording_options['record_objectives']
-        rec_constraints = self.recording_options['record_constraints']
-
-        all_desvars = {n for n in driver._designvars
-                       if check_path(n, incl, excl, True)}
-        all_objectives = {n for n in driver._objs
-                          if check_path(n, incl, excl, True)}
-        all_constraints = {n for n in driver._cons
-                           if check_path(n, incl, excl, True)}
-        if rec_desvars:
-            mydesvars = all_desvars
-
-        if rec_objectives:
-            myobjectives = all_objectives
-
-        if rec_constraints:
-            myconstraints = all_constraints
-
-        # get the includes that were requested for this Driver recording
-        if incl:
-            # The my* variables are sets
-
-            # First gather all of the desired outputs
-            # The following might only be the local vars if MPI
-            mysystem_outputs = {n for n in model._outputs
-                                if check_path(n, incl, excl)}
-
-            # If MPI, and on rank 0, need to gather up all the variables
-            #    even those not local to rank 0
-            if MPI:
-                all_vars = model.comm.gather(mysystem_outputs, root=0)
-                if MPI.COMM_WORLD.rank == 0:
-                    mysystem_outputs = all_vars[-1]
-                    for d in all_vars[:-1]:
-                        mysystem_outputs.update(d)
-
-            # de-duplicate mysystem_outputs
-            mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
-                                                           all_constraints)
-
-        if MPI:  # filter based on who owns the variables
-            # TODO Eventually, we think we can get rid of this next check. But to be safe,
-            #       we are leaving it in there.
-            if not model.is_active():
-                raise RuntimeError("RecordingManager.startup should never be called when "
-                                   "running in parallel on an inactive System")
-            rrank = self.comm.rank
-            rowned = model._owning_rank
-            mydesvars = [n for n in mydesvars if rrank == rowned[n]]
-            myobjectives = [n for n in myobjectives if rrank == rowned[n]]
-            myconstraints = [n for n in myconstraints if rrank == rowned[n]]
-
-        self._filtered_vars_to_record = {
-            'des': mydesvars,
-            'obj': myobjectives,
-            'con': myconstraints,
-        }
+        self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
 
         self._rec_mgr.startup(self)
-
-        record_viewer_data(self)
 
     def add_recorder(self, recorder):
         """
@@ -868,7 +801,9 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
-        response_size, desvar_size = self.driver._update_voi_meta(self.model)
+        driver = self.driver
+
+        response_size, desvar_size = driver._update_voi_meta(self.model)
 
         # update mode if it's been set to 'auto'
         if self._orig_mode == 'auto':
@@ -881,9 +816,9 @@ class Problem(object):
             self.model._final_setup(self.comm, 'full',
                                     force_alloc_complex=self._force_alloc_complex)
 
-        self.driver._setup_driver(self)
+        driver._setup_driver(self)
 
-        coloring_info = self.driver._simul_coloring_info
+        coloring_info = driver._simul_coloring_info
         if coloring_info and coloring._use_sparsity:
             # if we're using simultaneous derivatives then our effective size is less
             # than the full size
@@ -906,7 +841,11 @@ class Problem(object):
                            "(objectives and nonlinear constraints)." %
                            (mode, desvar_size, response_size), RuntimeWarning)
 
-        self._setup_recording()
+        # we only want to set up recording once, after problem setup
+        if self._setup_status == 1:
+            driver._setup_recording()
+            self._setup_recording()
+            record_viewer_data(self)
 
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
@@ -1845,7 +1784,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                         fwd_rev_error / fd_norm)
 
             # Skip printing the dependent keys if the derivatives are fine.
-            if indep_key is not None:
+            if not compact_print and indep_key is not None:
                 rel_key = (of, wrt)
                 if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
                     del derivative_data[sys_name][rel_key]

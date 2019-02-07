@@ -183,24 +183,28 @@ class ExplCompTestCase(unittest.TestCase):
         # list_inputs tests
         # Can't do exact equality here because units cause comp.y to be slightly different than 12.0
         stream = cStringIO()
-        inputs = prob.model.list_inputs(units=True, out_stream=stream)
+        inputs = prob.model.list_inputs(units=True, shape=True, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
-            ('comp.x', {'value': [12.], 'units': 'inch'}),
-            ('comp.y', {'value': [12.], 'units': 'inch'})
+            ('comp.x', {'value': [12.], 'shape': (1,), 'units': 'inch'}),
+            ('comp.y', {'value': [12.], 'shape': (1,), 'units': 'inch'})
         ]):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
+            self.assertEqual(expected[1]['shape'], actual[1]['shape'])
             assert_rel_error(self, expected[1]['value'], actual[1]['value'], tol)
 
         text = stream.getvalue()
+
         self.assertEqual(1, text.count("Input(s) in 'model'"))
         self.assertEqual(1, text.count('varname'))
         self.assertEqual(1, text.count('value'))
+        self.assertEqual(1, text.count('shape'))
         self.assertEqual(1, text.count('top'))
         self.assertEqual(1, text.count('  comp'))
         self.assertEqual(1, text.count('    x'))
         self.assertEqual(1, text.count('    y'))
+
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(8, num_non_empty_lines)
 

@@ -37,10 +37,8 @@ class NonlinearRunOnce(NonlinearSolver):
 
             # If this is not a parallel group, transfer for each subsystem just prior to running it.
             else:
-                for isub, subsys in enumerate(system._subsystems_myproc):
-                    system._transfer('nonlinear', 'fwd', isub)
-                    subsys._solve_nonlinear()
-                    system._check_reconf_update()
+                self._gs_iter()
+
             rec.abs = 0.0
             rec.rel = 0.0
 

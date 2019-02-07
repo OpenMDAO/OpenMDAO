@@ -63,7 +63,7 @@ def _ad_exec(options):
 
 def _create_instances(prob, classes):
     """
-    Creates instances of the given classes and checks their partials.
+    Create instances of the given classes and checks their partials.
 
     Note: this only works for classes that can be instantiated with no args.
 
@@ -97,9 +97,9 @@ def _create_instances(prob, classes):
 
 def _find_instances(prob, classes, exclude=()):
     """
-    Finds instances of the given classes in the problem.
+    Find instances of the given classes in the problem.
 
-    Yields only one instance of each class.
+    Yields only the first instance of each class that it finds.
 
     Parameters
     ----------
@@ -121,18 +121,11 @@ def _find_instances(prob, classes, exclude=()):
         cname = s.__class__.__name__
         if cname not in seen and (cname in classes or not classes):
             seen.add(cname)
-            print("\nClass:", cname)
-            print("Instance:", s.pathname)
             yield s
-
-        # if we've found an instance of each class we're looking for, we're done.
-        if classes and (len(seen) == len(classes) + len(exclude)):
-            break
 
     not_found = classes - seen
     if not_found:
-        raise RuntimeError("Couldn't find an instance of the following classes: %s." %
-                            not_found)
+        raise RuntimeError("Couldn't find an instance of the following classes: %s." % not_found)
 
 
 def _ad(prob, options):
@@ -170,6 +163,8 @@ def _ad(prob, options):
     summary = {}
 
     for comp in it:
+        print("\nClass:", type(comp).__name__)
+        print("Instance:", comp.pathname)
 
         if options.ad_method == 'autograd':
             import autograd.numpy as agnp
@@ -329,5 +324,3 @@ def _ad_cmd(options):
         The post-setup hook function.
     """
     return lambda prob: _ad(prob, options)
-
-

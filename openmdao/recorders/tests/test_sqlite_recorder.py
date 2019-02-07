@@ -440,7 +440,7 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, prom2abs, abs2prom)
         expected_problem_metadata = {
             'connections_list_length': 11,
-            'tree_length': 4,
+            'tree_length': 6,
             'tree_children_length': 7,
             'abs2prom': abs2prom,
         }
@@ -478,8 +478,9 @@ class TestSqliteRecorder(unittest.TestCase):
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
-            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # second check to see if not recorded recursively, when option set to False
         prob = Problem(model=SellarDerivatives())
@@ -513,8 +514,9 @@ class TestSqliteRecorder(unittest.TestCase):
         # Quick check to see that keys and values were recorded
         for key in ['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
             self.assertTrue(key in cr.system_metadata.keys())
-            value = cr.system_metadata[key]['component_options']['assembled_jac_type']
-            self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+
+        value = cr.system_metadata['root']['component_options']['assembled_jac_type']
+        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         prob = Problem(model=SellarDerivatives())
         prob.setup()
@@ -1755,7 +1757,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
-                         {'name', 'type', 'subsystem_type', 'children'})
+                         {'name', 'type', 'subsystem_type', 'children', 'linear_solver', 'nonlinear_solver'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
                          ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
@@ -1830,19 +1832,16 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # options for system 'd1', with second option excluded
         self.assertEqual(str(metadata['d1']['component_options']),
-            "================== ======= ================= ================ ======================================\n"
-            "Option             Default Acceptable Values Acceptable Types Description                           \n"
-            "================== ======= ================= ================ ======================================\n"
-            "assembled_jac_type csc     ['csc', 'dense']  N/A              Linear solver(s) in this group, if usi\n"
-            "                                                              ng an assembled jacobian, will use thi\n"
-            "                                                              s type.\n"
-            "distributed        False   N/A               N/A              True if the component has variables th\n"
-            "                                                              at are distributed across multiple pro\n"
-            "                                                              cesses.\n"
-            "options value 1    1       N/A               N/A                                                    \n"
-            "================== ======= ================= ================ ======================================")
+            "=============== ======= ================= ================ =========================================\n"
+            "Option          Default Acceptable Values Acceptable Types Description                              \n"
+            "=============== ======= ================= ================ =========================================\n"
+            "distributed     False   N/A               N/A              True if the component has variables that \n"
+            "                                                           are distributed across multiple processes\n"
+            "                                                           .\n"
+            "options value 1 1       N/A               N/A                                                       \n"
+            "=============== ======= ================= ================ =========================================")
 
-        self.assertEqual(metadata['d1']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(metadata['d1']['component_options']['distributed'], False)
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader

@@ -102,11 +102,12 @@ register_add_grad(_OptionsAD, np.ndarray, lambda l, r: r.copy())
 
 
 @tangent.tangent_(set_vec)
-def tset_vec(z, x, y):
+def _tset_vec(z, x, y):
     d[z] = d[x]
 
+
 @tangent.grads.adjoint(set_vec)
-def svec(z, x, y):
+def _svec(z, x, y):
     d[x] = d[z]
     d[y] = d[z]
 
@@ -150,9 +151,6 @@ def _translate_compute_source(comp, verbose=0):
 
     temp_mod_name = '_temp_' + comp.__class__.__name__
     temp_file_name = temp_mod_name + '.py'
-
-    # convert any literal slices to calls to slice (else tangent fwd mode bombs)
-    #src = astunparse.unparse(transform_ast_slices(ast.parse(src)))
 
     if verbose == 1:
         print("SRC:")
@@ -408,7 +406,7 @@ def check_tangent_ad(comp, failtol=1.e-6, mode=None, verbose=0, optimize=True, r
 
         print("FINAL:")
         print(inspect.getsource(deriv_func))
-        
+
         print("\nJAC:")
         print(Jad)
 

@@ -621,6 +621,45 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue("  comp: 'g' wrt 'x'" in lines)
         self.assertTrue(('g', 'x') in data['comp'])
 
+    def test_dependent_false_compact_print_never_hide(self):
+        # API Change: we no longer omit derivatives for compact_print, even when declared as not
+        # dependent.
+
+        class SimpleComp1(ExplicitComponent):
+            def setup(self):
+                self.add_input('z', shape=(2, 2))
+                self.add_input('x', shape=(2, 2))
+                self.add_output('g', shape=(2, 2))
+
+                self.declare_partials(of='g', wrt='x')
+                self.declare_partials(of='g', wrt='z', dependent=False)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = 3.0*inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['g', 'x'] = 3.
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('comp', SimpleComp1())
+        prob.model.connect('p1.z', 'comp.z')
+        prob.model.connect('p2.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        stream = cStringIO()
+        data = prob.check_partials(out_stream=stream, compact_print=True)
+        txt = stream.getvalue()
+
+        self.assertTrue("'g'        wrt 'z'" in txt)
+        self.assertTrue(('g', 'z') in data['comp'])
+        self.assertTrue("'g'        wrt 'x'" in txt)
+        self.assertTrue(('g', 'x') in data['comp'])
+
     def test_dependent_false_show(self):
         # Test that we show derivs declared with dependent=False if the fd is not
         # ~zero.
@@ -2252,7 +2291,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = DirectSolver()
+        sub.linear_solver = DirectSolver(assemble_jac=False)
 
         # Need this.
         model.linear_solver = LinearBlockGS()

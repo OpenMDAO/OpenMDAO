@@ -22,7 +22,7 @@ from openmdao.vectors.default_vector import Vector, DefaultVector
 from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.devtools.ast_tools import transform_ast_names, dependency_analysis, \
-    StringSubscriptVisitor #, transform_ast_slices
+    StringSubscriptVisitor
 
 try:
     import autograd.numpy as agnp
@@ -35,8 +35,8 @@ except ImportError:
     DictBox = DictVSpace = container_take = None
 else:
     class _VectorBox(DictBox):
-        def get_slice(self, slc): return container_take(self._value._data, slc)
-
+        def get_slice(self, slc):
+            return container_take(self._value._data, slc)
 
     _VectorBox.register(Vector)
     _VectorBox.register(DefaultVector)
@@ -44,18 +44,7 @@ else:
 
 
 def _get_arg_replacement_map(comp):
-    """
-    Return a mapping of names or subscript expressions to be replaced with simple var names.
-
-    Parameters
-    ----------
-    comp : Component
-        Component that is being AD'd.
-
-    Returns
-    -------
-
-    """
+    # Return a mapping of names or subscript expressions to be replaced with simple var names.
     inputs = comp._inputs
     outputs = comp._outputs
 
@@ -187,7 +176,7 @@ def translate_compute_source_autograd(comp, mode):
                 if isinstance(val, np.ndarray) and len(val.shape) > 1:
                     pre_lines.append('    %s = %s[%d:%d].reshape(%s)' %
                                      (mapping["%s['%s']" % (pname, n)], vecname, start, end,
-                                     val.shape))
+                                      val.shape))
                 else:
                     pre_lines.append('    %s = %s[%d:%d]' % (mapping["%s['%s']" % (pname, n)],
                                                              vecname, start, end))

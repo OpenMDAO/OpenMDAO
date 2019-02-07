@@ -1,3 +1,5 @@
+.. _tutorial_paraboloid_optimization:
+
 This tutorial will show you how to setup and run an optimization using a component you've already defined.
 The organization of this run script and its use of the :code:`Problem` class is the basis for executing all models in OpenMDAO.
 

@@ -8,9 +8,12 @@ from six.moves import range, zip
 
 from scipy import __version__ as scipy_version
 try:
-    from scipy.interpolate._bsplines import make_interp_spline
+    from scipy.interpolate._bsplines import make_interp_spline as _make_interp_spline
 except ImportError:
-    make_interp_spline = False
+    def _make_interp_spline(*args, **kwargs):
+        msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
+              " installed version is %s." % scipy_version
+        raise RuntimeError(msg)
 
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 import numpy as np
@@ -186,11 +189,6 @@ class _RegularGridInterp(object):
             order will be reduced as needed on a per-dimension basis. Default
             is True (raise an exception).
         """
-        if not make_interp_spline:
-            msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
-                  " installed version is %s." % scipy_version
-            simple_warning(msg)
-
         configs = _RegularGridInterp._interp_methods()
         self._all_methods, self._interp_config = configs
         if method not in self._all_methods:
@@ -327,7 +325,7 @@ class _RegularGridInterp(object):
                 if n_p <= k:
                     ki[-1] = n_p - 1
 
-        interpolator = make_interp_spline
+        interpolator = _make_interp_spline
         result = self._evaluate_splines(self.values[:].T,
                                         xi,
                                         indices,
@@ -626,11 +624,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         Initialize the component.
         """
-        if not make_interp_spline:
-            msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
-                  " installed version is %s." % scipy_version
-            simple_warning(msg)
-
         self.options.declare('extrapolate', types=bool, default=False,
                              desc='Sets whether extrapolation should be performed '
                                   'when an input is out of bounds.')
@@ -790,7 +783,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             for j in range(self.options['vec_size']):
                 for i, axis in enumerate(self.params):
                     e_i = np.eye(axis.size)
-                    interp = make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
+                    interp = _make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
                     if i == 0:
                         val = interp(pt[j, i])
                     else:

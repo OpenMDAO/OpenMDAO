@@ -14,7 +14,8 @@ communicators.
 
 Setup also performs some level of model checking, mainly for critical errors. More extensive model
 checking can be done by setting "check" to True when calling `setup`, or by using the :ref:`openmdao command
-line check<om-command>`. It is recommended that you do this before your first full run of the model.
+line check<om-command>`. It is recommended that you do this after making any changes to the configuration
+of your model.
 
 The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process: `setup`, `configure`, and
 `initialize`. Most of the time, `setup` is all you need to build a group. The specific use case for

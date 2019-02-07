@@ -508,7 +508,7 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
         prob.setup(mode=prob._mode)
 
     if run_model:
-        prob.run_model()
+        prob.run_model(reset_iter_counts=False)
 
     wrt = list(prob.driver._designvars)
 

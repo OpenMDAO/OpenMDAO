@@ -78,7 +78,7 @@ class BoundsEnforceLS(NonlinearSolver):
         super(BoundsEnforceLS, self)._declare_options()
         opt = self.options
         opt.declare(
-            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
+            'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', then the output vector is backtracked to the "
             "first point where violation occured. If it is set to 'scalar' or 'wall', then only "
             "the violated variables are backtracked to their point of violation.")
@@ -93,7 +93,7 @@ class BoundsEnforceLS(NonlinearSolver):
         opt.undeclare("maxiter")
         opt.undeclare("err_on_maxiter")
 
-    def _run_iterator(self):
+    def _solve(self):
         """
         Run the iterative solver.
         """
@@ -246,7 +246,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         opt.declare('retry_on_analysis_error', default=True,
                     desc="Backtrack and retry if an AnalysisError is raised.")
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """
@@ -259,13 +259,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
 
             try:
                 cache = self._solver_info.save_cache()
-
-                for isub, subsys in enumerate(system._subsystems_allprocs):
-                    system._transfer('nonlinear', 'fwd', isub)
-
-                    if subsys in system._subsystems_myproc:
-                        subsys._solve_nonlinear()
-
+                self._gs_iter()
                 self._run_apply()
 
             except AnalysisError as err:
@@ -284,7 +278,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         else:
             self._run_apply()
 
-    def _run_iterator(self):
+    def _solve(self):
         """
         Run the iterative solver.
         """
@@ -314,7 +308,7 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 cache = self._solver_info.save_cache()
 
                 try:
-                    self._iter_execute()
+                    self._single_iteration()
                     self._iter_count += 1
 
                     norm = self._iter_get_norm()

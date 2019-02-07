@@ -3,17 +3,113 @@
 import sys
 import unittest
 
-from six import assertRaisesRegex, StringIO, assertRegex
+from six import assertRaisesRegex, StringIO, assertRegex, iteritems
 
 import numpy as np
 
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
-from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
+from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, DirectSolver, \
     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, NonlinearRunOnce
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
+
+
+class SellarOneComp(ImplicitComponent):
+
+    def initialize(self):
+        self.options.declare('solve_y1', types=bool, default=True)
+        self.options.declare('solve_y2', types=bool, default=True)
+
+    def setup(self):
+
+
+        # Global Design Variable
+        self.add_input('z', val=np.array([-1., -1.]))
+
+        # Local Design Variable
+        self.add_input('x', val=2.)
+
+        self.add_output('y1', val=1.0)
+        self.add_output('y2', val=1.0)
+
+        self.add_output('R_y1')
+        self.add_output('R_y2')
+
+        if self.options['solve_y1']:
+            self.declare_partials('y1', ['x', 'z', 'y1', 'y2'])
+        else:
+            self.declare_partials('y1', 'y1')
+
+        if self.options['solve_y2']:
+            self.declare_partials('y2', ['z', 'y1', 'y2'])
+        else:
+            self.declare_partials('y2', 'y2')
+
+        self.declare_partials('R_y1', ['R_y1', 'x', 'z', 'y1', 'y2'])
+        self.declare_partials('R_y2', ['R_y2','z', 'y1', 'y2'])
+
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+
+        z0 = inputs['z'][0]
+        z1 = inputs['z'][1]
+        x = inputs['x']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        if self.options['solve_y1']:
+            residuals['y1'] = (z0**2 + z1 + x - 0.2*y2) - y1
+        else:
+            residuals['y1'] = 0
+
+        if self.options['solve_y2']:
+            residuals['y2'] = (y1**.5 + z0 + z1) - y2
+        else:
+            residuals['y2'] = 0
+
+        residuals['R_y1'] = (z0**2 + z1 + x - 0.2*y2) - y1 - outputs['R_y1']
+        residuals['R_y2'] = (y1**.5 + z0 + z1) - y2 - outputs['R_y2']
+
+    def linearize(self, inputs, outputs, J):
+
+        # this will look wrong in check_partials if solve_y2 = False, but its not: R['y1'] = y1^* - y1
+        J['y1', 'y1'] = -1.
+        J['R_y1','R_y1'] = -1
+
+        if self.options['solve_y1']:
+            J['y1', 'x'] = [1]
+            J['y1', 'z'] = [2*inputs['z'][0], 1]
+            J['y1', 'y2'] = -0.2
+
+        J['R_y1', 'x'] = [1]
+        J['R_y1', 'z'] = [2*inputs['z'][0], 1]
+        J['R_y1', 'y1'] = -1.
+        J['R_y1', 'y2'] = -0.2
+
+        # this will look wrong in check_partials if solve_y2 = False, but its not" R['y1'] = y2^* - y2
+        J['y2','y2'] = -1
+
+        J['R_y2','R_y2'] = -1
+        if self.options['solve_y2']:
+            J['y2','z'] = [1, 1]
+            J['y2','y1'] = 0.5*outputs['y1']**-0.5
+
+        J['R_y2','y2'] = -1
+        J['R_y2','z'] = [1, 1]
+        J['R_y2','y1'] = 0.5*outputs['y1']**-0.5
+
+
+    def solve_nonlinear(self, inputs, outputs):
+        z0 = inputs['z'][0]
+        z1 = inputs['z'][1]
+        x = inputs['x']
+        y1 = outputs['y1']
+        y2 = outputs['y2']
+
+        outputs['R_y1'] = (z0**2 + z1 + x - 0.2*y2) - y1
+        outputs['R_y2'] = (y1**.5 + z0 + z1) - y2
 
 
 class TestProblem(unittest.TestCase):
@@ -1157,7 +1253,8 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        relevant = get_relevant_vars(model._conn_global_abs_in2out, ['indep1.x', 'indep2.x'],
+        relevant = get_relevant_vars(model._conn_global_abs_in2out,
+                                     ['indep1.x', 'indep2.x'],
                                      ['C8.y', 'Unconnected.y'], mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
@@ -1207,6 +1304,49 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(inputs, indep1_ins | indep2_ins)
         self.assertEqual(outputs, indep1_outs | indep2_outs)
         self.assertEqual(systems, indep1_sys | indep2_sys)
+
+    def test_relevance_with_component_model(self):
+        # Test relevance when model is a Component
+        SOLVE_Y1 = False
+        SOLVE_Y2 = True
+
+        p_opt = Problem()
+
+        p_opt.model = SellarOneComp(solve_y1=SOLVE_Y1, solve_y2=SOLVE_Y2)
+
+        if SOLVE_Y1 or SOLVE_Y2:
+            newton = p_opt.model.nonlinear_solver = NewtonSolver()
+            newton.options['iprint'] = 0
+
+        # NOTE: need to have this direct solver attached to the sellar comp until I define a solve_linear for it
+        p_opt.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        p_opt.driver = ScipyOptimizeDriver()
+        p_opt.driver.options['disp'] = False
+
+        if not SOLVE_Y1:
+            p_opt.model.add_design_var('y1', lower=-10, upper=10)
+            p_opt.model.add_constraint('R_y1', equals=0)
+
+        if not SOLVE_Y2:
+            p_opt.model.add_design_var('y2', lower=-10, upper=10)
+            p_opt.model.add_constraint('R_y2', equals=0)
+
+        # this objective doesn't really matter... just need something there
+        p_opt.model.add_objective('y2')
+
+        p_opt.setup()
+
+        # set
+        p_opt['y2'] = 5
+        p_opt['y1'] = 5
+
+        p_opt.run_driver()
+
+        np.testing.assert_almost_equal(p_opt['y1'][0], 2.109516506074582, decimal=5)
+        np.testing.assert_almost_equal(p_opt['y2'][0], -0.5475825303740725, decimal=5)
+        np.testing.assert_almost_equal(p_opt['x'][0], 2.0, decimal=5)
+        np.testing.assert_almost_equal(p_opt['z'], np.array([-1., -1.]), decimal=5)
 
     def test_system_setup_and_configure(self):
         # Test that we can change solver settings on a subsystem in a system's setup method.

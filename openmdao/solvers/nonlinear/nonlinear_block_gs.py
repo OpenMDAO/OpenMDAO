@@ -94,7 +94,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
-    def _iter_execute(self):
+    def _single_iteration(self):
         """
         Perform the operations in the iteration loop.
         """
@@ -119,12 +119,7 @@ class NonlinearBlockGS(NonlinearSolver):
             outputs_n = outputs._data.copy()
 
         self._solver_info.append_subsolver()
-        for isub, subsys in enumerate(system._subsystems_myproc):
-            print("xfer to", subsys.pathname)
-            system._transfer('nonlinear', 'fwd', isub)
-            subsys._solve_nonlinear()
-            system._check_reconf_update()
-
+        self._gs_iter()
         self._solver_info.pop()
 
         if use_aitken:

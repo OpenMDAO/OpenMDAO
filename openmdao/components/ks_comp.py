@@ -24,13 +24,37 @@ CITATIONS = """
 
 class KSfunction(object):
     """
-    Helper class for KS.
+    Helper class for KSComp.
 
-    Helper class that can be used inside other components to aggregate constraint vectors with a
+    Helper class that can be used to aggregate constraint vectors with a
     Kreisselmeier-Steinhauser Function.
     """
 
-    def compute(self, g, rho=50.0):
+    @staticmethod
+    def _compute_values(g, rho):
+        """
+        Compute values needed by the KS function for the given array of constraints.
+
+        Parameters
+        ----------
+        g : ndarray
+            Array of constraint values, where negative means satisfied and positive means violated.
+        rho : float
+            Constraint Aggregation Factor.
+
+        Returns
+        -------
+        tuple
+            g_max, g_diff, exponents and summation as needed by compute and derivates functions.
+        """
+        g_max = np.max(np.atleast_2d(g), axis=-1)[:, np.newaxis]
+        g_diff = g - g_max
+        exponents = np.exp(rho * g_diff)
+        summation = np.sum(exponents, axis=-1)[:, np.newaxis]
+        return g_max, g_diff, exponents, summation
+
+    @staticmethod
+    def compute(g, rho=50.0):
         """
         Compute the value of the KS function for the given array of constraints.
 
@@ -46,29 +70,36 @@ class KSfunction(object):
         float
             Value of KS function.
         """
-        self.rho = rho
-        g_max = np.max(g)
-        self.g_diff = g - g_max
-        self.exponents = np.exp(rho * self.g_diff)
-        self.summation = np.sum(self.exponents)
-        KS = g_max + 1.0 / rho * np.log(self.summation)
+        g_max, g_diff, exponents, summation = KSfunction._compute_values(g, rho)
+
+        KS = g_max + 1.0 / rho * np.log(summation)
 
         return KS
 
-    def derivatives(self):
+    @staticmethod
+    def derivatives(g, rho=50.0):
         """
-        Compute elements of [dKS_gd, dKS_drho] based on previously computed values.
+        Compute elements of [dKS_gd, dKS_drho] for the given array of constraints.
+
+        Parameters
+        ----------
+        g : ndarray
+            Array of constraint values, where negative means satisfied and positive means violated.
+        rho : float
+            Constraint Aggregation Factor.
 
         Returns
         -------
         ndarray
             Derivative of KS function with respect to parameter values.
         """
-        dsum_dg = self.rho * self.exponents
-        dKS_dsum = 1.0 / (self.rho * self.summation)
+        g_max, g_diff, exponents, summation = KSfunction._compute_values(g, rho)
+
+        dsum_dg = rho * exponents
+        dKS_dsum = 1.0 / (rho * summation)
         dKS_dg = dKS_dsum * dsum_dg
 
-        dsum_drho = np.sum(self.g_diff * self.exponents)
+        dsum_drho = np.sum(g_diff * exponents, axis=-1)[:, np.newaxis]
         dKS_drho = dKS_dsum * dsum_drho
 
         return dKS_dg, dKS_drho
@@ -135,7 +166,6 @@ class KSComp(ExplicitComponent):
         cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), width) * width
 
         self.declare_partials(of='KS', wrt='g', rows=rows, cols=cols)
-        self._ks = KSfunction()
 
     def compute(self, inputs, outputs):
         """
@@ -149,19 +179,12 @@ class KSComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         opt = self.options
-        opts = self.options
-        vec_size = opts['vec_size']
-        width = opts['width']
 
         con_val = inputs['g'] - opt['upper']
         if opt['lower_flag']:
             con_val = -con_val
 
-        self.derivs = np.empty((vec_size, width))
-
-        for j in range(opts['vec_size']):
-            outputs['KS'][j, :] = self._ks.compute(con_val[j, :], opt['rho'])
-            self.derivs[j, :] = self._ks.derivatives()[0]
+        outputs['KS'] = KSfunction.compute(con_val, opt['rho'])
 
     def compute_partials(self, inputs, partials):
         """
@@ -174,7 +197,14 @@ class KSComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        derivs = self.derivs
+        opt = self.options
+        width = opt['width']
+
+        con_val = inputs['g'] - opt['upper']
+        if opt['lower_flag']:
+            con_val = -con_val
+
+        derivs = KSfunction.derivatives(con_val, opt['rho'])[0]
 
         if self.options['lower_flag']:
             derivs = -derivs

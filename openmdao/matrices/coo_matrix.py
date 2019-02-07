@@ -227,6 +227,7 @@ class COOMatrix(Matrix):
                 else:
                     rstart, rend, cstart, cend = ranges
                     rmat = mat.tocoo()
+
                     # find all row and col indices that are within the desired range
                     ridxs = np.nonzero(np.logical_and(rmat.row >= rstart, rmat.row < rend))[0]
                     cidxs = np.nonzero(np.logical_and(rmat.col >= cstart, rmat.col < cend))[0]
@@ -290,3 +291,22 @@ class COOMatrix(Matrix):
                     mask[ind1:ind2] = False
 
             return mask
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if active:
+            self._coo.data = self._coo.data.astype(np.complex)
+            self._coo.dtype = np.complex
+        else:
+            self._coo.data = self._coo.data.real
+            self._coo.dtype = np.float

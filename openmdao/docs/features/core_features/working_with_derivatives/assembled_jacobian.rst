@@ -19,7 +19,16 @@ In many cases this can yield a substantial speed up over the default,
 To use an assembled Jacobian, you set the :code:`assemble_jac` option of the linear solver that
 will use it to True.  The type of the assembled jacobian will be determined by the value of
 :code:`options['assembled_jac_type']` in the solver's containing system.
-There are two options of 'assembled_jac_type' to choose from, `dense` and `csc`.  For example:
+There are two options of 'assembled_jac_type' to choose from, `dense` and `csc`.
+
+.. note::
+    `csc` is an abbreviation for `compressed sparse column`. `csc` is one of many sparse storage schemes that
+    allocate contiguous storage in memory for the nonzero elements of the matrix, and perhaps a limited number of zeros.
+    For more information, see
+    `Compressed sparse column <https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)>`_.
+
+
+For example:
 
 .. code-block:: python
 
