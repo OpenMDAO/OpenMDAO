@@ -1,9 +1,11 @@
 import os
 import json
-from six import iteritems
+from six import iteritems, itervalues
 import networkx as nx
 from collections import OrderedDict
 import base64
+
+from openmdao.devtools.html_utils import head_and_body, write_style
 
 try:
     import h5py
@@ -244,18 +246,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    html_begin_tags = """
-                      <html>
-                      <head>
-                        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-                      </head>
-                      <body>\n
-                      """
-    html_end_tags = """
-                    </body>
-                    </html>
-                    """
-
     code_dir = os.path.dirname(os.path.abspath(__file__))
     vis_dir = os.path.join(code_dir, "visualization")
     libs_dir = os.path.join(vis_dir, "libs")
@@ -267,6 +257,7 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     src_names = 'constants', 'draw', 'legend', 'modal', 'ptN2', 'search', 'svg'
     srcs = _read_files(src_names, src_dir, 'js')
     styles = _read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+    style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
 
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
@@ -276,18 +267,18 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         index = f.read()
 
     # add the necessary HTML tags if we aren't embedding
-    if not embeddable:
-        index = html_begin_tags + index + html_end_tags
+    if embeddable:
+        index = '\n\n'.join([style_elems, index])
+    else:
+        meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+        head = '\n\n'.join([meta, style_elems])
+        index = head_and_body(head, index)
 
     # put all style and JS into index
-    for name, code in iteritems(styles):  # styles
-        index = index.replace('{{%s_style}}' % name, code)
-
     index = index.replace('{{fontello}}', encoded_font)
 
-    index = index.replace('{{d3_lib}}', libs['d3.v4.min'])
-    index = index.replace('{{awesomplete_lib}}', libs['awesomplete'])
-    index = index.replace('{{vk_beautify_lib}}', libs['vkBeautify'])
+    for k, v in iteritems({'d3': 'd3.v4.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}):
+        index = index.replace('{{{}_lib}}'.format(k), libs[v])
 
     for name, code in iteritems(srcs):
         index = index.replace('{{{}_lib}}'.format(name.lower()), code)
