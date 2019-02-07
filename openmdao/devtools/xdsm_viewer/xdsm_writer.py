@@ -387,8 +387,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
+    out_formats = _OUT_FORMATS
     try:
-        out_formats = _OUT_FORMATS
         writer = out_formats[out_format]
     except KeyError:
         msg = 'Invalid output format "{}", choose from: {}'
