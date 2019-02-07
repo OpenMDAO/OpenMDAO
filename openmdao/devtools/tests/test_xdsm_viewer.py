@@ -25,7 +25,6 @@ FILENAME = 'XDSM'
 class TestXDSMViewer(unittest.TestCase):
 
     def setUp(self):
-        self.tstfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mem_model.py')
         self.startdir = os.getcwd()
         self.tempdir = tempfile.mkdtemp(prefix='TestXDSMviewer-')
         os.chdir(self.tempdir)
