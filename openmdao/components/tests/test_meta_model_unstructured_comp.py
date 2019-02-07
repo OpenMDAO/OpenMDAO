@@ -2,8 +2,11 @@
 Unit tests for the unstructured metamodel component.
 """
 from math import sin
-import numpy as np
+from six import StringIO
+import sys
 import unittest
+
+import numpy as np
 
 from openmdao.api import Group, Problem, MetaModelUnStructuredComp, IndepVarComp, ResponseSurface, \
     FloatKrigingSurrogate, KrigingSurrogate, ScipyOptimizeDriver, SurrogateModel, NearestNeighbor
@@ -1191,6 +1194,54 @@ class MetaModelTestCase(unittest.TestCase):
         deriv_second_time = J[('trig.sin_x', 'indep.x')]
 
         assert_rel_error(self, deriv_first_time, deriv_second_time, 1e-4)
+
+    def test_warning_bug(self):
+        # Make sure we don't warn that we are doing FD when the surrogate has analytic derivs.
+
+        x_train = np.arange(0., 10.)
+        y_train = np.arange(10., 20.)
+        z_train = x_train**2 + y_train**2
+
+        p = Problem()
+        p.model = m = Group()
+
+        params = IndepVarComp()
+        params.add_output('x', val=0.)
+        params.add_output('y', val=0.)
+
+        m.add_subsystem('params', params, promotes=['*'])
+
+        sm = MetaModelUnStructuredComp(default_surrogate=ResponseSurface())
+        sm.add_input('x', val=0.)
+        sm.add_input('y', val=0.)
+        sm.add_output('z', val=0.)
+
+        sm.options['train:x'] = x_train
+        sm.options['train:y'] = y_train
+        sm.options['train:z'] = z_train
+
+        # With or without the line below does not matter
+        # Only when method is set to fd, then RuntimeWarning disappears
+        sm.declare_partials('*', '*', method='exact')
+
+        m.add_subsystem('sm', sm, promotes=['*'])
+
+        m.add_design_var('x', lower=0., upper=10.)
+        m.add_design_var('y', lower=0., upper=10.)
+        m.add_objective('z')
+
+        p.setup(check=True)
+
+        stderr = sys.stderr
+        str_err = StringIO()
+        sys.stderr = str_err
+        try:
+            p.final_setup()
+        finally:
+            sys.stderr = stderr
+
+        output = str_err.getvalue()
+        self.assertTrue('finite difference' not in output)
 
 
 if __name__ == "__main__":
