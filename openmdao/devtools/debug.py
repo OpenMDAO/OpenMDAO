@@ -351,7 +351,7 @@ def profiling(outname='prof.out'):
 
 
 def compute_approx_jac(comp, method='fd', step=None, form='forward', step_calc='abs'):
-    # Finite Difference to calculate Jacobian
+    # Finite Difference to calculate partial Jacobian
     alloc_complex = comp._outputs._alloc_complex
     all_fd_options = {}
     could_not_cs = False
