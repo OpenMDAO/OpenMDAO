@@ -4,8 +4,6 @@ import sys
 import tempfile
 import unittest
 
-from six import StringIO
-
 import numpy as np
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
