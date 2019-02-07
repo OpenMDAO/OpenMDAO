@@ -688,10 +688,8 @@ def _prune_connections(conns, model_path=None):
     else:
         for conn in conns:
             src = conn['src']
-            rel_src = src.replace(model_path + '.', '')
             src_path = _format_name(src.rsplit('.', 1)[0])
             tgt = conn['tgt']
-            rel_tgt = tgt.replace(model_path + '.', '')
             tgt_path = _format_name(tgt.rsplit('.', 1)[0])
 
             if src.startswith(model_path) and tgt.startswith(model_path):

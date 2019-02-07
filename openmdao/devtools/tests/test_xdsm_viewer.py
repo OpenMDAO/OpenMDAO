@@ -202,7 +202,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def test_xdsmjs_embed_data(self):
         """
-        Makes XDSMjs input file for the Sellar problem.
+        Makes XDSMjs HTML file for the Sellar problem.
 
         Data is embedded into the HTML file.
         """
@@ -228,9 +228,9 @@ class TestXDSMViewer(unittest.TestCase):
 
     def test_xdsmjs_embeddable(self):
         """
-        Makes XDSMjs input file for the Sellar problem.
+        Makes XDSMjs HTML file for the Sellar problem.
 
-        HTML file is embeddable (no head and body tags)
+        The HTML file is embeddable (no head and body tags).
         """
 
         filename = 'xdsmjs_embeddable'  # this name is needed for XDSMjs
