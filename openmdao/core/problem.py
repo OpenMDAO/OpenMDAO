@@ -56,8 +56,7 @@ _contains_all = ContainsAll()
 _undefined = object()
 
 
-CITATION = """@inproceedings{2014_openmdao_derivs,
-    @article{openmdao_2019,
+CITATION = """@article{openmdao_2019,
     Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A. Martins and Kenneth T. Moore and Bret A. Naylor},
     Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary Design, Analysis, and Optimization}",
     Journal="{Structural and Multidisciplinary Optimization}",
@@ -65,8 +64,7 @@ CITATION = """@inproceedings{2014_openmdao_derivs,
     Publisher={Springer},
     pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
     note= {In Press}
-    }
-}"""
+    }"""
 
 
 class Problem(object):

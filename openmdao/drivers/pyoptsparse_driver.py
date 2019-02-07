@@ -38,8 +38,7 @@ optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
 # All optimizers that require an initial run
 run_required = ['NSGA2', 'ALPSO']
 
-CITATIONS = """
-@article{Hwang_maud_2018
+CITATIONS = """@article{Hwang_maud_2018
  author = {Hwang, John T. and Martins, Joaquim R.R.A.},
  title = {A Computational Architecture for Coupling Heterogeneous Numerical Models and Computing Coupled Derivatives},
  journal = {ACM Trans. Math. Softw.},
