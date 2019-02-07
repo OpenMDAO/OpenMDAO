@@ -84,8 +84,10 @@ class TestFindCite(unittest.TestCase):
 
         expected = """Class: <class 'openmdao.core.problem.Problem'>
     @article{openmdao_2019,
-        Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A. Martins and Kenneth T. Moore and Bret A. Naylor},
-        Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary Design, Analysis, and Optimization}",
+        Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
+                Martins and Kenneth T. Moore and Bret A. Naylor},
+        Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary
+                Design, Analysis, and Optimization}",
         Journal="{Structural and Multidisciplinary Optimization}",
         Year={2019},
         Publisher={Springer},
@@ -113,8 +115,10 @@ Class: <class 'openmdao.components.exec_comp.ExecComp'>
 
         expected = """Class: <class 'openmdao.core.problem.Problem'>
     @article{openmdao_2019,
-        Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A. Martins and Kenneth T. Moore and Bret A. Naylor},
-        Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary Design, Analysis, and Optimization}",
+        Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
+                Martins and Kenneth T. Moore and Bret A. Naylor},
+        Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary
+                Design, Analysis, and Optimization}",
         Journal="{Structural and Multidisciplinary Optimization}",
         Year={2019},
         Publisher={Springer},
