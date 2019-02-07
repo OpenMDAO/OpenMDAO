@@ -46,7 +46,8 @@ _use_new_style = True  # Recommended to set to True
 CITATIONS = """
 @article{Hwang_maud_2018
  author = {Hwang, John T. and Martins, Joaquim R.R.A.},
- title = {A Computational Architecture for Coupling Heterogeneous Numerical Models and Computing Coupled Derivatives},
+ title = {A Computational Architecture for Coupling Heterogeneous
+          Numerical Models and Computing Coupled Derivatives},
  journal = {ACM Trans. Math. Softw.},
  volume = {44},
  number = {4},
@@ -57,7 +58,7 @@ CITATIONS = """
  numpages = {39},
  doi = {10.1145/3182393},
  publisher = {ACM},
-} 
+}
 """
 
 
