@@ -57,15 +57,15 @@ _undefined = object()
 
 
 CITATION = """@inproceedings{2014_openmdao_derivs,
-    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
-              and John Hwang and Joaquim Martins and Andrew Ning},
-    Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
-    Doi = {doi:10.2514/6.2014-2042},
-    Month = {2014/07/08},
-    Publisher = {American Institute of Aeronautics and Astronautics},
-    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
-             a Graph-Based Problem Formulation in OpenMDAO},
-    Year = {2014}
+    @article{openmdao_2019,
+    Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A. Martins and Kenneth T. Moore and Bret A. Naylor},
+    Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary Design, Analysis, and Optimization}",
+    Journal="{Structural and Multidisciplinary Optimization}",
+    Year={2019},
+    Publisher={Springer},
+    pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
+    note= {In Press}
+    }
 }"""
 
 
