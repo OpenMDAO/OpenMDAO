@@ -5,10 +5,22 @@ HTML file writing to create (semi)standalone XDSMjs output file.
 import json
 import os
 
-from six import iteritems
+from six import iteritems, itervalues
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
-_HTML_TEMPLATE = "index.html"  # Template for the output file
+_HTML_TEMPLATE = (
+    '<!doctype html>'
+    '<html class="js" lang="">'
+    '<head>'
+    '<meta charset="utf-8">'
+    '{{styles}}'
+    '{{xdsm_bundle}}'
+    '</head>'
+    '<body>'
+    '{{body}}'
+    '</body>'
+    '</html>'
+)  # Template for the output file
 
 
 def write_html(outfile, source_data=None, data_file=None):
@@ -35,7 +47,6 @@ def write_html(outfile, source_data=None, data_file=None):
     main_dir = os.path.dirname(os.path.abspath(__file__))
     code_dir = os.path.join(main_dir, 'XDSMjs')
     build_dir = os.path.join(code_dir, "build")
-    vis_dir = os.path.join(main_dir, "visualization")
     style_dir = code_dir  # CSS
 
     with open(os.path.join(build_dir, "xdsm.bundle.js"), "r") as f:
@@ -64,21 +75,22 @@ def write_html(outfile, source_data=None, data_file=None):
         raise ValueError(msg.format(type(source_data)))
 
     # grab the style
-    with open(os.path.join(style_dir, "fontello.css"), "r") as f:
-        fontello_style = f.read()
-    with open(os.path.join(style_dir, "xdsm.css"), "r") as f:
-        xdsm_style = f.read()
+    styles = _read_files(('fontello', 'xdsm'), style_dir, 'css')
 
     # grab the index.html template
-    with open(os.path.join(vis_dir, _HTML_TEMPLATE), "r") as f:
-        index = f.read()
+    index = _HTML_TEMPLATE
 
     # put all style and JS into index
     toolbar_div = _write_div(attrs={'class': 'xdsm-toolbar'})
     xdsm_div = _write_div(attrs=xdsm_attrs)
     index = index.replace('{{body}}', toolbar_div + '\n' + xdsm_div)
-    index = index.replace('{{fontello_style}}', fontello_style)
-    index = index.replace('{{xdsm_style}}', xdsm_style)
+    index = index.replace('{{fontello_style}}', styles['fontello'])
+    index = index.replace('{{xdsm_style}}', styles['xdsm'])
+    styles_elem = _write_tags(tag='style',
+                              content='\n\n'.join(itervalues(styles)),
+                              attrs={'type': "text/css"},
+                              new_lines=True)
+    index = index.replace('{{styles}}', styles_elem)
     index = index.replace('{{xdsm_bundle}}', xdsm_bundle)
 
     # Embed style, scripts and data to HTML
@@ -102,6 +114,15 @@ def _write_div(content='', attrs=None):
 
 def _write_script(content='', attrs=None):
     return _write_tags('script', content, attrs, new_lines=True)
+
+
+def _read_files(filenames, directory, extension):
+    # Reads files (based on filenames) from a directory with a given extension.
+    libs = dict()
+    for name in filenames:
+        with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
+            libs[name] = f.read()
+    return libs
 
 
 if __name__ == '__main__':
