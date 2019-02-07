@@ -298,4 +298,3 @@ class FloatKrigingSurrogate(KrigingSurrogate):
         warn_deprecation("'FloatKrigingSurrogate' has been deprecated. Use "
                          "'KrigingSurrogate' instead.")
         super(FloatKrigingSurrogate, self).__init__(**kwargs)
-
