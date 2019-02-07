@@ -407,7 +407,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
-                show_browser=False, add_process_conns=True, **kwargs):
+                show_browser=False, add_process_conns=True, quiet=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -446,6 +446,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     add_process_conns: bool
         Add process connections (thin black lines)
         Defaults to True
+    quiet : bool
+        Set to True to suppress output from pdflatex
+
     kwargs : dict
         Keyword arguments
 
@@ -553,7 +556,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     if add_process_conns:
         x.add_workflow()
-    x.write(filename, cleanup=cleanup, **kwargs)
+    x.write(filename, cleanup=cleanup, quiet=quiet, **kwargs)
 
     if show_browser:
         # path will be specified based on the "out_format", if all required inputs where
