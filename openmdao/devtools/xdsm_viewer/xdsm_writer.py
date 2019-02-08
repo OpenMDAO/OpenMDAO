@@ -510,7 +510,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             if number_alignment == 'horizontal':
                 opt_label = ' '.join([index_str, optimizer])
             elif number_alignment == 'vertical':
-                opt_label = _multiblock_comp(index_str, optimizer)
+                opt_label = _multiline_block(index_str, optimizer)
         x.add_optimizer(label=opt_label)
 
     if include_solver is not None:
@@ -548,7 +548,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             if number_alignment == 'horizontal':
                 label = '{}:{}'.format(i, label)
             elif number_alignment == 'vertical':
-                label = _multiblock_comp(i, label)
+                label = _multiline_block(i, label)
         x.add_comp(name=comp['abs_name'], label=label)
 
     # Add the connections
@@ -903,6 +903,7 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
         if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:
             solvers.append(solver_name)
     if stacking == 'vertical':
+        # Make multiline comp if not numbered
         return NotImplementedError()
     elif stacking == 'horizontal':
         return ' '.join(solvers)
@@ -911,12 +912,21 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
         raise ValueError(msg.format(stacking))
 
 
-def _multiblock_comp(text1, *args, **kwargs):
+def _multiline_block(text1, *args, **kwargs):
     width = kwargs.pop('width', None)
     unit = kwargs.pop('unit', 'em')
     width_factor = kwargs.pop('width_factor', 1)
+    formatting = kwargs.pop('formatting', 'array').lower()
     texts = [text1] + list(args)
+    texts = [str(t) for t in texts]
     if width is None:
-        width = min([len(str(t)) for t in texts]) * width_factor
-    template = '\\MultilineComponent{{{width}{unit}}}'
-    return template.format(width=width, unit=unit) + ''.join(['{{{}}}'.format(t) for t in texts])
+        width = max([len(t) for t in texts]) * width_factor
+    if formatting == 'multilinecomp':
+        template = '\\MultilineComponent{{{width}{unit}}}'
+        multiline_comp = template.format(width=width, unit=unit)
+        return multiline_comp + ''.join(['{{{}}}'.format(t) for t in texts])
+    elif formatting == 'array':
+        template = '\\begin{{array}}{{c}} {} \\end{{array}}'
+        template.format('\\'.join(texts))
+    else:
+        raise ValueError
