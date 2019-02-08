@@ -153,7 +153,7 @@ class XDSMWriter(XDSM):
         """
         if label is None:
             label = name
-        self.add_system(name, 'Analysis', label, **kwargs)
+        self.add_system(name, 'Analysis', '\\text{%s}' % label, **kwargs)
 
     def add_func(self, name, **kwargs):
         """
@@ -470,7 +470,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
     box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
     # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
-    add_component_indices = kwargs.pop('numbered_comps', True) and writer_name == 'pyxdsm'
+    add_component_indices = kwargs.pop('numbered_comps', True) and (writer_name == 'pyxdsm')
     number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     def format_block(names, **kwargs):
@@ -506,7 +506,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         opt_label = optimizer
         if add_component_indices:
             opt_index = len(comps)+2  # index of last component + 1
-            index_str = '1, {}$\\rightarrow$ 2:'.format(opt_index)
+            index_str = '1, {}$ \\rightarrow $ 2:'.format(opt_index)
             if number_alignment == 'horizontal':
                 opt_label = ' '.join([index_str, optimizer])
             elif number_alignment == 'vertical':
@@ -912,21 +912,19 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
         raise ValueError(msg.format(stacking))
 
 
-def _multiline_block(text1, *args, **kwargs):
-    width = kwargs.pop('width', None)
-    unit = kwargs.pop('unit', 'em')
-    width_factor = kwargs.pop('width_factor', 1)
-    formatting = kwargs.pop('formatting', 'array').lower()
-    texts = [text1] + list(args)
-    texts = [str(t) for t in texts]
-    if width is None:
-        width = max([len(t) for t in texts]) * width_factor
-    if formatting == 'multilinecomp':
-        template = '\\MultilineComponent{{{width}{unit}}}'
-        multiline_comp = template.format(width=width, unit=unit)
-        return multiline_comp + ''.join(['{{{}}}'.format(t) for t in texts])
-    elif formatting == 'array':
-        template = '\\begin{{array}}{{c}} {} \\end{{array}}'
-        template.format('\\'.join(texts))
-    else:
-        raise ValueError
+def _multiline_block(*texts):
+    """
+    Makes a string for a multiline block.
+
+    texts : iterable(str)
+       Text strings, each will go to new line
+
+    Returns
+    -------
+       str
+    """
+    texts = ['\\text{{{}:}}'.format(t) for t in texts]
+    template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
+    new_line = ' \\\\ '
+    return template.format(text=new_line.join(texts), pos='c'*len(texts))
+
