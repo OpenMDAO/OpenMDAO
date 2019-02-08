@@ -15,6 +15,8 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
 # TODO implement "stack" boxes for parallel components
+# TODO solvers: also include solvers of groups, not just for the root. Include connections between
+#  component inputs & outputs and the solver.
 
 from __future__ import print_function
 
@@ -234,7 +236,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         if label is None:
             label = node_name
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
-        self.components.append(dct)
+        self.comps.append(dct)
 
     def add_workflow(self):
         wf = ["_U_", [self.optimizer, self.comp_names]]
@@ -254,7 +256,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         -------
             dict
         """
-        data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
+        data = {'edges': self.connections, 'nodes': self.comps, 'workflow': self.processes}
         return data
 
     def write(self, filename='xdsmjs', embed_data=True, **kwargs):
@@ -483,12 +485,18 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             return names
 
     def number_label(number, text, alignment):
+        # Adds an index to the label either above or on the left side.
+        number_str = '{}: '.format(number)
         if alignment == 'horizontal':
-            return '{}:{}'.format(number, text)
+            txt = '{}{}'.format(number_str, text)
+            if box_stacking == 'vertical':
+                return _multiline_block(txt)
+            else:
+                return txt
         elif alignment == 'vertical':
-            return _multiline_block(number, text)
+            return _multiline_block(number_str, text)
         else:
-            return text
+            return text  # In case of a wrong setting
 
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
@@ -531,7 +539,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
         warnings.warn(msg)
 
-        solver_str = _format_solver_str(tree)
+        solver_str = _format_solver_str(tree,
+                                        stacking=box_stacking,
+                                        add_indices=add_component_indices)
 
         if solver_str:  # At least one non-default solver
             if add_component_indices:
@@ -651,7 +661,8 @@ def _accumulate_connections(conns):
             continue
         var = conn['src']['var']
         conns_new.setdefault(src_comp, {})
-        conns_new[src_comp].setdefault(tgt_comp, []).append(var)
+        if var not in conns_new[src_comp].setdefault(tgt_comp, []):  # Avoid duplicates
+            conns_new[src_comp][tgt_comp].append(var)
     return conns_new
 
 
@@ -881,9 +892,9 @@ def _replace_chars(name, substitutes):
     Parameters
     ----------
     name : str
-       Name
+        Name
     substitutes: tuple or None
-       Character pairs with old and substitute characters
+        Character pairs with old and substitute characters
 
     Returns
     -------
@@ -895,22 +906,23 @@ def _replace_chars(name, substitutes):
     return name
 
 
-def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear')):
+def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear'),
+                       add_indices=False):
     """
     Format solver string.
 
     Parameters
     ----------
     dct : dict
-       Dictionary, which contains keys for the solver names
+        Dictionary, which contains keys for the solver names
     stacking : str
-       Box stacking
+        Box stacking
     solver_types : tuple(str)
-       Solver types, e.g. "linear"
+        Solver types, e.g. "linear"
 
     Returns
     -------
-       str
+        str
     """
     stacking = stacking.lower()
 
@@ -921,7 +933,10 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
             solvers.append(solver_name)
     if stacking == 'vertical':
         # Make multiline comp if not numbered
-        return NotImplementedError()
+        if add_indices:  # array is already created for the numbering
+            return '} \\\\ \\text{'.join(solvers)
+        else:  # Goes into an array environment
+            return _multiline_block(*solvers)
     elif stacking == 'horizontal':
         return ' '.join(solvers)
     else:
@@ -929,18 +944,21 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
         raise ValueError(msg.format(stacking))
 
 
-def _multiline_block(*texts):
+def _multiline_block(*texts, **kwargs):
     """
     Makes a string for a multiline block.
 
     texts : iterable(str)
-       Text strings, each will go to new line
-
+        Text strings, each will go to new line
+    kwargs : dict
+        Unused keywords are ignored.
+        "end_char" is the separator at the end of line. Defaults to '' (no separator).
     Returns
     -------
        str
     """
-    texts = ['\\text{{{}:}}'.format(t) for t in texts]
+    end_char = kwargs.pop('end_char', '')
+    texts = ['\\text{{{}{}}}'.format(t, end_char) for t in texts]
     template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
