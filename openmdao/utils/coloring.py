@@ -467,7 +467,7 @@ def _computing_coloring_context(top):
             jac._randomize = False
 
 
-def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=False):
+def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
@@ -510,20 +510,11 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     if run_model:
         prob.run_model(reset_iter_counts=False)
 
-    wrt = list(prob.driver._designvars)
-
-    # get responses in order used by the driver
-    of = prob.driver._get_ordered_nl_responses()
-
-    if not of or not wrt:
-        raise RuntimeError("Sparsity structure cannot be computed without declaration of design "
-                           "variables and responses.")
-
     with _computing_coloring_context(prob.model):
         start_time = time.time()
         fullJ = None
         for i in range(repeats):
-            J = prob.driver._compute_totals(return_format='array', of=of, wrt=wrt)
+            J = prob.driver._compute_totals(return_format='array')
             if fullJ is None:
                 fullJ = np.abs(J)
             else:
@@ -543,9 +534,6 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
-
-    # with open("array_viz%d.out" % system.comm.rank, "w") as f:
-    #     array_viz(boolJ, prob=prob, stream=f)
 
     return boolJ
 
@@ -739,8 +727,8 @@ def _json2coloring(coloring):
     return coloring
 
 
-def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
-                 setup=False, run_model=False, stream=sys.stdout):
+def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
+                         setup=False, run_model=False, stream=sys.stdout):
     """
     Compute derivative sparsity for the given problem.
 
@@ -770,8 +758,7 @@ def get_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
     """
     driver = problem.driver
 
-    J = _get_bool_jac(problem, repeats=repeats, tol=tol, setup=setup,
-                      run_model=run_model)
+    J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup, run_model=run_model)
 
     of = driver._get_ordered_nl_responses()
     wrt = list(driver._designvars)
@@ -999,8 +986,8 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
             raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
                                (mode, problem._mode))
         start_time = time.time()
-        J = _get_bool_jac(problem, repeats=repeats, tol=tol, setup=setup,
-                          run_model=run_model)
+        J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup,
+                                run_model=run_model)
         time_sparsity = time.time() - start_time
 
         if include_sparsity or (show_jac and stream is not None):
@@ -1099,7 +1086,7 @@ def dynamic_sparsity(driver):
 
     # save the sparsity.json file for later inspection
     with open("sparsity.json", "w") as f:
-        sparsity = get_sparsity(problem, mode=problem._mode, repeats=repeats, stream=f)
+        sparsity = get_tot_jac_sparsity(problem, mode=problem._mode, repeats=repeats, stream=f)
 
     driver.set_total_jac_sparsity(sparsity)
     driver._setup_tot_jac_sparsity()
@@ -1256,8 +1243,8 @@ def _sparsity_cmd(options):
         else:
             outfile = open(options.outfile, 'w')
         Problem._post_setup_func = None  # avoid recursive loop
-        get_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=prob._mode,
-                     show_jac=options.show_jac, setup=True, run_model=True, stream=outfile)
+        get_tot_jac_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=prob._mode,
+                             show_jac=options.show_jac, setup=True, run_model=True, stream=outfile)
         exit()
     return _sparsity
 
