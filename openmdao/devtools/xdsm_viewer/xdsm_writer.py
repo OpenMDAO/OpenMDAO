@@ -49,6 +49,7 @@ _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
     'xdsmjs': (),
 }
+_DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 
 # Default file names in XDSMjs
 
@@ -386,7 +387,6 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     # Name is None if the driver is not specified
     driver_name = _get_cls_name(driver) if driver else None
-    solver_name = _get_cls_name(_model.nonlinear_solver) if include_solver else None
 
     design_vars = _model.get_design_vars()
     responses = _model.get_responses()
@@ -403,14 +403,14 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     if isinstance(subs, dict):
         subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
     return _write_xdsm(filename, viewer_data=viewer_data,
-                       optimizer=driver_name, solver=solver_name, model_path=model_path,
+                       optimizer=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, **kwargs)
 
 
-def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
+def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
                 show_browser=False, add_process_conns=True, quiet=False, **kwargs):
@@ -425,8 +425,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         Connections list
     optimizer : str or None, optional
         Optimizer name
-    solver:  str or None, optional
-        Solver name
+    include_solver:  bool, optional
+        Defaults to False.
     cleanup : bool, optional
         Clean-up temporary files after making the diagram.
         Defaults to True.
@@ -510,8 +510,14 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
             opt_label = '1, {}$\\rightarrow$ 2:{}{}'.format(opt_index, index_separator, optimizer)
         x.add_optimizer(label=opt_label)
 
-    if solver is not None:
-        x.add_solver(solver)
+    if include_solver is not None:
+        # Default "run once" solvers are ignored
+        # Nonlinear solver has precedence
+        for solver_type in ('nonlinear', 'linear'):
+            solver_name = tree['{}_solver'.format(solver_type)]
+            if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:
+                x.add_solver(solver_name)
+                break
 
     design_vars2 = _collect_connections(design_vars)
     responses2 = _collect_connections(responses)

@@ -32,11 +32,21 @@ def write_div(content='', attrs=None, indent=0):
     return write_tags('div', content, attrs, new_lines=False, indent=indent)
 
 
-def write_style(content='', indent=0):
-    return write_tags('style', content, attrs={'type': "text/css"}, new_lines=True, indent=indent)
+def write_style(content='', attrs=None, indent=0):
+    default = {'type': "text/css"}
+    if attrs is None:
+        attrs = default
+    else:
+        attrs = default.update(attrs)
+    return write_tags('style', content, attrs=attrs, new_lines=True, indent=indent)
 
 
 def write_script(content='', attrs=None, indent=0):
+    default = {'type': "text/javascript"}
+    if attrs is None:
+        attrs = default
+    else:
+        attrs = default.update(attrs)
     return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent)
 
 

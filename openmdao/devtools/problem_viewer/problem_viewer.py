@@ -279,15 +279,12 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     index = index.replace('{{fontello}}', encoded_font)
 
     for k, v in iteritems(lib_dct):
-        script = write_script(libs[v], attrs={'type': 'text/javascript'}, indent=4)
-        index = index.replace('{{{}_lib}}'.format(k), script)
+        index = index.replace('{{{}_lib}}'.format(k), write_script(libs[v], indent=4))
 
     for name, code in iteritems(srcs):
-        script = write_script(code, attrs={'type': 'text/javascript'}, indent=4)
-        index = index.replace('{{{}_lib}}'.format(name.lower()), script)
+        index = index.replace('{{{}_lib}}'.format(name.lower()), write_script(code, indent=4))
 
-    script = write_script(model_viewer_data, attrs={'type': 'text/javascript'}, indent=4)
-    index = index.replace('{{model_data}}', script)
+    index = index.replace('{{model_data}}', write_script(model_viewer_data, indent=4))
     index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
     with open(outfile, 'w') as f:  # write output file
