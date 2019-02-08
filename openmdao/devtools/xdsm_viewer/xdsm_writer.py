@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import json
 import os
+import warnings
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
@@ -200,7 +201,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         super(XDSMjsWriter, self).__init__()
         self.optimizer = 'opt'
         self.comp_names = []  # Component names
-        self.components = []
+        self.comps = []
         self.reserved_words = '_U_',  # Ignored at text formatting
 
     def _format_id(self, name, subs=(('_', ''),)):
@@ -331,7 +332,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       Example: To write :math:`x_12` the variable name should be "x(12)"
     * "box_lines" can be used to limit the number of lines, if the box stacking is vertical
     * "numbered_comps": bool, If True, components are numbered. Defaults to True.
-    * "number_alignment": str, Horizontal or vertical. Defaults to horizontal
+    * "number_alignment": str, Horizontal or vertical. Defaults to horizontal. If "numbered_comps"
+      is True, it positions the number either above or in front of the component label.
 
     XDSMjs
     ~~~~~~
@@ -468,7 +470,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
-    box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
+    box_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
     # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
     add_component_indices = kwargs.pop('numbered_comps', True) and (writer_name == 'pyxdsm')
     number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
@@ -480,11 +482,20 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         else:
             return names
 
+    def number_label(number, text, alignment):
+        if alignment == 'horizontal':
+            return '{}:{}'.format(number, text)
+        elif alignment == 'vertical':
+            return _multiline_block(number, text)
+        else:
+            return text
+
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
 
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse)
+    solvers = []
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
                                                                      model_path=model_path)
@@ -501,24 +512,32 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         x = XDSMWriter()
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
+    else:
+        msg = 'Undefined XDSM writer "{}"'
+        raise ValueError(msg.format(writer_name))
 
     if optimizer is not None:
-        opt_label = optimizer
+        label = optimizer
         if add_component_indices:
-            opt_index = len(comps)+2  # index of last component + 1
-            index_str = '1, {}$ \\rightarrow $ 2:'.format(opt_index)
-            if number_alignment == 'horizontal':
-                opt_label = ' '.join([index_str, optimizer])
-            elif number_alignment == 'vertical':
-                opt_label = _multiline_block(index_str, optimizer)
-        x.add_optimizer(label=opt_label)
+            opt_index = len(comps) + len(solvers) + 2  # index of last block + 1
+            nr_comps = len(x.comps)
+            index_str = '{}, {}$ \\rightarrow $ 2'.format(nr_comps+1, opt_index, nr_comps+2)
+            label = number_label(index_str, label, number_alignment)
+        x.add_optimizer(label=label)
 
-    if include_solver is not None:
+    if include_solver:
         # Default "run once" solvers are ignored
         # Nonlinear solver has precedence
+        msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
+        warnings.warn(msg)
+
         solver_str = _format_solver_str(tree)
 
-        if solver_str:
+        if solver_str:  # At least one non-default solver
+            if add_component_indices:
+                i = len(x.comps) + 1
+                solver_str = number_label(i, solver_str, number_alignment)
+            solvers.append(solver_str)
             x.add_solver(solver_str)
 
     design_vars2 = _collect_connections(design_vars)
@@ -542,13 +561,11 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
     # Add components
-    for i, comp in enumerate(comps, 2):  # Driver is 1, so starting from 2
+    for comp in comps:  # Driver is 1, so starting from 2
+        i = len(x.comps) + 1
         label = _replace_chars(comp['name'], substitutes=subs)
         if add_component_indices:
-            if number_alignment == 'horizontal':
-                label = '{}:{}'.format(i, label)
-            elif number_alignment == 'vertical':
-                label = _multiline_block(i, label)
+            label = number_label(i, label, number_alignment)
         x.add_comp(name=comp['abs_name'], label=label)
 
     # Add the connections
