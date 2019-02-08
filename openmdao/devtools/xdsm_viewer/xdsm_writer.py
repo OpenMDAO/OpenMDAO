@@ -277,16 +277,17 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
         html_filename = '.'.join([filename, 'html'])
 
+        embeddable = kwargs.pop('embeddable', False)
         if embed_data:
             # Write HTML file
-            write_html(outfile=html_filename, source_data=data)
+            write_html(outfile=html_filename, source_data=data, embeddable=embeddable)
         else:
             json_filename = '.'.join([filename, 'json'])
             with open(json_filename, 'w') as f:
                 json.dump(data, f)
 
             # Write HTML file
-            write_html(outfile=html_filename, data_file=json_filename)
+            write_html(outfile=html_filename, data_file=json_filename, embeddable=embeddable)
         print('XDSM output file written to: {}'.format(html_filename))
 
 
@@ -322,6 +323,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       To write in subscripts wrap that part of the name into a round bracket.
       Example: To write :math:`x_12` the variable name should be "x(12)"
     * "box_lines" can be used to limit the number of lines, if the box stacking is vertical
+    * "numbered_comps": bool, If True, components are numbered. Defaults to True.
+    * "index_separator": str, characters (for example a space or new line) to separate component
+      numbers from component names. Only used, "numbered_comps" is True.
 
     XDSMjs
     ~~~~~~
@@ -330,6 +334,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       the data of the XDSM diagram.
     * variable names with exactly one underscore have a subscript.
       Example: "x_12" will be :math:`x_12`
+    * If "embeddable" is True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>,
+      <body> and <head> tags. If False, gives a single, standalone HTML file for viewing.
 
     Parameters
     ----------
@@ -381,8 +387,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
+    out_formats = _OUT_FORMATS
     try:
-        out_formats = _OUT_FORMATS
         writer = out_formats[out_format]
     except KeyError:
         msg = 'Invalid output format "{}", choose from: {}'
@@ -401,7 +407,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
-                show_browser=False, add_process_conns=True, **kwargs):
+                show_browser=False, add_process_conns=True, quiet=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -440,6 +446,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     add_process_conns: bool
         Add process connections (thin black lines)
         Defaults to True
+    quiet : bool
+        Set to True to suppress output from pdflatex
+
     kwargs : dict
         Keyword arguments
 
@@ -449,10 +458,15 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     """
     # TODO implement residuals
 
+    writer_name = writer.lower()  # making it case insensitive
+
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
     box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
+    # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
+    add_component_indices = kwargs.pop('numbered_comps', True) and writer_name == 'pyxdsm'
+    index_separator = kwargs.pop('index_separator', '')  # nothing, space or new line
 
     def format_block(names, **kwargs):
         if writer == 'pyxdsm':
@@ -463,6 +477,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
+
+    # Get the top level system to be transcripted to XDSM
+    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
                                                                      model_path=model_path)
@@ -475,15 +492,17 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    writer_name = writer.lower()  # making it case insensitive
-
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
 
     if optimizer is not None:
-        x.add_optimizer(optimizer)
+        opt_label = optimizer
+        if add_component_indices:
+            opt_index = len(comps)+2  # index of last component + 1
+            opt_label = '1, {}-2:{}{}'.format(opt_index, index_separator, optimizer)
+        x.add_optimizer(label=opt_label)
 
     if solver is not None:
         x.add_solver(solver)
@@ -508,12 +527,12 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
-    # Get the top level system to be transcripted to XDSM
-    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
-
     # Add components
-    for comp in comps:
-        x.add_comp(name=comp['abs_name'], label=_replace_chars(comp['name'], substitutes=subs))
+    for i, comp in enumerate(comps, 2):  # Driver is 1, so starting from 2
+        label = _replace_chars(comp['name'], substitutes=subs)
+        if add_component_indices:
+            label = '{}:{}{}'.format(i, index_separator, label)
+        x.add_comp(name=comp['abs_name'], label=label)
 
     # Add the connections
     for src, dct in iteritems(conns3):
@@ -537,7 +556,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     if add_process_conns:
         x.add_workflow()
-    x.write(filename, cleanup=cleanup, **kwargs)
+    x.write(filename, cleanup=cleanup, quiet=quiet, **kwargs)
 
     if show_browser:
         # path will be specified based on the "out_format", if all required inputs where
@@ -685,10 +704,8 @@ def _prune_connections(conns, model_path=None):
     else:
         for conn in conns:
             src = conn['src']
-            rel_src = src.replace(model_path + '.', '')
             src_path = _format_name(src.rsplit('.', 1)[0])
             tgt = conn['tgt']
-            rel_tgt = tgt.replace(model_path + '.', '')
             tgt_path = _format_name(tgt.rsplit('.', 1)[0])
 
             if src.startswith(model_path) and tgt.startswith(model_path):
