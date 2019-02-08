@@ -331,8 +331,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       Example: To write :math:`x_12` the variable name should be "x(12)"
     * "box_lines" can be used to limit the number of lines, if the box stacking is vertical
     * "numbered_comps": bool, If True, components are numbered. Defaults to True.
-    * "index_separator": str, characters (for example a space or new line) to separate component
-      numbers from component names. Only used, "numbered_comps" is True.
+    * "number_alignment": str, Horizontal or vertical. Defaults to horizontal
 
     XDSMjs
     ~~~~~~
@@ -472,7 +471,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
     # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
     add_component_indices = kwargs.pop('numbered_comps', True) and writer_name == 'pyxdsm'
-    index_separator = kwargs.pop('index_separator', '')  # nothing, space or new line
+    number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     def format_block(names, **kwargs):
         if writer == 'pyxdsm':
@@ -507,17 +506,20 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         opt_label = optimizer
         if add_component_indices:
             opt_index = len(comps)+2  # index of last component + 1
-            opt_label = '1, {}$\\rightarrow$ 2:{}{}'.format(opt_index, index_separator, optimizer)
+            index_str = '1, {}$\\rightarrow$ 2:'.format(opt_index)
+            if number_alignment == 'horizontal':
+                opt_label = ' '.join([index_str, optimizer])
+            elif number_alignment == 'vertical':
+                opt_label = _multiblock_comp(index_str, optimizer)
         x.add_optimizer(label=opt_label)
 
     if include_solver is not None:
         # Default "run once" solvers are ignored
         # Nonlinear solver has precedence
-        for solver_type in ('nonlinear', 'linear'):
-            solver_name = tree['{}_solver'.format(solver_type)]
-            if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:
-                x.add_solver(solver_name)
-                break
+        solver_str = _format_solver_str(tree)
+
+        if solver_str:
+            x.add_solver(solver_str)
 
     design_vars2 = _collect_connections(design_vars)
     responses2 = _collect_connections(responses)
@@ -543,7 +545,10 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     for i, comp in enumerate(comps, 2):  # Driver is 1, so starting from 2
         label = _replace_chars(comp['name'], substitutes=subs)
         if add_component_indices:
-            label = '{}:{}{}'.format(i, index_separator, label)
+            if number_alignment == 'horizontal':
+                label = '{}:{}'.format(i, label)
+            elif number_alignment == 'vertical':
+                label = _multiblock_comp(i, label)
         x.add_comp(name=comp['abs_name'], label=label)
 
     # Add the connections
@@ -807,7 +812,6 @@ def _format_block_string(var_names, stacking='vertical', **kwargs):
             names = var_names[0:max_lines]
             names[-1] = names[-1] + ', ...'
             return names
-
     elif stacking == 'horizontal':
         return ', '.join(var_names)
     elif stacking in ('max_chars', 'cut_chars'):
@@ -872,3 +876,47 @@ def _replace_chars(name, substitutes):
         for (k, v) in substitutes:
             name = name.replace(k, v)
     return name
+
+
+def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear')):
+    """
+    Format solver string.
+
+    Parameters
+    ----------
+    dct : dict
+       Dictionary, which contains keys for the solver names
+    stacking : str
+       Box stacking
+    solver_types : tuple(str)
+       Solver types, e.g. "linear"
+
+    Returns
+    -------
+       str
+    """
+    stacking = stacking.lower()
+
+    solvers = []
+    for solver_type in solver_types:
+        solver_name = dct['{}_solver'.format(solver_type)]
+        if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:
+            solvers.append(solver_name)
+    if stacking == 'vertical':
+        return NotImplementedError()
+    elif stacking == 'horizontal':
+        return ' '.join(solvers)
+    else:
+        msg = 'Invalid stacking "{}". Choose from: "vertical", "horizontal"'
+        raise ValueError(msg.format(stacking))
+
+
+def _multiblock_comp(text1, *args, **kwargs):
+    width = kwargs.pop('width', None)
+    unit = kwargs.pop('unit', 'em')
+    width_factor = kwargs.pop('width_factor', 1)
+    texts = [text1] + list(args)
+    if width is None:
+        width = min([len(str(t)) for t in texts]) * width_factor
+    template = '\\MultilineComponent{{{width}{unit}}}'
+    return template.format(width=width, unit=unit) + ''.join(['{{{}}}'.format(t) for t in texts])
