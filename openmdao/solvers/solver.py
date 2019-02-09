@@ -172,6 +172,11 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
+        self.options.declare('convrg_vars', types=list, default=[],
+                             desc='list of variables (names) used by relative error criterium.')
+        self.options.declare('convrg_rtols', types=list, default=[],
+                             desc='list of relative error tolerances corresponding to each'
+                             ' variable specified in convrg_vars option (rtol is used otherwise)')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -209,8 +214,6 @@ class Solver(object):
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
-        self._convergence_varnames = []
-        self._convergence_rtols = []
 
     def _assembled_jac_solver_iter(self):
         """
@@ -349,7 +352,6 @@ class Solver(object):
         """
         maxiter = self.options['maxiter']
         atol = self.options['atol']
-        rtol = self.options['rtol']
         iprint = self.options['iprint']
 
         self._mpi_print_header()
@@ -361,7 +363,7 @@ class Solver(object):
 
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        is_rtol_converged = self.is_rtol_converged(norm, norm0, rtol)
+        is_rtol_converged = self._is_rtol_converged(norm, norm0)
         while self._iter_count < maxiter and norm > atol and not is_rtol_converged:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._single_iteration()
@@ -374,14 +376,14 @@ class Solver(object):
                 rec.abs = norm
                 rec.rel = norm / norm0
 
-            is_rtol_converged = self.is_rtol_converged(norm, norm0, rtol)
             if norm0 == 0:
                 norm0 = 1
+            is_rtol_converged = self._is_rtol_converged(norm, norm0)
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
-            is_rtol_converged =  self.is_rtol_converged(norm, norm0, rtol)
+            is_rtol_converged = self._is_rtol_converged(norm, norm0)
             if np.isinf(norm) or np.isnan(norm) or (norm > atol and not is_rtol_converged):
                 if iprint > -1:
                     msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
@@ -397,21 +399,37 @@ class Solver(object):
             elif iprint == 2:
                 print(prefix + ' Converged')
 
-    def is_rtol_converged(self, norm, norm0, rtol):
-        is_rtol_converged = norm / norm0 <= rtol
-        if self._convergence_names:
-            errors = np.ones(len(self._convergence_names))
-            outputs = np.ones(len(self._convergence_names))
-            for i, name in enumerate(self._convergence_names):
-                outputs[i] = self._system._outputs._views[name]
-                errors[i] = np.linalg.norm(self._system._residuals._views[name])/(np.linalg.norm(outputs[i]))
-            print(errors, self._convergence_rtols, outputs)
-            is_rtol_converged = (errors < self._convergence_rtols).all()
-        return is_rtol_converged
+    def _is_rtol_converged(self, norm, norm0):
+        """
+        Check convergence regarding relative tolerance error.
 
-    def set_convergence_variables(self, names, rtols):
-        self._convergence_names = names
-        self._convergence_rtols = np.array(rtols)
+        Parameters
+        ----------
+        norm : float
+            error (residuals norm)
+        norm0 : float
+            initial error
+
+        Returns
+        -------
+        bool
+            whether convergence is reached regarding relative error tolerance
+        """
+        rtol = self.options['rtol']
+        is_rtol_converged = (norm / norm0 < rtol)
+        if self.options['convrg_vars']:
+            names = self.options['convrg_vars']
+            rtols = self.options['convrg_rtols']
+            if not rtols:
+                rtols = rtol * np.ones(len(names))
+            rerrs = np.ones(len(names))
+            outputs = np.ones(len(names))
+            for i, name in enumerate(names):
+                outputs[i] = self._system._outputs._views[name]
+                residual = self._system._residuals._views[name]
+                rerrs[i] = np.linalg.norm(residual) / np.linalg.norm(outputs[i])
+            is_rtol_converged = (rerrs < rtols).all()
+        return is_rtol_converged
 
     def _iter_initialize(self):
         """
@@ -561,6 +579,8 @@ class NonlinearSolver(Solver):
         """
         super(NonlinearSolver, self).__init__(**kwargs)
         self._err_cache = OrderedDict()
+        self._convrg_vars = []
+        self._convrg_rtols = []
 
     def _declare_options(self):
         """
@@ -626,14 +646,12 @@ class NonlinearSolver(Solver):
             norm.
         """
         residuals = self._system._residuals
-        if self._convergence_names:
+        if self._convrg_vars:
             norm = np.nan
             total = []
-            for name in self._convergence_names:
+            for name in self._convrg_vars:
                 total.append(residuals._views_flat[name])
-            print("GET NORM", np.concatenate(total))
             norm = np.linalg.norm(np.concatenate(total))
-
         else:
             norm = residuals.get_norm()
         return norm
