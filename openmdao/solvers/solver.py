@@ -172,11 +172,6 @@ class Solver(object):
                              desc='whether to print output')
         self.options.declare('err_on_maxiter', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
-        self.options.declare('convrg_vars', types=list, default=[],
-                             desc='list of variables (names) used by relative error criterium.')
-        self.options.declare('convrg_rtols', types=list, default=[],
-                             desc='list of relative error tolerances corresponding to each'
-                             ' variable specified in convrg_vars option (rtol is used otherwise)')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -416,20 +411,7 @@ class Solver(object):
             whether convergence is reached regarding relative error tolerance
         """
         rtol = self.options['rtol']
-        is_rtol_converged = (norm / norm0 < rtol)
-        if self.options['convrg_vars']:
-            names = self.options['convrg_vars']
-            rtols = self.options['convrg_rtols']
-            if not rtols:
-                rtols = rtol * np.ones(len(names))
-            rerrs = np.ones(len(names))
-            outputs = np.ones(len(names))
-            for i, name in enumerate(names):
-                outputs[i] = self._system._outputs._views[name]
-                residual = self._system._residuals._views[name]
-                rerrs[i] = np.linalg.norm(residual) / np.linalg.norm(outputs[i])
-            is_rtol_converged = (rerrs < rtols).all()
-        return is_rtol_converged
+        return (norm / norm0 < rtol)
 
     def _iter_initialize(self):
         """
@@ -579,8 +561,6 @@ class NonlinearSolver(Solver):
         """
         super(NonlinearSolver, self).__init__(**kwargs)
         self._err_cache = OrderedDict()
-        self._convrg_vars = []
-        self._convrg_rtols = []
 
     def _declare_options(self):
         """
@@ -645,16 +625,7 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        residuals = self._system._residuals
-        if self._convrg_vars:
-            norm = np.nan
-            total = []
-            for name in self._convrg_vars:
-                total.append(residuals._views_flat[name])
-            norm = np.linalg.norm(np.concatenate(total))
-        else:
-            norm = residuals.get_norm()
-        return norm
+        return self._system._residuals.get_norm()
 
     def _disallow_discrete_outputs(self):
         """

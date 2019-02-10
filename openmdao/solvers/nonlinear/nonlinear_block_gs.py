@@ -34,6 +34,8 @@ class NonlinearBlockGS(NonlinearSolver):
 
         self._theta_n_1 = 1.0
         self._delta_outputs_n_1 = None
+        self._convrg_vars = None
+        self._convrg_rtols = None
 
     def _setup_solvers(self, system, depth):
         """
@@ -69,6 +71,11 @@ class NonlinearBlockGS(NonlinearSolver):
         self.options.declare('use_apply_nonlinear', False,
                              desc="Set to True to always call apply_linear on the solver's system "
                              "after solve_nonlinear has been called.")
+        self.options.declare('convrg_vars', types=list, default=[],
+                             desc='list of variables (names) used by relative error criterium.')
+        self.options.declare('convrg_rtols', types=list, default=[],
+                             desc='list of relative error tolerances corresponding to each'
+                             ' variable specified in convrg_vars option (rtol is used otherwise)')
 
     def _iter_initialize(self):
         """
@@ -92,7 +99,65 @@ class NonlinearBlockGS(NonlinearSolver):
         if self._system.under_complex_step and self.options['cs_reconverge']:
             self._system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
 
+        self._convrg_vars = self.options['convrg_vars']
+        if self._convrg_vars and not self.options['convrg_rtols']:
+            rtol = self.options['rtol']
+            self._convrg_rtols = rtol * np.ones(len(self._convrg_vars))
+        else:
+            self._convrg_rtols = self.options['convrg_rtols']
+            if len(self._convrg_rtols) != len(self._convrg_vars):
+                raise RuntimeError('Convergence rtols bad size : should be {}, '
+                                   'found {}.'.format(len(self._convrg_vars),
+                                                      len(self._convrg_rtols)))
+
         return super(NonlinearBlockGS, self)._iter_initialize()
+
+    def _is_rtol_converged(self, norm, norm0):
+        """
+        Check convergence regarding relative tolerance error.
+
+        Parameters
+        ----------
+        norm : float
+            error (residuals norm)
+        norm0 : float
+            initial error
+
+        Returns
+        -------
+        bool
+            whether convergence is reached regarding relative error tolerance
+        """
+        is_rtol_converged = super(NonlinearBlockGS, self)._is_rtol_converged(norm, norm0)
+        if self._convrg_vars:
+            nbvars = len(self._convrg_vars)
+            rerrs = np.ones(nbvars)
+            outputs = np.ones(nbvars)
+            for i, name in enumerate(self._convrg_vars):
+                outputs[i] = self._system._outputs._views[name]
+                residual = self._system._residuals._views[name]
+                rerrs[i] = np.linalg.norm(residual) / np.linalg.norm(outputs[i])
+            is_rtol_converged = (rerrs < self._convrg_rtols).all()
+        return is_rtol_converged
+
+    def _iter_get_norm(self):
+        """
+        Return the norm of the residual regarding convergence variable settings.
+
+        Returns
+        -------
+        float
+            norm.
+        """
+        residuals = self._system._residuals
+        if self._convrg_vars:
+            total = []
+            for name in self._convrg_vars:
+                total.append(residuals._views_flat[name])
+            norm = np.linalg.norm(np.concatenate(total))
+        else:
+            norm = super(NonlinearBlockGS, self)._iter_get_norm()
+        return norm
 
     def _single_iteration(self):
         """

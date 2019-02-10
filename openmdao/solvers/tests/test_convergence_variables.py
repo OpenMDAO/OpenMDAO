@@ -1,14 +1,9 @@
 import unittest
-
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, NonlinearBlockGS, Group, ScipyKrylov, IndepVarComp, \
-    ExecComp, AnalysisError
+from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives, \
-    SellarDis1, SellarDis2
-from random import random
 
 class ContrivedSellarDis1(SellarDis1):
 
@@ -22,10 +17,9 @@ class ContrivedSellarDis1(SellarDis1):
 
 class TestConvergenceVariables(unittest.TestCase):
 
-    def test_convergence_variables(self):
-
-        prob = Problem()
-        model = prob.model
+    def setUp(self):
+        self.prob = Problem()
+        model = self.prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -33,12 +27,16 @@ class TestConvergenceVariables(unittest.TestCase):
         model.add_subsystem('d1', ContrivedSellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
 
-        nlbgs = model.nonlinear_solver = NonlinearBlockGS()
+        self.nlbgs = nlbgs = model.nonlinear_solver = NonlinearBlockGS()
 
         nlbgs.options['maxiter'] = 20
         nlbgs.options['atol'] = 1e-6
         nlbgs.options['rtol'] = 1e-6
         nlbgs.options['iprint'] = 2
+
+    def test_convergence_variables(self):
+        prob = self.prob
+        nlbgs = self.nlbgs
 
         prob.setup()
         prob.run_model()
@@ -52,18 +50,27 @@ class TestConvergenceVariables(unittest.TestCase):
         prob.setup()
         prob.run_model()
         nb2 = nlbgs._iter_count
-        self.assertGreater(nb1, nb2)
+        self.assertLess(nb2, nb1)
 
         nlbgs.options['convrg_rtols'] = [1e-3, 1e-3]
 
         prob.setup()
         prob.run_model()
         nb3 = nlbgs._iter_count
-        self.assertGreater(nb2, nb3)
+        self.assertLess(nb3, nb2)
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
+    def test_bad_size(self):
+        self.nlbgs.options['convrg_vars'] = ['d1.y1', 'd2.y2']
+        self.nlbgs.options['convrg_rtols'] = [1e-3]
+
+        self.prob.setup()
+        with self.assertRaises(RuntimeError) as context:
+            self.prob.run_model()
+        self.assertEqual(str(context.exception),
+            "Convergence rtols bad size : should be 2, found 1.")
 
 if __name__ == "__main__":
     unittest.main()
