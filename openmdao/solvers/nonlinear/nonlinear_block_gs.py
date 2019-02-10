@@ -114,7 +114,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
     def _is_rtol_converged(self, norm, norm0):
         """
-        Check convergence regarding relative tolerance error.
+        Check convergence regarding relative error tolerance.
 
         Parameters
         ----------

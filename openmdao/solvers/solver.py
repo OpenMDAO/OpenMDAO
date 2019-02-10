@@ -373,8 +373,8 @@ class Solver(object):
 
             if norm0 == 0:
                 norm0 = 1
-            is_rtol_converged = self._is_rtol_converged(norm, norm0)
             self._mpi_print(self._iter_count, norm, norm / norm0)
+            is_rtol_converged = self._is_rtol_converged(norm, norm0)
 
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
@@ -396,7 +396,7 @@ class Solver(object):
 
     def _is_rtol_converged(self, norm, norm0):
         """
-        Check convergence regarding relative tolerance error.
+        Check convergence regarding relative error tolerance.
 
         Parameters
         ----------
@@ -410,8 +410,7 @@ class Solver(object):
         bool
             whether convergence is reached regarding relative error tolerance
         """
-        rtol = self.options['rtol']
-        return (norm / norm0 < rtol)
+        return norm / norm0 < self.options['rtol']
 
     def _iter_initialize(self):
         """

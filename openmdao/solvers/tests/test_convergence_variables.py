@@ -70,7 +70,7 @@ class TestConvergenceVariables(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             self.prob.run_model()
         self.assertEqual(str(context.exception),
-            "Convergence rtols bad size : should be 2, found 1.")
+                         "Convergence rtols bad size : should be 2, found 1.")
 
 if __name__ == "__main__":
     unittest.main()
