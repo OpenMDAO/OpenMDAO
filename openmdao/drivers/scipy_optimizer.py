@@ -54,20 +54,11 @@ _supports_new_style = {'trust-constr'}
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
-@article{Hwang_maud_2018
- author = {Hwang, John T. and Martins, Joaquim R.R.A.},
- title = "{A Computational Architecture for Coupling Heterogeneous
-          Numerical Models and Computing Coupled Derivatives}",
- journal = "{ACM Trans. Math. Softw.}",
- volume = {44},
- number = {4},
- month = jun,
- year = {2018},
- pages = {37:1--37:39},
- articleno = {37},
- numpages = {39},
- doi = {10.1145/3182393},
- publisher = {ACM},
+@phdthesis{hwang_thesis_2015,
+  author       = {John T. Hwang},
+  title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
+  school       = {University of Michigan},
+  year         = 2015
 }
 """
 
@@ -466,7 +457,6 @@ class ScipyOptimizeDriver(Driver):
                 self.opt_settings.pop('disp')  # It does not have this argument
                 # There is no "options" param, so "opt_settings" can be used to set the (many)
                 # keyword arguments
-                # Note, that
                 result = dual_annealing(self._objfunc,
                                         bounds=bounds,
                                         **self.opt_settings)
