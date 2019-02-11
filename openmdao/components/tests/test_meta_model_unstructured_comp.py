@@ -1414,8 +1414,8 @@ class MetaModelUnstructuredFloatKrigingDeprecation(unittest.TestCase):
 
         msg = "'FloatKrigingSurrogate' has been deprecated. Use 'KrigingSurrogate' instead."
 
-        #with assert_warning(DeprecationWarning, msg):
-        sin_mm.add_output('f_x', 0., surrogate=FloatKrigingSurrogate())
+        with assert_warning(DeprecationWarning, msg):
+            sin_mm.add_output('f_x', 0., surrogate=FloatKrigingSurrogate())
 
 
 if __name__ == "__main__":
