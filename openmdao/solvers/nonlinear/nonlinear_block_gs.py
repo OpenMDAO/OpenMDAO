@@ -17,6 +17,12 @@ class NonlinearBlockGS(NonlinearSolver):
     _theta_n_1 : float
         Cached relaxation factor from previous iteration. Only used if the aitken acceleration
         option is turned on.
+    _convrg_vars: list of string
+        List of absolute variable names used to compute relative error and control
+        solver convergence.
+    _convrg_rtols: list of float
+        List of relative error tolerance values for each variables of _convrg_vars. If not set, rtol
+        value is used for all specified variables. Only used if _convrg_vars is set.
     """
 
     SOLVER = 'NL: NLBGS'
