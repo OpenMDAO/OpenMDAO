@@ -20,14 +20,6 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 
 from __future__ import print_function
 
-import json
-import os
-import warnings
-
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-from openmdao.devtools.webview import webview
-from openmdao.devtools.xdsm_viewer.html_writer import write_html
-
 try:
     from pyxdsm.XDSM import XDSM
 except ImportError:
@@ -36,6 +28,18 @@ except ImportError:
     raise ImportError(msg)
 
 from six import iteritems
+
+import json
+import os
+import warnings
+
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from openmdao.devtools.webview import webview
+from openmdao.devtools.xdsm_viewer.html_writer import write_html
+
+from numpy.distutils.exec_command import find_executable
+from openmdao.utils.general_utils import simple_warning
+
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _XDSMJS_PATH = os.path.join(_DIR, 'XDSMjs')
@@ -518,6 +522,14 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
 
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
+
+        # if not find_executable('pdflatex'):
+        #     if 'build' in kwargs and kwargs['build']:
+        #         raise RuntimeError("Cannot build PDF file, 'pdflatex' command is not available.")
+        #     else:
+        #         simple_warning("Cannot build PDF file, 'pdflatex' command is not available.")
+        #         kwargs['build'] = False
+
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
     else:
