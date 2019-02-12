@@ -128,7 +128,6 @@ class NonlinearBlockGS(NonlinearSolver):
         bool
             whether convergence is reached regarding relative error tolerance
         """
-        is_rtol_converged = super(NonlinearBlockGS, self)._is_rtol_converged(norm, norm0)
         if self._convrg_vars:
             nbvars = len(self._convrg_vars)
             rerrs = np.ones(nbvars)
@@ -138,6 +137,8 @@ class NonlinearBlockGS(NonlinearSolver):
                 residual = self._system._residuals._views[name]
                 rerrs[i] = np.linalg.norm(residual) / np.linalg.norm(outputs[i])
             is_rtol_converged = (rerrs < self._convrg_rtols).all()
+        else:
+            is_rtol_converged = super(NonlinearBlockGS, self)._is_rtol_converged(norm, norm0)
         return is_rtol_converged
 
     def _iter_get_norm(self):
@@ -149,11 +150,10 @@ class NonlinearBlockGS(NonlinearSolver):
         float
             norm.
         """
-        residuals = self._system._residuals
         if self._convrg_vars:
             total = []
             for name in self._convrg_vars:
-                total.append(residuals._views_flat[name])
+                total.append(self._system._residuals._views_flat[name])
             norm = np.linalg.norm(np.concatenate(total))
         else:
             norm = super(NonlinearBlockGS, self)._iter_get_norm()
