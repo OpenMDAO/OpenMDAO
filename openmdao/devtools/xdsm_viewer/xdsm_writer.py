@@ -32,7 +32,8 @@ try:
     from pyxdsm.XDSM import XDSM
 except ImportError:
     msg = ('The pyxdsm package should be installed. You can download the package '
-           'from https://github.com/mdolab/pyXDSM')
+           'from https://github.com/mdolab/pyXDSM, or install using the pip command: '
+           'pip install git+https://github.com/mdolab/pyXDSM.git')
     raise ImportError(msg)
 
 from six import iteritems
@@ -963,3 +964,58 @@ def _multiline_block(*texts, **kwargs):
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
 
+##### openmdao command line setup
+
+def _xdsm_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao view_model' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
+                        help='XDSM output file.')
+    parser.add_argument('-f', '--format', default='html', action='store', dest='format',
+                        help='format of XSDM output.')
+    parser.add_argument('-m', '--model_path', action='store', dest='model_path',
+                        help='Path to system to transcribe to XDSM.')
+    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
+                        help="don't treat the top level of each name as the source/target component.")
+    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
+                        help="don't display in a browser.")
+    parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
+                        help="don't show externally connected outputs.")
+    parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
+                        help="include the problem model's nonlinear solver in the XDSM.")
+    parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
+                        help="don't add process connections (thin black lines).")
+
+
+
+def _xdsm_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao view_model'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    def _xdsm(prob):
+        write_xdsm(prob, filename=options.outfile, model_path=options.model_path,
+                   recurse=options.recurse,
+                   include_external_outputs=not options.no_extern_outputs,
+                   out_format=options.format,
+                   include_solver=options.include_solver, subs=_CHAR_SUBS,
+                   show_browser=not options.no_browser,
+                   add_process_conns=not options.no_process_conns)
+        exit()
+    return _xdsm
