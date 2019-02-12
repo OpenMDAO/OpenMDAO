@@ -1,0 +1,158 @@
+/*
+ * XDSMjs
+ * Copyright 2016 Rémi Lafage
+ */
+
+/* Component types */
+.xdsm .driver {
+    visibility: hidden;
+}
+
+.xdsm .optimization {
+    fill: #CCCCFF;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .lp_optimization {
+    fill: #CCCCFF;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .analysis {
+    fill: #CCFFCC;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .mdo {
+    fill: #FFCCCC;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .function {
+    fill: #F2CCD9;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .mda {
+    fill: #FFE5CC;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .metamodel {
+    fill: #FFFCCC;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+.xdsm .doe {
+    fill: #FFFCCC;
+    stroke: black;
+    stroke-width: 1px;
+}
+
+/* Title */
+.xdsm g.title text {
+    display: block;
+    font-size: 2em;
+    margin-top: 0.67em;
+    margin-bottom: 0.67em;
+    margin-left: 0;
+    margin-right: 0;
+    font-weight: bold;
+}
+.xdsm g.title rect {
+    fill: none;
+}
+
+
+/* Text Default */
+.xdsm text {
+  fill: black;
+  stroke: none;
+  font-size: large;
+  font-family: Arial, sans-serif;
+}
+.xdsm tspan.sub {
+  font-size: small;
+}
+.xdsm tspan.sup {
+  font-size: small;
+}
+
+/* Data */
+.xdsm .dataInter polygon {
+  fill: #E5E5E5;
+  stroke: black;
+  stroke-width: 1px;
+}
+
+.xdsm .dataIO polygon {
+  fill: #FFFFFF;
+  stroke: black;
+  stroke-width: 1px;
+}
+
+/* Dataflow */
+.xdsm g.dataflow {
+    fill: none;
+    stroke: grey;
+    stroke-width: 8px;
+}
+
+/* Workflow */
+.xdsm g.workflow {
+    fill: none;
+    stroke: black;
+    stroke-width: 2px;
+}
+
+/* Tooltip */
+div.tooltip {
+    position: absolute;
+    text-align: center;
+    padding: 10px;
+    background: lightsteelblue;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+/* Info */
+div.optpb {
+    position: absolute;
+    padding: 10px;
+    background: #CCCCFF;
+    border: 0px;
+    border-radius: 8px;
+    font-size: 150%;
+}
+
+sub, sup {
+  /* Specified in % so that the sup/sup is the right size relative to the surrounding text */
+  font-size: 75%;
+  /* Zero out the line-height so that it doesn't interfere with the positioning that follows */
+  line-height: 0;
+  /* Where the magic happens: makes all browsers position the sup/sup properly, relative to the surrounding text */
+  position: relative;
+  /* Note that if you're using Eric Meyer's reset.css, this is already set and you can remove this rule */
+  vertical-align: baseline;
+}
+
+sup {
+  /* Move the superscripted text up */
+  top: -0.5em;
+}
+
+sub {
+  /* Move the subscripted text down, but only half as far down as the superscript moved up */
+  bottom: -0.5em;
+}
+
+
+

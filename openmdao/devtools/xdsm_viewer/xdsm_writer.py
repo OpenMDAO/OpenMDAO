@@ -15,11 +15,14 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
 # TODO implement "stack" boxes for parallel components
+# TODO solvers: also include solvers of groups, not just for the root. Include connections between
+#  component inputs & outputs and the solver.
 
 from __future__ import print_function
 
 import json
 import os
+import warnings
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
@@ -49,6 +52,7 @@ _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
     'xdsmjs': (),
 }
+_DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 
 # Default file names in XDSMjs
 
@@ -152,7 +156,7 @@ class XDSMWriter(XDSM):
         """
         if label is None:
             label = name
-        self.add_system(name, 'Analysis', label, **kwargs)
+        self.add_system(name, 'Analysis', '\\text{%s}' % label, **kwargs)
 
     def add_func(self, name, **kwargs):
         """
@@ -199,7 +203,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         super(XDSMjsWriter, self).__init__()
         self.optimizer = 'opt'
         self.comp_names = []  # Component names
-        self.components = []
+        self.comps = []
         self.reserved_words = '_U_',  # Ignored at text formatting
 
     def _format_id(self, name, subs=(('_', ''),)):
@@ -232,7 +236,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         if label is None:
             label = node_name
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
-        self.components.append(dct)
+        self.comps.append(dct)
 
     def add_workflow(self):
         wf = ["_U_", [self.optimizer, self.comp_names]]
@@ -252,7 +256,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         -------
             dict
         """
-        data = {'edges': self.connections, 'nodes': self.components, 'workflow': self.processes}
+        data = {'edges': self.connections, 'nodes': self.comps, 'workflow': self.processes}
         return data
 
     def write(self, filename='xdsmjs', embed_data=True, **kwargs):
@@ -277,16 +281,17 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
         html_filename = '.'.join([filename, 'html'])
 
+        embeddable = kwargs.pop('embeddable', False)
         if embed_data:
             # Write HTML file
-            write_html(outfile=html_filename, source_data=data)
+            write_html(outfile=html_filename, source_data=data, embeddable=embeddable)
         else:
             json_filename = '.'.join([filename, 'json'])
             with open(json_filename, 'w') as f:
                 json.dump(data, f)
 
             # Write HTML file
-            write_html(outfile=html_filename, data_file=json_filename)
+            write_html(outfile=html_filename, data_file=json_filename, embeddable=embeddable)
         print('XDSM output file written to: {}'.format(html_filename))
 
 
@@ -312,16 +317,25 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     ~~~~~~
 
     * The appearance of the boxes can be controlled with "box_stacking" and "box_width" arguments.
-      The box stacking can be "horizontal", "vertical", "cut_chars" or "max_chars".
-      With "cut_chars" the text in the box will be one line with the maximum number of characters
-      limited by "box_width". In the latter case the "box_width" argument is used to determine
-      the maximum allowed width of boxes (in characters).
+      The box stacking can be:
+
+      * "horizontal" - All variables in one line
+      * "vertical" - All variables in one column
+      * "cut_chars" - The text in the box will be one line with the maximum number of characters
+        limited by "box_width".
+      * "max_chars" - The "box_width" argument is used to determine
+        the maximum allowed width of boxes (in characters).
+      * "empty" - There are no variable names in the data block. Good for large diagrams.
+
       A default value is taken, if not specified.
     * By default the part of variable names following underscores (_)
       are not converted to subscripts.
       To write in subscripts wrap that part of the name into a round bracket.
       Example: To write :math:`x_12` the variable name should be "x(12)"
     * "box_lines" can be used to limit the number of lines, if the box stacking is vertical
+    * "numbered_comps": bool, If True, components are numbered. Defaults to True.
+    * "number_alignment": str, Horizontal or vertical. Defaults to horizontal. If "numbered_comps"
+      is True, it positions the number either above or in front of the component label.
 
     XDSMjs
     ~~~~~~
@@ -330,6 +344,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       the data of the XDSM diagram.
     * variable names with exactly one underscore have a subscript.
       Example: "x_12" will be :math:`x_12`
+    * If "embeddable" is True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>,
+      <body> and <head> tags. If False, gives a single, standalone HTML file for viewing.
 
     Parameters
     ----------
@@ -374,15 +390,14 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     # Name is None if the driver is not specified
     driver_name = _get_cls_name(driver) if driver else None
-    solver_name = _get_cls_name(_model.nonlinear_solver) if include_solver else None
 
     design_vars = _model.get_design_vars()
     responses = _model.get_responses()
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
+    out_formats = _OUT_FORMATS
     try:
-        out_formats = _OUT_FORMATS
         writer = out_formats[out_format]
     except KeyError:
         msg = 'Invalid output format "{}", choose from: {}'
@@ -391,17 +406,17 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     if isinstance(subs, dict):
         subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
     return _write_xdsm(filename, viewer_data=viewer_data,
-                       optimizer=driver_name, solver=solver_name, model_path=model_path,
+                       optimizer=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, **kwargs)
 
 
-def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True,
+def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
-                show_browser=False, add_process_conns=True, **kwargs):
+                show_browser=False, add_process_conns=True, quiet=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -413,8 +428,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         Connections list
     optimizer : str or None, optional
         Optimizer name
-    solver:  str or None, optional
-        Solver name
+    include_solver:  bool, optional
+        Defaults to False.
     cleanup : bool, optional
         Clean-up temporary files after making the diagram.
         Defaults to True.
@@ -440,6 +455,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     add_process_conns: bool
         Add process connections (thin black lines)
         Defaults to True
+    quiet : bool
+        Set to True to suppress output from pdflatex
+
     kwargs : dict
         Keyword arguments
 
@@ -449,10 +467,15 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     """
     # TODO implement residuals
 
+    writer_name = writer.lower()  # making it case insensitive
+
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
-    box_lines = kwargs.pop('box_lines', _DEFAULT_BOX_WIDTH)
+    box_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
+    # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
+    add_component_indices = kwargs.pop('numbered_comps', True) and (writer_name == 'pyxdsm')
+    number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     def format_block(names, **kwargs):
         if writer == 'pyxdsm':
@@ -461,8 +484,26 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         else:
             return names
 
+    def number_label(number, text, alignment):
+        # Adds an index to the label either above or on the left side.
+        number_str = '{}: '.format(number)
+        if alignment == 'horizontal':
+            txt = '{}{}'.format(number_str, text)
+            if box_stacking == 'vertical':
+                return _multiline_block(txt)
+            else:
+                return txt
+        elif alignment == 'vertical':
+            return _multiline_block(number_str, text)
+        else:
+            return text  # In case of a wrong setting
+
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
+
+    # Get the top level system to be transcripted to XDSM
+    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
+    solvers = []
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
                                                                      model_path=model_path)
@@ -475,18 +516,39 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    writer_name = writer.lower()  # making it case insensitive
-
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
+    else:
+        msg = 'Undefined XDSM writer "{}"'
+        raise ValueError(msg.format(writer_name))
 
     if optimizer is not None:
-        x.add_optimizer(optimizer)
+        label = optimizer
+        if add_component_indices:
+            opt_index = len(comps) + len(solvers) + 2  # index of last block + 1
+            nr_comps = len(x.comps)
+            index_str = '{}, {}$ \\rightarrow $ 2'.format(nr_comps+1, opt_index, nr_comps+2)
+            label = number_label(index_str, label, number_alignment)
+        x.add_optimizer(label=label)
 
-    if solver is not None:
-        x.add_solver(solver)
+    if include_solver:
+        # Default "run once" solvers are ignored
+        # Nonlinear solver has precedence
+        msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
+        warnings.warn(msg)
+
+        solver_str = _format_solver_str(tree,
+                                        stacking=box_stacking,
+                                        add_indices=add_component_indices)
+
+        if solver_str:  # At least one non-default solver
+            if add_component_indices:
+                i = len(x.comps) + 1
+                solver_str = number_label(i, solver_str, number_alignment)
+            solvers.append(solver_str)
+            x.add_solver(solver_str)
 
     design_vars2 = _collect_connections(design_vars)
     responses2 = _collect_connections(responses)
@@ -508,12 +570,13 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
         x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
-    # Get the top level system to be transcripted to XDSM
-    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
-
     # Add components
-    for comp in comps:
-        x.add_comp(name=comp['abs_name'], label=_replace_chars(comp['name'], substitutes=subs))
+    for comp in comps:  # Driver is 1, so starting from 2
+        i = len(x.comps) + 1
+        label = _replace_chars(comp['name'], substitutes=subs)
+        if add_component_indices:
+            label = number_label(i, label, number_alignment)
+        x.add_comp(name=comp['abs_name'], label=label)
 
     # Add the connections
     for src, dct in iteritems(conns3):
@@ -537,7 +600,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, solver=None, cleanup=True
 
     if add_process_conns:
         x.add_workflow()
-    x.write(filename, cleanup=cleanup, **kwargs)
+    x.write(filename, cleanup=cleanup, quiet=quiet, **kwargs)
 
     if show_browser:
         # path will be specified based on the "out_format", if all required inputs where
@@ -598,7 +661,8 @@ def _accumulate_connections(conns):
             continue
         var = conn['src']['var']
         conns_new.setdefault(src_comp, {})
-        conns_new[src_comp].setdefault(tgt_comp, []).append(var)
+        if var not in conns_new[src_comp].setdefault(tgt_comp, []):  # Avoid duplicates
+            conns_new[src_comp][tgt_comp].append(var)
     return conns_new
 
 
@@ -685,10 +749,8 @@ def _prune_connections(conns, model_path=None):
     else:
         for conn in conns:
             src = conn['src']
-            rel_src = src.replace(model_path + '.', '')
             src_path = _format_name(src.rsplit('.', 1)[0])
             tgt = conn['tgt']
-            rel_tgt = tgt.replace(model_path + '.', '')
             tgt_path = _format_name(tgt.rsplit('.', 1)[0])
 
             if src.startswith(model_path) and tgt.startswith(model_path):
@@ -778,7 +840,6 @@ def _format_block_string(var_names, stacking='vertical', **kwargs):
             names = var_names[0:max_lines]
             names[-1] = names[-1] + ', ...'
             return names
-
     elif stacking == 'horizontal':
         return ', '.join(var_names)
     elif stacking in ('max_chars', 'cut_chars'):
@@ -811,6 +872,8 @@ def _format_block_string(var_names, stacking='vertical', **kwargs):
                 return lines
             else:
                 return lines[0]  # return the string instead of a list
+    elif stacking == 'empty':  # No variable names in the data block, good for big diagrams
+        return ''
     else:
         msg = 'Invalid block stacking option "{}".'
         raise ValueError(msg.format(stacking))
@@ -829,9 +892,9 @@ def _replace_chars(name, substitutes):
     Parameters
     ----------
     name : str
-       Name
+        Name
     substitutes: tuple or None
-       Character pairs with old and substitute characters
+        Character pairs with old and substitute characters
 
     Returns
     -------
@@ -841,3 +904,62 @@ def _replace_chars(name, substitutes):
         for (k, v) in substitutes:
             name = name.replace(k, v)
     return name
+
+
+def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear'),
+                       add_indices=False):
+    """
+    Format solver string.
+
+    Parameters
+    ----------
+    dct : dict
+        Dictionary, which contains keys for the solver names
+    stacking : str
+        Box stacking
+    solver_types : tuple(str)
+        Solver types, e.g. "linear"
+
+    Returns
+    -------
+        str
+    """
+    stacking = stacking.lower()
+
+    solvers = []
+    for solver_type in solver_types:
+        solver_name = dct['{}_solver'.format(solver_type)]
+        if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:
+            solvers.append(solver_name)
+    if stacking == 'vertical':
+        # Make multiline comp if not numbered
+        if add_indices:  # array is already created for the numbering
+            return '} \\\\ \\text{'.join(solvers)
+        else:  # Goes into an array environment
+            return _multiline_block(*solvers)
+    elif stacking == 'horizontal':
+        return ' '.join(solvers)
+    else:
+        msg = 'Invalid stacking "{}". Choose from: "vertical", "horizontal"'
+        raise ValueError(msg.format(stacking))
+
+
+def _multiline_block(*texts, **kwargs):
+    """
+    Makes a string for a multiline block.
+
+    texts : iterable(str)
+        Text strings, each will go to new line
+    kwargs : dict
+        Unused keywords are ignored.
+        "end_char" is the separator at the end of line. Defaults to '' (no separator).
+    Returns
+    -------
+       str
+    """
+    end_char = kwargs.pop('end_char', '')
+    texts = ['\\text{{{}{}}}'.format(t, end_char) for t in texts]
+    template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
+    new_line = ' \\\\ '
+    return template.format(text=new_line.join(texts), pos='c'*len(texts))
+

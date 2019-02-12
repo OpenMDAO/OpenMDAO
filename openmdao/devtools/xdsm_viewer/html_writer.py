@@ -1,17 +1,20 @@
 """
-HTML file writing to create (semi)standalone XDSMjs output file.
+HTML file writing to create standalone XDSMjs output file.
 """
 
 import json
 import os
 
-from six import iteritems
+from six import itervalues
+
+from openmdao.devtools.html_utils import read_files, write_div, head_and_body, write_script, \
+    write_style
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
-_HTML_TEMPLATE = "index.html"  # Template for the output file
+_CHAR_SET = "utf-8"  # HTML character set
 
 
-def write_html(outfile, source_data=None, data_file=None):
+def write_html(outfile, source_data=None, data_file=None, embeddable=False):
     """
     Writes XDSMjs HTML output file, with style and script files embedded.
 
@@ -29,18 +32,20 @@ def write_html(outfile, source_data=None, data_file=None):
         XDSM data in a dictionary or string
     data_file : str or None
         Output HTML file
+    embeddable : bool, optional
+        If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
+        and <head> tags. If False, gives a single, standalone HTML file for viewing.
     """
 
     # directories
     main_dir = os.path.dirname(os.path.abspath(__file__))
     code_dir = os.path.join(main_dir, 'XDSMjs')
     build_dir = os.path.join(code_dir, "build")
-    vis_dir = os.path.join(main_dir, "visualization")
     style_dir = code_dir  # CSS
 
     with open(os.path.join(build_dir, "xdsm.bundle.js"), "r") as f:
         code = f.read()
-        xdsm_bundle = _write_script(code, {'type': 'text/javascript'})
+        xdsm_bundle = write_script(code, {'type': 'text/javascript'})
 
     xdsm_attrs = {'class': 'xdsm'}
     # grab the data
@@ -64,44 +69,26 @@ def write_html(outfile, source_data=None, data_file=None):
         raise ValueError(msg.format(type(source_data)))
 
     # grab the style
-    with open(os.path.join(style_dir, "fontello.css"), "r") as f:
-        fontello_style = f.read()
-    with open(os.path.join(style_dir, "xdsm.css"), "r") as f:
-        xdsm_style = f.read()
-
-    # grab the index.html template
-    with open(os.path.join(vis_dir, _HTML_TEMPLATE), "r") as f:
-        index = f.read()
+    styles = read_files(('fontello', 'xdsm'), style_dir, 'css')
+    styles_elem = write_style(content='\n\n'.join(itervalues(styles)))
 
     # put all style and JS into index
-    toolbar_div = _write_div(attrs={'class': 'xdsm-toolbar'})
-    xdsm_div = _write_div(attrs=xdsm_attrs)
-    index = index.replace('{{body}}', toolbar_div + '\n' + xdsm_div)
-    index = index.replace('{{fontello_style}}', fontello_style)
-    index = index.replace('{{xdsm_style}}', xdsm_style)
-    index = index.replace('{{xdsm_bundle}}', xdsm_bundle)
+    toolbar_div = write_div(attrs={'class': 'xdsm-toolbar'})
+    xdsm_div = write_div(attrs=xdsm_attrs)
+    body = '\n\n'.join([toolbar_div, xdsm_div])
+
+    if embeddable:
+        index = '\n\n'.join([styles_elem, xdsm_bundle, body])
+    else:
+        meta = '<meta charset="{}">'.format(_CHAR_SET)
+
+        head = '\n\n'.join([meta, styles_elem, xdsm_bundle])
+
+        index = head_and_body(head, body, attrs={'class': "js", 'lang': ""})
 
     # Embed style, scripts and data to HTML
     with open(outfile, 'w') as f:
         f.write(index)
-
-
-def _write_tags(tag, content, attrs, new_lines=False):
-    # Writes an HTML tag with element content and element attributes (given as a dictionary)
-    line_sep = '\n' if new_lines else ''
-    template = '<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
-    if attrs is None:
-        attrs = {}
-    attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
-    return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep)
-
-
-def _write_div(content='', attrs=None):
-    return _write_tags('div', content, attrs, new_lines=False)
-
-
-def _write_script(content='', attrs=None):
-    return _write_tags('script', content, attrs, new_lines=True)
 
 
 if __name__ == '__main__':

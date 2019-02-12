@@ -1,0 +1,18 @@
+{
+    "nodes" : [{"id": "Opt", "name":"Optimization", "type":"optimization"},
+               {"id": "MDA", "name":"MDA", "type":"mda"}, 
+               {"id": "DA1", "name":"Analysis 1"}, 
+               {"id": "DA2", "name":"Analysis 2"}, 
+               {"id": "DA3", "name":"Analysis 3"},
+               {"id": "Func", "name":"Functions"}
+               ],
+    "edges" : [{"from":"Opt" ,"to":"DA1", "name":"x_0,x_1"},
+               {"from":"DA1" ,"to":"DA3", "name":"x_share"},
+               {"from":"DA3" ,"to":"DA1", "name":"y_1^2"},
+               {"from":"MDA" ,"to":"DA1", "name":"x_2"},
+               {"from":"Func","to":"Opt", "name":"f,c"},
+               {"from":"_U_", "to":"DA1", "name":"x_0"},
+               {"from":"DA3", "to":"_U_", "name":"y_0"}
+               ],    
+    "workflow" : ["Opt", ["MDA", "DA1", "DA2", "DA3"], "Func"]
+}
