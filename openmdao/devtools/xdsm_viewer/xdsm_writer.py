@@ -967,7 +967,7 @@ def _multiline_block(*texts, **kwargs):
 
 def _xdsm_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao view_model' command.
+    Set up the openmdao subparser for the 'openmdao xdsm' command.
 
     Parameters
     ----------
@@ -1010,7 +1010,7 @@ def _xdsm_setup_parser(parser):
 
 def _xdsm_cmd(options):
     """
-    Return the post_setup hook function for 'openmdao view_model'.
+    Return the post_setup hook function for 'openmdao xdsm'.
 
     Parameters
     ----------
