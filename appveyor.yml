@@ -20,14 +20,14 @@ environment:
       SCIPY: 1.0.1
       # PETSc: 3.9.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Previous Visual Studio 2015
-      PYTHON: 2.7.15
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PYTHON: 2.7
       # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
       SCIPY: 1.0.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Previous Visual Studio 2015
-      PYTHON: 3.6.1
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      PYTHON: 3.6
       # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
       SCIPY: 1.0.1
