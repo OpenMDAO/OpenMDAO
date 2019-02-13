@@ -977,9 +977,9 @@ def _xdsm_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
-                        help='XDSM output file.')
+                        help='XDSM output file. (use pathname without extension)')
     parser.add_argument('-f', '--format', default='html', action='store', dest='format',
-                        help='format of XSDM output.')
+                        choices=['html', 'pdf', 'tex'], help='format of XSDM output.')
     parser.add_argument('-m', '--model_path', action='store', dest='model_path',
                         help='Path to system to transcribe to XDSM.')
     parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
@@ -992,7 +992,21 @@ def _xdsm_setup_parser(parser):
                         help="include the problem model's nonlinear solver in the XDSM.")
     parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
                         help="don't add process connections (thin black lines).")
-
+    parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
+                        choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
+                        dest='box_stacking', help='Controls the appearance of boxes.')
+    parser.add_argument('--box_width', action='store', default=_DEFAULT_BOX_WIDTH,
+                        dest='box_width', type=int, help='Controls the width of boxes.')
+    parser.add_argument('--box_lines', action='store', default=_MAX_BOX_LINES,
+                        dest='box_lines', type=int,
+                        help='Limits number of vertical lines in box if box_stacking is vertical.')
+    parser.add_argument('--numbered_comps', action='store_true', dest='numbered_comps',
+                        help="Display components with numbers.  Only active for 'pdf' and 'tex' "
+                        "formats.")
+    parser.add_argument('--number_alignment', action='store', dest='number_alignment',
+                        choices=['horizontal', 'vertical'], default='horizontal',
+                        help='positions the number either above or in front of the component label '
+                        'if numbered_comps is true.')
 
 
 def _xdsm_cmd(options):
@@ -1010,12 +1024,18 @@ def _xdsm_cmd(options):
         The post-setup hook function.
     """
     def _xdsm(prob):
+        kwargs = {}
+        for name in ['box_stacking', 'box_width', 'box_lines', 'numbered_comps', 'number_alignment']:
+            val = getattr(options, name)
+            if val is not None:
+                kwargs[name] = val
+
         write_xdsm(prob, filename=options.outfile, model_path=options.model_path,
                    recurse=options.recurse,
                    include_external_outputs=not options.no_extern_outputs,
                    out_format=options.format,
                    include_solver=options.include_solver, subs=_CHAR_SUBS,
                    show_browser=not options.no_browser,
-                   add_process_conns=not options.no_process_conns)
+                   add_process_conns=not options.no_process_conns, **kwargs)
         exit()
     return _xdsm
