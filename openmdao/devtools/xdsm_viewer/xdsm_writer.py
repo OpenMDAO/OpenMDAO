@@ -24,7 +24,8 @@ try:
     from pyxdsm.XDSM import XDSM
 except ImportError:
     msg = ('The pyxdsm package should be installed. You can download the package '
-           'from https://github.com/mdolab/pyXDSM')
+           'from https://github.com/mdolab/pyXDSM, or install using the pip command: '
+           'pip install git+https://github.com/mdolab/pyXDSM.git')
     raise ImportError(msg)
 
 from six import iteritems
@@ -522,14 +523,6 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
 
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
-
-        # if not find_executable('pdflatex'):
-        #     if 'build' in kwargs and kwargs['build']:
-        #         raise RuntimeError("Cannot build PDF file, 'pdflatex' command is not available.")
-        #     else:
-        #         simple_warning("Cannot build PDF file, 'pdflatex' command is not available.")
-        #         kwargs['build'] = False
-
     elif writer_name == 'xdsmjs':  # XDSMjs
         x = XDSMjsWriter()
     else:
