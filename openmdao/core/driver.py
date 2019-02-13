@@ -308,6 +308,7 @@ class Driver(object):
         excl = recording_options['excludes']
 
         # includes and excludes for outputs are specified using promoted names
+        # NOTE: only local var names are in abs2prom, all will be gathered later
         abs2prom = model._var_abs2prom['output']
 
         all_desvars = {n for n in self._designvars
