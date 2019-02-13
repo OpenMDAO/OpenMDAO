@@ -24,18 +24,13 @@ import json
 import os
 import warnings
 
+from six import iteritems
+
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
 from openmdao.devtools.xdsm_viewer.html_writer import write_html
 
-try:
-    from pyxdsm.XDSM import XDSM
-except ImportError:
-    msg = ('The pyxdsm package should be installed. You can download the package '
-           'from https://github.com/mdolab/pyXDSM')
-    raise ImportError(msg)
-
-from six import iteritems
+from numpy.distutils.exec_command import find_executable
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _XDSMJS_PATH = os.path.join(_DIR, 'XDSMjs')
@@ -112,84 +107,6 @@ class AbstractXDSMWriter(object):
 
     def add_process(self, systems, arrow=True):
         pass  # Implement in child class
-
-
-class XDSMWriter(XDSM):
-    """
-    XDSM with some additional semantics.
-    Creates a TeX file and TiKZ file, and converts it to PDF.
-
-    On Windows it might be necessary to add the second line in the :class:`~pyxdsm.XDSM.XDSM`::
-
-        diagram_styles_path = os.path.join(module_path, 'diagram_styles')
-        diagram_styles_path = diagram_styles_path.replace('\\', '/')  # Add this line on Windows
-
-    """
-
-    def add_solver(self, label, name='solver', **kwargs):
-        """
-        Add a solver.
-
-        Parameters
-        ----------
-        label : str
-            Label in the XDSM
-        name : str
-            Name of the solver
-        kwargs : dict
-            Keyword args
-        """
-        self.add_system(name, 'MDA', '\\text{%s}' % label, **kwargs)
-
-    def add_comp(self, name, label=None, **kwargs):
-        """
-        Add a component.
-
-        Parameters
-        ----------
-        label : str
-            Label in the XDSM, defaults to the name of the component.
-        name : str
-            Name of the component
-        kwargs : dict
-            Keyword args
-        """
-        if label is None:
-            label = name
-        self.add_system(name, 'Analysis', '\\text{%s}' % label, **kwargs)
-
-    def add_func(self, name, **kwargs):
-        """
-        Add a function
-
-        Parameters
-        ----------
-        name : str
-            Name of the function
-        kwargs : dict
-            Keyword args
-        """
-        self.add_system(name, 'Function', name, **kwargs)
-
-    def add_optimizer(self, label, name='opt', **kwargs):
-        """
-        Add an optimizer.
-
-        Parameters
-        ----------
-        label : str
-            Label in the XDSM
-        name : str
-            Name of the optimizer.
-        kwargs : dict
-            Keyword args
-        """
-        self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
-
-    def add_workflow(self):
-        comp_names = [c[0] for c in self.comps]
-        comp_names.append(comp_names[0])  # close the loop
-        self.add_process(comp_names, arrow=_PROCESS_ARROWS)
 
 
 class XDSMjsWriter(AbstractXDSMWriter):
@@ -295,6 +212,108 @@ class XDSMjsWriter(AbstractXDSMWriter):
         print('XDSM output file written to: {}'.format(html_filename))
 
 
+try:
+    from pyxdsm.XDSM import XDSM
+except ImportError:
+    XDSM = None
+else:
+
+    class XDSMWriter(XDSM):
+        """
+        XDSM with some additional semantics.
+        Creates a TeX file and TiKZ file, and converts it to PDF.
+
+        On Windows it might be necessary to add the second line in the :class:`~pyxdsm.XDSM.XDSM`::
+
+            diagram_styles_path = os.path.join(module_path, 'diagram_styles')
+            diagram_styles_path = diagram_styles_path.replace('\\', '/')  # Add this line on Windows
+
+        """
+
+        def write(self, filename=None, **kwargs):
+            """
+            Write the output file.
+
+            This just wraps the XDSM version and throws out incompatible arguments.
+
+            Parameters
+            ----------
+            filename : str
+                Name of the file to be written.
+            kwargs : dict
+                Keyword args
+            """
+            build = kwargs.pop('build', False)
+            cleanup = kwargs.pop('cleanup', True)
+
+            super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup)
+
+        def add_solver(self, label, name='solver', **kwargs):
+            """
+            Add a solver.
+
+            Parameters
+            ----------
+            label : str
+                Label in the XDSM
+            name : str
+                Name of the solver
+            kwargs : dict
+                Keyword args
+            """
+            self.add_system(name, 'MDA', '\\text{%s}' % label, **kwargs)
+
+        def add_comp(self, name, label=None, **kwargs):
+            """
+            Add a component.
+
+            Parameters
+            ----------
+            label : str
+                Label in the XDSM, defaults to the name of the component.
+            name : str
+                Name of the component
+            kwargs : dict
+                Keyword args
+            """
+            if label is None:
+                label = name
+            self.add_system(name, 'Analysis', '\\text{%s}' % label, **kwargs)
+
+        def add_func(self, name, **kwargs):
+            """
+            Add a function
+
+            Parameters
+            ----------
+            name : str
+                Name of the function
+            kwargs : dict
+                Keyword args
+            """
+            self.add_system(name, 'Function', name, **kwargs)
+
+        def add_optimizer(self, label, name='opt', **kwargs):
+            """
+            Add an optimizer.
+
+            Parameters
+            ----------
+            label : str
+                Label in the XDSM
+            name : str
+                Name of the optimizer.
+            kwargs : dict
+                Keyword args
+            """
+            self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
+
+        def add_workflow(self):
+            comp_names = [c[0] for c in self.comps]
+            comp_names.append(comp_names[0])  # close the loop
+            self.add_process(comp_names, arrow=_PROCESS_ARROWS)
+
+
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
@@ -302,7 +321,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     """
     Writes XDSM diagram of an optimization problem.
 
-    With the 'tex' or 'pdf' output format it uses the pyXDSM package, with 'json' or 'HTML'
+    With the 'tex' or 'pdf' output format it uses the pyXDSM package, with 'html'
     output format it uses XDSMjs.
 
     If a component (or group) name is not unique in the diagram, the systems absolute path is
@@ -361,7 +380,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         If True, show externally connected outputs when transcribing a subsystem.
         Defaults to True.
     out_format : str, optional
-        Output format, one of "tex" (pyXDSM) or "json"/"html" (XDSMjs)
+        Output format, one of "tex" or "pdf" (pyXDSM) or "html" (XDSMjs).
         Defaults to "tex".
     include_solver : bool
         Include or not the problem model's nonlinear solver in the XDSM.
@@ -380,6 +399,18 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     -------
        XDSM
     """
+    build_pdf = False
+    if out_format in ('tex', 'pdf'):
+        if XDSM is None:
+            print('\nThe "tex" and "pdf" formats require the pyxdsm package. You can download the '
+                'package from https://github.com/mdolab/pyXDSM, or install it directly from '
+                'github using:  pip install git+https://github.com/mdolab/pyXDSM.git')
+            return
+        elif out_format == 'pdf':
+            if not find_executable('pdflatex'):
+                print("Can't find pdflatex, so a pdf can't be generated.")
+            else:
+                build_pdf = True
 
     viewer_data = _get_viewer_data(problem)
     driver = problem.driver
@@ -396,12 +427,11 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
-    out_formats = _OUT_FORMATS
     try:
-        writer = out_formats[out_format]
+        writer = _OUT_FORMATS[out_format]
     except KeyError:
         msg = 'Invalid output format "{}", choose from: {}'
-        raise ValueError(msg.format(out_format, out_formats.keys()))
+        raise ValueError(msg.format(out_format, _OUT_FORMATS.keys()))
     writer_name = writer.lower()  # making it case insensitive
     if isinstance(subs, dict):
         subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
@@ -410,13 +440,13 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
-                       add_process_conns=add_process_conns, **kwargs)
+                       add_process_conns=add_process_conns, build_pdf=build_pdf, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
-                show_browser=False, add_process_conns=True, quiet=False, **kwargs):
+                show_browser=False, add_process_conns=True, quiet=False, build_pdf=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -457,6 +487,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         Defaults to True
     quiet : bool
         Set to True to suppress output from pdflatex
+    build_pdf : bool
+        If True and a .tex file is generated, create a .pdf file from the .tex.
 
     kwargs : dict
         Keyword arguments
@@ -600,9 +632,10 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
 
     if add_process_conns:
         x.add_workflow()
-    x.write(filename, cleanup=cleanup, quiet=quiet, **kwargs)
 
-    if show_browser:
+    x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
+
+    if show_browser and (build_pdf or writer_name == 'xdsmjs'):
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
         if writer_name == 'pyxdsm':  # pyXDSM
@@ -963,3 +996,78 @@ def _multiline_block(*texts, **kwargs):
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
 
+##### openmdao command line setup
+
+def _xdsm_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao xdsm' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
+                        help='XDSM output file. (use pathname without extension)')
+    parser.add_argument('-f', '--format', default='html', action='store', dest='format',
+                        choices=['html', 'pdf', 'tex'], help='format of XSDM output.')
+    parser.add_argument('-m', '--model_path', action='store', dest='model_path',
+                        help='Path to system to transcribe to XDSM.')
+    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
+                        help="don't treat the top level of each name as the source/target component.")
+    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
+                        help="don't display in a browser.")
+    parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
+                        help="don't show externally connected outputs.")
+    parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
+                        help="include the problem model's nonlinear solver in the XDSM.")
+    parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
+                        help="don't add process connections (thin black lines).")
+    parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
+                        choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
+                        dest='box_stacking', help='Controls the appearance of boxes.')
+    parser.add_argument('--box_width', action='store', default=_DEFAULT_BOX_WIDTH,
+                        dest='box_width', type=int, help='Controls the width of boxes.')
+    parser.add_argument('--box_lines', action='store', default=_MAX_BOX_LINES,
+                        dest='box_lines', type=int,
+                        help='Limits number of vertical lines in box if box_stacking is vertical.')
+    parser.add_argument('--numbered_comps', action='store_true', dest='numbered_comps',
+                        help="Display components with numbers.  Only active for 'pdf' and 'tex' "
+                        "formats.")
+    parser.add_argument('--number_alignment', action='store', dest='number_alignment',
+                        choices=['horizontal', 'vertical'], default='horizontal',
+                        help='positions the number either above or in front of the component label '
+                        'if numbered_comps is true.')
+
+
+def _xdsm_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao xdsm'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    def _xdsm(prob):
+        kwargs = {}
+        for name in ['box_stacking', 'box_width', 'box_lines', 'numbered_comps', 'number_alignment']:
+            val = getattr(options, name)
+            if val is not None:
+                kwargs[name] = val
+
+        write_xdsm(prob, filename=options.outfile, model_path=options.model_path,
+                   recurse=options.recurse,
+                   include_external_outputs=not options.no_extern_outputs,
+                   out_format=options.format,
+                   include_solver=options.include_solver, subs=_CHAR_SUBS,
+                   show_browser=not options.no_browser,
+                   add_process_conns=not options.no_process_conns, **kwargs)
+        exit()
+    return _xdsm
