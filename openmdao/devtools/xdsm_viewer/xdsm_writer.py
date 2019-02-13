@@ -32,8 +32,7 @@ try:
     from pyxdsm.XDSM import XDSM
 except ImportError:
     msg = ('The pyxdsm package should be installed. You can download the package '
-           'from https://github.com/mdolab/pyXDSM, or install using the pip command: '
-           'pip install git+https://github.com/mdolab/pyXDSM.git')
+           'from https://github.com/mdolab/pyXDSM')
     raise ImportError(msg)
 
 from six import iteritems
