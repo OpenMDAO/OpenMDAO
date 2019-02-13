@@ -20,17 +20,17 @@ environment:
       SCIPY: 1.0.1
       # PETSc: 3.9.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       PYTHON: 2.7
       # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
       SCIPY: 1.0.1
 
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
-      PYTHON: 3.6
+      PYTHON: 3.7
       # MKL: 2018.0.2  # Math Kernel Library
-      NUMPY: 1.15
-      SCIPY: 1.0.1
+      NUMPY: 1.16.1
+      SCIPY: 1.2.1
 
   encrypted_74d70a284b7d_key:
     secure: 7u/kPupG0BmwqAJOLeyGMPakwj3lqukKHXsxEP4+6aX+Huu8VH2ZkDNq6GYlaw6HGJHi2JTAal9VDgOpZc9RMlweOrXJiNFWS3Iu0chy+L4=
