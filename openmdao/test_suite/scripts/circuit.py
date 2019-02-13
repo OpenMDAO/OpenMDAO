@@ -2,6 +2,7 @@ from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarCom
 
 from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
 
+
 class Circuit(Group):
 
     def setup(self):
