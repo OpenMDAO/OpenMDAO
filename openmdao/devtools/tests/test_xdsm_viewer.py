@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 import numpy as np
+from numpy.distutils.exec_command import find_executable
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
     Group
@@ -17,9 +18,6 @@ except ImportError:
     XDSM = None
 
 FILENAME = 'XDSM'
-
-from numpy.distutils.exec_command import find_executable
-pdflatex = find_executable('pdflatex')
 
 
 @unittest.skipUnless(XDSM, "XDSM is required.")
@@ -173,6 +171,9 @@ class TestXDSMViewer(unittest.TestCase):
         p.setup(check=True)
 
         p.run_model()
+
+        # requesting 'pdf', but if 'pdflatex' is not found we will only get 'tex'
+        pdflatex = find_executable('pdflatex')
 
         # Test non unique local names
         write_xdsm(p, 'xdsm3', out_format='pdf', quiet=True, show_browser=False)
