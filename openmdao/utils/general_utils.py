@@ -763,7 +763,7 @@ def unique_name(name, dct):
 
 def print_line_numbers(s):
     """
-    Print the given string, listig line numbers on the left.
+    Print the given string, listing line numbers on the left.
 
     Parameters
     ----------
