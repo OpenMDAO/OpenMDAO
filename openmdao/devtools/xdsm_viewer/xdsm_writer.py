@@ -246,7 +246,7 @@ else:
             build = kwargs.pop('build', False)
             cleanup = kwargs.pop('cleanup', True)
 
-            super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup)
+            super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
         def add_solver(self, label, name='solver', **kwargs):
             """
