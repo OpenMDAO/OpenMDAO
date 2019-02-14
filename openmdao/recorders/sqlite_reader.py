@@ -16,6 +16,7 @@ from openmdao.recorders.case import Case, PromotedToAbsoluteMap
 
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_array
+
 from openmdao.recorders.sqlite_recorder import format_version
 
 if PY2:
@@ -228,9 +229,17 @@ class SqliteCaseReader(BaseCaseReader):
             abs2meta = row['abs2meta']
 
             if PY2:
-                self._abs2prom = pickle.loads(str(abs2prom))
-                self._prom2abs = pickle.loads(str(prom2abs))
-                self._abs2meta = pickle.loads(str(abs2meta))
+                try:
+                    self._abs2prom = pickle.loads(str(abs2prom))
+                    self._prom2abs = pickle.loads(str(prom2abs))
+                    self._abs2meta = pickle.loads(str(abs2meta))
+                except ValueError as err:
+                    if err.message.startswith('unsupported pickle protocol'):
+                        raise ValueError("This data appears to have been recorded with "
+                                         "Python 3 and cannot be read with Python 2 "
+                                         "(%s)." % err.message)
+                    else:
+                        raise err
 
             if PY3:
                 try:
