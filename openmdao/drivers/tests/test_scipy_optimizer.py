@@ -1296,6 +1296,38 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.driver.run()
         self.assertEqual(len(prob.driver._lincongrad_cache), 1)
 
+    def test_call_final_setup(self):
+        # Make sure we call final setup if our model hasn't been setup.
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', equals=-15.0)
+
+        prob.setup(check=False)
+
+        with self.assertRaises(RuntimeError) as cm:
+            totals = prob.check_totals(method='fd', out_stream=False)
+
+        expected_msg = "run_model must be called before total derivatives can be checked."
+
+        self.assertEqual(expected_msg, str(cm.exception))
+
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
