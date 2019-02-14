@@ -420,7 +420,5 @@ class ImplicitComponent(Component):
         """
         of, wrt = super(ImplicitComponent, self)._get_partials_varlists()
 
-        # The only outputs in wrt should be implicit states.
-        wrt.extend(of)
-
-        return of, wrt
+        # wrt should include implicit states
+        return of, of + wrt
