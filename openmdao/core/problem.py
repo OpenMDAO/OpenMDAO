@@ -1288,6 +1288,9 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
+        if self._setup_status < 2:
+            raise RuntimeError("run_model must be called before total derivatives can be checked.")
+
         model = self.model
 
         if method == 'cs' and not model._outputs._alloc_complex:

@@ -19,7 +19,7 @@ except ImportError:
 FILENAME = 'XDSM'
 
 from numpy.distutils.exec_command import find_executable
-build_pdf = find_executable('pdflatex')
+pdflatex = find_executable('pdflatex')
 
 
 @unittest.skipUnless(XDSM, "XDSM is required.")
@@ -53,7 +53,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', build=False, show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
@@ -75,7 +75,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', build=False, show_browser=False, recurse=False)
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False, recurse=False)
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
@@ -119,7 +119,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', build=False, show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
@@ -173,24 +173,25 @@ class TestXDSMViewer(unittest.TestCase):
         p.setup(check=True)
 
         p.run_model()
+
         # Test non unique local names
-        write_xdsm(p, 'xdsm3', out_format='tex', build=build_pdf, quiet=True, show_browser=False)
+        write_xdsm(p, 'xdsm3', out_format='pdf', quiet=True, show_browser=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'tex'])))
-        self.assertTrue(not build_pdf or os.path.isfile('.'.join(['xdsm3', 'pdf'])))
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm3', 'pdf'])))
 
         # Check formatting
 
         # Max character box formatting
-        write_xdsm(p, 'xdsm4', out_format='tex', build=build_pdf, quiet=True, show_browser=False,
+        write_xdsm(p, 'xdsm4', out_format='pdf', quiet=True, show_browser=False,
                    box_stacking='cut_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'tex'])))
-        self.assertTrue(not build_pdf or os.path.isfile('.'.join(['xdsm4', 'pdf'])))
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm4', 'pdf'])))
 
         # Cut characters box formatting
-        write_xdsm(p, 'xdsm5', out_format='tex', build=build_pdf, quiet=True, show_browser=False,
+        write_xdsm(p, 'xdsm5', out_format='pdf', quiet=True, show_browser=False,
                    box_stacking='max_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'tex'])))
-        self.assertTrue(not build_pdf or os.path.isfile('.'.join(['xdsm5', 'pdf'])))
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm5', 'pdf'])))
 
         write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
