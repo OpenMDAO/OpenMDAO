@@ -19,37 +19,55 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation
 
-_optimizers = ['Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP']
-if LooseVersion(scipy_version) >= LooseVersion("1.1"):
-    _optimizers.append('trust-constr')
+# Optimizers in scipy.minimize
+_optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
+               'TNC', 'COBYLA', 'SLSQP'}
+if LooseVersion(scipy_version) >= LooseVersion("1.1"):  # Only available in newer versions
+    _optimizers.add('trust-constr')
 
-_gradient_optimizers = ['CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC',
-                        'SLSQP', 'dogleg', 'trust-ncg', 'trust-constr']
-_hessian_optimizers = ['trust-constr', 'trust-ncg']
-_bounds_optimizers = ['L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr']
-_constraint_optimizers = ['COBYLA', 'SLSQP', 'trust-constr']
-_constraint_grad_optimizers = ['SLSQP', 'trust-constr']
-_eq_constraint_optimizers = ['SLSQP', 'trust-constr']
+# For 'basinhopping' and 'shgo' gradients are used only in the local minimization
+_gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', 'dogleg',
+                        'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
+_hessian_optimizers = {'trust-constr', 'trust-ncg'}
+_bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
+                      'differential_evolution', 'basinhopping'}
+_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
+_constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
+_eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
+_global_optimizers = {'differential_evolution', 'basinhopping'}
+if LooseVersion(scipy_version) >= LooseVersion("1.2"):  # Only available in newer versions
+    _global_optimizers |= {'shgo', 'dual_annealing'}
+
+# Global optimizers and optimizers in minimize
+_all_optimizers = _optimizers | _global_optimizers
 
 # These require Hessian or Hessian-vector product, so they are not supported
 # right now.
-_unsupported_optimizers = ['dogleg', 'trust-ncg']
+# dual-annealing and basinhopping not supported yet
+_unsupported_optimizers = {'dogleg', 'trust-ncg'}
 
 # With "old-style" a constraint is a dictionary, with "new-style" an object
 # With "old-style" a bound is a tuple, with "new-style" a Bounds instance
 # In principle now everything can work with "old-style"
 # These settings have no effect to the optimizers implemented before SciPy 1.1
-_supports_new_style = ['trust-constr']
+_supports_new_style = {'trust-constr'}
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
-@phdthesis{hwang_thesis_2015,
-  author       = {John T. Hwang},
-  title        = {A Modular Approach to Large-Scale Design Optimization of Aerospace Systems},
-  school       = {University of Michigan},
-  year         = 2015
-}
+@article{Hwang_maud_2018
+ author = {Hwang, John T. and Martins, Joaquim R.R.A.},
+ title = "{A Computational Architecture for Coupling Heterogeneous
+          Numerical Models and Computing Coupled Derivatives}",
+ journal = "{ACM Trans. Math. Softw.}",
+ volume = {44},
+ number = {4},
+ month = jun,
+ year = {2018},
+ pages = {37:1--37:39},
+ articleno = {37},
+ numpages = {39},
+ doi = {10.1145/3182393},
+ publisher = {ACM},
 """
 
 
@@ -136,7 +154,7 @@ class ScipyOptimizeDriver(Driver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('optimizer', 'SLSQP', values=_optimizers,
+        self.options.declare('optimizer', 'SLSQP', values=_all_optimizers,
                              desc='Name of optimizer to use')
         self.options.declare('tol', 1.0e-6, lower=0.0,
                              desc='Tolerance for termination. For detailed '
@@ -399,17 +417,85 @@ class ScipyOptimizeDriver(Driver):
 
         # optimize
         try:
-            result = minimize(self._objfunc, x_init,
-                              # args=(),
-                              method=opt,
-                              jac=jac,
-                              hess=hess,
-                              # hessp=None,
+            if opt in _optimizers:
+                result = minimize(self._objfunc, x_init,
+                                  # args=(),
+                                  method=opt,
+                                  jac=jac,
+                                  hess=hess,
+                                  # hessp=None,
+                                  bounds=bounds,
+                                  constraints=constraints,
+                                  tol=self.options['tol'],
+                                  # callback=None,
+                                  options=self.opt_settings)
+            elif opt == 'basinhopping':
+                from scipy.optimize import basinhopping
+
+                def fun(x):
+                    return self._objfunc(x), jac(x)
+
+                if 'minimizer_kwargs' not in self.opt_settings:
+                    self.opt_settings['minimizer_kwargs'] = {"method": "L-BFGS-B", "jac": True}
+                self.opt_settings.pop('maxiter')  # It does not have this argument
+
+                def accept_test(f_new, x_new, f_old, x_old):
+                    # Used to implement bounds besides the original functionality
+                    if bounds is not None:
+                        bound_check = all([b[0] <= xi <= b[1] for xi, b in zip(x_new, bounds)])
+                        user_test = self.opt_settings.pop('accept_test', None)  # callable
+                        # has to satisfy both the bounds and the acceptance test defined by the
+                        # user
+                        if user_test is not None:
+                            test_res = user_test(f_new, x_new, f_old, x_old)
+                            if test_res == 'force accept':
+                                return test_res
+                            else:  # result is boolean
+                                return bound_check and test_res
+                        else:  # no user acceptance test, check only the bounds
+                            return bound_check
+                    else:
+                        return True
+
+                result = basinhopping(fun, x_init,
+                                      accept_test=accept_test,
+                                      **self.opt_settings)
+            elif opt == 'dual_annealing':
+                from scipy.optimize import dual_annealing
+                self.opt_settings.pop('disp')  # It does not have this argument
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
+                # keyword arguments
+                result = dual_annealing(self._objfunc,
+                                        bounds=bounds,
+                                        **self.opt_settings)
+            elif opt == 'differential_evolution':
+                from scipy.optimize import differential_evolution
+                # There is no "options" param, so "opt_settings" can be used to set the (many)
+                # keyword arguments
+                result = differential_evolution(self._objfunc,
+                                                bounds=bounds,
+                                                **self.opt_settings)
+            elif opt == 'shgo':
+                from scipy.optimize import shgo
+                kwargs = dict()
+                for param in ('minimizer_kwargs', 'sampling_method ', 'n', 'iters'):
+                    if param in self.opt_settings:
+                        kwargs[param] = self.opt_settings[param]
+                # Set the Jacobian and the Hessian to the value calculated in OpenMDAO
+                if 'minimizer_kwargs' not in kwargs or kwargs['minimizer_kwargs'] is None:
+                    kwargs['minimizer_kwargs'] = {}
+                kwargs['minimizer_kwargs'].setdefault('jac', jac)
+                kwargs['minimizer_kwargs'].setdefault('hess', hess)
+                # Objective function tolerance
+                self.opt_settings['f_tol'] = self.options['tol']
+                result = shgo(self._objfunc,
                               bounds=bounds,
                               constraints=constraints,
-                              tol=self.options['tol'],
-                              # callback=None,
-                              options=self.opt_settings)
+                              options=self.opt_settings,
+                              **kwargs)
+            else:
+                msg = 'Optimizer "{}" is not implemented yet. Choose from: {}'
+                raise NotImplementedError(msg.format(opt, _all_optimizers))
 
         # If an exception was swallowed in one of our callbacks, we want to raise it
         # rather than the cryptic message from scipy.

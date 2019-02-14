@@ -1,9 +1,11 @@
 import os
 import json
-from six import iteritems
+from six import iteritems, itervalues
 import networkx as nx
 from collections import OrderedDict
 import base64
+
+from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script
 
 try:
     import h5py
@@ -244,18 +246,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    html_begin_tags = """
-                      <html>
-                      <head>
-                        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-                      </head>
-                      <body>\n
-                      """
-    html_end_tags = """
-                    </body>
-                    </html>
-                    """
-
     code_dir = os.path.dirname(os.path.abspath(__file__))
     vis_dir = os.path.join(code_dir, "visualization")
     libs_dir = os.path.join(vis_dir, "libs")
@@ -263,10 +253,12 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     style_dir = os.path.join(vis_dir, "style")
 
     # grab the libraries, src and style
-    libs = _read_files(('awesomplete', 'd3.v4.min', 'vkBeautify'), libs_dir, 'js')
+    lib_dct = {'d3': 'd3.v4.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}
+    libs = read_files(itervalues(lib_dct), libs_dir, 'js')
     src_names = 'constants', 'draw', 'legend', 'modal', 'ptN2', 'search', 'svg'
-    srcs = _read_files(src_names, src_dir, 'js')
-    styles = _read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+    srcs = read_files(src_names, src_dir, 'js')
+    styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+    style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
 
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
@@ -276,22 +268,23 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         index = f.read()
 
     # add the necessary HTML tags if we aren't embedding
-    if not embeddable:
-        index = html_begin_tags + index + html_end_tags
+    if embeddable:
+        index = '\n\n'.join([style_elems, index])
+    else:
+        meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+        head = '\n\n'.join([meta, style_elems])  # Write styles to head
+        index = head_and_body(head=head, body=index)
 
     # put all style and JS into index
-    for name, code in iteritems(styles):  # styles
-        index = index.replace('{{%s_style}}' % name, code)
-
     index = index.replace('{{fontello}}', encoded_font)
 
-    index = index.replace('{{d3_lib}}', libs['d3.v4.min'])
-    index = index.replace('{{awesomplete_lib}}', libs['awesomplete'])
-    index = index.replace('{{vk_beautify_lib}}', libs['vkBeautify'])
+    for k, v in iteritems(lib_dct):
+        index = index.replace('{{{}_lib}}'.format(k), write_script(libs[v], indent=4))
 
     for name, code in iteritems(srcs):
-        index = index.replace('{{{}_lib}}'.format(name.lower()), code)
-    index = index.replace('{{model_data}}', model_viewer_data)
+        index = index.replace('{{{}_lib}}'.format(name.lower()), write_script(code, indent=4))
+
+    index = index.replace('{{model_data}}', write_script(model_viewer_data, indent=4))
     index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
     with open(outfile, 'w') as f:  # write output file
@@ -301,12 +294,3 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     if show_browser:
         from openmdao.devtools.webview import webview
         webview(outfile)
-
-
-def _read_files(filenames, directory, extension):
-    # Reads files (based on filenames) from a directory with a given extension.
-    libs = dict()
-    for name in filenames:
-        with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
-            libs[name] = f.read()
-    return libs

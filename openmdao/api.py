@@ -74,6 +74,7 @@ except ImportError:
 # Developer Tools
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
+from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
 
 # Drivers
 try:

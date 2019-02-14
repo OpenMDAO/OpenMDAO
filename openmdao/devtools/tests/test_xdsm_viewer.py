@@ -1,4 +1,7 @@
 import os
+import shutil
+import sys
+import tempfile
 import unittest
 
 import numpy as np
@@ -19,6 +22,18 @@ FILENAME = 'XDSM'
 @unittest.skipUnless(XDSM, "XDSM is required.")
 class TestXDSMViewer(unittest.TestCase):
 
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestXDSMviewer-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
         filename = FILENAME+'0'
@@ -35,7 +50,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='tex', quiet=True, show_browser=False)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
@@ -56,7 +71,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False, recurse=False)
+        write_xdsm(prob, filename=filename, out_format='tex', quiet=True, show_browser=False, recurse=False)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
@@ -99,7 +114,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='tex', quiet=True, show_browser=False)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
@@ -153,19 +168,19 @@ class TestXDSMViewer(unittest.TestCase):
 
         p.run_model()
         # Test non unique local names
-        write_xdsm(p, 'xdsm3', out_format='tex', show_browser=False)
+        write_xdsm(p, 'xdsm3', out_format='tex', quiet=True, show_browser=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'tex'])))
         self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'pdf'])))
 
         # Check formatting
 
         # Max character box formatting
-        write_xdsm(p, 'xdsm4', out_format='tex', show_browser=False,
+        write_xdsm(p, 'xdsm4', out_format='tex', quiet=True, show_browser=False,
                    box_stacking='cut_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'tex'])))
         self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'pdf'])))
         # Cut characters box formatting
-        write_xdsm(p, 'xdsm5', out_format='tex', show_browser=False,
+        write_xdsm(p, 'xdsm5', out_format='tex', quiet=True, show_browser=False,
                    box_stacking='max_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'tex'])))
         self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'pdf'])))
@@ -194,7 +209,7 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False, quiet=True,
                    embed_data=False)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'json'])))
@@ -202,7 +217,7 @@ class TestXDSMViewer(unittest.TestCase):
 
     def test_xdsmjs_embed_data(self):
         """
-        Makes XDSMjs input file for the Sellar problem.
+        Makes XDSMjs HTML file for the Sellar problem.
 
         Data is embedded into the HTML file.
         """
@@ -221,8 +236,34 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), quiet=True, show_browser=False,
                    embed_data=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
+
+    def test_xdsmjs_embeddable(self):
+        """
+        Makes XDSMjs HTML file for the Sellar problem.
+
+        The HTML file is embeddable (no head and body tags).
+        """
+
+        filename = 'xdsmjs_embeddable'  # this name is needed for XDSMjs
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), quiet=True, show_browser=False,
+                   embed_data=True, embeddable=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
@@ -298,33 +339,7 @@ class TestXDSMViewer(unittest.TestCase):
 
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
-            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=False)
-
-    def tearDown(self):
-        """Set "clean_up" to False, if you want to inspect the output files."""
-        clean_up = True
-
-        def clean_file(fname):
-            try:  # Try to clean up
-                if os.path.exists(fname):
-                    os.remove(fname)
-            except Exception as e:
-                pass
-
-        if clean_up:
-
-            # clean-up of pyXDSM files
-            nr_pyxdsm_tests = 4  # number of tests with pyXDSM
-            for ext in ('aux', 'log', 'pdf', 'tex', 'tikz'):
-                for i in range(nr_pyxdsm_tests):
-                    filename = '.'.join([FILENAME+str(i), ext])
-                    clean_file(filename)
-
-            # clean-up of XDSMjs files
-            for ext in ('json', 'html'):
-                for name in ['xdsmjs', 'xdsmjs2', 'xdsmjs3', 'xdsmjs_embedded', 'xdsmjs_orbit']:
-                    filename = '.'.join([name, ext])
-                    clean_file(filename)
+            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), quiet=True, show_browser=False)
 
 
 if __name__ == "__main__":
