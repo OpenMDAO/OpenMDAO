@@ -47,6 +47,9 @@ _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
     'xdsmjs': (),
 }
+# Variable formatting settings
+_SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't'}
+# Default solver, if no solver is added to a group.
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 
 # Default file names in XDSMjs
@@ -403,8 +406,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     if out_format in ('tex', 'pdf'):
         if XDSM is None:
             print('\nThe "tex" and "pdf" formats require the pyxdsm package. You can download the '
-                'package from https://github.com/mdolab/pyXDSM, or install it directly from '
-                'github using:  pip install git+https://github.com/mdolab/pyXDSM.git')
+                  'package from https://github.com/mdolab/pyXDSM, or install it directly from '
+                  'github using:  pip install git+https://github.com/mdolab/pyXDSM.git')
             return
         elif out_format == 'pdf':
             if not find_executable('pdflatex'):
@@ -510,11 +513,18 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     def format_block(names, **kwargs):
-        if writer == 'pyxdsm':
+        if writer_name == 'pyxdsm':
             return _format_block_string(var_names=names, stacking=box_stacking,
                                         box_width=box_width, box_lines=box_lines, **kwargs)
         else:
             return names
+
+    def format_var_str(name, var_type):
+        sup = _SUPERSCRIPTS[var_type]
+        if writer_name == 'pyxdsm':
+            return '{}^{{{}}}'.format(name, sup)
+        else:
+            return '{}^{}'.format(name, sup)
 
     def number_label(number, text, alignment):
         # Adds an index to the label either above or on the left side.
@@ -588,8 +598,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     # Design variables
     for comp, conn_vars in iteritems(design_vars2):
         conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
-        opt_con_vars = [_opt_var_str(var) for var in conn_vars]   # Optimal var names
-        init_con_vars = [_init_var_str(var, writer_name) for var in conn_vars]   # Optimal var names
+        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
+        init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
         x.connect('opt', comp, format_block(conn_vars))  # Connection from optimizer
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
         x.add_output('opt', format_block(opt_con_vars), side='left')  # Optimal design variables
@@ -598,7 +608,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     # Responses
     for comp, conn_vars in iteritems(responses2):
         conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
-        opt_con_vars = [_opt_var_str(var) for var in conn_vars]
+        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
         x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
         x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
@@ -631,21 +641,14 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             x.add_output(src, formatted_outputs, side='right')
 
     if add_process_conns:
-        x.add_workflow()
+        x.add_workflow()  # Add optimizer loop
+    x.write(filename, cleanup=cleanup, quiet=quiet, **kwargs)
 
-    x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
-
-    if show_browser and (build_pdf or writer_name == 'xdsmjs'):
-        # path will be specified based on the "out_format", if all required inputs where
-        # provided for showing the results.
-        if writer_name == 'pyxdsm':  # pyXDSM
-            ext = 'pdf'
-        elif writer_name == 'xdsmjs':  # XDSMjs
-            ext = 'html'
-        else:
-            err_msg = '"{}" is an invalid writer name.'
-            raise ValueError(err_msg.format(writer))
-        path = '.'.join([filename, ext])
+    if show_browser:
+        # Path will be specified based on the "out_format", if all required inputs where provided
+        # for showing the results.
+        exts = {'pyxdsm': 'pdf', 'xdsmjs': 'html'}
+        path = '.'.join([filename, exts[writer_name]])
         webview(path)  # Can open also PDFs
 
     return x
@@ -658,19 +661,6 @@ def _get_cls_name(obj):
 def _residual_str(name):
     """Makes a residual symbol."""
     return '\\mathcal{R}(%s)' % name
-
-
-def _opt_var_str(name):
-    """Puts an asterisk superscript on a string."""
-    return '{}^*'.format(name)
-
-
-def _init_var_str(name, writer):
-    """Puts a 0 superscript on a string."""
-    if writer == 'pyxdsm':
-        return '{}^{{(0)}}'.format(name)
-    elif writer == 'xdsmjs':
-        return '{}^(0)'.format(name)
 
 
 def _process_connections(conns, recurse=True, subs=None):
@@ -745,9 +735,13 @@ def _convert_name(name, recurse=True, subs=None):
         return convert(name)
 
 
-def _format_name(x):
-    # Character to replace dot (.) in names for pyXDSM component and connection names
-    return x.replace('.', '@')
+def _format_name(name):
+    # Replaces illegal characters in names for pyXDSM component and connection names
+    # This does not effect the labels, only reference names TikZ
+    if isinstance(name, str):
+        for char in ('.', ' ', '-', '_', ':'):
+            name = name.replace(char, '@')
+    return name
 
 
 def _prune_connections(conns, model_path=None):
@@ -822,8 +816,8 @@ def _get_comps(tree, model_path=None, recurse=True):
 
     """
     # Components are ordered in the tree, so they can be collected by walking through the tree.
-    components = list()
-    comp_names = set()
+    components = list()  # Components will be collected to this list
+    comp_names = set()  # To check if names are unique
 
     def get_children(tree_branch, path=''):
         for ch in tree_branch['children']:
@@ -865,13 +859,14 @@ def _get_comps(tree, model_path=None, recurse=True):
 
 
 def _format_block_string(var_names, stacking='vertical', **kwargs):
+    end_str = ', ...'
     max_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
     if stacking == 'vertical':
         if (max_lines is None) or (max_lines >= len(var_names)):
             return var_names
         else:
             names = var_names[0:max_lines]
-            names[-1] = names[-1] + ', ...'
+            names[-1] = names[-1] + end_str
             return names
     elif stacking == 'horizontal':
         return ', '.join(var_names)
@@ -896,7 +891,7 @@ def _format_block_string(var_names, stacking='vertical', **kwargs):
                         line = name
                         lengths = len(name)
                     else:  # 'cut_chars'
-                        lines.append(line + ', ...')
+                        lines.append(line + end_str)
                         line = ''  # No new line
                         break
             if line:  # it will be the last line, if var_names was not empty
@@ -970,10 +965,11 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
             return '} \\\\ \\text{'.join(solvers)
         else:  # Goes into an array environment
             return _multiline_block(*solvers)
-    elif stacking == 'horizontal':
+    elif stacking in ('horizontal', 'max_chars', 'cut_chars'):
         return ' '.join(solvers)
     else:
-        msg = 'Invalid stacking "{}". Choose from: "vertical", "horizontal"'
+        msg = ('Invalid stacking "{}". Choose from: "vertical", "horizontal", "max_chars", '
+               '"cut_chars"')
         raise ValueError(msg.format(stacking))
 
 
