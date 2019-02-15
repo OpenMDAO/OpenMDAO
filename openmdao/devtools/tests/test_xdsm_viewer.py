@@ -22,17 +22,17 @@ FILENAME = 'XDSM'
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
 class TestPyXDSMViewer(unittest.TestCase):
 
-    # def setUp(self):
-    #     self.startdir = os.getcwd()
-    #     self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
-    #     os.chdir(self.tempdir)
-    #
-    # def tearDown(self):
-    #     os.chdir(self.startdir)
-    #     try:
-    #         shutil.rmtree(self.tempdir)
-    #     except OSError:
-    #         pass
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
@@ -233,9 +233,9 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.connect('source.I', 'circuit.I_in')
         model.connect('ground.V', 'circuit.Vg')
 
-        model.add_design_var('ground.V')
-        model.add_design_var('source.I')
-        model.add_objective('circuit.D1.I')
+        # model.add_design_var('ground.V')
+        # model.add_design_var('source.I')
+        # model.add_objective('circuit.D1.I')
 
         p.setup(check=False)
 
