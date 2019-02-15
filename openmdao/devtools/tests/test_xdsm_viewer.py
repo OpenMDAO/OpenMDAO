@@ -233,9 +233,9 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.connect('source.I', 'circuit.I_in')
         model.connect('ground.V', 'circuit.Vg')
 
-        # model.add_design_var('ground.V')
-        # model.add_design_var('source.I')
-        # model.add_objective('circuit.D1.I')
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
 
         p.setup(check=False)
 

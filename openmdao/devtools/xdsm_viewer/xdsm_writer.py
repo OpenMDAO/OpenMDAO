@@ -641,14 +641,21 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             x.add_output(src, formatted_outputs, side='right')
 
     if add_process_conns:
-        x.add_workflow()  # Add optimizer loop
-    x.write(filename, cleanup=cleanup, quiet=quiet, **kwargs)
+        x.add_workflow()
 
-    if show_browser:
-        # Path will be specified based on the "out_format", if all required inputs where provided
-        # for showing the results.
-        exts = {'pyxdsm': 'pdf', 'xdsmjs': 'html'}
-        path = '.'.join([filename, exts[writer_name]])
+    x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
+
+    if show_browser and (build_pdf or writer_name == 'xdsmjs'):
+        # path will be specified based on the "out_format", if all required inputs where
+        # provided for showing the results.
+        if writer_name == 'pyxdsm':  # pyXDSM
+            ext = 'pdf'
+        elif writer_name == 'xdsmjs':  # XDSMjs
+            ext = 'html'
+        else:
+            err_msg = '"{}" is an invalid writer name.'
+            raise ValueError(err_msg.format(writer))
+        path = '.'.join([filename, ext])
         webview(path)  # Can open also PDFs
 
     return x
