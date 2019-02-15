@@ -231,12 +231,15 @@ class TestPyXDSMViewer(unittest.TestCase):
         p = Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
+        group = model.add_subsystem('G1', Group(), promotes=['*'])
+        group2 = model.add_subsystem('G2', Group())
+        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
+        group.add_subsystem('circuit', Circuit())
 
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
+        group.connect('source.I', 'circuit.I_in')
+        group.connect('ground.V', 'circuit.Vg')
 
         model.add_design_var('ground.V')
         model.add_design_var('source.I')
@@ -251,7 +254,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.run_model()
 
         write_xdsm(p, 'xdsm_circuit2', out_format='pdf', quiet=True, show_browser=False,
-                   recurse=True, model_path='circuit')
+                   recurse=True, model_path='G1')
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', 'tex'])))
 
 

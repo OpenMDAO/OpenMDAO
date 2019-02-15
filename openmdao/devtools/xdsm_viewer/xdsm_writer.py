@@ -704,7 +704,7 @@ def _collect_connections(variables, recurse):
     return connections
 
 
-def _convert_name(name, recurse=True, subs=None):
+def _convert_name(name, recurse=True, subs=None, sep='.'):
     """
     From an absolute path returns the variable name and its owner component in a dict.
     Names are also formatted.
@@ -717,17 +717,22 @@ def _convert_name(name, recurse=True, subs=None):
         If False, treat the top level of each name as the source/target component.
     subs: tuple or None
         Character pairs with old and substitute characters
-
+    sep: str
+        Separator.
     Returns
     -------
         dict(str, str)
     """
 
     def convert(name):
-        name_items = name.split('.')
+        name_items = name.split(sep)
         if recurse:
-            comp = name_items[-2]  # -1 is variable name, before that -2 is the component name
-            path = name.rsplit('.', 1)[0]
+            if len(name_items) > 1:
+                comp = name_items[-2]  # -1 is variable name, before that -2 is the component name
+                path = name.rsplit(sep, 1)[0]
+            else:
+                msg = 'The name "{}" cannot be processed. The separator character is "{}"'
+                raise ValueError(msg.format(name, sep))
         else:
             comp = name_items[0]
             path = comp
@@ -751,7 +756,7 @@ def _format_name(name):
     return name
 
 
-def _prune_connections(conns, model_path=None):
+def _prune_connections(conns, model_path=None, sep='.'):
     """
     Remove connections that don't involve components within model.
 
@@ -783,9 +788,9 @@ def _prune_connections(conns, model_path=None):
     else:
         for conn in conns:
             src = conn['src']
-            src_path = _format_name(src.rsplit('.', 1)[0])
+            src_path = _format_name(src.rsplit(sep, 1)[0])
             tgt = conn['tgt']
-            tgt_path = _format_name(tgt.rsplit('.', 1)[0])
+            tgt_path = _format_name(tgt.rsplit(sep, 1)[0])
 
             if src.startswith(model_path) and tgt.startswith(model_path):
                 # Internal connections
@@ -825,27 +830,28 @@ def _get_comps(tree, model_path=None, recurse=True):
     # Components are ordered in the tree, so they can be collected by walking through the tree.
     components = list()  # Components will be collected to this list
     comp_names = set()  # To check if names are unique
+    sep = '.'
 
     def get_children(tree_branch, path=''):
         for ch in tree_branch['children']:
             ch['path'] = path
             name = ch['name']
             if path:
-                ch['abs_name'] = _format_name('.'.join([path, name]))
+                ch['abs_name'] = _format_name(sep.join([path, name]))
             else:
                 ch['abs_name'] = _format_name(name)
             ch['rel_name'] = name
             if ch['subsystem_type'] == 'component':
                 if name in comp_names:  # There is already a component with the same name
-                    ch['name'] = '.'.join([path, name])  # Replace with absolute name
+                    ch['name'] = sep.join([path, name])  # Replace with absolute name
                     for comp in components:
                         if comp['name'] == name:  # replace in the other component to abs. name
-                            comp['name'] = '.'.join([comp['path'], name])
+                            comp['name'] = sep.join([comp['path'], name])
                 components.append(ch)
                 comp_names.add(ch['rel_name'])
             elif recurse:
                 if path:
-                    new_path = '.'.join([path, ch['name']])
+                    new_path = sep.join([path, ch['name']])
                 else:
                     new_path = ch['name']
                 get_children(ch, new_path)
@@ -855,7 +861,7 @@ def _get_comps(tree, model_path=None, recurse=True):
 
     top_level_tree = tree
     if model_path is not None:
-        path_list = model_path.split('.')
+        path_list = model_path.split(sep)
         while path_list:
             next_path = path_list.pop(0)
             children = [child for child in top_level_tree['children']]
