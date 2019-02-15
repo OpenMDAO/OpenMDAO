@@ -1,6 +1,5 @@
 import os
 import shutil
-import sys
 import tempfile
 import unittest
 
@@ -8,24 +7,24 @@ import numpy as np
 from numpy.distutils.exec_command import find_executable
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
-    Group
+    Group, write_xdsm
+from openmdao.devtools.xdsm_viewer.html_writer import write_html
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 try:
     from pyxdsm.XDSM import XDSM
-    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm, write_html
 except ImportError:
     XDSM = None
 
 FILENAME = 'XDSM'
 
 
-@unittest.skipUnless(XDSM, "XDSM is required.")
-class TestXDSMViewer(unittest.TestCase):
+@unittest.skipUnless(XDSM, "The pyXDSM package is required.")
+class TestPyXDSMViewer(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestXDSMviewer-')
+        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
         os.chdir(self.tempdir)
 
     def tearDown(self):
@@ -194,8 +193,20 @@ class TestXDSMViewer(unittest.TestCase):
         self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'tex'])))
         self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm5', 'pdf'])))
 
-        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
-        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
+
+class TestXDSMjsViewer(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestXDSMjsViewer-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_xdsmjs(self):
         """
@@ -338,6 +349,59 @@ class TestXDSMViewer(unittest.TestCase):
         write_html(outfile=outfile, source_data=data)
 
         self.assertTrue(os.path.isfile(outfile))
+
+    def test_pyxdsm_identical_relative_names(self):
+        class TimeComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('t_initial', val=0.)
+                self.add_input('t_duration', val=1.)
+                self.add_output('time', shape=(2,))
+
+            def compute(self, inputs, outputs):
+                t_initial = inputs['t_initial']
+                t_duration = inputs['t_duration']
+
+                outputs['time'][0] = t_initial
+                outputs['time'][1] = t_initial + t_duration
+
+        class Phase(Group):
+
+            def setup(self):
+                super(Phase, self).setup()
+
+                indep = IndepVarComp()
+                for var in ['t_initial', 't_duration']:
+                    indep.add_output(var, val=1.0)
+
+                self.add_subsystem('time_extents', indep, promotes_outputs=['*'])
+
+                time_comp = TimeComp()
+                self.add_subsystem('time', time_comp)
+
+                self.connect('t_initial', 'time.t_initial')
+                self.connect('t_duration', 'time.t_duration')
+
+                self.set_order(['time_extents', 'time'])
+
+        p = Problem()
+        p.driver = ScipyOptimizeDriver()
+        orbit_phase = Phase()
+        p.model.add_subsystem('orbit_phase', orbit_phase)
+
+        systems_phase = Phase()
+        p.model.add_subsystem('systems_phase', systems_phase)
+
+        systems_phase = Phase()
+        p.model.add_subsystem('extra_phase', systems_phase)
+        p.model.add_design_var('orbit_phase.t_initial')
+        p.model.add_design_var('orbit_phase.t_duration')
+        p.setup(check=True)
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
+        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
 
     def test_wrong_out_format(self):
         """Incorrect output format error."""
