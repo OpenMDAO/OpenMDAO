@@ -704,7 +704,7 @@ def _collect_connections(variables, recurse):
     return connections
 
 
-def _convert_name(name, recurse=True, subs=None, sep='.'):
+def _convert_name(name, recurse=True, subs=None):
     """
     From an absolute path returns the variable name and its owner component in a dict.
     Names are also formatted.
@@ -717,21 +717,23 @@ def _convert_name(name, recurse=True, subs=None, sep='.'):
         If False, treat the top level of each name as the source/target component.
     subs: tuple or None
         Character pairs with old and substitute characters
-    sep: str
-        Separator.
+
     Returns
     -------
         dict(str, str)
     """
 
     def convert(name):
+        sep = '.'
+        name = name.replace('@', sep)
         name_items = name.split(sep)
         if recurse:
             if len(name_items) > 1:
                 comp = name_items[-2]  # -1 is variable name, before that -2 is the component name
                 path = name.rsplit(sep, 1)[0]
             else:
-                msg = 'The name "{}" cannot be processed. The separator character is "{}"'
+                msg = ('The name "{}" cannot be processed. The separator character is "{}", '
+                       'which does not occur in the name.')
                 raise ValueError(msg.format(name, sep))
         else:
             comp = name_items[0]
