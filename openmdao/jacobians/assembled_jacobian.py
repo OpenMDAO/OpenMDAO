@@ -149,11 +149,14 @@ class AssembledJacobian(Jacobian):
             # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
             if res_abs_name not in out_ranges:
                 continue
-            res_offset, _ = out_ranges[res_abs_name]
+            res_offset, res_end = out_ranges[res_abs_name]
+            res_size = res_end - res_offset
 
             if wrt_abs_name in abs2prom_out:
-                out_offset, _ = out_ranges[wrt_abs_name]
-                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, info['shape'])
+                out_offset, out_end = out_ranges[wrt_abs_name]
+                out_size = out_end - out_offset
+                shape = (res_size, out_size)
+                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
                 keymap[abs_key] = abs_key
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
@@ -168,7 +171,9 @@ class AssembledJacobian(Jacobian):
                     else:
                         factor = None
 
-                    out_offset, _ = out_ranges[out_abs_name]
+                    out_offset, out_end = out_ranges[out_abs_name]
+                    out_size = out_end - out_offset
+                    shape = (res_size, out_size)
                     src_indices = abs2meta[wrt_abs_name]['src_indices']
 
                     # need to add an entry for d(output)/d(source)
@@ -176,17 +181,17 @@ class AssembledJacobian(Jacobian):
                     abs_key2 = (res_abs_name, out_abs_name)
                     keymap[abs_key] = abs_key2
 
-                    if src_indices is None:
-                        shape = info['shape']
-                    else:
+                    if src_indices is not None:
                         shape = abs_key2shape(abs_key2)
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
 
                 elif not is_top:  # input is connected to something outside current system
+                    in_offset, in_end = in_ranges[wrt_abs_name]
+                    shape = (res_size, in_end - in_offset)
                     ext_mtx._add_submat(abs_key, info, res_offset,
-                                        in_ranges[wrt_abs_name][0], None, info['shape'])
+                                        in_offset, None, shape)
 
         iproc = system.comm.rank
         out_size = np.sum(out_sizes[iproc, :])
