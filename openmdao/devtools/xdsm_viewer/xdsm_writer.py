@@ -627,7 +627,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             output_vars = set()
             for tgt, conn_vars in iteritems(tgts):
                 output_vars |= set(conn_vars)
-                formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
+            formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
             x.add_output(src, formatted_outputs, side='right')
 
     if add_process_conns:
