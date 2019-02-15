@@ -592,8 +592,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             solvers.append(solver_str)
             x.add_solver(solver_str)
 
-    design_vars2 = _collect_connections(design_vars)
-    responses2 = _collect_connections(responses)
+    design_vars2 = _collect_connections(design_vars, recurse=recurse)
+    responses2 = _collect_connections(responses, recurse=recurse)
 
     # Design variables
     for comp, conn_vars in iteritems(design_vars2):
@@ -696,8 +696,8 @@ def _accumulate_connections(conns):
     return conns_new
 
 
-def _collect_connections(variables):
-    conv_vars = [_convert_name(v) for v in variables]
+def _collect_connections(variables, recurse):
+    conv_vars = [_convert_name(v, recurse) for v in variables]
     connections = dict()
     for conv_var in conv_vars:
         connections.setdefault(conv_var['path'], []).append(conv_var['var'])
