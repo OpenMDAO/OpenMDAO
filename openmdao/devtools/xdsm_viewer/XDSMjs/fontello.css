@@ -33,7 +33,7 @@
   /* Uncomment for 3D effect */
   /* text-shadow: 1px 1px 1px rgba(127, 127, 127, 0.3); */
 }
-.icon-start:before { content: '\e800'; } /* '' */
-.icon-stop:before { content: '\e801'; } /* '' */
-.icon-step-next:before { content: '\e803'; } /* '' */
-.icon-step-prev:before { content: '\e804'; } /* '' */
+.icon-start:before { content: '\e800'; }
+.icon-stop:before { content: '\e801'; }
+.icon-step-next:before { content: '\e803'; }
+.icon-step-prev:before { content: '\e804'; }
