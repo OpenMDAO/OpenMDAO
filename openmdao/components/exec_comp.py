@@ -51,6 +51,9 @@ class ExecComp(ExplicitComponent):
     _vectorize : bool
         If True, treat all array/array partials as diagonal if both arrays have size > 1.
         All arrays with size > 1 must have the same flattened size or an exception will be raised.
+    _units : str or None
+        Units to be assigned to all variables in this component.
+        Default is None, which means units are provided for variables individually.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
 
