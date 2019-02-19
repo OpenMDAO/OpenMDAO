@@ -717,12 +717,22 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         super(MetaModelStructuredComp, self)._setup_partials()
         n = self.options['vec_size']
+        pnames = tuple(self.pnames)
 
         for name in self._outputs:
             arange = np.arange(n)
-            self._declare_partials(of=name, wrt=self.pnames, rows=arange, cols=arange)
+            dct = {
+                'rows': arange,
+                'cols': arange,
+                'dependent': True,
+            }
+
+            self._declare_partials(of=name, wrt=pnames, dct=dct)
             if self.options['training_data_gradients']:
-                self._declare_partials(of=name, wrt="%s_train" % name)
+                dct = {
+                    'dependent': True,
+                }
+                self._declare_partials(of=name, wrt="%s_train" % name, dct=dct)
 
     def compute(self, inputs, outputs):
         """

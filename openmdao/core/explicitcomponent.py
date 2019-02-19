@@ -84,9 +84,15 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
+            dct = {
+                'rows': arange,
+                'cols': arange,
+                'value': np.full(meta['size'], -1.),
+                'dependent': True,
+            }
+
             # ExplicitComponent jacobians have -1 on the diagonal.
-            self._declare_partials(out_name, out_name, rows=arange, cols=arange,
-                                   val=np.full(meta['size'], -1.))
+            self._declare_partials(out_name, out_name, dct)
 
     def _setup_jacobians(self, recurse=True):
         """

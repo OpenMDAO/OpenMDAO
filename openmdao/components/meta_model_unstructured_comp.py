@@ -1,4 +1,5 @@
 """MetaModel provides basic meta modeling capability."""
+from six import iteritems
 from six.moves import range
 from copy import deepcopy
 from itertools import chain, product
@@ -250,25 +251,38 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
                     cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
 
-                    self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
+                    dct = {
+                        'rows': rows,
+                        'cols': cols,
+                        'dependent': True,
+                    }
+                    self._declare_partials(of=of, wrt=wrt, dct=dct)
 
         else:
+            dct = {
+                'value': None,
+                'dependent': True,
+            }
             # Dense specification of partials for non-vectorized models.
-            self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
-                                   wrt=[name[0] for name in self._surrogate_input_names])
+            self._declare_partials(of=tuple([name[0] for name in self._surrogate_output_names]),
+                                   wrt=tuple([name[0] for name in self._surrogate_input_names]),
+                                   dct=dct)
 
             # warn the user that if they don't explicitly set options for fd,
             #   the defaults will be used
             # get a list of approximated partials
-            declared_partials = set()
-            for of, wrt, method, fd_options in self._approximated_partials:
-                pattern_matches = self._find_partial_matches(of, wrt)
-                for of_bundle, wrt_bundle in product(*pattern_matches):
-                    of_pattern, of_matches = of_bundle
-                    wrt_pattern, wrt_matches = wrt_bundle
-                    for rel_key in product(of_matches, wrt_matches):
-                        abs_key = rel_key2abs_key(self, rel_key)
-                        declared_partials.add(abs_key)
+            declared_partials = set([
+                key for key, dct in iteritems(self._subjacs_info) if 'method' in dct
+                and dct['method']])
+
+            # for of, wrt, method, fd_options in self._approximated_partials:
+            #     pattern_matches = self._find_partial_matches(of, wrt)
+            #     for of_bundle, wrt_bundle in product(*pattern_matches):
+            #         of_pattern, of_matches = of_bundle
+            #         wrt_pattern, wrt_matches = wrt_bundle
+            #         for rel_key in product(of_matches, wrt_matches):
+            #             abs_key = rel_key2abs_key(self, rel_key)
+            #             declared_partials.add(abs_key)
             non_declared_partials = []
             for of, n_of in self._surrogate_output_names:
                 has_derivs = False

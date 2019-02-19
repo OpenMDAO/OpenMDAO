@@ -1818,28 +1818,23 @@ class Group(System):
 
                 meta['method'] = method
 
-                # A group under approximation needs all keys from below, so set dependent to
-                # True.
                 # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
-                meta['dependent'] = True
 
                 meta.update(self._owns_approx_jac_meta)
 
-                # Create approximations, but only for the ones we need.
-                if meta['dependent']:
+                # Create approximations for the ones we need.
+                # Skip indepvarcomp res wrt other srcs
+                if key[0] in ivc:
+                    continue
 
-                    # Skip indepvarcomp res wrt other srcs
-                    if key[0] in ivc:
+                # Skip explicit res wrt outputs
+                if key[1] in of and key[1] not in ivc:
+
+                    # Support for specifying a desvar as an obj/con.
+                    if key[1] not in wrt or key[0] == key[1]:
                         continue
 
-                    # Skip explicit res wrt outputs
-                    if key[1] in of and key[1] not in ivc:
-
-                        # Support for specifying a desvar as an obj/con.
-                        if key[1] not in wrt or key[0] == key[1]:
-                            continue
-
-                    approx.add_approximation(key, meta)
+                approx.add_approximation(key, meta)
 
                 if meta['value'] is None:
                     shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])

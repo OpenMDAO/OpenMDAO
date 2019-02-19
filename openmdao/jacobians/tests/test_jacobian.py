@@ -825,7 +825,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p = Problem()
         indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
 
-        p.model.add_subsystem('C1', MyDenseComp())
+        C1 = p.model.add_subsystem('C1', MyDenseComp())
         p.model.options['assembled_jac_type'] = 'csc'
         p.model.linear_solver = DirectSolver(assemble_jac=True)
 

@@ -1002,13 +1002,14 @@ class MetaModelTestCase(unittest.TestCase):
         # Test with user explicitly setting fd inside of setup
         trig = TrigWithFdInSetup()
         prob = no_surrogate_test_setup(trig)
-        of, wrt, method, fd_options = trig._approximated_partials[0]
+        opts = trig._subjacs_info['trig.sin_x', 'trig.x']
         expected_fd_options = {
             'step': 1e-7,
             'form': 'backward',
             'step_calc': 'rel',
         }
-        self.assertEqual(expected_fd_options, fd_options)
+        for name in expected_fd_options:
+            self.assertEqual(expected_fd_options[name], opts[name])
         J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
         deriv_using_fd = J[('trig.sin_x', 'indep.x')]
         assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)
@@ -1016,13 +1017,14 @@ class MetaModelTestCase(unittest.TestCase):
         # Test with user explicitly setting fd inside of configure for a group
         trig = TrigWithFdInConfigure()
         prob = no_surrogate_test_setup(trig, group = TrigGroup())
-        of, wrt, method, fd_options = trig._approximated_partials[0]
+        opts = trig._subjacs_info['trig.sin_x', 'trig.x']
         expected_fd_options = {
             'step': 1e-7,
             'form': 'backward',
             'step_calc': 'rel',
         }
-        self.assertEqual(expected_fd_options, fd_options)
+        for name in expected_fd_options:
+            self.assertEqual(expected_fd_options[name], opts[name])
         J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
         deriv_using_fd = J[('trig.sin_x', 'indep.x')]
         assert_rel_error(self, deriv_using_fd[0], np.cos(prob['indep.x']), 1e-4)

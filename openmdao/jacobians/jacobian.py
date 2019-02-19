@@ -10,6 +10,13 @@ from six import itervalues, iteritems
 from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
 
+SUBJAC_META_DEFAULTS = {
+    'rows': None,
+    'cols': None,
+    'value': None,
+    'dependent': False,
+}
+
 
 class Jacobian(object):
     """

@@ -8,19 +8,12 @@ from six import iteritems, itervalues
 
 import numpy as np
 
-from openmdao.jacobians.jacobian import Jacobian
+from openmdao.jacobians.jacobian import Jacobian, SUBJAC_META_DEFAULTS
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import get_conversion
-
-SUBJAC_META_DEFAULTS = {
-    'rows': None,
-    'cols': None,
-    'value': None,
-    'dependent': False,
-}
 
 _empty_dict = {}
 
