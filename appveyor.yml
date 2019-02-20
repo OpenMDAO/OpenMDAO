@@ -1,5 +1,9 @@
 build: off
 
+branches:
+  only:
+    - master
+
 environment:
   matrix:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
