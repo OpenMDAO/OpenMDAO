@@ -109,9 +109,7 @@ install:
 - cmd: if %PYTHON% GTR 3 (set CONDA="C:\\Miniconda3%PYTHON:~2%-x64") else (set CONDA="C:\\Miniconda-x64")
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
-- cmd: conda update conda
 - cmd: conda install python=%PYTHON% numpy=%NUMPY% scipy=%SCIPY% pip --quiet
-- cmd: cd C:\projects\blue*
 - cmd: pip install -e .[all]
 - cmd: conda list
 

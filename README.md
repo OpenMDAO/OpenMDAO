@@ -42,14 +42,14 @@ Here is a list of things that have not yet been developed in 2.x:
 * File variables
 * Active-set constraint calculation disabling
 * Brent Solver
-* CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and 
-WebRecorder are currently supported)
+* Case recording using CSV, HDF5, and dump recorders (SqliteRecorder is the 
+currently supported case recorder)
 
 ## Install OpenMDAO 2
 You have two options for installing **OpenMDAO**, (1) from the
 [Python Package Index (PyPI)][1], and (2) from the [GitHub repository][4].
 
-**OpenMDAO** includes two optional sets of dependencies, `develop` for
+**OpenMDAO** includes two optional sets of dependencies, `test` for
 installing the developer tools (e.g., testing, coverage), and `docs` for
 building the documentation.  A third option, `all` combines these two sets.
 
