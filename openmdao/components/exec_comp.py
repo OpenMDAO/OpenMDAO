@@ -9,6 +9,7 @@ from six import string_types
 from six.moves import range
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.units import valid_units
 
 # regex to check for variable names.
 VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -17,6 +18,9 @@ VAR_RGX = re.compile('([.]*[_a-zA-Z]\w*[ ]*\(?)')
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
                  'flat_src_indices'}
+
+# Names that are not allowed for input or output variables
+_disallowed_names = {'units'}
 
 
 def array_idx_iter(shape):
@@ -47,12 +51,15 @@ class ExecComp(ExplicitComponent):
     _vectorize : bool
         If True, treat all array/array partials as diagonal if both arrays have size > 1.
         All arrays with size > 1 must have the same flattened size or an exception will be raised.
+    _units : str or None
+        Units to be assigned to all variables in this component.
+        Default is None, which means units are provided for variables individually.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
 
     """
 
-    def __init__(self, exprs, vectorize=False, **kwargs):
+    def __init__(self, exprs, vectorize=False, units=None, **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -129,6 +136,10 @@ class ExecComp(ExplicitComponent):
             All arrays with size > 1 must have the same flattened size or an exception will be
             raised.
 
+        units : str or None
+            Units to be assigned to all variables in this component.
+            Default is None, which means units are provided for variables individually.
+
         **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
@@ -166,6 +177,13 @@ class ExecComp(ExplicitComponent):
         """
         super(ExecComp, self).__init__()
 
+        # Check that units arg is valid
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError('The units argument should be a str or None.')
+            if not valid_units(units):
+                raise ValueError("The units '%s' are invalid." % units)
+
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
 
@@ -176,6 +194,7 @@ class ExecComp(ExplicitComponent):
         self._codes = None
         self._kwargs = kwargs
         self._vectorize = vectorize
+        self._units = units
 
     def setup(self):
         """
@@ -185,6 +204,7 @@ class ExecComp(ExplicitComponent):
         allvars = set()
         exprs = self._exprs
         kwargs = self._kwargs
+        units = self._units
 
         # find all of the variables and which ones are outputs
         for expr in exprs:
@@ -210,6 +230,16 @@ class ExecComp(ExplicitComponent):
                                        (self.pathname, arg, sorted(diff)))
 
                 kwargs2[arg] = val.copy()
+
+                if units is not None:
+                    if 'units' in val and val['units'] != units:
+                        raise RuntimeError("%s: units of '%s' have been specified for "
+                                           "variable '%s', but units of '%s' have been "
+                                           "specified for the entire component." %
+                                           (self.pathname, val['units'], arg, units))
+                    else:
+                        kwargs2[arg]['units'] = units
+
                 if 'value' in val:
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
@@ -278,6 +308,9 @@ class ExecComp(ExplicitComponent):
                       if not x.endswith('(') and not x.startswith('.')])
         to_remove = []
         for v in vnames:
+            if v in _disallowed_names:
+                raise NameError("%s: cannot use variable name '%s' because "
+                                "it's a reserved keyword." % (self.pathname, v))
             if v in _expr_dict:
                 expvar = _expr_dict[v]
                 if callable(expvar):

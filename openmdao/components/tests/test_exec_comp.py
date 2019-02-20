@@ -381,6 +381,73 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
+    def test_units_varname(self):
+        prob = Problem(model=Group())
+
+        with self.assertRaises(TypeError) as cm:
+            prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
+                                                    x={'value': 2.0, 'units': 'm'},
+                                                    y={'units': 'm'},
+                                                    units=2.0))
+
+        self.assertEqual(str(cm.exception), "The units argument should be a str or None.")
+
+    def test_units_varname_str(self):
+        prob = Problem(model=Group())
+
+        with self.assertRaises(ValueError) as cm:
+            prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
+                                                    x={'value': 2.0, 'units': 'm'},
+                                                    y={'units': 'm'},
+                                                    units='two'))
+
+        self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
+
+    def test_units_varname_novalue(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
+                                                     x={'value': 2.0, 'units': 'm'},
+                                                     y={'units': 'm'}))
+        prob.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(NameError) as cm:
+            prob.setup(check=False)
+
+        self.assertEqual(str(cm.exception),
+                         "C1: cannot use variable name 'units' because it's a reserved keyword.")
+
+    def test_common_units(self):
+        # all variables in the ExecComp have the same units
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.', units='m',
+                                                     x={'value': 2.0},
+                                                     z=2.0))
+        prob.model.connect('indep.x', 'C1.x')
+
+        prob.setup(check=False)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
+
+    def test_conflicting_units(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.', units='m',
+                                                     x={'value': 2.0, 'units': 'km'},
+                                                     z=2.0))
+        prob.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup(check=False)
+
+        self.assertEqual(str(cm.exception),
+                         "C1: units of 'km' have been specified for variable 'x', but "
+                         "units of 'm' have been specified for the entire component.")
+
     def test_math(self):
         prob = Problem(model=Group())
         C1 = prob.model.add_subsystem('C1', ExecComp('y=sin(x)', x=2.0))
