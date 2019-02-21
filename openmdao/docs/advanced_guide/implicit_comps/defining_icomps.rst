@@ -68,7 +68,7 @@ Notice that we still define *V* as an output of the :code:`Node` component, albe
 
 Every state variable must have exactly one corresponding residual which is defined in the :code:`apply_nonlinear` method. The :code:`residuals` equations 
 in an implicit component are not analogous to the :code:`outputs` equations in the :code:`compute` method of an explicit component. 
-Instead of defining an equation for the output, as in an explicit component, :code:`residuals['example_output']` defines an equation for the residual associated with the 
+Instead of defining an explicit equation for the output, :code:`residuals['example_output']` defines an equation for the residual *associated with* the 
 output (state variable) :code:`example_output`. In our example, :code:`residuals['V']` defines the equation of the residual associated with the state variable *V*. There will be no explicit 
 equation defining *V*, instead, the residual equation sums the currents associated with *V* so the sum can be driven to zero. 
 
