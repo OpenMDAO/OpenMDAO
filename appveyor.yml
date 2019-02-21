@@ -24,13 +24,13 @@ environment:
       SCIPY: 1.0.1
       # PETSc: 3.9.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       PYTHON: 2.7
       # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
       SCIPY: 1.0.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       PYTHON: 3.6
       # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
@@ -113,7 +113,7 @@ install:
 - cmd: if %PYTHON% GTR 3 (set CONDA="C:\\Miniconda3%PYTHON:~2%-x64") else (set CONDA="C:\\Miniconda-x64")
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
-- cmd: conda install python=%PYTHON% numpy=%NUMPY% scipy=%SCIPY% pip --quiet
+- cmd: conda install numpy=%NUMPY% scipy=%SCIPY% pip --quiet
 - cmd: pip install -e .[all]
 - cmd: conda list
 
