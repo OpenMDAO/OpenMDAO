@@ -1,7 +1,7 @@
 .. _defining_icomps_tutorial:
 
 ****************************************************
-Building Models with Solvers and Implicit Components
+Building Models with Solvers and Implicit omponents
 ****************************************************
 
 This tutorial will show you how to define implicit components and build models with them.
