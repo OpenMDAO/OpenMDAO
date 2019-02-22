@@ -138,8 +138,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
                 'name': label}
         self.connections.append(edge)
 
-    def add_solver(self, label, name='solver', **kwargs):
-        raise NotImplementedError()
+    def add_solver(self, name, label=None, **kwargs):
+        self.comp_names.append(self._format_id(name))
+        self.add_system(name, 'mda', label, **kwargs)
 
     def add_comp(self, name, label=None, **kwargs):
         self.comp_names.append(self._format_id(name))
@@ -574,7 +575,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         if add_component_indices:
             opt_index = len(comps) + len(solvers) + 2  # index of last block + 1
             nr_comps = len(x.comps)
-            index_str = '{}, {}$ \\rightarrow $ 2'.format(nr_comps+1, opt_index, nr_comps+2)
+            index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=1)
             label = number_label(index_str, label, number_alignment)
         x.add_optimizer(label=label)
 
@@ -792,25 +793,25 @@ def _prune_connections(conns, model_path=None, sep='.'):
         return conns, external_inputs, external_outputs
     else:
         for conn in conns:
-            src = conn['src']
+            src = src0 = conn['src']
             if src.startswith(model_path):
                 src = src[len(model_path):]
             src_path = _format_name(src.rsplit(sep, 1)[0])
-            tgt = conn['tgt']
+            tgt = tgt0 = conn['tgt']
             if tgt.startswith(model_path):
                 tgt = tgt[len(model_path):]
             tgt_path = _format_name(tgt.rsplit(sep, 1)[0])
 
-            if src.startswith(model_path) and tgt.startswith(model_path):
+            if src0.startswith(model_path) and tgt0.startswith(model_path):
                 # Internal connections
                 internal_conns.append({'src': src_path, 'tgt': tgt_path})
-            elif not src.startswith(model_path) and tgt.startswith(model_path):
+            elif not src0.startswith(model_path) and tgt0.startswith(model_path):
                 # Externally connected input
                 external_inputs.append({'src': src_path, 'tgt': tgt_path})
-            elif src.startswith(model_path) and not tgt.startswith(model_path):
+            elif src0.startswith(model_path) and not tgt0.startswith(model_path):
                 # Externally connected output
                 external_outputs.append({'src': src_path, 'tgt': tgt_path})
-
+        print('CONNNNNS', internal_conns, external_inputs, external_outputs)
         return internal_conns, external_inputs, external_outputs
 
 
@@ -1014,7 +1015,15 @@ def _multiline_block(*texts, **kwargs):
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
 
+
+def _make_loop_str(first, last, start_index=0):
+    i = start_index
+    txt = '{}, {}$ \\rightarrow $ {}'
+    return txt.format(first+i, last+i, first+i+1)
+
+
 ##### openmdao command line setup
+
 
 def _xdsm_setup_parser(parser):
     """

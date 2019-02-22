@@ -10,6 +10,7 @@ from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, Sci
     Group, write_xdsm
 from openmdao.devtools.xdsm_viewer.html_writer import write_html
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
 
 try:
@@ -23,17 +24,17 @@ FILENAME = 'XDSM'
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
 class TestPyXDSMViewer(unittest.TestCase):
 
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+    # def setUp(self):
+    #     self.startdir = os.getcwd()
+    #     self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
+    #     os.chdir(self.tempdir)
+    #
+    # def tearDown(self):
+    #     os.chdir(self.startdir)
+    #     try:
+    #         shutil.rmtree(self.tempdir)
+    #     except OSError:
+    #         pass
 
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
@@ -323,6 +324,60 @@ class TestPyXDSMViewer(unittest.TestCase):
             write_xdsm(p, 'xdsm_circuit3', out_format='pdf', quiet=True, show_browser=False,
                        recurse=False, model_path='G3')
 
+    def test_pyxdsm_solver(self):
+        from openmdao.api import NonlinearBlockGS
+
+        filename = 'pyxdsm_solver'
+        out_format = 'pdf'
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.nonlinear_solver = NonlinearBlockGS()
+        prob.driver = ScipyOptimizeDriver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True,
+                   show_browser=False, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_pyxdsm_mda(self):
+        filename = 'pyxdsm_mda'
+        out_format = 'pdf'
+        prob = Problem(model=SellarMDA())
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True,
+                   show_browser=False, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_pyxdsm_mdf(self):
+        filename = 'pyxdsm_mdf'
+        out_format = 'pdf'
+        prob = Problem(model=SellarMDA())
+        model = prob.model
+        prob.driver = ScipyOptimizeDriver()
+        prob.setup(check=False)
+        prob.final_setup()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True,
+                   show_browser=False, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
 
 class TestXDSMjsViewer(unittest.TestCase):
 
@@ -532,6 +587,59 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
+
+    def test_xdsmjs_mda(self):
+        filename = 'xdsmjs_mda'
+        out_format = 'html'
+        prob = Problem(model=SellarMDA())
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True,
+                   show_browser=False, embed_data=True, embeddable=True, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_xdsmjs_mdf(self):
+        filename = 'xdsmjs_mdf'
+        out_format = 'html'
+        prob = Problem(model=SellarMDA())
+        model = prob.model
+        prob.driver = ScipyOptimizeDriver()
+        prob.setup(check=False)
+        prob.final_setup()
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format,
+                   show_browser=False, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_xdsm_solver(self):
+        from openmdao.api import NonlinearBlockGS
+
+        filename = 'xdsmjs_solver'
+        out_format = 'html'
+        prob = Problem(model=SellarNoDerivatives())
+        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.driver = ScipyOptimizeDriver()
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format,
+                   show_browser=False, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
     def test_wrong_out_format(self):
         """Incorrect output format error."""
