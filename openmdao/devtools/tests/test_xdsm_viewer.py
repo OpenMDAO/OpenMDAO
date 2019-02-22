@@ -425,7 +425,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=True,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=False,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
