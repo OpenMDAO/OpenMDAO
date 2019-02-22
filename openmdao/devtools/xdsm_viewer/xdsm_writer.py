@@ -227,10 +227,13 @@ else:
         XDSM with some additional semantics.
         Creates a TeX file and TiKZ file, and converts it to PDF.
 
-        On Windows it might be necessary to add the second line in the :class:`~pyxdsm.XDSM.XDSM`::
+        .. note:: On Windows it might be necessary to add the second line in the
+           :class:`~pyxdsm.XDSM.XDSM`, if an older version of the package is installed::
 
             diagram_styles_path = os.path.join(module_path, 'diagram_styles')
             diagram_styles_path = diagram_styles_path.replace('\\', '/')  # Add this line on Windows
+
+           This issue is resolved in the latest version of pyXDSM.
 
         """
 
