@@ -83,9 +83,6 @@ will generate an :math:`N^2` diagram like the one below.
 .. embed-n2::
     ../test_suite/scripts/circuit.py
 
-.. raw:: html
-   :file: /Users/kmarstel/Work/OpenMDAO/openmdao/docs/circuit_n2.html
-
 .. _om-command-view_connections:
 
 openmdao view_connections
