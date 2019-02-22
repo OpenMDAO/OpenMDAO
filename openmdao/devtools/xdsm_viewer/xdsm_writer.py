@@ -14,7 +14,6 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-# TODO implement "stack" boxes for parallel components
 # TODO solvers: also include solvers of groups, not just for the root. Include connections between
 #  component inputs & outputs and the solver.
 
@@ -146,7 +145,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.comp_names.append(self._format_id(name))
         self.add_system(name, 'analysis', label, **kwargs)
 
-    def add_func(self, name, **kwargs):
+    def add_func(self, name, label=None, **kwargs):
         pass
 
     def add_optimizer(self, label, name='opt', **kwargs):
