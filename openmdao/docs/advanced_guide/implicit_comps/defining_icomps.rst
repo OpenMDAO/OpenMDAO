@@ -66,10 +66,19 @@ Notice that we still define *V* as an output of the :code:`Node` component, albe
 .. embed-code::
      openmdao.test_suite.test_examples.test_circuit_analysis.Node
 
-All implicit components must define the :code:`apply_nonlinear` method,
-but it is not a requirement that every :ref:`ImplicitComponent <comp-type-3-implicitcomp>`  define the :code:`solve_nonlinear` method.
-In fact, for the :code:`Node` component, it is not even possible to define a :code:`solve_nonlinear` because *V* does not show up directly
-in the residual function.
+Every state variable must have exactly one corresponding residual which is defined in the :code:`apply_nonlinear` method. The :code:`residuals` equations 
+in an implicit component are not analogous to the :code:`outputs` equations in the :code:`compute` method of an explicit component. 
+Instead of defining an explicit equation for the output, :code:`residuals['example_output']` defines an equation for the residual *associated with* the 
+output (state variable) :code:`example_output`. In our example, :code:`residuals['V']` defines the equation of the residual associated with the state variable *V*. There will be no explicit 
+equation defining *V*, instead, the residual equation sums the currents associated with *V* so the sum can be driven to zero. 
+
+An implicit component varies its outputs (state variables, in this case *V*) to drive the residual equation to zero. In our model, *V* does not show up directly in the residual 
+equation. Instead, our explicit components :code:`Resistor` and :code:`Diode` create a dependence of the currents on *V*, so by using a solver on a higher level of the model 
+hierarchy, we can vary *V* to have an effect on current, and we can drive the residuals to zero. 
+
+All implicit components must define the :code:`apply_nonlinear` method, but it is not a requirement that every :ref:`ImplicitComponent <comp-type-3-implicitcomp>`  define the 
+:code:`solve_nonlinear` method. (The :code:`solve_nonlinear` method provides a way to explicitly define an output within an implicit component.) In fact, for the :code:`Node` 
+component, it is not even possible to define a :code:`solve_nonlinear` because *V* does not show up directly in the residual function.
 So the implicit function represented by instances of the :code:`Node` component must be converged at a higher level in the model hierarchy.
 
 There are cases where it is possible, and even advantageous, to define the :code:`solve_nonlinear` method.
