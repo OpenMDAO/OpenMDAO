@@ -255,7 +255,7 @@ else:
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
-        def add_solver(self, label, name='solver', **kwargs):
+        def add_solver(self, name, label=None, **kwargs):
             """
             Add a solver.
 
@@ -268,9 +268,11 @@ else:
             kwargs : dict
                 Keyword args
             """
-            self.add_system(name, 'MDA', '\\text{%s}' % label, **kwargs)
+            if label is None:
+                label = name
+            self.add_system(node_name=name, style='MDA', label='\\text{%s}' % label, **kwargs)
 
-        def add_comp(self, name, label=None, **kwargs):
+        def add_comp(self, name, label=None, stack=False, **kwargs):
             """
             Add a component.
 
@@ -280,27 +282,39 @@ else:
                 Label in the XDSM, defaults to the name of the component.
             name : str
                 Name of the component
+            stack : bool
+                True for parallel components.
+                Defaults to False.
             kwargs : dict
                 Keyword args
             """
             if label is None:
                 label = name
-            self.add_system(name, 'Analysis', '\\text{%s}' % label, **kwargs)
+            self.add_system(node_name=name, style='Analysis', label='\\text{%s}' % label,
+                            stack=stack, **kwargs)
 
-        def add_func(self, name, **kwargs):
+        def add_func(self, name, label=None, stack=False, **kwargs):
             """
             Add a function
 
             Parameters
             ----------
+            label : str
+                Label in the XDSM, defaults to the name of the component.
             name : str
-                Name of the function
+                Name of the component
+            stack : bool
+                True for parallel.
+                Defaults to False.
             kwargs : dict
                 Keyword args
             """
-            self.add_system(name, 'Function', name, **kwargs)
+            if label is None:
+                label = name
+            self.add_system(node_name=name, style='Function', label='\\text{%s}' % label,
+                            stack=stack, **kwargs)
 
-        def add_optimizer(self, label, name='opt', **kwargs):
+        def add_optimizer(self, name, label=None, **kwargs):
             """
             Add an optimizer.
 
@@ -574,13 +588,34 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         raise ValueError(msg.format(writer_name))
 
     if optimizer is not None:
-        label = optimizer
+        optimizer_label = optimizer
+        optimizer_name = _format_name(optimizer)
         if add_component_indices:
             opt_index = len(comps) + len(solvers) + 2  # index of last block + 1
             nr_comps = len(x.comps)
             index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=1)
-            label = number_label(index_str, label, number_alignment)
-        x.add_optimizer(label=label)
+            optimizer_label = number_label(index_str, optimizer_label, number_alignment)
+        x.add_optimizer(name=optimizer_name, label=optimizer_label)
+
+    design_vars2 = _collect_connections(design_vars, recurse=recurse)
+    responses2 = _collect_connections(responses, recurse=recurse)
+
+    # Design variables
+    for comp, conn_vars in iteritems(design_vars2):
+        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
+        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
+        init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
+        x.connect(optimizer_name, comp, format_block(conn_vars))  # Connection from optimizer
+        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
+        x.add_output(optimizer_name, format_block(opt_con_vars), side='left')  # Optimal design variables
+        x.add_input(optimizer_name, format_block(init_con_vars))  # Initial design variables
+
+    # Responses
+    for comp, conn_vars in iteritems(responses2):
+        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
+        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
+        x.connect(comp, optimizer_name, conn_vars)  # Connection to optimizer
+        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
     if include_solver:
         # Default "run once" solvers are ignored
@@ -598,26 +633,6 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
                 solver_str = number_label(i, solver_str, number_alignment)
             solvers.append(solver_str)
             x.add_solver(solver_str)
-
-    design_vars2 = _collect_connections(design_vars, recurse=recurse)
-    responses2 = _collect_connections(responses, recurse=recurse)
-
-    # Design variables
-    for comp, conn_vars in iteritems(design_vars2):
-        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
-        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
-        init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
-        x.connect('opt', comp, format_block(conn_vars))  # Connection from optimizer
-        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
-        x.add_output('opt', format_block(opt_con_vars), side='left')  # Optimal design variables
-        x.add_input('opt', format_block(init_con_vars))  # Initial design variables
-
-    # Responses
-    for comp, conn_vars in iteritems(responses2):
-        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
-        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
-        x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
-        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
     # Add components
     for comp in comps:  # Driver is 1, so starting from 2
