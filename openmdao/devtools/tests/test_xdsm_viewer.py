@@ -224,10 +224,7 @@ class TestPyXDSMViewer(unittest.TestCase):
                    recurse=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', 'tex'])))
 
-    @unittest.expectedFailure
-    def test_circuit_recurse(self):
-        # FIXME fails if model_path is added and recurse is True. Issue related to connections
-        #  naming.
+    def test_circuit_model_path_recurse(self):
 
         from openmdao.api import Problem, IndepVarComp
 
@@ -257,8 +254,74 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.run_model()
 
         write_xdsm(p, 'xdsm_circuit2', out_format='pdf', quiet=True, show_browser=False,
-                   recurse=True, model_path='G1')
+                   recurse=True, model_path='G1', include_external_outputs=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', 'tex'])))
+
+    def test_circuit_model_path_no_recurse(self):
+
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        group = model.add_subsystem('G1', Group(), promotes=['*'])
+        group2 = model.add_subsystem('G2', Group())
+        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
+        group.add_subsystem('circuit', Circuit())
+
+        group.connect('source.I', 'circuit.I_in')
+        group.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsm_circuit3', out_format='pdf', quiet=True, show_browser=False,
+                   recurse=False, model_path='G1')
+        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit3', 'tex'])))
+
+    def test_invalid_model_path(self):
+
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        group = model.add_subsystem('G1', Group(), promotes=['*'])
+        group2 = model.add_subsystem('G2', Group())
+        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
+        group.add_subsystem('circuit', Circuit())
+
+        group.connect('source.I', 'circuit.I_in')
+        group.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        with self.assertRaises(ValueError):
+            write_xdsm(p, 'xdsm_circuit3', out_format='pdf', quiet=True, show_browser=False,
+                       recurse=False, model_path='G3')
 
 
 class TestXDSMjsViewer(unittest.TestCase):

@@ -421,6 +421,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         _model = problem.model
     else:
         _model = problem.model._get_subsystem(model_path)
+        if _model is None:
+            msg = 'Model path "{}" does not exist in problem "{}".'
+            raise ValueError(msg.format(model_path, problem))
 
     # Name is None if the driver is not specified
     driver_name = _get_cls_name(driver) if driver else None
@@ -790,8 +793,12 @@ def _prune_connections(conns, model_path=None, sep='.'):
     else:
         for conn in conns:
             src = conn['src']
+            if src.startswith(model_path):
+                src = src[len(model_path):]
             src_path = _format_name(src.rsplit(sep, 1)[0])
             tgt = conn['tgt']
+            if tgt.startswith(model_path):
+                tgt = tgt[len(model_path):]
             tgt_path = _format_name(tgt.rsplit(sep, 1)[0])
 
             if src.startswith(model_path) and tgt.startswith(model_path):
