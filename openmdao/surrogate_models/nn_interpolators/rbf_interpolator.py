@@ -24,6 +24,45 @@ class RBFInterpolator(NNBase):
         Weights for each interpolation point.
     """
 
+    def __init__(self, training_points, training_values, num_leaves=2, num_neighbors=5,
+                 rbf_family=2):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        training_points : ndarray
+            ndarray of shape (num_points x independent dims) containing training input locations.
+        training_values : ndarray
+            ndarray of shape (num_points x dependent dims) containing training output values.
+        num_leaves : int
+            How many leaves the tree should have.
+        num_neighbors : int
+            The number of neighbors to use for interpolation.
+        rbf_family : int
+            Specifies the order of the radial basis function to be used.
+            <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
+            order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
+        """
+        super(RBFInterpolator, self).__init__(training_points, training_values, num_leaves)
+
+        if self._ntpts < num_neighbors:
+            raise ValueError('RBFInterpolator only given {0} training points, '
+                             'but requested num_neighbors={1}.'.format(self._ntpts, num_neighbors))
+
+        # rbf_family is an arbitrary value that picks a function to use
+        self.rbf_family = rbf_family
+
+        # For weights, first find the training points radial neighbors
+        tdist, tloc = self._KData.query(self._tp, num_neighbors)
+        Tt = tdist[:, :-1] / tdist[:, -1:]
+        # Next determine weight matrix
+        Rt = self._find_R(self._ntpts, Tt, tloc)
+        weights = (spsolve(csc_matrix(Rt), self._tv))[..., np.newaxis]
+
+        self.N = num_neighbors
+        self.weights = weights
+
     def _find_R(self, npp, T, neighbor_idx):
         """
         Evaluate RBF polynomial.
@@ -319,45 +358,6 @@ class RBFInterpolator(NNBase):
                          dtx, self.weights[neighbor_idx[:, :-1]])
 
         return grad.reshape((prediction_points.shape[0], self._dep_dims, self._indep_dims))
-
-    def __init__(self, training_points, training_values, num_leaves=2, num_neighbors=5,
-                 rbf_family=2):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        training_points : ndarray
-            ndarray of shape (num_points x independent dims) containing training input locations.
-        training_values : ndarray
-            ndarray of shape (num_points x dependent dims) containing training output values.
-        num_leaves : int
-            How many leaves the tree should have.
-        num_neighbors : int
-            The number of neighbors to use for interpolation.
-        rbf_family : int
-            Specifies the order of the radial basis function to be used.
-            <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
-            order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
-        """
-        super(RBFInterpolator, self).__init__(training_points, training_values, num_leaves)
-
-        if self._ntpts < num_neighbors:
-            raise ValueError('RBFInterpolator only given {0} training points, '
-                             'but requested num_neighbors={1}.'.format(self._ntpts, num_neighbors))
-
-        # rbf_family is an arbitrary value that picks a function to use
-        self.rbf_family = rbf_family
-
-        # For weights, first find the training points radial neighbors
-        tdist, tloc = self._KData.query(self._tp, num_neighbors)
-        Tt = tdist[:, :-1] / tdist[:, -1:]
-        # Next determine weight matrix
-        Rt = self._find_R(self._ntpts, Tt, tloc)
-        weights = (spsolve(csc_matrix(Rt), self._tv))[..., np.newaxis]
-
-        self.N = num_neighbors
-        self.weights = weights
 
     def __call__(self, prediction_points):
         """

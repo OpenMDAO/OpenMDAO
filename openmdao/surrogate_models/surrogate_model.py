@@ -1,6 +1,7 @@
 """
 Class definition for SurrogateModel, the base class for all surrogate models.
 """
+from openmdao.utils.options_dictionary import OptionsDictionary
 
 
 class SurrogateModel(object):
@@ -9,15 +10,26 @@ class SurrogateModel(object):
 
     Attributes
     ----------
+    options : <OptionsDictionary>
+        Dictionary with general pyoptsparse options.
     trained : bool
         True when surrogate has been trained.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
         """
         self.trained = False
+
+        self.options = OptionsDictionary()
+        self._declare_options()
+        self.options.update(kwargs)
 
     def train(self, x, y):
         """
@@ -65,6 +77,12 @@ class SurrogateModel(object):
         ----------
         x : array-like
             Point at which the surrogate Jacobian is evaluated.
+        """
+        pass
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
         """
         pass
 
