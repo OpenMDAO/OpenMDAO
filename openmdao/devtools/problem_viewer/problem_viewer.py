@@ -5,6 +5,7 @@ import networkx as nx
 from collections import OrderedDict
 import base64
 
+from openmdao.core.parallel_group import ParallelGroup
 from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script
 
 try:
@@ -22,7 +23,7 @@ from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 
 
-def _get_tree_dict(system, component_execution_orders, component_execution_index):
+def _get_tree_dict(system, component_execution_orders, component_execution_index, is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
     tree_dict = OrderedDict()
     tree_dict['name'] = system.name
@@ -30,6 +31,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
+        tree_dict['is_parallel'] = is_parallel
         component_execution_orders[system.pathname] = component_execution_index[0]
         component_execution_index[0] += 1
 
@@ -51,8 +53,11 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
                 var_dict['dtype'] = type(meta['value']).__name__
                 children.append(var_dict)
     else:
+        if isinstance(system, ParallelGroup):
+            is_parallel = True
         tree_dict['subsystem_type'] = 'group'
-        children = [_get_tree_dict(s, component_execution_orders, component_execution_index)
+        tree_dict['is_parallel'] = is_parallel
+        children = [_get_tree_dict(s, component_execution_orders, component_execution_index, is_parallel)
                     for s in system._subsystems_myproc]
         if system.comm.size > 1:
             if system._subsystems_myproc:
