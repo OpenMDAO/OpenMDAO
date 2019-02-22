@@ -18,7 +18,7 @@ The team will be making frequent updates to the source code, so users are
 encouraged to regularly pull for updates.
 
 ### OpenMDAO Versions
-> **PLEASE NOTE**: Until recently, this repository was named **OpenMDAO/blue**. 
+> **PLEASE NOTE**: This repository was previously named **OpenMDAO/blue**. 
 If you had cloned that repository, please update your repository name and
 remotes to reflect these changes. You can find instructions [here][8].
 
@@ -33,7 +33,7 @@ The legacy **OpenMDAO v0.x** (versions 0.13.0 and older) of the
 **OpenMDAO-Framework** are [here][6].
 
 ### Missing Features from OpenMDAO 1.7.4
-Be aware that this new version of **OpenMDAO** is in Development Status **BETA**
+Be aware that version 2.x of **OpenMDAO** is in Development Status **BETA**
 and not all the features of 1.7.4 are currently available.
 
 Here is a list of things that have not yet been developed in 2.x:
@@ -42,14 +42,14 @@ Here is a list of things that have not yet been developed in 2.x:
 * File variables
 * Active-set constraint calculation disabling
 * Brent Solver
-* CaseRecording using CSV, HDF5, and dump recorders (SqliteRecorder and 
-WebRecorder are currently supported)
+* Case recording using CSV, HDF5, and dump recorders (SqliteRecorder is the 
+currently supported case recorder)
 
 ## Install OpenMDAO 2
 You have two options for installing **OpenMDAO**, (1) from the
 [Python Package Index (PyPI)][1], and (2) from the [GitHub repository][4].
 
-**OpenMDAO** includes two optional sets of dependencies, `develop` for
+**OpenMDAO** includes two optional sets of dependencies, `test` for
 installing the developer tools (e.g., testing, coverage), and `docs` for
 building the documentation.  A third option, `all` combines these two sets.
 
@@ -70,18 +70,15 @@ This allows you to install **OpenMDAO** from a local copy of the source code.
     pip install OpenMDAO
 
 #### Install the Developer Dependencies
-If you want to modify **OpenMDAO**, you may want to install the packages
-necessary for running **OpenMDAO**'s tests and documentation generator.  You
-can install them explicitly by running:
-
-    pip install OpenMDAO[all]
 
 If you would like to make changes to **OpenMDAO** it is recommended you
 install it in *[editable][16]* mode (i.e., development mode) by adding the `-e`
 flag when calling `pip`, this way any changes you make to the source code will
-be included when you import **OpenMDAO** in *Python*.
+be included when you import **OpenMDAO** in *Python*. You will also want to
+install the packages necessary for running **OpenMDAO**'s tests and documentation
+generator.  You can install everything needed for development by running:
 
-    pip install -e OpenMDAO[test]
+    pip install -e OpenMDAO[all]
 
 ## Test OpenMDAO 2
 Users are encourage to run the unit tests to ensure **OpenMDAO** is performing

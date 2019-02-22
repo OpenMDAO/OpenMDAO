@@ -10,11 +10,12 @@ from numbers import Integral
 from six import iteritems, string_types
 
 import numpy as np
+import networkx as nx
 
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, warn_deprecation, ContainsAll
+    format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
@@ -22,6 +23,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.graph_utils import all_connected_nodes
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -123,6 +125,9 @@ class System(object):
         in the given system.  This is only defined in a Group that owns one or more interprocess
         connections or a top level Group or System that is used to compute total derivatives
         across multiple processes.
+    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
+        Dictionary containing all explicit & implicit connections owned by this system
+        or any descendant system. The data is the same across all processors.
     _ext_num_vars : {'input': (int, int), 'output': (int, int)}
         Total number of allprocs variables in system before/after this one.
     _ext_sizes : {'input': (int, int), 'output': (int, int)}
@@ -346,6 +351,8 @@ class System(object):
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
         self._rec_mgr = RecordingManager()
+
+        self._conn_global_abs_in2out = {}
 
         self._static_mode = True
         self._static_subsystems_allprocs = []
@@ -735,16 +742,20 @@ class System(object):
             if self._inputs:
                 myinputs = {n for n in self._inputs._names
                             if check_path(n, incl, excl)}
+
+        # includes and excludes for outputs are specified using promoted names
+        abs2prom = self._var_abs2prom['output']
+
         if self.recording_options['record_outputs']:
             if self._outputs:
                 myoutputs = {n for n in self._outputs._names
-                             if check_path(n, incl, excl)}
+                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
             if self.recording_options['record_residuals']:
                 myresiduals = myoutputs  # outputs and residuals have same names
         elif self.recording_options['record_residuals']:
             if self._residuals:
                 myresiduals = {n for n in self._residuals._names
-                               if check_path(n, incl, excl)}
+                               if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
         self._filtered_vars_to_record = {
             'i': myinputs,
@@ -1011,13 +1022,16 @@ class System(object):
         dict
             The relevance dictionary.
         """
-        self._relevant = relevant = {}
-        relevant['nonlinear'] = {'@all': ({'input': ContainsAll(),
-                                           'output': ContainsAll()},
-                                          ContainsAll())}
         if self._use_derivatives:
-            relevant['linear'] = relevant['nonlinear']
-        return relevant
+            desvars = self.get_design_vars(recurse=True, get_sizes=False)
+            responses = self.get_responses(recurse=True, get_sizes=False)
+            return get_relevant_vars(self._conn_global_abs_in2out, desvars, responses,
+                                     mode)
+        else:
+            relevant = defaultdict(dict)
+            relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                              ContainsAll())}
+            return relevant
 
     def _setup_relevance(self, mode, relevant=None):
         """
@@ -2345,7 +2359,9 @@ class System(object):
 
     def list_inputs(self,
                     values=True,
+                    prom_name=False,
                     units=False,
+                    shape=False,
                     hierarchical=True,
                     print_arrays=False,
                     out_stream=_DEFAULT_OUT_STREAM):
@@ -2360,8 +2376,13 @@ class System(object):
         ----------
         values : bool, optional
             When True, display/return input values. Default is True.
+        prom_name : bool, optional
+            When True, display/return the promoted name of the variable.
+            Default is False.
         units : bool, optional
             When True, display/return units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -2389,8 +2410,12 @@ class System(object):
             outs = {}
             if values:
                 outs['value'] = val
+            if prom_name:
+                outs['prom_name'] = self._var_abs2prom['input'][name]
             if units:
                 outs['units'] = meta[name]['units']
+            if shape:
+                outs['shape'] = val.shape
             inputs.append((name, outs))
 
         if out_stream is _DEFAULT_OUT_STREAM:
@@ -2905,8 +2930,14 @@ class System(object):
                 sub._vectors['input']['linear'].set_complex_step_mode(active)
                 sub._vectors['residual']['linear'].set_complex_step_mode(active)
 
+                if sub.linear_solver:
+                    sub.linear_solver._set_complex_step_mode(active)
+
                 if sub._owns_approx_jac:
                     sub._jacobian.set_complex_step_mode(active)
+
+                if sub._assembled_jac:
+                    sub._assembled_jac.set_complex_step_mode(active)
 
     def cleanup(self):
         """
@@ -2920,3 +2951,162 @@ class System(object):
             self._nonlinear_solver.cleanup()
         if self._linear_solver:
             self._linear_solver.cleanup()
+
+
+def get_relevant_vars(connections, desvars, responses, mode):
+    """
+    Find all relevant vars between desvars and responses.
+
+    Both vars are assumed to be outputs (either design vars or responses).
+
+    Parameters
+    ----------
+    connections : dict
+        Mapping of targets to their sources.
+    desvars : list of str
+        Names of design variables.
+    responses : list of str
+        Names of response variables.
+    mode : str
+        Direction of derivatives, either 'fwd' or 'rev'.
+
+    Returns
+    -------
+    dict
+        Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
+        keyed by design vars and responses.
+    """
+    relevant = defaultdict(dict)
+    cache = {}
+
+    # Create a hybrid graph with components and all connected vars.  If a var is connected,
+    # also connect it to its corresponding component.
+    graph = nx.DiGraph()
+    for tgt, src in iteritems(connections):
+        if src not in graph:
+            graph.add_node(src, type_='out')
+        graph.add_node(tgt, type_='in')
+
+        src_sys = src.rsplit('.', 1)[0]
+        graph.add_edge(src_sys, src)
+
+        tgt_sys = tgt.rsplit('.', 1)[0]
+        graph.add_edge(tgt, tgt_sys)
+
+        graph.add_edge(src, tgt)
+
+    for dv in desvars:
+        if dv not in graph:
+            graph.add_node(dv, type_='out')
+            parts = dv.rsplit('.', 1)
+            if len(parts) == 1:
+                system = ''  # this happens when a component is the model
+                graph.add_edge(dv, system)
+            else:
+                system = parts[0]
+                graph.add_edge(system, dv)
+
+    for res in responses:
+        if res not in graph:
+            graph.add_node(res, type_='out')
+            parts = res.rsplit('.', 1)
+            if len(parts) == 1:
+                system = ''  # this happens when a component is the model
+            else:
+                system = parts[0]
+            graph.add_edge(system, res)
+
+    nodes = graph.nodes
+    grev = graph.reverse(copy=False)
+
+    for desvar in desvars:
+        dv = (desvar, 'dv')
+        if dv not in cache:
+            cache[dv] = set(all_connected_nodes(graph, desvar))
+
+        for response in responses:
+            res = (response, 'r')
+            if res not in cache:
+                cache[res] = set(all_connected_nodes(grev, response))
+
+            common = cache[dv].intersection(cache[res])
+
+            if common:
+                input_deps = set()
+                output_deps = set()
+                sys_deps = set()
+                for node in common:
+                    if 'type_' in nodes[node]:
+                        typ = nodes[node]['type_']
+                        parts = node.rsplit('.', 1)
+                        if len(parts) == 1:
+                            system = ''
+                        else:
+                            system = parts[0]
+                        if typ == 'in':  # input var
+                            input_deps.add(node)
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
+                        else:  # output var
+                            output_deps.add(node)
+                            if system not in sys_deps:
+                                sys_deps.update(all_ancestors(system))
+
+            elif desvar == response:
+                input_deps = set()
+                output_deps = set([response])
+                parts = desvar.rsplit('.', 1)
+                if len(parts) == 1:
+                    s = ''
+                else:
+                    s = parts[0]
+                sys_deps = set(all_ancestors(s))
+
+            if common or desvar == response:
+                if mode == 'fwd' or mode == 'auto':
+                    relevant[desvar][response] = ({'input': input_deps,
+                                                   'output': output_deps}, sys_deps)
+                if mode == 'rev' or mode == 'auto':
+                    relevant[response][desvar] = ({'input': input_deps,
+                                                   'output': output_deps}, sys_deps)
+
+                sys_deps.add('')  # top level Group is always relevant
+
+    voi_lists = []
+    if mode == 'fwd' or mode == 'auto':
+        voi_lists.append((desvars, responses))
+    if mode == 'rev' or mode == 'auto':
+        voi_lists.append((responses, desvars))
+
+    # now calculate dependencies between each VOI and all other VOIs of the
+    # other type, e.g for each input VOI wrt all output VOIs.  This is only
+    # done for design vars in fwd mode or responses in rev mode. In auto mode,
+    # we combine the results for fwd and rev modes.
+    for inputs, outputs in voi_lists:
+        for inp in inputs:
+            relinp = relevant[inp]
+            if relinp:
+                if '@all' in relinp:
+                    dct, total_systems = relinp['@all']
+                    total_inps = dct['input']
+                    total_outs = dct['output']
+                else:
+                    total_inps = set()
+                    total_outs = set()
+                    total_systems = set()
+                for out in outputs:
+                    if out in relinp:
+                        dct, systems = relinp[out]
+                        total_inps.update(dct['input'])
+                        total_outs.update(dct['output'])
+                        total_systems.update(systems)
+                relinp['@all'] = ({'input': total_inps, 'output': total_outs},
+                                  total_systems)
+            else:
+                relinp['@all'] = ({'input': set(), 'output': set()}, set())
+
+    relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
+                                   ContainsAll())}
+    relevant['nonlinear'] = relevant['linear']
+
+    return relevant

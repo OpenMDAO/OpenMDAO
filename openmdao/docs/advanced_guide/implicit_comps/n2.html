@@ -1,5 +1,4 @@
 
-
                       <html>
                       <head>
                         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -1112,7 +1111,7 @@ return _;
     window.vkbeautify = new vkbeautify();
 
 })();</script>
-    <script type="text/javascript">var modelData = {"tree": {"name": "root", "type": "root", "subsystem_type": "group", "linear_solver": "LN: Direct", "nonlinear_solver": "NL: Newton", "children": [{"name": "ground", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "batt", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "batt_balance", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "lhs:I", "type": "param", "dtype": "ndarray"}, {"name": "rhs:I", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}, {"name": "circuit", "type": "subsystem", "subsystem_type": "group", "linear_solver": "LN: RUNONCE", "nonlinear_solver": "NL: RUNONCE", "children": [{"name": "n1", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "I_in:0", "type": "param", "dtype": "ndarray"}, {"name": "I_out:0", "type": "param", "dtype": "ndarray"}, {"name": "I_out:1", "type": "param", "dtype": "ndarray"}, {"name": "V", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}, {"name": "n2", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "I_in:0", "type": "param", "dtype": "ndarray"}, {"name": "I_out:0", "type": "param", "dtype": "ndarray"}, {"name": "V", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}, {"name": "R1", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V_in", "type": "param", "dtype": "ndarray"}, {"name": "V_out", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "R2", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V_in", "type": "param", "dtype": "ndarray"}, {"name": "V_out", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "D1", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V_in", "type": "param", "dtype": "ndarray"}, {"name": "V_out", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}, {"name": "batt_deltaV", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V1", "type": "param", "dtype": "ndarray"}, {"name": "V2", "type": "param", "dtype": "ndarray"}, {"name": "dV", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}, "connections_list": [{"src": "batt_deltaV.dV", "tgt": "batt_balance.lhs:I", "cycle_arrows": ["batt_balance circuit.n1", "circuit.D1 circuit.n2", "circuit.R1 circuit.n1", "circuit.R2 circuit.n1", "circuit.R2 circuit.n2", "circuit.n1 batt_deltaV", "circuit.n1 circuit.R1", "circuit.n1 circuit.R2", "circuit.n2 circuit.D1", "circuit.n2 circuit.R2"]}, {"src": "batt.V", "tgt": "batt_balance.rhs:I"}, {"src": "circuit.n1.V", "tgt": "batt_deltaV.V1", "cycle_arrows": ["circuit.D1 circuit.n2", "circuit.R1 circuit.n1", "circuit.R2 circuit.n1", "circuit.R2 circuit.n2", "circuit.n1 circuit.R1", "circuit.n1 circuit.R2", "circuit.n2 circuit.D1", "circuit.n2 circuit.R2"]}, {"src": "ground.V", "tgt": "batt_deltaV.V2"}, {"src": "circuit.n2.V", "tgt": "circuit.D1.V_in", "cycle_arrows": ["circuit.D1 circuit.n2", "circuit.R2 circuit.n2", "circuit.n2 circuit.R2"]}, {"src": "ground.V", "tgt": "circuit.D1.V_out"}, {"src": "circuit.n1.V", "tgt": "circuit.R1.V_in", "cycle_arrows": ["circuit.R1 circuit.n1"]}, {"src": "ground.V", "tgt": "circuit.R1.V_out"}, {"src": "circuit.n1.V", "tgt": "circuit.R2.V_in", "cycle_arrows": ["circuit.R1 circuit.n1", "circuit.R2 circuit.n1", "circuit.R2 circuit.n2", "circuit.n1 circuit.R1", "circuit.n2 circuit.R2"]}, {"src": "circuit.n2.V", "tgt": "circuit.R2.V_out", "cycle_arrows": ["circuit.R2 circuit.n2"]}, {"src": "batt_balance.I", "tgt": "circuit.n1.I_in:0"}, {"src": "circuit.R1.I", "tgt": "circuit.n1.I_out:0", "cycle_arrows": ["circuit.n1 circuit.R1"]}, {"src": "circuit.R2.I", "tgt": "circuit.n1.I_out:1", "cycle_arrows": ["circuit.R1 circuit.n1", "circuit.R2 circuit.n2", "circuit.n1 circuit.R1", "circuit.n1 circuit.R2", "circuit.n2 circuit.R2"]}, {"src": "circuit.R2.I", "tgt": "circuit.n2.I_in:0", "cycle_arrows": ["circuit.n2 circuit.R2"]}, {"src": "circuit.D1.I", "tgt": "circuit.n2.I_out:0", "cycle_arrows": ["circuit.R2 circuit.n2", "circuit.n2 circuit.D1", "circuit.n2 circuit.R2"]}], "abs2prom": {"input": {"batt_balance.lhs:I": "batt_balance.lhs:I", "batt_balance.rhs:I": "batt_balance.rhs:I", "circuit.n1.I_in:0": "circuit.I_in", "circuit.n1.I_out:0": "circuit.n1.I_out:0", "circuit.n1.I_out:1": "circuit.n1.I_out:1", "circuit.n2.I_in:0": "circuit.n2.I_in:0", "circuit.n2.I_out:0": "circuit.n2.I_out:0", "circuit.R1.V_in": "circuit.R1.V_in", "circuit.R1.V_out": "circuit.Vg", "circuit.R2.V_in": "circuit.R2.V_in", "circuit.R2.V_out": "circuit.R2.V_out", "circuit.D1.V_in": "circuit.D1.V_in", "circuit.D1.V_out": "circuit.Vg", "batt_deltaV.V1": "batt_deltaV.V1", "batt_deltaV.V2": "batt_deltaV.V2"}, "output": {"ground.V": "ground.V", "batt.V": "batt.V", "batt_balance.I": "batt_balance.I", "circuit.n1.V": "circuit.n1.V", "circuit.n2.V": "circuit.n2.V", "circuit.R1.I": "circuit.R1.I", "circuit.R2.I": "circuit.R2.I", "circuit.D1.I": "circuit.D1.I", "batt_deltaV.dV": "batt_deltaV.dV"}}}</script>
+    <script type="text/javascript">var modelData = {"tree": {"name": "root", "type": "root", "subsystem_type": "group", "linear_solver": "LN: RUNONCE", "nonlinear_solver": "NL: RUNONCE", "children": [{"name": "ground", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "source", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "circuit", "type": "subsystem", "subsystem_type": "group", "linear_solver": "LN: Direct", "nonlinear_solver": "NL: Newton", "children": [{"name": "n1", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "I_in:0", "type": "param", "dtype": "ndarray"}, {"name": "I_out:0", "type": "param", "dtype": "ndarray"}, {"name": "I_out:1", "type": "param", "dtype": "ndarray"}, {"name": "V", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}, {"name": "n2", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "I_in:0", "type": "param", "dtype": "ndarray"}, {"name": "I_out:0", "type": "param", "dtype": "ndarray"}, {"name": "V", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}, {"name": "R1", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V_in", "type": "param", "dtype": "ndarray"}, {"name": "V_out", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "R2", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V_in", "type": "param", "dtype": "ndarray"}, {"name": "V_out", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "D1", "type": "subsystem", "subsystem_type": "component", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "V_in", "type": "param", "dtype": "ndarray"}, {"name": "V_out", "type": "param", "dtype": "ndarray"}, {"name": "I", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}]}, "connections_list": [{"src": "circuit.n2.V", "tgt": "circuit.D1.V_in", "cycle_arrows": ["circuit.D1 circuit.n2", "circuit.R2 circuit.n2", "circuit.n2 circuit.R2"]}, {"src": "ground.V", "tgt": "circuit.D1.V_out"}, {"src": "circuit.n1.V", "tgt": "circuit.R1.V_in", "cycle_arrows": ["circuit.R1 circuit.n1"]}, {"src": "ground.V", "tgt": "circuit.R1.V_out"}, {"src": "circuit.n1.V", "tgt": "circuit.R2.V_in", "cycle_arrows": ["circuit.R1 circuit.n1", "circuit.R2 circuit.n1", "circuit.R2 circuit.n2", "circuit.n1 circuit.R1", "circuit.n2 circuit.R2"]}, {"src": "circuit.n2.V", "tgt": "circuit.R2.V_out", "cycle_arrows": ["circuit.R2 circuit.n2"]}, {"src": "source.I", "tgt": "circuit.n1.I_in:0"}, {"src": "circuit.R1.I", "tgt": "circuit.n1.I_out:0", "cycle_arrows": ["circuit.n1 circuit.R1"]}, {"src": "circuit.R2.I", "tgt": "circuit.n1.I_out:1", "cycle_arrows": ["circuit.R1 circuit.n1", "circuit.R2 circuit.n2", "circuit.n1 circuit.R1", "circuit.n1 circuit.R2", "circuit.n2 circuit.R2"]}, {"src": "circuit.R2.I", "tgt": "circuit.n2.I_in:0", "cycle_arrows": ["circuit.n2 circuit.R2"]}, {"src": "circuit.D1.I", "tgt": "circuit.n2.I_out:0", "cycle_arrows": ["circuit.R2 circuit.n2", "circuit.n2 circuit.D1", "circuit.n2 circuit.R2"]}], "abs2prom": {"input": {"circuit.n1.I_in:0": "circuit.I_in", "circuit.n1.I_out:0": "circuit.n1.I_out:0", "circuit.n1.I_out:1": "circuit.n1.I_out:1", "circuit.n2.I_in:0": "circuit.n2.I_in:0", "circuit.n2.I_out:0": "circuit.n2.I_out:0", "circuit.R1.V_in": "circuit.R1.V_in", "circuit.R1.V_out": "circuit.Vg", "circuit.R2.V_in": "circuit.R2.V_in", "circuit.R2.V_out": "circuit.R2.V_out", "circuit.D1.V_in": "circuit.D1.V_in", "circuit.D1.V_out": "circuit.Vg"}, "output": {"ground.V": "ground.V", "source.I": "source.I", "circuit.n1.V": "circuit.n1.V", "circuit.n2.V": "circuit.n2.V", "circuit.R1.I": "circuit.R1.I", "circuit.R2.I": "circuit.R2.I", "circuit.D1.I": "circuit.D1.I"}}}</script>
     <script type="text/javascript">// From Isaias Reyes
 var CONNECTION_COLOR = "black",
    UNKNOWN_IMPLICIT_COLOR = "#c7d06d",
@@ -1127,7 +1126,10 @@ var CONNECTION_COLOR = "black",
    GROUP_COLOR = "#3476a2",
    COMPONENT_COLOR = "DeepSkyBlue",
    COLLAPSED_COLOR = "#555",
-   UNCONNECTED_PARAM_COLOR = "#F42E0C";
+   UNCONNECTED_PARAM_COLOR = "#F42E0C",
+   HIGHLIGHT_HOVERED_COLOR = "blue",
+   RED_ARROW_COLOR = "salmon",
+   GREEN_ARROW_COLOR = "seagreen";
 
 // This is how we want to map solvers to colors and CSS classes
 //    Linear             Nonlinear
@@ -1398,7 +1400,7 @@ var inDataFunction = true;
 var filterSet = {};
 var callSearchFromEnterKeyPressed = false;
 var autoCompleteListNames = [], autoCompleteListPathNames = [];
-var searchCollapsedUndo = [];
+var searchCollapsedUndo = [];        
 var autoCompleteSetNames = {}, autoCompleteSetPathNames = {};
 var showParams = true; //default off
 
@@ -2308,7 +2310,7 @@ function DrawMatrix() {
 
             text += "<br />self.connect(\"" + unknownName + "\", \"" + paramName + "\")";
         }
-        if(true) {
+        if(false) {
              parentDiv.querySelector("#connectionId").innerHTML = text;
         }
         else {
@@ -2376,7 +2378,7 @@ function DrawMatrix() {
             var param = d3RightTextNodesArrayZoomed[c],
                 unknown = d3RightTextNodesArrayZoomed[r];
             if (param.type !== "param" && unknown.type !== "unknown") return;
-            if (r > c && true) { //bottom left
+            if (r > c && false) { //bottom left
                 DrawPathTwoLines(
                     n2Dx * r, //x1
                     n2Dy * r + n2Dy * .5, //y1
@@ -2386,7 +2388,7 @@ function DrawMatrix() {
                     n2Dy * c + n2Dy - 1e-2, //up y3
                     "blue", lineWidth, true);
             }
-            else if (r < c && true) { //top right
+            else if (r < c && false) { //top right
                 DrawPathTwoLines(
                     n2Dx * r + n2Dx, //x1
                     n2Dy * r + n2Dy * .5, //y1
@@ -2411,7 +2413,7 @@ function DrawMatrix() {
                     "<b>" + zoomedElement.promotions[unknown.absPathName] + "</b>" :
                     ((zoomedElement === root) ? unknown.absPathName : unknown.absPathName.slice(zoomedElement.absPathName.length + 1));
 
-                if(true) {
+                if(false) {
                     parentDiv.querySelector("#connectionId").innerHTML += "<br /><i style=\"color:red;\">self.connect(\"" + unknownName + "\", \"" + paramName + "\")</i>";
                 }
             }

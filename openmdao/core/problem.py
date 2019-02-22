@@ -27,7 +27,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
-from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
@@ -56,17 +56,17 @@ _contains_all = ContainsAll()
 _undefined = object()
 
 
-CITATION = """@inproceedings{2014_openmdao_derivs,
-    Author = {Justin S. Gray and Tristan A. Hearn and Kenneth T. Moore
-              and John Hwang and Joaquim Martins and Andrew Ning},
-    Booktitle = {15th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference},
-    Doi = {doi:10.2514/6.2014-2042},
-    Month = {2014/07/08},
-    Publisher = {American Institute of Aeronautics and Astronautics},
-    Title = {Automatic Evaluation of Multidisciplinary Derivatives Using
-             a Graph-Based Problem Formulation in OpenMDAO},
-    Year = {2014}
-}"""
+CITATION = """@article{openmdao_2019,
+    Author={Justin S. Gray and John T. Hwang and Joaquim R. R. A.
+            Martins and Kenneth T. Moore and Bret A. Naylor},
+    Title="{OpenMDAO: An Open-Source Framework for Multidisciplinary
+            Design, Analysis, and Optimization}",
+    Journal="{Structural and Multidisciplinary Optimization}",
+    Year={2019},
+    Publisher={Springer},
+    pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
+    note= {In Press}
+    }"""
 
 
 class Problem(object):
@@ -1288,6 +1288,9 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
+        if self._setup_status < 2:
+            raise RuntimeError("run_model must be called before total derivatives can be checked.")
+
         model = self.model
 
         if method == 'cs' and not model._outputs._alloc_complex:
@@ -1784,7 +1787,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                         fwd_rev_error / fd_norm)
 
             # Skip printing the dependent keys if the derivatives are fine.
-            if indep_key is not None:
+            if not compact_print and indep_key is not None:
                 rel_key = (of, wrt)
                 if rel_key in indep_key[sys_name] and fd_norm < abs_error_tol:
                     del derivative_data[sys_name][rel_key]

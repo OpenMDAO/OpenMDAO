@@ -130,7 +130,7 @@ class Case(object):
                 inputs = json_to_np_array(data['inputs'], abs2meta)
             elif data_format in (1, 2):
                 inputs = blob_to_array(data['inputs'])
-                if not inputs:
+                if type(inputs) is np.ndarray and not inputs.shape:
                     inputs = None
             else:
                 inputs = data['inputs']
@@ -142,7 +142,7 @@ class Case(object):
                 outputs = json_to_np_array(data['outputs'], abs2meta)
             elif self._format_version in (1, 2):
                 outputs = blob_to_array(data['outputs'])
-                if not outputs:
+                if type(outputs) is np.ndarray and not outputs.shape:
                     outputs = None
             else:
                 outputs = data['outputs']
@@ -154,7 +154,7 @@ class Case(object):
                 residuals = json_to_np_array(data['residuals'], abs2meta)
             elif data_format in (1, 2):
                 residuals = blob_to_array(data['residuals'])
-                if not residuals:
+                if type(residuals) is np.ndarray and not residuals.shape:
                     residuals = None
             else:
                 residuals = data['residuals']
@@ -164,7 +164,7 @@ class Case(object):
         if 'jacobian' in data.keys():
             if data_format >= 2:
                 jacobian = blob_to_array(data['jacobian'])
-                if not jacobian:
+                if type(jacobian) is np.ndarray and not jacobian.shape:
                     jacobian = None
             else:
                 jacobian = data['jacobian']

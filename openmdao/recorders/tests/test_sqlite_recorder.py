@@ -634,7 +634,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['*']
-        driver.recording_options['excludes'] = ['p2*']
+        driver.recording_options['excludes'] = ['y*']
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -680,7 +680,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['*']
-        driver.recording_options['excludes'] = ['p2*']
+        driver.recording_options['excludes'] = ['y*']
 
         prob.set_solver_print(0)
         t0, t1 = run_driver(prob)
@@ -1450,7 +1450,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_inputs'] = False
-        driver.recording_options['includes'] = ['mda.d2.y2']
+        driver.recording_options['includes'] = ['y2']
         driver.add_recorder(self.recorder)
 
         prob.setup()

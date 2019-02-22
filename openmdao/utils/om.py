@@ -21,6 +21,7 @@ from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, 
     _mempost_exec, _mempost_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
+from openmdao.devtools.xdsm_viewer.xdsm_writer import _xdsm_setup_parser, _xdsm_cmd
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
@@ -366,6 +367,7 @@ _post_setup_map = {
     'sparsity': (_sparsity_setup_parser, _sparsity_cmd),
     'cite': (_cite_setup_parser, _cite_cmd),
     'check': (_check_config_setup_parser, _check_config_cmd),
+    'xdsm': (_xdsm_setup_parser, _xdsm_cmd),
 }
 
 

@@ -82,6 +82,9 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
 
         prob.setup(check=False)
 
+        # Set this to False because we have matrix-free component(s).
+        prob.model.linear_solver.options['assemble_jac'] = False
+
         # Conclude setup but don't run model.
         prob.final_setup()
 

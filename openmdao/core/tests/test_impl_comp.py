@@ -189,6 +189,25 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp3.'), 3)
         self.assertEqual(text.count('value'), 1)
 
+    def test_list_inputs_prom_name(self):
+        self.prob.run_model()
+
+        stream = cStringIO()
+        states = self.prob.model.list_inputs(prom_name=True, shape=True, hierarchical=True,
+                                             out_stream=stream)
+
+        text = stream.getvalue()
+
+        self.assertEqual(text.count('comp2.a'), 1)
+        self.assertEqual(text.count('comp2.b'), 1)
+        self.assertEqual(text.count('comp2.c'), 1)
+        self.assertEqual(text.count('comp3.a'), 1)
+        self.assertEqual(text.count('comp3.b'), 1)
+        self.assertEqual(text.count('comp3.c'), 1)
+
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 13)
+
     def test_list_explicit_outputs(self):
         self.prob.run_model()
 

@@ -750,6 +750,19 @@ class LinearSolver(Solver):
         finally:
             self._recording_iter.stack.pop()
 
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        pass
+
 
 class BlockLinearSolver(LinearSolver):
     """
@@ -792,6 +805,23 @@ class BlockLinearSolver(LinearSolver):
                 self._rhs_vecs[vec_name][:] = self._system._vectors['residual'][vec_name]._data
             else:
                 self._rhs_vecs[vec_name][:] = self._system._vectors['output'][vec_name]._data
+
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        for vec_name in self._system._lin_rel_vec_name_list:
+            if active:
+                self._rhs_vecs[vec_name] = self._rhs_vecs[vec_name].astype(np.complex)
+            else:
+                self._rhs_vecs[vec_name] = self._rhs_vecs[vec_name].real
 
     def _iter_initialize(self):
         """

@@ -22,7 +22,7 @@ optional_dependencies = {
         'parameterized',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.3',
+        'testflo>=1.3.4',
     ],
 }
 
@@ -72,6 +72,7 @@ setup(
         'openmdao.devtools',
         'openmdao.devtools.problem_viewer',
         'openmdao.devtools.iprofile_app',
+        'openmdao.devtools.xdsm_viewer',
         'openmdao.docs',
         'openmdao.docs._exts',
         'openmdao.docs._utils',
@@ -104,6 +105,14 @@ setup(
             'visualization/style/*.css',
             'visualization/style/*.woff',
             'visualization/*.html'
+        ],
+        'openmdao.devtools.xdsm_viewer': [
+            'XDSMjs/*',
+            'XDSMjs/src/*.js',
+            'XDSMjs/build/*.js',
+            'XDSMjs/test/*.js',
+            'XDSMjs/test/*.html',
+            'XDSMjs/examples/*.json',
         ],
         'openmdao.devtools.iprofile_app': [
             'static/*.html',

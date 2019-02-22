@@ -1,9 +1,11 @@
 import os
 import json
-from six import iteritems
+from six import iteritems, itervalues
 import networkx as nx
 from collections import OrderedDict
 import base64
+
+from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script
 
 try:
     import h5py
@@ -91,7 +93,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['name'] = 'root'
         tree_dict['type'] = 'root'
 
-
     return tree_dict
 
 
@@ -174,7 +175,7 @@ def _get_viewer_data(data_source):
         for li in scc_list:
             if src_subsystem in li and tgt_subsystem in li:
                 count += 1
-                if(count > 1):
+                if count > 1:
                     raise ValueError('Count greater than 1')
 
                 exe_tgt = comp_exec_orders[tgt_subsystem]
@@ -188,7 +189,7 @@ def _get_viewer_data(data_source):
                     if edge_str != src_to_tgt_str:
                         edges_list.append(edge_str)
 
-        if(edges_list):
+        if edges_list:
             edges_list.sort()  # make deterministic so same .html file will be produced each run
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
                                                  ('cycle_arrows', edges_list)]))
@@ -245,53 +246,20 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    html_begin_tags = """
-                      <html>
-                      <head>
-                        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-                      </head>
-                      <body>\n
-                      """
-    html_end_tags = """
-                    </body>
-                    </html>
-                    """
-
     code_dir = os.path.dirname(os.path.abspath(__file__))
     vis_dir = os.path.join(code_dir, "visualization")
     libs_dir = os.path.join(vis_dir, "libs")
     src_dir = os.path.join(vis_dir, "src")
     style_dir = os.path.join(vis_dir, "style")
 
-    # grab the libraries
-    with open(os.path.join(libs_dir, "awesomplete.js"), "r") as f:
-        awesomplete = f.read()
-    with open(os.path.join(libs_dir, "d3.v4.min.js"), "r") as f:
-        d3 = f.read()
-    with open(os.path.join(libs_dir, "vkBeautify.js"), "r") as f:
-        vk_beautify = f.read()
+    # grab the libraries, src and style
+    lib_dct = {'d3': 'd3.v4.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}
+    libs = read_files(itervalues(lib_dct), libs_dir, 'js')
+    src_names = 'constants', 'draw', 'legend', 'modal', 'ptN2', 'search', 'svg'
+    srcs = read_files(src_names, src_dir, 'js')
+    styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
+    style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
 
-    # grab the src
-    with open(os.path.join(src_dir, "constants.js"), "r") as f:
-        constants = f.read()
-    with open(os.path.join(src_dir, "draw.js"), "r") as f:
-        draw = f.read()
-    with open(os.path.join(src_dir, "legend.js"), "r") as f:
-        legend = f.read()
-    with open(os.path.join(src_dir, "modal.js"), "r") as f:
-        modal = f.read()
-    with open(os.path.join(src_dir, "ptN2.js"), "r") as f:
-        pt_n2 = f.read()
-    with open(os.path.join(src_dir, "search.js"), "r") as f:
-        search = f.read()
-    with open(os.path.join(src_dir, "svg.js"), "r") as f:
-        svg = f.read()
-
-    # grab the style
-    with open(os.path.join(style_dir, "awesomplete.css"), "r") as f:
-        awesomplete_style = f.read()
-    with open(os.path.join(style_dir, "partition_tree.css"), "r") as f:
-        partition_tree_style = f.read()
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
@@ -300,30 +268,26 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         index = f.read()
 
     # add the necessary HTML tags if we aren't embedding
-    if not embeddable:
-        index = html_begin_tags + index + html_end_tags
+    if embeddable:
+        index = '\n\n'.join([style_elems, index])
+    else:
+        meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+        head = '\n\n'.join([meta, style_elems])  # Write styles to head
+        index = head_and_body(head=head, body=index)
 
     # put all style and JS into index
-    index = index.replace('{{awesomplete_style}}', awesomplete_style)
-    index = index.replace('{{partition_tree_style}}', partition_tree_style)
     index = index.replace('{{fontello}}', encoded_font)
-    index = index.replace('{{d3_lib}}', d3)
-    index = index.replace('{{awesomplete_lib}}', awesomplete)
-    index = index.replace('{{vk_beautify_lib}}', vk_beautify)
-    index = index.replace('{{model_data}}', model_viewer_data)
-    index = index.replace('{{constants_lib}}', constants)
-    index = index.replace('{{modal_lib}}', modal)
-    index = index.replace('{{svg_lib}}', svg)
-    index = index.replace('{{search_lib}}', search)
-    index = index.replace('{{legend_lib}}', legend)
-    index = index.replace('{{draw_lib}}', draw)
-    index = index.replace('{{ptn2_lib}}', pt_n2)
-    if draw_potential_connections:
-        index = index.replace('{{draw_potential_connections}}', 'true')
-    else:
-        index = index.replace('{{draw_potential_connections}}', 'false')
 
-    with open(outfile, 'w') as f:
+    for k, v in iteritems(lib_dct):
+        index = index.replace('{{{}_lib}}'.format(k), write_script(libs[v], indent=4))
+
+    for name, code in iteritems(srcs):
+        index = index.replace('{{{}_lib}}'.format(name.lower()), write_script(code, indent=4))
+
+    index = index.replace('{{model_data}}', write_script(model_viewer_data, indent=4))
+    index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
+
+    with open(outfile, 'w') as f:  # write output file
         f.write(index)
 
     # open it up in the browser

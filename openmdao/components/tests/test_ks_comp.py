@@ -62,6 +62,34 @@ class TestKSFunction(unittest.TestCase):
         for (of, wrt) in partials['ks']:
             assert_rel_error(self, partials['ks'][of, wrt]['abs error'][0], 0.0, 1e-6)
 
+    def test_partials_no_compute(self):
+        prob = Problem()
+
+        model = prob.model
+
+        model.add_subsystem('px', IndepVarComp('x', val=np.array([5.0, 4.0])))
+
+        ks_comp = model.add_subsystem('ks', KSComp(width=2))
+
+        model.connect('px.x', 'ks.g')
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # compute partials with the current model inputs
+        inputs = { 'g': prob['ks.g'] }
+        partials = {}
+
+        ks_comp.compute_partials(inputs, partials)
+        assert_rel_error(self, partials[('KS', 'g')], np.array([1., 0.]), 1e-6)
+
+        # swap inputs and call compute partials again, without calling compute
+        inputs['g'][0][0] = 4
+        inputs['g'][0][1] = 5
+
+        ks_comp.compute_partials(inputs, partials)
+        assert_rel_error(self, partials[('KS', 'g')], np.array([0., 1.]), 1e-6)
+
     def test_beam_stress(self):
         E = 1.
         L = 1.
@@ -251,6 +279,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['ks.KS'][0], -12.0)
+
 
 if __name__ == "__main__":
     unittest.main()
