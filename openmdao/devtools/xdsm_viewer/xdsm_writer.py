@@ -16,6 +16,7 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 
 # TODO solvers: also include solvers of groups, not just for the root. Include connections between
 #  component inputs & outputs and the solver.
+# TODO show parallel blocks also in XDSMjs
 
 from __future__ import print_function
 
@@ -484,7 +485,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
-                       add_process_conns=add_process_conns, build_pdf=build_pdf, **kwargs)
+                       add_process_conns=add_process_conns, build_pdf=build_pdf,
+                       show_parallel=show_parallel, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cleanup=True,
@@ -690,7 +692,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         label = _replace_chars(comp['name'], substitutes=subs)
         if add_component_indices:
             label = number_label(i, label, number_alignment)
-        x.add_comp(name=comp['abs_name'], label=label, stack=comp['is_parallel'])
+        stack = comp['is_parallel'] and show_parallel
+        x.add_comp(name=comp['abs_name'], label=label, stack=stack)
 
     # Add the connections
     for src, dct in iteritems(conns3):
@@ -1113,15 +1116,18 @@ def _xdsm_setup_parser(parser):
     parser.add_argument('-m', '--model_path', action='store', dest='model_path',
                         help='Path to system to transcribe to XDSM.')
     parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
-                        help="don't treat the top level of each name as the source/target component.")
+                        help="Don't treat the top level of each name as the source/target component.")
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
-                        help="don't display in a browser.")
+                        help="Don't display in a browser.")
+    parser.add_argument('--no_parallel', action='store_true', dest='no_parallel',
+                        help="don't show stacked parallel blocks. Only active for 'pdf' and 'tex' "
+                             "formats.")
     parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
-                        help="don't show externally connected outputs.")
+                        help="Don't show externally connected outputs.")
     parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
-                        help="include the problem model's nonlinear solver in the XDSM.")
+                        help="Include the problem model's solver in the XDSM.")
     parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
-                        help="don't add process connections (thin black lines).")
+                        help="Don't add process connections (thin black lines).")
     parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
                         choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
                         dest='box_stacking', help='Controls the appearance of boxes.')
@@ -1135,7 +1141,7 @@ def _xdsm_setup_parser(parser):
                         "formats.")
     parser.add_argument('--number_alignment', action='store', dest='number_alignment',
                         choices=['horizontal', 'vertical'], default='horizontal',
-                        help='positions the number either above or in front of the component label '
+                        help='Positions the number either above or in front of the component label '
                         'if numbered_comps is true.')
 
 
@@ -1165,7 +1171,7 @@ def _xdsm_cmd(options):
                    include_external_outputs=not options.no_extern_outputs,
                    out_format=options.format,
                    include_solver=options.include_solver, subs=_CHAR_SUBS,
-                   show_browser=not options.no_browser,
+                   show_browser=not options.no_browser, show_parallel=not options.no_parallel,
                    add_process_conns=not options.no_process_conns, **kwargs)
         exit()
     return _xdsm
