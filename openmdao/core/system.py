@@ -891,16 +891,20 @@ class System(object):
             if self._inputs:
                 myinputs = {n for n in self._inputs._names
                             if check_path(n, incl, excl)}
+
+        # includes and excludes for outputs are specified using promoted names
+        abs2prom = self._var_abs2prom['output']
+
         if self.recording_options['record_outputs']:
             if self._outputs:
                 myoutputs = {n for n in self._outputs._names
-                             if check_path(n, incl, excl)}
+                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
             if self.recording_options['record_residuals']:
                 myresiduals = myoutputs  # outputs and residuals have same names
         elif self.recording_options['record_residuals']:
             if self._residuals:
                 myresiduals = {n for n in self._residuals._names
-                               if check_path(n, incl, excl)}
+                               if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
         self._filtered_vars_to_record = {
             'i': myinputs,

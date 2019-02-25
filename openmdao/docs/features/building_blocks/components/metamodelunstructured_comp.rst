@@ -36,7 +36,7 @@ The following example demonstrates a simple `Problem` in which a
 In this example, the `MetaModelUnStructuredComp` ``trig`` has a single input,
 ``x``, and two outputs, ``sin_x`` and ``cos_x``.
 
-`FloatKrigingSurrogate` is given as the surrogate for the ``sin_x`` output.
+`KrigingSurrogate` is given as the surrogate for the ``sin_x`` output.
 Although no surrogate has been given for the ``cos_x`` output, a
 ``default_surrogate`` is specified for the component. Any output which has
 not had a surrogate assigned will use one of the default type.
@@ -51,6 +51,28 @@ values. This training step only occurs on the first run.
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_metamodel_feature
     :layout: code, output
+
+Available Surrogates
+--------------------
+
+The following surrogates are available to use with `MetaModelUnStructuredComp`.
+
+:ref:`KrigingSurrogate <kriging>`
+  **Derivatives**: Yes
+
+  **Description**: Based on Kriging interpolation; prediction returns mean predicted value, optionally returns RMSE.
+
+
+:ref:`NearestNeighbor <nearest_neighbor>`
+  **Derivatives**: Yes
+
+  **Description**: Based on the N-Dimensional Interpolation library by Stephen Marone.
+
+
+:ref:`ResponseSurface <response_surface>`
+  **Derivatives**: Yes
+
+  **Description**: Based on second order response surface equations.
 
 
 Advanced usage

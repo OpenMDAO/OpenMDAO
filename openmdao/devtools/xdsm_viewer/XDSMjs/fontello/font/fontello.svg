@@ -1,0 +1,18 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg">
+<metadata>Copyright (C) 2019 by original authors @ fontello.com</metadata>
+<defs>
+<font id="fontello" horiz-adv-x="1000" >
+<font-face font-family="fontello" font-weight="400" font-stretch="normal" units-per-em="1000" ascent="850" descent="-150" />
+<missing-glyph horiz-adv-x="1000" />
+<glyph glyph-name="start" unicode="&#xe800;" d="M772 333l-741-412q-13-7-22-2t-9 20v822q0 14 9 20t22-2l741-412q13-7 13-17t-13-17z" horiz-adv-x="785.7" />
+
+<glyph glyph-name="stop" unicode="&#xe801;" d="M857 743v-786q0-14-10-25t-26-11h-785q-15 0-25 11t-11 25v786q0 14 11 25t25 11h785q15 0 26-11t10-25z" horiz-adv-x="857.1" />
+
+<glyph glyph-name="step-next" unicode="&#xe803;" d="M25-71q-10-11-18-8t-7 18v822q0 14 7 18t18-8l396-396q5-5 8-10v378q0 14 10 25t25 11h72q14 0 25-11t10-25v-786q0-14-10-25t-25-11h-72q-14 0-25 11t-10 25v379q-3-6-8-11z" horiz-adv-x="571.4" />
+
+<glyph glyph-name="step-prev" unicode="&#xe804;" d="M546 771q11 11 18 8t7-18v-822q0-14-7-18t-18 8l-396 396q-5 5-7 11v-379q0-14-11-25t-25-11h-71q-15 0-25 11t-11 25v786q0 14 11 25t25 11h71q15 0 25-11t11-25v-378q2 5 7 10z" horiz-adv-x="571.4" />
+</font>
+</defs>
+</svg>

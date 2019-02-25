@@ -1,4 +1,40 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.6.0
+
+February 22, 2018
+
+New Features:
+-------------
+- MetaModelStructured will detect NaN in requested sample and print a readable message.
+- ScipyOptimizeDriver now supports Hessian calculation option for optimizers that use it.
+- User can specify src_indices that have duplicates or have two inputs on a single component connected to the same output, and still have CSC Jacobian work.
+- User can get/set problem values in a straightforward manner: prob['var'] = 2., etc. even when running in parallel.
+    - Problem 'get' access to distributed variables will raise an exception since it isn't clear what behavior is expected,
+      i.e. should prob['comp.x'] return the full distributed variable or just the local part.
+- Directsolver has an improved error message when it detects identical rows or columns in Jacobian.
+- The NonlinearBlockGS solver has been updated with a less expensive implementation that does not call the compute method of Explicit components as many times.
+- User can request a directional-derivative check (similar to SNOPTs built-in level 0 check) for check_partials.
+- check_partials with compact_print will now always show all check pairs.
+- The N^2 diagram (from `openmdao view_model`) now shows the solver hierarchy.
+- KSComp has an improved, vectorized implementation.
+- list_inputs now includes a 'shape' argument.
+- User can generate an XDSM from a model (`openmdao xdsm`).
+- User can set `units=<something>` for an execcomp, when all variables have the same units.
+
+Backwards Incompatible API Changes:
+-----------------------------------
+- The default bounds enforcement for BoundsEnforceLS is now 'scalar' (was 'vector')
+- Direct solver will now use 'assemble_jac=True' by default
+- Recording options 'includes' and 'excludes' now use promoted names for outputs (absolute path names are still used for inputs)
+- FloatKrigingSurrogate has been deprecated since it does not provide any unique functionality.
+- FloatMultifiKrigingSurrogate has been deleted because it was never used, was incorrectly implemented, and provides no new functionality.
+
+Bug Fixes:
+----------
+- Complex-step around Newton+DirectSolver now works with assembled Jacobians.
+- Armijolinesearch implementation was incorrect when used with solve_subsystems. The implementation is now correct.
+
+################################################################################################
 Release Notes for OpenMDAO 2.5.0
 
 October 31, 2018
