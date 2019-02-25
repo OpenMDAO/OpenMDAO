@@ -196,6 +196,8 @@ body {
     line-height: 0.75em;
     vertical-align: -15%;
 }
+
+/* To get SVG and PNG images of these icon fonts, use https://icomoon.io/app/#/select */
 .icon-home:before { content: '\e800'; }
 .icon-left-big:before { content: '\e801'; }
 .icon-right-big:before { content: '\e802'; }
