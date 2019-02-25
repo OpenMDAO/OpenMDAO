@@ -10,5 +10,6 @@ Building Blocks
     components/index.rst
     drivers/index.rst
     solvers/index.rst
+    surrogates/index.rst
 
 

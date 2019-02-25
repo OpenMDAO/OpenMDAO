@@ -1,30 +1,31 @@
 import os
 import shutil
-import sys
 import tempfile
 import unittest
 
 import numpy as np
+from numpy.distutils.exec_command import find_executable
 
 from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, ScipyOptimizeDriver, \
-    Group
+    Group, write_xdsm
+from openmdao.devtools.xdsm_viewer.html_writer import write_html
 from openmdao.test_suite.components.sellar import SellarNoDerivatives
+from openmdao.test_suite.scripts.circuit import Circuit
 
 try:
     from pyxdsm.XDSM import XDSM
-    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm, write_html
 except ImportError:
     XDSM = None
 
 FILENAME = 'XDSM'
 
 
-@unittest.skipUnless(XDSM, "XDSM is required.")
-class TestXDSMViewer(unittest.TestCase):
+@unittest.skipUnless(XDSM, "The pyXDSM package is required.")
+class TestPyXDSMViewer(unittest.TestCase):
 
     def setUp(self):
         self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestXDSMviewer-')
+        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
         os.chdir(self.tempdir)
 
     def tearDown(self):
@@ -50,7 +51,8 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', quiet=True, show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
@@ -71,7 +73,8 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', quiet=True, show_browser=False, recurse=False)
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False, recurse=False)
+
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
@@ -114,7 +117,8 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', quiet=True, show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
@@ -167,26 +171,109 @@ class TestXDSMViewer(unittest.TestCase):
         p.setup(check=True)
 
         p.run_model()
+
+        # requesting 'pdf', but if 'pdflatex' is not found we will only get 'tex'
+        pdflatex = find_executable('pdflatex')
+
         # Test non unique local names
-        write_xdsm(p, 'xdsm3', out_format='tex', quiet=True, show_browser=False)
+        write_xdsm(p, 'xdsm3', out_format='pdf', quiet=True, show_browser=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'tex'])))
-        self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'pdf'])))
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm3', 'pdf'])))
 
         # Check formatting
 
         # Max character box formatting
-        write_xdsm(p, 'xdsm4', out_format='tex', quiet=True, show_browser=False,
+        write_xdsm(p, 'xdsm4', out_format='pdf', quiet=True, show_browser=False,
                    box_stacking='cut_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'tex'])))
-        self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'pdf'])))
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm4', 'pdf'])))
+
         # Cut characters box formatting
-        write_xdsm(p, 'xdsm5', out_format='tex', quiet=True, show_browser=False,
+        write_xdsm(p, 'xdsm5', out_format='pdf', quiet=True, show_browser=False,
                    box_stacking='max_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'tex'])))
-        self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'pdf'])))
-        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm5', 'pdf'])))
 
-        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
+    def test_circuit_no_recurse(self):
+
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsm_circuit', out_format='pdf', quiet=True, show_browser=False,
+                   recurse=False)
+        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', 'tex'])))
+
+    @unittest.expectedFailure
+    def test_circuit_recurse(self):
+        # FIXME fails if model_path is added and recurse is True. Issue related to connections
+        #  naming.
+
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        group = model.add_subsystem('G1', Group(), promotes=['*'])
+        group2 = model.add_subsystem('G2', Group())
+        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
+        group.add_subsystem('circuit', Circuit())
+
+        group.connect('source.I', 'circuit.I_in')
+        group.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsm_circuit2', out_format='pdf', quiet=True, show_browser=False,
+                   recurse=True, model_path='G1')
+        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', 'tex'])))
+
+
+class TestXDSMjsViewer(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestXDSMjsViewer-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_xdsmjs(self):
         """
@@ -209,8 +296,9 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False, quiet=True,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
                    embed_data=False)
+
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'json'])))
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
@@ -236,8 +324,9 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), quiet=True, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
                    embed_data=True)
+
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
@@ -262,8 +351,9 @@ class TestXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), quiet=True, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
                    embed_data=True, embeddable=True)
+
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
@@ -327,6 +417,59 @@ class TestXDSMViewer(unittest.TestCase):
 
         self.assertTrue(os.path.isfile(outfile))
 
+    def test_pyxdsm_identical_relative_names(self):
+        class TimeComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('t_initial', val=0.)
+                self.add_input('t_duration', val=1.)
+                self.add_output('time', shape=(2,))
+
+            def compute(self, inputs, outputs):
+                t_initial = inputs['t_initial']
+                t_duration = inputs['t_duration']
+
+                outputs['time'][0] = t_initial
+                outputs['time'][1] = t_initial + t_duration
+
+        class Phase(Group):
+
+            def setup(self):
+                super(Phase, self).setup()
+
+                indep = IndepVarComp()
+                for var in ['t_initial', 't_duration']:
+                    indep.add_output(var, val=1.0)
+
+                self.add_subsystem('time_extents', indep, promotes_outputs=['*'])
+
+                time_comp = TimeComp()
+                self.add_subsystem('time', time_comp)
+
+                self.connect('t_initial', 'time.t_initial')
+                self.connect('t_duration', 'time.t_duration')
+
+                self.set_order(['time_extents', 'time'])
+
+        p = Problem()
+        p.driver = ScipyOptimizeDriver()
+        orbit_phase = Phase()
+        p.model.add_subsystem('orbit_phase', orbit_phase)
+
+        systems_phase = Phase()
+        p.model.add_subsystem('systems_phase', systems_phase)
+
+        systems_phase = Phase()
+        p.model.add_subsystem('extra_phase', systems_phase)
+        p.model.add_design_var('orbit_phase.t_initial')
+        p.model.add_design_var('orbit_phase.t_duration')
+        p.setup(check=True)
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
+        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
+
     def test_wrong_out_format(self):
         """Incorrect output format error."""
 
@@ -339,7 +482,7 @@ class TestXDSMViewer(unittest.TestCase):
 
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
-            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), quiet=True, show_browser=False)
+            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=False)
 
 
 if __name__ == "__main__":

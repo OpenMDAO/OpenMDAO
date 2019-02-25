@@ -27,7 +27,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
-from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
@@ -1288,6 +1288,9 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
+        if self._setup_status < 2:
+            raise RuntimeError("run_model must be called before total derivatives can be checked.")
+
         model = self.model
 
         if method == 'cs' and not model._outputs._alloc_complex:

@@ -28,35 +28,33 @@ class NearestNeighbor(SurrogateModel):
         Interpolator object
     interpolant_init_args : dict
         Input keyword arguments for the interpolator.
-    interpolant_type : str
-        Type of interpolator from ['linear', 'weighted', 'rbf']
-
     """
 
-    def __init__(self, interpolant_type='rbf', **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        interpolant_type : str
-            must be one of 'linear', 'weighted', or 'rbf'.
         **kwargs : dict
-            keyword arguments
+            options dictionary.
         """
         super(NearestNeighbor, self).__init__()
 
-        if interpolant_type not in _interpolators.keys():
-            msg = "NearestNeighbor: interpolant_type '{0}' not supported." \
-                  " interpolant_type must be one of {1}.".format(
-                      interpolant_type, list(_interpolators.keys())
-                  )
-            raise ValueError(msg)
-
+        # Note: don't pass kwargs to parent because most of them are specific to choice of
+        # interpolant.
+        if 'interpolant_type' in kwargs:
+            self.options['interpolant_type'] = kwargs.pop('interpolant_type')
         self.interpolant_init_args = kwargs
-
-        self.interpolant_type = interpolant_type
         self.interpolant = None
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('interpolant_type', default='rbf',
+                             values=['linear', 'weighted', 'rbf'],
+                             desc="Type of interpolant, must be 'linear', 'weighted', or 'rbf'")
 
     def train(self, x, y):
         """
@@ -70,7 +68,7 @@ class NearestNeighbor(SurrogateModel):
             Model responses at given inputs.
         """
         super(NearestNeighbor, self).train(x, y)
-        self.interpolant = _interpolators[self.interpolant_type](
+        self.interpolant = _interpolators[self.options['interpolant_type']](
             x, y, **self.interpolant_init_args)
 
     def predict(self, x, **kwargs):
