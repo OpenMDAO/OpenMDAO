@@ -5,16 +5,17 @@ from contextlib import contextmanager
 from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
+import time
 from numbers import Integral
 
-from six import iteritems, string_types
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 import networkx as nx
 
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
-from openmdao.utils.general_utils import determine_adder_scaler, \
+from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
@@ -24,6 +25,10 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
+from openmdao.utils.name_maps import rel_name2abs_name
+from openmdao.utils.coloring import _compute_coloring
+from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -34,6 +39,11 @@ _asm_jac_types = {
     'csc': CSCJacobian,
     'dense': DenseJacobian,
 }
+
+# Suppored methods for derivatives
+_supported_approx_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
+                             'cs': (ComplexStep, DEFAULT_CS_OPTIONS),
+                             'exact': (None, {})}
 
 
 class System(object):
@@ -246,6 +256,10 @@ class System(object):
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
     _use_derivatives : bool
         If True, perform any memory allocations necessary for derivative computation.
+    _partial_coloring_info : tuple
+        Metadata that defines how to perform coloring of this System's partial jacobian.
+    _jac_saves_remaining : int
+        Counter that determines when jacobian sparsity collection ends and the coloring is computed.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -269,6 +283,9 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
+                             desc='Number of _linearize calls during dynamic computation of '
+                                  'simultaneous derivative coloring or derivatives sparsity')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -393,6 +410,8 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
+        self._jac_saves_remaining = 0
+        self._partial_coloring_info = None
 
     def _declare_options(self):
         """
@@ -695,6 +714,136 @@ class System(object):
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _setup_partials(self, recurse=True):
+        """
+        Process all partials and approximations that the user declared.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        if self._partial_coloring_info is not None:
+            self._setup_approx_coloring()
+            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+        else:
+            self._jac_saves_remaining = 0
+
+    def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, has_diag_jac=False,
+                            directory=None):
+        """
+        Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        has_diag_jac : bool
+            If True, jacobian is diagonal and can be computed with a single color.
+        directory : str or None
+            If not None, the coloring for this system will be saved to the given directory.
+            The file will be named as the system's pathname with dots replaced by underscores.
+        """
+        _, default_opts = _supported_approx_methods[method]
+        if step is None:
+            step = default_opts['step']
+
+        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+
+        if self._partial_coloring_info is not None:
+            simple_warning("%s: set_approx_coloring() was called multiple times. The "
+                           "last call will be used." % self.pathname)
+
+        # TODO: handle issues with 'has_diag_jac' if wrt doesn't cover every column of the jac
+        self._partial_coloring_info = (wrt_list, method, form, step, has_diag_jac, directory)
+
+    def _setup_approx_coloring(self):
+            wrt_list, method, form, step, has_diag_jac, directory = self._partial_coloring_info
+            ofs, allwrt = self._get_partials_varlists()
+            matches = set()
+            for w in wrt_list:
+                matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
+
+            # error if nothing matched
+            if not matches:
+                raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
+                                 "options on Component '{}': {}.".format(self.pathname, wrt_list))
+
+            self._partial_coloring_info = (matches, method, form, step, has_diag_jac, directory)
+
+            try:
+                method_func, default_opts = _supported_approx_methods[method]
+                if method == 'exact':
+                    raise KeyError('exact')
+            except KeyError:
+                msg = 'Method "{}" is not supported, method must be one of {}'
+                raise ValueError(msg.format(method,
+                                            [k for k in _supported_methods if k != 'exact']))
+
+            if method not in self._approx_schemes:
+                self._approx_schemes[method] = method_func()
+
+            meta = default_opts.copy()
+            meta['coloring'] = None  # set a placeholder for later replacement of approximations
+            meta['coloring_wrts'] = matches
+            if form:
+                meta['form'] = form
+            if step:
+                meta['step'] = step
+
+            abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+            # if coloring is not initially activated (because it must be computed dynamically)
+            # then we need to specify active subjacs that will be approximated using normal
+            # FD or CS.  These will be computed normally until enough jacobians have been
+            # computed to calculate the coloring.  Once the coloring exists, the approximations
+            # will be re-initialized to use the coloring info.
+            for wrt in matches:
+                for of in abs_ofs:
+                    self._approx_schemes[method].add_approximation((of, wrt), meta)
+
+    def _check_coloring_update(self):
+        """
+        Save jacobians and/or compute coloring and update approximation schemes.
+        """
+        if self._jac_saves_remaining > 0:
+            self._jacobian._save_sparsity()
+            self._jac_saves_remaining -= 1
+            if self._jac_saves_remaining == 0:
+                sparsity = self._jacobian._compute_sparsity(self, self._partial_coloring_info[0])
+
+                # print(self.pathname, "SPARSITY")
+                # from openmdao.utils.array_utils import array_viz
+                # array_viz(sparsity)
+                self._jacobian._jac_summ = None  # reclaim the memory
+
+                has_diag_jac = self._partial_coloring_info[4]
+                start_time = time.time()
+                if has_diag_jac:
+                    raise NotImplementedError("has_diag_jac not supported yet.")
+                else:
+                    coloring = _compute_coloring(sparsity, 'fwd')
+
+                coloring['time_coloring'] = time.time() - start_time
+
+                directory = self._partial_coloring_info[5]
+                if directory is not None:
+                    name = self.pathname.replace('.', '_') if self.pathname else 'top'
+                    fname = os.path.join(directory, name)
+                    with open(fname, 'w') as f:
+                        _write_coloring(['fwd'], coloring, f)
+
+                for approx in itervalues(self._approx_schemes):
+                    approx._update_coloring(self, coloring)
 
     def _setup_par_fd_procs(self, comm):
         """
@@ -1258,6 +1407,11 @@ class System(object):
         """
         if not self._use_derivatives:
             return
+
+        if self._partial_coloring_info is not None:
+            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+        else:
+            self._jac_saves_remaining = 0
 
         asm_jac_solvers = set()
         if self._linear_solver is not None:

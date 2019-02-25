@@ -1747,6 +1747,8 @@ class Group(System):
         """
         self._subjacs_info = info = {}
 
+        super(Group, self)._setup_partials(recurse)
+
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)

@@ -10,7 +10,8 @@ import numpy as np
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
 from openmdao.utils.name_maps import abs_key2rel_key
-
+from openmdao.utils.array_utils import sub_to_full_indices, get_local_offset_map
+from openmdao.utils.name_maps import rel_name2abs_name
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -60,8 +61,9 @@ def _generate_fd_coeff(form, order):
         namedtuple containing the 'deltas', 'coeffs', and 'current_coeff'. These deltas and
         coefficients need to be scaled by the step size.
     """
-    fd_form = FD_COEFFS.get((form, order))
-    if fd_form is None:
+    try:
+        fd_form = FD_COEFFS[form, order]
+    except KeyError:
         # TODO: Automatically generate requested form and store in dict.
         msg = 'Finite Difference form="{}" and order={} are not supported'
         raise ValueError(msg.format(form, order))
@@ -136,9 +138,14 @@ class FiniteDifference(ApproximationScheme):
             Sorting key (wrt, form, step_size, order, step_calc, directional)
 
         """
-        fd_options = approx_tuple[2]
-        return (approx_tuple[1], fd_options['form'], fd_options['order'],
-                fd_options['step'], fd_options['step_calc'], fd_options['directional'])
+        options = approx_tuple[2]
+        if 'coloring' in options and options['coloring'] is not None:
+            # this will only happen after the coloring has been computed
+            return ('@color', options['form'], options['order'],
+                    options['step'], options['step_calc'], options['directional'])
+        else:
+            return (approx_tuple[1], options['form'], options['order'],
+                    options['step'], options['step_calc'], options['directional'])
 
     def _init_approximations(self, system):
         """
@@ -162,8 +169,17 @@ class FiniteDifference(ApproximationScheme):
         approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
                                                                         self._key_fun)]
 
-        self._approx_groups = [None] * len(approx_groups)
-        for i, (key, approximations) in enumerate(approx_groups):
+        outputs = system._outputs
+        inputs = system._inputs
+        iproc = system.comm.rank
+
+        wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
+                                               system._var_sizes['nonlinear']['output'][iproc])
+        wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
+                                              system._var_sizes['nonlinear']['input'][iproc])
+
+        self._approx_groups = []
+        for key, approximations in approx_groups:
             wrt, form, order, step, step_calc, directional = key
 
             # FD forms are written as a collection of changes to inputs (deltas) and the associated
@@ -186,34 +202,63 @@ class FiniteDifference(ApproximationScheme):
             coeffs = fd_form.coeffs / step
             current_coeff = fd_form.current_coeff / step
 
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = range(in_size)
-
-            outputs = []
-
-            # Directional derivatives for quick partial checking.
-            # We place the indices in a list so that they are all stepped at the same time.
-            if directional:
-                in_idx = [in_idx]
-                in_size = 1
-
-            for approx_tuple in approximations:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
+            if wrt == '@color':  # use coloring
+                # need mapping from coloring jac columns (subset) to full jac columns
+                options = approx[0][2]
+                coloring = options['coloring']
+                wrts = options['coloring_wrts']
+                _, wrt_names = system._get_partials_varlists()
+                _, sizes = system._get_partials_sizes()
+                if len(wrt_names) != len(wrts):
+                    wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
+                    col_map = sub_to_full_indices(wrt_names, wrts, sizes)
+                    for cols, nzrows in color_iterator(coloring, 'fwd'):
+                        self._approx_groups.append((None, deltas, coeffs, current_coeff,
+                                                    col_map[cols], nzrows, None))
                 else:
-                    out_size = system._var_allprocs_abs2meta[of]['size']
-                    out_idx = _full_slice
+                    for cols, nzrows in color_iterator(coloring, 'fwd'):
+                        self._approx_groups.append((None, deltas, coeffs, current_coeff, cols,
+                                                    nzrows, None))
+            else:
+                if wrt in inputs._views_flat:
+                    arr = inputs._data
+                    offsets = wrt_in_offsets
+                else:
+                    arr = outputs._data
+                    offsets = wrt_out_offsets
 
-                outputs.append((of, np.zeros((out_size, in_size), dtype=dtype), out_idx))
+                if wrt in system._owns_approx_wrt_idx:
+                    in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int) + offsets[wrt]
+                    in_size = len(in_idx)
+                else:
+                    in_size = system._var_allprocs_abs2meta[wrt]['size']
+                    if wrt in offsets:
+                        in_idx = range(offsets[wrt], offsets[wrt] + in_size)
+                    else:
+                        in_idx = range(in_size)  # wrt is remote
+                        arr = None
 
-            self._approx_groups[i] = (wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs)
+                # Directional derivatives for quick partial checking.
+                # We place the indices in a list so that they are all stepped at the same time.
+                if directional:
+                    in_idx = [in_idx]
+                    in_size = 1
+
+                outs = []
+
+                for approx_tuple in approximations:
+                    of = approx_tuple[0]
+                    # TODO: Sparse derivatives
+                    if of in system._owns_approx_of_idx:
+                        out_idx = system._owns_approx_of_idx[of]
+                        out_size = len(out_idx)
+                    else:
+                        out_size = system._var_allprocs_abs2meta[of]['size']
+                        out_idx = _full_slice
+
+                    outs.append((of, np.zeros((out_size, in_size), dtype=dtype), out_idx))
+
+                self._approx_groups.append((wrt, deltas, coeffs, current_coeff, in_idx, outs, arr))
 
     def compute_approximations(self, system, jac=None, total=False):
         """
@@ -267,7 +312,7 @@ class FiniteDifference(ApproximationScheme):
 
         fd_count = 0
         approx_groups = self._get_approx_groups(system, under_cs=cs_active)
-        for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
+        for wrt, deltas, coeffs, current_coeff, in_idx, outputs, arr in approx_groups:
 
             for i_count, idx in enumerate(in_idx):
                 if fd_count % num_par_fd == system._par_fd_id:
@@ -279,7 +324,7 @@ class FiniteDifference(ApproximationScheme):
 
                     # Run the Finite Difference
                     for delta, coeff in zip(deltas, coeffs):
-                        self._run_point(system, wrt, idx, delta, out_tmp, in_tmp, result_array,
+                        self._run_point(system, arr, idx, delta, out_tmp, in_tmp, result_array,
                                         total)
                         result_array *= coeff
                         result._data += result_array
@@ -298,7 +343,7 @@ class FiniteDifference(ApproximationScheme):
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, _, _, _, _, outputs in approx_groups:
+        for wrt, _, _, _, _, outputs, arr in approx_groups:
             for of, subjac, _ in outputs:
                 key = (of, wrt)
                 if is_parallel:
@@ -312,7 +357,7 @@ class FiniteDifference(ApproximationScheme):
                 else:
                     jac[key] = subjac
 
-    def _run_point(self, system, in_name, idxs, delta, out_tmp, in_tmp, result_array, total=False):
+    def _run_point(self, system, arr, idxs, delta, out_tmp, in_tmp, result_array, total=False):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -320,8 +365,8 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        in_name : str
-            Input name.
+        arr : ndarray
+            Array being perturbed.
         idxs : ndarray
             Input indices.
         delta : float
@@ -350,13 +395,16 @@ class FiniteDifference(ApproximationScheme):
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        if in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] += delta
-        elif in_name in inputs._views_flat:
-            inputs._views_flat[in_name][idxs] += delta
-        else:
-            # If we make it here, this variable is remote, so don't increment by any delta.
-            pass
+        if arr is not None:
+            arr[idxs] += delta
+
+        # if in_name in outputs._views_flat:
+        #     outputs._views_flat[in_name][idxs] += delta
+        # elif in_name in inputs._views_flat:
+        #     inputs._views_flat[in_name][idxs] += delta
+        # else:
+        #     # If we make it here, this variable is remote, so don't increment by any delta.
+        #     pass
 
         run_model()
 
@@ -365,7 +413,7 @@ class FiniteDifference(ApproximationScheme):
         inputs._data[:] = in_tmp
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
-        if results_vec is not outputs and in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] -= delta
+        if arr is outputs._data and results_vec is not outputs:
+            arr[idxs] -= delta
 
         return result_array

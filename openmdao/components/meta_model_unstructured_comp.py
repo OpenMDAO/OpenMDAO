@@ -240,16 +240,17 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         vec_size = self.options['vec_size']
         if vec_size > 1:
+            vec_arange = np.arange(vec_size)
+
             # Sparse specification of partials for vectorized models.
             for wrt, n_wrt in self._surrogate_input_names:
                 for of, shape_of in self._surrogate_output_names:
-
                     n_of = np.prod(shape_of)
                     rows = np.repeat(np.arange(n_of), n_wrt)
                     cols = np.tile(np.arange(n_wrt), n_of)
-                    nnz = len(rows)
-                    rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
-                    cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
+                    repeat = np.repeat(vec_arange, len(rows))
+                    rows = np.tile(rows, vec_size) + repeat * n_of
+                    cols = np.tile(cols, vec_size) + repeat * n_wrt
 
                     dct = {
                         'rows': rows,

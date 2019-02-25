@@ -88,23 +88,8 @@ class AssembledJacobian(Jacobian):
         system : System
             Parent system to this jacobian.
         """
-        iproc = system.comm.rank
-        abs2idx = system._var_allprocs_abs2idx['nonlinear']
-        sizes = system._var_sizes['nonlinear']['output']
-        out_ranges = self._out_ranges = {}
-        start = end = 0
-        for name in system._var_allprocs_abs_names['output']:
-            end += sizes[iproc, abs2idx[name]]
-            out_ranges[name] = (start, end)
-            start = end
-
-        sizes = system._var_sizes['nonlinear']['input']
-        in_ranges = self._in_ranges = {}
-        start = end = 0
-        for name in system._var_allprocs_abs_names['input']:
-            end += sizes[iproc, abs2idx[name]]
-            in_ranges[name] = (start, end)
-            start = end
+        self._out_ranges = self._get_ranges(system, 'output')
+        self._in_ranges = self._get_ranges(system, 'input')
 
     def _initialize(self, system):
         """
@@ -183,8 +168,7 @@ class AssembledJacobian(Jacobian):
                 elif not is_top:  # input is connected to something outside current system
                     in_offset, in_end = in_ranges[wrt_abs_name]
                     shape = (res_size, in_end - in_offset)
-                    ext_mtx._add_submat(abs_key, info, res_offset,
-                                        in_offset, None, shape)
+                    ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
         iproc = system.comm.rank
         out_size = np.sum(out_sizes[iproc, :])

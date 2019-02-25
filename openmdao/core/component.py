@@ -12,7 +12,7 @@ from scipy.sparse import issparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
 from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.core.system import System
+from openmdao.core.system import System, _supported_approx_methods
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
@@ -21,11 +21,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 import openmdao.utils.mod_wrapper as mod_wrapper
-
-# Suppored methods for derivatives
-_supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
-                      'cs': (ComplexStep, DEFAULT_CS_OPTIONS),
-                      'exact': (None, {})}
+from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 
 # the following metadata will be accessible for vars on all procs
@@ -348,6 +344,8 @@ class Component(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
+        super(Component, self)._setup_partials(recurse)
+
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
         approx_methods = ('cs', 'fd')
@@ -785,10 +783,10 @@ class Component(System):
             its default value.
         """
         try:
-            method_func, default_opts = _supported_methods[method]
+            method_func, default_opts = _supported_approx_methods[method]
         except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, _supported_methods.keys()))
+            raise ValueError(msg.format(method, _supported_approx_methods.keys()))
 
         if isinstance(of, list):
             of = tuple(of)
@@ -840,49 +838,6 @@ class Component(System):
                 meta['step_calc'] = step_calc
             else:
                 raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
-
-    def set_partial_approx_coloring(self, wrt, method='fd', form='forward', step=None):
-        """
-        Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
-
-        Parameters
-        ----------
-        wrt : str or list of str
-            The name or names of the variables that derivatives are taken with respect to.
-            This can contain input names, output names, or glob patterns.
-        method : str
-            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str
-            Finite difference form, can be "forward", "central", or "backward". Leave
-            undeclared to keep unchanged from previous or default value.
-        step : float
-            Step size for finite difference. Leave undeclared to keep unchanged from previous
-            or default value.
-        """
-        _, default_opts = _supported_methods[method]
-        if step is None:
-            step = default_opts['step']
-
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        _, allwrt = self._get_partials_varlists()
-        matches = set()
-        for w in wrt_list:
-            matches.update(find_matches(w, allwrt))
-
-        # error if nothing matched
-        if not matches:
-            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options on Component '{}': {}.".format(self.pathname, wrt))
-
-        # error if any list of matches overlaps
-        for oldwrt, mat, _, _, _ in self._partial_coloring_info:
-            overlap = mat & matches
-            if overlap:
-                raise RuntimeError("Overlapping 'wrt' variable specifications (%s, %s) when "
-                                   "specifying colored approx partial settings.  The following "
-                                   "variables overlap: %s" % (wrt, oldwrt, sorted(overlap)))
-
-        self._partial_coloring_info.append((wrt, matches, method, form, step))
 
     def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
                                   directional=False):
@@ -1223,6 +1178,20 @@ class Component(System):
         wrt = list(self._var_allprocs_prom2abs_list['input'])
         return of, wrt
 
+    def _get_partials_sizes(self):
+        """
+        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(ndarray, ndarray)
+            'of' and 'wrt' variable sizes.
+        """
+        iproc = self.comm.rank
+        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
+        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
+        return out_sizes, in_sizes
+
     def compute_approx_partials(self, method='fd', step=None, form='forward', step_calc='abs'):
         """
         Compute partial derivatives for this Component using finite FD or CS.
@@ -1270,21 +1239,18 @@ class Component(System):
             fd_options = {'order': None, 'method': method}
 
             if method == 'cs':
-                defaults = DEFAULT_CS_OPTIONS
-
                 fd_options['form'] = None
                 fd_options['step_calc'] = None
+                if not step:
+                    step = DEFAULT_CS_OPTIONS['step']
 
             elif method == 'fd':
-                defaults = DEFAULT_FD_OPTIONS
-
                 fd_options['form'] = form
                 fd_options['step_calc'] = step_calc
+                if not step:
+                    step = DEFAULT_FD_OPTIONS['step']
 
-            if step:
-                fd_options['step'] = step
-            else:
-                fd_options['step'] = defaults['step']
+            fd_options['step'] = step
 
             # Precedence: component options > global options > defaults
             if local_wrt in local_opts:

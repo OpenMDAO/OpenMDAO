@@ -373,6 +373,8 @@ class ExplicitComponent(Component):
                 finally:
                     self._inputs.read_only = False
 
+        self._check_coloring_update()
+
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.

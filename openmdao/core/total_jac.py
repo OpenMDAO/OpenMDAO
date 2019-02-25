@@ -518,29 +518,29 @@ class _TotalJacInfo(object):
                     else:
                         it = self.par_deriv_iter
                     imeta = defaultdict(bool)
-                    imeta["par_deriv_color"] = parallel_deriv_color
-                    imeta["matmat"] = matmat
-                    imeta["idx_list"] = [(start, end)]
+                    imeta['par_deriv_color'] = parallel_deriv_color
+                    imeta['matmat'] = matmat
+                    imeta['idx_list'] = [(start, end)]
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta, _ = idx_iter_dict[parallel_deriv_color]
                     if imeta['matmat'] != matmat:
-                        raise RuntimeError("Mixing of vectorized and non-vectorized derivs in "
-                                           "the same parallel color group (%s) is not "
-                                           "supported." % parallel_deriv_color)
+                        raise RuntimeError('Mixing of vectorized and non-vectorized derivs in '
+                                           'the same parallel color group (%s) is not '
+                                           'supported.' % parallel_deriv_color)
                     imeta['idx_list'].append((start, end))
             elif matmat:
                 if name not in idx_iter_dict:
                     imeta = defaultdict(bool)
-                    imeta["matmat"] = matmat
-                    imeta["idx_list"] = [np.arange(start, end, dtype=int)]
+                    imeta['matmat'] = matmat
+                    imeta['idx_list'] = [np.arange(start, end, dtype=int)]
                     idx_iter_dict[name] = (imeta, self.matmat_iter)
                 else:
                     raise RuntimeError("Variable name '%s' matches a parallel_deriv_color "
                                        "name." % name)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
-                imeta["idx_list"] = np.arange(start, end, dtype=int)
+                imeta['idx_list'] = np.arange(start, end, dtype=int)
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if name in relevant:
@@ -558,7 +558,7 @@ class _TotalJacInfo(object):
 
         if simul_coloring and mode in simul_coloring:
             imeta = defaultdict(bool)
-            imeta["coloring"] = simul_coloring
+            imeta['coloring'] = simul_coloring
             all_rel_systems = set()
             cache = False
             imeta['itermeta'] = itermeta = []

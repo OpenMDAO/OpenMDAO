@@ -297,7 +297,6 @@ def MNCO_bidir(J):
             dict['rev'] = (row_lists, col_maps)
                 row_lists is a list of row lists, the first being a list of uncolored rows.
                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-            dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
     """
     nrows, ncols = J.shape
 
@@ -911,7 +910,6 @@ def _compute_coloring(J, mode):
             dict['rev'] = (row_lists, col_maps)
                 row_lists is a list of row lists, the first being a list of uncolored rows.
                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-            dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
     """
     bidirectional = mode == 'auto'
     rev = mode == 'rev'
@@ -931,6 +929,32 @@ def _compute_coloring(J, mode):
             col2rows[col] = np.nonzero(J[:, col])[0]
 
     return {mode: [col_groups, col2rows]}
+
+
+def color_iterator(coloring, direction):
+    """
+    Given a list of column groupings and a mapping of nonzero rows per column, iterate over colors.
+
+    Parameters
+    ----------
+    coloring : dict
+        dict[direction] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        Dict may contain either 'fwd' subdict, 'rev' subdict, or both.
+    direction : str
+        Indicates which coloring subdict ('fwd' or 'rev') to use.
+    """
+    col_lists = coloring[direction][0]
+    nz_rows = coloring[direction][1]
+
+    for i, col_chunk in enumerate(col_lists):
+        if i == 0:
+            # first chunk is a list of uncolored columns
+            for c in col_chunk:
+                yield c, nz_rows[c]
+        else:
+            yield col_chunk, [nz_rows[c] for c in col_chunk]
 
 
 def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,

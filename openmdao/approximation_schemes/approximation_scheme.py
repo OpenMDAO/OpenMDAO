@@ -48,6 +48,40 @@ class ApproximationScheme(object):
             self._approx_groups_cached_under_cs = under_cs
         return self._approx_groups
 
+    def _update_coloring(self, system, coloring):
+        """
+        Replace all 'colored' approx entries with a single entry containing the actual coloring.
+
+        Parameters
+        ----------
+        system : System
+            The System whose approximation schemes are being updated.
+        coloring : dict
+            dict['fwd'] = (col_lists, row_maps)
+                col_lists is a list of column lists, the first being a list of uncolored columns.
+                row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+            dict['rev'] = (row_lists, col_maps)
+                row_lists is a list of row lists, the first being a list of uncolored rows.
+                col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        """
+        new_list = []
+        new_entry = None
+        for tup in self._exec_list:
+            if 'coloring' in tup[2]:
+                if new_entry is None:
+                    options = tup[2]
+                    options['coloring'] = coloring
+                    new_entry = (None, None, options)
+                    new_list.append(new_entry)
+            else:
+                new_list.append(tup)
+
+        self._exec_list = new_list
+        self._approx_groups = None
+
+        # rebuid the approx_groups
+        self._get_approx_groups(system)
+
     def add_approximation(self, abs_key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).

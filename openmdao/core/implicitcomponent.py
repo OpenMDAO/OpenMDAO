@@ -268,6 +268,8 @@ class ImplicitComponent(Component):
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)
 
+        self._check_coloring_update()
+
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
         Compute residuals given inputs and outputs.
@@ -422,3 +424,15 @@ class ImplicitComponent(Component):
 
         # wrt should include implicit states
         return of, of + wrt
+
+    def _get_partials_sizes(self):
+        """
+        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(ndarray, ndarray)
+            'of' and 'wrt' variable sizes.
+        """
+        out_sizes, in_sizes = super(ImplicitComponent, self)._get_partials_sizes()
+        return out_sizes, np.hstack((out_sizes, in_sizes))

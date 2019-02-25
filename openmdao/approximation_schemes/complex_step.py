@@ -10,6 +10,9 @@ import numpy as np
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
 from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.coloring import color_iterator
+from openmdao.utils.array_utils import sub_to_full_indices, get_local_offset_map
+from openmdao.utils.name_maps import rel_name2abs_name
 
 
 DEFAULT_CS_OPTIONS = {
@@ -86,7 +89,11 @@ class ComplexStep(ApproximationScheme):
 
         """
         options = approx_tuple[2]
-        return (approx_tuple[1], options['form'], options['step'], options['directional'])
+        if 'coloring' in options and options['coloring'] is not None:
+            # this will only happen after the coloring has been computed
+            return ('@color', options['form'], options['step'], options['directional'])
+        else:
+            return (approx_tuple[1], options['form'], options['step'], options['directional'])
 
     def _init_approximations(self, system):
         """
@@ -110,42 +117,81 @@ class ComplexStep(ApproximationScheme):
         approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
                                                                         self._key_fun)]
 
-        self._approx_groups = [None] * len(approx_groups)
-        for i, (key, approx) in enumerate(approx_groups):
+        outputs = system._outputs
+        inputs = system._inputs
+        iproc = system.comm.rank
+
+        wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
+                                               system._var_sizes['nonlinear']['output'][iproc])
+        wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
+                                              system._var_sizes['nonlinear']['input'][iproc])
+
+        self._approx_groups = []
+        for key, approx in approx_groups:
             wrt, form, delta, directional = key
             if form == 'reverse':
                 delta *= -1.0
             fact = 1.0 / delta
             delta *= 1j
 
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = range(in_size)
-
-            outputs = []
-
-            # Directional derivatives for quick partial checking.
-            # We place the indices in a list so that they are all stepped at the same time.
-            if directional:
-                in_idx = [in_idx]
-                in_size = 1
-
-            for approx_tuple in approx:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
+            if wrt == '@color':   # use coloring
+                # need mapping from coloring jac columns (subset) to full jac columns
+                options = approx[0][2]
+                coloring = options['coloring']
+                wrts = options['coloring_wrts']
+                _, wrt_names = system._get_partials_varlists()
+                _, sizes = system._get_partials_sizes()
+                if len(wrt_names) != len(wrts):
+                    wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
+                    col_map = sub_to_full_indices(wrt_names, wrts, sizes)
+                    for cols, nzrows in color_iterator(coloring, 'fwd'):
+                        self._approx_groups.append((None, delta, fact, col_map[cols], nzrows, None))
                 else:
-                    out_size = system._var_allprocs_abs2meta[of]['size']
-                    out_idx = _full_slice
+                    for cols, nzrows in color_iterator(coloring, 'fwd'):
+                        self._approx_groups.append((None, delta, fact, cols, nzrows, None))
+            else:
+                if wrt in inputs._views_flat:
+                    arr = inputs._data
+                    offsets = wrt_in_offsets
+                elif wrt in outputs._views_flat:
+                    arr = outputs._data
+                    offsets = wrt_out_offsets
+                else:  # wrt is remote
+                    arr = None
 
-                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
+                if wrt in system._owns_approx_wrt_idx:
+                    in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int)
+                    if arr is not None:
+                        in_idx += offsets[wrt]
+                    in_size = len(in_idx)
+                else:
+                    in_size = system._var_allprocs_abs2meta[wrt]['size']
+                    if arr is None:
+                        in_idx = range(in_size)
+                    else:
+                        in_idx = range(offsets[wrt], offsets[wrt] + in_size)
 
-            self._approx_groups[i] = (wrt, delta, fact, in_idx, in_size, outputs)
+                # Directional derivatives for quick partial checking.
+                # We place the indices in a list so that they are all stepped at the same time.
+                if directional:
+                    in_idx = [in_idx]
+                    in_size = 1
+
+                outs = []
+
+                for approx_tuple in approx:
+                    of = approx_tuple[0]
+                    # TODO: Sparse derivatives
+                    if of in system._owns_approx_of_idx:
+                        out_idx = system._owns_approx_of_idx[of]
+                        out_size = len(out_idx)
+                    else:
+                        out_size = system._var_allprocs_abs2meta[of]['size']
+                        out_idx = _full_slice
+
+                    outs.append((of, np.zeros((out_size, in_size)), out_idx))
+
+                self._approx_groups.append((wrt, delta, fact, in_idx, outs, arr))
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -179,13 +225,11 @@ class ComplexStep(ApproximationScheme):
             self._fd.compute_approximations(system, jac, total=total)
             return
 
-        if total:
-            current_vec = system._outputs
-        else:
-            current_vec = system._residuals
-
         # Clean vector for results
-        results_clone = current_vec._clone(True)
+        if total:
+            results_clone = system._outputs._clone(True)
+        else:
+            results_clone = system._residuals._clone(True)
 
         # Turn on complex step.
         system._set_complex_step_mode(True)
@@ -207,13 +251,13 @@ class ComplexStep(ApproximationScheme):
         mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
+
         approx_groups = self._get_approx_groups(system)
-        for tup in approx_groups:
-            wrt, delta, fact, in_idx, in_size, outputs = tup
-            for i_count, idx in enumerate(in_idx):
+        for wrt, delta, fact, in_idxs, outputs, arr in approx_groups:
+            for i_count, idx in enumerate(in_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # Run the Finite Difference
-                    result = self._run_point_complex(system, wrt, idx, delta, results_clone, total)
+                    result = self._run_point_complex(system, arr, idx, delta, results_clone, total)
 
                     if is_parallel:
                         for of, _, out_idx in outputs:
@@ -229,7 +273,7 @@ class ComplexStep(ApproximationScheme):
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, fact, _, _, outputs in approx_groups:
+        for wrt, _, fact, _, outputs, _ in approx_groups:
             for of, subjac, _ in outputs:
                 key = (of, wrt)
                 if is_parallel:
@@ -247,7 +291,7 @@ class ComplexStep(ApproximationScheme):
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, in_name, idxs, delta, result_clone, total=False):
+    def _run_point_complex(self, system, vec, idxs, delta, result_clone, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -255,8 +299,8 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        in_name : str
-            Input name.
+        vec : ndarray
+            Vector to perturb.
         idxs : ndarray
             Input indices.
         delta : complex
@@ -271,28 +315,21 @@ class ComplexStep(ApproximationScheme):
         Vector
             Copy of the results from running the perturbed system.
         """
-        inputs = system._inputs
-        outputs = system._outputs
-
         if total:
             run_model = system.run_solve_nonlinear
-            results_vec = outputs
+            results_vec = system._outputs
         else:
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        if in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] += delta
-        elif in_name in inputs._views_flat:
-            inputs._views_flat[in_name][idxs] += delta
+        if vec is not None:
+            vec[idxs] += delta
 
         run_model()
 
         result_clone.set_vec(results_vec)
 
-        if in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] -= delta
-        elif in_name in inputs._views_flat:
-            inputs._views_flat[in_name][idxs] -= delta
+        if vec is not None:
+            vec[idxs] -= delta
 
         return result_clone

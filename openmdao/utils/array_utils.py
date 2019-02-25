@@ -207,7 +207,10 @@ def array_connection_compatible(shape1, shape2):
 
 def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     """
-    Assemble a sprase csr jacobian for a vectorized component.
+    Assemble arrays necessary to define a COO sparse jacobian for a vectorized component.
+
+    These arrays can also be passed to csc_matrix or csr_matrix to create CSC and CSR sparse
+    matrices.
 
     Parameters
     ----------
@@ -227,7 +230,7 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     Returns
     -------
     ndarray, ndarray, ndarray
-        CSR Sparse jacobian of size num_nodes*nrow by num_nodes*ncol
+        Arrays to define a COO sparse jacobian of size num_nodes*nrow by num_nodes*ncol
     """
     nnz = len(rows)
 
@@ -240,9 +243,11 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     if not np.isscalar(ncol):
         ncol = np.prod(ncol)
 
+    repeat_arr = np.repeat(np.arange(num_nodes), nnz)
+
     data = np.tile(data, num_nodes)
-    rows = np.tile(rows, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * nrow
-    cols = np.tile(cols, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * ncol
+    rows = np.tile(rows, num_nodes) + repeat_arr * nrow
+    cols = np.tile(cols, num_nodes) + repeat_arr * ncol
 
     return data, rows, cols
 
@@ -271,4 +276,135 @@ def _global2local_offsets(global_offsets):
                 # adjust offsets to be local in each process
                 off_vn[type_] -= off_vn[type_][:, 0].reshape((goff.shape[0], 1))
 
+    return offsets
+
+
+def local_index_iter(sizes):
+    """
+    Generate local variable indices given an array of variable sizes.
+
+    Parameters
+    ----------
+    sizes : ndarray of int
+        Array of variable sizes.
+
+    Yields
+    ------
+    int
+        local intra-variable indices.
+    """
+    for size in sizes:
+        for i in range(size):
+            yield i
+
+
+def var_name_idx_iter(names, sizes):
+    """
+    Generate variable names that will map to overall array index.
+
+    Parameters
+    ----------
+    names : iter of str
+        Iterator over variable names corresponding to the given sizes.
+    sizes : ndarray of int
+        Array of variable sizes.
+
+    Yields
+    ------
+    str
+        Variable name. Each name will be yielded a number of times equal to the variable size.
+    """
+    for name, size in zip(names, sizes):
+        for i in range(size):
+            yield name
+
+
+def sub_to_full_indices(all_names, matching_names, sizes):
+    """
+    Return the given indices converted into indices into the full vector.
+
+    This routine is used to compute how column indices computed during coloring of a subset
+    of the jacobian map to column indices corresponding to the full jacobian.
+
+    Parameters
+    ----------
+    all_names : ordered iter of str
+        An ordered list of variable names containing all variables of the appropriate type.
+    matching_names : set of str
+        Subset of all_names that make up the reduced index set.
+    sizes : ndarray of int
+        Array of variable sizes.
+
+    Returns
+    -------
+    ndarray
+        Full array indices that map to the provided subset of variables.
+    """
+    global_idxs = []
+    start = end = 0
+    for name, size in zip(all_names, sizes):
+        end += size
+        if size > 0 and name in matching_names:
+            global_idxs.append(np.arange(start, end))
+        start = end
+
+    return np.hstack(global_idxs)
+
+
+def get_index_array_maps(names, sizes):
+    """
+    Given names and sizes, return mappings of names and local indices to array index.
+
+    Parameters
+    ----------
+    names : iter of str
+        Iterator over the names.  (Must be ordered.)
+    sizes : ndarray of int
+        Sizes of variables specified in names.
+
+    Returns
+    -------
+    list
+        list of length sum(sizes) containing corresponding var name in each entry.
+    ndarray
+        Array of length sum(sizes) with var local index in each entry.
+    """
+    tot_size = np.sum(sizes)
+    name_list = [None] * tot_size
+    loc_idxs = np.empty(tot_size, dtype=numpy.uint32)
+
+    start = end = 0
+    for name, size in zip(names, sizes):
+        end += size
+        if size > 0:
+            name_list[start:end] = name
+            loc_idxs[start:end] = np.arange(size, dtype=uint32)
+        start = end
+
+    return name_list, loc_idxs
+
+
+def get_local_offset_map(names, sizes):
+    """
+    Return a mapping of var name to local offset.
+
+    Parameters
+    ----------
+    names : list of str
+        Variable names.
+    sizes : ndarray of int
+        Local variable sizes.
+
+    Returns
+    -------
+    dict
+        Mapping of var name to local offset.
+    """
+    offsets = {}
+    start = end = 0
+    for name, size in zip(names, sizes):
+        end += size
+        if end != start:
+            offsets[name] = start
+        start = end
     return offsets

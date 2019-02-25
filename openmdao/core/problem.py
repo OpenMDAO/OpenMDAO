@@ -1143,8 +1143,8 @@ class Problem(object):
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
 
-            of = list(comp._var_allprocs_prom2abs_list['output'].keys())
-            wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
+            of = list(comp._var_allprocs_prom2abs_list['output'])
+            wrt = list(comp._var_allprocs_prom2abs_list['input'])
 
             # The only outputs in wrt should be implicit states.
             if not explicit:

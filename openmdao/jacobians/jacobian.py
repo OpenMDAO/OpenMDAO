@@ -41,6 +41,9 @@ class Jacobian(object):
         A cache dict for key to absolute key.
     _randomize : bool
         If True, sparsity is being computed for simultaneous derivative coloring.
+    _jac_summ : dict or None
+        A dict containing a summation of some number of instantaneous absolute values of this
+        jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
     """
 
     def __init__(self, system):
@@ -58,6 +61,7 @@ class Jacobian(object):
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
+        self._jac_summ = None
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -244,6 +248,98 @@ class Jacobian(object):
             return sparse
 
         return rand(*subjac.shape) + 1.0
+
+    def _get_ranges(self, system, vtype):
+        iproc = system.comm.rank
+        abs2idx = system._var_allprocs_abs2idx['linear']
+        sizes = system._var_sizes['linear'][vtype]
+        start = end = 0
+        ranges = OrderedDict()
+        for name in system._var_allprocs_abs_names[vtype]:
+            end += sizes[iproc, abs2idx[name]]
+            ranges[name] = (start, end)
+            start = end
+        return ranges
+
+    def _save_sparsity(self):
+        subjacs = self._subjacs_info
+        if self._jac_summ is None:
+            # create _jac_summ structure
+            self._jac_summ = summ = {}
+            for key in subjacs:
+                summ[key] = np.abs(self[key])
+        else:
+            summ = self._jac_summ
+            for key in subjacs:
+                summ[key] += np.abs(self[key])
+
+    def _compute_sparsity(self, system, wrt_matches, tol=1e-15, orders=5):
+        """
+        Compute a dense sparsity matrix for this jacobian using saved absolute summations.
+
+        The sparsity matrix will contain only those columns that match the wrt variables in
+        wrt_matches.
+
+        Parameters
+        ----------
+        system : System
+            The System containing the jacobian whose sparsity will be computed.
+        wrt_matches : set of str
+            Set of wrt variables to compute sparity for.
+        tol : float
+            Tolerance used to determine if an array entry is zero or nonzero.
+        orders : int
+            Number of orders +/- for the tolerance sweep.
+
+        Returns
+        -------
+        ndarray
+            Boolean sparsity matrix.
+        """
+        from openmdao.utils.coloring import _tol_sweep
+
+        summ = self._jac_summ
+        subjacs = self._subjacs_info
+        ofs = list(system._var_allprocs_abs_names['output'])
+        wrts = list(system._var_allprocs_abs_names['input'])
+
+        iproc = system.comm.rank
+        abs2idx = system._var_allprocs_abs2idx['linear']
+        osizes = system._var_sizes['linear']['output']
+        isizes = system._var_sizes['linear']['input']
+
+        wrt_info = ((ofs, osizes), (wrts, isizes))
+
+        ncols = nrows = 0
+        locs = {}
+        roffset = rend = 0
+        coffset = cend = 0
+        for of in ofs:
+            rend += osizes[iproc, abs2idx[of]]
+            for wrts, sizes in wrt_info:
+                for wrt in wrts:
+                    if wrt in wrt_matches:
+                        cend += sizes[iproc, abs2idx[wrt]]
+                        key = (of, wrt)
+                        if key in subjacs:
+                            locs[key] = (slice(roffset, rend), slice(coffset, cend))
+                        coffset = cend
+            roffset = rend
+
+        J = np.zeros((rend, cend))
+
+        for key in locs:
+            J[locs[key]] = summ[key]
+
+        # normalize by largest value
+        J /= np.max(J)
+
+        good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(J, tol, orders)
+
+        boolJ = np.zeros(J.shape, dtype=bool)
+        boolJ[J > good_tol] = True
+
+        return boolJ
 
     def set_complex_step_mode(self, active):
         """
