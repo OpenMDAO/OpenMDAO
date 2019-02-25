@@ -212,6 +212,7 @@ embed-code
         `embed-code` is a custom directive that takes one argument, which can be:
             * A class, test, or method's full, dotted path (e.g. "openmdao.core.tests.test_expl_comp.RectangleComp").
             * The path to a file (e.g. "experimental_guide/examples/bezier_plot.py").
+              Note that the path is relative to the openmdao/docs directory.
 
         The syntax for invoking the directive within an .rst file looks like this:
 
