@@ -52,7 +52,16 @@ From a Script
 
 .. _script_view_model:
 
-You can do the same thing programmatically by adding the following to your Python script:
+You can do the same thing programmatically by adding the following to your Python script.
+
+.. autofunction:: openmdao.devtools.problem_viewer.problem_viewer.view_model
+   :noindex:
+
+Notice that the data source can be either a `Problem` or case recorder database containing the model or model data.
+The latter is indicated by a string giving the file path to the case recorder file.
+
+
+
 
 .. code::
 
