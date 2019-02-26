@@ -319,7 +319,7 @@ def var_name_idx_iter(names, sizes):
             yield name
 
 
-def sub_to_full_indices(all_names, matching_names, sizes):
+def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
     """
     Return the given indices converted into indices into the full vector.
 
@@ -334,6 +334,8 @@ def sub_to_full_indices(all_names, matching_names, sizes):
         Subset of all_names that make up the reduced index set.
     sizes : ndarray of int
         Array of variable sizes.
+    idx_map : dict
+        Mapping of var name to some subset of its full indices.
 
     Returns
     -------
@@ -345,10 +347,16 @@ def sub_to_full_indices(all_names, matching_names, sizes):
     for name, size in zip(all_names, sizes):
         end += size
         if size > 0 and name in matching_names:
-            global_idxs.append(np.arange(start, end))
+            if name in idx_map:
+                global_idxs.append(np.arange(start, end)[idx_map[name]])
+            else:
+                global_idxs.append(np.arange(start, end))
         start = end
 
-    return np.hstack(global_idxs)
+    if global_idxs:
+        return np.hstack(global_idxs)
+    else:
+        return np.asarray(global_idxs, dtype=int)
 
 
 def get_index_array_maps(names, sizes):
@@ -408,3 +416,4 @@ def get_local_offset_map(names, sizes):
             offsets[name] = start
         start = end
     return offsets
+

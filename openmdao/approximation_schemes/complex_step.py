@@ -2,16 +2,17 @@
 from __future__ import division, print_function
 
 from itertools import groupby
+from six import iteritems
 from six.moves import range
 from collections import defaultdict
 
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results
+    _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.coloring import color_iterator
-from openmdao.utils.array_utils import sub_to_full_indices, get_local_offset_map
+from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map
 from openmdao.utils.name_maps import rel_name2abs_name
 
 
@@ -141,14 +142,18 @@ class ComplexStep(ApproximationScheme):
                 wrts = options['coloring_wrts']
                 _, wrt_names = system._get_partials_varlists()
                 _, sizes = system._get_partials_sizes()
+                tmpJ = {}
+                iwidth = _get_wrt_subjacs(system, options['approxs'], tmpJ)
+
                 if len(wrt_names) != len(wrts):
                     wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
-                    col_map = sub_to_full_indices(wrt_names, wrts, sizes)
+                    col_map = sub2full_indices(wrt_names, wrts, sizes)
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, delta, fact, col_map[cols], nzrows, None))
+                        self._approx_groups.append((None, delta, fact, [col_map[cols]], tmpJ,
+                                                    nzrows))
                 else:
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, delta, fact, cols, nzrows, None))
+                        self._approx_groups.append((None, delta, fact, [cols], tmpJ, nzrows))
             else:
                 if wrt in inputs._views_flat:
                     arr = inputs._data
@@ -177,21 +182,23 @@ class ComplexStep(ApproximationScheme):
                     in_idx = [in_idx]
                     in_size = 1
 
-                outs = []
+                # outs = []
 
-                for approx_tuple in approx:
-                    of = approx_tuple[0]
-                    # TODO: Sparse derivatives
-                    if of in system._owns_approx_of_idx:
-                        out_idx = system._owns_approx_of_idx[of]
-                        out_size = len(out_idx)
-                    else:
-                        out_size = system._var_allprocs_abs2meta[of]['size']
-                        out_idx = _full_slice
+                # for approx_tuple in approx:
+                #     of = approx_tuple[0]
+                #     # TODO: Sparse derivatives
+                #     if of in system._owns_approx_of_idx:
+                #         out_idx = system._owns_approx_of_idx[of]
+                #         out_size = len(out_idx)
+                #     else:
+                #         out_size = system._var_allprocs_abs2meta[of]['size']
+                #         out_idx = _full_slice
 
-                    outs.append((of, np.zeros((out_size, in_size)), out_idx))
+                #     outs.append((of, np.zeros((out_size, in_size)), out_idx))
+                tmpJ = {}
+                _get_wrt_subjacs(system, approx, tmpJ, in_size)
 
-                self._approx_groups.append((wrt, delta, fact, in_idx, outs, arr))
+                self._approx_groups.append((wrt, delta, fact, in_idx, tmpJ, arr))
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -253,45 +260,69 @@ class ComplexStep(ApproximationScheme):
         fd_count = 0
 
         approx_groups = self._get_approx_groups(system)
-        for wrt, delta, fact, in_idxs, outputs, arr in approx_groups:
-            for i_count, idx in enumerate(in_idxs):
+        for wrt, delta, fact, in_idxs, tmpJ, arr in approx_groups:
+            J = tmpJ[wrt]
+            for i_count, idxs in enumerate(in_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
-                    # Run the Finite Difference
-                    result = self._run_point_complex(system, arr, idx, delta, results_clone, total)
+                    # Run the complex step
+                    result = self._run_point_complex(system, arr, idxs, delta, results_clone, total)
 
-                    if is_parallel:
-                        for of, _, out_idx in outputs:
-                            if owns[of] == iproc:
-                                results[(of, wrt)].append(
-                                    (i_count, result._views_flat[of][out_idx].imag.copy()))
+                    if wrt is None:  # colored
+                        nz_rows = arr
+                        # ????
                     else:
-                        for of, subjac, out_idx in outputs:
-                            subjac[:, i_count] = result._views_flat[of][out_idx].imag
+                        if is_parallel:
+                            for of, (oview, out_idxs) in iteritems(J['ofs']):
+                                if owns[of] == iproc:
+                                    results[(of, wrt)].append(
+                                        (i_count, result._views_flat[of][out_idxs].imag.copy()))
+                        else:
+                            J['data'][:, i_count] = result._data[J['full_idxs']].imag
+                            # for of, subjac, out_idx in tmpJ:
+                            #     subjac[:, i_count] = result._views_flat[of][out_idx].imag
 
                 fd_count += 1
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, fact, _, outputs, _ in approx_groups:
-            for of, subjac, _ in outputs:
-                key = (of, wrt)
-                if is_parallel:
-                    for i, result in results[key]:
-                        subjac[:, i] = result
+        for wrt, _, fact, _, tmpJ, _ in approx_groups:
+            if wrt is None:  # colored
+                pass
+            else:
+                ofs = tmpJ[wrt]['ofs']
+                for of in ofs:
+                    oview, oidxs = ofs[of]
+                    if is_parallel:
+                        for i, result in results[(of, wrt)]:
+                            oview[:, i] = result
 
-                subjac *= fact
-                if uses_src_indices:
-                    jac._override_checks = True
-                    jac[key] = subjac
-                    jac._override_checks = False
-                else:
-                    jac[key] = subjac
+                    oview *= fact
+                    if uses_src_indices:
+                        jac._override_checks = True
+                        jac[(of, wrt)] = oview
+                        jac._override_checks = False
+                    else:
+                        jac[(of, wrt)] = oview
+
+                # for of, subjac, _ in tmpJ:
+                #     key = (of, wrt)
+                #     if is_parallel:
+                #         for i, result in results[key]:
+                #             subjac[:, i] = result
+
+                #     subjac *= fact
+                #     if uses_src_indices:
+                #         jac._override_checks = True
+                #         jac[key] = subjac
+                #         jac._override_checks = False
+                #     else:
+                #         jac[key] = subjac
 
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, vec, idxs, delta, result_clone, total=False):
+    def _run_point_complex(self, system, arr, idxs, delta, result_clone, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -299,8 +330,8 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        vec : ndarray
-            Vector to perturb.
+        arr : ndarray
+            Array to perturb.
         idxs : ndarray
             Input indices.
         delta : complex
@@ -322,14 +353,14 @@ class ComplexStep(ApproximationScheme):
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        if vec is not None:
-            vec[idxs] += delta
+        if arr is not None:
+            arr[idxs] += delta
 
         run_model()
 
         result_clone.set_vec(results_vec)
 
-        if vec is not None:
-            vec[idxs] -= delta
+        if arr is not None:
+            arr[idxs] -= delta
 
         return result_clone

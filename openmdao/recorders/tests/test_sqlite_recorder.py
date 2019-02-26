@@ -1809,10 +1809,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # declare two options
         d1 = prob.model.d1
         d1.options.declare('options value 1', 1)
-        d1.options.declare('options value to ignore', 2)
 
-        # don't record the second option on d1
-        d1.recording_options['options_excludes'] = ['options value to ignore']
+        # don't record the dynamic_derivs_repeats option on d1
+        d1.recording_options['options_excludes'] = ['dynamic_derivs_repeats']
 
         # create recorder and attach to driver and d1
         recorder = SqliteRecorder("cases.sql")

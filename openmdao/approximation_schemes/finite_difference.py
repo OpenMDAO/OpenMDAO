@@ -10,7 +10,7 @@ import numpy as np
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
 from openmdao.utils.name_maps import abs_key2rel_key
-from openmdao.utils.array_utils import sub_to_full_indices, get_local_offset_map
+from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map
 from openmdao.utils.name_maps import rel_name2abs_name
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
@@ -211,7 +211,7 @@ class FiniteDifference(ApproximationScheme):
                 _, sizes = system._get_partials_sizes()
                 if len(wrt_names) != len(wrts):
                     wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
-                    col_map = sub_to_full_indices(wrt_names, wrts, sizes)
+                    col_map = sub2full_indices(wrt_names, wrts, sizes)
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
                         self._approx_groups.append((None, deltas, coeffs, current_coeff,
                                                     col_map[cols], nzrows, None))
@@ -397,14 +397,6 @@ class FiniteDifference(ApproximationScheme):
 
         if arr is not None:
             arr[idxs] += delta
-
-        # if in_name in outputs._views_flat:
-        #     outputs._views_flat[in_name][idxs] += delta
-        # elif in_name in inputs._views_flat:
-        #     inputs._views_flat[in_name][idxs] += delta
-        # else:
-        #     # If we make it here, this variable is remote, so don't increment by any delta.
-        #     pass
 
         run_model()
 

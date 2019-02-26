@@ -1,7 +1,11 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+import numpy as np
+from openmdao.utils.array_utils import sub2full_indices
+
+_full_slice = slice(None)
 
 
 class ApproximationScheme(object):
@@ -68,11 +72,15 @@ class ApproximationScheme(object):
         new_entry = None
         for tup in self._exec_list:
             if 'coloring' in tup[2]:
+                _, _, options = tup
                 if new_entry is None:
-                    options = tup[2]
+                    options = options.copy()
                     options['coloring'] = coloring
+                    options['approxs'] = [tup]
                     new_entry = (None, None, options)
                     new_list.append(new_entry)
+                else:
+                    new_entry[2]['approxs'].append(tup)
             else:
                 new_list.append(tup)
 
@@ -133,3 +141,56 @@ def _gather_jac_results(comm, results):
             new_results[key].extend(proc_results[key])
 
     return new_results
+
+
+def _get_wrt_subjacs(system, approxs, J, in_size=None):
+    abs2idx = system._var_allprocs_abs2idx['nonlinear']
+    abs2meta = system._var_allprocs_abs2meta
+    approx_of_idx = system._owns_approx_of_idx
+    approx_wrt_idx = system._owns_approx_wrt_idx
+    iproc = system.comm.rank
+
+    ofdict = {}
+
+    # in the non-colored case, all wrts will be the same below
+    for of, wrt, options in approxs:
+        if wrt not in J:
+            J[wrt] = {'ofs': [], 'tot_rows': 0}
+
+        if of not in ofdict:
+            J[wrt]['ofs'].append(of)
+            if of in approx_of_idx:
+                out_idx = approx_of_idx[of]
+                out_size = len(out_idx)
+            else:
+                out_size = abs2meta[of]['size']
+                out_idx = _full_slice
+            ofdict[of] = (out_size, out_idx)
+            J[wrt]['tot_rows'] += out_size
+
+    for wrt in J:
+        lst = J[wrt]['ofs']
+        J[wrt]['ofs'] = wrt_ofs = OrderedDict()
+
+        # create dense array to contain all nonzero subjacs for this wrt
+        if in_size is None:
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
+        else:
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], in_size))
+
+        # sort ofs into the proper order to match outputs/resids vecs
+        start = end = 0
+        sorted_ofs = sorted(lst, key=lambda n: abs2idx[n])
+        for of in sorted_ofs:
+            osize, oidx = ofdict[of]
+            end += osize
+            # store subview corresponding to the (of, wrt) subjac and any index info
+            wrt_ofs[of] = (arr[start:end, :], oidx)
+            start = end
+
+        ofset = set(sorted_ofs)
+        J[wrt]['full_idxs'] = sub2full_indices(system._var_allprocs_abs_names['output'], ofset,
+                                               system._var_sizes['nonlinear']['output'][iproc],
+                                               approx_of_idx)
+
+    return J

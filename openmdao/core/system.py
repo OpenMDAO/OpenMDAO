@@ -124,11 +124,11 @@ class System(object):
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_sizes : {'input': ndarray, 'output': ndarray}
+    _var_sizes : {<vecname>: {'input': ndarray, 'output': ndarray}, ...}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
+    _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
         in this System's communicator and num_var is the number of allprocs variables

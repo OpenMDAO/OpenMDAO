@@ -144,59 +144,106 @@ class Jacobian(object):
                 msg = 'Variable name pair ("{}", "{}") must first be declared.'
                 raise KeyError(msg.format(key[0], key[1]))
 
-            self._set_abs(abs_key, subjac)
+            subjacs_info = self._subjacs_info[abs_key]
+
+            if issparse(subjac):
+                subjacs_info['value'] = subjac
+            else:
+                # np.promote_types will choose the smallest dtype that can contain both arguments
+                subjac = np.atleast_1d(subjac)
+                safe_dtype = np.promote_types(subjac.dtype, float)
+                subjac = subjac.astype(safe_dtype, copy=False)
+
+                # Bail here so that we allow top level jacobians to be of reduced size when indices are
+                # specified on driver vars.
+                if self._override_checks:
+                    subjacs_info['value'] = subjac
+                    return
+
+                rows = subjacs_info['rows']
+
+                if rows is None:
+                    # Dense subjac
+                    shape = self._abs_key2shape(abs_key)
+                    subjac = np.atleast_2d(subjac)
+                    if subjac.shape == (1, 1):
+                        subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
+                    else:
+                        subjac = subjac.reshape(shape)
+                else:
+                    # Sparse subjac
+                    if subjac.shape == (1,):
+                        subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
+
+                    if subjac.shape != rows.shape:
+                        raise ValueError("Sub-jacobian for key %s has "
+                                         "the wrong shape (%s), expected (%s)." %
+                                         (abs_key, subjac.shape, rows.shape))
+
+                np.copyto(subjacs_info['value'], subjac)
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
 
-    def _set_abs(self, abs_key, subjac):
+    def set_column(self, key, subjac):
         """
         Set sub-Jacobian.
 
         Parameters
         ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        subjacs_info = self._subjacs_info[abs_key]
+        abs_key = self._get_abs_key(key)
+        if abs_key is not None:
 
-        if not issparse(subjac):
-            # np.promote_types will choose the smallest dtype that can contain both arguments
-            subjac = np.atleast_1d(subjac)
-            safe_dtype = np.promote_types(subjac.dtype, float)
-            subjac = subjac.astype(safe_dtype, copy=False)
+            # You can only set declared subjacobians.
+            if abs_key not in self._subjacs_info:
+                msg = 'Variable name pair ("{}", "{}") must first be declared.'
+                raise KeyError(msg.format(key[0], key[1]))
 
-            # Bail here so that we allow top level jacobians to be of reduced size when indices are
-            # specified on driver vars.
-            if self._override_checks:
+            subjacs_info = self._subjacs_info[abs_key]
+
+            if issparse(subjac):
                 subjacs_info['value'] = subjac
-                return
-
-            rows = subjacs_info['rows']
-
-            if rows is None:
-                # Dense subjac
-                shape = self._abs_key2shape(abs_key)
-                subjac = np.atleast_2d(subjac)
-                if subjac.shape == (1, 1):
-                    subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
-                else:
-                    subjac = subjac.reshape(shape)
             else:
-                # Sparse subjac
-                if subjac.shape == (1,):
-                    subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
+                # np.promote_types will choose the smallest dtype that can contain both arguments
+                subjac = np.atleast_1d(subjac)
+                safe_dtype = np.promote_types(subjac.dtype, float)
+                subjac = subjac.astype(safe_dtype, copy=False)
 
-                if subjac.shape != rows.shape:
-                    raise ValueError("Sub-jacobian for key %s has "
-                                     "the wrong shape (%s), expected (%s)." %
-                                     (abs_key, subjac.shape, rows.shape))
+                # Bail here so that we allow top level jacobians to be of reduced size when indices are
+                # specified on driver vars.
+                if self._override_checks:
+                    subjacs_info['value'] = subjac
+                    return
 
-            np.copyto(subjacs_info['value'], subjac)
+                rows = subjacs_info['rows']
+
+                if rows is None:
+                    # Dense subjac
+                    shape = self._abs_key2shape(abs_key)
+                    subjac = np.atleast_2d(subjac)
+                    if subjac.shape == (1, 1):
+                        subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
+                    else:
+                        subjac = subjac.reshape(shape)
+                else:
+                    # Sparse subjac
+                    if subjac.shape == (1,):
+                        subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
+
+                    if subjac.shape != rows.shape:
+                        raise ValueError("Sub-jacobian for key %s has "
+                                        "the wrong shape (%s), expected (%s)." %
+                                        (abs_key, subjac.shape, rows.shape))
+
+                np.copyto(subjacs_info['value'], subjac)
         else:
-            subjacs_info['value'] = subjac
+            msg = 'Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(key[0], key[1]))
 
     def _update(self, system):
         """
