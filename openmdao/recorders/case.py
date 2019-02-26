@@ -784,4 +784,3 @@ class PromotedToAbsoluteMap(dict):
                 yield (of, wrt)
             else:
                 yield key
-
