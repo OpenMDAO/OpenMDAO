@@ -2173,6 +2173,60 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
         assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
 
+    def test_scaling_multiple_calls(self):
+        from openmdao.api import Problem, SqliteRecorder, ScipyOptimizeDriver, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        import numpy as np
+
+        scaler = 2.
+
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj', scaler=scaler)
+        model.add_constraint('con1', upper=0.0, scaler=scaler)
+        model.add_constraint('con2', upper=0.0, scaler=scaler)
+
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+
+        prob.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.recording_options['includes'] = []
+        prob.recording_options['record_objectives'] = True
+        prob.recording_options['record_constraints'] = True
+        prob.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        # get list of cases recorded on problem
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(problem_cases, ['final'])
+
+        # get list of output variables recorded on problem
+        problem_vars = cr.list_source_vars('problem')
+        self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
+
+        # get the recorded case and check values
+        case = cr.get_case('final')
+
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        # Methods are called a second time
+        assert_rel_error(self, objectives['obj'], case.get_objectives()['obj'], 1e-1)
+        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
+        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+
 
 class TestFeatureBasicRecording(unittest.TestCase):
     def setUp(self):
