@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Documentation for OpenMDAO version: |release|
+Documentation for OpenMDAO version: |version|
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 OpenMDAO is an open-source high-performance computing platform for systems analysis and multidisciplinary optimization, written in Python.

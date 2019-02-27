@@ -5,7 +5,7 @@ import os
 
 def get_tag_info():
     """
-    Return the latest git tag, meaning, highest numerically, as a string.
+    Return the latest git tag, meaning, highest numerically, as a string, and the associated commit ID.
     """
     # using a pattern to only grab tags that are in version format "X.Y.Z"
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -23,30 +23,22 @@ def get_tag_info():
 
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]
-    return latest_tag
+
+    cmd = subprocess.Popen(['git', 'rev-list', '-1', latest_tag, '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    cmd_out, cmd_err = cmd.communicate()
+    commit_id = cmd_out.strip()
+
+    return latest_tag, str(commit_id)
 
 
 def get_commit_info():
     """
     Return the commit number of the most recent git commit as a string.
     """
-    git_commit = subprocess.Popen(['git', 'show', '--oneline', '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    git_commit = subprocess.Popen(['git', 'show', '--pretty=oneline', '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     commit_cmd_out, commit_cmd_err = git_commit.communicate()
     commit_id = commit_cmd_out.split()[0]
-    return commit_id
-
-
-def exists_remote(host, path):
-    """
-    Test if a dir exists at path on a host accessible with SSH.
-    """
-    status = subprocess.call(['ssh', '-o PasswordAuthentication=no', host, 'test -d {}'.format(pipes.quote(path))])
-
-    if status == 0:
-        return True
-    elif status == 1:
-        return False
-    raise Exception('SSH failed.')
+    return str(commit_id)
 
 
 def get_doc_version():
@@ -54,14 +46,14 @@ def get_doc_version():
     Returns either a git commit ID, or a X.Y.Z release number,
     and an indicator if this is a release or not
     """
-    tag = get_tag_info()
-    remote_host = 'openmdao@web543.webfaction.com'
-    remote_path = '/home/openmdao/webapps/twodocversions/' + tag
+    release_tag, release_commit = get_tag_info()
 
-    if exists_remote(remote_host, remote_path):
-        return get_commit_info(), 0
+    current_commit = get_commit_info()
+
+    if current_commit == release_commit:
+        return release_tag, 1
     else:
-        return tag, 1
+        return current_commit, 0
 
 
 def upload_doc_version():
@@ -87,6 +79,7 @@ def upload_doc_version():
         return True
     else:
         raise Exception('Doc transfer failed.')
+
 
 if __name__ == "__main__":
     upload_doc_version()
