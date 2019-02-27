@@ -336,7 +336,6 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     Writer specific settings and default:
 
     pyXDSM
-    ~~~~~~
 
     * The appearance of the boxes can be controlled with "box_stacking" and "box_width" arguments.
       The box stacking can be:
@@ -360,7 +359,6 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
       is True, it positions the number either above or in front of the component label.
 
     XDSMjs
-    ~~~~~~
 
     * If "embed_data" is true, a single standalone HTML file will be generated, which includes
       the data of the XDSM diagram.
