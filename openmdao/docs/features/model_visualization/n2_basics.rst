@@ -9,9 +9,10 @@ Trying to keep track of all the connections in your head can be a bit challengin
 some visualization tools to help see what's going on. This page explains the basics of generating an N2 diagram
 either from the command line or from a script.
 
-N2 diagrams, also known as N-squared diagramm is a diagram in the shape of a matrix, representing functional or
+An N2 diagram, also known as an N-squared diagram, is a diagram in the shape of a matrix, representing functional or
 physical interfaces between system elements. It is used to systematically identify, define, tabulate, design, and
 analyze functional and physical interfaces. It applies to system interfaces and hardware and/or software interfaces.
+For more information, see N2_chart_.
 
 .. _N2_chart: https://en.wikipedia.org/wiki/N2_chart
 
@@ -26,18 +27,17 @@ inputs quickly.
 From the Command Line
 ---------------------
 
-.. _om-command-view_model:
+.. _om-command-view_n2:
 
 Generating an N2 diagram for a model from the command line is easy. First, you need a Python script that contains
 and runs the model.
 
 .. note::
 
-    To get into more details, if final_setup isn't called in the script (either directly or as a result of run_model
-    or run_driver) then nothing will happen. The openmdao view_model command runs the script until the
-    end of final_setup, then it displays the model, then quits.
+    To get into more details, if :code:`final_setup` isn't called in the script (either directly or as a result of :code:`run_model`
+    or :code:`run_driver`) then nothing will happen.
 
-The :code:`openmdao view_model` command will generate an :math:`N^2` diagram of the model that is
+The :code:`openmdao view_model` command will generate an N2 diagram of the model that is
 viewable in a browser, for example:
 
 .. code-block:: none
@@ -45,23 +45,48 @@ viewable in a browser, for example:
     openmdao view_model openmdao/test_suite/scripts/circuit_with_unconnected_input.py
 
 
-will generate an :math:`N^2` diagram like the one below.
+will generate an N2 diagram like the one below.
+
+The :code:`openmdao view_model` has several options:
+
+.. code-block:: none
+
+    usage: openmdao view_model [-h] [-o OUTFILE] [--no_browser] [--embed]
+                               [--draw_potential_connections]
+                               file
+
+    positional arguments:
+      file                  Python file containing the model.
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -o OUTFILE            html output file.
+      --no_browser          don't display in a browser.
+      --embed               create embeddable version.
+      --draw_potential_connections
+                            draw potential connections.
+
+.. raw:: html
+    :file: examples/n2_circuit_with_unconnected_input.html
+
 
 From a Script
 -------------
 
 .. _script_view_model:
 
-You can do the same thing programmatically by adding the following to your Python script.
+You can do the same thing programmatically by calling the :code:`view_model` function.
 
 .. autofunction:: openmdao.devtools.problem_viewer.problem_viewer.view_model
    :noindex:
 
-Notice that the data source can be either a `Problem` or case recorder database containing the model or model data.
+Notice that the data source can be either a :code:`Problem` or case recorder database containing the model or model data.
 The latter is indicated by a string giving the file path to the case recorder file.
 
+Here are some code snippets showing the two cases.
 
-
+Problem as Data Source
+**********************
 
 .. code::
 
@@ -70,6 +95,22 @@ The latter is indicated by a string giving the file path to the case recorder fi
     from openmdao.api import view_model
     view_model(p)
 
+Case Recorder as Data Source
+****************************
 
-.. raw:: html
-    :file: examples/n2_circuit_with_unconnected_input.html
+.. code::
+
+    p = Problem()
+    p.model = SellarStateConnection()
+    r = SqliteRecorder('circuit.sqlite')
+    p.driver.add_recorder(r)
+    p.setup(check=False)
+    p.final_setup()
+    r.shutdown()
+
+    from openmdao.api import view_model
+
+    view_model('circuit.sqlite', outfile='circuit.html')
+
+
+For more details on N2 diagrams, see the :ref:`N2 Details<n2_details>` section.

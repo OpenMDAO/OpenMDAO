@@ -14,4 +14,3 @@ a model.
 
     n2_basics.rst
     n2_details.rst
-    xdsm.rst
