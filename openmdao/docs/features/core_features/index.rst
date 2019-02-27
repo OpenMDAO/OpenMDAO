@@ -1,4 +1,4 @@
-.. _feature_building_blocks:
+.. _feature_core_features:
 
 *************
 Core Features
