@@ -22,17 +22,17 @@ except ImportError:
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
 class TestPyXDSMViewer(unittest.TestCase):
 
-    # def setUp(self):
-    #     self.startdir = os.getcwd()
-    #     self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
-    #     os.chdir(self.tempdir)
-    #
-    # def tearDown(self):
-    #     os.chdir(self.startdir)
-    #     try:
-    #         shutil.rmtree(self.tempdir)
-    #     except OSError:
-    #         pass
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
