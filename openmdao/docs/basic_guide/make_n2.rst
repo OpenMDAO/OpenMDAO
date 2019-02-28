@@ -20,9 +20,8 @@ You can generate a visualization of the model in :math:`N^2` form with the follo
 
     openmdao view_model sellar.py
 
-
-.. raw:: html
-    :file: images/sellar_n2.html
+.. embed-n2::
+    ../test_suite/scripts/sellar.py
 
 
 This diagram is a version of a design-structure matrix, with the model hierarchy displayed on the left side.

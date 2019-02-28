@@ -1947,7 +1947,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
     def test_feature_circuit_with_recorder(self):
         from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, \
             CaseReader, SqliteRecorder
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
+        from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
         class Circuit(Group):
 

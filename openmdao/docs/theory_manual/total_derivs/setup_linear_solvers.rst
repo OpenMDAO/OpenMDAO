@@ -232,8 +232,8 @@ You can see that coupling clearly in the n2 diagram below, because there are off
 .. embed-code::
     openmdao.test_suite.components.sellar_feature.SellarMDALinearSolver
 
-.. raw:: html
-    :file: sellar_n2.html
+.. embed-n2::
+    ../test_suite/scripts/sellar.py
 
 Since there is coupling in this model, there must also be some linear solver there to deal with it.
 One option would be to assign the :ref:`DirectSolver <directsolver>` right at the top level of the model, and have it compute an inverse of the full Jacobian.
