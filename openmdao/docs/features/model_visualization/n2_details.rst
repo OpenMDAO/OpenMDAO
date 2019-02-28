@@ -36,7 +36,7 @@ Model Hierarchy
 The model hierarchy is on the left side of the diagram. It is actually a mix of Systems and variables, both
 inputs and outputs.
 
-The top System, the root of the model, is on the left and the subsystem hierarchy is displayed to right.
+The top System, the root of the model, is on the left and the subsystem hierarchy is displayed on the right.
 
 The colors indicate the type of
 item in the hierarchy. To see what the colors represent, an optional legend can be displayed using the |show_legend| button.
@@ -80,16 +80,16 @@ are green and upstream connections are salmon colored.
 In the upper triangular, the marked cells represent downstream connections. The salmon colored arrow that is drawn shows
 that connection.
 
-Clicking in the matrix on a connection or diagonal, lets us pin connections arrows so that they don't
+Clicking in the matrix on a connection or diagonal, lets you pin connection arrows so that they don't
 disappear when you hover away from the cell. You can clear these connections arrows by using the Clear Arrows and
 Connections button |clear_conn_arrows| in the toolbar.
 
 Solver Structure
 ----------------
-Each System in a model can potentially have a linear and non-linear model associated with it. On the right side
+Each System in a model can potentially have a linear and nonlinear model associated with it. On the right side
 of the N2 diagram, the hierarchy of the solvers is shown. This time the hierarchy goes from right to left with the root
 of the model on the right.
-You can switch between showing the linear or non-linear
+You can switch between showing the linear or nonlinear
 solvers using the button |toggle_solver_names| in the toolbar at the top.
 
 The colors indicate the type of solver. The colors are shown in the Legend. The section of the legend showing
@@ -118,7 +118,7 @@ only the part of the hierarchy beginning at that subsystem is shown.
 You can change the view and zoom into a System by clicking on it. Other parts of the hierarchy are no longer
 visible.
 
-The diagram keeps track of the view history and then lets us go back and forth through the history similar to undo and
+The diagram keeps track of the view history and then lets you go back and forth through the history similar to undo and
 redo in apps.
 
 The buttons in the first group of the toolbar control the view.
@@ -262,7 +262,7 @@ Search bar
    :align: middle
    :scale: 60 %
 
-The search bar below the Toolbar lets us search for variables in the model. This can be very useful when working
+The search bar below the Toolbar lets you search for variables in the model. This can be very useful when working
 with very large models.
 
 When you enter a variable name into the search box and click the search button |search| or hit the Enter key, the N2

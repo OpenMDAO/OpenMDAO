@@ -78,9 +78,9 @@ However, there are a few rules of thumb that can be used to guide most cases:
 
 .. note::
 
-    There is a relationship between linear and non-linear solvers.
-    Any coupling in your model will affect both the linear and non-linear solves,
-    and thus impact which type of linear and non-linear solvers you use.
+    There is a relationship between linear and nonlinear solvers.
+    Any coupling in your model will affect both the linear and nonlinear solves,
+    and thus impact which type of linear and nonlinear solvers you use.
 
     In the most basic case, an uncoupled model will use the default :ref:`NonLinearRunOnce <nlrunonce>` and the :ref:`LinearRunOnce<lnrunonce>` solvers.
     These *RunOnce* solvers are a special degenerate class of Solver, which can't handle any kind of coupling or implicitness in a model.

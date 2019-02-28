@@ -34,8 +34,13 @@ and runs the model.
 
 .. note::
 
-    To get into more details, if :code:`final_setup` isn't called in the script (either directly or as a result of :code:`run_model`
-    or :code:`run_driver`) then nothing will happen.
+    To get into more details, if :code:`final_setup` isn't called in the script (either directly or as a result
+    of :code:`run_model`
+    or :code:`run_driver`) then nothing will happen. Also, when using the command line version,
+    even if the script does call :code:`run_model` or :code:`run_driver`,
+    the script will terminate after :code:`final_setup` and will not actually run the model.
+
+
 
 The :code:`openmdao view_model` command will generate an N2 diagram of the model that is
 viewable in a browser, for example:
