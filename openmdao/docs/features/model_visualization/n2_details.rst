@@ -66,18 +66,18 @@ Black boxes outline items in the matrix to show the grouping of the variables of
 When you hover over a connection in the matrix, arrows are drawn to indicate connections. The behavior is different
 depending on whether you hover over a diagonal or an off-diagonal cell.
 
-When hovering over a diagonal item, the explicit connections to/from that variable are displayed. Red arrows indicate
+When hovering over a diagonal item, the explicit connections to/from that variable are displayed. Salmon colored arrows indicate
 that element is the target of the connection. A green arrow indicates it is the source.
 
-When hovering over a off-diagonal, the behavior differs depending on whether the cell is in the lower or upper
+When hovering over an off-diagonal, the behavior differs depending on whether the cell is in the lower or upper
 triangular part of the diagram.
 
 In the lower triangular, the marked cells represent upstream (in the sense of execution order of the
 components) connections. All the connections involved in that cycle
 are drawn to indicate which systems and components are involved in the convergence loop. Downstream connection arrows
-are green and upstream connections are red.
+are green and upstream connections are salmon colored.
 
-In the upper triangular, the marked cells represent downstream connections. The red arrow that is drawn shows
+In the upper triangular, the marked cells represent downstream connections. The salmon colored arrow that is drawn shows
 that connection.
 
 Clicking in the matrix on a connection or diagonal, lets us pin connections arrows so that they don't
