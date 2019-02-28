@@ -695,7 +695,7 @@ class TestBryodenFeature(unittest.TestCase):
     def test_circuit(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        from openmdao.test_suite.scripts.circuit_analysisimport Circuit
+        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = Problem()
         model = p.model
