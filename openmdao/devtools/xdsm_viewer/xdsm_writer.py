@@ -17,6 +17,7 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 # TODO solvers: also include solvers of groups, not just for the root. Include connections between
 #  component inputs & outputs and the solver.
 # TODO show parallel blocks also in XDSMjs
+# TODO numbering of data blocks. Logic: index of the receiving block
 
 from __future__ import print_function
 
@@ -48,7 +49,10 @@ _CHAR_SUBS = {
     'xdsmjs': (),
 }
 # Variable formatting settings
-_SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't'}
+_SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
+# Text constants.
+# "no_data" - showed as the output of an MDA
+_TEXT_CONSTANTS = {'no_data': '(no data)'}
 # Default solver, if no solver is added to a group.
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 
@@ -68,10 +72,11 @@ _DEFAULT_BOX_WIDTH = 3.  # Width of boxes [cm]. Depends on other settings, weath
 _DEFAULT_BOX_CHAR_LIMIT = 25
 # Controls the appearance of boxes
 # Can be set with keyword argument "box_stacking"
-# Options: horizontal, vertical, max_chars
+# Options: horizontal, vertical, max_chars, cut_chars, empty
 _DEFAULT_BOX_STACKING = 'max_chars'
-# Show arrowheads in processes
+# Show arrowheads in process connection lines
 _PROCESS_ARROWS = False
+# Maximum number of lines in a box. No limit, if None.
 _MAX_BOX_LINES = None
 
 
@@ -559,6 +564,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     def format_block(names, **kwargs):
+        # Sets the width, number of lines and other string formatting for a block.
         if writer_name == 'pyxdsm':
             return _format_block_string(var_names=names, stacking=box_stacking,
                                         box_width=box_width, box_lines=box_lines, **kwargs)
