@@ -22,17 +22,17 @@ except ImportError:
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
 class TestPyXDSMViewer(unittest.TestCase):
 
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+    # def setUp(self):
+    #     self.startdir = os.getcwd()
+    #     self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
+    #     os.chdir(self.tempdir)
+    #
+    # def tearDown(self):
+    #     os.chdir(self.startdir)
+    #     try:
+    #         shutil.rmtree(self.tempdir)
+    #     except OSError:
+    #         pass
 
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
@@ -425,6 +425,65 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=False,
+                   show_parallel=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_execcomp(self):
+        filename = 'pyxdsm_execcomp'
+        out_format = 'pdf'
+        prob = Problem(model=Group())
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x')
+        prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver()
+        prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        prob.model.add_objective('y')
+        prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=False,
+                   show_parallel=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_meta_model(self):
+        from openmdao.components.tests.test_meta_model_structured_comp import SampleMap
+        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+
+        filename = 'pyxdsm_meta_model'
+        out_format = 'pdf'
+        model = Group()
+        ivc = IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = MetaModelStructuredComp(method='slinear', extrapolate=True)
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        prob = Problem(model)
+        prob.setup(check=False)
+        prob.final_setup()
+
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=False,
                    show_parallel=True)
         # Check if file was created

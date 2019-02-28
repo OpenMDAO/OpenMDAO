@@ -351,7 +351,7 @@ def assertViewerDataRecorded(test, expected):
 
         tr = model_viewer_data['tree']
         test.assertEqual({'name', 'type', 'subsystem_type', 'children', 'linear_solver',
-                          'nonlinear_solver', 'is_parallel'},
+                          'nonlinear_solver', 'is_parallel', 'component_type'},
                          set(tr.keys()))
         test.assertEqual(expected['tree_children_length'],
                          len(model_viewer_data['tree']['children']))

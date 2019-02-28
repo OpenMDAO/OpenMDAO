@@ -78,6 +78,12 @@ _DEFAULT_BOX_STACKING = 'max_chars'
 _PROCESS_ARROWS = False
 # Maximum number of lines in a box. No limit, if None.
 _MAX_BOX_LINES = None
+_COMPONENT_TYPE_MAP = {
+    'explicit': 'Analysis',
+    'implicit': 'ImplicitAnalysis',
+    'exec': 'Function',
+    'metamodel': 'Metamodel'
+}
 
 
 class AbstractXDSMWriter(object):
@@ -285,7 +291,7 @@ else:
                 label = name
             self.add_system(node_name=name, style='MDA', label='\\text{%s}' % label, **kwargs)
 
-        def add_comp(self, name, label=None, stack=False, **kwargs):
+        def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
             """
             Add a component.
 
@@ -298,12 +304,17 @@ else:
             stack : bool
                 True for parallel components.
                 Defaults to False.
+            comp_type : str or None
+                Component type, e.g. explicit, implicit or metamodel
             kwargs : dict
                 Keyword args
             """
             if label is None:
                 label = name
-            self.add_system(node_name=name, style='Analysis', label='\\text{%s}' % label,
+
+            comp_type_map = _COMPONENT_TYPE_MAP
+            style = comp_type_map.get(comp_type, 'Analysis')
+            self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
         def add_func(self, name, label=None, stack=False, **kwargs):
@@ -699,7 +710,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         if add_component_indices:
             label = number_label(i, label, number_alignment)
         stack = comp['is_parallel'] and show_parallel
-        x.add_comp(name=comp['abs_name'], label=label, stack=stack)
+        x.add_comp(name=comp['abs_name'], label=label, stack=stack, comp_type=comp['component_type'])
 
     # Add the connections
     for src, dct in iteritems(conns3):
