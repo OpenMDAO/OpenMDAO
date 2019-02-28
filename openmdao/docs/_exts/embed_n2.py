@@ -36,23 +36,27 @@ class EmbedN2Directive(Directive):
 
         html_name = os.path.join(os.getcwd(), (os.path.basename(path_to_model).split('.')[0] + "_n2.html"))
 
-        subprocess.Popen(['openmdao', 'view_model', np, '--no_browser', '--embed', '-o' + html_name])
+        cmd = subprocess.Popen(['openmdao', 'view_model', np, '--no_browser', '--embed', '-o' + html_name])
+        cmd_out, cmd_err = cmd.communicate()
 
-        # add raw embed for HTML file
-        doc_nodes = []
+        rst = ViewList()
 
-        source = "\n.. raw:: html\n"
-        source += "   :file: " + html_name + "\n"
+        # Add the content one line at a time.
+        # Second argument is the filename to report in any warnings
+        # or errors, third argument is the line number.
+        env = self.state.document.settings.env
+        docname = env.doc2path(env.docname)
+        rst.append(".. raw:: html", docname, self.lineno)
+        rst.append("   :file: %s" % html_name, docname, self.lineno)
 
-        body = nodes.literal_block(source, source)
-        # body['language'] = 'html'
+        # Create a node.
+        node = nodes.section()
 
-        # body.append(".. raw:: html")
-        # body.append("   :file: %s" % html_name)
+        # Parse the rst.
+        nested_parse_with_titles(self.state, rst, node)
 
-        doc_nodes.append(body)
-
-        return doc_nodes
+        # And return the result.
+        return node.children
 
 
 def setup(app):
