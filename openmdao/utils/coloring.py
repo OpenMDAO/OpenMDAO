@@ -520,8 +520,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_m
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    # normalize the full J by dividing by the max value
-    fullJ /= np.max(fullJ)
+    fullJ /= repeats
 
     good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
 
