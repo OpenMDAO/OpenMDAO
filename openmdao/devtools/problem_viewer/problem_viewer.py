@@ -6,17 +6,16 @@ from collections import OrderedDict
 import networkx as nx
 from six import iteritems, itervalues
 
-from openmdao.components.exec_comp import ExecComp
-from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.core.explicitcomponent import ExplicitComponent
-
 try:
     import h5py
 except ImportError:
     # Necessary for the file to parse
     h5py = None
 
+from openmdao.components.exec_comp import ExecComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
