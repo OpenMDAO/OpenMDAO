@@ -417,3 +417,15 @@ def get_local_offset_map(names, sizes):
         start = end
     return offsets
 
+
+def update_sizes(names, sizes, index_map):
+    """
+    Return a sizes array, with possibly some sizes reduced to agree with index_map.
+    """
+    if index_map:
+        sizes = sizes.copy()
+        for i, (name, size) in enumerate(zip(names, sizes)):
+            if size > 0 and name in index_map:
+                sizes[i] = len(index_map[name])
+
+    return sizes

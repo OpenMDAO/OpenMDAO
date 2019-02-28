@@ -3,7 +3,7 @@ from __future__ import print_function, division
 
 from collections import defaultdict, OrderedDict
 import numpy as np
-from openmdao.utils.array_utils import sub2full_indices
+from openmdao.utils.array_utils import sub2full_indices, update_sizes
 
 _full_slice = slice(None)
 
@@ -143,16 +143,43 @@ def _gather_jac_results(comm, results):
     return new_results
 
 
-def _get_wrt_subjacs(system, approxs, J, in_size=None):
+def _get_jac_slice_dict(of_names, of_sizes, wrt_names, wrt_sizes):
+    """
+    Return a dict of (of,wrt) pairs mapped to slices of a dense matrix.
+    """
+    dct = {}
+    rstart = rend = 0
+    for ofname, ofsize in zip(of_names, of_sizes):
+        rend += ofsize
+        cstart = cend = 0
+        for wrtname, wrtsize in zip(wrt_names, wrt_sizes):
+            cend += wrtsize
+            dct[(ofname, wrtname)] = (slice(rstart, rend), slice(cstart, cend))
+            cstart = cend
+        rstart = rend
+    return dct
+
+
+def _get_wrt_subjacs(system, approxs):
+    """
+    Return a dict mapping wrt names to contiguous memory views of all of their nonzero subjacs.
+
+    All nonzero subjacs for a particular wrt are 'compressed' together so they're contiguous.
+
+    This allows for setting an entire column of the jacobian at once instead of looping over
+    each subjac.
+    """
+    abs_out_names = system._var_allprocs_abs_names['output']
     abs2idx = system._var_allprocs_abs2idx['nonlinear']
     abs2meta = system._var_allprocs_abs2meta
     approx_of_idx = system._owns_approx_of_idx
     approx_wrt_idx = system._owns_approx_wrt_idx
     iproc = system.comm.rank
 
+    J = {}
     ofdict = {}
 
-    # in the non-colored case, all wrts will be the same below
+    # in the non-colored case, all wrts will be the same for all entries in approxs
     for of, wrt, options in approxs:
         if wrt not in J:
             J[wrt] = {'ofs': [], 'tot_rows': 0}
@@ -173,10 +200,10 @@ def _get_wrt_subjacs(system, approxs, J, in_size=None):
         J[wrt]['ofs'] = wrt_ofs = OrderedDict()
 
         # create dense array to contain all nonzero subjacs for this wrt
-        if in_size is None:
-            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
+        if wrt in approx_wrt_idx:
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], len(approx_wrt_idx[wrt])))
         else:
-            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], in_size))
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
 
         # sort ofs into the proper order to match outputs/resids vecs
         start = end = 0
@@ -188,9 +215,13 @@ def _get_wrt_subjacs(system, approxs, J, in_size=None):
             wrt_ofs[of] = (arr[start:end, :], oidx)
             start = end
 
-        ofset = set(sorted_ofs)
-        J[wrt]['full_idxs'] = sub2full_indices(system._var_allprocs_abs_names['output'], ofset,
-                                               system._var_sizes['nonlinear']['output'][iproc],
-                                               approx_of_idx)
+        if len(sorted_ofs) != len(system._var_allprocs_abs_names['output']):
+            ofset = set(sorted_ofs)
+            J[wrt]['full_out_idxs'] = \
+                sub2full_indices(system._var_allprocs_abs_names['output'], ofset, 
+                                 system._var_sizes['nonlinear']['output'][iproc],
+                                 approx_of_idx)
+        else:
+            J[wrt]['full_out_idxs'] = _full_slice
 
     return J

@@ -313,7 +313,7 @@ class FiniteDifference(ApproximationScheme):
         fd_count = 0
         approx_groups = self._get_approx_groups(system, under_cs=cs_active)
         for wrt, deltas, coeffs, current_coeff, in_idx, outputs, arr in approx_groups:
-
+            xx = 0
             for i_count, idx in enumerate(in_idx):
                 if fd_count % num_par_fd == system._par_fd_id:
                     if current_coeff:

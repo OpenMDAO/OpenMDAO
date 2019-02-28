@@ -71,17 +71,21 @@ class SparseComp(ImplicitComponent):
     #     outputs['y'] = self.sparsity.dot(inputs._data)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        residuals['y'] = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs._data)
+        residuals['y0'] = prod[:outputs['y0'].size]
+        residuals['y1'] = prod[outputs['y0'].size:]
 
 
 class TestFDColoring(unittest.TestCase):
     def test_simple(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
              [0, 1, 1, 0, 0]],
         )
 
@@ -90,16 +94,19 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseComp(sparsity, isplit=2, dynamic_derivs_repeats=1))
-        comp.set_approx_coloring('x*', method='cs')
+        comp = model.add_subsystem('comp', SparseComp(sparsity, isplit=2, osplit=2))#, dynamic_derivs_repeats=1))
+        #comp.set_approx_coloring('x*', method='cs')
+        model.set_approx_coloring('*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
+        model.comp.add_constraint('y0', indices=[0,2])
+        model.approx_totals(method='cs')
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        of = ['comp.y']
+        of = ['comp.y0', 'comp.y1']
         wrt = ['indeps.x0', 'indeps.x1']
         derivs = prob.compute_totals(of=of, wrt=wrt)
         print(derivs)

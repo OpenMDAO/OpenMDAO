@@ -12,7 +12,7 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
     _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.coloring import color_iterator
-from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map
+from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, update_sizes
 from openmdao.utils.name_maps import rel_name2abs_name
 
 
@@ -135,19 +135,23 @@ class ComplexStep(ApproximationScheme):
             fact = 1.0 / delta
             delta *= 1j
 
-            if wrt == '@color':   # use coloring
+            if wrt == '@color':   # use coloring (should be only 1 of these)
                 # need mapping from coloring jac columns (subset) to full jac columns
                 options = approx[0][2]
-                coloring = options['coloring']
-                wrts = options['coloring_wrts']
+                colored_wrts = options['coloring_wrts']
                 _, wrt_names = system._get_partials_varlists()
+                wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
                 _, sizes = system._get_partials_sizes()
-                tmpJ = {}
-                iwidth = _get_wrt_subjacs(system, options['approxs'], tmpJ)
+                reduced_sizes = update_sizes(wrt_names, sizes, system._owns_approx_wrt_idx)
+                coloring = options['coloring']
+                tmpJ = {
+                    '@name_idx_map': list(var_name_idx_iter(wrt_names, reduced_sizes)),
+                    'nrows': coloring['nrows'],
+                    'ncols': coloring['ncols'],
+                }
 
-                if len(wrt_names) != len(wrts):
-                    wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
-                    col_map = sub2full_indices(wrt_names, wrts, sizes)
+                if len(wrt_names) != len(colored_wrts):
+                    col_map = sub2full_indices(wrt_names, colored_wrts, sizes)
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
                         self._approx_groups.append((None, delta, fact, [col_map[cols]], tmpJ,
                                                     nzrows))
@@ -182,21 +186,7 @@ class ComplexStep(ApproximationScheme):
                     in_idx = [in_idx]
                     in_size = 1
 
-                # outs = []
-
-                # for approx_tuple in approx:
-                #     of = approx_tuple[0]
-                #     # TODO: Sparse derivatives
-                #     if of in system._owns_approx_of_idx:
-                #         out_idx = system._owns_approx_of_idx[of]
-                #         out_size = len(out_idx)
-                #     else:
-                #         out_size = system._var_allprocs_abs2meta[of]['size']
-                #         out_idx = _full_slice
-
-                #     outs.append((of, np.zeros((out_size, in_size)), out_idx))
-                tmpJ = {}
-                _get_wrt_subjacs(system, approx, tmpJ, in_size)
+                tmpJ = _get_wrt_subjacs(system, approx)
 
                 self._approx_groups.append((wrt, delta, fact, in_idx, tmpJ, arr))
 
@@ -249,6 +239,7 @@ class ComplexStep(ApproximationScheme):
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
+        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
         is_parallel = use_parallel_fd or system.comm.size > 1
 
@@ -261,7 +252,6 @@ class ComplexStep(ApproximationScheme):
 
         approx_groups = self._get_approx_groups(system)
         for wrt, delta, fact, in_idxs, tmpJ, arr in approx_groups:
-            J = tmpJ[wrt]
             for i_count, idxs in enumerate(in_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # Run the complex step
@@ -269,15 +259,34 @@ class ComplexStep(ApproximationScheme):
 
                     if wrt is None:  # colored
                         nz_rows = arr
-                        # ????
-                    else:
                         if is_parallel:
+                            if par_fd_w_serial_model:
+                                raise NotImplementedError("simul approx w/par FD not supported yet")
+                            else:
+                                raise NotImplementedError("simul approx coloring with par FD is "
+                                                          "only supported currently when using "
+                                                          "a serial model, i.e., when "
+                                                          "num_par_fd == number of MPI procs.")
+                        else:
+                            idx_map = tmpJ['@name_idx_map']
+                            for col in idxs:
+                                wrt = idx_map[col]
+                                coljac = tmpJ[wrt]
+                                rows = nz_rows[col]
+                    else:
+                        J = tmpJ[wrt]
+
+                        if is_parallel:
+                            # TODO: this could be more efficient for the case of parallel FD
+                            # using a serial model in each proc, because all outputs would be
+                            # local to each proc so we could save the whole column instead of
+                            # looping over the outputs individually.
                             for of, (oview, out_idxs) in iteritems(J['ofs']):
                                 if owns[of] == iproc:
                                     results[(of, wrt)].append(
                                         (i_count, result._views_flat[of][out_idxs].imag.copy()))
                         else:
-                            J['data'][:, i_count] = result._data[J['full_idxs']].imag
+                            J['data'][:, i_count] = result._data[J['full_out_idxs']].imag
                             # for of, subjac, out_idx in tmpJ:
                             #     subjac[:, i_count] = result._views_flat[of][out_idx].imag
 

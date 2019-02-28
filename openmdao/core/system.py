@@ -816,7 +816,7 @@ class System(object):
         Save jacobians and/or compute coloring and update approximation schemes.
         """
         if self._jac_saves_remaining > 0:
-            self._jacobian._save_sparsity()
+            self._jacobian._save_sparsity(self)
             self._jac_saves_remaining -= 1
             if self._jac_saves_remaining == 0:
                 sparsity = self._jacobian._compute_sparsity(self, self._partial_coloring_info[0])
@@ -3106,6 +3106,33 @@ class System(object):
         if self._linear_solver:
             self._linear_solver.cleanup()
 
+    def _get_partials_varlists(self):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of = list(self._var_allprocs_prom2abs_list['output'])
+        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        return of, wrt
+
+    def _get_partials_sizes(self):
+        """
+        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(ndarray, ndarray)
+            'of' and 'wrt' variable sizes.
+        """
+        iproc = self.comm.rank
+        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
+        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
+        return out_sizes, in_sizes
+
 
 def get_relevant_vars(connections, desvars, responses, mode):
     """
@@ -3264,3 +3291,4 @@ def get_relevant_vars(connections, desvars, responses, mode):
     relevant['nonlinear'] = relevant['linear']
 
     return relevant
+

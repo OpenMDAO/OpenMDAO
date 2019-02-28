@@ -356,7 +356,7 @@ def MNCO_bidir(J):
 
             col_i += 1
 
-    coloring = {}
+    coloring = {'nrows': nrows, 'ncols': ncols}
 
     nnz_Jc = nnz_Jr = 0
     jac = np.zeros(J.shape, dtype=bool)
@@ -928,7 +928,7 @@ def _compute_coloring(J, mode):
         for col in lst:
             col2rows[col] = np.nonzero(J[:, col])[0]
 
-    return {mode: [col_groups, col2rows]}
+    return {mode: [col_groups, col2rows], 'nrows': nrows, 'ncols': ncols}
 
 
 def color_iterator(coloring, direction):
@@ -1036,8 +1036,6 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
 
     coloring['time_coloring'] = time.time() - start_time
     coloring['time_sparsity'] = time_sparsity
-    coloring['nrows'] = J.shape[0]
-    coloring['ncols'] = J.shape[1]
 
     modes = [m for m in ('fwd', 'rev') if m in coloring]
 

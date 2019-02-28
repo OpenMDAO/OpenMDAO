@@ -17,6 +17,8 @@ SUBJAC_META_DEFAULTS = {
     'dependent': False,
 }
 
+_full_slice = slice(None)
+
 
 class Jacobian(object):
     """
@@ -308,7 +310,7 @@ class Jacobian(object):
             start = end
         return ranges
 
-    def _save_sparsity(self):
+    def _save_sparsity(self, system):
         subjacs = self._subjacs_info
         if self._jac_summ is None:
             # create _jac_summ structure
@@ -354,29 +356,42 @@ class Jacobian(object):
         abs2idx = system._var_allprocs_abs2idx['linear']
         osizes = system._var_sizes['linear']['output']
         isizes = system._var_sizes['linear']['input']
+        approx_of_idx = system._owns_approx_of_idx
+        approx_wrt_idx = system._owns_approx_wrt_idx
 
-        wrt_info = ((ofs, osizes), (wrts, isizes))
+        wrt_info = ((ofs, osizes, approx_of_idx), (wrts, isizes, approx_wrt_idx))
 
         ncols = nrows = 0
         locs = {}
         roffset = rend = 0
-        coffset = cend = 0
         for of in ofs:
-            rend += osizes[iproc, abs2idx[of]]
-            for wrts, sizes in wrt_info:
+            if of in approx_of_idx:
+                sub_of_idx = approx_of_idx[of]
+                rend += len(sub_of_idx)
+            else:
+                rend += osizes[iproc, abs2idx[of]]
+                sub_of_idx = _full_slice
+            coffset = cend = 0
+            for wrts, sizes, approx_idx in wrt_info:
                 for wrt in wrts:
                     if wrt in wrt_matches:
-                        cend += sizes[iproc, abs2idx[wrt]]
+                        if wrt in approx_idx:
+                            sub_wrt_idx = approx_idx[wrt]
+                            cend += len(sub_wrt_idx)
+                        else:
+                            cend += sizes[iproc, abs2idx[wrt]]
+                            sub_wrt_idx = _full_slice
                         key = (of, wrt)
                         if key in subjacs:
-                            locs[key] = (slice(roffset, rend), slice(coffset, cend))
+                            locs[key] = ((slice(roffset, rend), slice(coffset, cend)), sub_of_idx, sub_wrt_idx)
                         coffset = cend
             roffset = rend
 
         J = np.zeros((rend, cend))
 
         for key in locs:
-            J[locs[key]] = summ[key]
+            jslice, sub_of_idx, sub_wrt_idx = locs[key]
+            J[jslice] = summ[key][sub_of_idx, sub_wrt_idx]
 
         # normalize by largest value
         J /= np.max(J)
