@@ -108,8 +108,6 @@ if __name__ == "__main__":
     from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp, BalanceComp, ExecComp
     from openmdao.api import NewtonSolver, DirectSolver, NonlinearRunOnce, LinearRunOnce
 
-    from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
-
     p = Problem()
     model = p.model
 
