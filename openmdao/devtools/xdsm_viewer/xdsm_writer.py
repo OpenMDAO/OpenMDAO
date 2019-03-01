@@ -78,11 +78,31 @@ _DEFAULT_BOX_STACKING = 'max_chars'
 _PROCESS_ARROWS = False
 # Maximum number of lines in a box. No limit, if None.
 _MAX_BOX_LINES = None
+# On which side to place outputs? One of "left", "right"
+_OUTPUT_SIDE = 'left'
+
+# Maps OpenMDAO component types with the available block styling options in the writer.
+# For pyXDSM check the "diagram_styles" file for style definitions.
+# For XDSMjs check the CSS style sheets.
 _COMPONENT_TYPE_MAP = {
-    'explicit': 'Analysis',
-    'implicit': 'ImplicitAnalysis',
-    'exec': 'Function',
-    'metamodel': 'Metamodel'
+    'pyxdsm': {
+        'indep': 'Function',
+        'explicit': 'Analysis',
+        'implicit': 'ImplicitAnalysis',
+        'exec': 'Function',
+        'metamodel': 'Metamodel',
+        'optimization': 'Optimization',
+        'doe': 'DOE',
+    },
+    'xdsmjs': {
+        'indep': 'function',
+        'explicit': 'analysis',
+        'implicit': 'analysis',
+        'exec': 'function',
+        'metamodel': 'metamodel',
+        'optimization': 'optimization',
+        'doe': 'doe',
+    }
 }
 
 
@@ -110,7 +130,7 @@ class AbstractXDSMWriter(object):
     def add_func(self, name, **kwargs):
         pass  # Implement in child class
 
-    def add_optimizer(self, label, name='opt', **kwargs):
+    def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
         pass  # Implement in child class
 
     def add_input(self, name, label, style='DataIO', stack=False):
@@ -150,6 +170,18 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.connections.append(edge)
 
     def add_solver(self, name, label=None, **kwargs):
+        """
+        Add a solver.
+
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM
+        name : str
+            Name of the solver
+        kwargs : dict
+            Keyword args
+        """
         self.comp_names.append(self._format_id(name))
         self.add_system(name, 'mda', label, **kwargs)
 
@@ -172,18 +204,19 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         comp_type_map = _COMPONENT_TYPE_MAP
-        style = comp_type_map.get(comp_type, 'style').lower()
-        if stack:
+        style = comp_type_map['xdsmjs'].get(comp_type, 'style')
+        if stack:  # Parallel block
             style += '_multi'
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_func(self, name, label=None, **kwargs):
-        pass
+        self.add_system(node_name=name, style='function', label=label, **kwargs)
 
-    def add_optimizer(self, label, name='opt', **kwargs):
+    def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
         self.optimizer = self._format_id(name)
-        self.add_system(name, 'optimization', label, **kwargs)
+        style = _COMPONENT_TYPE_MAP['xdsmjs'].get(driver_type, 'optimization')
+        self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_system(self, node_name, style, label=None, **kwargs):
         if label is None:
@@ -334,7 +367,7 @@ else:
                 label = name
 
             comp_type_map = _COMPONENT_TYPE_MAP
-            style = comp_type_map.get(comp_type, 'Analysis')
+            style = comp_type_map['pyxdsm'].get(comp_type, 'Analysis')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
@@ -359,7 +392,7 @@ else:
             self.add_system(node_name=name, style='Function', label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
-        def add_optimizer(self, name, label=None, **kwargs):
+        def add_driver(self, name, label=None, driver_type='Optimization', **kwargs):
             """
             Add an optimizer.
 
@@ -369,10 +402,14 @@ else:
                 Label in the XDSM
             name : str
                 Name of the optimizer.
+            driver_type : str
+                Driver type can be "Optimizer" or "DOE".
+                Defaults to "Optimizer"
             kwargs : dict
                 Keyword args
             """
-            self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
+            style = _COMPONENT_TYPE_MAP['pyxdsm'].get(driver_type, 'Optimization')
+            self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_workflow(self, comp_names=None):
             """
@@ -504,6 +541,13 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     # Name is None if the driver is not specified
     driver_name = _get_cls_name(driver) if driver else None
 
+    try:
+        from openmdao.drivers.doe_driver import DOEDriver
+        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+    except ImportError:
+        DOEDriver = None
+        driver_type = 'optimization'
+
     design_vars = _model.get_design_vars()
     responses = _model.get_responses()
 
@@ -518,18 +562,19 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     if isinstance(subs, dict):
         subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
     return _write_xdsm(filename, viewer_data=viewer_data,
-                       optimizer=driver_name, include_solver=include_solver, model_path=model_path,
+                       driver=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
-                       show_parallel=show_parallel, **kwargs)
+                       show_parallel=show_parallel, driver_type=driver_type, **kwargs)
 
 
-def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cleanup=True,
+def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
-                add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False, **kwargs):
+                add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
+                output_side=_OUTPUT_SIDE, driver_type='optimizer', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -539,8 +584,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         Filename (absolute path without extension)
     connections : list[(str, str)]
         Connections list
-    optimizer : str or None, optional
-        Optimizer name
+    driver : str or None, optional
+        Driver name
     include_solver:  bool, optional
         Defaults to False.
     cleanup : bool, optional
@@ -575,7 +620,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         Set to True to suppress output from pdflatex
     build_pdf : bool
         If True and a .tex file is generated, create a .pdf file from the .tex.
-
+    output_side : str
+        Left or right.
+        Defaults to "left"
     kwargs : dict
         Keyword arguments
 
@@ -684,17 +731,17 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         msg = 'Undefined XDSM writer "{}"'
         raise ValueError(msg.format(writer_name))
 
-    if optimizer is not None:
-        optimizer_label = optimizer
-        optimizer_name = _format_name(optimizer)
+    if driver is not None:
+        driver_label = driver
+        driver_name = _format_name(driver)
         if add_component_indices:
             opt_index = len(comps) + 1  # index of last block + 1
             if include_solver:
                 opt_index += len(solvers)
             nr_comps = len(x.comps)
             index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=1)
-            optimizer_label = number_label(index_str, optimizer_label, number_alignment)
-        x.add_optimizer(name=optimizer_name, label=optimizer_label)
+            driver_label = number_label(index_str, driver_label, number_alignment)
+        x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type)
 
         design_vars2 = _collect_connections(design_vars, recurse=recurse)
         responses2 = _collect_connections(responses, recurse=recurse)
@@ -704,17 +751,17 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
             opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
             init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
-            x.connect(optimizer_name, comp, format_block(conn_vars))  # Connection from optimizer
-            x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
-            x.add_output(optimizer_name, format_block(opt_con_vars), side='left')  # Optimal design variables
-            x.add_input(optimizer_name, format_block(init_con_vars))  # Initial design variables
+            x.connect(driver_name, comp, format_block(conn_vars))  # Connection from optimizer
+            x.add_output(comp, format_block(opt_con_vars), side=output_side)  # Optimal design variables
+            x.add_output(driver_name, format_block(opt_con_vars), side=output_side)  # Optimal design variables
+            x.add_input(driver_name, format_block(init_con_vars))  # Initial design variables
 
         # Responses
         for comp, conn_vars in iteritems(responses2):
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
             opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
-            x.connect(comp, optimizer_name, conn_vars)  # Connection to optimizer
-            x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
+            x.connect(comp, driver_name, conn_vars)  # Connection to optimizer
+            x.add_output(comp, format_block(opt_con_vars), side=output_side)  # Optimal output
 
     if include_solver:
         # Default "run once" solvers are ignored
