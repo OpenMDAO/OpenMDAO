@@ -18,21 +18,25 @@ try:
 except ImportError:
     XDSM = None
 
+DEBUG = True
+
 
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
 class TestPyXDSMViewer(unittest.TestCase):
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
-        os.chdir(self.tempdir)
+        if not DEBUG:
+            self.startdir = os.getcwd()
+            self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
+            os.chdir(self.tempdir)
 
     def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        if not DEBUG:
+            os.chdir(self.startdir)
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
     def test_pyxdsm_sellar(self):
         """Makes XDSM for the Sellar problem"""
@@ -493,16 +497,18 @@ class TestPyXDSMViewer(unittest.TestCase):
 class TestXDSMjsViewer(unittest.TestCase):
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='TestXDSMjsViewer-')
-        os.chdir(self.tempdir)
+        if not DEBUG:
+            self.startdir = os.getcwd()
+            self.tempdir = tempfile.mkdtemp(prefix='TestXDSMjsViewer-')
+            os.chdir(self.tempdir)
 
     def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
+        if not DEBUG:
+            os.chdir(self.startdir)
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
     def test_xdsmjs(self):
         """
@@ -751,6 +757,96 @@ class TestXDSMjsViewer(unittest.TestCase):
                    show_browser=False, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_execcomp(self):
+        filename = 'xdsmjs_execcomp'
+        out_format = 'html'
+        prob = Problem(model=Group())
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x')
+        prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0), promotes=['*'])
+        prob.driver = ScipyOptimizeDriver()
+        prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        prob.model.add_objective('y')
+        prob.setup(check=False)
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=False,
+                   show_parallel=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_meta_model(self):
+        from openmdao.components.tests.test_meta_model_structured_comp import SampleMap
+        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+
+        filename = 'xdsmjs_meta_model'
+        out_format = 'html'
+        model = Group()
+        ivc = IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = MetaModelStructuredComp(method='slinear', extrapolate=True)
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        prob = Problem(model)
+        prob.setup(check=False)
+        prob.final_setup()
+
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=True, show_browser=False,
+                   show_parallel=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_circuit_recurse(self):
+        # Implicit component is also tested here
+
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsmjs_circuit', out_format='html', quiet=True, show_browser=False,
+                   recurse=True)
+        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
 
     def test_wrong_out_format(self):
         """Incorrect output format error."""
