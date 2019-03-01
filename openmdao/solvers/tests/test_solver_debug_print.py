@@ -23,7 +23,7 @@ from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 
-from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_model
@@ -146,7 +146,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
     def test_solver_debug_print_feature(self):
         from openmdao.api import Problem, IndepVarComp, NewtonSolver, AnalysisError
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.test_suite.scripts.circuit_analysis import Circuit
         from openmdao.utils.general_utils import printoptions
 
         p = Problem()
