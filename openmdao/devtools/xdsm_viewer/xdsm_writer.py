@@ -902,7 +902,6 @@ def _prune_connections(conns, model_path=None, sep='.'):
             elif src0.startswith(model_path) and not tgt0.startswith(model_path):
                 # Externally connected output
                 external_outputs.append({'src': src_path, 'tgt': tgt_path})
-        print('CONNNNNS', internal_conns, external_inputs, external_outputs)
         return internal_conns, external_inputs, external_outputs
 
 
