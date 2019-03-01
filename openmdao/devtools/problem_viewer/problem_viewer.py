@@ -16,6 +16,7 @@ from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
@@ -42,6 +43,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['component_type'] = 'exec'
         elif isinstance(system, (MetaModelStructuredComp, MetaModelUnStructuredComp)):
             tree_dict['component_type'] = 'metamodel'
+        elif isinstance(system, IndepVarComp):
+            tree_dict['component_type'] = 'indep'
         elif isinstance(system, ExplicitComponent):
             tree_dict['component_type'] = 'explicit'
         else:

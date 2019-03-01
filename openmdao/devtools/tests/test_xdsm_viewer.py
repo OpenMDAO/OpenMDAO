@@ -19,7 +19,7 @@ try:
 except ImportError:
     XDSM = None
 
-DEBUG = True
+DEBUG = False
 QUIET = not DEBUG
 
 
