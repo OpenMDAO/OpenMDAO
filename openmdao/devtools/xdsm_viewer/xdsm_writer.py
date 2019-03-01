@@ -104,7 +104,7 @@ class AbstractXDSMWriter(object):
     def add_solver(self, label, name='solver', **kwargs):
         pass  # Implement in child class
 
-    def add_comp(self, name, label=None, **kwargs):
+    def add_comp(self, name, label=None, comp_type=None, **kwargs):
         pass  # Implement in child class
 
     def add_func(self, name, **kwargs):
@@ -153,9 +153,30 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.comp_names.append(self._format_id(name))
         self.add_system(name, 'mda', label, **kwargs)
 
-    def add_comp(self, name, label=None, **kwargs):
+    def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
+        """
+        Add a component.
+
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM, defaults to the name of the component.
+        name : str
+            Name of the component
+        stack : bool
+            True for parallel components.
+            Defaults to False.
+        comp_type : str or None
+            Component type, e.g. explicit, implicit or metamodel
+        kwargs : dict
+            Keyword args
+        """
+        comp_type_map = _COMPONENT_TYPE_MAP
+        style = comp_type_map.get(comp_type, 'style').lower()
+        if stack:
+            style += '_multi'
         self.comp_names.append(self._format_id(name))
-        self.add_system(name, 'analysis', label, **kwargs)
+        self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_func(self, name, label=None, **kwargs):
         pass
