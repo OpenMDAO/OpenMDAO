@@ -545,7 +545,6 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         from openmdao.drivers.doe_driver import DOEDriver
         driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
     except ImportError:
-        DOEDriver = None
         driver_type = 'optimization'
 
     design_vars = _model.get_design_vars()
@@ -574,7 +573,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
-                output_side=_OUTPUT_SIDE, driver_type='optimizer', **kwargs):
+                output_side=_OUTPUT_SIDE, driver_type='optimization', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -623,6 +622,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     output_side : str
         Left or right.
         Defaults to "left"
+    driver_type : str
+        Optimization or DOE.
+        Defaults to "optimization"
     kwargs : dict
         Keyword arguments
 
@@ -741,7 +743,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             nr_comps = len(x.comps)
             index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=1)
             driver_label = number_label(index_str, driver_label, number_alignment)
-        x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type)
+        x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
         design_vars2 = _collect_connections(design_vars, recurse=recurse)
         responses2 = _collect_connections(responses, recurse=recurse)
