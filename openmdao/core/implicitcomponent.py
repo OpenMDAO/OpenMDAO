@@ -431,7 +431,7 @@ class ImplicitComponent(Component):
 
         Returns
         -------
-        tuple(ndarray, ndarray)
+        tuple(ndarray, ndarray, is_implicit)
             'of' and 'wrt' variable sizes.
         """
         out_sizes, in_sizes = super(ImplicitComponent, self)._get_partials_sizes()

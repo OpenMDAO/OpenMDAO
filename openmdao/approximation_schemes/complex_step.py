@@ -127,6 +127,7 @@ class ComplexStep(ApproximationScheme):
         wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
                                               system._var_sizes['nonlinear']['input'][iproc])
 
+        iproc = system.comm.rank
         self._approx_groups = []
         for key, approx in approx_groups:
             wrt, form, delta, directional = key
@@ -142,6 +143,8 @@ class ComplexStep(ApproximationScheme):
                 _, wrt_names = system._get_partials_varlists()
                 wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
                 _, sizes = system._get_partials_sizes()
+                is_implicit = self._var_sizes['nonlinear']['input'][iproc].size < sizes:
+
                 reduced_sizes = update_sizes(wrt_names, sizes, system._owns_approx_wrt_idx)
                 coloring = options['coloring']
                 tmpJ = {
@@ -153,6 +156,7 @@ class ComplexStep(ApproximationScheme):
                 if len(wrt_names) != len(colored_wrts):
                     col_map = sub2full_indices(wrt_names, colored_wrts, sizes)
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
+                        # convert nzrows
                         self._approx_groups.append((None, delta, fact, [col_map[cols]], tmpJ,
                                                     nzrows))
                 else:
@@ -330,6 +334,8 @@ class ComplexStep(ApproximationScheme):
 
         # Turn off complex step.
         system._set_complex_step_mode(False)
+
+    def _perturb(self, arr, delta, )
 
     def _run_point_complex(self, system, arr, idxs, delta, result_clone, total=False):
         """
