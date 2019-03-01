@@ -33,8 +33,9 @@ where :math:`K` is the stiffness matrix. However, in practice, we augment the li
 Since our model contains a system of equations, we use the adjoint method to compute the gradient of the objective with respect to the beam height vector.
 The model is shown below.
 
-.. raw:: html
-    :file: n2.html
+.. embed-n2::
+    ../test_suite/scripts/multipoint_beam_opt.py
+
 
 Implementation: group
 ---------------------
