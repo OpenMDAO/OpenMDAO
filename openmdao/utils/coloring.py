@@ -458,7 +458,7 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     Return a boolean version of the total jacobian.
 
     The jacobian is computed by calculating a total jacobian using _compute_totals 'repeats'
-    times and adding the absolute values of those together, then dividing by the max value,
+    times and adding the absolute values of those together, then dividing by 'repeats',
     then converting to a boolean array, specifying all entries below a tolerance as False and all
     others as True.  Prior to calling _compute_totals, all of the partial jacobians in the
     model are modified so that when any of their subjacobians are assigned a value, that
