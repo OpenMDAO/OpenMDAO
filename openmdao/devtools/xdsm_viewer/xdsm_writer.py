@@ -157,6 +157,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.comp_names = []  # Component names
         self.comps = []  # List of systems
         self.reserved_words = '_U_',  # Ignored at text formatting
+        self._writer_name = 'xdsmjs'
 
     def _format_id(self, name, subs=(('_', ''),)):
         if name not in self.reserved_words:
@@ -198,7 +199,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.comp_names.append(self._format_id(name))
-        style = _COMPONENT_TYPE_MAP['xdsmjs']['solver']
+        style = _COMPONENT_TYPE_MAP[self._writer_name]['solver']
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
@@ -220,7 +221,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         comp_type_map = _COMPONENT_TYPE_MAP
-        style = comp_type_map['xdsmjs'].get(comp_type, 'analysis')
+        style = comp_type_map[self._writer_name].get(comp_type, 'analysis')
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
@@ -258,7 +259,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.driver = self._format_id(name)
-        style = _COMPONENT_TYPE_MAP['xdsmjs'].get(driver_type, 'optimization')
+        style = _COMPONENT_TYPE_MAP[self._writer_name].get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_system(self, node_name, style, label=None, stack=False, **kwargs):
@@ -372,6 +373,10 @@ else:
 
         """
 
+        def __init__(self):
+            super(XDSMWriter, self).__init__()
+            self._writer_name = 'pyxdsm'
+
         def write(self, filename=None, **kwargs):
             """
             Write the output file.
@@ -391,6 +396,22 @@ else:
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
         def add_system(self, node_name, style, label, stack=False, faded=False):
+            """
+            Add a system.
+
+            Parameters
+            ----------
+            node_name :str
+                Name of the system.
+            style : str
+                Block formatting style, e.g. Analysis
+            label : str
+                Label of system in XDSM.
+            stack : bool
+                Defaults to False.
+            faded : bool
+                Defaults to False.
+            """
             if label is None:
                 label = node_name
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
@@ -409,7 +430,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            style = _COMPONENT_TYPE_MAP['pyxdsm']['solver']
+            style = _COMPONENT_TYPE_MAP[self._writer_name]['solver']
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
@@ -431,7 +452,7 @@ else:
                 Keyword args
             """
             comp_type_map = _COMPONENT_TYPE_MAP
-            style = comp_type_map['pyxdsm'].get(comp_type, 'Analysis')
+            style = comp_type_map[self._writer_name].get(comp_type, 'Analysis')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
@@ -470,7 +491,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            style = _COMPONENT_TYPE_MAP['pyxdsm'].get(driver_type, 'Optimization')
+            style = _COMPONENT_TYPE_MAP[self._writer_name].get(driver_type, 'Optimization')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_workflow(self, comp_names=None):
