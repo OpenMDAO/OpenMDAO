@@ -19,7 +19,9 @@ try:
 except ImportError:
     XDSM = None
 
+# Set DEBUG to True if you want to view the generated HTML and PDF output files.
 DEBUG = False
+# Suppress pyXDSM console output
 QUIET = not DEBUG
 
 
