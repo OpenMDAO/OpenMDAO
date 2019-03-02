@@ -16,7 +16,6 @@ XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 
 # TODO solvers: also include solvers of groups, not just for the root. Include connections between
 #  component inputs & outputs and the solver.
-# TODO show parallel blocks also in XDSMjs
 # TODO numbering of data blocks. Logic: index of the receiving block
 
 from __future__ import print_function
@@ -70,6 +69,7 @@ _COMPONENT_TYPE_MAP = {
         'metamodel': 'Metamodel',
         'optimization': 'Optimization',
         'doe': 'DOE',
+        'solver': 'MDA',
     },
     'xdsmjs': {
         'indep': 'function',
@@ -79,6 +79,7 @@ _COMPONENT_TYPE_MAP = {
         'metamodel': 'metamodel',
         'optimization': 'optimization',
         'doe': 'doe',
+        'solver': 'mda',
     }
 }
 
@@ -152,9 +153,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
     """
     def __init__(self):
         super(XDSMjsWriter, self).__init__()
-        self.optimizer = 'opt'
+        self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
-        self.comps = []
+        self.comps = []  # List of systems
         self.reserved_words = '_U_',  # Ignored at text formatting
 
     def _format_id(self, name, subs=(('_', ''),)):
@@ -197,7 +198,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.comp_names.append(self._format_id(name))
-        self.add_system(name, 'mda', label, **kwargs)
+        style = _COMPONENT_TYPE_MAP['xdsmjs']['solver']
+        self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
         """
@@ -218,7 +220,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         comp_type_map = _COMPONENT_TYPE_MAP
-        style = comp_type_map['xdsmjs'].get(comp_type, 'style')
+        style = comp_type_map['xdsmjs'].get(comp_type, 'analysis')
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
@@ -255,7 +257,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         kwargs : dict
             Keyword args
         """
-        self.optimizer = self._format_id(name)
+        self.driver = self._format_id(name)
         style = _COMPONENT_TYPE_MAP['xdsmjs'].get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
@@ -291,7 +293,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         # FIXME now it does not work as expected, because second process might be inserted
         #  into another process (like optimizer and MDA)
         if len(self.processes) < 2:
-            self.processes.append([self.optimizer, comp_names])
+            self.processes.append([self.driver, comp_names])
         else:
             new_proc = [comp_names[0], comp_names[1:]]
             self.processes[1].insert(1, new_proc)
@@ -388,6 +390,12 @@ else:
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
+        def add_system(self, node_name, style, label, stack=False, faded=False):
+            if label is None:
+                label = node_name
+            super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
+                                               stack=stack, faded=faded)
+
         def add_solver(self, name, label=None, **kwargs):
             """
             Add a solver.
@@ -401,9 +409,8 @@ else:
             kwargs : dict
                 Keyword args
             """
-            if label is None:
-                label = name
-            self.add_system(node_name=name, style='MDA', label='\\text{%s}' % label, **kwargs)
+            style = _COMPONENT_TYPE_MAP['pyxdsm']['solver']
+            self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
             """
@@ -423,9 +430,6 @@ else:
             kwargs : dict
                 Keyword args
             """
-            if label is None:
-                label = name
-
             comp_type_map = _COMPONENT_TYPE_MAP
             style = comp_type_map['pyxdsm'].get(comp_type, 'Analysis')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
@@ -447,8 +451,6 @@ else:
             kwargs : dict
                 Keyword args
             """
-            if label is None:
-                label = name
             self.add_system(node_name=name, style='Function', label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
