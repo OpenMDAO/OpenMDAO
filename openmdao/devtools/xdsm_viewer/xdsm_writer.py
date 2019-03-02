@@ -55,29 +55,6 @@ _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency':
 _TEXT_CONSTANTS = {'no_data': '(no data)'}
 # Default solver, if no solver is added to a group.
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
-
-# Default file names in XDSMjs
-
-_XDSMJS_DATA = 'xdsm.json'  # data file, used only if data is not embedded
-_XDSMJS_FILENAME = 'xdsm.html'  # output file
-
-
-# Settings for pyXDSM
-
-# The box width can be set by the user:
-# _DEFAULT_BOX_WIDTH or _DEFAULT_BOX_CHAR_LIMIT can be overwritten with keyword argument "box_width"
-_DEFAULT_BOX_WIDTH = 3.  # Width of boxes [cm]. Depends on other settings, weather it is used or not
-# Maximum characters for line breaking.
-# The line can be longer, if a variable name is longer.
-_DEFAULT_BOX_CHAR_LIMIT = 25
-# Controls the appearance of boxes
-# Can be set with keyword argument "box_stacking"
-# Options: horizontal, vertical, max_chars, cut_chars, empty
-_DEFAULT_BOX_STACKING = 'max_chars'
-# Show arrowheads in process connection lines
-_PROCESS_ARROWS = False
-# Maximum number of lines in a box. No limit, if None.
-_MAX_BOX_LINES = None
 # On which side to place outputs? One of "left", "right"
 _OUTPUT_SIDE = 'left'
 
@@ -104,6 +81,29 @@ _COMPONENT_TYPE_MAP = {
         'doe': 'doe',
     }
 }
+
+# Default file names in XDSMjs
+
+_XDSMJS_DATA = 'xdsm.json'  # data file, used only if data is not embedded
+_XDSMJS_FILENAME = 'xdsm.html'  # output file
+
+
+# Settings for pyXDSM
+
+# The box width can be set by the user:
+# _DEFAULT_BOX_WIDTH or _DEFAULT_BOX_CHAR_LIMIT can be overwritten with keyword argument "box_width"
+_DEFAULT_BOX_WIDTH = 3.  # Width of boxes [cm]. Depends on other settings, weather it is used or not
+# Maximum characters for line breaking.
+# The line can be longer, if a variable name is longer.
+_DEFAULT_BOX_CHAR_LIMIT = 25
+# Controls the appearance of boxes
+# Can be set with keyword argument "box_stacking"
+# Options: horizontal, vertical, max_chars, cut_chars, empty
+_DEFAULT_BOX_STACKING = 'max_chars'
+# Show arrowheads in process connection lines
+_PROCESS_ARROWS = False
+# Maximum number of lines in a box. No limit, if None.
+_MAX_BOX_LINES = None
 
 
 class AbstractXDSMWriter(object):
@@ -164,6 +164,20 @@ class XDSMjsWriter(AbstractXDSMWriter):
             return name
 
     def connect(self, src, target, label, **kwargs):
+        """
+        Connect to system block.
+
+        Parameters
+        ----------
+        src : str
+            Source system name.
+        target : str
+            Target system name.
+        label : str
+            Label to be displayed in the XDSM data block.
+        kwargs : dict
+            Keyword args
+        """
         edge = {'to': self._format_id(target),
                 'from': self._format_id(src),
                 'name': label}
@@ -205,22 +219,68 @@ class XDSMjsWriter(AbstractXDSMWriter):
         """
         comp_type_map = _COMPONENT_TYPE_MAP
         style = comp_type_map['xdsmjs'].get(comp_type, 'style')
-        if stack:  # Parallel block
-            style += '_multi'
         self.comp_names.append(self._format_id(name))
-        self.add_system(node_name=name, style=style, label=label, **kwargs)
+        self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
-    def add_func(self, name, label=None, **kwargs):
-        self.add_system(node_name=name, style='function', label=label, **kwargs)
+    def add_func(self, name, label=None, stack=False, **kwargs):
+        """
+        Add a function.
+
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM, defaults to the name of the component.
+        name : str
+            Name of the component
+        stack : bool
+            True for parallel.
+            Defaults to False.
+        kwargs : dict
+            Keyword args
+        """
+        self.add_system(node_name=name, style='function', label=label, stack=stack, **kwargs)
 
     def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
+        """
+
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM.
+        name : str
+            Name of the driver.
+        driver_type : str
+            Optimization or DOE.
+            Defaults to "optimization".
+        kwargs : dict
+            Keyword args
+        """
         self.optimizer = self._format_id(name)
         style = _COMPONENT_TYPE_MAP['xdsmjs'].get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
-    def add_system(self, node_name, style, label=None, **kwargs):
+    def add_system(self, node_name, style, label=None, stack=False, **kwargs):
+        """
+        Add a system.
+
+        Parameters
+        ----------
+        node_name : str
+            Name of the system
+        style : str
+            Block formatting style.
+        label : str
+            Label in the XDSM, defaults to the name of the component.
+        stack : bool
+            True for parallel.
+            Defaults to False.
+        kwargs : dict
+            Keyword args
+        """
         if label is None:
             label = node_name
+        if stack:  # Parallel block
+            style += '_multi'  # Block will be stacked in XDSMjs, if ends with this string
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.comps.append(dct)
 
@@ -239,7 +299,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
 
-    def add_output(self, name, label=None, style='DataIO', stack=False, side="left"):
+    def add_output(self, name, label=None, style='DataIO', stack=False, side=_OUTPUT_SIDE):
         self.connect(src=name, target='_U_', label=label)
 
     def collect_data(self):
@@ -624,7 +684,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Defaults to "left"
     driver_type : str
         Optimization or DOE.
-        Defaults to "optimization"
+        Defaults to "optimization".
     kwargs : dict
         Keyword arguments
 
