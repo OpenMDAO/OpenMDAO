@@ -137,7 +137,7 @@ class AbstractXDSMWriter(object):
     def add_input(self, name, label, style='DataIO', stack=False):
         pass  # Implement in child class
 
-    def add_output(self, name, label, style='DataIO', stack=False, side="left"):
+    def add_output(self, name, label, style='DataIO', stack=False, side=_OUTPUT_SIDE):
         pass  # Implement in child class
 
     def add_process(self, systems, arrow=True):
@@ -288,6 +288,14 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.comps.append(dct)
 
     def add_workflow(self, comp_names=None):
+        """
+        Add a workflow. If "comp_names" is None, all components will be included.
+
+        Parameters
+        ----------
+        comp_names : list(str) or None, optional
+            List of component names.
+        """
         if comp_names is None:
             comp_names = self.comp_names
 
@@ -496,7 +504,7 @@ else:
 
         def add_workflow(self, comp_names=None):
             """
-            Add a workflow. If not specified, all components will be included.
+            Add a workflow. If "comp_names" is None, all components will be included.
 
             Parameters
             ----------
