@@ -1,3 +1,5 @@
+.. _feature_core_features:
+
 *************
 Core Features
 *************

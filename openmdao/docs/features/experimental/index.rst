@@ -11,4 +11,5 @@ Anything documented here is functional but not fully tested.
    :maxdepth: 2
 
    discrete_vars.rst
+   xdsm_visualization.rst
 

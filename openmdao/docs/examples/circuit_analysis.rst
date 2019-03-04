@@ -1,8 +1,8 @@
 .. _`circuit_analysis_examples`:
 
-*********************************************************
-Converging an Implicit Model: Non-linear circuit analysis
-*********************************************************
+********************************************************
+Converging an Implicit Model: Nonlinear circuit analysis
+********************************************************
 
 Consider a simple electrical circuit made up from two resistors, a diode, and a constant current source.
 Our goal is to solve for the steady-state voltages at node 1 and node 2.
