@@ -44,7 +44,7 @@ the model level and the
 .. note::
 
    You are allowed to use multiple assembled Jacobians at multiple different levels of your model hierarchy.
-   This may be useful if you have nested non-linear solvers to converge very difficult problems.
+   This may be useful if you have nested nonlinear solvers to converge very difficult problems.
 
 -------------
 Usage Example

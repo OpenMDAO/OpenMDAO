@@ -60,7 +60,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //COLUMN TITLES
     {
-        var text = ["System Colors", "N^2 Symbols", showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
+        var text = ["Systems & Variables", "N^2 Symbols", showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * i + xOffset) + "," + (60) + ")");
             el.append("svg:text")
@@ -91,7 +91,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //N2 SYMBOLS
     {
-        var text = ["Scalar", "Vector", "Group"];
+        var text = ["Scalar", "Vector", "Collapsed variables"];
         var colors = [UNKNOWN_EXPLICIT_COLOR, UNKNOWN_EXPLICIT_COLOR, UNKNOWN_EXPLICIT_COLOR];
         var shapeFunctions = [DrawScalar, DrawVector, DrawGroup];
         for (var i = 0; i < text.length; ++i) {

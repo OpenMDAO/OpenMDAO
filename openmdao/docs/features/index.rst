@@ -14,6 +14,7 @@ has been thoroughly tested, and should be considered fully functional.
    core_features/index.rst
    building_blocks/index.rst
    recording/index.rst
+   model_visualization/index.rst
    debugging/index.rst
    units.rst
    experimental/index.rst
