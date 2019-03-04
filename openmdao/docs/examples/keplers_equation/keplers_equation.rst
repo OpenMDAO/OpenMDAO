@@ -32,10 +32,11 @@ left-hand side (LHS) of the equation.  For our example, we will assign the right
 
 In this implementation, we rely on an ExecComp to compute the value of the LHS.
 
-Implicit components in OpenMDAO also provide an "initial guess" method,
-*guess_nonlinear*, which provides the starting value for the implicit state
-variable (:math:`E` in this case) for the nonlinear solver.  When solving Kepler's
-equation, using :math:`M` as the initial guess for :math:`E` is a good starting point.
+BalanceComp also provides a way to supply the starting value for the implicit state variable
+(:math:`E` in this case) for the nonlinear solver, via the `guess_func` argument.
+The supplied function should have a simiilar signature to the *guess_nonlinear* function of
+:ref:`ImplicitComponent <comp-type-3-implicitcomp>`.
+When solving Kepler's equation, using :math:`M` as the initial guess for :math:`E` is a good starting point.
 
 In summary, the recipe for solving Kepler's equation is as follows:
 
