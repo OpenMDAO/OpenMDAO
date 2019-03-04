@@ -32,7 +32,7 @@ and runs the model.
 
 .. note::
 
-    To get into more details, if :code:`final_setup` isn't called in the script (either directly or as a result
+    If :code:`final_setup` isn't called in the script (either directly or as a result
     of :code:`run_model`
     or :code:`run_driver`) then nothing will happen. Also, when using the command line version,
     even if the script does call :code:`run_model` or :code:`run_driver`,
@@ -49,46 +49,9 @@ will generate an XDSM diagram like the one below.
 
 The :code:`openmdao xdsm` command has many options:
 
-.. code-block:: none
+.. embed-shell-cmd::
+    :cmd: openmdao xdsm -h
 
-    usage: openmdao xdsm [-h] [-o OUTFILE] [-f {html,pdf,tex}] [-m MODEL_PATH]
-                         [-r] [--no_browser] [--no_ext] [-s] [--no_process_conns]
-                         [--box_stacking {max_chars,vertical,horizontal,cut_chars,empty}]
-                         [--box_width BOX_WIDTH] [--box_lines BOX_LINES]
-                         [--numbered_comps]
-                         [--number_alignment {horizontal,vertical}]
-                         file
-
-    positional arguments:
-      file                  Python file containing the model.
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      -o OUTFILE, --outfile OUTFILE
-                            XDSM output file. (use pathname without extension)
-      -f {html,pdf,tex}, --format {html,pdf,tex}
-                            format of XSDM output.
-      -m MODEL_PATH, --model_path MODEL_PATH
-                            Path to system to transcribe to XDSM.
-      -r, --recurse         don't treat the top level of each name as the
-                            source/target component.
-      --no_browser          don't display in a browser.
-      --no_ext              don't show externally connected outputs.
-      -s, --include_solver  include the problem model's nonlinear solver in the
-                            XDSM.
-      --no_process_conns    don't add process connections (thin black lines).
-      --box_stacking {max_chars,vertical,horizontal,cut_chars,empty}
-                            Controls the appearance of boxes.
-      --box_width BOX_WIDTH
-                            Controls the width of boxes.
-      --box_lines BOX_LINES
-                            Limits number of vertical lines in box if box_stacking
-                            is vertical.
-      --numbered_comps      Display components with numbers. Only active for 'pdf'
-                            and 'tex' formats.
-      --number_alignment {horizontal,vertical}
-                            positions the number either above or in front of the
-                            component label if numbered_comps is true.
 
 From a Script
 -------------

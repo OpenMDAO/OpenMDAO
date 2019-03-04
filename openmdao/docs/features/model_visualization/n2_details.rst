@@ -86,7 +86,7 @@ Connections button |clear_conn_arrows| in the toolbar.
 
 Solver Structure
 ----------------
-Each System in a model can potentially have a linear and nonlinear model associated with it. On the right side
+Each System in a model can potentially have a linear and nonlinear solver associated with it. On the right side
 of the N2 diagram, the hierarchy of the solvers is shown. This time the hierarchy goes from right to left with the root
 of the model on the right.
 You can switch between showing the linear or nonlinear

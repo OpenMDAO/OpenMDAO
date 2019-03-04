@@ -34,7 +34,7 @@ and runs the model.
 
 .. note::
 
-    To get into more details, if :code:`final_setup` isn't called in the script (either directly or as a result
+    If :code:`final_setup` isn't called in the script (either directly or as a result
     of :code:`run_model`
     or :code:`run_driver`) then nothing will happen. Also, when using the command line version,
     even if the script does call :code:`run_model` or :code:`run_driver`,
@@ -54,22 +54,9 @@ will generate an N2 diagram like the one below.
 
 The :code:`openmdao view_model` has several options:
 
-.. code-block:: none
+.. embed-shell-cmd::
+    :cmd: openmdao view_model -h
 
-    usage: openmdao view_model [-h] [-o OUTFILE] [--no_browser] [--embed]
-                               [--draw_potential_connections]
-                               file
-
-    positional arguments:
-      file                  Python file containing the model.
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      -o OUTFILE            html output file.
-      --no_browser          don't display in a browser.
-      --embed               create embeddable version.
-      --draw_potential_connections
-                            draw potential connections.
 
 .. raw:: html
     :file: examples/n2_circuit_with_unconnected_input.html
