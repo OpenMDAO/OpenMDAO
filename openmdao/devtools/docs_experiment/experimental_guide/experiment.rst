@@ -192,3 +192,8 @@ SNOPT test
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_atol
     :layout: interleave
 
+Embed-N2 test
+
+.. embed-n2::
+    ../../test_suite/scripts/circuit.py
+

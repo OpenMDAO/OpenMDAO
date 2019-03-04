@@ -81,5 +81,5 @@ You can do the same thing programmatically by adding the following to your pytho
 
 Here is what the resulting visualization would look like for the above model:
 
-.. raw:: html
-    :file: n2.html
+.. embed-n2::
+    ../test_suite/scripts/circuit_analysis.py

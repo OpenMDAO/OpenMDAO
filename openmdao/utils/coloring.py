@@ -381,8 +381,8 @@ def _tol_sweep(arr, tol=1e-15, orders=5):
     """
     Find best tolerance 'around' tol to choose nonzero values of arr.
 
-    # Sweeps over tolerances +- 'orders' orders of magnitude around tol and picks the most
-    # stable one (one corresponding to the most repeated number of nonzero entries).
+    Sweeps over tolerances +- 'orders' orders of magnitude around tol and picks the most
+    stable one (one corresponding to the most repeated number of nonzero entries).
 
     Parameters
     ----------
@@ -458,7 +458,7 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
     Return a boolean version of the total jacobian.
 
     The jacobian is computed by calculating a total jacobian using _compute_totals 'repeats'
-    times and adding the absolute values of those together, then dividing by the max value,
+    times and adding the absolute values of those together, then dividing by 'repeats',
     then converting to a boolean array, specifying all entries below a tolerance as False and all
     others as True.  Prior to calling _compute_totals, all of the partial jacobians in the
     model are modified so that when any of their subjacobians are assigned a value, that
@@ -516,8 +516,7 @@ def _get_bool_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=F
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    # normalize the full J by dividing by the max value
-    fullJ /= np.max(fullJ)
+    fullJ /= repeats
 
     good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
 

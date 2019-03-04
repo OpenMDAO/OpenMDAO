@@ -473,6 +473,23 @@ embed-bibtex
         ScipyOptimizeDriver
 
 
+embed-n2
+++++++++++++
+
+    `embed-n2` is a custom directive that lets you insert an N-squared diagram into
+    the documentation. The argument is a path to a model file that can successfully
+    have `view_model` run on it.
+
+    .. code-block:: rst
+
+        .. embed-n2::
+            ../test_suite/scripts/sellar.py
+
+    The output from the above syntax should look like this:
+
+    .. embed-n2::
+        ../test_suite/scripts/sellar.py
+
 Tagging
 -------
 
