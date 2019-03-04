@@ -1,6 +1,6 @@
 from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
 
-from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
+from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
 class Circuit(Group):
 

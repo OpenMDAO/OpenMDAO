@@ -25,10 +25,8 @@ Here is the N2 diagram that is generated from this model.
 There are three parts to the N2 diagram. The model hierarchy is on the left, the connection matrix is displayed
 in the center, and the solver structure is shown on the right.
 
-
-.. raw:: html
-    :file: examples/n2_circuit_with_unconnected_input.html
-
+.. embed-n2::
+    ../test_suite/scripts/circuit_with_unconnected_input.py
 
 Model Hierarchy
 ---------------
@@ -39,8 +37,8 @@ inputs and outputs.
 The top System, the root of the model, is on the left and the subsystem hierarchy is displayed on the right.
 
 The colors indicate the type of
-item in the hierarchy. To see what the colors represent, an optional legend can be displayed using the |show_legend| button.
-Here is the part of the legend that explains the colors of the model hierarchy.
+item in the hierarchy. To see what the colors represent, an optional legend can be displayed using the |show_legend|
+button. Here is the part of the legend that explains the colors of the model hierarchy.
 
 .. image::
     images/systems_and_variables_legend.png

@@ -57,9 +57,8 @@ The :code:`openmdao view_model` has several options:
 .. embed-shell-cmd::
     :cmd: openmdao view_model -h
 
-
-.. raw:: html
-    :file: examples/n2_circuit_with_unconnected_input.html
+.. embed-n2::
+    ../test_suite/scripts/circuit_with_unconnected_input.py
 
 
 From a Script
