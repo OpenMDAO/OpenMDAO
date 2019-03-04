@@ -14,9 +14,9 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-# TODO implement "stack" boxes for parallel components
 # TODO solvers: also include solvers of groups, not just for the root. Include connections between
 #  component inputs & outputs and the solver.
+# TODO show parallel blocks also in XDSMjs
 
 from __future__ import print_function
 
@@ -138,14 +138,15 @@ class XDSMjsWriter(AbstractXDSMWriter):
                 'name': label}
         self.connections.append(edge)
 
-    def add_solver(self, label, name='solver', **kwargs):
-        raise NotImplementedError()
+    def add_solver(self, name, label=None, **kwargs):
+        self.comp_names.append(self._format_id(name))
+        self.add_system(name, 'mda', label, **kwargs)
 
     def add_comp(self, name, label=None, **kwargs):
         self.comp_names.append(self._format_id(name))
         self.add_system(name, 'analysis', label, **kwargs)
 
-    def add_func(self, name, **kwargs):
+    def add_func(self, name, label=None, **kwargs):
         pass
 
     def add_optimizer(self, label, name='opt', **kwargs):
@@ -158,9 +159,17 @@ class XDSMjsWriter(AbstractXDSMWriter):
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.comps.append(dct)
 
-    def add_workflow(self):
-        wf = ["_U_", [self.optimizer, self.comp_names]]
-        self.processes = wf
+    def add_workflow(self, comp_names=None):
+        if comp_names is None:
+            comp_names = self.comp_names
+
+        # FIXME now it does not work as expected, because second process might be inserted
+        #  into another process (like optimizer and MDA)
+        if len(self.processes) < 2:
+            self.processes.append([self.optimizer, comp_names])
+        else:
+            new_proc = [comp_names[0], comp_names[1:]]
+            self.processes[1].insert(1, new_proc)
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
@@ -226,10 +235,13 @@ else:
         XDSM with some additional semantics.
         Creates a TeX file and TiKZ file, and converts it to PDF.
 
-        On Windows it might be necessary to add the second line in the :class:`~pyxdsm.XDSM.XDSM`::
+        .. note:: On Windows it might be necessary to add the second line in the
+           :class:`~pyxdsm.XDSM.XDSM`, if an older version of the package is installed::
 
             diagram_styles_path = os.path.join(module_path, 'diagram_styles')
             diagram_styles_path = diagram_styles_path.replace('\\', '/')  # Add this line on Windows
+
+           This issue is resolved in the latest version of pyXDSM.
 
         """
 
@@ -251,7 +263,7 @@ else:
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
-        def add_solver(self, label, name='solver', **kwargs):
+        def add_solver(self, name, label=None, **kwargs):
             """
             Add a solver.
 
@@ -264,9 +276,11 @@ else:
             kwargs : dict
                 Keyword args
             """
-            self.add_system(name, 'MDA', '\\text{%s}' % label, **kwargs)
+            if label is None:
+                label = name
+            self.add_system(node_name=name, style='MDA', label='\\text{%s}' % label, **kwargs)
 
-        def add_comp(self, name, label=None, **kwargs):
+        def add_comp(self, name, label=None, stack=False, **kwargs):
             """
             Add a component.
 
@@ -276,27 +290,39 @@ else:
                 Label in the XDSM, defaults to the name of the component.
             name : str
                 Name of the component
+            stack : bool
+                True for parallel components.
+                Defaults to False.
             kwargs : dict
                 Keyword args
             """
             if label is None:
                 label = name
-            self.add_system(name, 'Analysis', '\\text{%s}' % label, **kwargs)
+            self.add_system(node_name=name, style='Analysis', label='\\text{%s}' % label,
+                            stack=stack, **kwargs)
 
-        def add_func(self, name, **kwargs):
+        def add_func(self, name, label=None, stack=False, **kwargs):
             """
             Add a function
 
             Parameters
             ----------
+            label : str
+                Label in the XDSM, defaults to the name of the component.
             name : str
-                Name of the function
+                Name of the component
+            stack : bool
+                True for parallel.
+                Defaults to False.
             kwargs : dict
                 Keyword args
             """
-            self.add_system(name, 'Function', name, **kwargs)
+            if label is None:
+                label = name
+            self.add_system(node_name=name, style='Function', label='\\text{%s}' % label,
+                            stack=stack, **kwargs)
 
-        def add_optimizer(self, label, name='opt', **kwargs):
+        def add_optimizer(self, name, label=None, **kwargs):
             """
             Add an optimizer.
 
@@ -311,16 +337,26 @@ else:
             """
             self.add_system(name, 'Optimization', '\\text{%s}' % label, **kwargs)
 
-        def add_workflow(self):
-            comp_names = [c[0] for c in self.comps]
-            comp_names.append(comp_names[0])  # close the loop
-            self.add_process(comp_names, arrow=_PROCESS_ARROWS)
+        def add_workflow(self, comp_names=None):
+            """
+            Add a workflow. If not specified, all components will be included.
+
+            Parameters
+            ----------
+            comp_names : list(str) or None, optional
+                List of component names.
+                Defaults to None.
+            """
+            if comp_names is None:
+                comp_names = [c[0] for c in self.comps]
+            comps = comp_names + [comp_names[0]]  # close the loop
+            self.add_process(comps, arrow=_PROCESS_ARROWS)
 
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
-               add_process_conns=True, **kwargs):
+               add_process_conns=True, show_parallel=True, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -396,11 +432,14 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     add_process_conns: bool
         Add process connections (thin black lines)
         Defaults to True
+    show_parallel : bool
+        Show parallel components with stacked blocks.
+        Defaults to True.
     kwargs : dict
         Keyword arguments
     Returns
     -------
-       XDSM
+       XDSM or AbstractXDSMWriter
     """
     build_pdf = False
     if out_format in ('tex', 'pdf'):
@@ -421,6 +460,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         _model = problem.model
     else:
         _model = problem.model._get_subsystem(model_path)
+        if _model is None:
+            msg = 'Model path "{}" does not exist in problem "{}".'
+            raise ValueError(msg.format(model_path, problem))
 
     # Name is None if the driver is not specified
     driver_name = _get_cls_name(driver) if driver else None
@@ -443,13 +485,14 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                        design_vars=design_vars, responses=responses, writer=writer,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
-                       add_process_conns=add_process_conns, build_pdf=build_pdf, **kwargs)
+                       add_process_conns=add_process_conns, build_pdf=build_pdf,
+                       show_parallel=show_parallel, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
-                include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM',
-                show_browser=False, add_process_conns=True, quiet=False, build_pdf=False, **kwargs):
+                include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
+                add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -488,6 +531,9 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     add_process_conns: bool
         Add process connections (thin black lines)
         Defaults to True
+    show_parallel : bool
+        Show parallel components with stacked blocks.
+        Defaults to True.
     quiet : bool
         Set to True to suppress output from pdflatex
     build_pdf : bool
@@ -498,7 +544,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
 
     Returns
     -------
-        XDSM
+        XDSM or AbstractXDSMWriter
     """
     # TODO implement residuals
 
@@ -545,6 +591,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
 
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse)
+    comps_dct = {comp['abs_name']: comp for comp in comps}
     solvers = []
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
@@ -558,6 +605,39 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
+    def add_solver(comps, first=0):
+        # Adds a solver.
+        # Uses some vars from the outer scope.
+        comp_names = [_format_name(c['abs_name']) for c in comps]
+        solver_label = _format_solver_str(tree,
+                                          stacking=box_stacking,
+                                          add_indices=add_component_indices)
+        solver_label = _replace_chars(solver_label, subs)
+        solver_name = _format_solver_str(tree, stacking='horizontal', add_indices=False)
+        solver_name = _format_name(solver_name)
+
+        if solver_label:  # At least one non-default solver (default solvers are ignored)
+            nr_components = len(comps)
+            if add_component_indices:
+                solver_index = _make_loop_str(first=first,
+                                              last=nr_components, start_index=1)
+                solver_label = number_label(solver_index, solver_label, number_alignment)
+            solvers.append(solver_label)
+            x.add_solver(name=solver_name, label=solver_label)
+            if add_process_conns:
+                x.add_workflow([solver_name] + comp_names)
+
+            # Add the connections
+            for src, dct in iteritems(conns3):
+                for tgt, conn_vars in iteritems(dct):
+                    formatted_cons = format_block(conn_vars)
+                    if (src in comp_names) and (tgt in comp_names):
+                        formatted_targets = [format_var_str(c, 'target') for c in formatted_cons]
+                        # From solver to components (targets)
+                        x.connect(solver_name, tgt, formatted_targets)
+                        # From components to solver
+                        x.connect(src, solver_name, formatted_cons)
+
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
     elif writer_name == 'xdsmjs':  # XDSMjs
@@ -567,13 +647,36 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         raise ValueError(msg.format(writer_name))
 
     if optimizer is not None:
-        label = optimizer
+        optimizer_label = optimizer
+        optimizer_name = _format_name(optimizer)
         if add_component_indices:
-            opt_index = len(comps) + len(solvers) + 2  # index of last block + 1
+            opt_index = len(comps) + 1  # index of last block + 1
+            if include_solver:
+                opt_index += len(solvers)
             nr_comps = len(x.comps)
-            index_str = '{}, {}$ \\rightarrow $ 2'.format(nr_comps+1, opt_index, nr_comps+2)
-            label = number_label(index_str, label, number_alignment)
-        x.add_optimizer(label=label)
+            index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=1)
+            optimizer_label = number_label(index_str, optimizer_label, number_alignment)
+        x.add_optimizer(name=optimizer_name, label=optimizer_label)
+
+        design_vars2 = _collect_connections(design_vars, recurse=recurse)
+        responses2 = _collect_connections(responses, recurse=recurse)
+
+        # Design variables
+        for comp, conn_vars in iteritems(design_vars2):
+            conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
+            opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
+            init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
+            x.connect(optimizer_name, comp, format_block(conn_vars))  # Connection from optimizer
+            x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
+            x.add_output(optimizer_name, format_block(opt_con_vars), side='left')  # Optimal design variables
+            x.add_input(optimizer_name, format_block(init_con_vars))  # Initial design variables
+
+        # Responses
+        for comp, conn_vars in iteritems(responses2):
+            conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
+            opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
+            x.connect(comp, optimizer_name, conn_vars)  # Connection to optimizer
+            x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
 
     if include_solver:
         # Default "run once" solvers are ignored
@@ -581,36 +684,7 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
         warnings.warn(msg)
 
-        solver_str = _format_solver_str(tree,
-                                        stacking=box_stacking,
-                                        add_indices=add_component_indices)
-
-        if solver_str:  # At least one non-default solver
-            if add_component_indices:
-                i = len(x.comps) + 1
-                solver_str = number_label(i, solver_str, number_alignment)
-            solvers.append(solver_str)
-            x.add_solver(solver_str)
-
-    design_vars2 = _collect_connections(design_vars, recurse=recurse)
-    responses2 = _collect_connections(responses, recurse=recurse)
-
-    # Design variables
-    for comp, conn_vars in iteritems(design_vars2):
-        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
-        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
-        init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
-        x.connect('opt', comp, format_block(conn_vars))  # Connection from optimizer
-        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal design variables
-        x.add_output('opt', format_block(opt_con_vars), side='left')  # Optimal design variables
-        x.add_input('opt', format_block(init_con_vars))  # Initial design variables
-
-    # Responses
-    for comp, conn_vars in iteritems(responses2):
-        conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
-        opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
-        x.connect(comp, 'opt', conn_vars)  # Connection to optimizer
-        x.add_output(comp, format_block(opt_con_vars), side='left')  # Optimal output
+        add_solver(comps=comps, first=1)
 
     # Add components
     for comp in comps:  # Driver is 1, so starting from 2
@@ -618,18 +692,21 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
         label = _replace_chars(comp['name'], substitutes=subs)
         if add_component_indices:
             label = number_label(i, label, number_alignment)
-        x.add_comp(name=comp['abs_name'], label=label)
+        stack = comp['is_parallel'] and show_parallel
+        x.add_comp(name=comp['abs_name'], label=label, stack=stack)
 
     # Add the connections
     for src, dct in iteritems(conns3):
         for tgt, conn_vars in iteritems(dct):
-            x.connect(src, tgt, format_block(conn_vars))
+            stack = (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel']) and show_parallel
+            x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
 
     # Add the externally sourced inputs
     for src, tgts in iteritems(external_inputs3):
         for tgt, conn_vars in iteritems(tgts):
             formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
-            x.add_input(tgt, format_block(formatted_conn_vars))
+            stack = comps_dct[tgt]['is_parallel'] and show_parallel
+            x.add_input(tgt, format_block(formatted_conn_vars), stack=stack)
 
     # Add the externally connected outputs
     if include_external_outputs:
@@ -638,7 +715,8 @@ def _write_xdsm(filename, viewer_data, optimizer=None, include_solver=False, cle
             for tgt, conn_vars in iteritems(tgts):
                 output_vars |= set(conn_vars)
             formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
-            x.add_output(src, formatted_outputs, side='right')
+            stack = comps_dct[src]['is_parallel'] and show_parallel
+            x.add_output(src, formatted_outputs, side='right', stack=stack)
 
     if add_process_conns:
         x.add_workflow()
@@ -789,21 +867,25 @@ def _prune_connections(conns, model_path=None, sep='.'):
         return conns, external_inputs, external_outputs
     else:
         for conn in conns:
-            src = conn['src']
+            src = src0 = conn['src']
+            if src.startswith(model_path):
+                src = src[len(model_path):]
             src_path = _format_name(src.rsplit(sep, 1)[0])
-            tgt = conn['tgt']
+            tgt = tgt0 = conn['tgt']
+            if tgt.startswith(model_path):
+                tgt = tgt[len(model_path):]
             tgt_path = _format_name(tgt.rsplit(sep, 1)[0])
 
-            if src.startswith(model_path) and tgt.startswith(model_path):
+            if src0.startswith(model_path) and tgt0.startswith(model_path):
                 # Internal connections
                 internal_conns.append({'src': src_path, 'tgt': tgt_path})
-            elif not src.startswith(model_path) and tgt.startswith(model_path):
+            elif not src0.startswith(model_path) and tgt0.startswith(model_path):
                 # Externally connected input
                 external_inputs.append({'src': src_path, 'tgt': tgt_path})
-            elif src.startswith(model_path) and not tgt.startswith(model_path):
+            elif src0.startswith(model_path) and not tgt0.startswith(model_path):
                 # Externally connected output
                 external_outputs.append({'src': src_path, 'tgt': tgt_path})
-
+        print('CONNNNNS', internal_conns, external_inputs, external_outputs)
         return internal_conns, external_inputs, external_outputs
 
 
@@ -1007,7 +1089,15 @@ def _multiline_block(*texts, **kwargs):
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
 
+
+def _make_loop_str(first, last, start_index=0):
+    i = start_index
+    txt = '{}, {}$ \\rightarrow $ {}'
+    return txt.format(first+i, last+i, first+i+1)
+
+
 ##### openmdao command line setup
+
 
 def _xdsm_setup_parser(parser):
     """
@@ -1026,15 +1116,18 @@ def _xdsm_setup_parser(parser):
     parser.add_argument('-m', '--model_path', action='store', dest='model_path',
                         help='Path to system to transcribe to XDSM.')
     parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
-                        help="don't treat the top level of each name as the source/target component.")
+                        help="Don't treat the top level of each name as the source/target component.")
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
-                        help="don't display in a browser.")
+                        help="Don't display in a browser.")
+    parser.add_argument('--no_parallel', action='store_true', dest='no_parallel',
+                        help="don't show stacked parallel blocks. Only active for 'pdf' and 'tex' "
+                             "formats.")
     parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
-                        help="don't show externally connected outputs.")
+                        help="Don't show externally connected outputs.")
     parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
-                        help="include the problem model's nonlinear solver in the XDSM.")
+                        help="Include the problem model's solver in the XDSM.")
     parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
-                        help="don't add process connections (thin black lines).")
+                        help="Don't add process connections (thin black lines).")
     parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
                         choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
                         dest='box_stacking', help='Controls the appearance of boxes.')
@@ -1048,7 +1141,7 @@ def _xdsm_setup_parser(parser):
                         "formats.")
     parser.add_argument('--number_alignment', action='store', dest='number_alignment',
                         choices=['horizontal', 'vertical'], default='horizontal',
-                        help='positions the number either above or in front of the component label '
+                        help='Positions the number either above or in front of the component label '
                         'if numbered_comps is true.')
 
 
@@ -1078,7 +1171,7 @@ def _xdsm_cmd(options):
                    include_external_outputs=not options.no_extern_outputs,
                    out_format=options.format,
                    include_solver=options.include_solver, subs=_CHAR_SUBS,
-                   show_browser=not options.no_browser,
+                   show_browser=not options.no_browser, show_parallel=not options.no_parallel,
                    add_process_conns=not options.no_process_conns, **kwargs)
         exit()
     return _xdsm
