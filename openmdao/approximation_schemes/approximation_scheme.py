@@ -70,8 +70,11 @@ class ApproximationScheme(object):
         """
         new_list = []
         new_entry = None
+        colored = set()
         for tup in self._exec_list:
+            key = tuple(tup[:2])
             if 'coloring' in tup[2]:
+                colored.add(key)
                 _, _, options = tup
                 if new_entry is None:
                     options = options.copy()
@@ -81,7 +84,7 @@ class ApproximationScheme(object):
                     new_list.append(new_entry)
                 else:
                     new_entry[2]['approxs'].append(tup)
-            else:
+            elif key not in colored:
                 new_list.append(tup)
 
         self._exec_list = new_list
@@ -218,7 +221,7 @@ def _get_wrt_subjacs(system, approxs):
         if len(sorted_ofs) != len(system._var_allprocs_abs_names['output']):
             ofset = set(sorted_ofs)
             J[wrt]['full_out_idxs'] = \
-                sub2full_indices(system._var_allprocs_abs_names['output'], ofset, 
+                sub2full_indices(system._var_allprocs_abs_names['output'], ofset,
                                  system._var_sizes['nonlinear']['output'][iproc],
                                  approx_of_idx)
         else:

@@ -156,8 +156,8 @@ class Jacobian(object):
                 safe_dtype = np.promote_types(subjac.dtype, float)
                 subjac = subjac.astype(safe_dtype, copy=False)
 
-                # Bail here so that we allow top level jacobians to be of reduced size when indices are
-                # specified on driver vars.
+                # Bail here so that we allow top level jacobians to be of reduced size when indices
+                # are specified on driver vars.
                 if self._override_checks:
                     subjacs_info['value'] = subjac
                     return
@@ -216,8 +216,8 @@ class Jacobian(object):
                 safe_dtype = np.promote_types(subjac.dtype, float)
                 subjac = subjac.astype(safe_dtype, copy=False)
 
-                # Bail here so that we allow top level jacobians to be of reduced size when indices are
-                # specified on driver vars.
+                # Bail here so that we allow top level jacobians to be of reduced size when indices
+                # are specified on driver vars.
                 if self._override_checks:
                     subjacs_info['value'] = subjac
                     return
@@ -239,8 +239,8 @@ class Jacobian(object):
 
                     if subjac.shape != rows.shape:
                         raise ValueError("Sub-jacobian for key %s has "
-                                        "the wrong shape (%s), expected (%s)." %
-                                        (abs_key, subjac.shape, rows.shape))
+                                         "the wrong shape (%s), expected (%s)." %
+                                         (abs_key, subjac.shape, rows.shape))
 
                 np.copyto(subjacs_info['value'], subjac)
         else:
@@ -327,14 +327,14 @@ class Jacobian(object):
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
         The sparsity matrix will contain only those columns that match the wrt variables in
-        wrt_matches.
+        wrt_matches, but will contain rows for all outputs in the given system.
 
         Parameters
         ----------
         system : System
             The System containing the jacobian whose sparsity will be computed.
         wrt_matches : set of str
-            Set of wrt variables to compute sparity for.
+            Set of wrt variables to compute sparsity for.
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero.
         orders : int
@@ -383,7 +383,8 @@ class Jacobian(object):
                             sub_wrt_idx = _full_slice
                         key = (of, wrt)
                         if key in subjacs:
-                            locs[key] = ((slice(roffset, rend), slice(coffset, cend)), sub_of_idx, sub_wrt_idx)
+                            locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
+                                         sub_of_idx, sub_wrt_idx)
                         coffset = cend
             roffset = rend
 
@@ -391,10 +392,22 @@ class Jacobian(object):
 
         for key in locs:
             jslice, sub_of_idx, sub_wrt_idx = locs[key]
-            J[jslice] = summ[key][sub_of_idx, sub_wrt_idx]
+            meta = subjacs[key]
+            if meta['rows'] is not None:
+                rows = meta['rows'] + jslice[0].start
+                if sub_of_idx is not _full_slice:
+                    rows = rows[sub_of_idx]
+                cols = meta['cols'] + jslice[1].start
+                if sub_wrt_idx is not _full_slice:
+                    cols = cols[sub_wrt_idx]
+                J[rows, cols] = summ[key]
+            elif issparse(summ[key]):
+                raise NotImplementedError("don't support scipy sparse arrays yet")
+            else:
+                J[jslice] = summ[key][sub_of_idx, sub_wrt_idx]
 
-        # normalize by largest value
-        J /= np.max(J)
+        # normalize by number of saved jacs, giving a sort of 'average' jac
+        J /= system.options['dynamic_derivs_repeats']
 
         good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(J, tol, orders)
 

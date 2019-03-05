@@ -768,48 +768,56 @@ class System(object):
         self._partial_coloring_info = (wrt_list, method, form, step, has_diag_jac, directory)
 
     def _setup_approx_coloring(self):
-            wrt_list, method, form, step, has_diag_jac, directory = self._partial_coloring_info
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+
+        wrt_list, method, form, step, has_diag_jac, directory = self._partial_coloring_info
+        if is_total:
+            ofs = self.get_responses(recurse=True, get_sizes=False)
+            allwrt = self.get_design_vars(recurse=True, get_sizes=False)
+        else:
             ofs, allwrt = self._get_partials_varlists()
-            matches = set()
-            for w in wrt_list:
-                matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
 
-            # error if nothing matched
-            if not matches:
-                raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
-                                 "options on Component '{}': {}.".format(self.pathname, wrt_list))
+        matches = set()
+        for w in wrt_list:
+            matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
 
-            self._partial_coloring_info = (matches, method, form, step, has_diag_jac, directory)
+        # error if nothing matched
+        if not matches:
+            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
+                             "options on Component '{}': {}.".format(self.pathname, wrt_list))
 
-            try:
-                method_func, default_opts = _supported_approx_methods[method]
-                if method == 'exact':
-                    raise KeyError('exact')
-            except KeyError:
-                msg = 'Method "{}" is not supported, method must be one of {}'
-                raise ValueError(msg.format(method,
-                                            [k for k in _supported_methods if k != 'exact']))
+        self._partial_coloring_info = (matches, method, form, step, has_diag_jac, directory)
 
-            if method not in self._approx_schemes:
-                self._approx_schemes[method] = method_func()
+        try:
+            method_func, default_opts = _supported_approx_methods[method]
+            if method == 'exact':
+                raise KeyError('exact')
+        except KeyError:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method,
+                                        [k for k in _supported_methods if k != 'exact']))
 
-            meta = default_opts.copy()
-            meta['coloring'] = None  # set a placeholder for later replacement of approximations
-            meta['coloring_wrts'] = matches
-            if form:
-                meta['form'] = form
-            if step:
-                meta['step'] = step
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = method_func()
 
-            abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
-            # if coloring is not initially activated (because it must be computed dynamically)
-            # then we need to specify active subjacs that will be approximated using normal
-            # FD or CS.  These will be computed normally until enough jacobians have been
-            # computed to calculate the coloring.  Once the coloring exists, the approximations
-            # will be re-initialized to use the coloring info.
-            for wrt in matches:
-                for of in abs_ofs:
-                    self._approx_schemes[method].add_approximation((of, wrt), meta)
+        meta = default_opts.copy()
+        meta['coloring'] = None  # set a placeholder for later replacement of approximations
+        meta['coloring_wrts'] = matches
+        if form:
+            meta['form'] = form
+        if step:
+            meta['step'] = step
+
+        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+        # if coloring is not initially activated (because it must be computed dynamically)
+        # then we need to specify active subjacs that will be approximated using normal
+        # FD or CS.  These will be computed normally until enough jacobians have been
+        # computed to calculate the coloring.  Once the coloring exists, the approximations
+        # will be re-initialized to use the coloring info.
+        for wrt in matches:
+            for of in abs_ofs:
+                self._approx_schemes[method].add_approximation((of, wrt), meta)
 
     def _check_coloring_update(self):
         """
@@ -2359,7 +2367,7 @@ class System(object):
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
         get_sizes : bool, optional
-            If True, compute the size of each response.
+            If True, compute the size of each design variable.
 
         Returns
         -------
@@ -3291,4 +3299,3 @@ def get_relevant_vars(connections, desvars, responses, mode):
     relevant['nonlinear'] = relevant['linear']
 
     return relevant
-

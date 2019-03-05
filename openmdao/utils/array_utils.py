@@ -346,7 +346,7 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
     start = end = 0
     for name, size in zip(all_names, sizes):
         end += size
-        if size > 0 and name in matching_names:
+        if size > 0 and (matching_names is None or name in matching_names):
             if name in idx_map:
                 global_idxs.append(np.arange(start, end)[idx_map[name]])
             else:
@@ -356,7 +356,25 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
     if global_idxs:
         return np.hstack(global_idxs)
     else:
-        return np.asarray(global_idxs, dtype=int)
+        return None
+
+
+def get_input_idx_split(full_idxs, input_arr, output_arr, is_implicit):
+    assert full_idxs.size > 0, "Empty index array passed to get_input_idx_split."
+    full_size = input_arr._data.size
+    if is_implicit:
+        out_size = output_arr._data.size
+        full_size += out_size
+        out_idxs = full_idxs[full_idxs < out_size]
+        in_idxs = full_idxs[full_idxs >= out_size]
+        if out_idxs.size > 0 and in_idxs.size > 0:
+            return [(input_arr, in_idxs - out_size), (output_arr, out_idxs)]
+        elif in_idxs.size > 0:
+            return [(input_arr, in_idxs - out_size)]
+        elif out_idxs.size > 0:
+            return [(output_arr, out_idxs)]
+    else:
+        return [(input_arr, full_idxs)]
 
 
 def get_index_array_maps(names, sizes):

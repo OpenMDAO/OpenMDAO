@@ -12,7 +12,7 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
     _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.coloring import color_iterator
-from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, update_sizes
+from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, update_sizes, get_input_idx_split
 from openmdao.utils.name_maps import rel_name2abs_name
 
 
@@ -106,6 +106,8 @@ class ComplexStep(ApproximationScheme):
             The system having its derivs approximated.
         """
         global _full_slice
+        from openmdao.core.group import Group
+        is_total = isinstance(system, Group)
 
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
@@ -128,6 +130,10 @@ class ComplexStep(ApproximationScheme):
                                               system._var_sizes['nonlinear']['input'][iproc])
 
         iproc = system.comm.rank
+        nproc = system.comm.size
+        approx_of_idx = system._owns_approx_of_idx
+        approx_wrt_idx = system._owns_approx_wrt_idx
+
         self._approx_groups = []
         for key, approx in approx_groups:
             wrt, form, delta, directional = key
@@ -137,37 +143,50 @@ class ComplexStep(ApproximationScheme):
             delta *= 1j
 
             if wrt == '@color':   # use coloring (should be only 1 of these)
-                # need mapping from coloring jac columns (subset) to full jac columns
                 options = approx[0][2]
                 colored_wrts = options['coloring_wrts']
-                _, wrt_names = system._get_partials_varlists()
+                if is_total:
+                    raise NotImplementedError("colored approx totals not supported yet")
+                else:
+                    of_names, wrt_names = system._get_partials_varlists()
+                    ofsizes, wrtsizes = system._get_partials_sizes()
+                is_implicit = not is_total and \
+                    system._var_sizes['nonlinear']['input'][iproc].size < wrtsizes.size
                 wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
-                _, sizes = system._get_partials_sizes()
-                is_implicit = self._var_sizes['nonlinear']['input'][iproc].size < sizes:
+                of_names = [rel_name2abs_name(system, n) for n in of_names]
 
-                reduced_sizes = update_sizes(wrt_names, sizes, system._owns_approx_wrt_idx)
                 coloring = options['coloring']
                 tmpJ = {
-                    '@name_idx_map': list(var_name_idx_iter(wrt_names, reduced_sizes)),
                     'nrows': coloring['nrows'],
                     'ncols': coloring['ncols'],
                 }
 
-                if len(wrt_names) != len(colored_wrts):
-                    col_map = sub2full_indices(wrt_names, colored_wrts, sizes)
+                # FIXME: need to deal with mix of local/remote indices
+                # if nproc > 1:
+
+                if len(wrt_names) != len(colored_wrts) or approx_wrt_idx or approx_of_idx:
+                    reduced_wrt_sizes = update_sizes(wrt_names, wrtsizes, approx_wrt_idx)
+                    tmpJ['@name_idx_map'] = list(var_name_idx_iter(wrt_names, reduced_wrt_sizes))
+                    # need mapping from coloring jac columns (subset) to full jac columns
+                    tmpJ['@col_map'] = col_map = sub2full_indices(wrt_names, colored_wrts, wrtsizes,
+                                                                  approx_wrt_idx)
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        # convert nzrows
-                        self._approx_groups.append((None, delta, fact, [col_map[cols]], tmpJ,
+                        # get nzrows to pull from result (uses full vec index)
+                        ccols = col_map[cols]
+                        idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit)
+                        self._approx_groups.append((None, delta, fact, [cols], tmpJ, idx_info,
                                                     nzrows))
                 else:
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, delta, fact, [cols], tmpJ, nzrows))
+                        idx_info = get_input_idx_split(cols, inputs, outputs, is_implicit)
+                        self._approx_groups.append((None, delta, fact, [cols], tmpJ, idx_info,
+                                                    nzrows))
             else:
                 if wrt in inputs._views_flat:
-                    arr = inputs._data
+                    arr = inputs
                     offsets = wrt_in_offsets
                 elif wrt in outputs._views_flat:
-                    arr = outputs._data
+                    arr = outputs
                     offsets = wrt_out_offsets
                 else:  # wrt is remote
                     arr = None
@@ -187,12 +206,12 @@ class ComplexStep(ApproximationScheme):
                 # Directional derivatives for quick partial checking.
                 # We place the indices in a list so that they are all stepped at the same time.
                 if directional:
-                    in_idx = [in_idx]
+                    in_idx = [list(in_idx)]
                     in_size = 1
 
                 tmpJ = _get_wrt_subjacs(system, approx)
 
-                self._approx_groups.append((wrt, delta, fact, in_idx, tmpJ, arr))
+                self._approx_groups.append((wrt, delta, fact, in_idx, tmpJ, [(arr, in_idx)], None))
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -238,7 +257,7 @@ class ComplexStep(ApproximationScheme):
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
-        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
+        uses_src_indices = (len(system._owns_approx_of_idx) > 0 or len(system._owns_approx_wrt_idx) > 0) and \
             not isinstance(jac, dict)
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
@@ -253,31 +272,37 @@ class ComplexStep(ApproximationScheme):
         mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
+        Jtmp = None
 
-        approx_groups = self._get_approx_groups(system)
-        for wrt, delta, fact, in_idxs, tmpJ, arr in approx_groups:
-            for i_count, idxs in enumerate(in_idxs):
+        approx_groups = self._get_approx_groups(system, total)
+        for wrt, delta, fact, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+            if wrt is None:  # colored
+                # Run the complex step
                 if fd_count % num_par_fd == system._par_fd_id:
-                    # Run the complex step
-                    result = self._run_point_complex(system, arr, idxs, delta, results_clone, total)
-
-                    if wrt is None:  # colored
-                        nz_rows = arr
-                        if is_parallel:
-                            if par_fd_w_serial_model:
-                                raise NotImplementedError("simul approx w/par FD not supported yet")
-                            else:
-                                raise NotImplementedError("simul approx coloring with par FD is "
-                                                          "only supported currently when using "
-                                                          "a serial model, i.e., when "
-                                                          "num_par_fd == number of MPI procs.")
+                    result = self._run_point_complex(system, idx_info, delta, results_clone, total)
+                    if Jtmp is None:
+                        Jtmp = np.zeros((tmpJ['nrows'], tmpJ['ncols']))
+                    if is_parallel:
+                        if par_fd_w_serial_model:
+                            raise NotImplementedError("simul approx w/par FD not supported yet")
                         else:
-                            idx_map = tmpJ['@name_idx_map']
-                            for col in idxs:
-                                wrt = idx_map[col]
-                                coljac = tmpJ[wrt]
-                                rows = nz_rows[col]
+                            raise NotImplementedError("simul approx coloring with par FD is "
+                                                        "only supported currently when using "
+                                                        "a serial model, i.e., when "
+                                                        "num_par_fd == number of MPI procs.")
                     else:
+                        idx_map = tmpJ['@name_idx_map']
+                        col_map = tmpJ.get('@col_map')
+                        for cols in col_idxs:
+                            for i, col in enumerate(cols):
+                                Jtmp[nz_rows[i], col] = result._data[nz_rows[i]].imag
+                fd_count += 1
+            else:
+                for i_count, idxs in enumerate(col_idxs):
+                    if fd_count % num_par_fd == system._par_fd_id:
+                        # Run the complex step
+                        result = self._run_point_complex(system, ((idx_info[0][0], idxs),),
+                                                            delta, results_clone, total)
                         J = tmpJ[wrt]
 
                         if is_parallel:
@@ -291,20 +316,19 @@ class ComplexStep(ApproximationScheme):
                                         (i_count, result._views_flat[of][out_idxs].imag.copy()))
                         else:
                             J['data'][:, i_count] = result._data[J['full_out_idxs']].imag
-                            # for of, subjac, out_idx in tmpJ:
-                            #     subjac[:, i_count] = result._views_flat[of][out_idx].imag
 
-                fd_count += 1
+                    fd_count += 1
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, fact, _, tmpJ, _ in approx_groups:
+        for wrt, _, fact, _, tmpJ, _, _ in approx_groups:
             if wrt is None:  # colored
-                pass
+                print("COLORED:", wrt)
             else:
                 ofs = tmpJ[wrt]['ofs']
                 for of in ofs:
+                    print("NON-COLORED:", of, wrt)
                     oview, oidxs = ofs[of]
                     if is_parallel:
                         for i, result in results[(of, wrt)]:
@@ -318,26 +342,10 @@ class ComplexStep(ApproximationScheme):
                     else:
                         jac[(of, wrt)] = oview
 
-                # for of, subjac, _ in tmpJ:
-                #     key = (of, wrt)
-                #     if is_parallel:
-                #         for i, result in results[key]:
-                #             subjac[:, i] = result
-
-                #     subjac *= fact
-                #     if uses_src_indices:
-                #         jac._override_checks = True
-                #         jac[key] = subjac
-                #         jac._override_checks = False
-                #     else:
-                #         jac[key] = subjac
-
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _perturb(self, arr, delta, )
-
-    def _run_point_complex(self, system, arr, idxs, delta, result_clone, total=False):
+    def _run_point_complex(self, system, idx_info, delta, result_clone, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -345,10 +353,8 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        arr : ndarray
-            Array to perturb.
-        idxs : ndarray
-            Input indices.
+        idx_info : tuple of (ndarray of int, ndarray of float)
+            Tuple of wrt indices and corresponding data array to perturb.
         delta : complex
             Perturbation amount.
         result_clone : Vector
@@ -368,14 +374,16 @@ class ComplexStep(ApproximationScheme):
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        if arr is not None:
-            arr[idxs] += delta
+        for arr, idxs in idx_info:
+            if arr is not None:
+                arr._data[idxs] += delta
 
         run_model()
 
         result_clone.set_vec(results_vec)
 
-        if arr is not None:
-            arr[idxs] -= delta
+        for arr, idxs in idx_info:
+            if arr is not None:
+                arr._data[idxs] -= delta
 
         return result_clone

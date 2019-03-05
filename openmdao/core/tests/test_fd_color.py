@@ -77,7 +77,7 @@ class SparseComp(ImplicitComponent):
 
 
 class TestFDColoring(unittest.TestCase):
-    def test_simple(self):
+    def test_simple_totals(self):
         prob = Problem()
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
@@ -95,12 +95,12 @@ class TestFDColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseComp(sparsity, isplit=2, osplit=2))#, dynamic_derivs_repeats=1))
-        #comp.set_approx_coloring('x*', method='cs')
         model.set_approx_coloring('*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
         model.comp.add_constraint('y0', indices=[0,2])
+        model.add_design_var('indeps.x0')
         model.approx_totals(method='cs')
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -111,6 +111,40 @@ class TestFDColoring(unittest.TestCase):
         derivs = prob.compute_totals(of=of, wrt=wrt)
         print(derivs)
 
+    def test_simple_partials(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 0],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 1]],
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseComp(sparsity, isplit=2, osplit=2, dynamic_derivs_repeats=1))
+        comp.set_approx_coloring('x*', method='cs')
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        comp._linearize()
+        comp._linearize()
+        jac = comp._jacobian._subjacs_info
+        for of in comp._var_allprocs_abs_names['output']:
+            for wrt in comp._var_allprocs_abs_names['input']:
+                key = (of, wrt)
+                if key in jac:
+                    print(key, jac[key]['value'])
+        print()
 
 
 if __name__ == '__main__':
