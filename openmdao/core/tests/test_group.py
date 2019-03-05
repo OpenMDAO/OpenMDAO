@@ -15,7 +15,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    NonlinearRunOnce, NonLinearRunOnce
+    NonlinearRunOnce, NonLinearRunOnce, BalanceComp, NewtonSolver, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.sellar import SellarDis2
 
@@ -907,6 +907,42 @@ class TestGroup(unittest.TestCase):
         prob.run_model()
 
         # this test passes if it doesn't raise an exception
+
+    def test_guess_nonlinear(self):
+        class GuessGroup(Group):
+            def __init__(self, target, guess=None, maxiter=100):
+                super(GuessGroup, self).__init__()
+                self._target_value = target
+                self._guess_value = guess
+                self._maxiter = maxiter
+
+            def setup(self):
+                self.add_subsystem('tgt', IndepVarComp('y', val=self._target_value))
+                self.add_subsystem('exp', ExecComp("y=x**2"))
+                self.add_subsystem('bal', BalanceComp('x'))
+
+                self.connect('tgt.y', 'bal.rhs:x')
+                self.connect('bal.x', 'exp.x')
+                self.connect('exp.y', 'bal.lhs:x')
+
+                self.linear_solver = DirectSolver(assemble_jac=True)
+                self.nonlinear_solver = NewtonSolver(solve_subsystems=True, maxiter=self._maxiter, iprint=0)
+
+            def guess_nonlinear(self, inputs, outputs, residuals):
+                if self._guess_value is not None:
+                    outputs['bal.x'] = self._guess_value
+
+        # verify it works with solver iteration and no guess
+        prob = Problem(GuessGroup(target=100, guess=None))
+        prob.setup()
+        prob.run_model()
+        assert_rel_error(self, prob['exp.y'], 100., 1e-6)
+
+        # verify it works with guess and no solver iteration
+        prob = Problem(GuessGroup(target=100, guess=10, maxiter=0))
+        prob.setup()
+        prob.run_model()
+        assert_rel_error(self, prob['exp.y'], 100., 1e-6)
 
 
 class MyComp(ExplicitComponent):

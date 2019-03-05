@@ -1565,12 +1565,34 @@ class Group(System):
         """
         Provide initial guess for states.
         """
+        # let any lower level systems do their guessing first
         if self._has_guess:
             for ind, sub in enumerate(self._subsystems_myproc):
                 if sub._has_guess:
                     isub = self._subsystems_myproc_inds[ind]
                     self._transfer('nonlinear', 'fwd', isub)
                     sub._guess_nonlinear()
+
+        # call our own guess_nonlinear method, after the recursion is done to
+        # all the lower level systems and the data transfers have happened
+        self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+
+    def guess_nonlinear(self, inputs, outputs, residuals):
+        """
+        Provide initial guess for states.
+
+        Override this method to set the initial guess for states.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
+        """
+        pass
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """

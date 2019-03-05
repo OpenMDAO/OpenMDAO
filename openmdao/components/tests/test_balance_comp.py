@@ -13,7 +13,6 @@ from openmdao.utils.general_utils import printoptions
 
 class TestBalanceComp(unittest.TestCase):
 
-
     def test_scalar_example(self):
 
         prob = Problem(model=Group())
