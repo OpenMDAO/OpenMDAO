@@ -80,9 +80,8 @@ viewable in a browser, for example:
 
 will generate an :math:`N^2` diagram like the one below.
 
-
-.. raw:: html
-    :file: ../../advanced_guide/implicit_comps/n2.html
+.. embed-n2::
+    ../test_suite/scripts/circuit.py
 
 .. _om-command-view_connections:
 

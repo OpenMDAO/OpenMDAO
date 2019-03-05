@@ -695,7 +695,7 @@ class TestBryodenFeature(unittest.TestCase):
     def test_circuit(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = Problem()
         model = p.model
@@ -734,7 +734,7 @@ class TestBryodenFeature(unittest.TestCase):
     def test_circuit_options(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = Problem()
         model = p.model
@@ -773,7 +773,7 @@ class TestBryodenFeature(unittest.TestCase):
     def test_circuit_full(self):
         from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
 
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Circuit
+        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = Problem()
         model = p.model

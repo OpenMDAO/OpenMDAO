@@ -440,7 +440,7 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, prom2abs, abs2prom)
         expected_problem_metadata = {
             'connections_list_length': 11,
-            'tree_length': 6,
+            'tree_length': 7,
             'tree_children_length': 7,
             'abs2prom': abs2prom,
         }
@@ -1757,7 +1757,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
-                         {'name', 'type', 'subsystem_type', 'children', 'linear_solver', 'nonlinear_solver'})
+                         {'name', 'type', 'subsystem_type', 'children', 'linear_solver', 'nonlinear_solver', 'is_parallel'})
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
                          ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
@@ -1946,7 +1946,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
     def test_feature_circuit_with_recorder(self):
         from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp, \
             CaseReader, SqliteRecorder
-        from openmdao.test_suite.test_examples.test_circuit_analysis import Resistor, Diode, Node
+        from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
         class Circuit(Group):
 
@@ -2169,6 +2169,60 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         assert_rel_error(self, objectives['obj'], 3.18, 1e-1)
 
+        assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
+        assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+
+    def test_scaling_multiple_calls(self):
+        from openmdao.api import Problem, SqliteRecorder, ScipyOptimizeDriver, CaseReader
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        import numpy as np
+
+        scaler = 2.
+
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj', scaler=scaler)
+        model.add_constraint('con1', upper=0.0, scaler=scaler)
+        model.add_constraint('con2', upper=0.0, scaler=scaler)
+
+        prob.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+
+        prob.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.recording_options['includes'] = []
+        prob.recording_options['record_objectives'] = True
+        prob.recording_options['record_constraints'] = True
+        prob.recording_options['record_desvars'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        # get list of cases recorded on problem
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(problem_cases, ['final'])
+
+        # get list of output variables recorded on problem
+        problem_vars = cr.list_source_vars('problem')
+        self.assertEqual(sorted(problem_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'z'])
+
+        # get the recorded case and check values
+        case = cr.get_case('final')
+
+        objectives = case.get_objectives()
+        design_vars = case.get_design_vars()
+        constraints = case.get_constraints()
+
+        # Methods are called a second time
+        assert_rel_error(self, objectives['obj'], case.get_objectives()['obj'], 1e-1)
         assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
         assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
 

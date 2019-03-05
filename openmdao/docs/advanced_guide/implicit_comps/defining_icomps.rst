@@ -43,10 +43,10 @@ These components will each declare some options to allow you to pass in the rele
 allow you to give some reasonable default values.
 
 .. embed-code::
-     openmdao.test_suite.test_examples.test_circuit_analysis.Resistor
+     openmdao.test_suite.scripts.circuit_analysis.Resistor
 
 .. embed-code::
-     openmdao.test_suite.test_examples.test_circuit_analysis.Diode
+     openmdao.test_suite.scripts.circuit_analysis.Diode
 
 .. note::
     Since we've provided default values for the options, they won't be required arguments when instantiating :code:`Resistor` or :code:`Diode`.
@@ -64,7 +64,7 @@ Notice that we still define *V* as an output of the :code:`Node` component, albe
 
 
 .. embed-code::
-     openmdao.test_suite.test_examples.test_circuit_analysis.Node
+     openmdao.test_suite.scripts.circuit_analysis.Node
 
 Every state variable must have exactly one corresponding residual which is defined in the :code:`apply_nonlinear` method. The :code:`residuals` equations 
 in an implicit component are not analogous to the :code:`outputs` equations in the :code:`compute` method of an explicit component. 

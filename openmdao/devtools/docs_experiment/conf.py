@@ -94,6 +94,7 @@ extensions = [
     'embed_compare',
     'embed_shell_cmd',
     'embed_bibtex',
+    'embed_n2',
     'tags'
 ]
 

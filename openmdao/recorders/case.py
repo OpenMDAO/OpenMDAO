@@ -560,9 +560,9 @@ class Case(object):
                 if scaled:
                     # physical to scaled
                     if meta['adder'] is not None:
-                        vals[name] += meta['adder']
+                        vals[name] = vals[name] + meta['adder']
                     if meta['scaler'] is not None:
-                        vals[name] *= meta['scaler']
+                        vals[name] = vals[name] * meta['scaler']
                 if use_indices:
                     if meta['indices'] is not None:
                         vals[name] = vals[name][meta['indices']]

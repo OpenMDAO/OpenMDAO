@@ -212,6 +212,7 @@ embed-code
         `embed-code` is a custom directive that takes one argument, which can be:
             * A class, test, or method's full, dotted path (e.g. "openmdao.core.tests.test_expl_comp.RectangleComp").
             * The path to a file (e.g. "experimental_guide/examples/bezier_plot.py").
+              Note that the path is relative to the openmdao/docs directory.
 
         The syntax for invoking the directive within an .rst file looks like this:
 
@@ -471,6 +472,23 @@ embed-bibtex
         openmdao.drivers.scipy_optimizer
         ScipyOptimizeDriver
 
+
+embed-n2
+++++++++++++
+
+    `embed-n2` is a custom directive that lets you insert an N-squared diagram into
+    the documentation. The argument is a path to a model file that can successfully
+    have `view_model` run on it.
+
+    .. code-block:: rst
+
+        .. embed-n2::
+            ../test_suite/scripts/sellar.py
+
+    The output from the above syntax should look like this:
+
+    .. embed-n2::
+        ../test_suite/scripts/sellar.py
 
 Tagging
 -------
