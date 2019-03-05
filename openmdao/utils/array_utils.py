@@ -359,22 +359,41 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
         return None
 
 
-def get_input_idx_split(full_idxs, input_arr, output_arr, is_implicit):
+def get_input_idx_split(full_idxs, inputs, outputs, is_implicit):
+    """
+    Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
+
+    Parameters
+    ----------
+    full_idxs : ndarray
+        Indices into the full array (which could be outs + ins or just ins)
+    inputs : Vector
+        Inputs vector.
+    outputs : Vector
+        Outputs vector.
+    is_implicit : bool
+        If True, current system is implicit and full idxs are into the full outs + ins vector.
+
+    Returns
+    -------
+    list of tuples
+        Each tuple is of the form (array, idxs).
+    """
     assert full_idxs.size > 0, "Empty index array passed to get_input_idx_split."
-    full_size = input_arr._data.size
     if is_implicit:
-        out_size = output_arr._data.size
+        full_size = inputs._data.size
+        out_size = outputs._data.size
         full_size += out_size
         out_idxs = full_idxs[full_idxs < out_size]
         in_idxs = full_idxs[full_idxs >= out_size]
         if out_idxs.size > 0 and in_idxs.size > 0:
-            return [(input_arr, in_idxs - out_size), (output_arr, out_idxs)]
+            return [(inputs, in_idxs - out_size), (outputs, out_idxs)]
         elif in_idxs.size > 0:
-            return [(input_arr, in_idxs - out_size)]
-        elif out_idxs.size > 0:
-            return [(output_arr, out_idxs)]
+            return [(inputs, in_idxs - out_size)]
+        else:  # out_idxs.size > 0
+            return [(outputs, out_idxs)]
     else:
-        return [(input_arr, full_idxs)]
+        return [(inputs, full_idxs)]
 
 
 def get_index_array_maps(names, sizes):
@@ -439,6 +458,20 @@ def get_local_offset_map(names, sizes):
 def update_sizes(names, sizes, index_map):
     """
     Return a sizes array, with possibly some sizes reduced to agree with index_map.
+
+    Parameters
+    ----------
+    names : list of str
+        Names of variables associated with sizes.
+    sizes : ndarray
+        Array of sizes of each variable.
+    index_map : dict
+        Mapping of variable name to some subset of indices.
+
+    Returns
+    -------
+    ndarray
+        Sizes of variables after reducing some due to index_map.
     """
     if index_map:
         sizes = sizes.copy()

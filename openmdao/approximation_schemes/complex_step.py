@@ -12,7 +12,8 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
     _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.coloring import color_iterator
-from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, update_sizes, get_input_idx_split
+from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
+    update_sizes, get_input_idx_split
 from openmdao.utils.name_maps import rel_name2abs_name
 
 
@@ -257,8 +258,8 @@ class ComplexStep(ApproximationScheme):
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
-        uses_src_indices = (len(system._owns_approx_of_idx) > 0 or len(system._owns_approx_wrt_idx) > 0) and \
-            not isinstance(jac, dict)
+        uses_src_indices = (len(system._owns_approx_of_idx) > 0 or
+                            len(system._owns_approx_wrt_idx) > 0) and not isinstance(jac, dict)
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
@@ -287,9 +288,9 @@ class ComplexStep(ApproximationScheme):
                             raise NotImplementedError("simul approx w/par FD not supported yet")
                         else:
                             raise NotImplementedError("simul approx coloring with par FD is "
-                                                        "only supported currently when using "
-                                                        "a serial model, i.e., when "
-                                                        "num_par_fd == number of MPI procs.")
+                                                      "only supported currently when using "
+                                                      "a serial model, i.e., when "
+                                                      "num_par_fd == number of MPI procs.")
                     else:
                         idx_map = tmpJ['@name_idx_map']
                         col_map = tmpJ.get('@col_map')
@@ -302,7 +303,7 @@ class ComplexStep(ApproximationScheme):
                     if fd_count % num_par_fd == system._par_fd_id:
                         # Run the complex step
                         result = self._run_point_complex(system, ((idx_info[0][0], idxs),),
-                                                            delta, results_clone, total)
+                                                         delta, results_clone, total)
                         J = tmpJ[wrt]
 
                         if is_parallel:

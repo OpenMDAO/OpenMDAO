@@ -185,7 +185,7 @@ def _get_wrt_subjacs(system, approxs):
     # in the non-colored case, all wrts will be the same for all entries in approxs
     for of, wrt, options in approxs:
         if wrt not in J:
-            J[wrt] = {'ofs': [], 'tot_rows': 0}
+            J[wrt] = {'ofs': [], 'tot_rows': 0, 'directional': options['directional']}
 
         if of not in ofdict:
             J[wrt]['ofs'].append(of)
@@ -203,7 +203,9 @@ def _get_wrt_subjacs(system, approxs):
         J[wrt]['ofs'] = wrt_ofs = OrderedDict()
 
         # create dense array to contain all nonzero subjacs for this wrt
-        if wrt in approx_wrt_idx:
+        if J[wrt]['directional']:
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], 1))
+        elif wrt in approx_wrt_idx:
             J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], len(approx_wrt_idx[wrt])))
         else:
             J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
