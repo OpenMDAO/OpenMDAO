@@ -55,7 +55,7 @@ _TEXT_CONSTANTS = {'no_data': '(no data)'}
 # Default solver, if no solver is added to a group.
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 # On which side to place outputs? One of "left", "right"
-_OUTPUT_SIDE = 'left'
+_DEFAULT_OUTPUT_SIDE = 'left'
 
 # Maps OpenMDAO component types with the available block styling options in the writer.
 # For pyXDSM check the "diagram_styles" file for style definitions.
@@ -137,7 +137,7 @@ class AbstractXDSMWriter(object):
     def add_input(self, name, label, style='DataIO', stack=False):
         pass  # Implement in child class
 
-    def add_output(self, name, label, style='DataIO', stack=False, side=_OUTPUT_SIDE):
+    def add_output(self, name, label, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
         pass  # Implement in child class
 
     def add_process(self, systems, arrow=True):
@@ -156,7 +156,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
         self.comps = []  # List of systems
-        self.reserved_words = '_U_',  # Ignored at text formatting
+        self.reserved_words = '_U_', '_E_'  # Ignored at text formatting
         self._writer_name = 'xdsmjs'
 
     def _format_id(self, name, subs=(('_', ''),)):
@@ -310,8 +310,12 @@ class XDSMjsWriter(AbstractXDSMWriter):
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
 
-    def add_output(self, name, label=None, style='DataIO', stack=False, side=_OUTPUT_SIDE):
-        self.connect(src=name, target='_U_', label=label)
+    def add_output(self, name, label=None, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
+        if side == "left":
+            self.connect(src=name, target='_U_', label=label)
+        else:
+            warnings.warn('Right side outputs not implemented for XDSMjs.')
+            self.connect(src=name, target='_U_', label=label)
 
     def collect_data(self):
         """
@@ -521,7 +525,7 @@ else:
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
-               add_process_conns=True, show_parallel=True, output_side=_OUTPUT_SIDE, **kwargs):
+               add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -666,7 +670,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
-                output_side=_OUTPUT_SIDE, driver_type='optimization', **kwargs):
+                output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -1322,6 +1326,9 @@ def _xdsm_setup_parser(parser):
                         choices=['horizontal', 'vertical'], default='horizontal',
                         help='Positions the number either above or in front of the component label '
                         'if numbered_comps is true.')
+    parser.add_argument('--output_side', action='store', dest='output_side',
+                        choices=['left', 'right'], default=_DEFAULT_OUTPUT_SIDE,
+                        help='Position of the outputs on the diagram..')
 
 
 def _xdsm_cmd(options):
@@ -1351,6 +1358,7 @@ def _xdsm_cmd(options):
                    out_format=options.format,
                    include_solver=options.include_solver, subs=_CHAR_SUBS,
                    show_browser=not options.no_browser, show_parallel=not options.no_parallel,
-                   add_process_conns=not options.no_process_conns, **kwargs)
+                   add_process_conns=not options.no_process_conns, output_side=options.output_side,
+                   **kwargs)
         exit()
     return _xdsm

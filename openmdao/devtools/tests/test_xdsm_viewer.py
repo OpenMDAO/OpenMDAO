@@ -966,6 +966,28 @@ class TestXDSMjsViewer(unittest.TestCase):
                    recurse=True)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
 
+    def test_pyxdsm_right_outputs(self):
+        """Makes XDSM for the Sellar problem"""
+        filename = 'xdsmjs_outputs_on_the_right'
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='html', show_browser=False, quiet=QUIET,
+                   output_side='right')
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
+
     def test_wrong_out_format(self):
         """Incorrect output format error."""
 
