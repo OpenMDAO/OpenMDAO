@@ -521,7 +521,7 @@ else:
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
-               add_process_conns=True, show_parallel=True, **kwargs):
+               add_process_conns=True, show_parallel=True, output_side=_OUTPUT_SIDE, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -598,6 +598,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
     show_parallel : bool
         Show parallel components with stacked blocks.
         Defaults to True.
+    output_side : str
+        Left or right.
+        Defaults to "left"
     kwargs : dict
         Keyword arguments
     Returns
@@ -655,7 +658,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                        recurse=recurse, subs=subs,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
-                       show_parallel=show_parallel, driver_type=driver_type, **kwargs)
+                       show_parallel=show_parallel, driver_type=driver_type,
+                       output_side=output_side, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,

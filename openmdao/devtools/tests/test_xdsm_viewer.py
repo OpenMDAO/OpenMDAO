@@ -20,7 +20,7 @@ except ImportError:
     XDSM = None
 
 # Set DEBUG to True if you want to view the generated HTML and PDF output files.
-DEBUG = False
+DEBUG = True
 # Suppress pyXDSM console output
 QUIET = not DEBUG
 
@@ -516,6 +516,28 @@ class TestPyXDSMViewer(unittest.TestCase):
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+    def test_pyxdsm_right_outputs(self):
+        """Makes XDSM for the Sellar problem"""
+        filename = 'xdsm_outputs_on_the_right'
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET,
+                   output_side='right')
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
 
 class TestXDSMjsViewer(unittest.TestCase):
