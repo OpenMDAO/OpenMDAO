@@ -93,8 +93,6 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
 
-        self._approx_schemes = OrderedDict()
-
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
@@ -344,15 +342,18 @@ class Component(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Component, self)._setup_partials(recurse)
-
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
-        approx_methods = ('cs', 'fd')
 
         for key, dct in iteritems(self._declared_partials):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
+
+        if self._approx_coloring_info is not None:
+            self._setup_approx_coloring()
+            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+        else:
+            self._jac_saves_remaining = 0
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):

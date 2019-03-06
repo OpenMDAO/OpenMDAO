@@ -379,7 +379,7 @@ def get_input_idx_split(full_idxs, inputs, outputs, is_implicit):
     list of tuples
         Each tuple is of the form (array, idxs).
     """
-    assert full_idxs.size > 0, "Empty index array passed to get_input_idx_split."
+    assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
     if is_implicit:
         full_size = inputs._data.size
         out_size = outputs._data.size

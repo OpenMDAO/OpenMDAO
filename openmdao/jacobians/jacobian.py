@@ -395,16 +395,16 @@ class Jacobian(object):
             meta = subjacs[key]
             if meta['rows'] is not None:
                 rows = meta['rows'] + jslice[0].start
-                if sub_of_idx is not _full_slice:
-                    rows = rows[sub_of_idx]
+                # if sub_of_idx is not _full_slice:
+                    # rows = rows[sub_of_idx]
                 cols = meta['cols'] + jslice[1].start
-                if sub_wrt_idx is not _full_slice:
-                    cols = cols[sub_wrt_idx]
+                # if sub_wrt_idx is not _full_slice:
+                    # cols = cols[sub_wrt_idx]
                 J[rows, cols] = summ[key]
             elif issparse(summ[key]):
                 raise NotImplementedError("don't support scipy sparse arrays yet")
             else:
-                J[jslice] = summ[key][sub_of_idx, sub_wrt_idx]
+                J[jslice] = summ[key]#[sub_of_idx, sub_wrt_idx]
 
         # normalize by number of saved jacs, giving a sort of 'average' jac
         J /= system.options['dynamic_derivs_repeats']

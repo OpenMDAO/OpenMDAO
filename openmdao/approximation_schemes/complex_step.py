@@ -292,7 +292,6 @@ class ComplexStep(ApproximationScheme):
                                                       "a serial model, i.e., when "
                                                       "num_par_fd == number of MPI procs.")
                     else:
-                        idx_map = tmpJ['@name_idx_map']
                         col_map = tmpJ.get('@col_map')
                         for cols in col_idxs:
                             for i, col in enumerate(cols):

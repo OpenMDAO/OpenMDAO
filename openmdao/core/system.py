@@ -15,6 +15,7 @@ import networkx as nx
 
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors
 from openmdao.recorders.recording_manager import RecordingManager
@@ -256,8 +257,8 @@ class System(object):
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
     _use_derivatives : bool
         If True, perform any memory allocations necessary for derivative computation.
-    _partial_coloring_info : tuple
-        Metadata that defines how to perform coloring of this System's partial jacobian.
+    _approx_coloring_info : tuple
+        Metadata that defines how to perform coloring of this System's approx jacobian.
     _jac_saves_remaining : int
         Counter that determines when jacobian sparsity collection ends and the coloring is computed.
     """
@@ -411,7 +412,7 @@ class System(object):
         self._owning_rank = None
         self._lin_vec_names = []
         self._jac_saves_remaining = 0
-        self._partial_coloring_info = None
+        self._approx_coloring_info = None
 
     def _declare_options(self):
         """
@@ -715,21 +716,6 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _setup_partials(self, recurse=True):
-        """
-        Process all partials and approximations that the user declared.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        if self._partial_coloring_info is not None:
-            self._setup_approx_coloring()
-            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-        else:
-            self._jac_saves_remaining = 0
-
     def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, has_diag_jac=False,
                             directory=None):
         """
@@ -760,18 +746,21 @@ class System(object):
 
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
 
-        if self._partial_coloring_info is not None:
+        if self._approx_coloring_info is not None:
             simple_warning("%s: set_approx_coloring() was called multiple times. The "
                            "last call will be used." % self.pathname)
 
         # TODO: handle issues with 'has_diag_jac' if wrt doesn't cover every column of the jac
-        self._partial_coloring_info = (wrt_list, method, form, step, has_diag_jac, directory)
+        self._approx_coloring_info = (wrt_list, method, form, step, has_diag_jac, directory)
 
     def _setup_approx_coloring(self):
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
 
-        wrt_list, method, form, step, has_diag_jac, directory = self._partial_coloring_info
+        if self._jacobian is None:
+            self._jacobian = DictionaryJacobian(self)
+
+        wrt_list, method, form, step, has_diag_jac, directory = self._approx_coloring_info
         if is_total:
             ofs = self.get_responses(recurse=True, get_sizes=False)
             allwrt = self.get_design_vars(recurse=True, get_sizes=False)
@@ -787,7 +776,7 @@ class System(object):
             raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
                              "options on Component '{}': {}.".format(self.pathname, wrt_list))
 
-        self._partial_coloring_info = (matches, method, form, step, has_diag_jac, directory)
+        self._approx_coloring_info = (matches, method, form, step, has_diag_jac, directory)
 
         try:
             method_func, default_opts = _supported_approx_methods[method]
@@ -827,14 +816,14 @@ class System(object):
             self._jacobian._save_sparsity(self)
             self._jac_saves_remaining -= 1
             if self._jac_saves_remaining == 0:
-                sparsity = self._jacobian._compute_sparsity(self, self._partial_coloring_info[0])
+                sparsity = self._jacobian._compute_sparsity(self, self._approx_coloring_info[0])
 
                 # print(self.pathname, "SPARSITY")
                 # from openmdao.utils.array_utils import array_viz
                 # array_viz(sparsity)
                 self._jacobian._jac_summ = None  # reclaim the memory
 
-                has_diag_jac = self._partial_coloring_info[4]
+                has_diag_jac = self._approx_coloring_info[4]
                 start_time = time.time()
                 if has_diag_jac:
                     raise NotImplementedError("has_diag_jac not supported yet.")
@@ -843,7 +832,7 @@ class System(object):
 
                 coloring['time_coloring'] = time.time() - start_time
 
-                directory = self._partial_coloring_info[5]
+                directory = self._approx_coloring_info[5]
                 if directory is not None:
                     name = self.pathname.replace('.', '_') if self.pathname else 'top'
                     fname = os.path.join(directory, name)
@@ -1419,11 +1408,6 @@ class System(object):
         """
         if not self._use_derivatives:
             return
-
-        if self._partial_coloring_info is not None:
-            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-        else:
-            self._jac_saves_remaining = 0
 
         asm_jac_solvers = set()
         if self._linear_solver is not None:
