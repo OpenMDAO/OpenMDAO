@@ -33,7 +33,7 @@ MPI and give it two processes using the following command:
 In the previous example, both components in the :code:`ParallelGroup` required just a single MPI process, but
 what happens if we want to add subsystems to a :code:`ParallelGroup` that has other processor requirements?
 In OpenMDAO, we control process allocation behavior by setting the :code:`min_procs` and/or :code:`max_procs` or
-:code:`proc_weights` args when we call the :code:`add_subsystem` function to add a particular subsystem to
+:code:`proc_weight` args when we call the :code:`add_subsystem` function to add a particular subsystem to
 a :code:`ParallelGroup`.
 
 
@@ -41,9 +41,9 @@ a :code:`ParallelGroup`.
     :noindex:
 
 
-If you use both :code:`min_procs/max_procs` and :code:`proc_weights`, it can become less obvious what the
+If you use both :code:`min_procs/max_procs` and :code:`proc_weight`, it can become less obvious what the
 resulting process allocation will be, so you may want to stick to just using one or the other.
-The algorithm used for the allocation starts, assuming that the number of processes is greater or
+The algorithm used for the allocation starts, assuming that the number of processes is greater than or
 equal to the number of subsystems, by assigning the :code:`min_procs` for each subsystem.  It then adds
 any remaining processes to subsystems based on their weights, being careful not to exceed their
 specified :code:`max_procs`, if any.
