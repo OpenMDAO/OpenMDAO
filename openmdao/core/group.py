@@ -1683,8 +1683,6 @@ class Group(System):
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
-        self._check_coloring_update()
-
     def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, has_diag_jac=False,
                             directory=None):
         """
@@ -1840,6 +1838,18 @@ class Group(System):
                     wrt.add(var)
 
             for key in product(of, wrt.union(of)):
+                # Create approximations for the ones we need.
+                # Skip indepvarcomp res wrt other srcs
+                if key[0] in ivc:
+                    continue
+            
+                # Skip explicit res wrt outputs
+                if key[1] in of and key[1] not in ivc:
+            
+                    # Support for specifying a desvar as an obj/con.
+                    if key[1] not in wrt or key[0] == key[1]:
+                        continue
+
                 if key in self._subjacs_info:
                     meta = self._subjacs_info[key]
                 else:
@@ -1856,18 +1866,6 @@ class Group(System):
                 # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
 
                 meta.update(self._owns_approx_jac_meta)
-
-                # Create approximations for the ones we need.
-                # Skip indepvarcomp res wrt other srcs
-                if key[0] in ivc:
-                    continue
-
-                # Skip explicit res wrt outputs
-                if key[1] in of and key[1] not in ivc:
-
-                    # Support for specifying a desvar as an obj/con.
-                    if key[1] not in wrt or key[0] == key[1]:
-                        continue
 
                 approx.add_approximation(key, meta)
 

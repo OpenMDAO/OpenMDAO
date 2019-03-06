@@ -18,8 +18,6 @@ class DictionaryJacobian(Jacobian):
     ----------
     _iter_keys : list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
-    _inited : bool
-        True if _initialize has been called.
 
     """
 
@@ -36,70 +34,6 @@ class DictionaryJacobian(Jacobian):
         """
         super(DictionaryJacobian, self).__init__(system, **kwargs)
         self._iter_keys = {}
-        self._inited = False
-
-    def _initialize(self, system):
-        """
-        Perform any needed initialization.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
-        """
-        iproc = system.comm.rank
-        subjacs = self._subjacs_info
-        out_sizes = system._var_sizes['nonlinear']['output']
-        in_sizes = system._var_sizes['nonlinear']['input']
-        sizes = np.hstack((out_sizes, in_sizes))
-        outs = system._var_allprocs_abs_names['output']
-        ins = system._var_allprocs_abs_names['input']
-        self._col_name_map, self._loc_col_idx_map = get_index_array_maps(outs + ins, sizes)
-        self._row_name_map, self._loc_row_idx_map = get_index_array_maps(outs, out_sizes)
-        start = end = 0
-        self._out_slices = slices = {}
-        for i, out in enumerate(outs):
-            end += sizes[i]
-            if end != start:
-                slices[out] = slice(start, end)
-            start = end
-
-        self._wrt_of_map = wrtmap = defaultdict(list)
-        for of, wrt in subjacs:
-            wrtmap[wrt].append(of)
-
-        self._inited = True
-
-    def set_column(self, col_idx, vec, row_idxs=None):
-        """
-        Assign the value of vec to column i of this jacobian.
-
-        Parameters
-        ----------
-        col_idx : int
-            Column index.
-        vec : ndarray
-            Array to assign to the specified column.
-        row_idxs : ndarray or None
-            Nonzero row indices for the given column index. (used in coloring only)
-        """
-        if not self._inited:
-            self._initialize(system)
-
-        subjacs = self._subjacs_info
-        wrt = self._col_name_map[col_idx]
-        loc_col = self._loc_col_idx_map[col_idx]
-        if row_idxs is None:
-            for of in self._wrt_of_map[wrt]:
-                subjacs[(of, wrt)]['value'][:, loc_col] = vec[self._out_slices[of]]
-        else:
-            # TODO: this will be slow.  Should change default jac to be something more efficient.
-            #  Maybe each wrt could be mapped to a contiguous array containing all nonzero subjacs
-            # for that wrt or something like that...
-            for i in row_idxs:
-                of = self._row_name_map[i]
-                loc_row = self._loc_row_idx_map[i]
-                subjacs[(of, wrt)]['value'][loc_row, loc_col] = vec[i]
 
     def _iter_abs_keys(self, system, vec_name):
         """

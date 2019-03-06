@@ -147,7 +147,22 @@ class ComplexStep(ApproximationScheme):
                 options = approx[0][2]
                 colored_wrts = options['coloring_wrts']
                 if is_total:
-                    raise NotImplementedError("colored approx totals not supported yet")
+                    of_names = system._owns_approx_of
+                    wrt_names = system._owns_approx_wrt
+                    ofsizes = []
+                    for of in of_names:
+                        if of in approx_of_idx:
+                            ofsizes.append(len(approx_of_idx[of]))
+                        else:
+                            ofsizes.append(outputs._views_flat[of].size)
+                    wrtsizes = []
+                    for wrt in wrt_names:
+                        if of in approx_wrt_idx:
+                            wrtsizes.append(len(approx_wrt_idx[wrt]))
+                        elif wrt in outputs:
+                            wrtsizes.append(outputs._views_flat[wrt].size)
+                        else:
+                            wrtsizes.append(inputs._views_flat[wrt].size)
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
                     ofsizes, wrtsizes = system._get_partials_sizes()

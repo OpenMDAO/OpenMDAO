@@ -349,8 +349,6 @@ class Jacobian(object):
 
         summ = self._jac_summ
         subjacs = self._subjacs_info
-        ofs = list(system._var_allprocs_abs_names['output'])
-        wrts = list(system._var_allprocs_abs_names['input'])
 
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['linear']
@@ -359,7 +357,15 @@ class Jacobian(object):
         approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
 
-        wrt_info = ((ofs, osizes, approx_of_idx), (wrts, isizes, approx_wrt_idx))
+        if system._owns_approx_of or system._owns_approx_wrt:
+            # we're computing totals
+            ofs = [n for n in system._var_allprocs_abs_names['output'] if n in system._owns_approx_of]
+            wrts = [n for n in system._var_allprocs_abs_names['output'] if n in system._owns_approx_wrt]
+            wrt_info = ((wrts, osizes, approx_wrt_idx),)
+        else:
+            ofs = system._var_allprocs_abs_names['output']
+            wrts = system._var_allprocs_abs_names['input']
+            wrt_info = ((ofs, osizes, approx_of_idx), (wrts, isizes, approx_wrt_idx))
 
         ncols = nrows = 0
         locs = {}

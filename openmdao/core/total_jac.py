@@ -1340,7 +1340,7 @@ class _TotalJacInfo(object):
             else:
                 model.approx_totals(method='fd')
 
-        model._setup_jacobians(recurse=False)
+            model._setup_jacobians(recurse=False)
 
         # Linearize Model
         model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
@@ -1372,6 +1372,8 @@ class _TotalJacInfo(object):
 
         if return_format == 'array':
             totals = self.J  # change back to array version
+
+        model._check_coloring_update()
 
         return totals
 
