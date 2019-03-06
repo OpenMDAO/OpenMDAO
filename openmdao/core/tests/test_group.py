@@ -452,17 +452,24 @@ class TestGroup(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 
         p = Problem()
-        indep = p.model.add_subsystem('indep', IndepVarComp())
-        indep.add_output('x', np.ones(5), units='ft')
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'},
-                                             y={'units': 'inch'}))
-        p.model.connect('indep.x', 'C1.x')
-        p.set_solver_print(level=0)
+
+        indep_comp = IndepVarComp()
+        indep_comp.add_output('x', np.ones(5), units='ft')
+
+        exec_comp = ExecComp('y=sum(x)',
+                             x={'value': np.zeros(5), 'units': 'inch'},
+                             y={'units': 'inch'})
+
+        p.model.add_subsystem('indep', indep_comp)
+        p.model.add_subsystem('comp1', exec_comp)
+        p.model.connect('indep.x', 'comp1.x')
+
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['indep.x'], np.ones(5))
-        assert_rel_error(self, p['C1.x'], np.ones(5)*12.)
-        assert_rel_error(self, p['C1.y'], 60.)
+        assert_rel_error(self, p['comp1.x'], np.ones(5)*12.)
+        assert_rel_error(self, p['comp1.y'], 60.)
 
     def test_connect_1_to_many(self):
         import numpy as np
