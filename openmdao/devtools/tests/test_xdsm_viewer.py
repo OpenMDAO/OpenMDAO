@@ -966,7 +966,7 @@ class TestXDSMjsViewer(unittest.TestCase):
                    recurse=True)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
 
-    def test_pyxdsm_right_outputs(self):
+    def test_xdsmjs_right_outputs(self):
         """Makes XDSM for the Sellar problem"""
         filename = 'xdsmjs_outputs_on_the_right'
         prob = Problem()
