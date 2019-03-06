@@ -952,6 +952,52 @@ class TestGroup(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['exp.y'], 100., 1e-6)
 
+    def test_guess_nonlinear_feature(self):
+        from openmdao.api import Problem, Group, NewtonSolver, DirectSolver
+        from openmdao.core.tests.test_impl_comp import QuadraticComp
+
+        class QuadraticGroup(Group):
+            def __init__(self, guess):
+                super(QuadraticGroup, self).__init__()
+                self._guess_value = guess
+
+            def setup(self):
+                # Quadratic equation: x^2 - 4x + 3 (solutions at x=1 and x=3)
+                self.add_subsystem('pa', IndepVarComp('a', 1.0))
+                self.add_subsystem('pb', IndepVarComp('b', -4.0))
+                self.add_subsystem('pc', IndepVarComp('c', 3.0))
+
+                self.add_subsystem('comp', QuadraticComp())
+
+                self.connect('pa.a', 'comp.a')
+                self.connect('pb.b', 'comp.b')
+                self.connect('pc.c', 'comp.c')
+
+                self.linear_solver = DirectSolver()
+                self.nonlinear_solver = NewtonSolver(solve_subsystems=True)
+                # self.nonlinear_solver.options['max_sub_solves'] = 1
+
+            def guess_nonlinear(self, inputs, outputs, residuals):
+                print('guessing:', self._guess_value)
+                outputs['comp.x'] = self._guess_value
+
+        # Set the initial guess to a value that will take us to the x=1 solution.
+        prob = Problem(QuadraticGroup(guess=0.))
+        prob.setup()
+        prob.set_solver_print(2)
+        prob.run_model()
+
+        print('solution:', prob['comp.x'])
+        assert_rel_error(self, prob['comp.x'], 1., 1e-6)
+
+        # Set the initial guess to a value that will take us to the x=3 solution.
+        prob = Problem(QuadraticGroup(guess=5.))
+        prob.setup()
+        prob.run_model()
+
+        print('solution:', prob['comp.x'])
+        assert_rel_error(self, prob['comp.x'], 3., 1e-6)
+
 
 class MyComp(ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
