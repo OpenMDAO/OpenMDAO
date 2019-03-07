@@ -178,6 +178,9 @@ class FiniteDifference(ApproximationScheme):
         wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
                                               system._var_sizes['nonlinear']['input'][iproc])
 
+        approx_of_idx = system._owns_approx_of_idx
+        approx_wrt_idx = system._owns_approx_wrt_idx
+
         self._approx_groups = []
         for key, approximations in approx_groups:
             wrt, form, order, step, step_calc, directional = key

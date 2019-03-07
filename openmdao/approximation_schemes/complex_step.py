@@ -130,8 +130,6 @@ class ComplexStep(ApproximationScheme):
         wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
                                               system._var_sizes['nonlinear']['input'][iproc])
 
-        iproc = system.comm.rank
-        nproc = system.comm.size
         approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
 
@@ -150,7 +148,8 @@ class ComplexStep(ApproximationScheme):
                 if is_total:
                     of_names = [n for n in system._var_allprocs_abs_names['output']
                                 if n in system._owns_approx_of]
-                    wrt_names = full_wrts = system._owns_approx_wrt
+                    wrt_names = full_wrts = [n for n in system._var_allprocs_abs_names['output']
+                                             if n in system._owns_approx_wrt]
                     ofsizes = [outputs._views_flat[of].size for of in of_names]
                     wrtsizes = [outputs._views_flat[wrt].size for wrt in wrt_names]
                     total_sizes = system._var_sizes['nonlinear']['output'][iproc]
