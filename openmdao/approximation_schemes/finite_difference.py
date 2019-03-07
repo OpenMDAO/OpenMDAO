@@ -147,6 +147,31 @@ class FiniteDifference(ApproximationScheme):
             return (approx_tuple[1], options['form'], options['order'],
                     options['step'], options['step_calc'], options['directional'])
 
+    def _get_approx_data(self, system, key):
+        wrt, form, order, step, step_calc, _ = key
+
+        # FD forms are written as a collection of changes to inputs (deltas) and the associated
+        # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
+        # coefficient is stored seperately (current_coeff). For example,
+        # f'(x) = (f(x+h) - f(x))/h + O(h) = 1/h * f(x+h) + (-1/h) * f(x) + O(h)
+        # would be stored as deltas = [h], coeffs = [1/h], and current_coeff = -1/h.
+        # A central second order accurate approximation for the first derivative would be stored
+        # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
+        # current_coeff = 0.
+        fd_form = _generate_fd_coeff(form, order)
+
+        if step_calc == 'rel':
+            if wrt in system._outputs._views_flat:
+                step *= np.linalg.norm(system._outputs._views_flat[wrt])
+            elif wrt in system._inputs._views_flat:
+                step *= np.linalg.norm(system._inputs._views_flat[wrt])
+
+        deltas = fd_form.deltas * step
+        coeffs = fd_form.coeffs / step
+        current_coeff = fd_form.current_coeff / step
+
+        return deltas, coeffs, current_coeff
+
     def _init_approximations(self, system):
         """
         Prepare for later approximations.
@@ -183,27 +208,9 @@ class FiniteDifference(ApproximationScheme):
 
         self._approx_groups = []
         for key, approximations in approx_groups:
-            wrt, form, order, step, step_calc, directional = key
-
-            # FD forms are written as a collection of changes to inputs (deltas) and the associated
-            # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
-            # coefficient is stored seperately (current_coeff). For example,
-            # f'(x) = (f(x+h) - f(x))/h + O(h) = 1/h * f(x+h) + (-1/h) * f(x) + O(h)
-            # would be stored as deltas = [h], coeffs = [1/h], and current_coeff = -1/h.
-            # A central second order accurate approximation for the first derivative would be stored
-            # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
-            # current_coeff = 0.
-            fd_form = _generate_fd_coeff(form, order)
-
-            if step_calc == 'rel':
-                if wrt in system._outputs._views_flat:
-                    step *= np.linalg.norm(system._outputs._views_flat[wrt])
-                elif wrt in system._inputs._views_flat:
-                    step *= np.linalg.norm(system._inputs._views_flat[wrt])
-
-            deltas = fd_form.deltas * step
-            coeffs = fd_form.coeffs / step
-            current_coeff = fd_form.current_coeff / step
+            wrt = key[0]
+            directional = key[-1]
+            data = self._get_approx_data(system, key)
 
             if wrt == '@color':  # use coloring
                 # need mapping from coloring jac columns (subset) to full jac columns
@@ -216,12 +223,10 @@ class FiniteDifference(ApproximationScheme):
                     wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
                     col_map = sub2full_indices(wrt_names, wrts, sizes)
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, deltas, coeffs, current_coeff,
-                                                    col_map[cols], nzrows, None))
+                        self._approx_groups.append((None, data, col_map[cols], nzrows, None))
                 else:
                     for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, deltas, coeffs, current_coeff, cols,
-                                                    nzrows, None))
+                        self._approx_groups.append((None, data, cols, nzrows, None))
             else:
                 if wrt in inputs._views_flat:
                     arr = inputs._data
@@ -261,7 +266,7 @@ class FiniteDifference(ApproximationScheme):
 
                     outs.append((of, np.zeros((out_size, in_size), dtype=dtype), out_idx))
 
-                self._approx_groups.append((wrt, deltas, coeffs, current_coeff, in_idx, outs, arr))
+                self._approx_groups.append((wrt, data, in_idx, outs, arr))
 
     def compute_approximations(self, system, jac=None, total=False):
         """
@@ -288,13 +293,13 @@ class FiniteDifference(ApproximationScheme):
         else:
             current_vec = system._residuals
 
-        result = system._outputs._clone(True)
+        results_clone = current_vec._clone(True)
 
         cs_active = system._outputs._under_complex_step
         if cs_active:
-            result.set_complex_step_mode(cs_active)
+            results_clone.set_complex_step_mode(cs_active)
 
-        result_array = result._data.copy()
+        result_array = results_clone._data.copy()
         out_tmp = current_vec._data.copy()
         in_tmp = system._inputs._data.copy()
 
@@ -315,38 +320,28 @@ class FiniteDifference(ApproximationScheme):
 
         fd_count = 0
         approx_groups = self._get_approx_groups(system, under_cs=cs_active)
-        for wrt, deltas, coeffs, current_coeff, in_idx, outputs, arr in approx_groups:
-            xx = 0
+        for wrt, data, in_idx, outputs, arr in approx_groups:
+            deltas, coeffs, current_coeff = data
             for i_count, idx in enumerate(in_idx):
                 if fd_count % num_par_fd == system._par_fd_id:
-                    if current_coeff:
-                        result._data[:] = current_vec._data
-                        result._data *= current_coeff
-                    else:
-                        result._data[:] = 0.
-
-                    # Run the Finite Difference
-                    for delta, coeff in zip(deltas, coeffs):
-                        self._run_point(system, arr, idx, delta, out_tmp, in_tmp, result_array,
-                                        total)
-                        result_array *= coeff
-                        result._data += result_array
+                    self._run_points(system, arr, idx, data, out_tmp, in_tmp, result_array,
+                                     results_clone, current_vec, total)
 
                     if is_parallel:
                         for of, _, out_idx in outputs:
                             if owns[of] == iproc:
                                 results[(of, wrt)].append(
-                                    (i_count, result._views_flat[of][out_idx].copy()))
+                                    (i_count, results_clone._views_flat[of][out_idx].copy()))
                     else:
                         for of, subjac, out_idx in outputs:
-                            subjac[:, i_count] = result._views_flat[of][out_idx]
+                            subjac[:, i_count] = results_clone._views_flat[of][out_idx]
 
                 fd_count += 1
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, _, _, _, outputs, arr in approx_groups:
+        for wrt, _, _, outputs, arr in approx_groups:
             for of, subjac, _ in outputs:
                 key = (of, wrt)
                 if is_parallel:
@@ -360,7 +355,23 @@ class FiniteDifference(ApproximationScheme):
                 else:
                     jac[key] = subjac
 
-    def _run_point(self, system, arr, idxs, delta, out_tmp, in_tmp, result_array, total=False):
+    def _run_points(self, system, arr, idx, data, out_tmp, in_tmp, result_array, results_clone,
+                    current_vec, is_total):
+        deltas, coeffs, current_coeff = data
+        if current_coeff:
+            results_clone._data[:] = current_vec._data
+            results_clone._data *= current_coeff
+        else:
+            results_clone._data[:] = 0.
+
+        # Run the Finite Difference
+        for delta, coeff in zip(deltas, coeffs):
+            self._run_point(system, arr, idx, delta, out_tmp, in_tmp, result_array,
+                            is_total)
+            result_array *= coeff
+            results_clone._data += result_array
+
+    def _run_point(self, system, arr, idxs, delta, out_tmp, in_tmp, result_array, is_total):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -380,7 +391,7 @@ class FiniteDifference(ApproximationScheme):
             A copy of the starting inputs array used to restore the inputs to original values.
         result_array : ndarray
             An array the same size as the system outputs. Used to store the results.
-        total : bool
+        is_total : bool
             If True total derivatives are being approximated, else partials.
 
         Returns
@@ -391,7 +402,7 @@ class FiniteDifference(ApproximationScheme):
         inputs = system._inputs
         outputs = system._outputs
 
-        if total:
+        if is_total:
             run_model = system.run_solve_nonlinear
             results_vec = outputs
         else:

@@ -1,9 +1,13 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
+from itertools import groupby
 from collections import defaultdict, OrderedDict
 import numpy as np
-from openmdao.utils.array_utils import sub2full_indices, update_sizes
+from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
+    update_sizes, get_input_idx_split, _get_jac_slice_dict
+from openmdao.utils.name_maps import rel_name2abs_name
+from openmdao.utils.coloring import color_iterator
 
 _full_slice = slice(None)
 
@@ -124,14 +128,141 @@ class ApproximationScheme(object):
 
     def _init_approximations(self, system):
         """
-        Perform any necessary setup for the approximation scheme.
+        Prepare for later approximations.
 
         Parameters
         ----------
         system : System
             The system having its derivs approximated.
         """
-        pass
+        global _full_slice
+        from openmdao.core.group import Group
+        is_total = isinstance(system, Group)
+
+        # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
+        # group adjacent items with identical keys.
+        self._exec_list.sort(key=self._key_fun)
+
+        # groupby (along with this key function) will group all 'of's that have the same wrt and
+        # step size.
+        # Note: Since access to `approximations` is required multiple times, we need to
+        # throw it in a list. The groupby iterator only works once.
+        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
+                                                                        self._key_fun)]
+
+        outputs = system._outputs
+        inputs = system._inputs
+        iproc = system.comm.rank
+
+        wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
+                                               system._var_sizes['nonlinear']['output'][iproc])
+        wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
+                                              system._var_sizes['nonlinear']['input'][iproc])
+
+        approx_of_idx = system._owns_approx_of_idx
+        approx_wrt_idx = system._owns_approx_wrt_idx
+
+        self._approx_groups = []
+        for key, approx in approx_groups:
+            wrt = key[0]
+            directional = key[-1]
+            data = self._get_approx_data(system, key)
+
+            if wrt == '@color':   # use coloring (there should be only 1 of these)
+                wrt_matches = system._approx_coloring_info[0]
+                options = approx[0][2]
+                colored_wrts = options['coloring_wrts']
+                if is_total:
+                    of_names = [n for n in system._var_allprocs_abs_names['output']
+                                if n in system._owns_approx_of]
+                    wrt_names = full_wrts = [n for n in system._var_allprocs_abs_names['output']
+                                             if n in system._owns_approx_wrt]
+                    ofsizes = [outputs._views_flat[of].size for of in of_names]
+                    wrtsizes = [outputs._views_flat[wrt].size for wrt in wrt_names]
+                    total_sizes = system._var_sizes['nonlinear']['output'][iproc]
+                else:
+                    of_names, wrt_names = system._get_partials_varlists()
+                    ofsizes, wrtsizes = system._get_partials_sizes()
+                    full_wrts = wrt_names
+                    wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
+                    of_names = [rel_name2abs_name(system, n) for n in of_names]
+                    full_wrts = [rel_name2abs_name(system, n) for n in full_wrts]
+
+                full_sizes = wrtsizes
+                is_implicit = not is_total and \
+                    system._var_sizes['nonlinear']['input'][iproc].size < wrtsizes.size
+                full_ofs = list(system._outputs._views)
+
+                if len(wrt_names) != len(wrt_matches):
+                    new_names = []
+                    new_sizes = []
+                    for name, size in zip(wrt_names, wrtsizes):
+                        if name in wrt_matches:
+                            new_names.append(name)
+                            new_sizes.append(size)
+                    wrt_names = new_names
+                    wrtsizes = new_sizes
+
+                coloring = options['coloring']
+                tmpJ = {
+                    '@nrows': coloring['nrows'],
+                    '@ncols': coloring['ncols'],
+                    '@matrix': None,
+                }
+
+                # FIXME: need to deal with mix of local/remote indices
+
+                reduced_wrt_sizes = update_sizes(wrt_names, wrtsizes, approx_wrt_idx)
+                reduced_of_sizes = update_sizes(of_names, ofsizes, approx_of_idx)
+                tmpJ['@jac_slices'] = _get_jac_slice_dict(of_names, reduced_of_sizes,
+                                                          wrt_names, reduced_wrt_sizes)
+
+                if len(full_wrts) != len(colored_wrts) or approx_wrt_idx:
+                    # need mapping from coloring jac columns (subset) to full jac columns
+                    col_map = sub2full_indices(full_wrts, colored_wrts, full_sizes, approx_wrt_idx)
+                else:
+                    col_map = None
+
+                if is_total and (approx_of_idx or len(full_ofs) > len(of_names)):
+                    tmpJ['@row_idx_map'] = sub2full_indices(full_ofs, system._owns_approx_of,
+                                                            total_sizes, approx_of_idx)
+
+                for cols, nzrows in color_iterator(coloring, 'fwd'):
+                    ccols = cols if col_map is None else col_map[cols]
+                    idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit, is_total)
+                    self._approx_groups.append((None, data, cols, tmpJ, idx_info, nzrows))
+            else:
+                if wrt in inputs._views_flat:
+                    arr = inputs
+                    offsets = wrt_in_offsets
+                elif wrt in outputs._views_flat:
+                    arr = outputs
+                    offsets = wrt_out_offsets
+                else:  # wrt is remote
+                    arr = None
+
+                if wrt in system._owns_approx_wrt_idx:
+                    in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int)
+                    if arr is not None:
+                        in_idx += offsets[wrt]
+                    in_size = len(in_idx)
+                else:
+                    in_size = system._var_allprocs_abs2meta[wrt]['size']
+                    if arr is None:
+                        in_idx = range(in_size)
+                    else:
+                        in_idx = range(offsets[wrt], offsets[wrt] + in_size)
+
+                # Directional derivatives for quick partial checking.
+                # We place the indices in a list so that they are all stepped at the same time.
+                if directional:
+                    in_idx = [list(in_idx)]
+                    in_size = 1
+
+                tmpJ = _get_wrt_subjacs(system, approx)
+
+                self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
+
 
 
 def _gather_jac_results(comm, results):
