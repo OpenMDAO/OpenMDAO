@@ -120,7 +120,6 @@ def _check_partial_matrix(system, jac, expected):
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key]['value'])
-                print(key, jac[key]['value'])
         if cblocks:
             blocks.append(np.hstack(cblocks))
     fullJ = np.vstack(blocks)
