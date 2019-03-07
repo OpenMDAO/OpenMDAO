@@ -138,7 +138,6 @@ class ComplexStep(ApproximationScheme):
             wrt, form, delta, directional = key
             if form == 'reverse':
                 delta *= -1.0
-            fact = 1.0 / delta
             delta *= 1j
 
             if wrt == '@color':   # use coloring (there should be only 1 of these)
@@ -203,7 +202,7 @@ class ComplexStep(ApproximationScheme):
                 for cols, nzrows in color_iterator(coloring, 'fwd'):
                     ccols = cols if col_map is None else col_map[cols]
                     idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit, is_total)
-                    self._approx_groups.append((None, delta, fact, cols, tmpJ, idx_info, nzrows))
+                    self._approx_groups.append((None, delta, cols, tmpJ, idx_info, nzrows))
             else:
                 if wrt in inputs._views_flat:
                     arr = inputs
@@ -234,7 +233,7 @@ class ComplexStep(ApproximationScheme):
 
                 tmpJ = _get_wrt_subjacs(system, approx)
 
-                self._approx_groups.append((wrt, delta, fact, in_idx, tmpJ, [(arr, in_idx)], None))
+                self._approx_groups.append((wrt, delta, in_idx, tmpJ, [(arr, in_idx)], None))
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -296,10 +295,10 @@ class ComplexStep(ApproximationScheme):
 
         fd_count = 0
         Jcolored = None
-        colored_fact = None
+        colored_delta = None
 
         approx_groups = self._get_approx_groups(system)
-        for wrt, delta, fact, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+        for wrt, delta, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
             if wrt is None:  # colored
                 row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
                 # Run the complex step
@@ -307,7 +306,7 @@ class ComplexStep(ApproximationScheme):
                     result = self._run_point_complex(system, idx_info, delta, results_clone, total)
                     if Jcolored is None:
                         tmpJ['@matrix'] = Jcolored = np.zeros((tmpJ['@nrows'], tmpJ['@ncols']))
-                        colored_fact = fact
+                        colored_delta = delta
                     if is_parallel:
                         if par_fd_w_serial_model:
                             raise NotImplementedError("simul approx w/par FD not supported yet")
@@ -354,12 +353,13 @@ class ComplexStep(ApproximationScheme):
                     fd_count += 1
 
         if Jcolored is not None:
-            Jcolored *= colored_fact
+            Jcolored *= (1.0 / colored_delta * 1j).real
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, fact, _, tmpJ, _, _ in approx_groups:
+        for wrt, delta, _, tmpJ, _, _ in approx_groups:
+            fact = (1.0 / delta * 1j).real
             if wrt is None:  # colored
                 mat = tmpJ['@matrix']
                 # TODO: coloring when using parallel FD and/or FD with remote comps
