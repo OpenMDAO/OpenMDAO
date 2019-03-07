@@ -580,6 +580,9 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                           dynamic_simul_derivs=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
+        # Tests a bug where coloring ran the model when not needed.
+        self.assertEqual(p_color.model.iter_count, 9)
+
         # run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False)
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
