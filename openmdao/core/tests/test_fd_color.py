@@ -11,7 +11,7 @@ except ImportError:
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent
+    ExplicitComponent, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
@@ -26,43 +26,50 @@ except ImportError:
     PETScVector = None
 
 
+def setup_vars(self, ofs, wrts):
+    matrix = self.sparsity
+    isplit = self.isplit
+    osplit = self.osplit
+
+    shapesz = matrix.shape[1]
+    sz = shapesz // isplit
+    rem = shapesz % isplit
+    for i in range(isplit):
+        if rem > 0:
+            isz = sz + rem
+            rem = 0
+        else:
+            isz = sz
+
+        self.add_input('x%d' % i, np.zeros(isz))
+
+    shapesz = matrix.shape[0]
+    sz = shapesz // osplit
+    rem = shapesz % osplit
+    for i in range(osplit):
+        if rem > 0:
+            isz = sz + rem
+            rem = 0
+        else:
+            isz = sz
+        self.add_output('y%d' % i, np.zeros(isz))
+
+    self.declare_partials(of=ofs, wrt=wrts, method=self.method)
+
+
 class SparseCompImplicit(ImplicitComponent):
 
-    def __init__(self, sparsity, isplit=1, osplit=1, **kwargs):
+    def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
         super(SparseCompImplicit, self).__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
+        self.method = method
 
     def setup(self):
-        shapesz = self.sparsity.shape[1]
-        sz = shapesz // self.isplit
-        rem = shapesz % self.isplit
-        for i in range(self.isplit):
-            if rem > 0:
-                isz = sz + rem
-                rem = 0
-            else:
-                isz = sz
+        setup_vars(self, ofs='*', wrts='*')
 
-            self.add_input('x%d' % i, np.zeros(isz))
-
-        shapesz = self.sparsity.shape[0]
-        sz = shapesz // self.osplit
-        rem = shapesz % self.osplit
-        for i in range(self.osplit):
-            if rem > 0:
-                isz = sz + rem
-                rem = 0
-            else:
-                isz = sz
-            self.add_output('y%d' % i, np.zeros(isz))
-
-        self.declare_partials(of='*', wrt='*', method='cs')
-
-    # def compute(self, inputs, outputs):
-    #     outputs['y'] = self.sparsity.dot(inputs._data)
-
+    # this is defined for easier testing of coloring of approx partials
     def apply_nonlinear(self, inputs, outputs, residuals):
         prod = self.sparsity.dot(inputs._data)
         start = end = 0
@@ -72,40 +79,28 @@ class SparseCompImplicit(ImplicitComponent):
             residuals[outname] = prod[start:end]
             start = end
 
+    # this is defined so we can more easily test coloring of approx totals in a Group above this comp
+    def solve_nonlinear(self, inputs, outputs):
+        prod = self.sparsity.dot(inputs._data)
+        start = end = 0
+        for i in range(self.osplit):
+            outname = 'y%d' % i
+            end += outputs[outname].size
+            outputs[outname] = prod[start:end]
+            start = end
+
 
 class SparseCompExplicit(ExplicitComponent):
 
-    def __init__(self, sparsity, isplit=1, osplit=1, **kwargs):
+    def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
         super(SparseCompExplicit, self).__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
+        self.method = method
 
     def setup(self):
-        shapesz = self.sparsity.shape[1]
-        sz = shapesz // self.isplit
-        rem = shapesz % self.isplit
-        for i in range(self.isplit):
-            if rem > 0:
-                isz = sz + rem
-                rem = 0
-            else:
-                isz = sz
-
-            self.add_input('x%d' % i, np.zeros(isz))
-
-        shapesz = self.sparsity.shape[0]
-        sz = shapesz // self.osplit
-        rem = shapesz % self.osplit
-        for i in range(self.osplit):
-            if rem > 0:
-                isz = sz + rem
-                rem = 0
-            else:
-                isz = sz
-            self.add_output('y%d' % i, np.zeros(isz))
-
-        self.declare_partials(of='*', wrt='*', method='cs')
+        setup_vars(self, ofs='*', wrts='*')
 
     def compute(self, inputs, outputs):
         prod = self.sparsity.dot(inputs._data)
@@ -140,14 +135,13 @@ def _check_total_matrix(system, jac, expected):
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key])
-                print(key, jac[key])
         if cblocks:
             blocks.append(np.hstack(cblocks))
     fullJ = np.vstack(blocks)
     np.testing.assert_almost_equal(fullJ, expected)
 
 
-class TestFDColoring(unittest.TestCase):
+class TestCSColoring(unittest.TestCase):
     def test_simple_totals(self):
         prob = Problem()
         model = prob.model = Group(dynamic_derivs_repeats=1)
@@ -165,7 +159,7 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, isplit=2, osplit=2))
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
         model.set_approx_coloring('*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -178,8 +172,43 @@ class TestFDColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.compute_totals()
-        derivs = prob.compute_totals()  # do twice, first time used to compute sparsity
+        derivs = prob.driver._compute_totals()
+        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        _check_total_matrix(model, derivs, sparsity)
+
+    def test_totals_over_implicit_comp(self):
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, 'cs', isplit=2, osplit=2))
+        model.set_approx_coloring('*', method='cs')
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0')
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        derivs = prob.driver._compute_totals()
+        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
         _check_total_matrix(model, derivs, sparsity)
 
     def test_totals_of_indices(self):
@@ -199,7 +228,7 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, isplit=2, osplit=2))
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
         model.set_approx_coloring('*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -234,7 +263,7 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, isplit=2, osplit=2))
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
         model.set_approx_coloring('*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -269,7 +298,7 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, isplit=2, osplit=2))
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
         model.set_approx_coloring('*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -304,7 +333,7 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, isplit=2, osplit=2, dynamic_derivs_repeats=1))
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, 'cs', isplit=2, osplit=2, dynamic_derivs_repeats=1))
         comp.set_approx_coloring('x*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -334,7 +363,7 @@ class TestFDColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, isplit=2, osplit=2, dynamic_derivs_repeats=1))
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2, dynamic_derivs_repeats=1))
         comp.set_approx_coloring('x*', method='cs')
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')

@@ -7,7 +7,7 @@ from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
 from six import itervalues, iteritems
 
-from openmdao.utils.name_maps import key2abs_key
+from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
 
 SUBJAC_META_DEFAULTS = {
@@ -187,66 +187,6 @@ class Jacobian(object):
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
 
-    def set_column(self, key, subjac):
-        """
-        Set sub-Jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            Promoted or relative name pair of sub-Jacobian.
-        subjac : int or float or ndarray or sparse matrix
-            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
-        """
-        abs_key = self._get_abs_key(key)
-        if abs_key is not None:
-
-            # You can only set declared subjacobians.
-            if abs_key not in self._subjacs_info:
-                msg = 'Variable name pair ("{}", "{}") must first be declared.'
-                raise KeyError(msg.format(key[0], key[1]))
-
-            subjacs_info = self._subjacs_info[abs_key]
-
-            if issparse(subjac):
-                subjacs_info['value'] = subjac
-            else:
-                # np.promote_types will choose the smallest dtype that can contain both arguments
-                subjac = np.atleast_1d(subjac)
-                safe_dtype = np.promote_types(subjac.dtype, float)
-                subjac = subjac.astype(safe_dtype, copy=False)
-
-                # Bail here so that we allow top level jacobians to be of reduced size when indices
-                # are specified on driver vars.
-                if self._override_checks:
-                    subjacs_info['value'] = subjac
-                    return
-
-                rows = subjacs_info['rows']
-
-                if rows is None:
-                    # Dense subjac
-                    shape = self._abs_key2shape(abs_key)
-                    subjac = np.atleast_2d(subjac)
-                    if subjac.shape == (1, 1):
-                        subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
-                    else:
-                        subjac = subjac.reshape(shape)
-                else:
-                    # Sparse subjac
-                    if subjac.shape == (1,):
-                        subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
-
-                    if subjac.shape != rows.shape:
-                        raise ValueError("Sub-jacobian for key %s has "
-                                         "the wrong shape (%s), expected (%s)." %
-                                         (abs_key, subjac.shape, rows.shape))
-
-                np.copyto(subjacs_info['value'], subjac)
-        else:
-            msg = 'Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(key[0], key[1]))
-
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
@@ -352,20 +292,26 @@ class Jacobian(object):
 
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['linear']
-        osizes = system._var_sizes['linear']['output']
-        isizes = system._var_sizes['linear']['input']
         approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
+        ofsizes = system._var_sizes['linear']['output'][iproc]
 
         if system._owns_approx_of or system._owns_approx_wrt:
             # we're computing totals
-            ofs = [n for n in system._var_allprocs_abs_names['output'] if n in system._owns_approx_of]
-            wrts = [n for n in system._var_allprocs_abs_names['output'] if n in system._owns_approx_wrt]
-            wrt_info = ((wrts, osizes, approx_wrt_idx),)
+            ofs = [n for n in system._var_allprocs_abs_names['output']
+                   if n in system._owns_approx_of]
+            wrts = [n for n in system._var_allprocs_abs_names['output']
+                    if n in system._owns_approx_wrt]
+            wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
+            from openmdao.core.implicitcomponent import ImplicitComponent
             ofs = system._var_allprocs_abs_names['output']
             wrts = system._var_allprocs_abs_names['input']
-            wrt_info = ((ofs, osizes, approx_of_idx), (wrts, isizes, approx_wrt_idx))
+            isizes = system._var_sizes['linear']['input'][iproc]
+            wrt_info = [(ofs, ofsizes, ())]
+            if isinstance(system, ImplicitComponent):
+                wrt_info.append(((ofs, ofsizes, ())))
+            wrt_info.append((wrts, isizes, ()))
 
         ncols = nrows = 0
         locs = {}
@@ -375,7 +321,7 @@ class Jacobian(object):
                 sub_of_idx = approx_of_idx[of]
                 rend += len(sub_of_idx)
             else:
-                rend += osizes[iproc, abs2idx[of]]
+                rend += ofsizes[abs2idx[of]]
                 sub_of_idx = _full_slice
             coffset = cend = 0
             for wrts, sizes, approx_idx in wrt_info:
@@ -385,7 +331,7 @@ class Jacobian(object):
                             sub_wrt_idx = approx_idx[wrt]
                             cend += len(sub_wrt_idx)
                         else:
-                            cend += sizes[iproc, abs2idx[wrt]]
+                            cend += sizes[abs2idx[wrt]]
                             sub_wrt_idx = _full_slice
                         key = (of, wrt)
                         if key in subjacs:
@@ -402,15 +348,15 @@ class Jacobian(object):
             if meta['rows'] is not None:
                 rows = meta['rows'] + jslice[0].start
                 # if sub_of_idx is not _full_slice:
-                    # rows = rows[sub_of_idx]
+                #     rows = rows[sub_of_idx]
                 cols = meta['cols'] + jslice[1].start
                 # if sub_wrt_idx is not _full_slice:
-                    # cols = cols[sub_wrt_idx]
+                #     cols = cols[sub_wrt_idx]
                 J[rows, cols] = summ[key]
             elif issparse(summ[key]):
                 raise NotImplementedError("don't support scipy sparse arrays yet")
             else:
-                J[jslice] = summ[key]#[sub_of_idx, sub_wrt_idx]
+                J[jslice] = summ[key]
 
         # normalize by number of saved jacs, giving a sort of 'average' jac
         J /= system.options['dynamic_derivs_repeats']

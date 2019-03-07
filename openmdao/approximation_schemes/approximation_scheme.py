@@ -146,23 +146,6 @@ def _gather_jac_results(comm, results):
     return new_results
 
 
-def _get_jac_slice_dict(of_names, of_sizes, wrt_names, wrt_sizes):
-    """
-    Return a dict of (of,wrt) pairs mapped to slices of a dense matrix.
-    """
-    dct = {}
-    rstart = rend = 0
-    for ofname, ofsize in zip(of_names, of_sizes):
-        rend += ofsize
-        cstart = cend = 0
-        for wrtname, wrtsize in zip(wrt_names, wrt_sizes):
-            cend += wrtsize
-            dct[(ofname, wrtname)] = (slice(rstart, rend), slice(cstart, cend))
-            cstart = cend
-        rstart = rend
-    return dct
-
-
 def _get_wrt_subjacs(system, approxs):
     """
     Return a dict mapping wrt names to contiguous memory views of all of their nonzero subjacs.

@@ -355,11 +355,9 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
 
     if global_idxs:
         return np.hstack(global_idxs)
-    else:
-        return None
 
 
-def get_input_idx_split(full_idxs, inputs, outputs, is_implicit):
+def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total):
     """
     Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
 
@@ -373,6 +371,8 @@ def get_input_idx_split(full_idxs, inputs, outputs, is_implicit):
         Outputs vector.
     is_implicit : bool
         If True, current system is implicit and full idxs are into the full outs + ins vector.
+    is_total : bool
+        If True, total derivatives are being computed and wrt vector is the outputs vector.
 
     Returns
     -------
@@ -392,6 +392,8 @@ def get_input_idx_split(full_idxs, inputs, outputs, is_implicit):
             return [(inputs, in_idxs - out_size)]
         else:  # out_idxs.size > 0
             return [(outputs, out_idxs)]
+    elif is_total:
+        return [(outputs, full_idxs)]
     else:
         return [(inputs, full_idxs)]
 
@@ -480,3 +482,20 @@ def update_sizes(names, sizes, index_map):
                 sizes[i] = len(index_map[name])
 
     return sizes
+
+
+def _get_jac_slice_dict(of_names, of_sizes, wrt_names, wrt_sizes):
+    """
+    Return a dict of (of,wrt) pairs mapped to slices of a dense matrix.
+    """
+    dct = {}
+    rstart = rend = 0
+    for ofname, ofsize in zip(of_names, of_sizes):
+        rend += ofsize
+        cstart = cend = 0
+        for wrtname, wrtsize in zip(wrt_names, wrt_sizes):
+            cend += wrtsize
+            dct[(ofname, wrtname)] = (slice(rstart, rend), slice(cstart, cend))
+            cstart = cend
+        rstart = rend
+    return dct
