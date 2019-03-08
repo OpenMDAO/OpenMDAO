@@ -21,7 +21,8 @@ from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script
+from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script, \
+    add_dropdown
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
@@ -309,6 +310,37 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
 
     index = index.replace('{{model_data}}', write_script(model_viewer_data, indent=4))
     index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
+
+    sizes = [8, 9, 10, 11, 12, 13, 14]
+    opts = ['{}px'.format(size) for size in sizes]
+    font_size_dropdown = add_dropdown(
+        "Font Size",
+        id_naming="idFontSize",
+        options=opts,
+        button_content="icon-text-height",
+        header="Font Size"
+    )
+    sizes = [600, 650, 700, 750, 800, 850, 900, 950, 1000, 2000, 3000, 4000]
+    opts = ['{}px'.format(size) for size in sizes]
+    vertical_size_dropdown = add_dropdown(
+        "Vertically Resize",
+        id_naming="idVerticalResize",
+        options=opts,
+        button_content="icon-resize-vertical",
+        header="Model Height"
+    )
+
+    collapse_depth_dropdown = add_dropdown(
+        "Collapse Depth",
+        button_content="icon-sort-number-up",
+        header="Collapse Depth",
+        dropdown_id="idCollapseDepthDiv"
+    )
+
+    # Dropdowns
+    index = index.replace('{{collapse_depth_dropdown}}', collapse_depth_dropdown)
+    index = index.replace('{{font_size_dropdown}}', font_size_dropdown)
+    index = index.replace('{{vertical_size_dropdown}}', vertical_size_dropdown)
 
     with open(outfile, 'w') as f:  # write output file
         f.write(index)

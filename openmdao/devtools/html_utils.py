@@ -17,7 +17,7 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content, attrs=None, new_lines=False, indent=0):
+def write_tags(tag, content='', attrs=None, new_lines=False, indent=0):
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
     spaces = ' ' * indent
@@ -57,3 +57,33 @@ def read_files(filenames, directory, extension):
         with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
             libs[name] = f.read()
     return libs
+
+# Viewer API
+
+
+def add_button(title, content='', indent=0):
+    i = write_tags(tag='i', attrs={'class': content})
+    return write_tags('button', content=i, attrs={'class': "myButton", 'title': title},
+                      new_lines=True, indent=indent)
+
+
+def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
+                 dropdown_id=None, indent=0):
+    button = add_button(title=title, content=button_content)
+    if header is not None:
+        items = write_tags(tag='span', attrs={'class': "fakeLink"}, content=header)
+    else:
+        items = ''
+
+    if options is not None:
+        for option in options:
+            idx = "{}{}".format(id_naming, option)
+            items += write_tags(tag='span', attrs={'class': "fakeLink", 'id': idx}, content=option)
+
+    attrs = {'class': 'dropdown-content'}
+    if dropdown_id is not None:
+        attrs['id'] = dropdown_id
+    menu = write_div(content=items, attrs=attrs)
+
+    content = '\n'.join([button, menu])
+    return write_div(content=content, attrs={'class': 'dropdown'}, indent=indent)

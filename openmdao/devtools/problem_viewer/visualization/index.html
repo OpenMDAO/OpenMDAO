@@ -49,14 +49,7 @@
                         <button class="myButton" id="collapseAllButtonId" title="Collapse All Outputs">
                             <i class="icon-resize-small bigger-font"></i>
                         </button>
-                        <div class="dropdown">
-                            <button class="myButton" title="Collapse Depth">
-                                <i class="icon-sort-number-up"></i>
-                            </button>
-                            <div id="idCollapseDepthDiv" class="dropdown-content">
-                                <span class="fakeLink">Collapse Depth</span>
-                            </div>
-                        </div>
+                        {{collapse_depth_dropdown}}
                     </div>
                     <div class="button-group">
                         <button class="myButton" id="clearArrowsAndConnectsButtonId" title="Clear Arrows and Connections">
@@ -75,41 +68,8 @@
                             <i class="icon-minus"></i>
                         </button>
 
-                        <div class="dropdown">
-                            <button class="myButton" title="Font Size">
-                                <i class="icon-text-height"></i>
-                            </button>
-                            <div class="dropdown-content">
-                                <span class="fakeLink">Font Size</span>
-                                <span class="fakeLink" id="idFontSize8px">8px</span>
-                                <span class="fakeLink" id="idFontSize9px">9px</span>
-                                <span class="fakeLink" id="idFontSize10px">10px</span>
-                                <span class="fakeLink" id="idFontSize11px"><b>11px</b></span>
-                                <span class="fakeLink" id="idFontSize12px">12px</span>
-                                <span class="fakeLink" id="idFontSize13px">13px</span>
-                                <span class="fakeLink" id="idFontSize14px">14px</span>
-                            </div>
-                        </div>
-                        <div class="dropdown">
-                            <button class="myButton" title="Vertically Resize">
-                                <i class="icon-resize-vertical"></i>
-                            </button>
-                            <div class="dropdown-content">
-                                <span class="fakeLink">Model Height</span>
-                                <span class="fakeLink" id="idVerticalResize600px"><b>600px</b></span>
-                                <span class="fakeLink" id="idVerticalResize650px">650px</span>
-                                <span class="fakeLink" id="idVerticalResize700px">700px</span>
-                                <span class="fakeLink" id="idVerticalResize750px">750px</span>
-                                <span class="fakeLink" id="idVerticalResize800px">800px</span>
-                                <span class="fakeLink" id="idVerticalResize850px">850px</span>
-                                <span class="fakeLink" id="idVerticalResize900px">900px</span>
-                                <span class="fakeLink" id="idVerticalResize950px">950px</span>
-                                <span class="fakeLink" id="idVerticalResize1000px">1000px</span>
-                                <span class="fakeLink" id="idVerticalResize2000px">2000px</span>
-                                <span class="fakeLink" id="idVerticalResize3000px">3000px</span>
-                                <span class="fakeLink" id="idVerticalResize4000px">4000px</span>
-                            </div>
-                        </div>
+                        {{font_size_dropdown}}
+                        {{vertical_size_dropdown}}
                     </div>
                     <div class="button-group">
                         <button class="myButton" id="saveSvgButtonId" title="Save SVG">
