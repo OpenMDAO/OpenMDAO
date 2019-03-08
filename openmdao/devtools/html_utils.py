@@ -71,11 +71,6 @@ def add_button(title, content='', button_id=None, indent=0):
                       new_lines=True, indent=indent)
 
 
-def add_button_group(buttons):
-    button_elems = [add_button(**b) for b in buttons]
-    return write_div(attrs={'class': "button-group"}, content=button_elems)
-
-
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
                  dropdown_id=None, indent=0):
     button = add_button(title=title, content=button_content)
@@ -96,3 +91,24 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
 
     content = [button, menu]
     return write_div(content=content, attrs={'class': 'dropdown'}, indent=indent)
+
+
+class ButtonGroup(object):
+
+    def __init__(self, indent=0):
+        self.items = []
+        self.indent = indent
+
+    def add_button(self, title, content='', button_id=None):
+        button = add_button(title, content=content, button_id=button_id, indent=self.indent+4)
+        self.items.append(button)
+
+    def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
+                     dropdown_id=None):
+        dropdown = add_dropdown(self, title=title, id_naming=id_naming, options=options,
+                                button_content=button_content, header=header,
+                                dropdown_id=dropdown_id, indent=self.indent+4)
+        self.items.append(dropdown)
+
+    def write(self):
+        return '\n\n'.join(self.items)
