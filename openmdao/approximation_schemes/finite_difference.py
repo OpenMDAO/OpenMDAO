@@ -88,6 +88,12 @@ class FiniteDifference(ApproximationScheme):
         A list of which derivatives (in execution order) to compute.
         The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
         and fd_options is a dictionary.
+    _starting_outs : ndarray
+        A copy of the starting outputs array used to restore the outputs to original values.
+    _starting_ins : ndarray
+        A copy of the starting inputs array used to restore the inputs to original values.
+    _results_tmp : ndarray
+        An array the same size as the system outputs. Used to store the results temporarily.
     """
 
     def __init__(self):
@@ -96,6 +102,7 @@ class FiniteDifference(ApproximationScheme):
         """
         super(FiniteDifference, self).__init__()
         self._exec_list = []
+        self._starting_ins = self._starting_outs = self._results_tmp = None
 
     def add_approximation(self, abs_key, kwargs):
         """
@@ -194,113 +201,46 @@ class FiniteDifference(ApproximationScheme):
             jac = system._jacobian
 
         if total:
-            current_vec = system._outputs
+            self._starting_outs = system._outputs._data.copy()
         else:
-            current_vec = system._residuals
+            self._starting_outs = system._residuals._data.copy()
 
-        result_array = current_vec._data.copy()  # current_vec._clone(True)
+        self._starting_ins = system._inputs._data.copy()
+        self._results_tmp = self._starting_outs.copy()
 
-        cs_active = system._outputs._under_complex_step
-        # if cs_active:
-        #     result_array.set_complex_step_mode(cs_active)
+        self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
 
-        result_tmp = result_array.copy()
-        starting_outs = current_vec._data.copy()
-        starting_ins = system._inputs._data.copy()
-
-        # To support driver src_indices, we need to override some checks in Jacobian, but do it
-        # selectively.
-        uses_voi_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
-            not isinstance(jac, dict)
-
-        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
-                                                      system._full_comm.size > 1)
-        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
-        num_par_fd = system._num_par_fd if use_parallel_fd else 1
-        is_parallel = use_parallel_fd or system.comm.size > 1
-
-        results = defaultdict(list)
-        iproc = system.comm.rank
-        owns = system._owning_rank
-        mycomm = system._full_comm if use_parallel_fd else system.comm
-
-        fd_count = 0
-        Jcolored = None
-        colored_data = None
-
-        approx_groups = self._get_approx_groups(system, under_cs=cs_active)
-        for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
-            deltas, coeffs, current_coeff = data
-            J = tmpJ[wrt]
-            out_slices = tmpJ['@out_slices']
-            for i_count, idx in enumerate(col_idxs):
-                if fd_count % num_par_fd == system._par_fd_id:
-                    self._run_points(system, ((idx_info[0][0], idx),), data, starting_outs,
-                                     starting_ins, result_tmp, result_array, current_vec, total)
-
-                    if is_parallel:
-                        for of, (oview, out_idxs) in iteritems(J['ofs']):
-                            if owns[of] == iproc:
-                                results[(of, wrt)].append(
-                                    (i_count, result_array[out_slices[of]][out_idxs].copy()))
-                    else:
-                        J['data'][:, i_count] = result_array[J['full_out_idxs']]
-
-                fd_count += 1
-
-        if is_parallel:
-            results = _gather_jac_results(mycomm, results)
-
-        for wrt, data, _, tmpJ, _, _ in approx_groups:
-            if wrt is None:  # colored
-                mat = tmpJ['@matrix']
-                # TODO: coloring when using parallel FD and/or FD with remote comps
-                for key, slc in iteritems(tmpJ['@jac_slices']):
-                    if uses_voi_indices:
-                        jac._override_checks = True
-                        jac[key] = mat[slc]
-                        jac._override_checks = False
-                    else:
-                        jac[key] = mat[slc]
-
-                tmpJ['matrix'] = None  # reclaim memory
-            else:
-                ofs = tmpJ[wrt]['ofs']
-                for of in ofs:
-                    oview, oidxs = ofs[of]
-                    if is_parallel:
-                        for i, result in results[(of, wrt)]:
-                            oview[:, i] = result
-
-                    oview = self._unscale(oview, data)
-                    if uses_voi_indices:
-                        jac._override_checks = True
-                        jac[(of, wrt)] = oview
-                        jac._override_checks = False
-                    else:
-                        jac[(of, wrt)] = oview
+    def _cleanup(self, system):
+        self._starting_ins = self._starting_outs = None
 
     def _unscale(self, value, data):
         return value
 
-    def _run_points(self, system, idx_info, data, starting_outs, starting_ins, result_tmp,
-                    result_array, current_vec, is_total):
+    def _collect_result(self, array, copy):
+        if copy:
+            return array.copy()
+        return array
+
+    def _run_point(self, system, idx_info, data, results_array, total):
         deltas, coeffs, current_coeff = data
+
         if current_coeff:
+            current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
-            result_array[:] = current_vec._data
-            result_array *= current_coeff
+            results_array[:] = current_vec._data
+            results_array *= current_coeff
         else:
-            result_array[:] = 0.
+            results_array[:] = 0.
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
-            self._run_point(system, idx_info, delta, starting_outs, starting_ins, result_tmp,
-                            is_total)
-            result_tmp *= coeff
-            result_array += result_tmp
+            results = self._run_sub_point(system, idx_info, delta, total)
+            results *= coeff
+            results_array += results
 
-    def _run_point(self, system, idx_info, delta, starting_outs, starting_ins, result_tmp, total):
+        return results_array
+
+    def _run_sub_point(self, system, idx_info, delta, total):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -312,12 +252,6 @@ class FiniteDifference(ApproximationScheme):
             Tuple of wrt indices and corresponding data array to perturb.
         delta : float
             Perturbation amount.
-        starting_outs : ndarray
-            A copy of the starting outputs array used to restore the outputs to original values.
-        starting_ins : ndarray
-            A copy of the starting inputs array used to restore the inputs to original values.
-        result_tmp : ndarray
-            An array the same size as the system outputs. Used to store the results.
         total : bool
             If True total derivatives are being approximated, else partials.
 
@@ -343,13 +277,13 @@ class FiniteDifference(ApproximationScheme):
         run_model()
 
         # save results and restore starting inputs/outputs
-        result_tmp[:] = results_vec._data
-        results_vec._data[:] = starting_outs
-        inputs._data[:] = starting_ins
+        self._results_tmp[:] = results_vec._data
+        results_vec._data[:] = self._starting_outs
+        inputs._data[:] = self._starting_ins
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
         for arr, idxs in idx_info:
             if not total and arr is outputs:
                 arr._data[idxs] -= delta
 
-        return result_tmp
+        return self._results_tmp

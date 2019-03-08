@@ -135,128 +135,12 @@ class ComplexStep(ApproximationScheme):
             self._fd.compute_approximations(system, jac, total=total)
             return
 
-        # Clean vector for results
-        if total:
-            current_vec = system._outputs
-        else:
-            current_vec = system._residuals
-
         # Turn on complex step.
         system._set_complex_step_mode(True)
 
-        results_array = current_vec._data[:]
+        self._compute_approximations(system, jac, total, under_cs=True)
 
-        # To support driver src_indices, we need to override some checks in Jacobian, but do it
-        # selectively.
-        uses_voi_indices = (len(system._owns_approx_of_idx) > 0 or
-                            len(system._owns_approx_wrt_idx) > 0) and not isinstance(jac, dict)
-
-        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
-                                                      system._full_comm.size > 1)
-        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
-        num_par_fd = system._num_par_fd if use_parallel_fd else 1
-        is_parallel = use_parallel_fd or system.comm.size > 1
-
-        results = defaultdict(list)
-        iproc = system.comm.rank
-        owns = system._owning_rank
-        mycomm = system._full_comm if use_parallel_fd else system.comm
-
-        fd_count = 0
-        Jcolored = None
-        colored_data = None
-
-        approx_groups = self._get_approx_groups(system)
-        for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
-            if wrt is None:  # colored
-                row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
-                # Run the complex step
-                if fd_count % num_par_fd == system._par_fd_id:
-                    result = self._run_point(system, idx_info, data, results_array, total)
-                    if Jcolored is None:
-                        tmpJ['@matrix'] = Jcolored = np.zeros((tmpJ['@nrows'], tmpJ['@ncols']))
-                        colored_data = data
-                    if is_parallel:
-                        if par_fd_w_serial_model:
-                            # TODO: this could be more efficient for the case of parallel FD
-                            # using a serial model in each proc, because all outputs would be
-                            # local to each proc so we could save the whole column instead of
-                            # looping over the outputs individually.
-                            raise NotImplementedError("simul approx w/par FD not supported yet")
-                        else:
-                            raise NotImplementedError("simul approx coloring with par FD is "
-                                                      "only supported currently when using "
-                                                      "a serial model, i.e., when "
-                                                      "num_par_fd == number of MPI procs.")
-                    else:  # serial colored
-                        if row_map is not None:
-                            if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = result[row_map].imag
-                            else:
-                                for i, col in enumerate(col_idxs):
-                                    Jcolored[nz_rows[i], col] = \
-                                        result[row_map[nz_rows[i]]].imag
-                        else:
-                            if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = result.imag
-                            else:
-                                for i, col in enumerate(col_idxs):
-                                    Jcolored[nz_rows[i], col] = result[nz_rows[i]].imag
-                fd_count += 1
-            else:  # uncolored
-                J = tmpJ[wrt]
-                out_slices = tmpJ['@out_slices']
-                for i_count, idxs in enumerate(col_idxs):
-                    if fd_count % num_par_fd == system._par_fd_id:
-                        # Run the complex step
-                        result = self._run_point(system, ((idx_info[0][0], idxs),),
-                                                 data, results_array, total)
-
-                        if is_parallel:
-                            for of, (oview, out_idxs) in iteritems(J['ofs']):
-                                if owns[of] == iproc:
-                                    results[(of, wrt)].append(
-                                        (i_count, result[out_slices[of]][out_idxs].imag.copy()))
-                        else:
-                            J['data'][:, i_count] = result[J['full_out_idxs']].imag
-
-                    fd_count += 1
-
-        if Jcolored is not None:
-            Jcolored = self._unscale(Jcolored, data)
-
-        if is_parallel:
-            results = _gather_jac_results(mycomm, results)
-
-        for wrt, data, _, tmpJ, _, _ in approx_groups:
-            if wrt is None:  # colored
-                mat = tmpJ['@matrix']
-                # TODO: coloring when using parallel FD and/or FD with remote comps
-                for key, slc in iteritems(tmpJ['@jac_slices']):
-                    if uses_voi_indices:
-                        jac._override_checks = True
-                        jac[key] = mat[slc]
-                        jac._override_checks = False
-                    else:
-                        jac[key] = mat[slc]
-
-                tmpJ['matrix'] = None  # reclaim memory
-            else:
-                ofs = tmpJ[wrt]['ofs']
-                for of in ofs:
-                    oview, oidxs = ofs[of]
-                    if is_parallel:
-                        for i, result in results[(of, wrt)]:
-                            oview[:, i] = result
-
-                    oview = self._unscale(oview, data)
-                    if uses_voi_indices:
-                        jac._override_checks = True
-                        jac[(of, wrt)] = oview
-                        jac._override_checks = False
-                    else:
-                        jac[(of, wrt)] = oview
-
+    def _cleanup(self, system):
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
@@ -264,7 +148,12 @@ class ComplexStep(ApproximationScheme):
         value *= (1.0 / delta * 1j).real
         return value
 
-    def _run_point(self, system, idx_info, delta, result_array, total=False):
+    def _collect_result(self, array, copy):
+        if copy:
+            return array.imag.copy()
+        return array.imag
+
+    def _run_point(self, system, idx_info, delta, result_array, total):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 

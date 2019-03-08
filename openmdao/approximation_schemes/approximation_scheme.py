@@ -1,6 +1,7 @@
 """Base class used to define the interface for derivative approximation schemes."""
 from __future__ import print_function, division
 
+from six import iteritems
 from itertools import groupby
 from collections import defaultdict, OrderedDict
 import numpy as np
@@ -156,10 +157,6 @@ class ApproximationScheme(object):
 
         out_slices = outputs.get_slice_dict()
         in_slices = inputs.get_slice_dict()
-        # wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
-        #                                        system._var_sizes['nonlinear']['output'][iproc])
-        # wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
-        #                                       system._var_sizes['nonlinear']['input'][iproc])
 
         approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
@@ -266,6 +263,129 @@ class ApproximationScheme(object):
                 tmpJ['@out_slices'] = out_slices
 
                 self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
+
+    def _compute_approximations(self, system, jac, total, under_cs):
+        # Clean vector for results
+        results_array = system._outputs._data.copy() if total else system._residuals._data.copy()
+
+        # To support driver src_indices, we need to override some checks in Jacobian, but do it
+        # selectively.
+        uses_voi_indices = (len(system._owns_approx_of_idx) > 0 or
+                            len(system._owns_approx_wrt_idx) > 0) and not isinstance(jac, dict)
+
+        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
+                                                      system._full_comm.size > 1)
+        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
+        num_par_fd = system._num_par_fd if use_parallel_fd else 1
+        is_parallel = use_parallel_fd or system.comm.size > 1
+
+        results = defaultdict(list)
+        iproc = system.comm.rank
+        owns = system._owning_rank
+        mycomm = system._full_comm if use_parallel_fd else system.comm
+
+        fd_count = 0
+        Jcolored = None
+        colored_data = None
+
+        approx_groups = self._get_approx_groups(system, under_cs)
+        for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+            if wrt is None:  # colored
+                row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
+                # Run the complex step
+                if fd_count % num_par_fd == system._par_fd_id:
+                    result = self._run_point(system, idx_info, data, results_array, total)
+                    if Jcolored is None:
+                        tmpJ['@matrix'] = Jcolored = np.zeros((tmpJ['@nrows'], tmpJ['@ncols']))
+                        colored_data = data
+                    if is_parallel:
+                        if par_fd_w_serial_model:
+                            # TODO: this could be more efficient for the case of parallel FD
+                            # using a serial model in each proc, because all outputs would be
+                            # local to each proc so we could save the whole column instead of
+                            # looping over the outputs individually.
+                            raise NotImplementedError("simul approx w/par FD not supported yet")
+                        else:
+                            raise NotImplementedError("simul approx coloring with par FD is "
+                                                      "only supported currently when using "
+                                                      "a serial model, i.e., when "
+                                                      "num_par_fd == number of MPI procs.")
+                    else:  # serial colored
+                        if row_map is not None:
+                            if nz_rows is None:  # uncolored column
+                                Jcolored[:, col_idxs[0]] = self._collect_result(result[row_map],
+                                                                                copy=False)
+                            else:
+                                for i, col in enumerate(col_idxs):
+                                    Jcolored[nz_rows[i], col] = \
+                                        self._collect_result(result[row_map[nz_rows[i]]],
+                                                             copy=False)
+                        else:
+                            if nz_rows is None:  # uncolored column
+                                Jcolored[:, col_idxs[0]] = self._collect_result(result, copy=False)
+                            else:
+                                for i, col in enumerate(col_idxs):
+                                    Jcolored[nz_rows[i], col] = \
+                                        self._collect_result(result[nz_rows[i]], copy=False)
+                fd_count += 1
+            else:  # uncolored
+                J = tmpJ[wrt]
+                out_slices = tmpJ['@out_slices']
+                for i_count, idxs in enumerate(col_idxs):
+                    if fd_count % num_par_fd == system._par_fd_id:
+                        # Run the complex step
+                        result = self._run_point(system, ((idx_info[0][0], idxs),),
+                                                 data, results_array, total)
+
+                        if is_parallel:
+                            for of, (oview, out_idxs) in iteritems(J['ofs']):
+                                if owns[of] == iproc:
+                                    results[(of, wrt)].append(
+                                        (i_count,
+                                         self._collect_result(result[out_slices[of]][out_idxs],
+                                                              copy=True)))
+                        else:
+                            J['data'][:, i_count] = self._collect_result(result[J['full_out_idxs']],
+                                                                         copy=False)
+
+                    fd_count += 1
+
+        if Jcolored is not None:
+            Jcolored = self._unscale(Jcolored, data)
+
+        if is_parallel:
+            results = _gather_jac_results(mycomm, results)
+
+        for wrt, data, _, tmpJ, _, _ in approx_groups:
+            if wrt is None:  # colored
+                mat = tmpJ['@matrix']
+                # TODO: coloring when using parallel FD and/or FD with remote comps
+                for key, slc in iteritems(tmpJ['@jac_slices']):
+                    if uses_voi_indices:
+                        jac._override_checks = True
+                        jac[key] = mat[slc]
+                        jac._override_checks = False
+                    else:
+                        jac[key] = mat[slc]
+
+                tmpJ['matrix'] = None  # reclaim memory
+            else:
+                ofs = tmpJ[wrt]['ofs']
+                for of in ofs:
+                    oview, oidxs = ofs[of]
+                    if is_parallel:
+                        for i, result in results[(of, wrt)]:
+                            oview[:, i] = result
+
+                    oview = self._unscale(oview, data)
+                    if uses_voi_indices:
+                        jac._override_checks = True
+                        jac[(of, wrt)] = oview
+                        jac._override_checks = False
+                    else:
+                        jac[(of, wrt)] = oview
+
+        self._cleanup(system)
 
 
 def _gather_jac_results(comm, results):
