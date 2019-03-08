@@ -603,7 +603,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         Show parallel components with stacked blocks.
         Defaults to True.
     output_side : str or dict(str, str)
-        Left or right, or a dictionary with component types as keys.
+        Left or right, or a dictionary with component types as keys. Component type key can
+        be 'optimization', 'doe' or 'default'.
         Defaults to "left".
     kwargs : dict
         Keyword arguments
@@ -717,7 +718,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     build_pdf : bool
         If True and a .tex file is generated, create a .pdf file from the .tex.
     output_side : str or dict(str, str)
-        Left or right, or a dictionary with component types as keys.
+        Left or right, or a dictionary with component types as keys. Component type key can
+        be 'optimization', 'doe' or 'default'.
         Defaults to "left".
     driver_type : str
         Optimization or DOE.
@@ -769,6 +771,19 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             return _multiline_block(number_str, text)
         else:
             return text  # In case of a wrong setting
+
+    def get_output_side(component_name):
+        if isinstance(output_side, str):
+            return output_side
+        elif isinstance(output_side, dict):
+            # Gets the specified key, or the default in the dictionary, or the global default
+            # if both of them are missing from the dictionary.
+            side = output_side.get(component_name, output_side.get('default', _DEFAULT_OUTPUT_SIDE))
+            print('side:', component_name, side, output_side)
+            return side
+        else:
+            msg = 'Output side argument should be string or dictionary, instead it is a {}.'
+            raise ValueError(msg.format(type(output_side)))
 
     connections = viewer_data['connections_list']
     tree = viewer_data['tree']
@@ -847,20 +862,29 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
         # Design variables
         for comp, conn_vars in iteritems(design_vars2):
-            conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Format var names
-            opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]   # Optimal var names
-            init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]   # Optimal var names
-            x.connect(driver_name, comp, format_block(conn_vars))  # Connection from optimizer
-            x.add_output(comp, format_block(opt_con_vars), side=output_side)  # Optimal design variables
-            x.add_output(driver_name, format_block(opt_con_vars), side=output_side)  # Optimal design variables
-            x.add_input(driver_name, format_block(init_con_vars))  # Initial design variables
+            # Format var names
+            conn_vars = [_replace_chars(var, subs) for var in conn_vars]
+            # Optimal var names
+            opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
+            # Initial var names
+            init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]
+            # Connection from optimizer
+            x.connect(driver_name, comp, format_block(conn_vars))
+            # Optimal design variables
+            x.add_output(comp, format_block(opt_con_vars), side=get_output_side('default'))
+            x.add_output(driver_name, format_block(opt_con_vars), side=get_output_side(driver_type))
+            # Initial design variables
+            x.add_input(driver_name, format_block(init_con_vars))
 
         # Responses
         for comp, conn_vars in iteritems(responses2):
-            conn_vars = [_replace_chars(var, subs) for var in conn_vars]  # Optimal var names
+            # Optimal var names
+            conn_vars = [_replace_chars(var, subs) for var in conn_vars]
             opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
-            x.connect(comp, driver_name, conn_vars)  # Connection to optimizer
-            x.add_output(comp, format_block(opt_con_vars), side=output_side)  # Optimal output
+            # Connection to optimizer
+            x.connect(comp, driver_name, conn_vars)
+            # Optimal output
+            x.add_output(comp, format_block(opt_con_vars), side=get_output_side('default'))
 
     if include_solver:
         # Default "run once" solvers are ignored

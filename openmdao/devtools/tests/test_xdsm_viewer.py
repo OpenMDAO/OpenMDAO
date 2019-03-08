@@ -539,6 +539,14 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
+        filename = 'xdsm_outputs_side_mixed'
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET,
+                   output_side={'optimization': 'left', 'default': 'right'})
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+
 
 class TestXDSMjsViewer(unittest.TestCase):
 
