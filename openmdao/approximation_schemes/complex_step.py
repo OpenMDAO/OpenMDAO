@@ -137,13 +137,14 @@ class ComplexStep(ApproximationScheme):
 
         # Clean vector for results
         if total:
-            results_clone = system._outputs._clone(True)
+            current_vec = system._outputs
         else:
-            results_clone = system._residuals._clone(True)
+            current_vec = system._residuals
 
         # Turn on complex step.
         system._set_complex_step_mode(True)
-        results_clone.set_complex_step_mode(True)
+
+        results_array = current_vec._data[:]
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -163,19 +164,18 @@ class ComplexStep(ApproximationScheme):
 
         fd_count = 0
         Jcolored = None
-        colored_delta = None
+        colored_data = None
 
         approx_groups = self._get_approx_groups(system)
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
-            delta = data
             if wrt is None:  # colored
                 row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
                 # Run the complex step
                 if fd_count % num_par_fd == system._par_fd_id:
-                    result = self._run_point(system, idx_info, delta, results_clone, total)
+                    result = self._run_point(system, idx_info, data, results_array, total)
                     if Jcolored is None:
                         tmpJ['@matrix'] = Jcolored = np.zeros((tmpJ['@nrows'], tmpJ['@ncols']))
-                        colored_delta = delta
+                        colored_data = data
                     if is_parallel:
                         if par_fd_w_serial_model:
                             # TODO: this could be more efficient for the case of parallel FD
@@ -191,45 +191,44 @@ class ComplexStep(ApproximationScheme):
                     else:  # serial colored
                         if row_map is not None:
                             if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = result._data[row_map].imag
+                                Jcolored[:, col_idxs[0]] = result[row_map].imag
                             else:
                                 for i, col in enumerate(col_idxs):
                                     Jcolored[nz_rows[i], col] = \
-                                        result._data[row_map[nz_rows[i]]].imag
+                                        result[row_map[nz_rows[i]]].imag
                         else:
                             if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = result._data.imag
+                                Jcolored[:, col_idxs[0]] = result.imag
                             else:
                                 for i, col in enumerate(col_idxs):
-                                    Jcolored[nz_rows[i], col] = result._data[nz_rows[i]].imag
+                                    Jcolored[nz_rows[i], col] = result[nz_rows[i]].imag
                 fd_count += 1
             else:  # uncolored
+                J = tmpJ[wrt]
+                out_slices = tmpJ['@out_slices']
                 for i_count, idxs in enumerate(col_idxs):
                     if fd_count % num_par_fd == system._par_fd_id:
                         # Run the complex step
                         result = self._run_point(system, ((idx_info[0][0], idxs),),
-                                                 delta, results_clone, total)
-                        J = tmpJ[wrt]
+                                                 data, results_array, total)
 
                         if is_parallel:
                             for of, (oview, out_idxs) in iteritems(J['ofs']):
                                 if owns[of] == iproc:
                                     results[(of, wrt)].append(
-                                        (i_count, result._views_flat[of][out_idxs].imag.copy()))
+                                        (i_count, result[out_slices[of]][out_idxs].imag.copy()))
                         else:
-                            J['data'][:, i_count] = result._data[J['full_out_idxs']].imag
+                            J['data'][:, i_count] = result[J['full_out_idxs']].imag
 
                     fd_count += 1
 
         if Jcolored is not None:
-            Jcolored *= (1.0 / colored_delta * 1j).real
+            Jcolored = self._unscale(Jcolored, data)
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
         for wrt, data, _, tmpJ, _, _ in approx_groups:
-            delta = data
-            fact = (1.0 / delta * 1j).real
             if wrt is None:  # colored
                 mat = tmpJ['@matrix']
                 # TODO: coloring when using parallel FD and/or FD with remote comps
@@ -250,7 +249,7 @@ class ComplexStep(ApproximationScheme):
                         for i, result in results[(of, wrt)]:
                             oview[:, i] = result
 
-                    oview *= fact
+                    oview = self._unscale(oview, data)
                     if uses_voi_indices:
                         jac._override_checks = True
                         jac[(of, wrt)] = oview
@@ -261,7 +260,11 @@ class ComplexStep(ApproximationScheme):
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point(self, system, idx_info, delta, result_clone, total=False):
+    def _unscale(self, value, delta):
+        value *= (1.0 / delta * 1j).real
+        return value
+
+    def _run_point(self, system, idx_info, delta, result_array, total=False):
         """
         Perturb the system inputs with a complex step, runs, and returns the results.
 
@@ -273,8 +276,8 @@ class ComplexStep(ApproximationScheme):
             Tuple of wrt indices and corresponding data array to perturb.
         delta : complex
             Perturbation amount.
-        result_clone : Vector
-            A vector cloned from the outputs vector. Used to store the results.
+        result_array : ndarray
+            An array copied from the outputs vector. Used to store the results.
         total : bool
             If True total derivatives are being approximated, else partials.
 
@@ -296,10 +299,10 @@ class ComplexStep(ApproximationScheme):
 
         run_model()
 
-        result_clone.set_vec(results_vec)
+        result_array[:] = results_vec._data
 
         for arr, idxs in idx_info:
             if arr is not None:
                 arr._data[idxs] -= delta
 
-        return result_clone
+        return result_array

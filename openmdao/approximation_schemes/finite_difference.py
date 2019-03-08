@@ -198,15 +198,15 @@ class FiniteDifference(ApproximationScheme):
         else:
             current_vec = system._residuals
 
-        results_clone = current_vec._clone(True)
+        result_array = current_vec._data.copy()  # current_vec._clone(True)
 
         cs_active = system._outputs._under_complex_step
-        if cs_active:
-            results_clone.set_complex_step_mode(cs_active)
+        # if cs_active:
+        #     result_array.set_complex_step_mode(cs_active)
 
-        result_array = results_clone._data.copy()
-        out_tmp = current_vec._data.copy()
-        in_tmp = system._inputs._data.copy()
+        result_tmp = result_array.copy()
+        starting_outs = current_vec._data.copy()
+        starting_ins = system._inputs._data.copy()
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
@@ -215,6 +215,7 @@ class FiniteDifference(ApproximationScheme):
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
+        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
         is_parallel = use_parallel_fd or system.comm.size > 1
 
@@ -224,22 +225,26 @@ class FiniteDifference(ApproximationScheme):
         mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
+        Jcolored = None
+        colored_data = None
+
         approx_groups = self._get_approx_groups(system, under_cs=cs_active)
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
             deltas, coeffs, current_coeff = data
             J = tmpJ[wrt]
+            out_slices = tmpJ['@out_slices']
             for i_count, idx in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
-                    self._run_points(system, ((idx_info[0][0], idx),), data, out_tmp, in_tmp,
-                                     result_array, results_clone, current_vec, total)
+                    self._run_points(system, ((idx_info[0][0], idx),), data, starting_outs,
+                                     starting_ins, result_tmp, result_array, current_vec, total)
 
                     if is_parallel:
                         for of, (oview, out_idxs) in iteritems(J['ofs']):
                             if owns[of] == iproc:
                                 results[(of, wrt)].append(
-                                    (i_count, results_clone._views_flat[of][out_idxs].copy()))
+                                    (i_count, result_array[out_slices[of]][out_idxs].copy()))
                     else:
-                        J['data'][:, i_count] = results_clone._data[J['full_out_idxs']]
+                        J['data'][:, i_count] = result_array[J['full_out_idxs']]
 
                 fd_count += 1
 
@@ -247,8 +252,6 @@ class FiniteDifference(ApproximationScheme):
             results = _gather_jac_results(mycomm, results)
 
         for wrt, data, _, tmpJ, _, _ in approx_groups:
-            # delta = data
-            # fact = (1.0 / delta * 1j).real
             if wrt is None:  # colored
                 mat = tmpJ['@matrix']
                 # TODO: coloring when using parallel FD and/or FD with remote comps
@@ -269,7 +272,7 @@ class FiniteDifference(ApproximationScheme):
                         for i, result in results[(of, wrt)]:
                             oview[:, i] = result
 
-                    # oview *= fact
+                    oview = self._unscale(oview, data)
                     if uses_voi_indices:
                         jac._override_checks = True
                         jac[(of, wrt)] = oview
@@ -277,24 +280,27 @@ class FiniteDifference(ApproximationScheme):
                     else:
                         jac[(of, wrt)] = oview
 
-    def _run_points(self, system, idx_info, data, out_tmp, in_tmp, result_array, results_clone,
-                    current_vec, is_total):
+    def _unscale(self, value, data):
+        return value
+
+    def _run_points(self, system, idx_info, data, starting_outs, starting_ins, result_tmp,
+                    result_array, current_vec, is_total):
         deltas, coeffs, current_coeff = data
         if current_coeff:
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
-            results_clone._data[:] = current_vec._data
-            results_clone._data *= current_coeff
+            result_array[:] = current_vec._data
+            result_array *= current_coeff
         else:
-            results_clone._data[:] = 0.
+            result_array[:] = 0.
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
-            self._run_point(system, idx_info, delta, out_tmp, in_tmp, result_array,
+            self._run_point(system, idx_info, delta, starting_outs, starting_ins, result_tmp,
                             is_total)
-            result_array *= coeff
-            results_clone._data += result_array
+            result_tmp *= coeff
+            result_array += result_tmp
 
-    def _run_point(self, system, idx_info, delta, out_tmp, in_tmp, result_array, is_total):
+    def _run_point(self, system, idx_info, delta, starting_outs, starting_ins, result_tmp, total):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -306,13 +312,13 @@ class FiniteDifference(ApproximationScheme):
             Tuple of wrt indices and corresponding data array to perturb.
         delta : float
             Perturbation amount.
-        out_tmp : ndarray
+        starting_outs : ndarray
             A copy of the starting outputs array used to restore the outputs to original values.
-        in_tmp : ndarray
+        starting_ins : ndarray
             A copy of the starting inputs array used to restore the inputs to original values.
-        result_array : ndarray
+        result_tmp : ndarray
             An array the same size as the system outputs. Used to store the results.
-        is_total : bool
+        total : bool
             If True total derivatives are being approximated, else partials.
 
         Returns
@@ -323,7 +329,7 @@ class FiniteDifference(ApproximationScheme):
         inputs = system._inputs
         outputs = system._outputs
 
-        if is_total:
+        if total:
             run_model = system.run_solve_nonlinear
             results_vec = outputs
         else:
@@ -336,13 +342,14 @@ class FiniteDifference(ApproximationScheme):
 
         run_model()
 
-        result_array[:] = results_vec._data
-        results_vec._data[:] = out_tmp
-        inputs._data[:] = in_tmp
+        # save results and restore starting inputs/outputs
+        result_tmp[:] = results_vec._data
+        results_vec._data[:] = starting_outs
+        inputs._data[:] = starting_ins
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
         for arr, idxs in idx_info:
-            if not is_total and arr is outputs:
+            if not total and arr is outputs:
                 arr._data[idxs] -= delta
 
-        return result_array
+        return result_tmp

@@ -154,10 +154,12 @@ class ApproximationScheme(object):
         inputs = system._inputs
         iproc = system.comm.rank
 
-        wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
-                                               system._var_sizes['nonlinear']['output'][iproc])
-        wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
-                                              system._var_sizes['nonlinear']['input'][iproc])
+        out_slices = outputs.get_slice_dict()
+        in_slices = inputs.get_slice_dict()
+        # wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
+        #                                        system._var_sizes['nonlinear']['output'][iproc])
+        # wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
+        #                                       system._var_sizes['nonlinear']['input'][iproc])
 
         approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
@@ -208,6 +210,7 @@ class ApproximationScheme(object):
                     '@nrows': coloring['nrows'],
                     '@ncols': coloring['ncols'],
                     '@matrix': None,
+                    '@out_slices': out_slices,
                 }
 
                 # FIXME: need to deal with mix of local/remote indices
@@ -234,24 +237,24 @@ class ApproximationScheme(object):
             else:
                 if wrt in inputs._views_flat:
                     arr = inputs
-                    offsets = wrt_in_offsets
+                    slices = in_slices
                 elif wrt in outputs._views_flat:
                     arr = outputs
-                    offsets = wrt_out_offsets
+                    slices = out_slices
                 else:  # wrt is remote
                     arr = None
 
                 if wrt in system._owns_approx_wrt_idx:
                     in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int)
                     if arr is not None:
-                        in_idx += offsets[wrt]
+                        in_idx += slices[wrt].start
                     in_size = len(in_idx)
                 else:
                     in_size = system._var_allprocs_abs2meta[wrt]['size']
                     if arr is None:
                         in_idx = range(in_size)
                     else:
-                        in_idx = range(offsets[wrt], offsets[wrt] + in_size)
+                        in_idx = range(slices[wrt].start, slices[wrt].start + in_size)
 
                 # Directional derivatives for quick partial checking.
                 # We place the indices in a list so that they are all stepped at the same time.
@@ -260,6 +263,7 @@ class ApproximationScheme(object):
                     in_size = 1
 
                 tmpJ = _get_wrt_subjacs(system, approx)
+                tmpJ['@out_slices'] = out_slices
 
                 self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
 

@@ -334,6 +334,24 @@ class DefaultVector(Vector):
         """
         return np.linalg.norm(self._data)
 
+    def get_slice_dict(self):
+        """
+        Return a dict of var names mapped to their slice in the local data array.
+
+        Returns
+        -------
+        dict
+            Mapping of var name to slice.
+        """
+        slices = {}
+        start = end = 0
+        for name, arr in iteritems(self._views_flat):
+            end += arr.size
+            slices[name] = slice(start, end)
+            start = end
+
+        return slices
+
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
         Enforce lower/upper bounds, backtracking the entire vector together.
