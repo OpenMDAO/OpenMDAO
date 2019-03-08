@@ -22,7 +22,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script, \
-    add_dropdown
+    add_dropdown, ButtonGroup
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
@@ -341,6 +341,18 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     index = index.replace('{{collapse_depth_dropdown}}', collapse_depth_dropdown)
     index = index.replace('{{font_size_dropdown}}', font_size_dropdown)
     index = index.replace('{{vertical_size_dropdown}}', vertical_size_dropdown)
+
+
+    button_group1 = ButtonGroup()
+    button_group1.add_button(title="Return To Root", button_id="returnToRootButtonId",
+                             disabled="disabled")
+    button_group1.add_button(title="Back", button_id="backButtonId",
+                             disabled="disabled")
+    button_group1.add_button(title="Forward", button_id="forwardButtonId",
+                             disabled="disabled")
+    button_group1.add_button(title="Up One Level", button_id="upOneLevelButtonId",
+                             disabled="disabled")
+    index = index.replace('{{button_group1}}', button_group1.write())
 
     with open(outfile, 'w') as f:  # write output file
         f.write(index)

@@ -16,13 +16,14 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0):
+def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0, **kwargs):
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
     spaces = ' ' * indent
     template = '{spaces}<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
     if attrs is None:
         attrs = {}
+    attrs.update(kwargs)
     if cls is not None:
         attrs['class'] = cls
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
@@ -31,26 +32,27 @@ def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0)
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
-def write_div(content='', attrs=None, cls=None, indent=0):
-    return write_tags('div', content=content, attrs=attrs, cls=cls, new_lines=False, indent=indent)
+def write_div(content='', attrs=None, cls=None, indent=0, **kwargs):
+    return write_tags('div', content=content, attrs=attrs, cls=cls, new_lines=False,
+                      indent=indent, **kwargs)
 
 
-def write_style(content='', attrs=None, indent=0):
+def write_style(content='', attrs=None, indent=0, **kwargs):
     default = {'type': "text/css"}
     if attrs is None:
         attrs = default
     else:
         attrs = default.update(attrs)
-    return write_tags('style', content, attrs=attrs, new_lines=True, indent=indent)
+    return write_tags('style', content, attrs=attrs, new_lines=True, indent=indent, **kwargs)
 
 
-def write_script(content='', attrs=None, indent=0):
+def write_script(content='', attrs=None, indent=0, **kwargs):
     default = {'type': "text/javascript"}
     if attrs is None:
         attrs = default
     else:
         attrs = default.update(attrs)
-    return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent)
+    return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent, **kwargs)
 
 
 def read_files(filenames, directory, extension):
@@ -64,17 +66,17 @@ def read_files(filenames, directory, extension):
 # Viewer API
 
 
-def add_button(title, content='', button_id=None, indent=0):
+def add_button(title, content='', button_id=None, indent=0, **kwargs):
     i = write_tags(tag='i', attrs={'class': content})
     attrs = {'title': title}
     if button_id:
         attrs['id'] = button_id
     return write_tags('button', cls="myButton", content=i, attrs=attrs,
-                      new_lines=True, indent=indent)
+                      new_lines=True, indent=indent, **kwargs)
 
 
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
-                 dropdown_id=None, indent=0):
+                 dropdown_id=None, indent=0, **kwargs):
     button = add_button(title=title, content=button_content)
     if header is not None:
         items = write_tags(tag='span', cls="fakeLink", content=header)
@@ -92,7 +94,7 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
     menu = write_div(content=items, attrs=attrs)
 
     content = [button, menu]
-    return write_div(content=content, cls='dropdown', indent=indent)
+    return write_div(content=content, cls='dropdown', indent=indent, **kwargs)
 
 
 class ButtonGroup(object):
@@ -102,15 +104,15 @@ class ButtonGroup(object):
         self.items = []
         self.indent = indent
 
-    def add_button(self, title, content='', button_id=None):
-        button = add_button(title, content=content, button_id=button_id, indent=self.indent+4)
+    def add_button(self, title, content='', button_id=None, **kwargs):
+        button = add_button(title, content=content, button_id=button_id, indent=self.indent+4, **kwargs)
         self.items.append(button)
 
     def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
-                     dropdown_id=None):
+                     dropdown_id=None, **kwargs):
         dropdown = add_dropdown(self, title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
-                                dropdown_id=dropdown_id, indent=self.indent+4)
+                                dropdown_id=dropdown_id, indent=self.indent+4, **kwargs)
         self.items.append(dropdown)
 
     def write(self):
