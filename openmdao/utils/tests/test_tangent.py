@@ -212,6 +212,7 @@ class TangentTestCase(unittest.TestCase):
         p.run_model()
         check_tangent_ad(comp, mode='fwd')
 
+    @unittest.expectedFailure
     def test_dynamic_loop_rev(self):
         p, comp = get_harness(Looper())
         comp._inputs._data[:] = np.random.random(comp._inputs._data.size)

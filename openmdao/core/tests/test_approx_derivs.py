@@ -1,6 +1,7 @@
 """ Testing for group finite differencing."""
 from six.moves import range
 import unittest
+import os
 import itertools
 from six import iterkeys
 
@@ -31,6 +32,8 @@ except ImportError:
     vector_class = DefaultVector
     PETScVector = None
 
+
+FD_METHOD = os.environ.get('FD_METHOD', 'fd')
 
 class TestGroupFiniteDifference(unittest.TestCase):
 
@@ -99,7 +102,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         prob.setup(check=False)
         prob.run_model()
-        print(prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y']))
+        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
+        # print(J)
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
@@ -268,7 +272,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('p2.x2', 'comp.x2')
 
         model.linear_solver = ScipyKrylov()
-        model.approx_totals()
+        model.approx_totals(method='cs')
 
         prob.setup(check=False)
         prob.run_model()

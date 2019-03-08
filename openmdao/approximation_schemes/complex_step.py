@@ -188,7 +188,7 @@ class ComplexStep(ApproximationScheme):
                                                       "only supported currently when using "
                                                       "a serial model, i.e., when "
                                                       "num_par_fd == number of MPI procs.")
-                    else:  # serial
+                    else:  # serial colored
                         if row_map is not None:
                             if nz_rows is None:  # uncolored column
                                 Jcolored[:, col_idxs[0]] = result._data[row_map].imag
@@ -203,7 +203,7 @@ class ComplexStep(ApproximationScheme):
                                 for i, col in enumerate(col_idxs):
                                     Jcolored[nz_rows[i], col] = result._data[nz_rows[i]].imag
                 fd_count += 1
-            else:
+            else:  # uncolored
                 for i_count, idxs in enumerate(col_idxs):
                     if fd_count % num_par_fd == system._par_fd_id:
                         # Run the complex step

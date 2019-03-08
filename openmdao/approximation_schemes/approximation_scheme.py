@@ -264,7 +264,6 @@ class ApproximationScheme(object):
                 self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
 
 
-
 def _gather_jac_results(comm, results):
     new_results = defaultdict(list)
 

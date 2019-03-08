@@ -324,6 +324,7 @@ class TestPyXDSMViewer(unittest.TestCase):
             write_xdsm(p, 'xdsm_circuit3', out_format='pdf', quiet=True, show_browser=False,
                        recurse=False, model_path='G3')
 
+    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_pyxdsm_solver(self):
         from openmdao.api import NonlinearBlockGS
 
@@ -343,6 +344,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
+    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_pyxdsm_mda(self):
         filename = 'pyxdsm_mda'
         out_format = 'pdf'
@@ -356,6 +358,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
+    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_pyxdsm_mdf(self):
         filename = 'pyxdsm_mdf'
         out_format = 'pdf'
@@ -378,6 +381,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
+    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_parallel(self):
         from openmdao.api import ParallelGroup, NonlinearBlockGS
 

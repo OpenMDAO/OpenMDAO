@@ -3,6 +3,7 @@ from __future__ import division, print_function
 
 from collections import namedtuple, defaultdict
 from itertools import groupby
+from six import iteritems
 from six.moves import range, zip
 
 import numpy as np
@@ -172,102 +173,6 @@ class FiniteDifference(ApproximationScheme):
 
         return deltas, coeffs, current_coeff
 
-    def _init_approximations(self, system):
-        """
-        Prepare for later approximations.
-
-        Parameters
-        ----------
-        system : System
-            The system having its derivs approximated.
-        """
-        # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
-        # group adjacent items with identical keys.
-        self._exec_list.sort(key=self._key_fun)
-
-        dtype = system._outputs._data.dtype
-
-        # groupby (along with this key function) will group all 'of's that have the same wrt and
-        # step size.
-        # Note: Since access to `approximations` is required multiple times, we need to
-        # throw it in a list. The groupby iterator only works once.
-        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
-                                                                        self._key_fun)]
-
-        outputs = system._outputs
-        inputs = system._inputs
-        iproc = system.comm.rank
-
-        wrt_out_offsets = get_local_offset_map(system._var_allprocs_abs_names['output'],
-                                               system._var_sizes['nonlinear']['output'][iproc])
-        wrt_in_offsets = get_local_offset_map(system._var_allprocs_abs_names['input'],
-                                              system._var_sizes['nonlinear']['input'][iproc])
-
-        approx_of_idx = system._owns_approx_of_idx
-        approx_wrt_idx = system._owns_approx_wrt_idx
-
-        self._approx_groups = []
-        for key, approximations in approx_groups:
-            wrt = key[0]
-            directional = key[-1]
-            data = self._get_approx_data(system, key)
-
-            if wrt == '@color':  # use coloring
-                # need mapping from coloring jac columns (subset) to full jac columns
-                options = approx[0][2]
-                coloring = options['coloring']
-                wrts = options['coloring_wrts']
-                _, wrt_names = system._get_partials_varlists()
-                _, sizes = system._get_partials_sizes()
-                if len(wrt_names) != len(wrts):
-                    wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
-                    col_map = sub2full_indices(wrt_names, wrts, sizes)
-                    for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, data, col_map[cols], nzrows, None))
-                else:
-                    for cols, nzrows in color_iterator(coloring, 'fwd'):
-                        self._approx_groups.append((None, data, cols, nzrows, None))
-            else:
-                if wrt in inputs._views_flat:
-                    arr = inputs._data
-                    offsets = wrt_in_offsets
-                else:
-                    arr = outputs._data
-                    offsets = wrt_out_offsets
-
-                if wrt in system._owns_approx_wrt_idx:
-                    in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int) + offsets[wrt]
-                    in_size = len(in_idx)
-                else:
-                    in_size = system._var_allprocs_abs2meta[wrt]['size']
-                    if wrt in offsets:
-                        in_idx = range(offsets[wrt], offsets[wrt] + in_size)
-                    else:
-                        in_idx = range(in_size)  # wrt is remote
-                        arr = None
-
-                # Directional derivatives for quick partial checking.
-                # We place the indices in a list so that they are all stepped at the same time.
-                if directional:
-                    in_idx = [in_idx]
-                    in_size = 1
-
-                outs = []
-
-                for approx_tuple in approximations:
-                    of = approx_tuple[0]
-                    # TODO: Sparse derivatives
-                    if of in system._owns_approx_of_idx:
-                        out_idx = system._owns_approx_of_idx[of]
-                        out_size = len(out_idx)
-                    else:
-                        out_size = system._var_allprocs_abs2meta[of]['size']
-                        out_idx = _full_slice
-
-                    outs.append((of, np.zeros((out_size, in_size), dtype=dtype), out_idx))
-
-                self._approx_groups.append((wrt, data, in_idx, outs, arr))
-
     def compute_approximations(self, system, jac=None, total=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
@@ -305,7 +210,7 @@ class FiniteDifference(ApproximationScheme):
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
-        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
+        uses_voi_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
             not isinstance(jac, dict)
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
@@ -320,45 +225,63 @@ class FiniteDifference(ApproximationScheme):
 
         fd_count = 0
         approx_groups = self._get_approx_groups(system, under_cs=cs_active)
-        for wrt, data, in_idx, outputs, arr in approx_groups:
+        for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
             deltas, coeffs, current_coeff = data
-            for i_count, idx in enumerate(in_idx):
+            J = tmpJ[wrt]
+            for i_count, idx in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
-                    self._run_points(system, arr, idx, data, out_tmp, in_tmp, result_array,
-                                     results_clone, current_vec, total)
+                    self._run_points(system, ((idx_info[0][0], idx),), data, out_tmp, in_tmp,
+                                     result_array, results_clone, current_vec, total)
 
                     if is_parallel:
-                        for of, _, out_idx in outputs:
+                        for of, (oview, out_idxs) in iteritems(J['ofs']):
                             if owns[of] == iproc:
                                 results[(of, wrt)].append(
-                                    (i_count, results_clone._views_flat[of][out_idx].copy()))
+                                    (i_count, results_clone._views_flat[of][out_idxs].copy()))
                     else:
-                        for of, subjac, out_idx in outputs:
-                            subjac[:, i_count] = results_clone._views_flat[of][out_idx]
+                        J['data'][:, i_count] = results_clone._data[J['full_out_idxs']]
 
                 fd_count += 1
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
 
-        for wrt, _, _, outputs, arr in approx_groups:
-            for of, subjac, _ in outputs:
-                key = (of, wrt)
-                if is_parallel:
-                    for i, result in results[key]:
-                        subjac[:, i] = result
+        for wrt, data, _, tmpJ, _, _ in approx_groups:
+            # delta = data
+            # fact = (1.0 / delta * 1j).real
+            if wrt is None:  # colored
+                mat = tmpJ['@matrix']
+                # TODO: coloring when using parallel FD and/or FD with remote comps
+                for key, slc in iteritems(tmpJ['@jac_slices']):
+                    if uses_voi_indices:
+                        jac._override_checks = True
+                        jac[key] = mat[slc]
+                        jac._override_checks = False
+                    else:
+                        jac[key] = mat[slc]
 
-                if uses_src_indices:
-                    jac._override_checks = True
-                    jac[key] = subjac
-                    jac._override_checks = False
-                else:
-                    jac[key] = subjac
+                tmpJ['matrix'] = None  # reclaim memory
+            else:
+                ofs = tmpJ[wrt]['ofs']
+                for of in ofs:
+                    oview, oidxs = ofs[of]
+                    if is_parallel:
+                        for i, result in results[(of, wrt)]:
+                            oview[:, i] = result
 
-    def _run_points(self, system, arr, idx, data, out_tmp, in_tmp, result_array, results_clone,
+                    # oview *= fact
+                    if uses_voi_indices:
+                        jac._override_checks = True
+                        jac[(of, wrt)] = oview
+                        jac._override_checks = False
+                    else:
+                        jac[(of, wrt)] = oview
+
+    def _run_points(self, system, idx_info, data, out_tmp, in_tmp, result_array, results_clone,
                     current_vec, is_total):
         deltas, coeffs, current_coeff = data
         if current_coeff:
+            # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_clone._data[:] = current_vec._data
             results_clone._data *= current_coeff
         else:
@@ -366,12 +289,12 @@ class FiniteDifference(ApproximationScheme):
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
-            self._run_point(system, arr, idx, delta, out_tmp, in_tmp, result_array,
+            self._run_point(system, idx_info, delta, out_tmp, in_tmp, result_array,
                             is_total)
             result_array *= coeff
             results_clone._data += result_array
 
-    def _run_point(self, system, arr, idxs, delta, out_tmp, in_tmp, result_array, is_total):
+    def _run_point(self, system, idx_info, delta, out_tmp, in_tmp, result_array, is_total):
         """
         Alter the specified inputs by the given deltas, runs the system, and returns the results.
 
@@ -379,10 +302,8 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        arr : ndarray
-            Array being perturbed.
-        idxs : ndarray
-            Input indices.
+        idx_info : tuple of (ndarray of int, ndarray of float)
+            Tuple of wrt indices and corresponding data array to perturb.
         delta : float
             Perturbation amount.
         out_tmp : ndarray
@@ -409,8 +330,9 @@ class FiniteDifference(ApproximationScheme):
             run_model = system.run_apply_nonlinear
             results_vec = system._residuals
 
-        if arr is not None:
-            arr[idxs] += delta
+        for arr, idxs in idx_info:
+            if arr is not None:
+                arr._data[idxs] += delta
 
         run_model()
 
@@ -419,7 +341,8 @@ class FiniteDifference(ApproximationScheme):
         inputs._data[:] = in_tmp
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
-        if arr is outputs._data and results_vec is not outputs:
-            arr[idxs] -= delta
+        for arr, idxs in idx_info:
+            if not is_total and arr is outputs:
+                arr._data[idxs] -= delta
 
         return result_array
