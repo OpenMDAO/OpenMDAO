@@ -1,7 +1,6 @@
 """
 Functions to write HTML elements.
 """
-
 import os
 
 from six import iteritems
@@ -25,6 +24,8 @@ def write_tags(tag, content='', attrs=None, new_lines=False, indent=0):
     if attrs is None:
         attrs = {}
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
+    if isinstance(content, list):  # Convert iterable to string
+        content = '\n'.join(content)
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
@@ -61,10 +62,18 @@ def read_files(filenames, directory, extension):
 # Viewer API
 
 
-def add_button(title, content='', indent=0):
+def add_button(title, content='', button_id=None, indent=0):
     i = write_tags(tag='i', attrs={'class': content})
+    attrs = {'class': "myButton", 'title': title}
+    if button_id:
+        attrs['id'] = button_id
     return write_tags('button', content=i, attrs={'class': "myButton", 'title': title},
                       new_lines=True, indent=indent)
+
+
+def add_button_group(buttons):
+    button_elems = [add_button(**b) for b in buttons]
+    return write_div(attrs={'class': "button-group"}, content=button_elems)
 
 
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
@@ -85,5 +94,5 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
         attrs['id'] = dropdown_id
     menu = write_div(content=items, attrs=attrs)
 
-    content = '\n'.join([button, menu])
+    content = [button, menu]
     return write_div(content=content, attrs={'class': 'dropdown'}, indent=indent)
