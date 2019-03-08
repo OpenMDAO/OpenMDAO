@@ -598,13 +598,13 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         Defaults to True.
     add_process_conns: bool
         Add process connections (thin black lines)
-        Defaults to True
+        Defaults to True.
     show_parallel : bool
         Show parallel components with stacked blocks.
         Defaults to True.
-    output_side : str
-        Left or right.
-        Defaults to "left"
+    output_side : str or dict(str, str)
+        Left or right, or a dictionary with component types as keys.
+        Defaults to "left".
     kwargs : dict
         Keyword arguments
     Returns
@@ -708,7 +708,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Defaults to False.
     add_process_conns: bool
         Add process connections (thin black lines)
-        Defaults to True
+        Defaults to True.
     show_parallel : bool
         Show parallel components with stacked blocks.
         Defaults to True.
@@ -716,9 +716,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Set to True to suppress output from pdflatex
     build_pdf : bool
         If True and a .tex file is generated, create a .pdf file from the .tex.
-    output_side : str
-        Left or right.
-        Defaults to "left"
+    output_side : str or dict(str, str)
+        Left or right, or a dictionary with component types as keys.
+        Defaults to "left".
     driver_type : str
         Optimization or DOE.
         Defaults to "optimization".
