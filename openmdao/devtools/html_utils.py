@@ -16,21 +16,23 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content='', attrs=None, new_lines=False, indent=0):
+def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0):
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
     spaces = ' ' * indent
     template = '{spaces}<{tag} {attributes}>{ls}{content}{ls}</{tag}>\n'
     if attrs is None:
         attrs = {}
+    if cls is not None:
+        attrs['class'] = cls
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
     if isinstance(content, list):  # Convert iterable to string
         content = '\n'.join(content)
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
-def write_div(content='', attrs=None, indent=0):
-    return write_tags('div', content, attrs, new_lines=False, indent=indent)
+def write_div(content='', attrs=None, cls=None, indent=0):
+    return write_tags('div', content=content, attrs=attrs, cls=cls, new_lines=False, indent=indent)
 
 
 def write_style(content='', attrs=None, indent=0):
@@ -64,10 +66,10 @@ def read_files(filenames, directory, extension):
 
 def add_button(title, content='', button_id=None, indent=0):
     i = write_tags(tag='i', attrs={'class': content})
-    attrs = {'class': "myButton", 'title': title}
+    attrs = {'title': title}
     if button_id:
         attrs['id'] = button_id
-    return write_tags('button', content=i, attrs={'class': "myButton", 'title': title},
+    return write_tags('button', cls="myButton", content=i, attrs=attrs,
                       new_lines=True, indent=indent)
 
 
@@ -75,14 +77,14 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
                  dropdown_id=None, indent=0):
     button = add_button(title=title, content=button_content)
     if header is not None:
-        items = write_tags(tag='span', attrs={'class': "fakeLink"}, content=header)
+        items = write_tags(tag='span', cls="fakeLink", content=header)
     else:
         items = ''
 
     if options is not None:
         for option in options:
             idx = "{}{}".format(id_naming, option)
-            items += write_tags(tag='span', attrs={'class': "fakeLink", 'id': idx}, content=option)
+            items += write_tags(tag='span', cls="fakeLink", attrs={'id': idx}, content=option)
 
     attrs = {'class': 'dropdown-content'}
     if dropdown_id is not None:
@@ -90,10 +92,11 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
     menu = write_div(content=items, attrs=attrs)
 
     content = [button, menu]
-    return write_div(content=content, attrs={'class': 'dropdown'}, indent=indent)
+    return write_div(content=content, cls='dropdown', indent=indent)
 
 
 class ButtonGroup(object):
+    """Button group, which consists of buttons and dropdowns."""
 
     def __init__(self, indent=0):
         self.items = []
@@ -111,4 +114,12 @@ class ButtonGroup(object):
         self.items.append(dropdown)
 
     def write(self):
-        return '\n\n'.join(self.items)
+        """
+        Outputs the HTML code.
+
+        Returns
+        -------
+            str
+        """
+        content = '\n\n'.join(self.items)
+        return write_div(content=content, cls="button-group")
