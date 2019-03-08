@@ -1351,7 +1351,9 @@ def _xdsm_setup_parser(parser):
                         help='Positions the number either above or in front of the component label '
                         'if numbered_comps is true.')
     parser.add_argument('--output_side', action='store', dest='output_side', default=_DEFAULT_OUTPUT_SIDE,
-                        help='Position of the outputs on the diagram.')
+                        help='Position of the outputs on the diagram. Left or right, or a '
+                             'dictionary with component types as keys. Component type key can be '
+                             '"optimization", "doe" or "default".')
 
 
 def _xdsm_cmd(options):
