@@ -102,8 +102,10 @@ def write_script(content='', attrs=None, indent=0, **kwargs):
         attrs = default.update(attrs)
     return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent, **kwargs)
 
+
 def _p(content):
     return write_tags(tag='p', content=content)
+
 
 def read_files(filenames, directory, extension):
     # Reads files (based on filenames) from a directory with a given extension.
@@ -172,19 +174,64 @@ class UIElement(object):
 
 
 class ButtonGroup(UIElement):
-    """Button group, which consists of buttons and dropdowns."""
+    """
+    Button group, which consists of buttons and dropdowns. Write it to get the HTML for the
+    button group.
+    """
 
     def add_button(self, title, content='', button_id=None, **kwargs):
+        """
+        Adds a button to the button group.
+
+        Parameters
+        ----------
+        title : str
+            Name to be shown.
+        content : str
+            The content of the element.
+        button_id : str
+            ID.
+        kwargs : dict
+            Attributes passed to the button element.
+        Returns
+        -------
+            str
+        """
         button = add_button(title, content=content, button_id=button_id, indent=self.indent+_IND,
                             **kwargs)
         self.items.append(button)
+        return button
 
     def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
-                     dropdown_id=None, **kwargs):
+                     dropdown_id=None, option_formatter=None, **kwargs):
+        """
+        Adds a dropdown to the button group.
+
+        Parameters
+        ----------
+        title : str
+            Name to be shown.
+        id_naming : str
+            ID of an item will be id_naming + option
+        options : list(str)
+            Items of the dropdown.
+        button_content : str
+            Content of the button.
+        header : str
+            First item in the dropdown. Defaults to the title.
+        dropdown_id : str
+            ID.
+        option_formatter : None or callable
+            An optional text formatter for the dropdown items. Called with one item.
+        kwargs : dict
+            Attributes passed to the dropdown element.
+        """
         dropdown = add_dropdown(title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
-                                dropdown_id=dropdown_id, indent=self.indent+_IND, **kwargs)
+                                dropdown_id=dropdown_id, indent=self.indent+_IND,
+                                option_formatter=option_formatter, **kwargs)
         self.items.append(dropdown)
+        return dropdown
 
     def write(self):
         """
@@ -199,6 +246,10 @@ class ButtonGroup(UIElement):
 
 
 class Toolbar(UIElement):
+    """
+    A toolbar consists of button groups. Add button groups, and write it to get the HTML for the
+    toolbar.
+    """
 
     def add_button_group(self):
         button_group = ButtonGroup(indent=self.indent+4)
@@ -218,6 +269,10 @@ class Toolbar(UIElement):
 
 
 class TemplateWriter(object):
+    """
+    Opens an HTML template files, text can be inserted into the template, and writes  anew HTML
+    file with the replacements.
+    """
 
     def __init__(self, filename, embeddable=False, title=None, styles=None):
         self.filename = filename
@@ -236,7 +291,7 @@ class TemplateWriter(object):
                 self.template = head_and_body(head=head, body=template)
 
         if title is not None:
-            self._replace('title', add_title(title))
+            self._replace('{{title}}', add_title(title))
 
     def _replace(self, ref, txt):
         # Replace a reference in the template file with a text
@@ -248,3 +303,50 @@ class TemplateWriter(object):
     def write(self, outfile):
         with open(outfile, 'w') as f:  # write output file
             f.write(self.template)
+
+
+class DiagramWriter(TemplateWriter):
+    """
+    An HTML diagram writer. The diagram has a toolbar, which can be edited by adding
+    button groups, dropdowns, buttons, etc. to this class.
+    """
+
+    def __init__(self, filename, embeddable=False, title=None, styles=None):
+        super(DiagramWriter, self).__init__(filename=filename, embeddable=embeddable, title=title,
+                                            styles=styles)
+        self.toolbar = Toolbar()
+        self.help = None
+
+    def add_help(self, txt, header='Instructions', footer=''):
+        """
+        Adds a modal with instructions.
+
+        Parameters
+        ----------
+        txt : str
+            Text.
+        header : str
+            Title of the modal.
+        footer : str
+            Extra info.
+
+        Returns
+        -------
+            str
+        """
+        self.help = add_help(txt=txt, header=header, footer=footer)
+        return self.help
+
+    def write(self, outfile):
+        """
+        Writes an HTML output file.
+
+        Parameters
+        ----------
+        outfile : str
+            Name of the output file (include extension).
+        """
+        self.insert('{{toolbar}}', self.toolbar.write())
+        if self.help is not None:
+            self._replace('{{help}}', self.help)
+        super(DiagramWriter, self).write(outfile)

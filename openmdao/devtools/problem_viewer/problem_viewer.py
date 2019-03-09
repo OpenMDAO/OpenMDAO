@@ -21,8 +21,7 @@ from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script, \
-    Toolbar, add_help, add_title, TemplateWriter
+from openmdao.devtools.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
@@ -289,9 +288,9 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
-    h = TemplateWriter(filename=os.path.join(vis_dir, "index.html"),
-                       # title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram."
-                       styles=styles)
+    h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
+                      title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.",
+                      styles=styles, embeddable=embeddable)
 
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
@@ -306,7 +305,7 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     h.insert('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
     # Toolbar
-    toolbar = Toolbar()
+    toolbar = h.toolbar
     group1 = toolbar.add_button_group()
     group1.add_button("Return To Root", button_id="returnToRootButtonId", disabled="disabled", content="icon-home")
     group1.add_button("Back", button_id="backButtonId", disabled="disabled", content="icon-left-big")
@@ -345,18 +344,14 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     group5 = toolbar.add_button_group()
     group5.add_button("Help", button_id="helpButtonId", content="icon-help")
 
+    # Help
     help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
                 'Right clicking on a node in the model hierarchy will collapse/uncollapse it. '
                 'A click on any element in the N^2 diagram will allow those arrows to persist.')
 
-    help = add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
+    h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
 
-    title = add_title("OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.")
-
-    h.insert('{{toolbar}}', toolbar.write())
-    h.insert('{{help}}', help)
-    h.insert('{{title}}', title)
-
+    # Write output file
     h.write(outfile)
 
     # open it up in the browser
