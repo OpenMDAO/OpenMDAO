@@ -285,7 +285,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     src_names = 'constants', 'draw', 'legend', 'modal', 'ptN2', 'search', 'svg'
     srcs = read_files(src_names, src_dir, 'js')
     styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
-    style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
 
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
@@ -294,33 +293,17 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
                        # title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram."
                        styles=styles)
 
-    # # grab the index.html
-    # with open(os.path.join(vis_dir, "index.html"), "r") as f:
-    #     index = f.read()
-
-
-    # # add the necessary HTML tags if we aren't embedding
-    # if embeddable:
-    #     index = '\n\n'.join([style_elems, index])
-    # else:
-    #     meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
-    #     head = '\n\n'.join([meta, style_elems])  # Write styles to head
-    #     index = head_and_body(head=head, body=index)
-
-    index = h.template
-
-
     # put all style and JS into index
-    index = index.replace('{{fontello}}', encoded_font)
+    h.insert('{{fontello}}', encoded_font)
 
     for k, v in iteritems(lib_dct):
-        index = index.replace('{{{}_lib}}'.format(k), write_script(libs[v], indent=4))
+        h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=4))
 
     for name, code in iteritems(srcs):
-        index = index.replace('{{{}_lib}}'.format(name.lower()), write_script(code, indent=4))
+        h.insert('{{{}_lib}}'.format(name.lower()), write_script(code, indent=4))
 
-    index = index.replace('{{model_data}}', write_script(model_viewer_data, indent=4))
-    index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
+    h.insert('{{model_data}}', write_script(model_viewer_data, indent=4))
+    h.insert('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
     # Toolbar
     toolbar = Toolbar()
@@ -370,12 +353,11 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
 
     title = add_title("OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.")
 
-    index = index.replace('{{toolbar}}', toolbar.write())
-    index = index.replace('{{help}}', help)
-    index = index.replace('{{title}}', title)
+    h.insert('{{toolbar}}', toolbar.write())
+    h.insert('{{help}}', help)
+    h.insert('{{title}}', title)
 
-    with open(outfile, 'w') as f:  # write output file
-        f.write(index)
+    h.write(outfile)
 
     # open it up in the browser
     if show_browser:
