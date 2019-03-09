@@ -314,31 +314,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     index = index.replace('{{model_data}}', write_script(model_viewer_data, indent=4))
     index = index.replace('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
-    sizes = [8, 9, 10, 11, 12, 13, 14]
-    opts = ['{}px'.format(size) for size in sizes]
-    font_size_dropdown = add_dropdown(
-        "Font Size",
-        id_naming="idFontSize",
-        options=opts,
-        button_content="icon-text-height",
-    )
-    sizes = [600, 650, 700, 750, 800, 850, 900, 950, 1000, 2000, 3000, 4000]
-    opts = ['{}px'.format(size) for size in sizes]
-    vertical_size_dropdown = add_dropdown(
-        "Vertically Resize",
-        id_naming="idVerticalResize",
-        options=opts,
-        button_content="icon-resize-vertical",
-        header="Model Height"
-    )
-
-    # collapse_depth_dropdown = add_dropdown(
-    #     "Collapse Depth",
-    #     button_content="icon-sort-number-up",
-    #     header="Collapse Depth",
-    #     dropdown_id="idCollapseDepthDiv"
-    # )
-
     # Toolbar
     toolbar = Toolbar()
     group1 = toolbar.add_button_group()
