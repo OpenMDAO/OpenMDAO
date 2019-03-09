@@ -18,7 +18,7 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0, **kwargs):
+def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False, indent=0, **kwargs):
     """
     Writes an HTML element enclosed in tags.
 
@@ -28,16 +28,20 @@ def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0,
         Name of the tag.
     content : str or list(str)
         This goes into the body of the element.
-    attrs : dict
+    attrs : dict or None
         Attributes of the element.
-    cls : str
+        Defaults to None.
+    cls : str or None
         The "class" attribute of the element.
-    new_lines : str
+    uid : str or None
+        The "id" attribute of the element.
+    new_lines : bool
         Make new line after tags.
     indent : int
         Indentation expressed in spaces.
+        Defaults to 0.
     kwargs
-        Alternative way to add element attributes. Use with attention, can overwrite some in-bult
+        Alternative way to add element attributes. Use with attention, can overwrite some in-built
         python names as "class" or "id" if misused.
 
     Returns
@@ -53,13 +57,15 @@ def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0,
     attrs.update(kwargs)
     if cls is not None:
         attrs['class'] = cls
+    if uid is not None:
+        attrs['id'] = uid
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
     if isinstance(content, list):  # Convert iterable to string
         content = '\n'.join(content)
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
-def write_div(content='', attrs=None, cls=None, indent=0, **kwargs):
+def write_div(content='', attrs=None, cls=None, uid=None, indent=0, **kwargs):
     """
     Writes an HTML div.
 
@@ -69,8 +75,10 @@ def write_div(content='', attrs=None, cls=None, indent=0, **kwargs):
         This goes into the body of the element.
     attrs : dict
         Attributes of the element.
-    cls : str
+    cls : str or None
         The "class" attribute of the element.
+    uid : str or None
+        The "id" attribute of the element.
     indent : int
         Indentation expressed in spaces.
     kwargs
@@ -81,7 +89,7 @@ def write_div(content='', attrs=None, cls=None, indent=0, **kwargs):
     -------
         str
     """
-    return write_tags('div', content=content, attrs=attrs, cls=cls, new_lines=False,
+    return write_tags('div', content=content, attrs=attrs, cls=cls, uid=uid, new_lines=False,
                       indent=indent, **kwargs)
 
 
@@ -118,17 +126,15 @@ def read_files(filenames, directory, extension):
 # Viewer API
 
 
-def add_button(title, content='', button_id=None, indent=0, **kwargs):
+def add_button(title, content='', uid=None, indent=0, **kwargs):
     i = write_tags(tag='i', attrs={'class': content})
     attrs = {'title': title}
-    if button_id:
-        attrs['id'] = button_id
-    return write_tags('button', cls="myButton", content=i, attrs=attrs,
+    return write_tags('button', cls="myButton", content=i, attrs=attrs, uid=uid,
                       new_lines=True, indent=indent, **kwargs)
 
 
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
-                 dropdown_id=None, indent=0, option_formatter=None, **kwargs):
+                 uid=None, indent=0, option_formatter=None, **kwargs):
     button = add_button(title=title, content=button_content)
     if header is None:
         header = title
@@ -139,30 +145,28 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
             if option_formatter is not None:
                 option = option_formatter(option)
             idx = "{}{}".format(id_naming, option)
-            items += write_tags(tag='span', cls="fakeLink", attrs={'id': idx}, content=option)
+            items += write_tags(tag='span', cls="fakeLink", uid=idx, content=option)
 
     attrs = {'class': 'dropdown-content'}
-    if dropdown_id is not None:
-        attrs['id'] = dropdown_id
-    menu = write_div(content=items, attrs=attrs)
+    menu = write_div(content=items, attrs=attrs, uid=uid)
 
     content = [button, menu]
     return write_div(content=content, cls='dropdown', indent=indent, **kwargs)
 
 
 def add_help(txt, header='Instructions', footer=''):
-    header_txt = write_tags(tag='span', cls='close', content='&times;', attrs={'id': "idSpanModalClose"})
+    header_txt = write_tags(tag='span', cls='close', content='&times;', uid="idSpanModalClose")
     header_txt += header
     head = write_div(content=header_txt, cls="modal-header")
     foot = write_div(content=footer, cls="modal-footer")
     body = write_div(content=_p(txt), cls="modal-body")
     modal_content = write_div(content=[head, body, foot], cls="modal-content")
-    return write_div(content=modal_content, cls="modal", attrs={'id': "myModal"})
+    return write_div(content=modal_content, cls="modal", uid="myModal")
 
 
 def add_title(txt):
     title = write_tags(tag='h1', content=txt)
-    return write_div(content=title, attrs={'id': "maintitle", 'style': "text-align: center"})
+    return write_div(content=title, uid="maintitle", attrs={'style': "text-align: center"})
 
 
 class UIElement(object):
@@ -179,7 +183,7 @@ class ButtonGroup(UIElement):
     button group.
     """
 
-    def add_button(self, title, content='', button_id=None, **kwargs):
+    def add_button(self, title, content='', uid=None, **kwargs):
         """
         Adds a button to the button group.
 
@@ -187,9 +191,9 @@ class ButtonGroup(UIElement):
         ----------
         title : str
             Name to be shown.
-        content : str
+        content : str, optional
             The content of the element.
-        button_id : str
+        uid : str or None
             ID.
         kwargs : dict
             Attributes passed to the button element.
@@ -197,13 +201,13 @@ class ButtonGroup(UIElement):
         -------
             str
         """
-        button = add_button(title, content=content, button_id=button_id, indent=self.indent+_IND,
+        button = add_button(title, content=content, uid=uid, indent=self.indent+_IND,
                             **kwargs)
         self.items.append(button)
         return button
 
     def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
-                     dropdown_id=None, option_formatter=None, **kwargs):
+                     uid=None, option_formatter=None, **kwargs):
         """
         Adds a dropdown to the button group.
 
@@ -211,24 +215,27 @@ class ButtonGroup(UIElement):
         ----------
         title : str
             Name to be shown.
-        id_naming : str
+        id_naming : str or None, optional
             ID of an item will be id_naming + option
-        options : list(str)
-            Items of the dropdown.
-        button_content : str
+            Defaults to None.
+        options : list(str) or None, optional
+            Items of the dropdown. Can be None, if filled with a script.
+            Defaults to None.
+        button_content : str, optional
             Content of the button.
-        header : str
+        header : str or None, optional
             First item in the dropdown. Defaults to the title.
-        dropdown_id : str
+        uid : str or None, optional
             ID.
-        option_formatter : None or callable
-            An optional text formatter for the dropdown items. Called with one item.
+        option_formatter : None or callable, optional
+            Text formatter for the dropdown items. Called with one item.
+            Defaults to None.
         kwargs : dict
             Attributes passed to the dropdown element.
         """
         dropdown = add_dropdown(title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
-                                dropdown_id=dropdown_id, indent=self.indent+_IND,
+                                uid=uid, indent=self.indent+_IND,
                                 option_formatter=option_formatter, **kwargs)
         self.items.append(dropdown)
         return dropdown
@@ -265,7 +272,7 @@ class Toolbar(UIElement):
             str
         """
         content = '\n\n'.join([item.write() for item in self.items])
-        return write_div(content=content, cls="toolbar", attrs={'id': "toolbarDiv"})
+        return write_div(content=content, cls="toolbar", uid="toolbarDiv")
 
 
 class TemplateWriter(object):
