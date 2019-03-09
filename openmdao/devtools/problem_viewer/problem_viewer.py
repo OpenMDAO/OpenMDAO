@@ -22,11 +22,14 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script, \
-    add_dropdown, ButtonGroup
+    add_dropdown, ButtonGroup, Toolbar
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
+
+_FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
+_MODEL_HEIGHTS = [600, 650, 700, 750, 800, 850, 900, 950, 1000, 2000, 3000, 4000]
 
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index, is_parallel=False):
@@ -318,7 +321,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         id_naming="idFontSize",
         options=opts,
         button_content="icon-text-height",
-        header="Font Size"
     )
     sizes = [600, 650, 700, 750, 800, 850, 900, 950, 1000, 2000, 3000, 4000]
     opts = ['{}px'.format(size) for size in sizes]
@@ -330,29 +332,54 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         header="Model Height"
     )
 
-    collapse_depth_dropdown = add_dropdown(
-        "Collapse Depth",
-        button_content="icon-sort-number-up",
-        header="Collapse Depth",
-        dropdown_id="idCollapseDepthDiv"
-    )
+    # collapse_depth_dropdown = add_dropdown(
+    #     "Collapse Depth",
+    #     button_content="icon-sort-number-up",
+    #     header="Collapse Depth",
+    #     dropdown_id="idCollapseDepthDiv"
+    # )
 
-    # Dropdowns
-    index = index.replace('{{collapse_depth_dropdown}}', collapse_depth_dropdown)
-    index = index.replace('{{font_size_dropdown}}', font_size_dropdown)
-    index = index.replace('{{vertical_size_dropdown}}', vertical_size_dropdown)
+    # Toolbar
+    toolbar = Toolbar()
+    group1 = toolbar.add_button_group()
+    group1.add_button("Return To Root", button_id="returnToRootButtonId", disabled="disabled", content="icon-home")
+    group1.add_button("Back", button_id="backButtonId", disabled="disabled", content="icon-left-big")
+    group1.add_button("Forward", button_id="forwardButtonId", disabled="disabled", content="icon-right-big")
+    group1.add_button("Up One Level", button_id="upOneLevelButtonId", disabled="disabled", content="icon-up-big")
 
+    group2 = toolbar.add_button_group()
+    group2.add_button("Uncollapse In View Only", button_id="uncollapseInViewButtonId",
+                      content="icon-resize-full")
+    group2.add_button("Uncollapse All", button_id="uncollapseAllButtonId",
+                      content="icon-resize-full bigger-font")
+    group2.add_button("Collapse Outputs In View Only", button_id="collapseInViewButtonId",
+                      content="icon-resize-small")
+    group2.add_button("Collapse All Outputs", button_id="collapseAllButtonId",
+                      content="icon-resize-small bigger-font")
+    group2.add_dropdown("Collapse Depth", button_content="icon-sort-number-up",
+                        dropdown_id="idCollapseDepthDiv")
 
-    button_group1 = ButtonGroup()
-    button_group1.add_button(title="Return To Root", button_id="returnToRootButtonId",
-                             disabled="disabled")
-    button_group1.add_button(title="Back", button_id="backButtonId",
-                             disabled="disabled")
-    button_group1.add_button(title="Forward", button_id="forwardButtonId",
-                             disabled="disabled")
-    button_group1.add_button(title="Up One Level", button_id="upOneLevelButtonId",
-                             disabled="disabled")
-    index = index.replace('{{button_group1}}', button_group1.write())
+    group3 = toolbar.add_button_group()
+    group3.add_button("Clear Arrows and Connections", button_id="clearArrowsAndConnectsButtonId",
+                      content="icon-eraser")
+    group3.add_button("Show Path", button_id="showCurrentPathButtonId", content="icon-terminal")
+    group3.add_button("Show Legend", button_id="showLegendButtonId", content="icon-map-signs")
+    group3.add_button("Show Params", button_id="showParamsButtonId", content="icon-exchange")
+    group3.add_button("Toggle Solver Names", button_id="toggleSolverNamesButtonId", content="icon-minus")
+    group3.add_dropdown("Font Size", id_naming="idFontSize", options=_FONT_SIZES,
+                        option_formatter=lambda x: '{}px'.format(x),
+                        button_content="icon-text-height")
+    group3.add_dropdown("Vertically Resize", id_naming="idVerticalResize",
+                        options=_MODEL_HEIGHTS, option_formatter=lambda x: '{}px'.format(x),
+                        button_content="icon-resize-vertical", header="Model Height")
+
+    group4 = toolbar.add_button_group()
+    group4.add_button("Save SVG", button_id="saveSvgButtonId", content="icon-floppy")
+
+    group5 = toolbar.add_button_group()
+    group5.add_button("Help", button_id="helpButtonId", content="icon-help")
+
+    index = index.replace('{{toolbar}}', toolbar.write())
 
     with open(outfile, 'w') as f:  # write output file
         f.write(index)

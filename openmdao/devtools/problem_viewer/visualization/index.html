@@ -21,75 +21,7 @@
                 </div>
             </div>
             <div id="toolbarLoc">
-                <div class="toolbar" id="toolbarDiv">
-                    <div class="button-group">
-                        <button class="myButton" id="returnToRootButtonId" disabled="disabled" title="Return To Root">
-                            <i class="icon-home"></i>
-                        </button>
-                        <button class="myButton" id="backButtonId" disabled="disabled" title="Back">
-                            <i class="icon-left-big"></i>
-                        </button>
-                        <button class="myButton" id="forwardButtonId" disabled="disabled" title="Forward">
-                            <i class="icon-right-big"></i>
-                        </button>
-                        <button class="myButton" id="upOneLevelButtonId" disabled="disabled" title="Up One Level">
-                            <i class="icon-up-big"></i>
-                        </button>
-                    </div>
-                    <div class="button-group">
-                        <button class="myButton" id="uncollapseInViewButtonId" title="Uncollapse In View Only">
-                            <i class="icon-resize-full"></i>
-                        </button>
-                        <button class="myButton" id="uncollapseAllButtonId" title="Uncollapse All">
-                            <i class="icon-resize-full bigger-font"></i>
-                        </button>
-                        <button class="myButton" id="collapseInViewButtonId" title="Collapse Outputs In View Only">
-                            <i class="icon-resize-small"></i>
-                        </button>
-                        <button class="myButton" id="collapseAllButtonId" title="Collapse All Outputs">
-                            <i class="icon-resize-small bigger-font"></i>
-                        </button>
-                        {{collapse_depth_dropdown}}
-                        <div class="dropdown">
-                            <button class="myButton" title="Collapse Depth">
-                                <i class="icon-sort-number-up"></i>
-                            </button>
-                            <div id="idCollapseDepthDiv" class="dropdown-content">
-                                <span class="fakeLink">Collapse Depth</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="button-group">
-                        <button class="myButton" id="clearArrowsAndConnectsButtonId" title="Clear Arrows and Connections">
-                            <i class="icon-eraser"></i>
-                        </button>
-                        <button class="myButton" id="showCurrentPathButtonId" title="Show Path">
-                            <i class="icon-terminal"></i>
-                        </button>
-                        <button class="myButton" id="showLegendButtonId" title="Show Legend">
-                            <i class="icon-map-signs"></i>
-                        </button>
-                        <button class="myButton" id="showParamsButtonId" type="checkbox" title="Show Params">
-                            <i class="icon-exchange"></i>
-                        </button>
-                        <button class="myButton" id="toggleSolverNamesButtonId" type="checkbox" title="Toggle Solver Names">
-                            <i class="icon-minus"></i>
-                        </button>
-
-                        {{font_size_dropdown}}
-                        {{vertical_size_dropdown}}
-                    </div>
-                    <div class="button-group">
-                        <button class="myButton" id="saveSvgButtonId" title="Save SVG">
-                            <i class="icon-floppy"></i>
-                        </button>
-                    </div>
-                    <div class="button-group">
-                        <button class="myButton" id="helpButtonId" title="Help">
-                            <i class="icon-help"></i>
-                        </button>
-                    </div>
-                </div>
+                {{toolbar}}
             </div>
             <div style="margin-top:5px;">
                 <input type="text" id="awesompleteId" size="80" />

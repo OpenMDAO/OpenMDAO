@@ -5,6 +5,8 @@ import os
 
 from six import iteritems
 
+_IND = 4  # indentation (spaces)
+
 
 def head_and_body(head, body, attrs=None):
     # Wraps the head and body in tags
@@ -76,15 +78,16 @@ def add_button(title, content='', button_id=None, indent=0, **kwargs):
 
 
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
-                 dropdown_id=None, indent=0, **kwargs):
+                 dropdown_id=None, indent=0, option_formatter=None, **kwargs):
     button = add_button(title=title, content=button_content)
-    if header is not None:
-        items = write_tags(tag='span', cls="fakeLink", content=header)
-    else:
-        items = ''
+    if header is None:
+        header = title
+    items = write_tags(tag='span', cls="fakeLink", content=header)
 
     if options is not None:
         for option in options:
+            if option_formatter is not None:
+                option = option_formatter(option)
             idx = "{}{}".format(id_naming, option)
             items += write_tags(tag='span', cls="fakeLink", attrs={'id': idx}, content=option)
 
@@ -97,22 +100,27 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
     return write_div(content=content, cls='dropdown', indent=indent, **kwargs)
 
 
-class ButtonGroup(object):
-    """Button group, which consists of buttons and dropdowns."""
+class UIElement(object):
+    """Abstract class for user interface elements."""
 
     def __init__(self, indent=0):
         self.items = []
         self.indent = indent
 
+
+class ButtonGroup(UIElement):
+    """Button group, which consists of buttons and dropdowns."""
+
     def add_button(self, title, content='', button_id=None, **kwargs):
-        button = add_button(title, content=content, button_id=button_id, indent=self.indent+4, **kwargs)
+        button = add_button(title, content=content, button_id=button_id, indent=self.indent+_IND,
+                            **kwargs)
         self.items.append(button)
 
     def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
                      dropdown_id=None, **kwargs):
-        dropdown = add_dropdown(self, title=title, id_naming=id_naming, options=options,
+        dropdown = add_dropdown(title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
-                                dropdown_id=dropdown_id, indent=self.indent+4, **kwargs)
+                                dropdown_id=dropdown_id, indent=self.indent+_IND, **kwargs)
         self.items.append(dropdown)
 
     def write(self):
@@ -125,3 +133,22 @@ class ButtonGroup(object):
         """
         content = '\n\n'.join(self.items)
         return write_div(content=content, cls="button-group")
+
+
+class Toolbar(UIElement):
+
+    def add_button_group(self):
+        button_group = ButtonGroup(indent=self.indent+4)
+        self.items.append(button_group)
+        return button_group
+
+    def write(self):
+        """
+        Outputs the HTML code.
+
+        Returns
+        -------
+            str
+        """
+        content = '\n\n'.join([item.write() for item in self.items])
+        return write_div(content=content, cls="toolbar", attrs={'id': "toolbarDiv"})
