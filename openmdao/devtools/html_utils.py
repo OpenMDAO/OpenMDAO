@@ -9,6 +9,22 @@ _IND = 4  # indentation (spaces)
 
 
 def head_and_body(head, body, attrs=None):
+    """
+    Makes an html element from a head and body.
+
+    Parameters
+    ----------
+    head : str
+        Head of HTML.
+    body : str
+        Body of the HTML
+    attrs : dict or None
+        Attributes of the html element.
+        Defaults to None.
+    Returns
+    -------
+        str
+    """
     # Wraps the head and body in tags
     doc_type = '<!doctype html>'
     head_elem = write_tags(tag='head', content=head, new_lines=True)
@@ -43,10 +59,6 @@ def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False,
     kwargs
         Alternative way to add element attributes. Use with attention, can overwrite some in-built
         python names as "class" or "id" if misused.
-
-    Returns
-    -------
-
     """
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
@@ -111,7 +123,8 @@ def write_script(content='', attrs=None, indent=0, **kwargs):
     return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent, **kwargs)
 
 
-def _p(content):
+def write_paragraph(content):
+    # Write a paragraph
     return write_tags(tag='p', content=content)
 
 
@@ -155,18 +168,52 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
 
 
 def add_help(txt, header='Instructions', footer=''):
+    """
+    Add a popup help.
+
+    Parameters
+    ----------
+    txt : str
+        Help message/instructions.
+    header : str
+        Message header.
+    footer : str
+        Additional info.
+
+    Returns
+    -------
+        str
+    """
     header_txt = write_tags(tag='span', cls='close', content='&times;', uid="idSpanModalClose")
     header_txt += header
     head = write_div(content=header_txt, cls="modal-header")
     foot = write_div(content=footer, cls="modal-footer")
-    body = write_div(content=_p(txt), cls="modal-body")
+    body = write_div(content=write_paragraph(txt), cls="modal-body")
     modal_content = write_div(content=[head, body, foot], cls="modal-content")
     return write_div(content=modal_content, cls="modal", uid="myModal")
 
 
-def add_title(txt):
-    title = write_tags(tag='h1', content=txt)
-    return write_div(content=title, uid="maintitle", attrs={'style': "text-align: center"})
+def add_title(txt, heading='h1', align='center'):
+    """
+    Add a title heading.
+
+    Parameters
+    ----------
+    txt : str
+        Title text.
+    heading : str
+        Heading. Options are "h1" to "h6".
+        Defaults to "h1"
+    align : str
+        Defaults to "center"
+
+    Returns
+    -------
+        str
+    """
+    title = write_tags(tag=heading, content=txt)
+    style = "text-align: {}".format(align)
+    return write_div(content=title, uid="maintitle", attrs={'style': style})
 
 
 class UIElement(object):
@@ -197,6 +244,7 @@ class ButtonGroup(UIElement):
             ID.
         kwargs : dict
             Attributes passed to the button element.
+
         Returns
         -------
             str
@@ -232,6 +280,10 @@ class ButtonGroup(UIElement):
             Defaults to None.
         kwargs : dict
             Attributes passed to the dropdown element.
+
+        Returns
+        -------
+            str
         """
         dropdown = add_dropdown(title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
