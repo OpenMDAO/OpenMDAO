@@ -291,19 +291,24 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
     h = TemplateWriter(filename=os.path.join(vis_dir, "index.html"),
-                       title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.")
+                       # title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram."
+                       styles=styles)
 
-    # grab the index.html
-    with open(os.path.join(vis_dir, "index.html"), "r") as f:
-        index = f.read()
+    # # grab the index.html
+    # with open(os.path.join(vis_dir, "index.html"), "r") as f:
+    #     index = f.read()
 
-    # add the necessary HTML tags if we aren't embedding
-    if embeddable:
-        index = '\n\n'.join([style_elems, index])
-    else:
-        meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
-        head = '\n\n'.join([meta, style_elems])  # Write styles to head
-        index = head_and_body(head=head, body=index)
+
+    # # add the necessary HTML tags if we aren't embedding
+    # if embeddable:
+    #     index = '\n\n'.join([style_elems, index])
+    # else:
+    #     meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+    #     head = '\n\n'.join([meta, style_elems])  # Write styles to head
+    #     index = head_and_body(head=head, body=index)
+
+    index = h.template
+
 
     # put all style and JS into index
     index = index.replace('{{fontello}}', encoded_font)
