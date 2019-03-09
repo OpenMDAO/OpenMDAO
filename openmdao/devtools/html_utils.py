@@ -3,7 +3,7 @@ Functions to write HTML elements.
 """
 import os
 
-from six import iteritems
+from six import iteritems, itervalues
 
 _IND = 4  # indentation (spaces)
 
@@ -19,6 +19,31 @@ def head_and_body(head, body, attrs=None):
 
 
 def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0, **kwargs):
+    """
+    Writes an HTML element enclosed in tags.
+
+    Parameters
+    ----------
+    tag : str
+        Name of the tag.
+    content : str or list(str)
+        This goes into the body of the element.
+    attrs : dict
+        Attributes of the element.
+    cls : str
+        The "class" attribute of the element.
+    new_lines : str
+        Make new line after tags.
+    indent : int
+        Indentation expressed in spaces.
+    kwargs
+        Alternative way to add element attributes. Use with attention, can overwrite some in-bult
+        python names as "class" or "id" if misused.
+
+    Returns
+    -------
+
+    """
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
     spaces = ' ' * indent
@@ -35,6 +60,27 @@ def write_tags(tag, content='', attrs=None, cls=None, new_lines=False, indent=0,
 
 
 def write_div(content='', attrs=None, cls=None, indent=0, **kwargs):
+    """
+    Writes an HTML div.
+
+    Parameters
+    ----------
+    content : str or list(str)
+        This goes into the body of the element.
+    attrs : dict
+        Attributes of the element.
+    cls : str
+        The "class" attribute of the element.
+    indent : int
+        Indentation expressed in spaces.
+    kwargs
+        Alternative way to add element attributes. Use with attention, can overwrite some in-bult
+        python names as "class" or "id" if misused.
+
+    Returns
+    -------
+        str
+    """
     return write_tags('div', content=content, attrs=attrs, cls=cls, new_lines=False,
                       indent=indent, **kwargs)
 
@@ -56,6 +102,8 @@ def write_script(content='', attrs=None, indent=0, **kwargs):
         attrs = default.update(attrs)
     return write_tags('script', content, attrs=attrs, new_lines=True, indent=indent, **kwargs)
 
+def _p(content):
+    return write_tags(tag='p', content=content)
 
 def read_files(filenames, directory, extension):
     # Reads files (based on filenames) from a directory with a given extension.
@@ -98,6 +146,21 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
 
     content = [button, menu]
     return write_div(content=content, cls='dropdown', indent=indent, **kwargs)
+
+
+def add_help(txt, header='Instructions', footer=''):
+    header_txt = write_tags(tag='span', cls='close', content='&times;', attrs={'id': "idSpanModalClose"})
+    header_txt += header
+    head = write_div(content=header_txt, cls="modal-header")
+    foot = write_div(content=footer, cls="modal-footer")
+    body = write_div(content=_p(txt), cls="modal-body")
+    modal_content = write_div(content=[head, body, foot], cls="modal-content")
+    return write_div(content=modal_content, cls="modal", attrs={'id': "myModal"})
+
+
+def add_title(txt):
+    title = write_tags(tag='h1', content=txt)
+    return write_div(content=title, attrs={'id': "maintitle", 'style': "text-align: center"})
 
 
 class UIElement(object):
@@ -152,3 +215,36 @@ class Toolbar(UIElement):
         """
         content = '\n\n'.join([item.write() for item in self.items])
         return write_div(content=content, cls="toolbar", attrs={'id': "toolbarDiv"})
+
+
+class TemplateWriter(object):
+
+    def __init__(self, filename, embeddable=False, title=None, styles=None):
+        self.filename = filename
+        # Load template
+        with open(self.filename, "r") as f:
+            self.template = template = f.read()
+
+        if styles is not None:
+            style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
+
+            if embeddable:
+                self.template = '\n\n'.join([style_elems, template])
+            else:
+                meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
+                head = '\n\n'.join([meta, style_elems])  # Write styles to head
+                self.template = head_and_body(head=head, body=template)
+
+        if title is not None:
+            self._replace('title', add_title(title))
+
+    def _replace(self, ref, txt):
+        # Replace a reference in the template file with a text
+        self.template = self.template.replace(ref, txt)
+
+    def insert(self, ref, txt):
+        self._replace(ref=ref, txt=txt)
+
+    def write(self, outfile):
+        with open(outfile, 'w') as f:  # write output file
+            f.write(self.template)

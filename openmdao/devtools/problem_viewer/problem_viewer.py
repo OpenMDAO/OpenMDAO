@@ -22,7 +22,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.html_utils import head_and_body, write_style, read_files, write_script, \
-    add_dropdown, ButtonGroup, Toolbar
+    Toolbar, add_help, add_title, TemplateWriter
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
@@ -290,6 +290,9 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
+    h = TemplateWriter(filename=os.path.join(vis_dir, "index.html"),
+                       title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.")
+
     # grab the index.html
     with open(os.path.join(vis_dir, "index.html"), "r") as f:
         index = f.read()
@@ -354,7 +357,17 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     group5 = toolbar.add_button_group()
     group5.add_button("Help", button_id="helpButtonId", content="icon-help")
 
+    help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
+                'Right clicking on a node in the model hierarchy will collapse/uncollapse it. '
+                'A click on any element in the N^2 diagram will allow those arrows to persist.')
+
+    help = add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
+
+    title = add_title("OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.")
+
     index = index.replace('{{toolbar}}', toolbar.write())
+    index = index.replace('{{help}}', help)
+    index = index.replace('{{title}}', title)
 
     with open(outfile, 'w') as f:  # write output file
         f.write(index)

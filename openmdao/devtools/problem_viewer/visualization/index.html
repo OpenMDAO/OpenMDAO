@@ -1,25 +1,8 @@
  <div id="all_pt_n2_content_div">
-        <div id="maintitle" style="text-align: center">
-            <h1>OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.</h1>
-        </div>
+        {{title}}
         <div id="ptN2ContentDivId">
             <!-- The Modal -->
-            <div id="myModal" class="modal">
-                <!-- Modal content -->
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <span id="idSpanModalClose" class="close">×</span> Instructions
-                    </div>
-                    <div class="modal-body">
-                        <p>Left clicking on a node in the partition tree will navigate to that node. Right clicking on a node
-                            in the model hierarchy will collapse/uncollapse it. A click on any element in the N^2 diagram
-                            will allow those arrows to persist.</p>
-                    </div>
-                    <div class="modal-footer">
-                        OpenMDAO Model Hierarchy and N^2 diagram.
-                    </div>
-                </div>
-            </div>
+            {{help}}
             <div id="toolbarLoc">
                 {{toolbar}}
             </div>
