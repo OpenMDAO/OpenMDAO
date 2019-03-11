@@ -27,15 +27,18 @@ to the balance, it solves the following equation:
      lhs(var) \cdot mult(var) = rhs(var)
 
 The :math:`mult` term is an optional multiplier than can be applied to the
-left-hand side (LHS) of the equation.  For our example, we will assign the right-hand side
-(RHS) to the mean anomaly (:math:`M`), and the left-hand side to :math:`E - e \sin{E}`
+left-hand side (LHS) of the equation.  For our example, we will assign the 
+right-hand side (RHS) to the mean anomaly (:math:`M`), and the left-hand 
+side to :math:`E - e \sin{E}`
 
 In this implementation, we rely on an ExecComp to compute the value of the LHS.
 
-Implicit components in OpenMDAO also provide an "initial guess" method,
-*guess_nonlinear*, which provides the starting value for the implicit state
-variable (:math:`E` in this case) for the nonlinear solver.  When solving Kepler's
-equation, using :math:`M` as the initial guess for :math:`E` is a good starting point.
+BalanceComp also provides a way to supply the starting value for the implicit
+state variable (:math:`E` in this case), via the `guess_func` argument.  The 
+supplied function should have a similar signature to the *guess_nonlinear* 
+function of :ref:`ImplicitComponent <comp-type-3-implicitcomp>`. When solving
+Kepler's equation, using :math:`M` as the initial guess for :math:`E` is a 
+good starting point.
 
 In summary, the recipe for solving Kepler's equation is as follows:
 

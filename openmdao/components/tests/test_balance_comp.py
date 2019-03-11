@@ -370,7 +370,7 @@ class TestBalanceComp(unittest.TestCase):
 
         bal = BalanceComp()
 
-        bal.add_balance('x', guess_func=lambda inputs, resids: np.sqrt(inputs['rhs:x']))
+        bal.add_balance('x', guess_func=lambda inputs, outputs, resids: np.sqrt(inputs['rhs:x']))
 
         tgt = IndepVarComp(name='y_tgt', val=4)
 
@@ -413,7 +413,7 @@ class TestBalanceComp(unittest.TestCase):
 
         bal = BalanceComp()
 
-        bal.add_balance('x', guess_func=lambda inputs, resids: inputs['guess_x'])
+        bal.add_balance('x', guess_func=lambda inputs, outputs, resids: inputs['guess_x'])
         bal.add_input('guess_x', val=0.0)
 
         ivc = IndepVarComp()
@@ -451,6 +451,53 @@ class TestBalanceComp(unittest.TestCase):
 
             for (of, wrt) in cpd['balance']:
                 assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
+    def test_scalar_guess_func_using_outputs(self):
+        # Implicitly solve -(ax^2 + bx) = c using a BalanceComp.
+        # For a=1, b=-4 and c=3, there are solutions at x=1 and x=3.
+
+        # Verify that we can set the guess value (and target a solution) based on outputs.
+
+        ind = IndepVarComp()
+        ind.add_output('a', 1)
+        ind.add_output('b', -4)
+        ind.add_output('c', 3)
+
+        lhs = ExecComp('lhs=-(a*x**2+b*x)')
+
+        bal = BalanceComp()
+
+        def guess_function(inputs, outputs, residuals):
+            if outputs['x'] < 0:
+                return 5.
+            else:
+                return 0.
+
+        bal.add_balance(name='x', rhs_name='c', guess_func=guess_function)
+
+        model = Group()
+
+        model.add_subsystem('ind_comp', ind, promotes_outputs=['a', 'b', 'c'])
+        model.add_subsystem('lhs_comp', lhs, promotes_inputs=['a', 'b', 'x'])
+        model.add_subsystem('bal_comp', bal, promotes_inputs=['c'], promotes_outputs=['x'])
+
+        model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
+
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver(maxiter=1000, iprint=0)
+
+        prob = Problem(model)
+        prob.setup()
+
+        # initial value of 'x' less than zero, guess should steer us to solution of 3.
+        prob['bal_comp.x'] = -1
+        prob.run_model()
+        assert_almost_equal(prob['bal_comp.x'], 3.0, decimal=7)
+
+        # initial value of 'x' greater than zero, guess should steer us to solution of 1.
+        prob['bal_comp.x'] = 99
+        prob.run_model()
+        assert_almost_equal(prob['bal_comp.x'], 1.0, decimal=7)
 
     def test_rhs_val(self):
         """ Test solution with a default RHS value and no connected RHS variable. """
