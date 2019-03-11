@@ -918,7 +918,7 @@ class TestGroup(unittest.TestCase):
 
     def test_guess_nonlinear(self):
         class GuessGroup(Group):
-            def __init__(self, target, guess=None, maxiter=100):
+            def __init__(self, target, guess=None, maxiter=10):
                 super(GuessGroup, self).__init__()
                 self._target_value = target
                 self._guess_value = guess
@@ -965,6 +965,7 @@ class TestGroup(unittest.TestCase):
                 self.add_input('a', val=1.)
                 self.add_input('b', val=1.)
                 self.add_input('c', val=1.)
+
                 self.add_output('x', val=0.)
 
                 self.declare_partials(of='*', wrt='*')
@@ -974,6 +975,7 @@ class TestGroup(unittest.TestCase):
                 b = inputs['b']
                 c = inputs['c']
                 x = outputs['x']
+
                 residuals['x'] = a * x ** 2 + b * x + c
 
             def linearize(self, inputs, outputs, partials):
@@ -997,15 +999,16 @@ class TestGroup(unittest.TestCase):
                 self._guess = guess
 
             def setup(self):
-                self.add_subsystem('pa', IndepVarComp('a', 1.0))
-                self.add_subsystem('pb', IndepVarComp('b', -4.0))
-                self.add_subsystem('pc', IndepVarComp('c', 3.0))
+                indep = self.add_subsystem('indep', IndepVarComp())
+                indep.add_output('a', 1.0)
+                indep.add_output('b', -4.0)
+                indep.add_output('c', 3.0)
 
                 self.add_subsystem('comp', QuadraticComp())
 
-                self.connect('pa.a', 'comp.a')
-                self.connect('pb.b', 'comp.b')
-                self.connect('pc.c', 'comp.c')
+                self.connect('indep.a', 'comp.a')
+                self.connect('indep.b', 'comp.b')
+                self.connect('indep.c', 'comp.c')
 
                 self.linear_solver = DirectSolver()
                 self.nonlinear_solver = NewtonSolver()
