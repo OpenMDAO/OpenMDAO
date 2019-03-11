@@ -256,11 +256,11 @@ class Jacobian(object):
             # create _jac_summ structure
             self._jac_summ = summ = {}
             for key in subjacs:
-                summ[key] = np.abs(self[key])
+                summ[key] = np.abs(subjacs[key]['value'])
         else:
             summ = self._jac_summ
             for key in subjacs:
-                summ[key] += np.abs(self[key])
+                summ[key] += np.abs(subjacs[key]['value'])
 
     def _compute_sparsity(self, system, wrt_matches, tol=1e-15, orders=5):
         """

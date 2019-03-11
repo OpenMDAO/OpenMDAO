@@ -182,10 +182,9 @@ class ApproximationScheme(object):
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
                     ofsizes, wrtsizes = system._get_partials_sizes()
-                    full_wrts = wrt_names
                     wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
                     of_names = [rel_name2abs_name(system, n) for n in of_names]
-                    full_wrts = [rel_name2abs_name(system, n) for n in full_wrts]
+                    full_wrts = wrt_names
 
                 full_sizes = wrtsizes
                 is_implicit = not is_total and \
@@ -214,6 +213,7 @@ class ApproximationScheme(object):
 
                 reduced_wrt_sizes = update_sizes(wrt_names, wrtsizes, approx_wrt_idx)
                 reduced_of_sizes = update_sizes(of_names, ofsizes, approx_of_idx)
+                # get slices info colored jac (which is some subset of the full jac)
                 tmpJ['@jac_slices'] = _get_jac_slice_dict(of_names, reduced_of_sizes,
                                                           wrt_names, reduced_wrt_sizes)
 
