@@ -1,33 +1,3 @@
-// var CONNECTION_COLOR = "black",
-//     UNKNOWN_IMPLICIT_COLOR = "orange",
-//     UNKNOWN_EXPLICIT_COLOR = "#AAA",
-//     N2_COMPONENT_BOX_COLOR = "#555",
-//     N2_BACKGROUND_COLOR = "#eee",
-//     N2_GRIDLINE_COLOR = "white",
-//     PT_STROKE_COLOR = "#eee",
-//     UNKNOWN_GROUP_COLOR = "#888",
-//     PARAM_COLOR = "Plum",
-//     PARAM_GROUP_COLOR = "Orchid",
-//     GROUP_COLOR = "steelblue",
-//     COMPONENT_COLOR = "DeepSkyBlue",
-//     COLLAPSED_COLOR = "#555";
-
-// From Isaias
-var CONNECTION_COLOR = "black",
-   UNKNOWN_IMPLICIT_COLOR = "#c7d06d",
-   UNKNOWN_EXPLICIT_COLOR = "#9ec4c7",
-   N2_COMPONENT_BOX_COLOR = "#555",
-   N2_BACKGROUND_COLOR = "#eee",
-   N2_GRIDLINE_COLOR = "white",
-   PT_STROKE_COLOR = "#eee",
-   UNKNOWN_GROUP_COLOR = "#888",
-   PARAM_COLOR = "#32afad",
-   PARAM_GROUP_COLOR = "Orchid",
-   GROUP_COLOR = "#3476a2",
-   COMPONENT_COLOR = "DeepSkyBlue",
-   COLLAPSED_COLOR = "#555",
-   UNCONNECTED_PARAM_COLOR = "#F42E0C";
-
 function SaveSvg(parentDiv) {
     //get svg element.
     var svgData = parentDiv.querySelector("#svgId").outerHTML;

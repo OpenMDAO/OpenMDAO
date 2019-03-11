@@ -240,8 +240,7 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-               draw_potential_connections=True):
+def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False):
     """
     Generates an HTML file containing a tree viewer.
 
@@ -262,10 +261,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     embeddable : bool, optional
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
-
-    draw_potential_connections : bool, optional
-        If true, allows connections to be drawn on the N2 that do not currently exist
-        in the model. Defaults to True.
     """
     # grab the model viewer data
     model_viewer_data = _get_viewer_data(data_source)
@@ -305,7 +300,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         h.insert('{{{}_lib}}'.format(name.lower()), write_script(code, indent=_IND))
 
     h.insert('{{model_data}}', write_script(model_viewer_data, indent=_IND))
-    h.insert('{{draw_potential_connections}}', str(draw_potential_connections).lower())
 
     # Toolbar
     toolbar = h.toolbar

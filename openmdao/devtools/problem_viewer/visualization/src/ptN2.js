@@ -120,12 +120,7 @@ function PtN2Diagram(parentDiv, modelData) {
 
             text += "<br />self.connect(\"" + unknownName + "\", \"" + paramName + "\")";
         }
-        if({{draw_potential_connections}}) {
-             parentDiv.querySelector("#connectionId").innerHTML = text;
-        }
-        else {
-            parentDiv.querySelector("#connectionId").innerHTML = "";
-        }
+        parentDiv.querySelector("#connectionId").innerHTML = "";
     }
     var n2BackgroundRect = n2Group.append("rect")
         .attr("class", "background")
@@ -188,26 +183,6 @@ function PtN2Diagram(parentDiv, modelData) {
             var param = d3RightTextNodesArrayZoomed[c],
                 unknown = d3RightTextNodesArrayZoomed[r];
             if (param.type !== "param" && unknown.type !== "unknown") return;
-            if (r > c && {{draw_potential_connections}}) { //bottom left
-                DrawPathTwoLines(
-                    n2Dx * r, //x1
-                    n2Dy * r + n2Dy * .5, //y1
-                    n2Dx * c + n2Dx * .5, //left x2
-                    n2Dy * r + n2Dy * .5, //left y2
-                    n2Dx * c + n2Dx * .5, //up x3
-                    n2Dy * c + n2Dy - 1e-2, //up y3
-                    "blue", lineWidth, true);
-            }
-            else if (r < c && {{draw_potential_connections}}) { //top right
-                DrawPathTwoLines(
-                    n2Dx * r + n2Dx, //x1
-                    n2Dy * r + n2Dy * .5, //y1
-                    n2Dx * c + n2Dx * .5, //right x2
-                    n2Dy * r + n2Dy * .5, //right y2
-                    n2Dx * c + n2Dx * .5, //down x3
-                    n2Dy * c + 1e-2, //down y3
-                    "blue", lineWidth, true);
-            }
             var leftTextWidthR = d3RightTextNodesArrayZoomed[r].nameWidthPx,
                 leftTextWidthC = d3RightTextNodesArrayZoomed[c].nameWidthPx;
             DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * r, leftTextWidthR, n2Dy, "blue"); //highlight var name
@@ -223,9 +198,6 @@ function PtN2Diagram(parentDiv, modelData) {
                     "<b>" + zoomedElement.promotions[unknown.absPathName] + "</b>" :
                     ((zoomedElement === root) ? unknown.absPathName : unknown.absPathName.slice(zoomedElement.absPathName.length + 1));
 
-                if({{draw_potential_connections}}) {
-                    parentDiv.querySelector("#connectionId").innerHTML += "<br /><i style=\"color:red;\">self.connect(\"" + unknownName + "\", \"" + paramName + "\")</i>";
-                }
             }
         });
 
