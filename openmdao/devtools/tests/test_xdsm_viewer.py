@@ -13,6 +13,7 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.test_suite.components.sellar import SellarNoDerivatives, SellarDis1, SellarDis2
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
+from openmdao.utils.assert_utils import assert_warning
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -517,6 +518,36 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
+    def test_pyxdsm_right_outputs(self):
+        """Makes XDSM for the Sellar problem"""
+        filename = 'xdsm_outputs_on_the_right'
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET,
+                   output_side='right')
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+
+        filename = 'xdsm_outputs_side_mixed'
+        # Write output
+        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET,
+                   output_side={'optimization': 'left', 'default': 'right'})
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+
 
 class TestXDSMjsViewer(unittest.TestCase):
 
@@ -943,6 +974,31 @@ class TestXDSMjsViewer(unittest.TestCase):
         write_xdsm(p, 'xdsmjs_circuit', out_format='html', quiet=QUIET, show_browser=False,
                    recurse=True)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
+
+    def test_xdsmjs_right_outputs(self):
+        """Makes XDSM for the Sellar problem"""
+        filename = 'xdsmjs_outputs_on_the_right'
+        prob = Problem()
+        prob.model = model = SellarNoDerivatives()
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', equals=np.zeros(1))
+        model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        msg = 'Right side outputs not implemented for XDSMjs.'
+
+        # Write output
+        with assert_warning(Warning, msg):
+            write_xdsm(prob, filename=filename, out_format='html', show_browser=False, quiet=QUIET,
+                       output_side='right')
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
     def test_wrong_out_format(self):
         """Incorrect output format error."""
