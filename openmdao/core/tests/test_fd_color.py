@@ -71,7 +71,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined for easier testing of coloring of approx partials
     def apply_nonlinear(self, inputs, outputs, residuals):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs._data) - outputs._data
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
