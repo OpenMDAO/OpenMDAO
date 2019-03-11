@@ -33,7 +33,8 @@ class TestKeplersEquation(unittest.TestCase):
 
         bal = BalanceComp()
 
-        def guess_function(inputs, outputs):
+        def guess_function(inputs, outputs, residuals):
+            # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
             return inputs['M']
 
         bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M',
