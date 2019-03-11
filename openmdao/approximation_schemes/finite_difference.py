@@ -282,8 +282,9 @@ class FiniteDifference(ApproximationScheme):
         inputs._data[:] = self._starting_ins
 
         # if results_vec are the residuals then we need to remove the delta's we added earlier.
-        for arr, idxs in idx_info:
-            if not total and arr is outputs:
-                arr._data[idxs] -= delta
+        if not total:
+            for arr, idxs in idx_info:
+                if arr is outputs:
+                    arr._data[idxs] -= delta
 
         return self._results_tmp

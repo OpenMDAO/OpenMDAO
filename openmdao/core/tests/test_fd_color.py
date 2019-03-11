@@ -141,6 +141,8 @@ def _check_total_matrix(system, jac, expected):
 
 
 class TestCSColoring(unittest.TestCase):
+    FD_METHOD = 'cs'
+
     def test_simple_totals(self):
         prob = Problem()
         model = prob.model = Group(dynamic_derivs_repeats=1)
@@ -158,8 +160,8 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
-        model.set_approx_coloring('*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.set_approx_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -193,8 +195,8 @@ class TestCSColoring(unittest.TestCase):
 
         model.nonlinear_solver = NonlinearBlockGS()
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, 'cs', isplit=2, osplit=2))
-        model.set_approx_coloring('*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.set_approx_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -227,8 +229,8 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
-        model.set_approx_coloring('*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.set_approx_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -262,8 +264,9 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
-        model.set_approx_coloring('*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        model.set_approx_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -297,8 +300,9 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2))
-        model.set_approx_coloring('*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        model.set_approx_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -320,20 +324,21 @@ class TestCSColoring(unittest.TestCase):
         model = prob.model
 
         sparsity = np.array(
-            [[1, 0, 0, 1, 1],
-             [0, 1, 0, 1, 0],
-             [0, 1, 0, 1, 1],
-             [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 1]], dtype=float
+            [[1, 0, 0, 1, 1, 1, 0],
+             [0, 1, 0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1, 1, 0],
+             [1, 0, 0, 0, 0, 1, 0],
+             [0, 1, 1, 0, 1, 1, 1]], dtype=float
         )
 
         indeps = IndepVarComp()
-        indeps.add_output('x0', np.ones(3))
-        indeps.add_output('x1', np.ones(2))
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, 'cs', isplit=2, osplit=2, dynamic_derivs_repeats=1))
-        comp.set_approx_coloring('x*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2, dynamic_derivs_repeats=1))
+        comp.set_approx_coloring('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -350,20 +355,21 @@ class TestCSColoring(unittest.TestCase):
         model = prob.model
 
         sparsity = np.array(
-            [[1, 0, 0, 1, 1],
-             [0, 1, 0, 1, 0],
-             [0, 1, 0, 1, 1],
-             [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 1]], dtype=float
-        )
-
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+            )
+    
         indeps = IndepVarComp()
-        indeps.add_output('x0', np.ones(3))
-        indeps.add_output('x1', np.ones(2))
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
 
         model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=2, osplit=2, dynamic_derivs_repeats=1))
-        comp.set_approx_coloring('x*', method='cs')
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2, dynamic_derivs_repeats=1))
+        comp.set_approx_coloring('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -374,6 +380,11 @@ class TestCSColoring(unittest.TestCase):
         comp._linearize()
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
+
+
+class TestFDColoring(TestCSColoring):
+    FD_METHOD = 'fd'
+
 
 if __name__ == '__main__':
     unitest.main()

@@ -33,8 +33,6 @@ except ImportError:
     PETScVector = None
 
 
-FD_METHOD = os.environ.get('FD_METHOD', 'fd')
-
 class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_paraboloid(self):
