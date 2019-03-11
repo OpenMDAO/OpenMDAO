@@ -205,18 +205,20 @@ class pyOptSparseDriver(Driver):
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
         con_meta = self._cons
+        model_ran = False
         if optimizer in run_required or np.any([con['linear'] for con in itervalues(self._cons)]):
             with RecordingDebugging(optimizer, self.iter_count, self) as rec:
                 # Initial Run
                 model._solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
+                model_ran = True
             self.iter_count += 1
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_sparsity:
             if self.options['dynamic_simul_derivs']:
-                coloring_mod.dynamic_simul_coloring(self, run_model=optimizer not in run_required,
+                coloring_mod.dynamic_simul_coloring(self, run_model=not model_ran,
                                                     do_sparsity=True)
             elif self.options['dynamic_derivs_sparsity']:
                 coloring_mod.dynamic_sparsity(self)
