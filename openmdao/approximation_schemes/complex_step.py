@@ -96,8 +96,23 @@ class ComplexStep(ApproximationScheme):
         else:
             return (approx_tuple[1], options['form'], options['step'], options['directional'])
 
-    def _get_approx_data(self, system, key):
-        wrt, form, delta, directional = key
+    def _get_approx_data(self, system, data):
+        """
+        Given approximation metadata, compute necessary delta for complex step.
+
+        Parameters
+        ----------
+        system : System
+            System whose derivatives are being approximated.
+        data : tuple
+            Tuple of the form (wrt, form, delta, directional)
+
+        Returns
+        -------
+        float
+            Delta needed for complex step perturbation.
+        """
+        wrt, form, delta, directional = data
         if form == 'reverse':
             delta *= -1.0
         delta *= 1j

@@ -4,6 +4,7 @@ from __future__ import print_function, division
 from six import iteritems
 from itertools import groupby
 from collections import defaultdict, OrderedDict
+from scipy.sparse import coo_matrix
 import numpy as np
 from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
     update_sizes, get_input_idx_split, _get_jac_slice_dict
@@ -285,46 +286,47 @@ class ApproximationScheme(object):
         mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
-        Jcolored = None
-        colored_data = None
+        colored_j = False
+        jrows = []
+        jcols = []
+        jdata = []
 
         approx_groups = self._get_approx_groups(system, under_cs)
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
             if wrt is None:  # colored
-                row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
+                colored_j = True
                 # Run the complex step
                 if fd_count % num_par_fd == system._par_fd_id:
                     result = self._run_point(system, idx_info, data, results_array, total)
-                    if Jcolored is None:
-                        tmpJ['@matrix'] = Jcolored = np.zeros((tmpJ['@nrows'], tmpJ['@ncols']))
-                        colored_data = data
-                    if is_parallel:
-                        if par_fd_w_serial_model:
-                            # TODO: this could be more efficient for the case of parallel FD
-                            # using a serial model in each proc, because all outputs would be
-                            # local to each proc so we could save the whole column instead of
-                            # looping over the outputs individually.
-                            raise NotImplementedError("simul approx w/par FD not supported yet")
-                        else:
-                            raise NotImplementedError("simul approx coloring with par FD is "
-                                                      "only supported currently when using "
-                                                      "a serial model, i.e., when "
-                                                      "num_par_fd == number of MPI procs.")
-                    else:  # serial colored
+                    if par_fd_w_serial_model or not is_parallel:
+                        row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
                         if row_map is not None:
                             if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = self._collect_result(result[row_map])
+                                nrows = tmpJ['@nrows']
+                                jrows.extend(range(nrows))
+                                jcols.extend(col_idxs * nrows)  # col_idxs is size 1 here
+                                jdata.extend(self._collect_result(result[row_map]))
                             else:
                                 for i, col in enumerate(col_idxs):
-                                    Jcolored[nz_rows[i], col] = \
-                                        self._collect_result(result[row_map[nz_rows[i]]])
+                                    jrows.extend(nz_rows[i])
+                                    jcols.extend([col] * len(nz_rows[i]))
+                                    jdata.extend(self._collect_result(result[row_map[nz_rows[i]]]))
                         else:
                             if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = self._collect_result(result)
+                                nrows = tmpJ['@nrows']
+                                jrows.extend(range(nrows))
+                                jcols.extend(col_idxs * nrows)
+                                jdata.extend(self._collect_result(result))
                             else:
                                 for i, col in enumerate(col_idxs):
-                                    Jcolored[nz_rows[i], col] = \
-                                        self._collect_result(result[nz_rows[i]])
+                                    jrows.extend(nz_rows[i])
+                                    jcols.extend([col] * len(nz_rows[i]))
+                                    jdata.extend(self._collect_result(result[nz_rows[i]]))
+                    else:  # parallel model (some vars are remote)
+                        raise NotImplementedError("simul approx coloring with par FD is "
+                                                  "only supported currently when using "
+                                                  "a serial model, i.e., when "
+                                                  "num_par_fd == number of MPI procs.")
                 fd_count += 1
             else:  # uncolored
                 J = tmpJ[wrt]
@@ -348,29 +350,47 @@ class ApproximationScheme(object):
                     fd_count += 1
 
         mult = self._get_multiplier(data)
-        if Jcolored is not None and mult != 1.0:
-            Jcolored *= mult
+        if colored_j:  # coloring is active
+            if par_fd_w_serial_model:
+                Jcolored = mycomm.allgather((jrows, jcols, jdata))
+                allrows = np.hstack(rows for rows, _, _ in Jcolored if rows)
+                allcols = np.hstack(cols for _, cols, _ in Jcolored if cols)
+                alldata = np.hstack(dat for _, _, dat in Jcolored if dat)
 
-        if is_parallel:
+                Jcolored = coo_matrix((alldata, (allrows, allcols)),
+                                      shape=(tmpJ['@nrows'], tmpJ['@ncols']))
+
+            elif is_parallel:
+                pass
+            else:  # serial colored
+                Jcolored = coo_matrix((jdata, (jrows, jcols)))
+
+            if mult != 1.0:
+                Jcolored.data *= mult
+
+        elif is_parallel:
             results = _gather_jac_results(mycomm, results)
+
+        if colored_j:
+            # convert COO matrix to dense for easier slicing
+            Jcolored = Jcolored.toarray()
 
         for wrt, data, _, tmpJ, _, _ in approx_groups:
             if wrt is None:  # colored
-                mat = tmpJ['@matrix']
                 # TODO: coloring when using parallel FD and/or FD with remote comps
                 for key, slc in iteritems(tmpJ['@jac_slices']):
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = mat[slc]
+                        jac[key] = Jcolored[slc]
                         jac._override_checks = False
                     else:
-                        jac[key] = mat[slc]
+                        jac[key] = Jcolored[slc]
 
                 tmpJ['matrix'] = None  # reclaim memory
             else:
                 ofs = tmpJ[wrt]['ofs']
                 for of in ofs:
-                    oview, oidxs = ofs[of]
+                    oview, _ = ofs[of]
                     if is_parallel:
                         for i, result in results[(of, wrt)]:
                             oview[:, i] = result

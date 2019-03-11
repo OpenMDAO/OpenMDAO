@@ -361,7 +361,7 @@ class TestCSColoring(unittest.TestCase):
                  [1, 0, 0, 0, 0, 1, 0],
                  [0, 1, 1, 0, 1, 1, 1]], dtype=float
             )
-    
+
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))
         indeps.add_output('x1', np.ones(3))
@@ -384,6 +384,46 @@ class TestCSColoring(unittest.TestCase):
 
 class TestFDColoring(TestCSColoring):
     FD_METHOD = 'fd'
+
+
+class TestCSColoringParallelFD(unittest.TestCase):
+    N_PROCS = 4
+    FD_METHOD = 'cs'
+
+    def test_simple_totals_all_local_vars(self):
+        # in this case, num_par_fd == N_PROCS, so each proc has local versions of all vars
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1, num_par_fd=4)
+
+        sparsity = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+            )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0')
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        derivs = prob.driver._compute_totals()
+        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        _check_total_matrix(model, derivs, sparsity)
 
 
 if __name__ == '__main__':

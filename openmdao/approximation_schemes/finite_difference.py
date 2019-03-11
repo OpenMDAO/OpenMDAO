@@ -155,8 +155,23 @@ class FiniteDifference(ApproximationScheme):
             return (approx_tuple[1], options['form'], options['order'],
                     options['step'], options['step_calc'], options['directional'])
 
-    def _get_approx_data(self, system, key):
-        wrt, form, order, step, step_calc, _ = key
+    def _get_approx_data(self, system, data):
+        """
+        Given approximation metadata, compute necessary deltas and coefficients.
+
+        Parameters
+        ----------
+        system : System
+            System whose derivatives are being approximated.
+        data : tuple
+            Tuple of the form (wrt, form, order, step, step_calc, directional)
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (deltas, coeffs, current_coeff)
+        """
+        wrt, form, order, step, step_calc, _ = data
 
         # FD forms are written as a collection of changes to inputs (deltas) and the associated
         # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its

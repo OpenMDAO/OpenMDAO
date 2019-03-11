@@ -951,7 +951,7 @@ def color_iterator(coloring, direction):
         if i == 0:
             # first chunk is a list of uncolored columns
             for c in col_chunk:
-                yield [c], None
+                yield [c], [nz_rows[c]]
         else:
             yield col_chunk, [nz_rows[c] for c in col_chunk]
 
