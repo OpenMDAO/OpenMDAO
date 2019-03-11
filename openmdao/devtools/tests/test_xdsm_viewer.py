@@ -13,6 +13,7 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.test_suite.components.sellar import SellarNoDerivatives, SellarDis1, SellarDis2
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
+from openmdao.utils.assert_utils import assert_warning
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -989,9 +990,12 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
+        msg = 'Right side outputs not implemented for XDSMjs.'
+
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', show_browser=False, quiet=QUIET,
-                   output_side='right')
+        with assert_warning(Warning, msg):
+            write_xdsm(prob, filename=filename, out_format='html', show_browser=False, quiet=QUIET,
+                       output_side='right')
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
