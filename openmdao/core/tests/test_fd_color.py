@@ -65,6 +65,8 @@ class SparseCompImplicit(ImplicitComponent):
         self.isplit = isplit
         self.osplit = osplit
         self.method = method
+        self._apply_nonlinear_count = 0
+        self._solve_nonlinear_count = 0
 
     def setup(self):
         setup_vars(self, ofs='*', wrts='*')
@@ -78,6 +80,7 @@ class SparseCompImplicit(ImplicitComponent):
             end += outputs[outname].size
             residuals[outname] = prod[start:end]
             start = end
+        self._apply_nonlinear_count += 1
 
     # this is defined so we can more easily test coloring of approx totals in a Group above this comp
     def solve_nonlinear(self, inputs, outputs):
@@ -88,6 +91,7 @@ class SparseCompImplicit(ImplicitComponent):
             end += outputs[outname].size
             outputs[outname] = prod[start:end]
             start = end
+        self._solve_nonlinear_count += 1
 
 
 class SparseCompExplicit(ExplicitComponent):
@@ -98,6 +102,7 @@ class SparseCompExplicit(ExplicitComponent):
         self.isplit = isplit
         self.osplit = osplit
         self.method = method
+        self._nruns = 0
 
     def setup(self):
         setup_vars(self, ofs='*', wrts='*')
@@ -110,6 +115,7 @@ class SparseCompExplicit(ExplicitComponent):
             end += outputs[outname].size
             outputs[outname] = prod[start:end]
             start = end
+        self._nruns += 1
 
 
 def _check_partial_matrix(system, jac, expected):
@@ -386,14 +392,14 @@ class TestFDColoring(TestCSColoring):
     FD_METHOD = 'fd'
 
 
-class TestCSColoringParallelFD(unittest.TestCase):
+class TestColoringParallelCS(unittest.TestCase):
     N_PROCS = 4
     FD_METHOD = 'cs'
 
     def test_simple_totals_all_local_vars(self):
         # in this case, num_par_fd == N_PROCS, so each proc has local versions of all vars
         prob = Problem()
-        model = prob.model = Group(dynamic_derivs_repeats=1, num_par_fd=4)
+        model = prob.model = Group(dynamic_derivs_repeats=1, num_par_fd=self.N_PROCS)
 
         sparsity = np.array(
                 [[1, 0, 0, 1, 1, 1, 0],
@@ -420,10 +426,85 @@ class TestCSColoringParallelFD(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
+        print(self.FD_METHOD, prob.comm.rank, "NUM_RUNS after run_model:", comp._nruns)
+        old = comp._nruns
 
         derivs = prob.driver._compute_totals()
+        print(self.FD_METHOD, prob.comm.rank, "NUM_RUNS after uncolored compute_totals:", comp._nruns - old)
+        old = comp._nruns
         derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        print(self.FD_METHOD, prob.comm.rank, "NUM_RUNS after colored compute_totals:", comp._nruns - old)
         _check_total_matrix(model, derivs, sparsity)
+
+    def test_simple_partials_implicit(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1, 1, 0],
+             [0, 1, 0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1, 1, 0],
+             [1, 0, 0, 0, 0, 1, 0],
+             [0, 1, 1, 0, 1, 1, 1]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2,
+                                                              dynamic_derivs_repeats=1,
+                                                              num_par_fd=self.N_PROCS))
+        comp.set_approx_coloring('x*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        comp._linearize()
+        comp._linearize()
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
+
+    def test_simple_partials_explicit(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+            )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2,
+                                                              dynamic_derivs_repeats=1,
+                                                              num_par_fd=self.N_PROCS))
+        comp.set_approx_coloring('x*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        comp._linearize()
+        comp._linearize()
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
+
+
+class TestColoringParallelFD(TestColoringParallelCS):
+    FD_METHOD = 'fd'
 
 
 if __name__ == '__main__':

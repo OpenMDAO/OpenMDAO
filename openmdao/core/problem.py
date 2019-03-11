@@ -1237,7 +1237,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=None, form='forward', step_calc='abs'):
+                     method='fd', step=None, form=None, step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1271,7 +1271,7 @@ class Problem(object):
             'cs'.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
-            'forward'.
+            None, which defaults to 'forward' for FD.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.

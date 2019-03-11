@@ -286,7 +286,7 @@ class ApproximationScheme(object):
         mycomm = system._full_comm if use_parallel_fd else system.comm
 
         fd_count = 0
-        colored_j = False
+        colored_shape = None
         jrows = []
         jcols = []
         jdata = []
@@ -294,7 +294,7 @@ class ApproximationScheme(object):
         approx_groups = self._get_approx_groups(system, under_cs)
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
             if wrt is None:  # colored
-                colored_j = True
+                colored_shape = (tmpJ['@nrows'], tmpJ['@ncols'])
                 # Run the complex step
                 if fd_count % num_par_fd == system._par_fd_id:
                     result = self._run_point(system, idx_info, data, results_array, total)
@@ -350,7 +350,7 @@ class ApproximationScheme(object):
                     fd_count += 1
 
         mult = self._get_multiplier(data)
-        if colored_j:  # coloring is active
+        if colored_shape is not None:  # coloring is active
             if par_fd_w_serial_model:
                 Jcolored = mycomm.allgather((jrows, jcols, jdata))
                 allrows = np.hstack(rows for rows, _, _ in Jcolored if rows)
@@ -358,7 +358,7 @@ class ApproximationScheme(object):
                 alldata = np.hstack(dat for _, _, dat in Jcolored if dat)
 
                 Jcolored = coo_matrix((alldata, (allrows, allcols)),
-                                      shape=(tmpJ['@nrows'], tmpJ['@ncols']))
+                                      shape=colored_shape)
 
             elif is_parallel:
                 pass
@@ -368,10 +368,10 @@ class ApproximationScheme(object):
             if mult != 1.0:
                 Jcolored.data *= mult
 
-        elif is_parallel:
+        elif is_parallel:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
 
-        if colored_j:
+        if colored_shape is not None:
             # convert COO matrix to dense for easier slicing
             Jcolored = Jcolored.toarray()
 

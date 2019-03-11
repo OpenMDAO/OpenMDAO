@@ -18,7 +18,6 @@ from openmdao.utils.name_maps import rel_name2abs_name
 
 DEFAULT_CS_OPTIONS = {
     'step': 1e-40,
-    'form': 'forward',
     'directional': False,
 }
 
@@ -86,15 +85,15 @@ class ComplexStep(ApproximationScheme):
         Returns
         -------
         tuple(str, str, float)
-            Sorting key (wrt, form, step_size, directional)
+            Sorting key (wrt, step_size, directional)
 
         """
         options = approx_tuple[2]
         if 'coloring' in options and options['coloring'] is not None:
             # this will only happen after the coloring has been computed
-            return ('@color', options['form'], options['step'], options['directional'])
+            return ('@color', options['step'], options['directional'])
         else:
-            return (approx_tuple[1], options['form'], options['step'], options['directional'])
+            return (approx_tuple[1], options['step'], options['directional'])
 
     def _get_approx_data(self, system, data):
         """
@@ -105,16 +104,14 @@ class ComplexStep(ApproximationScheme):
         system : System
             System whose derivatives are being approximated.
         data : tuple
-            Tuple of the form (wrt, form, delta, directional)
+            Tuple of the form (wrt, delta, directional)
 
         Returns
         -------
         float
             Delta needed for complex step perturbation.
         """
-        wrt, form, delta, directional = data
-        if form == 'reverse':
-            delta *= -1.0
+        wrt, delta, directional = data
         delta *= 1j
         return delta
 

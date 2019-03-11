@@ -1683,7 +1683,7 @@ class Group(System):
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
-    def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, has_diag_jac=False,
+    def set_approx_coloring(self, wrt, method='fd', form=None, step=None, has_diag_jac=False,
                             directory=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).

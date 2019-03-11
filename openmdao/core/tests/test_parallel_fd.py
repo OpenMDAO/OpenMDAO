@@ -29,7 +29,6 @@ class ScalableComp(ExplicitComponent):
         self._mult = mult
         self._add = add
 
-
     def setup(self):
         self._ncalls = 0
 
@@ -260,7 +259,7 @@ class MatMultTestCase(unittest.TestCase):
             else:
                 mat = None
             mat = MPI.COMM_WORLD.bcast(mat, root=0)
-            
+
             #import wingdbstub
         else:
             mat = np.random.random(5 * size).reshape((5, size)) - 0.5
