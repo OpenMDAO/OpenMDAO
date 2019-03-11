@@ -210,18 +210,37 @@ class FiniteDifference(ApproximationScheme):
 
         self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
 
-    def _cleanup(self, system):
-        self._starting_ins = self._starting_outs = None
+        # reclaim some memory
+        self._starting_ins = self._starting_outs = self._results_tmp = None
 
-    def _unscale(self, value, data):
-        return value
+    def _get_multiplier(self, data):
+        return 1.0
 
-    def _collect_result(self, array, copy):
-        if copy:
-            return array.copy()
+    def _collect_result(self, array):
         return array
 
     def _run_point(self, system, idx_info, data, results_array, total):
+        """
+        Alter the specified inputs by the given deltas, run the system, and return the results.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
+        idx_info : tuple of (ndarray of int, ndarray of float)
+            Tuple of wrt indices and corresponding data array to perturb.
+        data : tuple of float
+            Tuple of the form (deltas, coeffs, current_coeff)
+        results_array : ndarray
+            Where the results will be stored.
+        total : bool
+            If True total derivatives are being approximated, else partials.
+
+        Returns
+        -------
+        ndarray
+            The results from running the perturbed system.
+        """
         deltas, coeffs, current_coeff = data
 
         if current_coeff:
@@ -242,7 +261,7 @@ class FiniteDifference(ApproximationScheme):
 
     def _run_sub_point(self, system, idx_info, delta, total):
         """
-        Alter the specified inputs by the given deltas, runs the system, and returns the results.
+        Alter the specified inputs by the given delta, run the system, and return the results.
 
         Parameters
         ----------

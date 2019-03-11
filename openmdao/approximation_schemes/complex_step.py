@@ -140,22 +140,18 @@ class ComplexStep(ApproximationScheme):
 
         self._compute_approximations(system, jac, total, under_cs=True)
 
-    def _cleanup(self, system):
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _unscale(self, value, delta):
-        value *= (1.0 / delta * 1j).real
-        return value
+    def _get_multiplier(self, delta):
+        return (1.0 / delta * 1j).real
 
-    def _collect_result(self, array, copy):
-        if copy:
-            return array.imag.copy()
+    def _collect_result(self, array):
         return array.imag
 
     def _run_point(self, system, idx_info, delta, result_array, total):
         """
-        Perturb the system inputs with a complex step, runs, and returns the results.
+        Perturb the system inputs with a complex step, run, and return the results.
 
         Parameters
         ----------
@@ -166,7 +162,7 @@ class ComplexStep(ApproximationScheme):
         delta : complex
             Perturbation amount.
         result_array : ndarray
-            An array copied from the outputs vector. Used to store the results.
+            An array used to store the results.
         total : bool
             If True total derivatives are being approximated, else partials.
 

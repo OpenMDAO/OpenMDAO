@@ -313,20 +313,18 @@ class ApproximationScheme(object):
                     else:  # serial colored
                         if row_map is not None:
                             if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = self._collect_result(result[row_map],
-                                                                                copy=False)
+                                Jcolored[:, col_idxs[0]] = self._collect_result(result[row_map])
                             else:
                                 for i, col in enumerate(col_idxs):
                                     Jcolored[nz_rows[i], col] = \
-                                        self._collect_result(result[row_map[nz_rows[i]]],
-                                                             copy=False)
+                                        self._collect_result(result[row_map[nz_rows[i]]])
                         else:
                             if nz_rows is None:  # uncolored column
-                                Jcolored[:, col_idxs[0]] = self._collect_result(result, copy=False)
+                                Jcolored[:, col_idxs[0]] = self._collect_result(result)
                             else:
                                 for i, col in enumerate(col_idxs):
                                     Jcolored[nz_rows[i], col] = \
-                                        self._collect_result(result[nz_rows[i]], copy=False)
+                                        self._collect_result(result[nz_rows[i]])
                 fd_count += 1
             else:  # uncolored
                 J = tmpJ[wrt]
@@ -342,16 +340,16 @@ class ApproximationScheme(object):
                                 if owns[of] == iproc:
                                     results[(of, wrt)].append(
                                         (i_count,
-                                         self._collect_result(result[out_slices[of]][out_idxs],
-                                                              copy=True)))
+                                         self._collect_result(
+                                             result[out_slices[of]][out_idxs]).copy()))
                         else:
-                            J['data'][:, i_count] = self._collect_result(result[J['full_out_idxs']],
-                                                                         copy=False)
+                            J['data'][:, i_count] = self._collect_result(result[J['full_out_idxs']])
 
                     fd_count += 1
 
-        if Jcolored is not None:
-            Jcolored = self._unscale(Jcolored, data)
+        mult = self._get_multiplier(data)
+        if Jcolored is not None and mult != 1.0:
+            Jcolored *= mult
 
         if is_parallel:
             results = _gather_jac_results(mycomm, results)
@@ -377,15 +375,13 @@ class ApproximationScheme(object):
                         for i, result in results[(of, wrt)]:
                             oview[:, i] = result
 
-                    oview = self._unscale(oview, data)
+                    oview *= mult
                     if uses_voi_indices:
                         jac._override_checks = True
                         jac[(of, wrt)] = oview
                         jac._override_checks = False
                     else:
                         jac[(of, wrt)] = oview
-
-        self._cleanup(system)
 
 
 def _gather_jac_results(comm, results):
