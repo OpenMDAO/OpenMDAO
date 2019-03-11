@@ -919,25 +919,6 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         prob.model.bad._vectors['residual']['linear']['x'] = 111.
 
 
-class QuadGroup(Group):
-    def setup(self):
-        comp1 = self.add_subsystem('comp1', IndepVarComp())
-        comp1.add_output('a', 1.0)
-        comp1.add_output('b', 1.0)
-        comp1.add_output('c', 1.0)
-
-        sub = self.add_subsystem('sub', Group())
-        sub.add_subsystem('comp2', QuadraticComp())
-        sub.add_subsystem('comp3', QuadraticComp())
-
-        self.connect('comp1.a', 'sub.comp2.a')
-        self.connect('comp1.b', 'sub.comp2.b')
-        self.connect('comp1.c', 'sub.comp2.c')
-        self.connect('comp1.a', 'sub.comp3.a')
-        self.connect('comp1.b', 'sub.comp3.b')
-        self.connect('comp1.c', 'sub.comp3.c')
-
-
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
