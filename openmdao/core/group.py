@@ -1661,9 +1661,8 @@ class Group(System):
         # Group finite difference
         if self._owns_approx_jac:
             jac = self._jacobian
-            with self._unscaled_context(outputs=[self._outputs]):
-                for approximation in itervalues(self._approx_schemes):
-                    approximation.compute_approximations(self, jac=jac, total=True)
+            for approximation in itervalues(self._approx_schemes):
+                approximation.compute_approximations(self, jac=jac, total=True)
         else:
             if self._assembled_jac is not None:
                 jac = self._assembled_jac
