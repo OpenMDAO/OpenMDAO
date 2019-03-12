@@ -65,8 +65,8 @@ class SparseCompImplicit(ImplicitComponent):
         self.isplit = isplit
         self.osplit = osplit
         self.method = method
-        self._apply_nonlinear_count = 0
-        self._solve_nonlinear_count = 0
+        self._nruns = 0
+
 
     def setup(self):
         setup_vars(self, ofs='*', wrts='*')
@@ -80,7 +80,8 @@ class SparseCompImplicit(ImplicitComponent):
             end += outputs[outname].size
             residuals[outname] = prod[start:end]
             start = end
-        self._apply_nonlinear_count += 1
+        self._nruns += 1
+
 
     # this is defined so we can more easily test coloring of approx totals in a Group above this comp
     def solve_nonlinear(self, inputs, outputs):
@@ -91,7 +92,7 @@ class SparseCompImplicit(ImplicitComponent):
             end += outputs[outname].size
             outputs[outname] = prod[start:end]
             start = end
-        self._solve_nonlinear_count += 1
+        self._nruns += 1
 
 
 class SparseCompExplicit(ExplicitComponent):
@@ -426,14 +427,22 @@ class TestColoringParallelCS(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        print(self.FD_METHOD, prob.comm.rank, "NUM_RUNS after run_model:", comp._nruns)
-        old = comp._nruns
+        start_nruns = comp._nruns
 
-        derivs = prob.driver._compute_totals()
-        print(self.FD_METHOD, prob.comm.rank, "NUM_RUNS after uncolored compute_totals:", comp._nruns - old)
-        old = comp._nruns
-        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
-        print(self.FD_METHOD, prob.comm.rank, "NUM_RUNS after colored compute_totals:", comp._nruns - old)
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        if model._full_comm:
+            nruns = model._full_comm.allreduce(nruns)
+        self.assertEqual(nruns, sparsity.shape[1])
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+
+        nruns = comp._nruns - start_nruns
+        if model._full_comm:
+            nruns = model._full_comm.allreduce(nruns)
+        self.assertEqual(nruns, model._approx_schemes[self.FD_METHOD].ncolors())
         _check_total_matrix(model, derivs, sparsity)
 
     def test_simple_partials_implicit(self):
@@ -464,8 +473,23 @@ class TestColoringParallelCS(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        comp._linearize()
-        comp._linearize()
+
+        start_nruns = comp._nruns
+        comp._linearize()  # uncolored
+        nruns = comp._nruns - start_nruns
+        if comp._full_comm:
+            nruns = comp._full_comm.allreduce(nruns)
+        # one run per column of jac
+        self.assertEqual(nruns, np.sum(sparsity.shape))
+
+        start_nruns = comp._nruns
+        comp._linearize()   # colored
+        # number of runs = ncolors + number of outputs (only input columns were colored here)
+        nruns = comp._nruns - start_nruns
+        if comp._full_comm:
+            nruns = comp._full_comm.allreduce(nruns)
+        self.assertEqual(nruns, comp._approx_schemes[self.FD_METHOD].ncolors() + sparsity.shape[0])
+
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
@@ -497,8 +521,24 @@ class TestColoringParallelCS(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        comp._linearize()
-        comp._linearize()
+
+        start_nruns = comp._nruns
+        comp._linearize()  # uncolored
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        if comp._full_comm:
+            nruns = comp._full_comm.allreduce(nruns)
+        self.assertEqual(nruns, sparsity.shape[1])
+
+        start_nruns = comp._nruns
+        comp._linearize()   # colored
+        # when colored, there is one approx group per color, so len(_approx_groups) gives number of colors
+        ncolors = len(comp._approx_schemes[self.FD_METHOD]._approx_groups)
+        nruns = comp._nruns - start_nruns
+        if comp._full_comm:
+            nruns = comp._full_comm.allreduce(nruns)
+        self.assertEqual(nruns, ncolors)
+
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 

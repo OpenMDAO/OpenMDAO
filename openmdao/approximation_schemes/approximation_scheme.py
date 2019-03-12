@@ -206,7 +206,6 @@ class ApproximationScheme(object):
                 tmpJ = {
                     '@nrows': coloring['nrows'],
                     '@ncols': coloring['ncols'],
-                    '@matrix': None,
                     '@out_slices': out_slices,
                 }
 
@@ -403,6 +402,12 @@ class ApproximationScheme(object):
                     else:
                         jac[(of, wrt)] = oview
 
+    def ncolors(self):
+        color_count = 0
+        for approx in self._approx_groups:
+            if approx[0] is None:
+                color_count += 1
+        return color_count
 
 def _gather_jac_results(comm, results):
     new_results = defaultdict(list)
