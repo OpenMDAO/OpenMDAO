@@ -959,7 +959,8 @@ class TestGroup(unittest.TestCase):
 
             def setup(self):
                 self.add_subsystem('comp0', ExecComp('y=x**2'))
-                self.add_subsystem('comp1', ExecComp('z=2*ext_input'), promotes_inputs=['ext_input'])
+                self.add_subsystem('comp1', ExecComp('z=2*external_input'),
+                                   promotes_inputs=['external_input'])
 
                 self.add_subsystem('balance', BalanceComp('x', val=2., lhs_name='y', rhs_name='z'),
                                    promotes_outputs=['x'])
@@ -974,20 +975,20 @@ class TestGroup(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, residuals):
                 # inputs are addressed using full path name, regardless of promotion
-                ext_input = inputs['comp1.ext_input']
+                external_input = inputs['comp1.external_input']
 
-                # balance drives, 2*ext_input = x**2
-                x_guess = (2*ext_input)**.5
+                # balance drives x**2 = 2*external_input
+                x_guess = (2*external_input)**.5
 
                 # outputs are addressed by the their promoted names
                 outputs['x'] = x_guess # perfect guess should converge in 0 iterations
 
         p = Problem()
 
-        p.model.add_subsystem('parameters', IndepVarComp('ext_input'))
+        p.model.add_subsystem('parameters', IndepVarComp('input_value', 1.))
         p.model.add_subsystem('discipline', Discipline())
 
-        p.model.connect('parameters.ext_input', 'discipline.ext_input')
+        p.model.connect('parameters.input_value', 'discipline.external_input')
 
         p.setup()
         p.run_model()
