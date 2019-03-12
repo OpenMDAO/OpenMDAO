@@ -532,12 +532,10 @@ class TestColoringParallelCS(unittest.TestCase):
 
         start_nruns = comp._nruns
         comp._linearize()   # colored
-        # when colored, there is one approx group per color, so len(_approx_groups) gives number of colors
-        ncolors = len(comp._approx_schemes[self.FD_METHOD]._approx_groups)
         nruns = comp._nruns - start_nruns
         if comp._full_comm:
             nruns = comp._full_comm.allreduce(nruns)
-        self.assertEqual(nruns, ncolors)
+        self.assertEqual(nruns, comp._approx_schemes[self.FD_METHOD].ncolors())
 
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
