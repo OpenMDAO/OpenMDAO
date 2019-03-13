@@ -43,9 +43,6 @@ def _view_model_setup_parser(parser):
                         help="don't display in a browser.")
     parser.add_argument('--embed', action='store_true', dest='embeddable',
                         help="create embeddable version.")
-    parser.add_argument('--draw_potential_connections', action='store_true',
-                        dest='draw_potential_connections',
-                        help="draw potential connections.")
 
 
 def _view_model_cmd(options):
@@ -65,8 +62,7 @@ def _view_model_cmd(options):
     def _viewmod(prob):
         view_model(prob, outfile=options.outfile,
                    show_browser=not options.no_browser,
-                   embeddable=options.embeddable,
-                   draw_potential_connections=options.draw_potential_connections)
+                   embeddable=options.embeddable)
         exit()  # could make this command line selectable later
     return _viewmod
 
