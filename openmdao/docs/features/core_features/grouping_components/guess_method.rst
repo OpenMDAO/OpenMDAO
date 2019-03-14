@@ -17,6 +17,11 @@ for another.  In this case, a `Discipline` group solves a system of equations
 using a :ref:`BalanceComp <balancecomp_feature>`. It answers the question: 
 "What is :math:`x` such that :math:`x^2` is equal to twice our input value".
 
+.. figure:: guess_example.png
+   :align: center
+   :width: 70%
+   :alt: Group guess_nonlinear Example
+
 Given our knowledge of the relationship between the two equations, we can supply
 an initial guess for the implicit state variable, :math:`x`, that makes it 
 unnecessary for the solver to iterate.
