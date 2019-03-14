@@ -27,7 +27,7 @@ other metadata. For example,
 
 .. code-block:: python
 
-    ExecComp('y=x', x={'units': 'ft'}, y={'units': 'm'})
+    ExecComp('xdot=x/t', x={'units': 'ft'}, t={'units': 's'}, xdot={'units': 'ft/s')
 
 Here is a list of the possible metadata that can be assigned to a variable in this way. The **Applies To** column indicates
 whether the metadata is appropriate for input variables, output variables, or both.
