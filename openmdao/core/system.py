@@ -1450,7 +1450,6 @@ class System(object):
         residuals : list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
         """
-        print('unscale begin')
         if self._has_output_scaling:
             for vec in outputs:
                 vec.scale('phys')
@@ -1467,7 +1466,6 @@ class System(object):
         for vec in residuals:
             if self._has_resid_scaling:
                 vec.scale('norm')
-        print('unscale end')
 
     @contextmanager
     def _unscaled_context_all(self):
@@ -1495,7 +1493,6 @@ class System(object):
         """
         Context manager that temporarily puts all vectors in a scaled state.
         """
-        print('scale all begin')
         if self._has_output_scaling:
             for vec in self._vectors['output'].values():
                 vec.scale('norm')
@@ -1511,7 +1508,6 @@ class System(object):
         if self._has_resid_scaling:
             for vec in self._vectors['residual'].values():
                 vec.scale('phys')
-        print('scale all end')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -2357,7 +2353,8 @@ class System(object):
 
         This calls _apply_nonlinear, but with the model assumed to be in an unscaled state.
         """
-        self._apply_nonlinear()
+        with self._scaled_context_all():
+            self._apply_nonlinear()
 
     def list_inputs(self,
                     values=True,
@@ -2633,7 +2630,8 @@ class System(object):
         This calls _solve_nonlinear, but with the model assumed to be in an unscaled state.
 
         """
-        self._solve_nonlinear()
+        with self._scaled_context_all():
+            self._solve_nonlinear()
 
     def run_apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
         """
