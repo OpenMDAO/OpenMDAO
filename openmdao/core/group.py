@@ -1660,10 +1660,16 @@ class Group(System):
         """
         # Group finite difference
         if self._owns_approx_jac:
-            with self._unscaled_context(outputs=[self._outputs]):
-                jac = self._jacobian
+            jac = self._jacobian
+            if self.pathname == "":
                 for approximation in itervalues(self._approx_schemes):
                     approximation.compute_approximations(self, jac=jac, total=True)
+            else:
+                # When an approximation exists in a submodel (instead of in root), the model is
+                # in a scaled state.
+                with self._unscaled_context(outputs=[self._outputs]):
+                    for approximation in itervalues(self._approx_schemes):
+                        approximation.compute_approximations(self, jac=jac, total=True)
 
         else:
             if self._assembled_jac is not None:

@@ -1344,10 +1344,8 @@ class _TotalJacInfo(object):
         model._setup_jacobians(recurse=False)
 
         # Linearize Model
-        print('start linearize')
         model._linearize(model._assembled_jac,
                          sub_do_ln=model._linear_solver._linearize_children())
-        print('end linearize')
 
         approx_jac = model._jacobian._subjacs_info
 
