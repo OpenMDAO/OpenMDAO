@@ -279,6 +279,30 @@ class TestSimpleGA(unittest.TestCase):
         np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
 
+    def test_vector_desvars(self):
+        prob = Problem()
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        indeps.add_output('x', 3)
+        indeps.add_output('y', [4.0, -4])
+
+        prob.model.add_subsystem('paraboloid',
+                                 ExecComp('f = (x+5)**2 + (y[0]-3)**2 + (y[1]-1)**2 - 3',
+                                          y=[0, 0]))
+        prob.model.connect('indeps.x', 'paraboloid.x')
+        prob.model.connect('indeps.y', 'paraboloid.y')
+
+        prob.driver = SimpleGADriver()
+
+        prob.model.add_design_var('indeps.x', lower=-5, upper=5)
+        prob.model.add_design_var('indeps.y', lower=[-10, 0], upper=[10, 3])
+        prob.model.add_objective('paraboloid.f')
+        prob.setup()
+        prob.run_driver()
+
+        np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
+        np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
+
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
